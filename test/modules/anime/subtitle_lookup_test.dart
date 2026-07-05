@@ -39,10 +39,16 @@ void main() {
   test(
     'persistent Hoshi renderer refreshes payload without reloading shell',
     () {
-      final script = hoshiReplaceRenderScript(3);
+      final script = hoshiReplaceRenderScriptForEntries([
+        {'expression': '払う'},
+      ]);
 
-      expect(script, contains('window.lookupEntries = undefined'));
-      expect(script, contains('window.entryCount = 3'));
+      expect(script, contains('__mangayomiHoshiRenderToken'));
+      expect(script, contains('window.lookupEntries = [{"expression":"払う"}]'));
+      expect(
+        script,
+        contains('window.entryCount = window.lookupEntries.length'),
+      );
       expect(script, contains('entries-container'));
       expect(script, contains('window.renderPopup()'));
       expect(script, isNot(contains('location.reload')));

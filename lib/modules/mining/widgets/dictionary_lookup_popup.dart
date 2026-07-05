@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,217 @@ import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
+
+class DictionaryPopupHandle {
+  const DictionaryPopupHandle({required this.dismiss, required this.dismissed});
+
+  final VoidCallback dismiss;
+  final Future<void> dismissed;
+}
+
+final _dictionaryPopupHost = _DictionaryPopupHostController();
+
+class _DictionaryPopupHostController {
+  final key = GlobalKey<_DictionaryPopupOverlayHostState>();
+  OverlayEntry? _entry;
+  Future<void>? _initializing;
+
+  Future<void> prewarm(BuildContext context) => _ensure(context);
+
+  Future<void> _ensure(BuildContext context) {
+    if (_entry != null) return Future.value();
+    return _initializing ??= _initialize(context);
+  }
+
+  Future<void> _initialize(BuildContext context) async {
+    final preferences = await MiningPreferences.getDictionaryPopupPreferences();
+    if (!context.mounted || _entry != null) return;
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _entry = OverlayEntry(
+      builder: (_) =>
+          _DictionaryPopupOverlayHost(key: key, preferences: preferences),
+    );
+    overlay.insert(_entry!);
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
+  Future<DictionaryPopupHandle?> show({
+    required BuildContext context,
+    required Rect anchor,
+    required String text,
+    required MiningContext miningContext,
+    ValueChanged<int>? onMatchChanged,
+    ValueChanged<bool>? onHoverChanged,
+  }) async {
+    await _ensure(context);
+    if (!context.mounted) return null;
+    return key.currentState?.present(
+      screen: MediaQuery.sizeOf(context),
+      anchor: anchor,
+      text: text,
+      miningContext: miningContext,
+      onMatchChanged: onMatchChanged,
+      onHoverChanged: onHoverChanged,
+    );
+  }
+}
+
+class _DictionaryPopupRequest {
+  const _DictionaryPopupRequest({
+    required this.text,
+    required this.miningContext,
+    required this.onMatchChanged,
+    required this.onHoverChanged,
+  });
+
+  final String text;
+  final MiningContext miningContext;
+  final ValueChanged<int>? onMatchChanged;
+  final ValueChanged<bool>? onHoverChanged;
+}
+
+class _DictionaryPopupOverlayHost extends StatefulWidget {
+  const _DictionaryPopupOverlayHost({super.key, required this.preferences});
+
+  final DictionaryPopupPreferences preferences;
+
+  @override
+  State<_DictionaryPopupOverlayHost> createState() =>
+      _DictionaryPopupOverlayHostState();
+}
+
+class _DictionaryPopupOverlayHostState
+    extends State<_DictionaryPopupOverlayHost> {
+  _DictionaryPopupRequest? _request;
+  Completer<void>? _dismissed;
+  bool _visible = false;
+  late double _left;
+  double _top = 0;
+  late double _width;
+  late double _height;
+
+  @override
+  void initState() {
+    super.initState();
+    _width = widget.preferences.width;
+    _height = widget.preferences.height;
+    _left = -_width - 100;
+  }
+
+  DictionaryPopupHandle present({
+    required Size screen,
+    required Rect anchor,
+    required String text,
+    required MiningContext miningContext,
+    ValueChanged<int>? onMatchChanged,
+    ValueChanged<bool>? onHoverChanged,
+  }) {
+    _completeDismissal();
+    final width = math.min(widget.preferences.width, screen.width - 24);
+    final height = math.min(widget.preferences.height, screen.height - 24);
+    final left = (anchor.center.dx - width / 2)
+        .clamp(12.0, math.max(12.0, screen.width - width - 12))
+        .toDouble();
+    final below = anchor.bottom + 8;
+    final top = below + height <= screen.height - 12
+        ? below
+        : math.max(12.0, anchor.top - height - 8);
+    final completer = Completer<void>();
+    setState(() {
+      _request = _DictionaryPopupRequest(
+        text: text,
+        miningContext: miningContext,
+        onMatchChanged: onMatchChanged,
+        onHoverChanged: onHoverChanged,
+      );
+      _dismissed = completer;
+      _visible = true;
+      _left = left;
+      _top = top;
+      _width = width;
+      _height = height;
+    });
+    return DictionaryPopupHandle(dismiss: dismiss, dismissed: completer.future);
+  }
+
+  void dismiss() {
+    if (!_visible) {
+      _completeDismissal();
+      return;
+    }
+    setState(() {
+      _visible = false;
+      _left = -_width - 100;
+      _top = 0;
+    });
+    _completeDismissal();
+  }
+
+  void _completeDismissal() {
+    final completer = _dismissed;
+    _dismissed = null;
+    if (completer != null && !completer.isCompleted) completer.complete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final request = _request;
+    final popupTheme = _popupTheme(Theme.of(context), widget.preferences.theme);
+    return Stack(
+      children: [
+        if (_visible)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: dismiss,
+              child: const ColoredBox(color: Colors.transparent),
+            ),
+          ),
+        Positioned(
+          left: _left,
+          top: _top,
+          width: _width,
+          height: _height,
+          child: IgnorePointer(
+            ignoring: !_visible,
+            child: MouseRegion(
+              onEnter: (_) => request?.onHoverChanged?.call(true),
+              onExit: (_) => request?.onHoverChanged?.call(false),
+              child: Theme(
+                data: popupTheme.copyWith(
+                  textTheme: popupTheme.textTheme.apply(
+                    fontSizeFactor: widget.preferences.fontSize / 14,
+                  ),
+                ),
+                child: Material(
+                  elevation: _visible && !widget.preferences.eInkMode ? 12 : 0,
+                  clipBehavior: Clip.antiAlias,
+                  borderRadius: BorderRadius.circular(
+                    widget.preferences.eInkMode ? 0 : 8,
+                  ),
+                  color: popupTheme.colorScheme.surface,
+                  child: HoshiDictionaryPopup(
+                    text: request?.text ?? '',
+                    miningContext: request?.miningContext,
+                    preferences: widget.preferences,
+                    onMatchChanged: (count) =>
+                        _request?.onMatchChanged?.call(count),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _completeDismissal();
+    super.dispose();
+  }
+}
 
 class DictionaryLookupPopup extends StatelessWidget {
   const DictionaryLookupPopup({
@@ -27,57 +239,28 @@ class DictionaryLookupPopup extends StatelessWidget {
   final VoidCallback onClose;
   final DictionaryPopupPreferences preferences;
 
-  static Future<void> show({
+  static Future<DictionaryPopupHandle?> show({
     required BuildContext context,
     required Rect anchor,
     required String text,
     required MiningContext miningContext,
     ValueChanged<int>? onMatchChanged,
+    ValueChanged<bool>? onHoverChanged,
   }) async {
     final lookupText = text.trim();
-    if (lookupText.isEmpty) return;
-    final preferences = await MiningPreferences.getDictionaryPopupPreferences();
-    if (!context.mounted) return;
-    final overlay = Overlay.of(context, rootOverlay: true);
-    final screen = MediaQuery.sizeOf(context);
-    final width = math.min(preferences.width, screen.width - 24);
-    final height = math.min(preferences.height, screen.height - 24);
-    final left = (anchor.center.dx - width / 2)
-        .clamp(12.0, math.max(12.0, screen.width - width - 12))
-        .toDouble();
-    final below = anchor.bottom + 8;
-    final top = below + height <= screen.height - 12
-        ? below
-        : math.max(12.0, anchor.top - height - 8);
-    late final OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (_) => Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: entry.remove,
-              child: const ColoredBox(color: Colors.transparent),
-            ),
-          ),
-          Positioned(
-            left: left,
-            top: top,
-            width: width,
-            height: height,
-            child: DictionaryLookupPopup(
-              text: lookupText,
-              miningContext: miningContext,
-              onMatchChanged: onMatchChanged ?? (_) {},
-              onClose: entry.remove,
-              preferences: preferences,
-            ),
-          ),
-        ],
-      ),
+    if (lookupText.isEmpty) return null;
+    return _dictionaryPopupHost.show(
+      context: context,
+      anchor: anchor,
+      text: lookupText,
+      miningContext: miningContext,
+      onMatchChanged: onMatchChanged,
+      onHoverChanged: onHoverChanged,
     );
-    overlay.insert(entry);
   }
+
+  static Future<void> prewarm(BuildContext context) =>
+      _dictionaryPopupHost.prewarm(context);
 
   @override
   Widget build(BuildContext context) {

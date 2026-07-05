@@ -334,6 +334,8 @@ class StorageProvider {
       }
     }
 
+    await _migrateDesktopReaderToWindowed(isar, dir);
+
     final prefs = await isar.trackPreferences
         .filter()
         .syncIdIsNotNull()
@@ -382,5 +384,29 @@ end""",
     }
 
     return isar;
+  }
+
+  Future<void> _migrateDesktopReaderToWindowed(
+    Isar isar,
+    Directory databaseDirectory,
+  ) async {
+    if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) return;
+    final marker = File(
+      path.join(databaseDirectory.path, '.windowed-reader-default-v1'),
+    );
+    if (await marker.exists()) return;
+    try {
+      final settings = await isar.settings.get(227);
+      if (settings?.fullScreenReader == true) {
+        await isar.writeTxn(() async {
+          await isar.settings.put(settings!..fullScreenReader = false);
+        });
+      }
+      await marker.writeAsString('done', flush: true);
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[storage] Windowed reader migration skipped: $error');
+      }
+    }
   }
 }

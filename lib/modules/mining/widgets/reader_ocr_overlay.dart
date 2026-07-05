@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
@@ -405,17 +406,26 @@ class ReaderOcrLookupPopup extends StatefulWidget {
 }
 
 class _ReaderOcrLookupPopupState extends State<ReaderOcrLookupPopup> {
-  late final Future<List<HoshiLookupResult>> _results = _lookup();
+  late final Future<_LookupPayload> _results = _lookup();
   bool _exporting = false;
 
-  Future<List<HoshiLookupResult>> _lookup() async {
+  Future<_LookupPayload> _lookup() async {
     final results = await HoshidictsLookupBackend.instance.lookup(
       widget.text,
       maxResults: 20,
       scanLength: 80,
     );
     if (results.isNotEmpty) widget.onMatchChanged(results.first.matched.length);
-    return results;
+    List<HoshiDictionaryStyle> styles;
+    try {
+      styles = await HoshidictsLookupBackend.instance.getStyles();
+    } catch (_) {
+      styles = const [];
+    }
+    return _LookupPayload(
+      results: results,
+      styles: {for (final style in styles) style.dictName: style.styles},
+    );
   }
 
   Future<void> _export(HoshiLookupResult result) async {
@@ -477,7 +487,7 @@ class _ReaderOcrLookupPopupState extends State<ReaderOcrLookupPopup> {
           ),
           const Divider(height: 1),
           Expanded(
-            child: FutureBuilder<List<HoshiLookupResult>>(
+            child: FutureBuilder<_LookupPayload>(
               future: _results,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
@@ -488,7 +498,8 @@ class _ReaderOcrLookupPopupState extends State<ReaderOcrLookupPopup> {
                     child: Text('Lookup failed: ${snapshot.error}'),
                   );
                 }
-                final results = snapshot.data ?? const [];
+                final payload = snapshot.data;
+                final results = payload?.results ?? const [];
                 if (results.isEmpty) {
                   return const Center(
                     child: Text('No dictionary results found.'),
@@ -526,7 +537,13 @@ class _ReaderOcrLookupPopupState extends State<ReaderOcrLookupPopup> {
                                 ),
                                 const SizedBox(height: 3),
                                 for (final glossary in term.glossaries.take(3))
-                                  Text(glossary.glossary),
+                                  DictionaryGlossary(
+                                    rawGlossary: glossary.glossary,
+                                    dictionaryName: glossary.dictName,
+                                    dictionaryCss:
+                                        payload?.styles[glossary.dictName] ??
+                                        '',
+                                  ),
                               ],
                             ),
                           ),
@@ -549,6 +566,13 @@ class _ReaderOcrLookupPopupState extends State<ReaderOcrLookupPopup> {
       ),
     );
   }
+}
+
+class _LookupPayload {
+  const _LookupPayload({required this.results, required this.styles});
+
+  final List<HoshiLookupResult> results;
+  final Map<String, String> styles;
 }
 
 class _ReaderOcrPage {

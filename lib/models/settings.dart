@@ -444,7 +444,7 @@ class Settings {
     this.doHProviderId = 0,
     this.btServerAddress = "127.0.0.1",
     this.btServerPort,
-    this.fullScreenReader = true,
+    this.fullScreenReader = false,
     this.enableCustomColorFilter = false,
     this.customColorFilter,
     this.colorFilterBlendMode = ColorFilterBlendMode.none,

@@ -350,12 +350,20 @@ class _MangaChapterPageGalleryState
   Color _backgroundColor(BuildContext context) =>
       Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.9);
 
-  void _setFullScreen({bool? value}) async {
+  Future<void> _setFullScreen({bool? value}) async {
+    final target =
+        value ??
+        (isDesktop
+            ? !await windowManager.isFullScreen()
+            : !ref.read(fullScreenReaderStateProvider));
     if (isDesktop) {
-      value = await windowManager.isFullScreen();
-      setFullScreen(value: !value);
+      await setFullScreen(value: target);
+    } else if (target) {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    } else {
+      restoreSystemUI();
     }
-    ref.read(fullScreenReaderStateProvider.notifier).set(!value!);
+    ref.read(fullScreenReaderStateProvider.notifier).set(target);
   }
 
   /// Goes to either next or previous chapter
@@ -1123,7 +1131,7 @@ class _MangaChapterPageGalleryState
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
     if (fullScreenReader) {
       if (isDesktop) {
-        setFullScreen(value: true);
+        await setFullScreen(value: true);
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
       }

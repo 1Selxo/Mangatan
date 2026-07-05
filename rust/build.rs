@@ -14,10 +14,16 @@ fn main() {
         .expect("rust crate should live below project root");
     let bridge_dir = manifest_dir.join("native").join("hoshidicts_bridge");
 
-    let dst = cmake::Config::new(&bridge_dir)
+    let mut config = cmake::Config::new(&bridge_dir);
+    config
         .define("MANGAYOMI_PROJECT_ROOT", project_root)
-        .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
-        .build();
+        .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON");
+
+    if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreadedDLL");
+    }
+
+    let dst = config.build();
 
     println!(
         "cargo:rustc-link-search=native={}",

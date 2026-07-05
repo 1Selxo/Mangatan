@@ -870,12 +870,26 @@ class _CustomMaterialDesktopFullscreenButtonState
   }
 }
 
+bool _restoreMaximizedAfterFullscreen = false;
+
 Future<bool> setFullScreen({bool? value}) async {
-  if (value != null) {
-    await windowManager.setFullScreen(value);
-    return value;
+  final current = await windowManager.isFullScreen();
+  final target = value ?? !current;
+  if (target == current) return current;
+
+  if (target) {
+    _restoreMaximizedAfterFullscreen = await windowManager.isMaximized();
+    if (_restoreMaximizedAfterFullscreen) {
+      await windowManager.unmaximize();
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+    }
+    await windowManager.setFullScreen(true);
+  } else {
+    await windowManager.setFullScreen(false);
+    if (_restoreMaximizedAfterFullscreen) {
+      await windowManager.maximize();
+    }
+    _restoreMaximizedAfterFullscreen = false;
   }
-  final isFullScreen = await windowManager.isFullScreen();
-  await windowManager.setFullScreen(!isFullScreen);
-  return !isFullScreen;
+  return target;
 }

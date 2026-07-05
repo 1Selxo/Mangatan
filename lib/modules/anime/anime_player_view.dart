@@ -75,8 +75,8 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
   bool desktopFullScreenPlayer = false;
   @override
   void dispose() {
-    if (isDesktop) {
-      setFullScreen(value: desktopFullScreenPlayer);
+    if (isDesktop && desktopFullScreenPlayer) {
+      unawaited(setFullScreen(value: false));
     }
     for (var infoHash in _infoHashList) {
       MTorrentServer().removeTorrent(infoHash);

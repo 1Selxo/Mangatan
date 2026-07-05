@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -18,13 +19,13 @@ class HoshiDictionaryPopup extends StatefulWidget {
   const HoshiDictionaryPopup({
     super.key,
     required this.text,
-    required this.miningContext,
+    this.miningContext,
     required this.preferences,
     required this.onMatchChanged,
   });
 
   final String text;
-  final MiningContext miningContext;
+  final MiningContext? miningContext;
   final DictionaryPopupPreferences preferences;
   final ValueChanged<int> onMatchChanged;
 
@@ -33,42 +34,33 @@ class HoshiDictionaryPopup extends StatefulWidget {
 }
 
 class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
-  late Future<_HoshiPopupData> _future = _load();
+  late final Future<_HoshiPopupData> _shellFuture = _loadShell();
   InAppWebViewController? _controller;
   List<HoshiLookupResult> _results = const [];
   List<Map<String, dynamic>> _entries = const [];
   bool _exporting = false;
+  bool _webReady = false;
+  int _lookupGeneration = 0;
 
   @override
   void didUpdateWidget(covariant HoshiDictionaryPopup oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text ||
-        oldWidget.preferences != widget.preferences) {
-      _future = _load();
+    if (oldWidget.text != widget.text && _webReady) {
+      unawaited(_lookupAndRender(widget.text, notifyMatch: true));
     }
   }
 
-  Future<_HoshiPopupData> _load() async {
+  Future<_HoshiPopupData> _loadShell() async {
     final dark = _isDarkPopup(context, widget.preferences.theme);
     final values = await Future.wait<dynamic>([
       rootBundle.loadString('assets/hoshi_popup/popup.css'),
       rootBundle.loadString('assets/hoshi_popup/popup.js'),
       rootBundle.loadString('assets/hoshi_popup/selection.js'),
-      HoshidictsLookupBackend.instance.lookup(
-        widget.text.trim(),
-        maxResults: 20,
-        scanLength: 80,
-      ),
       HoshidictsLookupBackend.instance.getStyles().catchError(
         (_) => <HoshiDictionaryStyle>[],
       ),
     ]);
-    final results = values[3] as List<HoshiLookupResult>;
-    _setResults(results);
-    if (results.isNotEmpty) {
-      widget.onMatchChanged(results.first.matched.length);
-    }
-    final styles = values[4] as List<HoshiDictionaryStyle>;
+    final styles = values[3] as List<HoshiDictionaryStyle>;
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
         popupCss: values[0] as String,
@@ -84,6 +76,29 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   void _setResults(List<HoshiLookupResult> results) {
     _results = results;
     _entries = hoshiPopupEntries(results);
+  }
+
+  Future<void> _lookupAndRender(
+    String text, {
+    required bool notifyMatch,
+  }) async {
+    final generation = ++_lookupGeneration;
+    final query = text.trim();
+    _setResults(const []);
+    await _replaceRender();
+    final results = query.isEmpty
+        ? <HoshiLookupResult>[]
+        : await HoshidictsLookupBackend.instance.lookup(
+            query,
+            maxResults: 20,
+            scanLength: 80,
+          );
+    if (!mounted || generation != _lookupGeneration) return;
+    _setResults(results);
+    if (notifyMatch && results.isNotEmpty) {
+      widget.onMatchChanged(results.first.matched.length);
+    }
+    await _replaceRender();
   }
 
   Future<int> _lookupRedirect(String query) async {
@@ -125,6 +140,8 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
     }
     if (result == null || _exporting) return false;
+    final miningContext = widget.miningContext;
+    if (miningContext == null) return false;
     setState(() => _exporting = true);
     try {
       final profile = await MiningPreferences.getAnkiProfile();
@@ -134,7 +151,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
       final draft = await const AnkiCardBuilder().build(
         result: result,
-        context: widget.miningContext,
+        context: miningContext,
         profile: profile,
       );
       final noteId =
@@ -241,10 +258,18 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     );
   }
 
+  Future<void> _replaceRender() async {
+    final controller = _controller;
+    if (controller == null || !_webReady) return;
+    await controller.evaluateJavascript(
+      source: hoshiReplaceRenderScript(_entries.length),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_HoshiPopupData>(
-      future: _future,
+      future: _shellFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
@@ -253,9 +278,6 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           return Center(child: Text('Lookup failed: ${snapshot.error}'));
         }
         final data = snapshot.data!;
-        if (_entries.isEmpty) {
-          return const Center(child: Text('No dictionary results found.'));
-        }
         return InAppWebView(
           webViewEnvironment: webViewEnvironment,
           initialData: InAppWebViewInitialData(
@@ -274,7 +296,11 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             _controller = controller;
             _registerHandlers(controller);
           },
-          onLoadStop: (_, _) => _render(data),
+          onLoadStop: (_, _) async {
+            _webReady = true;
+            await _render(data);
+            await _lookupAndRender(widget.text, notifyMatch: true);
+          },
           onLoadResourceWithCustomScheme: (_, request) =>
               _loadDictionaryMedia(request),
         );
@@ -287,6 +313,13 @@ Map<String, dynamic> _argumentMap(List<dynamic> arguments) {
   if (arguments.isEmpty || arguments.first is! Map) return const {};
   return Map<String, dynamic>.from(arguments.first as Map);
 }
+
+@visibleForTesting
+String hoshiReplaceRenderScript(int entryCount) =>
+    'window.lookupEntries = undefined;'
+    'window.entryCount = $entryCount;'
+    'document.getElementById("entries-container").innerHTML = "";'
+    'window.renderPopup();';
 
 List<Map<String, dynamic>> hoshiPopupEntries(List<HoshiLookupResult> results) =>
     [for (final result in results) hoshiPopupEntry(result)];

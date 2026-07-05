@@ -1,12 +1,13 @@
 /// This file is a part of media_kit (https://github.com/media-kit/media-kit).
 ///
-/// Copyright © 2021 & onwards, Hitesh Kumar Saini <saini123hitesh@gmail.com>.
+/// Copyright (c) 2021 & onwards, Hitesh Kumar Saini <saini123hitesh@gmail.com>.
 /// All rights reserved.
 /// Use of this source code is governed by MIT license that can be found in the LICENSE file.
 // ignore_for_file: dangling_library_doc_comments, doc_directive_missing_closing_tag, deprecated_member_use
 
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
@@ -143,11 +144,10 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     padding = widget.configuration.padding;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final nr = (constraints.maxWidth * constraints.maxHeight);
+        final nr = constraints.maxWidth * constraints.maxHeight;
         const dr =
             kTextScaleFactorReferenceWidth * kTextScaleFactorReferenceHeight;
         final textScaleFactor = sqrt((nr / dr).clamp(0.0, 1.0));
-
         final textScaler =
             widget.configuration.textScaler ??
             TextScaler.linear(textScaleFactor);
@@ -155,19 +155,21 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
           for (final line in subtitle)
             if (line.trim().isNotEmpty) line.trim(),
         ].join('\n');
-        final subtitleStyle = widget.paintSubtitle
+        final rawSubtitleStyle = widget.paintSubtitle
             ? style
             : style.copyWith(
                 color: Colors.transparent,
                 backgroundColor: Colors.transparent,
                 shadows: const [],
               );
-        final text = Text(
+        final subtitleStyle = _subtitleFillStyle(rawSubtitleStyle);
+        final text = _CrispSubtitleText(
           key: _subtitleTextKey,
-          subtitleText,
+          text: subtitleText,
           style: subtitleStyle,
           textAlign: textAlign,
           textScaler: textScaler,
+          outlineColor: _subtitleOutlineColor(rawSubtitleStyle),
         );
         return AnimatedPadding(
           padding: padding,
@@ -226,7 +228,84 @@ bool _isAsciiWord(String value) {
 }
 
 bool _isLookupBoundary(String value) {
-  return RegExp(r'[\s、。！？!?「」『』（）()\[\]{}.,;:・…]').hasMatch(value);
+  return RegExp(
+    r'[\s\u3001\u3002\uff01\uff1f!?\u300c\u300d\u300e\u300f\uff08\uff09()\[\]{}.,;:\u30fb\u2026]',
+  ).hasMatch(value);
+}
+
+class _CrispSubtitleText extends StatelessWidget {
+  const _CrispSubtitleText({
+    super.key,
+    required this.text,
+    required this.style,
+    required this.textAlign,
+    required this.textScaler,
+    required this.outlineColor,
+  });
+
+  final String text;
+  final TextStyle style;
+  final TextAlign textAlign;
+  final TextScaler textScaler;
+  final Color outlineColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final fillColor = style.color ?? Colors.white;
+    final outlineVisible = fillColor.a > 0 && outlineColor.a > 0;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        if (outlineVisible)
+          Text(
+            text,
+            style: _subtitleOutlineStyle(style, outlineColor),
+            textAlign: textAlign,
+            textScaler: textScaler,
+          ),
+        Text(text, style: style, textAlign: textAlign, textScaler: textScaler),
+      ],
+    );
+  }
+}
+
+TextStyle _subtitleFillStyle(TextStyle style) {
+  return style.copyWith(shadows: const []);
+}
+
+Color _subtitleOutlineColor(TextStyle style) {
+  final shadows = style.shadows;
+  if (shadows != null && shadows.isNotEmpty) return shadows.first.color;
+  return Colors.black;
+}
+
+TextStyle _subtitleOutlineStyle(TextStyle style, Color outlineColor) {
+  return TextStyle(
+    inherit: style.inherit,
+    fontFamily: style.fontFamily,
+    fontFamilyFallback: style.fontFamilyFallback,
+    fontSize: style.fontSize,
+    fontWeight: style.fontWeight,
+    fontStyle: style.fontStyle,
+    letterSpacing: style.letterSpacing,
+    wordSpacing: style.wordSpacing,
+    textBaseline: style.textBaseline,
+    height: style.height,
+    leadingDistribution: style.leadingDistribution,
+    locale: style.locale,
+    foreground: Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 4.2
+      ..color = outlineColor,
+    fontFeatures: style.fontFeatures,
+    fontVariations: style.fontVariations,
+    decoration: style.decoration,
+    decorationColor: style.decorationColor,
+    decorationStyle: style.decorationStyle,
+    decorationThickness: style.decorationThickness,
+    overflow: style.overflow,
+  );
 }
 
 TextStyle subtileTextStyle(WidgetRef ref) {
@@ -248,26 +327,10 @@ TextStyle subtileTextStyle(WidgetRef ref) {
       subSets.textColorB!,
     ),
     shadows: [
-      Shadow(
-        offset: const Offset(-1.5, -1.5),
-        color: borderColor,
-        blurRadius: 1.4,
-      ),
-      Shadow(
-        offset: const Offset(1.5, -1.5),
-        color: borderColor,
-        blurRadius: 1.4,
-      ),
-      Shadow(
-        offset: const Offset(1.5, 1.5),
-        color: borderColor,
-        blurRadius: 1.4,
-      ),
-      Shadow(
-        offset: const Offset(-1.5, 1.5),
-        color: borderColor,
-        blurRadius: 1.4,
-      ),
+      Shadow(offset: const Offset(-1.5, -1.5), color: borderColor),
+      Shadow(offset: const Offset(1.5, -1.5), color: borderColor),
+      Shadow(offset: const Offset(1.5, 1.5), color: borderColor),
+      Shadow(offset: const Offset(-1.5, 1.5), color: borderColor),
     ],
     backgroundColor: Color.fromARGB(
       subSets.backgroundColorA!,

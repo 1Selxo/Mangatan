@@ -851,51 +851,63 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (_jimakuLoading) return;
     _jimakuLoading = true;
     try {
-      final guess = await _buildJimakuGuess(titleOverride);
-      if (guess.title.trim().isEmpty) {
+      final candidates = await _buildJimakuCandidates(titleOverride);
+      if (candidates.isEmpty) {
         if (showFeedback) botToast('Set a Jimaku title first', second: 3);
         return;
       }
-      if (showFeedback) botToast('Searching Jimaku: ${guess.displayName}');
+      if (showFeedback) {
+        botToast('Searching Jimaku: ${candidates.first.displayName}');
+      }
       final service = JimakuSubtitleService();
-      final entries = await service.searchEntries(
-        apiKey: apiKey,
-        query: guess.title,
-      );
-      final entry = selectBestJimakuEntry(entries, guess.title);
-      if (entry == null) {
-        if (showFeedback) {
-          botToast('No Jimaku entries found for "${guess.title}"', second: 4);
-        }
+      final attemptedQueries = <String>[];
+      var sawEntries = false;
+      for (final candidate in candidates) {
+        attemptedQueries.add(candidate.query);
+        final entries = await service.searchEntries(
+          apiKey: apiKey,
+          query: candidate.query,
+        );
+        if (entries.isEmpty) continue;
+        sawEntries = true;
+        final entry = selectBestJimakuEntryForTitles(
+          entries,
+          candidate.scoringTitles,
+        );
+        if (entry == null) continue;
+        final files = await service.matchingFiles(
+          apiKey: apiKey,
+          entry: entry,
+          guess: candidate.guess,
+        );
+        if (files.isEmpty) continue;
+        final outputDir = Directory(
+          path.join((await getTemporaryDirectory()).path, 'jimaku_subtitles'),
+        );
+        final subtitleFile = await service.downloadFile(
+          apiKey: apiKey,
+          file: files.first,
+          outputDirectory: outputDir,
+        );
+        await _player.setSubtitleTrack(
+          SubtitleTrack.uri(
+            subtitleFile.path,
+            title: 'Jimaku ${files.first.name}',
+            language: 'ja',
+          ),
+        );
+        if (showFeedback) botToast('Jimaku subtitle added', second: 3);
         return;
       }
-      final files = await service.matchingFiles(
-        apiKey: apiKey,
-        entry: entry,
-        guess: guess,
-      );
-      if (files.isEmpty) {
-        if (showFeedback) {
-          botToast('No matching Jimaku subtitle files found', second: 4);
-        }
-        return;
+      if (showFeedback) {
+        final tried = attemptedQueries.take(3).join(', ');
+        botToast(
+          sawEntries
+              ? 'No matching Jimaku subtitle files found'
+              : 'No Jimaku entries found for $tried',
+          second: 4,
+        );
       }
-      final outputDir = Directory(
-        path.join((await getTemporaryDirectory()).path, 'jimaku_subtitles'),
-      );
-      final subtitleFile = await service.downloadFile(
-        apiKey: apiKey,
-        file: files.first,
-        outputDirectory: outputDir,
-      );
-      await _player.setSubtitleTrack(
-        SubtitleTrack.uri(
-          subtitleFile.path,
-          title: 'Jimaku ${files.first.name}',
-          language: 'ja',
-        ),
-      );
-      if (showFeedback) botToast('Jimaku subtitle added', second: 3);
     } catch (e) {
       if (showFeedback) botToast('Jimaku failed: $e', second: 5);
     } finally {
@@ -903,7 +915,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
   }
 
-  Future<JimakuMediaGuess> _buildJimakuGuess(String titleOverride) async {
+  Future<List<JimakuSearchCandidate>> _buildJimakuCandidates(
+    String titleOverride,
+  ) async {
     final savedTitle = titleOverride.trim().isNotEmpty
         ? titleOverride.trim()
         : await MiningPreferences.getJimakuTitleOverride(
@@ -916,21 +930,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _firstVid.originalUrl,
       _firstVid.url,
     ];
-    JimakuMediaGuess? parsed;
-    for (final candidate in candidates) {
-      parsed = guessJimakuMedia(candidate);
-      if (parsed != null) break;
-    }
-    if (savedTitle.trim().isNotEmpty) {
-      return JimakuMediaGuess(
-        title: savedTitle,
-        episode: parsed?.episode,
-        season: parsed?.season,
-        episodeCandidates: parsed?.episodeCandidates ?? const {},
-      );
-    }
-    return parsed ??
-        JimakuMediaGuess(title: widget.episode.manga.value?.name ?? '');
+    return buildJimakuSearchCandidates(
+      values: candidates,
+      titleOverride: savedTitle,
+    );
   }
 
   void _updateRpcTimestamp() {

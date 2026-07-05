@@ -41,6 +41,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   bool _exporting = false;
   bool _webReady = false;
   int _lookupGeneration = 0;
+  Future<void> _javascriptQueue = Future<void>.value();
 
   @override
   void didUpdateWidget(covariant HoshiDictionaryPopup oldWidget) {
@@ -64,7 +65,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
         popupCss: values[0] as String,
-        popupJs: values[1] as String,
+        popupJs: _stabilizeHoshiPopupJs(values[1] as String),
         selectionJs: values[2] as String,
         preferences: widget.preferences,
         dark: dark,
@@ -84,8 +85,6 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }) async {
     final generation = ++_lookupGeneration;
     final query = text.trim();
-    _setResults(const []);
-    await _replaceRender();
     final results = query.isEmpty
         ? <HoshiLookupResult>[]
         : await HoshidictsLookupBackend.instance.lookup(
@@ -248,22 +247,26 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<void> _render(_HoshiPopupData data) async {
-    final controller = _controller;
-    if (controller == null) return;
-    await controller.evaluateJavascript(
-      source:
-          'window.dictionaryStyles = ${jsonEncode(data.styles)};'
-          'window.entryCount = ${_entries.length};'
-          'window.renderPopup();',
+    await _evaluateJavascript(
+      'window.dictionaryStyles = ${jsonEncode(data.styles)};'
+      '${hoshiReplaceRenderScriptForEntries(_entries)}',
     );
   }
 
   Future<void> _replaceRender() async {
+    if (!_webReady) return;
+    await _evaluateJavascript(hoshiReplaceRenderScriptForEntries(_entries));
+  }
+
+  Future<void> _evaluateJavascript(String source) {
     final controller = _controller;
-    if (controller == null || !_webReady) return;
-    await controller.evaluateJavascript(
-      source: hoshiReplaceRenderScript(_entries.length),
-    );
+    if (controller == null || !_webReady) return Future<void>.value();
+    final current = _javascriptQueue.then((_) async {
+      if (!mounted || _controller != controller || !_webReady) return;
+      await controller.evaluateJavascript(source: source);
+    });
+    _javascriptQueue = current.catchError((_) {});
+    return current;
   }
 
   @override
@@ -286,7 +289,9 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           ),
           initialSettings: InAppWebViewSettings(
             transparentBackground: true,
-            resourceCustomSchemes: const ['image'],
+            resourceCustomSchemes: _usesStableCustomSchemes
+                ? const ['image']
+                : const [],
             supportZoom: false,
             disableHorizontalScroll: true,
             horizontalScrollBarEnabled: false,
@@ -301,8 +306,9 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             await _render(data);
             await _lookupAndRender(widget.text, notifyMatch: true);
           },
-          onLoadResourceWithCustomScheme: (_, request) =>
-              _loadDictionaryMedia(request),
+          onLoadResourceWithCustomScheme: _usesStableCustomSchemes
+              ? (_, request) => _loadDictionaryMedia(request)
+              : null,
         );
       },
     );
@@ -320,6 +326,18 @@ String hoshiReplaceRenderScript(int entryCount) =>
     'window.entryCount = $entryCount;'
     'document.getElementById("entries-container").innerHTML = "";'
     'window.renderPopup();';
+
+@visibleForTesting
+String hoshiReplaceRenderScriptForEntries(List<Map<String, dynamic>> entries) =>
+    '(function(){'
+    'window.__mangayomiHoshiRenderToken = '
+    '(window.__mangayomiHoshiRenderToken || 0) + 1;'
+    'window.lookupEntries = ${jsonEncode(entries)};'
+    'window.entryCount = window.lookupEntries.length;'
+    'const container = document.getElementById("entries-container");'
+    'if (container) container.textContent = "";'
+    'window.renderPopup();'
+    '})();';
 
 List<Map<String, dynamic>> hoshiPopupEntries(List<HoshiLookupResult> results) =>
     [for (final result in results) hoshiPopupEntry(result)];
@@ -375,6 +393,13 @@ String buildHoshiPopupHtml({
   final scale = preferences.fontSize / 15;
   final customCss = jsonEncode(preferences.customCss);
   final colorScheme = dark ? 'dark' : 'light';
+  const nativeHandlers = [
+    'getEntries',
+    'lookupRedirect',
+    'textSelected',
+    'mineEntry',
+    'openLink',
+  ];
   return '''<!DOCTYPE html>
 <html style="color-scheme: $colorScheme">
 <head>
@@ -403,6 +428,7 @@ String buildHoshiPopupHtml({
     window.needsAudio = false;
     window.allowDupes = false;
     window.useAnkiConnect = true;
+    window.enableBackgroundDuplicateChecks = false;
     window.embedMedia = false;
     window.compactGlossariesAnki = false;
     window.customCSS = $customCss;
@@ -410,7 +436,9 @@ String buildHoshiPopupHtml({
     window.scanLength = 80;
     window.swipeThreshold = 0;
     window.webkit = {messageHandlers: new Proxy({}, {get: (_, name) => ({
-      postMessage: (payload) => window.flutter_inappwebview.callHandler(String(name), payload)
+      postMessage: (payload) => ${jsonEncode(nativeHandlers)}.includes(String(name))
+        ? window.flutter_inappwebview.callHandler(String(name), payload)
+        : Promise.resolve(String(name) === 'duplicateCheck' ? false : null)
     })})};
     document.addEventListener('click', (event) => {
       const slot = event.target.closest?.('.button-slot');
@@ -432,6 +460,30 @@ String buildHoshiPopupHtml({
 </html>''';
 }
 
+String _stabilizeHoshiPopupJs(String popupJs) {
+  var js = popupJs.replaceFirst(
+    'webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {',
+    'if (window.enableBackgroundDuplicateChecks !== false) { webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {',
+  );
+  js = js.replaceFirst(
+    '    });\n    \n    header.appendChild(buttonsContainer);',
+    '    }); } else { updateButtonSlot(mineSlot, { state: "default", enabled: true }); }\n    \n    header.appendChild(buttonsContainer);',
+  );
+  js = js.replaceFirst(
+    'window.renderPopup = function() {\n    const container = document.getElementById(\'entries-container\');',
+    'window.renderPopup = function() {\n    const renderToken = window.__mangayomiHoshiRenderToken || 0;\n    const container = document.getElementById(\'entries-container\');',
+  );
+  js = js.replaceFirst(
+    '        for (let idx = 0; idx < window.entryCount; idx++) {',
+    '        for (let idx = 0; idx < window.entryCount; idx++) {\n            if (renderToken !== (window.__mangayomiHoshiRenderToken || 0)) { return; }',
+  );
+  js = js.replaceFirst(
+    '                    scheduleMasonry();\n                    await new Promise(r => requestAnimationFrame(r));',
+    '                    scheduleMasonry();\n                    await new Promise(r => requestAnimationFrame(r));\n                    if (renderToken !== (window.__mangayomiHoshiRenderToken || 0)) { return; }',
+  );
+  return js;
+}
+
 bool _isDarkPopup(BuildContext context, DictionaryThemePreference preference) =>
     switch (preference) {
       DictionaryThemePreference.light => false,
@@ -450,6 +502,9 @@ String _mediaMimeType(String path) =>
       'heic' => 'image/heic',
       _ => 'image/png',
     };
+
+bool get _usesStableCustomSchemes =>
+    kIsWeb || defaultTargetPlatform != TargetPlatform.windows;
 
 class _HoshiPopupData {
   const _HoshiPopupData({required this.html, required this.styles});

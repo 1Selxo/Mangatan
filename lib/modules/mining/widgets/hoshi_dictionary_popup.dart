@@ -65,7 +65,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
         popupCss: values[0] as String,
-        popupJs: _stabilizeHoshiPopupJs(values[1] as String),
+        popupJs: values[1] as String,
         selectionJs: values[2] as String,
         preferences: widget.preferences,
         dark: dark,
@@ -458,30 +458,6 @@ String buildHoshiPopupHtml({
   <div class="overlay"><div class="overlay-close" onclick="closeOverlay()">×</div><div class="overlay-content"></div></div>
 </body>
 </html>''';
-}
-
-String _stabilizeHoshiPopupJs(String popupJs) {
-  var js = popupJs.replaceFirst(
-    'webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {',
-    'if (window.enableBackgroundDuplicateChecks !== false) { webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {',
-  );
-  js = js.replaceFirst(
-    '    });\n    \n    header.appendChild(buttonsContainer);',
-    '    }); } else { updateButtonSlot(mineSlot, { state: "default", enabled: true }); }\n    \n    header.appendChild(buttonsContainer);',
-  );
-  js = js.replaceFirst(
-    'window.renderPopup = function() {\n    const container = document.getElementById(\'entries-container\');',
-    'window.renderPopup = function() {\n    const renderToken = window.__mangayomiHoshiRenderToken || 0;\n    const container = document.getElementById(\'entries-container\');',
-  );
-  js = js.replaceFirst(
-    '        for (let idx = 0; idx < window.entryCount; idx++) {',
-    '        for (let idx = 0; idx < window.entryCount; idx++) {\n            if (renderToken !== (window.__mangayomiHoshiRenderToken || 0)) { return; }',
-  );
-  js = js.replaceFirst(
-    '                    scheduleMasonry();\n                    await new Promise(r => requestAnimationFrame(r));',
-    '                    scheduleMasonry();\n                    await new Promise(r => requestAnimationFrame(r));\n                    if (renderToken !== (window.__mangayomiHoshiRenderToken || 0)) { return; }',
-  );
-  return js;
 }
 
 bool _isDarkPopup(BuildContext context, DictionaryThemePreference preference) =>

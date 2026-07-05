@@ -148,17 +148,13 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     _highlightEnd = -1;
   }
 
-  void _setHighlight(_SubtitleLookupSelection selection) {
-    if (_highlightStart == selection.start && _highlightEnd == selection.end) {
-      return;
+  void _clearHighlightIfNeeded() {
+    if (_highlightStart != -1 || _highlightEnd != -1) {
+      setState(_clearHighlight);
     }
-    setState(() {
-      _highlightStart = selection.start;
-      _highlightEnd = selection.end;
-    });
   }
 
-  _SubtitleLookupSelection? _setHighlightAtPosition({
+  _SubtitleLookupSelection? _selectionAtPosition({
     required BuildContext context,
     required Offset globalPosition,
     required String subtitleText,
@@ -183,7 +179,6 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       }
       return null;
     }
-    _setHighlight(selection);
     return selection;
   }
 
@@ -214,7 +209,6 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
             textScaler: textScaler,
           );
     if (selection.text.trim().isEmpty || !context.mounted) return null;
-    _setHighlight(selection);
     final anchor = textBox == null
         ? Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1)
         : _lookupAnchorRect(
@@ -253,7 +247,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   }) {
     _subtitleHovered = true;
     _hoverExitTimer?.cancel();
-    final selection = _setHighlightAtPosition(
+    final selection = _selectionAtPosition(
       context: context,
       globalPosition: globalPosition,
       subtitleText: subtitleText,
@@ -267,6 +261,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     if (_sameSelection(_hoverSelection, selection) && _hoverPopup != null) {
       return;
     }
+    _clearHighlightIfNeeded();
     _hoverSelection = selection;
     _hoverLookupTimer?.cancel();
     _hoverLookupTimer = Timer(const Duration(milliseconds: 140), () {
@@ -495,13 +490,14 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
                           textScaler: textScaler,
                         );
                       } else {
-                        _setHighlightAtPosition(
+                        _selectionAtPosition(
                           context: context,
                           globalPosition: event.position,
                           subtitleText: subtitleText,
                           subtitleStyle: subtitleStyle,
                           textScaler: textScaler,
                         );
+                        _clearHighlightIfNeeded();
                       }
                     },
                     onExit: (_) {
@@ -514,13 +510,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
                     },
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTapDown: (details) => _setHighlightAtPosition(
-                        context: context,
-                        globalPosition: details.globalPosition,
-                        subtitleText: subtitleText,
-                        subtitleStyle: subtitleStyle,
-                        textScaler: textScaler,
-                      ),
+                      onTapDown: (_) => _clearHighlightIfNeeded(),
                       onTapUp: (details) {
                         _hoverLookupTimer?.cancel();
                         unawaited(

@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 class CustomSubtitleView extends ConsumerStatefulWidget {
@@ -40,8 +41,12 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   late EdgeInsets padding = widget.configuration.padding;
   late Duration duration = const Duration(milliseconds: 100);
   final GlobalKey _subtitleTextKey = GlobalKey();
+  int _highlightStart = -1;
+  int _highlightEnd = -1;
 
-  StreamSubscription<List<String>>? subscription;
+  StreamSubscription<List<String>>? _subtitleSubscription;
+  StreamSubscription<Track>? _trackSubscription;
+  Timer? _nativeSubtitlePaintTimer;
 
   static const kTextScaleFactorReferenceWidth = 1920.0;
   static const kTextScaleFactorReferenceHeight = 1080.0;
@@ -49,16 +54,26 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   @override
   void initState() {
     super.initState();
-    subscription = widget.controller.player.stream.subtitle.listen((value) {
+    _hideNativeSubtitlePaintSoon();
+    _subtitleSubscription = widget.controller.player.stream.subtitle.listen((
+      value,
+    ) {
+      _hideNativeSubtitlePaintSoon();
       setState(() {
         subtitle = value;
+        _clearHighlight();
       });
+    });
+    _trackSubscription = widget.controller.player.stream.track.listen((_) {
+      _hideNativeSubtitlePaintSoon();
     });
   }
 
   @override
   void dispose() {
-    subscription?.cancel();
+    _subtitleSubscription?.cancel();
+    _trackSubscription?.cancel();
+    _nativeSubtitlePaintTimer?.cancel();
     super.dispose();
   }
 
@@ -76,6 +91,69 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     });
   }
 
+  void _hideNativeSubtitlePaintSoon() {
+    if (!widget.paintSubtitle) return;
+    unawaited(_disableNativeSubtitlePaint());
+    _nativeSubtitlePaintTimer?.cancel();
+    _nativeSubtitlePaintTimer = Timer(
+      const Duration(milliseconds: 250),
+      () => unawaited(_disableNativeSubtitlePaint()),
+    );
+  }
+
+  Future<void> _disableNativeSubtitlePaint() async {
+    if (!widget.paintSubtitle) return;
+    try {
+      final platform = widget.controller.player.platform;
+      if (platform is NativePlayer) {
+        await platform.setProperty('sub-visibility', 'no');
+      }
+    } catch (_) {}
+  }
+
+  void _clearHighlight() {
+    _highlightStart = -1;
+    _highlightEnd = -1;
+  }
+
+  void _setHighlight(_SubtitleLookupSelection selection) {
+    if (_highlightStart == selection.start && _highlightEnd == selection.end) {
+      return;
+    }
+    setState(() {
+      _highlightStart = selection.start;
+      _highlightEnd = selection.end;
+    });
+  }
+
+  void _setHighlightAtPosition({
+    required BuildContext context,
+    required Offset globalPosition,
+    required String subtitleText,
+    required TextStyle subtitleStyle,
+    required TextScaler textScaler,
+  }) {
+    if (subtitleText.trim().isEmpty) return;
+    final textBox =
+        _subtitleTextKey.currentContext?.findRenderObject() as RenderBox?;
+    if (textBox == null) return;
+    final selection = _lookupTextAtPosition(
+      context: context,
+      box: textBox,
+      globalPosition: globalPosition,
+      subtitleText: subtitleText,
+      subtitleStyle: subtitleStyle,
+      textScaler: textScaler,
+    );
+    if (selection.text.trim().isEmpty) {
+      if (_highlightStart != -1 || _highlightEnd != -1) {
+        setState(_clearHighlight);
+      }
+      return;
+    }
+    _setHighlight(selection);
+  }
+
   Future<void> _showLookup(
     BuildContext context,
     TapUpDetails details,
@@ -87,8 +165,12 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     if (builder == null || subtitleText.trim().isEmpty) return;
     final textBox =
         _subtitleTextKey.currentContext?.findRenderObject() as RenderBox?;
-    final lookupText = textBox == null
-        ? subtitleText.trim()
+    final selection = textBox == null
+        ? _SubtitleLookupSelection(
+            text: subtitleText.trim(),
+            start: 0,
+            end: subtitleText.trim().length,
+          )
         : _lookupTextAtPosition(
             context: context,
             box: textBox,
@@ -97,7 +179,8 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
             subtitleStyle: subtitleStyle,
             textScaler: textScaler,
           );
-    if (lookupText.trim().isEmpty || !context.mounted) return;
+    if (selection.text.trim().isEmpty || !context.mounted) return;
+    _setHighlight(selection);
     final anchor = textBox == null
         ? Rect.fromLTWH(
             details.globalPosition.dx,
@@ -109,12 +192,12 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     await DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
-      text: lookupText,
+      text: selection.text,
       miningContext: builder(subtitleText),
     );
   }
 
-  String _lookupTextAtPosition({
+  _SubtitleLookupSelection _lookupTextAtPosition({
     required BuildContext context,
     required RenderBox box,
     required Offset globalPosition,
@@ -133,7 +216,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
         .offset
         .clamp(0, subtitleText.length)
         .toInt();
-    return _extractSubtitleLookupString(subtitleText, position);
+    return _extractSubtitleLookupSelection(subtitleText, position);
   }
 
   @override
@@ -170,6 +253,8 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
           textAlign: textAlign,
           textScaler: textScaler,
           outlineColor: _subtitleOutlineColor(rawSubtitleStyle),
+          highlightStart: _highlightStart,
+          highlightEnd: _highlightEnd,
         );
         return AnimatedPadding(
           padding: padding,
@@ -180,15 +265,38 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
                 subtitleText.trim().isEmpty ||
                     widget.miningContextBuilder == null
                 ? text
-                : GestureDetector(
-                    onTapUp: (details) => _showLookup(
-                      context,
-                      details,
-                      subtitleText,
-                      subtitleStyle,
-                      textScaler,
+                : MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onHover: (event) => _setHighlightAtPosition(
+                      context: context,
+                      globalPosition: event.position,
+                      subtitleText: subtitleText,
+                      subtitleStyle: subtitleStyle,
+                      textScaler: textScaler,
                     ),
-                    child: text,
+                    onExit: (_) {
+                      if (_highlightStart != -1 || _highlightEnd != -1) {
+                        setState(_clearHighlight);
+                      }
+                    },
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTapDown: (details) => _setHighlightAtPosition(
+                        context: context,
+                        globalPosition: details.globalPosition,
+                        subtitleText: subtitleText,
+                        subtitleStyle: subtitleStyle,
+                        textScaler: textScaler,
+                      ),
+                      onTapUp: (details) => _showLookup(
+                        context,
+                        details,
+                        subtitleText,
+                        subtitleStyle,
+                        textScaler,
+                      ),
+                      child: text,
+                    ),
                   ),
           ),
         );
@@ -197,13 +305,20 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   }
 }
 
-String _extractSubtitleLookupString(String text, int offset) {
-  if (text.isEmpty) return '';
+_SubtitleLookupSelection _extractSubtitleLookupSelection(
+  String text,
+  int offset,
+) {
+  if (text.isEmpty) {
+    return const _SubtitleLookupSelection(text: '', start: 0, end: 0);
+  }
   var start = offset.clamp(0, text.length - 1).toInt();
   while (start < text.length && _isLookupBoundary(text[start])) {
     start++;
   }
-  if (start >= text.length) return '';
+  if (start >= text.length) {
+    return const _SubtitleLookupSelection(text: '', start: 0, end: 0);
+  }
   if (_isAsciiWord(text[start])) {
     while (start > 0 && _isAsciiWord(text[start - 1])) {
       start--;
@@ -215,7 +330,23 @@ String _extractSubtitleLookupString(String text, int offset) {
       end - start < 80) {
     end++;
   }
-  return text.substring(start, end).trim();
+  return _SubtitleLookupSelection(
+    text: text.substring(start, end).trim(),
+    start: start,
+    end: end,
+  );
+}
+
+class _SubtitleLookupSelection {
+  const _SubtitleLookupSelection({
+    required this.text,
+    required this.start,
+    required this.end,
+  });
+
+  final String text;
+  final int start;
+  final int end;
 }
 
 bool _isAsciiWord(String value) {
@@ -241,6 +372,8 @@ class _CrispSubtitleText extends StatelessWidget {
     required this.textAlign,
     required this.textScaler,
     required this.outlineColor,
+    required this.highlightStart,
+    required this.highlightEnd,
   });
 
   final String text;
@@ -248,6 +381,8 @@ class _CrispSubtitleText extends StatelessWidget {
   final TextAlign textAlign;
   final TextScaler textScaler;
   final Color outlineColor;
+  final int highlightStart;
+  final int highlightEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -257,16 +392,55 @@ class _CrispSubtitleText extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         if (outlineVisible)
-          Text(
-            text,
+          Text.rich(
+            _subtitleSpan(
+              text: text,
+              style: _subtitleOutlineStyle(style, outlineColor),
+              highlightStart: -1,
+              highlightEnd: -1,
+            ),
             style: _subtitleOutlineStyle(style, outlineColor),
             textAlign: textAlign,
             textScaler: textScaler,
           ),
-        Text(text, style: style, textAlign: textAlign, textScaler: textScaler),
+        Text.rich(
+          _subtitleSpan(
+            text: text,
+            style: style,
+            highlightStart: highlightStart,
+            highlightEnd: highlightEnd,
+          ),
+          textAlign: textAlign,
+          textScaler: textScaler,
+        ),
       ],
     );
   }
+}
+
+TextSpan _subtitleSpan({
+  required String text,
+  required TextStyle style,
+  required int highlightStart,
+  required int highlightEnd,
+}) {
+  final start = highlightStart.clamp(0, text.length).toInt();
+  final end = highlightEnd.clamp(start, text.length).toInt();
+  if (start >= end) return TextSpan(text: text, style: style);
+  return TextSpan(
+    style: style,
+    children: [
+      if (start > 0) TextSpan(text: text.substring(0, start)),
+      TextSpan(
+        text: text.substring(start, end),
+        style: style.copyWith(
+          backgroundColor: const Color(0x99ffd54f),
+          color: Colors.white,
+        ),
+      ),
+      if (end < text.length) TextSpan(text: text.substring(end)),
+    ],
+  );
 }
 
 TextStyle _subtitleFillStyle(TextStyle style) {
@@ -296,7 +470,7 @@ TextStyle _subtitleOutlineStyle(TextStyle style, Color outlineColor) {
     foreground: Paint()
       ..style = PaintingStyle.stroke
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 4.2
+      ..strokeWidth = _subtitleOutlineWidth(style)
       ..color = outlineColor,
     fontFeatures: style.fontFeatures,
     fontVariations: style.fontVariations,
@@ -306,6 +480,11 @@ TextStyle _subtitleOutlineStyle(TextStyle style, Color outlineColor) {
     decorationThickness: style.decorationThickness,
     overflow: style.overflow,
   );
+}
+
+double _subtitleOutlineWidth(TextStyle style) {
+  final size = style.fontSize ?? 40;
+  return max(2.0, min(3.4, size * 0.075));
 }
 
 TextStyle subtileTextStyle(WidgetRef ref) {

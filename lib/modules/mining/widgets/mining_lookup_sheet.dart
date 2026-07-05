@@ -29,7 +29,9 @@ class MiningLookupSheet extends StatefulWidget {
       constraints: BoxConstraints(maxWidth: context.width(1)),
       builder: (_) => MiningLookupSheet(
         initialText: text,
-        miningContext: miningContext.copyWith(sentence: text),
+        miningContext: miningContext.sentence.trim().isEmpty
+            ? miningContext.copyWith(sentence: text)
+            : miningContext,
       ),
     );
   }
@@ -74,7 +76,9 @@ class _MiningLookupSheetState extends State<MiningLookupSheet> {
     try {
       final profile = await MiningPreferences.getAnkiProfile();
       final endpoint = await MiningPreferences.getAnkiEndpoint();
-      final context = widget.miningContext.copyWith(sentence: _controller.text);
+      final context = widget.miningContext.sentence.trim().isEmpty
+          ? widget.miningContext.copyWith(sentence: _controller.text)
+          : widget.miningContext;
       final draft = await const AnkiCardBuilder().build(
         result: result,
         context: context,

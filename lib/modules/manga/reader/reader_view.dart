@@ -27,6 +27,7 @@ import 'package:mangayomi/modules/manga/reader/widgets/reader_settings_modal.dar
 import 'package:mangayomi/modules/manga/reader/widgets/auto_scroll_button.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/page_indicator.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/image_actions_dialog.dart';
+import 'package:mangayomi/modules/mining/widgets/ocr_overlay_sheet.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
@@ -571,6 +572,7 @@ class _MangaChapterPageGalleryState
                           _isBookmarked = !_isBookmarked;
                         });
                       },
+                      onOcrPressed: _showCurrentPageOcr,
                       onWebViewPressed:
                           (chapter.manga.value!.isLocalArchive ?? false) ==
                               false
@@ -1088,6 +1090,23 @@ class _MangaChapterPageGalleryState
   //   } catch (_) {}
   // }
 
+  Future<void> _showCurrentPageOcr() async {
+    if (pages.isEmpty) return;
+    final actualIndex = (_currentIndex ?? 0).clamp(0, pages.length - 1);
+    final data = pages[actualIndex];
+    if (data.isTransitionPage) return;
+    final imageBytes = await data.getImageBytes;
+    final manga = data.chapter?.manga.value ?? chapter.manga.value;
+    if (imageBytes == null || manga == null || !mounted) return;
+    await OcrOverlaySheet.show(
+      context: context,
+      imageBytes: imageBytes,
+      data: data,
+      manga: manga,
+      chapterName: data.chapter?.name ?? chapter.name ?? '',
+    );
+  }
+
   void _initCurrentIndex() async {
     if (ref.read(cropBordersStateProvider)) _processCropBorders();
     final readerMode = _readerController.getReaderMode();
@@ -1173,18 +1192,25 @@ class _MangaChapterPageGalleryState
     if (needsReload) {
       final isLocalArchive = (currentChapter.archivePath ?? '').isNotEmpty;
       final storageProvider = StorageProvider();
-      final mangaDirectory = await storageProvider.getMangaMainDirectory(currentChapter);
+      final mangaDirectory = await storageProvider.getMangaMainDirectory(
+        currentChapter,
+      );
       final archivePath = isLocalArchive
           ? currentChapter.archivePath
-          : (mangaDirectory != null ? p.join(mangaDirectory.path, "${currentChapter.name}.cbz") : null);
+          : (mangaDirectory != null
+                ? p.join(mangaDirectory.path, "${currentChapter.name}.cbz")
+                : null);
 
       if (archivePath != null && await File(archivePath).exists()) {
         try {
-          final local = await ref.read(getArchiveDataFromFileProvider(archivePath).future);
+          final local = await ref.read(
+            getArchiveDataFromFileProvider(archivePath).future,
+          );
           final images = local.images ?? [];
           int imgIdx = 0;
           for (final page in pages) {
-            if (page.chapter?.id == currentChapter.id && !page.isTransitionPage) {
+            if (page.chapter?.id == currentChapter.id &&
+                !page.isTransitionPage) {
               if (imgIdx < images.length) {
                 page.archiveImage = images[imgIdx].image;
               }
@@ -1233,11 +1259,7 @@ class _MangaChapterPageGalleryState
       }
     }
 
-    await Future.wait([
-      worker(),
-      worker(),
-      worker(),
-    ]);
+    await Future.wait([worker(), worker(), worker()]);
   }
 
   Future<void> _onPageChanged(int index) async {

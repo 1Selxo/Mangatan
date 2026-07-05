@@ -4,6 +4,7 @@ import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 
 class DictionaryScreen extends StatefulWidget {
   const DictionaryScreen({super.key});
@@ -19,6 +20,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   double _opacity = 0.72;
   double _boxScale = 1;
   bool _outlineVisible = true;
+  bool _overlayEnabled = true;
   bool _loading = true;
   bool _importing = false;
 
@@ -36,6 +38,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getOcrOverlayOpacity(),
       MiningPreferences.getOcrBoxScale(),
       MiningPreferences.getOcrOutlineVisible(),
+      MiningPreferences.getOcrOverlayEnabled(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -45,6 +48,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _opacity = values[3] as double;
       _boxScale = values[4] as double;
       _outlineVisible = values[5] as bool;
+      _overlayEnabled = values[6] as bool;
       _loading = false;
     });
   }
@@ -67,6 +71,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       if (!imported.success) {
         throw StateError(imported.errors.join('\n'));
       }
+      await DictionaryStorage.instance.recordImport(
+        name: imported.title,
+        termCount: imported.termCount,
+        frequencyCount: imported.freqCount,
+        pitchCount: imported.pitchCount,
+      );
       await HoshidictsLookupBackend.instance.reloadFromStorage();
       await _load();
       botToast(
@@ -153,6 +163,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ),
                 const Divider(height: 24),
                 const _SectionHeader('OCR overlay'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.document_scanner_outlined),
+                  title: const Text('Show OCR in reader'),
+                  subtitle: const Text(
+                    'Recognize pages automatically as they load',
+                  ),
+                  value: _overlayEnabled,
+                  onChanged: (value) {
+                    setState(() => _overlayEnabled = value);
+                    ReaderOcrState.setEnabled(value);
+                  },
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: DropdownButtonFormField<OcrEnginePreference>(

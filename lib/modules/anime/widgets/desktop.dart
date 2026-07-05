@@ -9,6 +9,7 @@ import 'package:mangayomi/modules/anime/providers/anime_player_controller_provid
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/extensions/duration.dart';
@@ -26,6 +27,7 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
   final int defaultSkipIntroLength;
   final void Function(bool) desktopFullScreenPlayer;
   final ValueNotifier<List<(String, int)>> chapterMarks;
+  final MiningContext Function(String text)? subtitleMiningContextBuilder;
   const DesktopControllerWidget({
     super.key,
     required this.videoController,
@@ -39,6 +41,7 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
     required this.defaultSkipIntroLength,
     required this.desktopFullScreenPlayer,
     required this.chapterMarks,
+    this.subtitleMiningContextBuilder,
   });
 
   @override
@@ -270,16 +273,16 @@ class _DesktopControllerWidgetState
       child: Stack(
         children: [
           Consumer(
-            builder: (context, ref, _) => ref.read(useLibassStateProvider)
-                ? const SizedBox.shrink()
-                : Positioned(
-                    child: CustomSubtitleView(
-                      controller: widget.videoController,
-                      configuration: SubtitleViewConfiguration(
-                        style: subtileTextStyle(ref),
-                      ),
-                    ),
-                  ),
+            builder: (context, ref, _) => Positioned(
+              child: CustomSubtitleView(
+                controller: widget.videoController,
+                configuration: SubtitleViewConfiguration(
+                  style: subtileTextStyle(ref),
+                ),
+                paintSubtitle: !ref.read(useLibassStateProvider),
+                miningContextBuilder: widget.subtitleMiningContextBuilder,
+              ),
+            ),
           ),
           Focus(
             autofocus: true,

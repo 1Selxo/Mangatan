@@ -3,6 +3,7 @@
 //
 
 pub mod epub;
+pub mod hoshidicts;
 pub mod image;
 pub mod rhttp;
 

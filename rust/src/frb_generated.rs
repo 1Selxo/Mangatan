@@ -26,6 +26,7 @@
 
 // Section: imports
 
+use crate::api::hoshidicts::native::*;
 use crate::api::rhttp::client::*;
 use crate::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
@@ -40,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2140434025;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1523042926;
 
 // Section: executor
 
@@ -219,6 +220,38 @@ fn wire__crate__api__rhttp__client__create_dynamic_resolver_sync_impl(
         },
     )
 }
+fn wire__crate__api__hoshidicts__native__create_lookup_session_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "create_lookup_session",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::hoshidicts::native::create_lookup_session()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__rhttp__client__create_static_resolver_sync_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -281,6 +314,213 @@ fn wire__crate__api__epub__get_chapter_content_impl(
                 transform_result_sse::<_, String>((move || {
                     let output_ok =
                         crate::api::epub::get_chapter_content(api_epub_path, api_chapter_path)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__hoshidicts__native__get_media_file_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "get_media_file",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_session = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>,
+            >>::sse_decode(&mut deserializer);
+            let api_dict_name = <String>::sse_decode(&mut deserializer);
+            let api_media_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_session_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_session,
+                                0,
+                                false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_session_guard = Some(api_session.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_session_guard = api_session_guard.unwrap();
+                    let output_ok = crate::api::hoshidicts::native::get_media_file(
+                        &*api_session_guard,
+                        api_dict_name,
+                        api_media_path,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__hoshidicts__native__get_styles_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "get_styles",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_session = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_session_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_session,
+                                0,
+                                false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_session_guard = Some(api_session.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_session_guard = api_session_guard.unwrap();
+                    let output_ok =
+                        crate::api::hoshidicts::native::get_styles(&*api_session_guard)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__hoshidicts__native__import_dictionary_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "import_dictionary",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_zip_path = <String>::sse_decode(&mut deserializer);
+            let api_output_dir = <String>::sse_decode(&mut deserializer);
+            let api_low_ram = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::hoshidicts::native::import_dictionary(
+                        api_zip_path,
+                        api_output_dir,
+                        api_low_ram,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__hoshidicts__native__lookup_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "lookup",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_session = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>,
+            >>::sse_decode(&mut deserializer);
+            let api_text = <String>::sse_decode(&mut deserializer);
+            let api_max_results = <i32>::sse_decode(&mut deserializer);
+            let api_scan_length = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_session_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_session,
+                                0,
+                                false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_session_guard = Some(api_session.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_session_guard = api_session_guard.unwrap();
+                    let output_ok = crate::api::hoshidicts::native::lookup(
+                        &*api_session_guard,
+                        api_text,
+                        api_max_results,
+                        api_scan_length,
+                    )?;
                     Ok(output_ok)
                 })())
             }
@@ -411,6 +651,65 @@ fn wire__crate__api__image__process_crop_image_impl(
                     Result::<_, ()>::Ok(crate::api::image::process_crop_image(api_image))?;
                 Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__hoshidicts__native__rebuild_query_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "rebuild_query",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_session = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>,
+            >>::sse_decode(&mut deserializer);
+            let api_term_paths = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_freq_paths = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_pitch_paths = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_session_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_session,
+                                0,
+                                false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_session_guard = Some(api_session.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_session_guard = api_session_guard.unwrap();
+                    let output_ok = crate::api::hoshidicts::native::rebuild_query(
+                        &*api_session_guard,
+                        api_term_paths,
+                        api_freq_paths,
+                        api_pitch_paths,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
         },
     )
 }
@@ -627,6 +926,9 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DnsSettings>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RequestClient>
 );
 
@@ -665,6 +967,16 @@ impl SseDecode for DnsSettings {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DnsSettings>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode for HoshiLookupSession {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
@@ -724,6 +1036,16 @@ impl SseDecode
 
 impl SseDecode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DnsSettings>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -860,6 +1182,153 @@ impl SseDecode for crate::api::epub::EpubResource {
         return crate::api::epub::EpubResource {
             name: var_name,
             content: var_content,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiDictionaryStyle {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_dictName = <String>::sse_decode(deserializer);
+        let mut var_styles = <String>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiDictionaryStyle {
+            dict_name: var_dictName,
+            styles: var_styles,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiFrequency {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_value = <i32>::sse_decode(deserializer);
+        let mut var_displayValue = <String>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiFrequency {
+            value: var_value,
+            display_value: var_displayValue,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiFrequencyEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_dictName = <String>::sse_decode(deserializer);
+        let mut var_frequencies =
+            <Vec<crate::api::hoshidicts::HoshiFrequency>>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiFrequencyEntry {
+            dict_name: var_dictName,
+            frequencies: var_frequencies,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiGlossaryEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_dictName = <String>::sse_decode(deserializer);
+        let mut var_glossary = <String>::sse_decode(deserializer);
+        let mut var_definitionTags = <String>::sse_decode(deserializer);
+        let mut var_termTags = <String>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiGlossaryEntry {
+            dict_name: var_dictName,
+            glossary: var_glossary,
+            definition_tags: var_definitionTags,
+            term_tags: var_termTags,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiImportResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_success = <bool>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_termCount = <u64>::sse_decode(deserializer);
+        let mut var_metaCount = <u64>::sse_decode(deserializer);
+        let mut var_freqCount = <u64>::sse_decode(deserializer);
+        let mut var_pitchCount = <u64>::sse_decode(deserializer);
+        let mut var_mediaCount = <u64>::sse_decode(deserializer);
+        let mut var_errors = <Vec<String>>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiImportResult {
+            success: var_success,
+            title: var_title,
+            term_count: var_termCount,
+            meta_count: var_metaCount,
+            freq_count: var_freqCount,
+            pitch_count: var_pitchCount,
+            media_count: var_mediaCount,
+            errors: var_errors,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiLookupResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_matched = <String>::sse_decode(deserializer);
+        let mut var_deinflected = <String>::sse_decode(deserializer);
+        let mut var_trace =
+            <Vec<crate::api::hoshidicts::HoshiTransformGroup>>::sse_decode(deserializer);
+        let mut var_preprocessorSteps = <i32>::sse_decode(deserializer);
+        let mut var_term = <crate::api::hoshidicts::HoshiTermResult>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiLookupResult {
+            matched: var_matched,
+            deinflected: var_deinflected,
+            trace: var_trace,
+            preprocessor_steps: var_preprocessorSteps,
+            term: var_term,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiPitchEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_dictName = <String>::sse_decode(deserializer);
+        let mut var_pitchPositions = <Vec<i32>>::sse_decode(deserializer);
+        let mut var_transcriptions = <Vec<String>>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiPitchEntry {
+            dict_name: var_dictName,
+            pitch_positions: var_pitchPositions,
+            transcriptions: var_transcriptions,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiTermResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_expression = <String>::sse_decode(deserializer);
+        let mut var_reading = <String>::sse_decode(deserializer);
+        let mut var_rules = <String>::sse_decode(deserializer);
+        let mut var_score = <i32>::sse_decode(deserializer);
+        let mut var_glossaries =
+            <Vec<crate::api::hoshidicts::HoshiGlossaryEntry>>::sse_decode(deserializer);
+        let mut var_frequencies =
+            <Vec<crate::api::hoshidicts::HoshiFrequencyEntry>>::sse_decode(deserializer);
+        let mut var_pitches =
+            <Vec<crate::api::hoshidicts::HoshiPitchEntry>>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiTermResult {
+            expression: var_expression,
+            reading: var_reading,
+            rules: var_rules,
+            score: var_score,
+            glossaries: var_glossaries,
+            frequencies: var_frequencies,
+            pitches: var_pitches,
+        };
+    }
+}
+
+impl SseDecode for crate::api::hoshidicts::HoshiTransformGroup {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_description = <String>::sse_decode(deserializer);
+        return crate::api::hoshidicts::HoshiTransformGroup {
+            name: var_name,
+            description: var_description,
         };
     }
 }
@@ -1028,6 +1497,104 @@ impl SseDecode for Vec<crate::api::epub::EpubResource> {
     }
 }
 
+impl SseDecode for Vec<crate::api::hoshidicts::HoshiDictionaryStyle> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hoshidicts::HoshiDictionaryStyle>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::hoshidicts::HoshiFrequency> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hoshidicts::HoshiFrequency>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::hoshidicts::HoshiFrequencyEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hoshidicts::HoshiFrequencyEntry>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::hoshidicts::HoshiGlossaryEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hoshidicts::HoshiGlossaryEntry>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::hoshidicts::HoshiLookupResult> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hoshidicts::HoshiLookupResult>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::hoshidicts::HoshiPitchEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hoshidicts::HoshiPitchEntry>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::hoshidicts::HoshiTransformGroup> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hoshidicts::HoshiTransformGroup>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<Vec<u8>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1035,6 +1602,18 @@ impl SseDecode for Vec<Vec<u8>> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<Vec<u8>>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<i32>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -1431,6 +2010,13 @@ impl SseDecode for u16 {
     }
 }
 
+impl SseDecode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u64::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for u8 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1472,16 +2058,44 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        7 => wire__crate__api__epub__get_chapter_content_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__rhttp__http__make_http_request_receive_stream_impl(
+        6 => wire__crate__api__hoshidicts__native__create_lookup_session_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__epub__parse_epub_from_bytes_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__epub__parse_epub_from_path_impl(port, ptr, rust_vec_len, data_len),
-        12 => {
+        8 => wire__crate__api__epub__get_chapter_content_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__hoshidicts__native__get_media_file_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        10 => {
+            wire__crate__api__hoshidicts__native__get_styles_impl(port, ptr, rust_vec_len, data_len)
+        }
+        11 => wire__crate__api__hoshidicts__native__import_dictionary_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        12 => wire__crate__api__hoshidicts__native__lookup_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__rhttp__http__make_http_request_receive_stream_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        14 => wire__crate__api__epub__parse_epub_from_bytes_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__epub__parse_epub_from_path_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__hoshidicts__native__rebuild_query_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        18 => {
             wire__crate__api__rhttp__http__register_client_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -1501,13 +2115,13 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        6 => wire__crate__api__rhttp__client__create_static_resolver_sync_impl(
+        7 => wire__crate__api__rhttp__client__create_static_resolver_sync_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => wire__crate__api__image__process_crop_image_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__rhttp__http__register_client_sync_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__image__process_crop_image_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__rhttp__http__register_client_sync_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1540,6 +2154,24 @@ impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<
 
 impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<DnsSettings>> for DnsSettings {
     fn into_into_dart(self) -> FrbWrapper<DnsSettings> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<HoshiLookupSession> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<HoshiLookupSession>
+{
+}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<HoshiLookupSession>> for HoshiLookupSession {
+    fn into_into_dart(self) -> FrbWrapper<HoshiLookupSession> {
         self.into()
     }
 }
@@ -1687,6 +2319,212 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::epub::EpubResource>
     for crate::api::epub::EpubResource
 {
     fn into_into_dart(self) -> crate::api::epub::EpubResource {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiDictionaryStyle {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.dict_name.into_into_dart().into_dart(),
+            self.styles.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiDictionaryStyle
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiDictionaryStyle>
+    for crate::api::hoshidicts::HoshiDictionaryStyle
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiDictionaryStyle {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiFrequency {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.value.into_into_dart().into_dart(),
+            self.display_value.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiFrequency
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiFrequency>
+    for crate::api::hoshidicts::HoshiFrequency
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiFrequency {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiFrequencyEntry {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.dict_name.into_into_dart().into_dart(),
+            self.frequencies.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiFrequencyEntry
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiFrequencyEntry>
+    for crate::api::hoshidicts::HoshiFrequencyEntry
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiFrequencyEntry {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiGlossaryEntry {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.dict_name.into_into_dart().into_dart(),
+            self.glossary.into_into_dart().into_dart(),
+            self.definition_tags.into_into_dart().into_dart(),
+            self.term_tags.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiGlossaryEntry
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiGlossaryEntry>
+    for crate::api::hoshidicts::HoshiGlossaryEntry
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiGlossaryEntry {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiImportResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.success.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.term_count.into_into_dart().into_dart(),
+            self.meta_count.into_into_dart().into_dart(),
+            self.freq_count.into_into_dart().into_dart(),
+            self.pitch_count.into_into_dart().into_dart(),
+            self.media_count.into_into_dart().into_dart(),
+            self.errors.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiImportResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiImportResult>
+    for crate::api::hoshidicts::HoshiImportResult
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiImportResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiLookupResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.matched.into_into_dart().into_dart(),
+            self.deinflected.into_into_dart().into_dart(),
+            self.trace.into_into_dart().into_dart(),
+            self.preprocessor_steps.into_into_dart().into_dart(),
+            self.term.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiLookupResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiLookupResult>
+    for crate::api::hoshidicts::HoshiLookupResult
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiLookupResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiPitchEntry {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.dict_name.into_into_dart().into_dart(),
+            self.pitch_positions.into_into_dart().into_dart(),
+            self.transcriptions.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiPitchEntry
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiPitchEntry>
+    for crate::api::hoshidicts::HoshiPitchEntry
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiPitchEntry {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiTermResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.expression.into_into_dart().into_dart(),
+            self.reading.into_into_dart().into_dart(),
+            self.rules.into_into_dart().into_dart(),
+            self.score.into_into_dart().into_dart(),
+            self.glossaries.into_into_dart().into_dart(),
+            self.frequencies.into_into_dart().into_dart(),
+            self.pitches.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiTermResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiTermResult>
+    for crate::api::hoshidicts::HoshiTermResult
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiTermResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hoshidicts::HoshiTransformGroup {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.description.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hoshidicts::HoshiTransformGroup
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hoshidicts::HoshiTransformGroup>
+    for crate::api::hoshidicts::HoshiTransformGroup
+{
+    fn into_into_dart(self) -> crate::api::hoshidicts::HoshiTransformGroup {
         self
     }
 }
@@ -2050,6 +2888,13 @@ impl SseEncode for DnsSettings {
     }
 }
 
+impl SseEncode for HoshiLookupSession {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
 impl SseEncode for RequestClient {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2102,6 +2947,17 @@ impl SseEncode
 
 impl SseEncode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DnsSettings>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2208,6 +3064,98 @@ impl SseEncode for crate::api::epub::EpubResource {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.name, serializer);
         <Vec<u8>>::sse_encode(self.content, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiDictionaryStyle {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.dict_name, serializer);
+        <String>::sse_encode(self.styles, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiFrequency {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.value, serializer);
+        <String>::sse_encode(self.display_value, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiFrequencyEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.dict_name, serializer);
+        <Vec<crate::api::hoshidicts::HoshiFrequency>>::sse_encode(self.frequencies, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiGlossaryEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.dict_name, serializer);
+        <String>::sse_encode(self.glossary, serializer);
+        <String>::sse_encode(self.definition_tags, serializer);
+        <String>::sse_encode(self.term_tags, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiImportResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.success, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <u64>::sse_encode(self.term_count, serializer);
+        <u64>::sse_encode(self.meta_count, serializer);
+        <u64>::sse_encode(self.freq_count, serializer);
+        <u64>::sse_encode(self.pitch_count, serializer);
+        <u64>::sse_encode(self.media_count, serializer);
+        <Vec<String>>::sse_encode(self.errors, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiLookupResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.matched, serializer);
+        <String>::sse_encode(self.deinflected, serializer);
+        <Vec<crate::api::hoshidicts::HoshiTransformGroup>>::sse_encode(self.trace, serializer);
+        <i32>::sse_encode(self.preprocessor_steps, serializer);
+        <crate::api::hoshidicts::HoshiTermResult>::sse_encode(self.term, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiPitchEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.dict_name, serializer);
+        <Vec<i32>>::sse_encode(self.pitch_positions, serializer);
+        <Vec<String>>::sse_encode(self.transcriptions, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiTermResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.expression, serializer);
+        <String>::sse_encode(self.reading, serializer);
+        <String>::sse_encode(self.rules, serializer);
+        <i32>::sse_encode(self.score, serializer);
+        <Vec<crate::api::hoshidicts::HoshiGlossaryEntry>>::sse_encode(self.glossaries, serializer);
+        <Vec<crate::api::hoshidicts::HoshiFrequencyEntry>>::sse_encode(
+            self.frequencies,
+            serializer,
+        );
+        <Vec<crate::api::hoshidicts::HoshiPitchEntry>>::sse_encode(self.pitches, serializer);
+    }
+}
+
+impl SseEncode for crate::api::hoshidicts::HoshiTransformGroup {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.description, serializer);
     }
 }
 
@@ -2367,12 +3315,92 @@ impl SseEncode for Vec<crate::api::epub::EpubResource> {
     }
 }
 
+impl SseEncode for Vec<crate::api::hoshidicts::HoshiDictionaryStyle> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hoshidicts::HoshiDictionaryStyle>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::hoshidicts::HoshiFrequency> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hoshidicts::HoshiFrequency>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::hoshidicts::HoshiFrequencyEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hoshidicts::HoshiFrequencyEntry>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::hoshidicts::HoshiGlossaryEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hoshidicts::HoshiGlossaryEntry>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::hoshidicts::HoshiLookupResult> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hoshidicts::HoshiLookupResult>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::hoshidicts::HoshiPitchEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hoshidicts::HoshiPitchEntry>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::hoshidicts::HoshiTransformGroup> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hoshidicts::HoshiTransformGroup>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<Vec<u8>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <Vec<u8>>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <i32>::sse_encode(item, serializer);
         }
     }
 }
@@ -2716,6 +3744,13 @@ impl SseEncode for u16 {
     }
 }
 
+impl SseEncode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u64::<NativeEndian>(self).unwrap();
+    }
+}
+
 impl SseEncode for u8 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2746,6 +3781,7 @@ mod io {
     // Section: imports
 
     use super::*;
+    use crate::api::hoshidicts::native::*;
     use crate::api::rhttp::client::*;
     use crate::*;
     use flutter_rust_bridge::for_generated::byteorder::{
@@ -2787,6 +3823,20 @@ mod io {
     }
 
     #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_mangayomi_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_mangayomi_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>>::decrement_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_mangayomi_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
         ptr: *const std::ffi::c_void,
     ) {
@@ -2812,6 +3862,7 @@ mod web {
     // Section: imports
 
     use super::*;
+    use crate::api::hoshidicts::native::*;
     use crate::api::rhttp::client::*;
     use crate::*;
     use flutter_rust_bridge::for_generated::byteorder::{
@@ -2852,6 +3903,20 @@ mod web {
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DnsSettings>>::decrement_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>>::increment_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HoshiLookupSession>>::decrement_strong_count(ptr as _);
     }
 
     #[wasm_bindgen]

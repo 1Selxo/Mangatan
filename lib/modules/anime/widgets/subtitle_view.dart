@@ -10,16 +10,22 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 class CustomSubtitleView extends ConsumerStatefulWidget {
   final VideoController controller;
   final SubtitleViewConfiguration configuration;
+  final MiningContext Function(String text)? miningContextBuilder;
+  final bool paintSubtitle;
 
   const CustomSubtitleView({
     super.key,
     required this.controller,
     required this.configuration,
+    this.miningContextBuilder,
+    this.paintSubtitle = true,
   });
 
   @override
@@ -84,21 +90,46 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
         final textScaler =
             widget.configuration.textScaler ??
             TextScaler.linear(textScaleFactor);
+        final subtitleText = [
+          for (final line in subtitle)
+            if (line.trim().isNotEmpty) line.trim(),
+        ].join('\n');
+        final subtitleStyle = widget.paintSubtitle
+            ? style
+            : style.copyWith(
+                color: Colors.transparent,
+                backgroundColor: Colors.transparent,
+                shadows: const [],
+              );
+        final text = Text(
+          subtitleText,
+          style: subtitleStyle,
+          textAlign: textAlign,
+          textScaler: textScaler,
+        );
         return Material(
           color: Colors.transparent,
           child: AnimatedContainer(
             padding: padding,
             duration: duration,
             alignment: Alignment.bottomCenter,
-            child: Text(
-              [
-                for (final line in subtitle)
-                  if (line.trim().isNotEmpty) line.trim(),
-              ].join('\n'),
-              style: subtileTextStyle(ref),
-              textAlign: textAlign,
-              textScaler: textScaler,
-            ),
+            child:
+                subtitleText.trim().isEmpty ||
+                    widget.miningContextBuilder == null
+                ? text
+                : GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onLongPress: () {
+                      MiningLookupSheet.show(
+                        context: context,
+                        text: subtitleText,
+                        miningContext: widget.miningContextBuilder!(
+                          subtitleText,
+                        ),
+                      );
+                    },
+                    child: text,
+                  ),
           ),
         );
       },

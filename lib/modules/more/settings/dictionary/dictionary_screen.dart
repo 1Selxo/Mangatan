@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +7,7 @@ import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
+import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 
@@ -21,7 +22,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   List<InstalledDictionary> _dictionaries = const [];
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
   String _language = 'ja';
-  double _opacity = 0.72;
+  double _opacity = 0.0;
   double _boxScale = 1;
   double _boxScaleY = 1;
   bool _outlineVisible = true;
@@ -32,6 +33,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   late DictionaryPopupPreferences _popupPreferences;
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
   Uri _ankiEndpoint = Uri.parse('http://127.0.0.1:8765');
+  int? _ankiVersion;
+  List<String> _ankiDecks = const [];
+  List<String> _ankiModels = const [];
+  List<String> _ankiFields = const [];
+  String? _ankiError;
+  bool _ankiRefreshing = false;
 
   @override
   void initState() {
@@ -70,6 +77,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _screenAiAvailable = values[11] as bool;
       _loading = false;
     });
+    unawaited(_refreshAnki(silent: true));
   }
 
   Future<void> _importDictionary() async {
@@ -172,6 +180,187 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   Future<void> _saveAnki(AnkiMiningProfile profile) async {
     setState(() => _ankiProfile = profile);
     await MiningPreferences.setAnkiProfile(profile);
+  }
+
+  Future<void> _refreshAnki({bool silent = false}) async {
+    if (_ankiRefreshing) return;
+    setState(() {
+      _ankiRefreshing = true;
+      _ankiError = null;
+    });
+    try {
+      final service = AnkiConnectService(endpoint: _ankiEndpoint);
+      final version = await service.version();
+      final decks = await service.deckNames();
+      final models = await service.modelNames();
+      final selectedModel = _ankiProfile.modelName.trim().isNotEmpty
+          ? _ankiProfile.modelName
+          : (models.isEmpty ? '' : models.first);
+      final fields = selectedModel.trim().isEmpty
+          ? <String>[]
+          : await service.modelFieldNames(selectedModel);
+      final isLapis = _isLapisLike(selectedModel, fields);
+      final needsLapisMigration = isLapis && _needsLapisMigration();
+      final profile =
+          fields.isNotEmpty &&
+              (!_fieldMapMatches(fields) || needsLapisMigration)
+          ? _ankiProfile.copyWith(
+              fieldMap: _autoMapFields(
+                fields,
+                needsLapisMigration ? const {} : _ankiProfile.fieldMap,
+              ),
+            )
+          : _ankiProfile;
+      if (!identical(profile, _ankiProfile)) {
+        await MiningPreferences.setAnkiProfile(profile);
+      }
+      if (!mounted) return;
+      setState(() {
+        _ankiProfile = profile;
+        _ankiVersion = version;
+        _ankiDecks = decks;
+        _ankiModels = models;
+        _ankiFields = fields;
+      });
+      if (!silent) botToast('Connected to AnkiConnect v$version', second: 3);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _ankiVersion = null;
+        _ankiDecks = const [];
+        _ankiModels = const [];
+        _ankiFields = const [];
+        _ankiError = error.toString();
+      });
+      if (!silent) botToast('AnkiConnect failed: $error', second: 5);
+    } finally {
+      if (mounted) setState(() => _ankiRefreshing = false);
+    }
+  }
+
+  Future<void> _selectAnkiModel(String modelName) async {
+    var fields = <String>[];
+    try {
+      fields = await AnkiConnectService(
+        endpoint: _ankiEndpoint,
+      ).modelFieldNames(modelName);
+    } catch (error) {
+      botToast('Could not fetch fields: $error', second: 5);
+    }
+    final profile = _ankiProfile.copyWith(
+      modelName: modelName,
+      fieldMap: _autoMapFields(
+        fields,
+        _isLapisLike(modelName, fields) ? const {} : _ankiProfile.fieldMap,
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _ankiFields = fields);
+    await _saveAnki(profile);
+  }
+
+  Map<String, String> _autoMapFields(
+    List<String> fields,
+    Map<String, String> current,
+  ) {
+    if (fields.isEmpty) return current;
+    return {
+      for (final indexed in fields.indexed)
+        indexed.$2:
+            current[indexed.$2] ??
+            AnkiMarker.autoDetectTemplate(indexed.$2, indexed.$1) ??
+            '',
+    };
+  }
+
+  bool _fieldMapMatches(List<String> fields) {
+    final fieldSet = fields.toSet();
+    return _ankiProfile.fieldMap.keys.any(fieldSet.contains);
+  }
+
+  bool _isLapisLike(String modelName, List<String> fields) {
+    final names = fields.map((field) => field.toLowerCase()).toSet();
+    return modelName.toLowerCase().contains('lapis') ||
+        names.containsAll({'expression', 'maindefinition', 'sentence'});
+  }
+
+  bool _needsLapisMigration() {
+    final map = _ankiProfile.fieldMap;
+    return map['ExpressionFurigana'] == AnkiMarker.furigana ||
+        map['DefinitionPicture'] == AnkiMarker.screenshot ||
+        map['IsWordAndSentenceCard'] != 'x';
+  }
+
+  Future<void> _editAnkiFieldMap() async {
+    final fields = _ankiFields.isNotEmpty
+        ? _ankiFields
+        : _ankiProfile.fieldMap.keys.toList();
+    if (fields.isEmpty) {
+      botToast('Connect to Anki first to fetch note fields', second: 4);
+      return;
+    }
+    var map = _autoMapFields(fields, _ankiProfile.fieldMap);
+    final saved = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Anki field templates'),
+              content: SizedBox(
+                width: 560,
+                height: 520,
+                child: ListView.separated(
+                  itemCount: fields.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final field = fields[index];
+                    final value = map[field] ?? '';
+                    return _AnkiFieldTemplatePicker(
+                      fieldName: field,
+                      value: value,
+                      onChanged: (next) {
+                        setDialogState(() => map = {...map, field: next});
+                      },
+                      onEditCustom: () async {
+                        final next = await _editText(
+                          title: field,
+                          value: value,
+                          hint: AnkiMarker.expression,
+                          maxLines: 4,
+                        );
+                        if (next == null) return;
+                        setDialogState(() => map = {...map, field: next});
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setDialogState(
+                      () => map = _autoMapFields(fields, const {}),
+                    );
+                  },
+                  child: const Text('Auto map'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, map),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (saved == null) return;
+    await _saveAnki(_ankiProfile.copyWith(fieldMap: saved));
   }
 
   @override
@@ -500,9 +689,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 _SliderSetting(
                   title: 'Text overlay opacity',
                   value: _opacity,
-                  min: 0.1,
+                  min: 0,
                   max: 1,
-                  divisions: 18,
+                  divisions: 20,
                   label: '${(_opacity * 100).round()}%',
                   onChanged: (value) {
                     setState(() => _opacity = value);
@@ -575,40 +764,119 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     if (endpoint == null || !endpoint.hasScheme) return;
                     setState(() => _ankiEndpoint = endpoint);
                     await MiningPreferences.setAnkiEndpoint(endpoint);
+                    await _refreshAnki();
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.style_outlined),
-                  title: const Text('Deck'),
-                  subtitle: Text(_ankiProfile.deckName),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final value = await _editText(
-                      title: 'Anki deck',
-                      value: _ankiProfile.deckName,
-                    );
-                    if (value?.trim().isEmpty ?? true) return;
-                    await _saveAnki(
-                      _ankiProfile.copyWith(deckName: value!.trim()),
-                    );
-                  },
+                  leading: Icon(
+                    _ankiVersion == null
+                        ? Icons.cloud_off_outlined
+                        : Icons.check_circle_outline,
+                  ),
+                  title: Text(
+                    _ankiVersion == null
+                        ? 'AnkiConnect not connected'
+                        : 'AnkiConnect v$_ankiVersion',
+                  ),
+                  subtitle: Text(
+                    _ankiError ??
+                        (_ankiFields.isEmpty
+                            ? 'Refresh to fetch decks, note types, and fields.'
+                            : '${_ankiDecks.length} decks, ${_ankiModels.length} note types, ${_ankiFields.length} fields fetched.'),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: _ankiRefreshing
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : IconButton(
+                          tooltip: 'Refresh from Anki',
+                          onPressed: () => _refreshAnki(),
+                          icon: const Icon(Icons.refresh),
+                        ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.view_agenda_outlined),
-                  title: const Text('Note type'),
-                  subtitle: Text(_ankiProfile.modelName),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final value = await _editText(
-                      title: 'Anki note type',
-                      value: _ankiProfile.modelName,
-                    );
-                    if (value?.trim().isEmpty ?? true) return;
-                    await _saveAnki(
-                      _ankiProfile.copyWith(modelName: value!.trim()),
-                    );
-                  },
-                ),
+                if (_ankiDecks.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _ankiDecks.contains(_ankiProfile.deckName)
+                          ? _ankiProfile.deckName
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Deck',
+                        prefixIcon: Icon(Icons.style_outlined),
+                      ),
+                      hint: Text(_ankiProfile.deckName),
+                      items: [
+                        for (final deck in _ankiDecks)
+                          DropdownMenuItem(value: deck, child: Text(deck)),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        _saveAnki(_ankiProfile.copyWith(deckName: value));
+                      },
+                    ),
+                  )
+                else
+                  ListTile(
+                    leading: const Icon(Icons.style_outlined),
+                    title: const Text('Deck'),
+                    subtitle: Text(_ankiProfile.deckName),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () async {
+                      final value = await _editText(
+                        title: 'Anki deck',
+                        value: _ankiProfile.deckName,
+                      );
+                      if (value?.trim().isEmpty ?? true) return;
+                      await _saveAnki(
+                        _ankiProfile.copyWith(deckName: value!.trim()),
+                      );
+                    },
+                  ),
+                const SizedBox(height: 12),
+                if (_ankiModels.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _ankiModels.contains(_ankiProfile.modelName)
+                          ? _ankiProfile.modelName
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Note type',
+                        prefixIcon: Icon(Icons.view_agenda_outlined),
+                      ),
+                      hint: Text(_ankiProfile.modelName),
+                      items: [
+                        for (final model in _ankiModels)
+                          DropdownMenuItem(value: model, child: Text(model)),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        _selectAnkiModel(value);
+                      },
+                    ),
+                  )
+                else
+                  ListTile(
+                    leading: const Icon(Icons.view_agenda_outlined),
+                    title: const Text('Note type'),
+                    subtitle: Text(_ankiProfile.modelName),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () async {
+                      final value = await _editText(
+                        title: 'Anki note type',
+                        value: _ankiProfile.modelName,
+                      );
+                      if (value?.trim().isEmpty ?? true) return;
+                      await _saveAnki(
+                        _ankiProfile.copyWith(modelName: value!.trim()),
+                      );
+                      await _refreshAnki(silent: true);
+                    },
+                  ),
                 ListTile(
                   leading: const Icon(Icons.sell_outlined),
                   title: const Text('Default tags'),
@@ -635,36 +903,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   leading: const Icon(Icons.data_object),
                   title: const Text('Field templates'),
                   subtitle: Text(
-                    '${_ankiProfile.fieldMap.length} fields configured',
+                    _ankiFields.isEmpty
+                        ? '${_ankiProfile.fieldMap.length} fields configured'
+                        : '${_ankiFields.length} fetched fields, ${_ankiProfile.fieldMap.length} mapped',
                   ),
                   trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final value = await _editText(
-                      title: 'Anki field templates (JSON)',
-                      value: const JsonEncoder.withIndent(
-                        '  ',
-                      ).convert(_ankiProfile.fieldMap),
-                      maxLines: 14,
-                    );
-                    if (value == null) return;
-                    try {
-                      final decoded = jsonDecode(value);
-                      if (decoded is! Map) throw const FormatException();
-                      await _saveAnki(
-                        _ankiProfile.copyWith(
-                          fieldMap: decoded.map(
-                            (key, value) =>
-                                MapEntry(key.toString(), value.toString()),
-                          ),
-                        ),
-                      );
-                    } on FormatException {
-                      botToast(
-                        'Field templates must be a JSON object',
-                        second: 4,
-                      );
-                    }
-                  },
+                  onTap: _editAnkiFieldMap,
                 ),
                 SwitchListTile(
                   title: const Text('Check for duplicates'),
@@ -681,6 +925,69 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 const SizedBox(height: 24),
               ],
             ),
+    );
+  }
+}
+
+class _AnkiFieldTemplatePicker extends StatelessWidget {
+  const _AnkiFieldTemplatePicker({
+    required this.fieldName,
+    required this.value,
+    required this.onChanged,
+    required this.onEditCustom,
+  });
+
+  final String fieldName;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onEditCustom;
+
+  @override
+  Widget build(BuildContext context) {
+    final templates = <String, String>{
+      'Leave empty': '',
+      ...AnkiMarker.standardTemplates,
+    };
+    final isStandard = templates.containsValue(value);
+    final items = <DropdownMenuItem<String>>[
+      if (!isStandard && value.trim().isNotEmpty)
+        DropdownMenuItem(value: value, child: Text('Custom: $value')),
+      for (final entry in templates.entries)
+        DropdownMenuItem(value: entry.value, child: Text(entry.key)),
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 150,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Text(
+              fieldName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            initialValue: value,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Template'),
+            items: items,
+            onChanged: (next) {
+              if (next != null) onChanged(next);
+            },
+          ),
+        ),
+        IconButton(
+          tooltip: 'Edit custom template',
+          onPressed: onEditCustom,
+          icon: const Icon(Icons.edit_outlined),
+        ),
+      ],
     );
   }
 }

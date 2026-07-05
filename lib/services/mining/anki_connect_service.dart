@@ -14,21 +14,43 @@ class AnkiConnectException implements Exception {
 
 class AnkiConnectService {
   final Uri endpoint;
-  final http.Client _client;
+  final http.Client? _injectedClient;
 
   AnkiConnectService({Uri? endpoint, http.Client? client})
     : endpoint = endpoint ?? Uri.parse('http://127.0.0.1:8765'),
-      _client = client ?? http.Client();
+      _injectedClient = client;
 
   Future<dynamic> invoke(
     String action, {
     Map<String, dynamic> params = const {},
   }) async {
-    final response = await _client.post(
-      endpoint,
-      headers: const {'content-type': 'application/json'},
-      body: jsonEncode({'action': action, 'version': 6, 'params': params}),
-    );
+    // AnkiConnect closes idle HTTP/1.1 sockets without advertising it. Dart's
+    // pooled client can then reuse that stale socket and fail on the next
+    // request with Windows error 10053. Use a one-shot connection by default.
+    final client = _injectedClient ?? http.Client();
+    late final http.Response response;
+    try {
+      response = await client
+          .post(
+            endpoint,
+            headers: const {
+              'content-type': 'application/json',
+              'connection': 'close',
+            },
+            body: jsonEncode({
+              'action': action,
+              'version': 6,
+              'params': params,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (error) {
+      throw AnkiConnectException(
+        'Could not reach AnkiConnect at $endpoint. Make sure Anki is open and the AnkiConnect add-on is installed. ($error)',
+      );
+    } finally {
+      if (_injectedClient == null) client.close();
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw AnkiConnectException(
         'AnkiConnect HTTP ${response.statusCode}: ${response.body}',
@@ -58,6 +80,7 @@ class AnkiConnectService {
   }
 
   Future<List<String>> modelFieldNames(String modelName) async {
+    if (modelName.trim().isEmpty) return const [];
     final result = await invoke(
       'modelFieldNames',
       params: {'modelName': modelName},
@@ -129,25 +152,47 @@ class AnkiConnectService {
     bool duplicateCheck = true,
     bool syncOnCreate = false,
   }) async {
-    if (draft.screenshotBytes != null && draft.screenshotFileName != null) {
+    final normalized = await _normalizeFieldsForModel(draft);
+    for (final media in normalized.mediaFiles) {
+      await storeMediaFile(filename: media.filename, data: media.bytes);
+    }
+    if (normalized.screenshotBytes != null &&
+        normalized.screenshotFileName != null) {
       await storeMediaFile(
-        filename: draft.screenshotFileName!,
-        data: draft.screenshotBytes!,
+        filename: normalized.screenshotFileName!,
+        data: normalized.screenshotBytes!,
       );
     }
     if (duplicateCheck) {
       final existing = await findDuplicateExpressions(
-        deckName: draft.deckName,
-        expression: draft.expression,
+        deckName: normalized.deckName,
+        expression: normalized.expression,
       );
       if (existing.isNotEmpty) {
         throw AnkiConnectException(
-          'A card for "${draft.expression}" already exists.',
+          'A card for "${normalized.expression}" already exists.',
         );
       }
     }
-    final noteId = await addNote(draft);
+    final noteId = await addNote(normalized);
     if (syncOnCreate) await sync();
     return noteId;
+  }
+
+  Future<AnkiCardDraft> _normalizeFieldsForModel(AnkiCardDraft draft) async {
+    final modelFields = await modelFieldNames(draft.modelName);
+    if (modelFields.isEmpty) return draft;
+    return AnkiCardDraft(
+      deckName: draft.deckName,
+      modelName: draft.modelName,
+      expression: draft.expression,
+      fields: {
+        for (final field in modelFields) field: draft.fields[field] ?? '',
+      },
+      tags: draft.tags,
+      screenshotFileName: draft.screenshotFileName,
+      screenshotBytes: draft.screenshotBytes,
+      mediaFiles: draft.mediaFiles,
+    );
   }
 }

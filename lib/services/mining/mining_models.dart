@@ -73,6 +73,7 @@ class AnkiCardDraft {
   final List<String> tags;
   final String? screenshotFileName;
   final Uint8List? screenshotBytes;
+  final List<AnkiMediaFile> mediaFiles;
 
   const AnkiCardDraft({
     required this.deckName,
@@ -82,5 +83,13 @@ class AnkiCardDraft {
     this.tags = const [],
     this.screenshotFileName,
     this.screenshotBytes,
+    this.mediaFiles = const [],
   });
+}
+
+class AnkiMediaFile {
+  final String filename;
+  final Uint8List bytes;
+
+  const AnkiMediaFile({required this.filename, required this.bytes});
 }

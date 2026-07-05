@@ -12,6 +12,7 @@ import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,7 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
   final ValueNotifier<List<(String, int)>> chapterMarks;
   // Bumped by the player on each d-pad key so the controls reveal on a TV remote.
   final ValueNotifier<int> revealControls;
+  final MiningContext Function(String text)? subtitleMiningContextBuilder;
   const MobileControllerWidget({
     super.key,
     required this.videoController,
@@ -38,6 +40,7 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
     required this.doubleSpeed,
     required this.chapterMarks,
     required this.revealControls,
+    this.subtitleMiningContextBuilder,
   });
 
   @override
@@ -355,16 +358,16 @@ class _MobileControllerWidgetState
     return Stack(
       children: [
         Consumer(
-          builder: (context, ref, _) => ref.read(useLibassStateProvider)
-              ? const SizedBox.shrink()
-              : Positioned(
-                  child: CustomSubtitleView(
-                    controller: widget.videoController,
-                    configuration: SubtitleViewConfiguration(
-                      style: subtileTextStyle(ref),
-                    ),
-                  ),
-                ),
+          builder: (context, ref, _) => Positioned(
+            child: CustomSubtitleView(
+              controller: widget.videoController,
+              configuration: SubtitleViewConfiguration(
+                style: subtileTextStyle(ref),
+              ),
+              paintSubtitle: !ref.read(useLibassStateProvider),
+              miningContextBuilder: widget.subtitleMiningContextBuilder,
+            ),
+          ),
         ),
         FocusScope(
           node: _controlsScope,

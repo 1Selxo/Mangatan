@@ -47,6 +47,9 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/aniskip.dart';
 import 'package:mangayomi/services/fetch_subtitles.dart';
 import 'package:mangayomi/services/get_video_list.dart';
+import 'package:mangayomi/services/mining/jimaku_service.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/torrent_server.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
@@ -312,6 +315,8 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _hasEndingSkip = false;
   bool _initSubtitleAndAudio = true;
   bool _includeSubtitles = false;
+  bool _jimakuAutoLoadAttempted = false;
+  bool _jimakuLoading = false;
   int _subDelay = 0;
   final _subDelayController = TextEditingController(text: "0");
   double _subSpeed = 1;
@@ -754,6 +759,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           } catch (_) {}
         }
       }
+      unawaited(_autoLoadJimakuSubtitle());
     }
   }
 
@@ -771,6 +777,178 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       newPhase = _AniSkipPhase.none;
     }
     if (_skipPhase.value != newPhase) _skipPhase.value = newPhase;
+  }
+
+  MiningContext _subtitleMiningContext(String subtitleText) {
+    return MiningContext(
+      mediaType: MiningMediaType.anime,
+      sourceTitle: widget.episode.manga.value?.name ?? '',
+      chapterTitle: widget.episode.name ?? '',
+      sentence: subtitleText,
+      position: _currentPosition.value,
+      sourceUri: Uri.tryParse(_firstVid.originalUrl),
+      imageBytesLoader: () async => _player.screenshot(
+        format: 'image/png',
+        includeLibassSubtitles: _includeSubtitles,
+      ),
+    );
+  }
+
+  Future<void> _autoLoadJimakuSubtitle() async {
+    if (_jimakuAutoLoadAttempted || _jimakuLoading) return;
+    _jimakuAutoLoadAttempted = true;
+    if (!await MiningPreferences.getAutoJimakuEnabled()) return;
+    if (_firstVid.subtitles?.isNotEmpty ?? false) return;
+    final apiKey = await MiningPreferences.getJimakuApiKey();
+    if (apiKey.trim().isEmpty) return;
+    await _loadJimakuSubtitle(apiKey: apiKey, showFeedback: false);
+  }
+
+  Future<void> _showJimakuSubtitleDialog() async {
+    final mediaId = widget.episode.manga.value?.id;
+    final apiKeyController = TextEditingController(
+      text: await MiningPreferences.getJimakuApiKey(),
+    );
+    final titleController = TextEditingController(
+      text: await MiningPreferences.getJimakuTitleOverride(mediaId),
+    );
+    if (!mounted) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Jimaku subtitles'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: apiKeyController,
+                decoration: const InputDecoration(labelText: 'Jimaku API key'),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: titleController,
+                decoration: InputDecoration(
+                  labelText: 'Title override',
+                  hintText: widget.episode.manga.value?.name ?? '',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(context.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Search'),
+            ),
+          ],
+        );
+      },
+    );
+    if (result != true) return;
+    await MiningPreferences.setJimakuApiKey(apiKeyController.text);
+    await MiningPreferences.setJimakuTitleOverride(
+      mediaId,
+      titleController.text,
+    );
+    await _loadJimakuSubtitle(
+      apiKey: apiKeyController.text,
+      titleOverride: titleController.text,
+      showFeedback: true,
+    );
+  }
+
+  Future<void> _loadJimakuSubtitle({
+    required String apiKey,
+    String titleOverride = '',
+    required bool showFeedback,
+  }) async {
+    if (_jimakuLoading) return;
+    _jimakuLoading = true;
+    try {
+      final guess = await _buildJimakuGuess(titleOverride);
+      if (guess.title.trim().isEmpty) {
+        if (showFeedback) botToast('Set a Jimaku title first', second: 3);
+        return;
+      }
+      if (showFeedback) botToast('Searching Jimaku: ${guess.displayName}');
+      final service = JimakuSubtitleService();
+      final entries = await service.searchEntries(
+        apiKey: apiKey,
+        query: guess.title,
+      );
+      final entry = selectBestJimakuEntry(entries, guess.title);
+      if (entry == null) {
+        if (showFeedback) {
+          botToast('No Jimaku entries found for "${guess.title}"', second: 4);
+        }
+        return;
+      }
+      final files = await service.matchingFiles(
+        apiKey: apiKey,
+        entry: entry,
+        guess: guess,
+      );
+      if (files.isEmpty) {
+        if (showFeedback) {
+          botToast('No matching Jimaku subtitle files found', second: 4);
+        }
+        return;
+      }
+      final outputDir = Directory(
+        path.join((await getTemporaryDirectory()).path, 'jimaku_subtitles'),
+      );
+      final subtitleFile = await service.downloadFile(
+        apiKey: apiKey,
+        file: files.first,
+        outputDirectory: outputDir,
+      );
+      await _player.setSubtitleTrack(
+        SubtitleTrack.uri(
+          subtitleFile.path,
+          title: 'Jimaku ${files.first.name}',
+          language: 'ja',
+        ),
+      );
+      if (showFeedback) botToast('Jimaku subtitle added', second: 3);
+    } catch (e) {
+      if (showFeedback) botToast('Jimaku failed: $e', second: 5);
+    } finally {
+      _jimakuLoading = false;
+    }
+  }
+
+  Future<JimakuMediaGuess> _buildJimakuGuess(String titleOverride) async {
+    final savedTitle = titleOverride.trim().isNotEmpty
+        ? titleOverride.trim()
+        : await MiningPreferences.getJimakuTitleOverride(
+            widget.episode.manga.value?.id,
+          );
+    final candidates = [
+      if (savedTitle.trim().isNotEmpty) savedTitle,
+      '${widget.episode.manga.value?.name ?? ''} ${widget.episode.name ?? ''}',
+      widget.episode.name ?? '',
+      _firstVid.originalUrl,
+      _firstVid.url,
+    ];
+    JimakuMediaGuess? parsed;
+    for (final candidate in candidates) {
+      parsed = guessJimakuMedia(candidate);
+      if (parsed != null) break;
+    }
+    if (savedTitle.trim().isNotEmpty) {
+      return JimakuMediaGuess(
+        title: savedTitle,
+        episode: parsed?.episode,
+        season: parsed?.season,
+        episodeCandidates: parsed?.episodeCandidates ?? const {},
+      );
+    }
+    return parsed ??
+        JimakuMediaGuess(title: widget.episode.manga.value?.name ?? '');
   }
 
   void _updateRpcTimestamp() {
@@ -1425,6 +1603,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               }
             },
             child: textWidget(context.l10n.search_subtitles, false),
+          ),
+          const SizedBox(height: 30),
+          GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+              Future.microtask(_showJimakuSubtitleDialog);
+            },
+            child: textWidget('Search Jimaku', false),
           ),
         ],
       ),
@@ -2385,6 +2571,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
                   chapterMarks: _chapterMarks,
                   revealControls: _revealControls,
+                  subtitleMiningContextBuilder: _subtitleMiningContext,
                 )
               : MobileControllerWidget(
                   videoController: _controller,
@@ -2397,6 +2584,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                     _isDoubleSpeed.value = value ?? false;
                   },
                   chapterMarks: _chapterMarks,
+                  subtitleMiningContextBuilder: _subtitleMiningContext,
                 ),
           controller: _controller,
           // When docked left for the settings panel, fill the (narrower) slot

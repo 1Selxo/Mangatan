@@ -5,10 +5,11 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/providers/reader_controller_provider.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 
-class ImageViewPaged extends ConsumerWidget {
+class ImageViewPaged extends ConsumerStatefulWidget {
   final UChapDataPreload data;
   final Function(UChapDataPreload data) onLongPressData;
   final Widget? Function(ExtendedImageState state) loadStateChanged;
@@ -25,9 +26,44 @@ class ImageViewPaged extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ImageViewPaged> createState() => _ImageViewPagedState();
+}
+
+class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
+  final GlobalKey _imageKey = GlobalKey();
+  late ReaderOcrController _ocr = ReaderOcrController(
+    widget.data,
+    imageKey: _imageKey,
+  )..addListener(_repaint);
+
+  void _repaint() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant ImageViewPaged oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.data, widget.data)) {
+      _ocr
+        ..removeListener(_repaint)
+        ..dispose();
+      _ocr = ReaderOcrController(widget.data, imageKey: _imageKey)
+        ..addListener(_repaint);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ocr
+      ..removeListener(_repaint)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scaleType = ref.watch(scaleTypeStateProvider);
-    final image = data.getImageProvider(ref, true);
+    final image = widget.data.getImageProvider(ref, true);
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);
     final needsScaleOverride =
         scaleType == ScaleType.fitWidth || scaleType == ScaleType.fitHeight;
@@ -38,7 +74,7 @@ class ImageViewPaged extends ConsumerWidget {
     GestureConfig Function(ExtendedImageState)? effectiveGestureHandler;
     if (needsScaleOverride) {
       effectiveGestureHandler = (ExtendedImageState state) {
-        final base = initGestureConfigHandler?.call(state);
+        final base = widget.initGestureConfigHandler?.call(state);
         double initScale = base?.initialScale ?? 1.0;
         InitialAlignment alignment =
             base?.initialAlignment ?? InitialAlignment.center;
@@ -70,13 +106,14 @@ class ImageViewPaged extends ConsumerWidget {
         );
       };
     } else {
-      effectiveGestureHandler = initGestureConfigHandler;
+      effectiveGestureHandler = widget.initGestureConfigHandler;
     }
 
     return applyReaderColorFilter(
       GestureDetector(
-        onLongPress: () => onLongPressData.call(data),
+        onLongPress: () => widget.onLongPressData.call(widget.data),
         child: ExtendedImage(
+          key: _imageKey,
           image: image,
           colorBlendMode: colorBlendMode,
           color: color,
@@ -84,9 +121,15 @@ class ImageViewPaged extends ConsumerWidget {
           filterQuality: FilterQuality.medium,
           mode: ExtendedImageMode.gesture,
           handleLoadingProgress: true,
-          loadStateChanged: loadStateChanged,
+          loadStateChanged: (state) {
+            if (state.extendedImageLoadState == LoadState.completed) {
+              _ocr.load();
+            }
+            return widget.loadStateChanged(state);
+          },
           initGestureConfigHandler: effectiveGestureHandler,
-          onDoubleTap: onDoubleTap,
+          onDoubleTap: widget.onDoubleTap,
+          afterPaintImage: _ocr.paint,
         ),
       ),
       ref,

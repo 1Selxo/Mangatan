@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
@@ -128,10 +129,17 @@ class ReaderAppBar extends ConsumerWidget {
   List<Widget> _buildActions(BuildContext context, bool isLocalArchive) {
     return [
       if (onOcrPressed != null)
-        IconButton(
-          tooltip: 'OCR overlay',
-          onPressed: onOcrPressed,
-          icon: const Icon(Icons.document_scanner_outlined),
+        ValueListenableBuilder<bool>(
+          valueListenable: ReaderOcrState.enabled,
+          builder: (context, enabled, _) => IconButton(
+            tooltip: enabled ? 'Hide OCR overlay' : 'Show OCR overlay',
+            onPressed: onOcrPressed,
+            icon: Icon(
+              enabled
+                  ? Icons.document_scanner
+                  : Icons.document_scanner_outlined,
+            ),
+          ),
         ),
 
       // Chapter list button

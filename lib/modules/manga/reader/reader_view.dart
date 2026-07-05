@@ -27,7 +27,7 @@ import 'package:mangayomi/modules/manga/reader/widgets/reader_settings_modal.dar
 import 'package:mangayomi/modules/manga/reader/widgets/auto_scroll_button.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/page_indicator.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/image_actions_dialog.dart';
-import 'package:mangayomi/modules/mining/widgets/ocr_overlay_sheet.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
@@ -712,7 +712,7 @@ class _MangaChapterPageGalleryState
     );
   }
 
-  ConsumerWidget _buildPagedItem(int index, BackgroundColor backgroundColor) {
+  Widget _buildPagedItem(int index, BackgroundColor backgroundColor) {
     final page = pages[index];
     if (page.isTransitionPage) return TransitionViewPaged(data: page);
 
@@ -1091,20 +1091,7 @@ class _MangaChapterPageGalleryState
   // }
 
   Future<void> _showCurrentPageOcr() async {
-    if (pages.isEmpty) return;
-    final actualIndex = (_currentIndex ?? 0).clamp(0, pages.length - 1);
-    final data = pages[actualIndex];
-    if (data.isTransitionPage) return;
-    final imageBytes = await data.getImageBytes;
-    final manga = data.chapter?.manga.value ?? chapter.manga.value;
-    if (imageBytes == null || manga == null || !mounted) return;
-    await OcrOverlaySheet.show(
-      context: context,
-      imageBytes: imageBytes,
-      data: data,
-      manga: manga,
-      chapterName: data.chapter?.name ?? chapter.name ?? '',
-    );
+    await ReaderOcrState.toggle();
   }
 
   void _initCurrentIndex() async {

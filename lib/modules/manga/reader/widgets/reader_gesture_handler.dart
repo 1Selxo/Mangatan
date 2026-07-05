@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 
 /// Navigation layout variants matching Mihon.
@@ -271,7 +272,10 @@ class _ZoneGestureDetector extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onTap: onTap,
+      onTapUp: (details) async {
+        final handled = await ReaderOcrState.handleTap(details.globalPosition);
+        if (!handled) onTap();
+      },
       onDoubleTapDown: onDoubleTapDown != null
           ? (details) => onDoubleTapDown!(details.globalPosition)
           : null,

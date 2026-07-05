@@ -4,13 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/manga/reader/providers/reader_controller_provider.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
 
-class ImageViewVertical extends ConsumerWidget {
+class ImageViewVertical extends ConsumerStatefulWidget {
   final UChapDataPreload data;
   final Function(UChapDataPreload data) onLongPressData;
   final bool isHorizontal;
@@ -28,34 +29,72 @@ class ImageViewVertical extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ImageViewVertical> createState() => _ImageViewVerticalState();
+}
+
+class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
+  final GlobalKey _imageKey = GlobalKey();
+  late ReaderOcrController _ocr = ReaderOcrController(
+    widget.data,
+    imageKey: _imageKey,
+  )..addListener(_repaint);
+
+  void _repaint() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant ImageViewVertical oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.data, widget.data)) {
+      _ocr
+        ..removeListener(_repaint)
+        ..dispose();
+      _ocr = ReaderOcrController(widget.data, imageKey: _imageKey)
+        ..addListener(_repaint);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ocr
+      ..removeListener(_repaint)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);
     final imageWidget = ValueListenableBuilder<bool>(
-      valueListenable: isScrolling,
+      valueListenable: widget.isScrolling,
       builder: (context, scrolling, _) => ExtendedImage(
+        key: _imageKey,
         colorBlendMode: colorBlendMode,
         color: color,
-        image: data.getImageProvider(ref, true),
+        image: widget.data.getImageProvider(ref, true),
         filterQuality: scrolling ? FilterQuality.low : FilterQuality.medium,
         handleLoadingProgress: true,
         fit: getBoxFit(ref.watch(scaleTypeStateProvider)),
         enableLoadState: true,
         loadStateChanged: (state) {
           if (state.extendedImageLoadState == LoadState.completed) {
-            failedToLoadImage(false);
+            widget.failedToLoadImage(false);
+            _ocr.load();
             final rawSize = state.extendedImageInfo?.image;
-            if (rawSize != null && data.loadedHeight == null) {
-              final screenWidth = isHorizontal
+            if (rawSize != null && widget.data.loadedHeight == null) {
+              final screenWidth = widget.isHorizontal
                   ? context.width(0.8)
                   : MediaQuery.of(context).size.width;
               final aspect = rawSize.width / rawSize.height;
-              data.loadedWidth = screenWidth;
-              data.loadedHeight = screenWidth / aspect;
+              widget.data.loadedWidth = screenWidth;
+              widget.data.loadedHeight = screenWidth / aspect;
             }
           }
-          final placeholderHeight = data.loadedHeight ?? context.height(0.8);
-          final placeholderWidth = isHorizontal
-              ? (data.loadedWidth ?? context.width(0.8))
+          final placeholderHeight =
+              widget.data.loadedHeight ?? context.height(0.8);
+          final placeholderWidth = widget.isHorizontal
+              ? (widget.data.loadedWidth ?? context.width(0.8))
               : null;
           if (state.extendedImageLoadState == LoadState.loading) {
             final ImageChunkEvent? loadingProgress = state.loadingProgress;
@@ -71,7 +110,7 @@ class ImageViewVertical extends ConsumerWidget {
             );
           }
           if (state.extendedImageLoadState == LoadState.failed) {
-            failedToLoadImage(true);
+            widget.failedToLoadImage(true);
             return Container(
               color: Colors.black,
               height: placeholderHeight,
@@ -90,11 +129,11 @@ class ImageViewVertical extends ConsumerWidget {
                     child: GestureDetector(
                       onLongPress: () {
                         state.reLoadImage();
-                        failedToLoadImage(false);
+                        widget.failedToLoadImage(false);
                       },
                       onTap: () {
                         state.reLoadImage();
-                        failedToLoadImage(false);
+                        widget.failedToLoadImage(false);
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -117,17 +156,18 @@ class ImageViewVertical extends ConsumerWidget {
           }
           return null;
         },
+        afterPaintImage: _ocr.paint,
       ),
     );
     return applyReaderColorFilter(
       GestureDetector(
-        onLongPress: () => onLongPressData.call(data),
-        child: isHorizontal
+        onLongPress: () => widget.onLongPressData.call(widget.data),
+        child: widget.isHorizontal
             ? imageWidget
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (data.index == 0)
+                  if (widget.data.index == 0)
                     SizedBox(height: MediaQuery.of(context).padding.top),
                   imageWidget,
                 ],

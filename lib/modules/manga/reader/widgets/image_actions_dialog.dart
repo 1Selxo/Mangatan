@@ -8,7 +8,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
-import 'package:mangayomi/modules/mining/widgets/ocr_overlay_sheet.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -230,13 +230,8 @@ class _ImageActionsSheet extends StatelessWidget {
   }
 
   Future<void> _showOcrOverlay(BuildContext context) async {
-    await OcrOverlaySheet.show(
-      context: context,
-      imageBytes: Uint8List.fromList(imageBytes),
-      data: data,
-      manga: manga,
-      chapterName: chapterName,
-    );
+    await ReaderOcrState.setEnabled(true);
+    if (context.mounted) Navigator.pop(context);
   }
 }
 

@@ -10,6 +10,7 @@ class MiningPreferences {
   static const _ankiEndpoint = 'anki_endpoint';
   static const _ankiProfile = 'anki_profile';
   static const _ocrEngine = 'ocr_engine';
+  static const _ocrOverlayEnabled = 'ocr_overlay_enabled';
   static const _ocrLanguage = 'ocr_language';
   static const _ocrOverlayOpacity = 'ocr_overlay_opacity';
   static const _ocrBoxScale = 'ocr_box_scale';
@@ -100,6 +101,16 @@ class MiningPreferences {
 
   static Future<void> setOcrEngine(OcrEnginePreference value) async {
     await (await _boxOrNull())?.put(_ocrEngine, value.name);
+  }
+
+  static Future<bool> getOcrOverlayEnabled() async {
+    return (await _boxOrNull())?.get(_ocrOverlayEnabled, defaultValue: true)
+            as bool? ??
+        true;
+  }
+
+  static Future<void> setOcrOverlayEnabled(bool value) async {
+    await (await _boxOrNull())?.put(_ocrOverlayEnabled, value);
   }
 
   static Future<String> getOcrLanguage() async {

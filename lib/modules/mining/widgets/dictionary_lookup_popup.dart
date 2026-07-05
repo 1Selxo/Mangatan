@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
+import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
@@ -93,47 +94,11 @@ class DictionaryLookupPopup extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         borderRadius: BorderRadius.circular(preferences.eInkMode ? 0 : 8),
         color: popupTheme.colorScheme.surface,
-        child: Column(
-          children: [
-            SizedBox(
-              height: 34,
-              child: Row(
-                children: [
-                  const SizedBox(width: 12),
-                  const Icon(Icons.manage_search, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      text,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: onClose,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.close, size: 20),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: popupTheme.dividerColor),
-            Expanded(
-              child: DictionaryLookupResultsView(
-                text: text,
-                miningContext: miningContext,
-                preferences: preferences,
-                onMatchChanged: onMatchChanged,
-                physics: preferences.paginatedScrolling
-                    ? const PageScrollPhysics()
-                    : null,
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                compact: true,
-              ),
-            ),
-          ],
+        child: HoshiDictionaryPopup(
+          text: text,
+          miningContext: miningContext,
+          preferences: preferences,
+          onMatchChanged: onMatchChanged,
         ),
       ),
     );

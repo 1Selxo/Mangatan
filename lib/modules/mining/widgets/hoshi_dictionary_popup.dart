@@ -148,10 +148,15 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
         return false;
       }
+      final dictionaryMedia = await _loadAnkiDictionaryMedia(
+        content['dictionaryMedia'],
+      );
       final draft = await const AnkiCardBuilder().build(
         result: result,
         context: miningContext,
         profile: profile,
+        renderedContent: content,
+        dictionaryMedia: dictionaryMedia,
       );
       final noteId =
           await AnkiConnectService(
@@ -169,6 +174,38 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
+  }
+
+  Future<List<AnkiMediaFile>> _loadAnkiDictionaryMedia(Object? raw) async {
+    Object? decoded = raw;
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        decoded = jsonDecode(raw);
+      } on FormatException {
+        return const [];
+      }
+    }
+    if (decoded is! List) return const [];
+    final files = <AnkiMediaFile>[];
+    for (final item in decoded) {
+      if (item is! Map) continue;
+      final dictionary = item['dictionary']?.toString() ?? '';
+      final path = item['path']?.toString() ?? '';
+      final filename = item['filename']?.toString() ?? '';
+      if (dictionary.isEmpty || path.isEmpty || filename.isEmpty) continue;
+      final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
+        dictName: dictionary,
+        mediaPath: path,
+      );
+      if (bytes == null || bytes.isEmpty) continue;
+      files.add(
+        AnkiMediaFile(
+          filename: filename.split(RegExp(r'[/\\]')).last,
+          bytes: bytes,
+        ),
+      );
+    }
+    return files;
   }
 
   void _registerHandlers(InAppWebViewController controller) {

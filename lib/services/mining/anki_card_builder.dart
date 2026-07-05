@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -12,9 +13,11 @@ class AnkiCardBuilder {
     required HoshiLookupResult result,
     required MiningContext context,
     AnkiMiningProfile profile = const AnkiMiningProfile(),
+    Map<String, dynamic> renderedContent = const {},
+    List<AnkiMediaFile> dictionaryMedia = const [],
   }) async {
-    final screenshotBytes = await _loadScreenshot(context);
-    final screenshotName = screenshotBytes == null
+    final screenshot = await _loadScreenshot(context);
+    final screenshotName = screenshot == null
         ? null
         : _safeMediaName(
             [
@@ -23,8 +26,27 @@ class AnkiCardBuilder {
               result.term.expression,
               DateTime.now().millisecondsSinceEpoch.toString(),
             ].where((part) => part.trim().isNotEmpty).join(' '),
+            extension: screenshot.extension,
           );
 
+    final selectedGlossary = result.term.glossaries.take(1).toList();
+    String rendered(String key, String fallback) {
+      final value = renderedContent[key];
+      return value is String && value.isNotEmpty ? value : fallback;
+    }
+
+    final glossary = rendered('glossary', _glossary(result.term.glossaries));
+    final glossaryPlain = _glossaryPlain(result.term.glossaries);
+    final selectedGlossaryHtml = rendered(
+      'glossaryFirst',
+      _glossary(selectedGlossary),
+    );
+    final selectedGlossaryPlain = _glossaryPlain(selectedGlossary);
+    final frequencySummary = rendered(
+      'freqHarmonicRank',
+      _frequencySummary(result.term.frequencies),
+    );
+    final cloze = _cloze(context.sentence, result.matched);
     final replacements = <String, String>{
       AnkiMarker.expression: _escape(result.term.expression),
       AnkiMarker.reading: _escape(result.term.reading),
@@ -32,36 +54,68 @@ class AnkiCardBuilder {
         result.term.expression,
         result.term.reading,
       ),
-      AnkiMarker.glossary: _glossary(result.term.glossaries),
-      AnkiMarker.selectedGlossary: _glossary(result.term.glossaries.take(1)),
+      AnkiMarker.furiganaPlain: rendered(
+        'furiganaPlain',
+        _furiganaPlain(result.term.expression, result.term.reading),
+      ),
+      AnkiMarker.audio: '',
+      AnkiMarker.glossary: glossary,
+      AnkiMarker.glossaryBrief: selectedGlossaryHtml,
+      AnkiMarker.glossaryPlain: glossaryPlain,
+      AnkiMarker.glossaryFirst: selectedGlossaryHtml,
+      AnkiMarker.selectedGlossary: selectedGlossaryHtml,
+      AnkiMarker.singleGlossary: selectedGlossaryPlain,
       AnkiMarker.sentence: _escape(context.sentence),
+      AnkiMarker.sentenceBold: _sentenceBold(context.sentence, result.matched),
       AnkiMarker.sentenceFurigana: _escape(context.sentence),
-      AnkiMarker.clozePrefix: _cloze(context.sentence, result.matched).$1,
-      AnkiMarker.clozeBody: _cloze(context.sentence, result.matched).$2,
-      AnkiMarker.clozeSuffix: _cloze(context.sentence, result.matched).$3,
+      AnkiMarker.clozePrefix: cloze.$1,
+      AnkiMarker.clozeBody: cloze.$2,
+      AnkiMarker.clozeBodyKana: cloze.$2,
+      AnkiMarker.clozeSuffix: cloze.$3,
       AnkiMarker.tags: profile.tags.join(' '),
       AnkiMarker.partOfSpeech: _escape(result.term.rules),
+      AnkiMarker.conjugation: _escape(
+        result.trace.map((t) => t.name).join(' '),
+      ),
       AnkiMarker.dictionary: result.term.glossaries
           .map((entry) => entry.dictName)
           .where((name) => name.trim().isNotEmpty)
           .toSet()
           .map(_escape)
           .join(', '),
-      AnkiMarker.frequencies: _frequencies(result.term.frequencies),
-      AnkiMarker.frequencyHarmonic: _frequencySummary(result.term.frequencies),
-      AnkiMarker.frequencyAverage: _frequencySummary(result.term.frequencies),
-      AnkiMarker.pitchAccents: _pitchAccents(result.term.pitches),
-      AnkiMarker.pitchAccentPositions: result.term.pitches
-          .expand((pitch) => pitch.pitchPositions)
-          .map((position) => position.toString())
-          .toSet()
-          .join(', '),
-      AnkiMarker.pitchAccentCategories: result.term.pitches
-          .map((pitch) => pitch.dictName)
+      AnkiMarker.dictionaryAlias: result.term.glossaries
+          .map((entry) => entry.dictName)
           .where((name) => name.trim().isNotEmpty)
           .toSet()
           .map(_escape)
           .join(', '),
+      AnkiMarker.frequencies: rendered(
+        'frequenciesHtml',
+        _frequencies(result.term.frequencies),
+      ),
+      AnkiMarker.frequencyLowest: frequencySummary,
+      AnkiMarker.frequencyHarmonic: frequencySummary,
+      AnkiMarker.frequencyHarmonicRank: frequencySummary,
+      AnkiMarker.frequencyAverage: frequencySummary,
+      AnkiMarker.frequencyAverageRank: frequencySummary,
+      AnkiMarker.pitchAccents: _pitchAccents(result.term.pitches),
+      AnkiMarker.pitchAccentPositions: rendered(
+        'pitchPositions',
+        result.term.pitches
+            .expand((pitch) => pitch.pitchPositions)
+            .map((position) => position.toString())
+            .toSet()
+            .join(', '),
+      ),
+      AnkiMarker.pitchAccentCategories: rendered(
+        'pitchCategories',
+        result.term.pitches
+            .map((pitch) => pitch.dictName)
+            .where((name) => name.trim().isNotEmpty)
+            .toSet()
+            .map(_escape)
+            .join(', '),
+      ),
       AnkiMarker.screenshot: screenshotName == null
           ? ''
           : '<img src="$screenshotName">',
@@ -72,6 +126,12 @@ class AnkiCardBuilder {
       AnkiMarker.chapter: _escape(context.chapterTitle),
       AnkiMarker.media: _escape(context.locationLabel),
       AnkiMarker.source: _escape(context.locationLabel),
+      AnkiMarker.documentTitle: _escape(context.sourceTitle),
+      AnkiMarker.selectionText: _escape(result.matched),
+      AnkiMarker.popupSelectionText: rendered(
+        'popupSelectionText',
+        _escape(result.matched),
+      ),
     };
 
     final fields = profile.fieldMap.map((field, template) {
@@ -88,16 +148,29 @@ class AnkiCardBuilder {
       expression: result.term.expression,
       fields: fields,
       tags: profile.tags,
-      screenshotBytes: screenshotBytes,
+      screenshotBytes: screenshot?.bytes,
       screenshotFileName: screenshotName,
+      mediaFiles: dictionaryMedia,
     );
   }
 
-  Future<Uint8List?> _loadScreenshot(MiningContext context) async {
+  Future<_ScreenshotPayload?> _loadScreenshot(MiningContext context) async {
     final loader = context.imageBytesLoader;
     if (loader == null) return null;
     final bytes = await loader();
-    return bytes == null ? null : Uint8List.fromList(bytes);
+    if (bytes == null || bytes.isEmpty) return null;
+    final original = Uint8List.fromList(bytes);
+    if (original.length <= _maxScreenshotUploadBytes) {
+      return _ScreenshotPayload(original, _extensionForImage(original));
+    }
+    final resized = await _resizeScreenshot(original);
+    if (resized != null && resized.length < original.length) {
+      return _ScreenshotPayload(resized, 'png');
+    }
+    if (original.length <= _absoluteScreenshotUploadBytes) {
+      return _ScreenshotPayload(original, _extensionForImage(original));
+    }
+    return null;
   }
 
   static String _furigana(String expression, String reading) {
@@ -105,6 +178,11 @@ class AnkiCardBuilder {
       return _escape(expression);
     }
     return '<ruby>${_escape(expression)}<rt>${_escape(reading)}</rt></ruby>';
+  }
+
+  static String _furiganaPlain(String expression, String reading) {
+    if (reading.trim().isEmpty || reading == expression) return expression;
+    return '$expression[$reading]';
   }
 
   static String _glossary(Iterable<HoshiGlossaryEntry> entries) {
@@ -117,6 +195,14 @@ class AnkiCardBuilder {
       },
     ).join();
     return rows.isEmpty ? '' : '<ol>$rows</ol>';
+  }
+
+  static String _glossaryPlain(Iterable<HoshiGlossaryEntry> entries) {
+    return entries
+        .map((entry) => entry.glossary.trim())
+        .where((entry) => entry.isNotEmpty)
+        .map(_escape)
+        .join('<br>');
   }
 
   static String _frequencies(List<HoshiFrequencyEntry> entries) {
@@ -172,15 +258,98 @@ class AnkiCardBuilder {
     );
   }
 
-  static String _safeMediaName(String value) {
+  static String _sentenceBold(String sentence, String matched) {
+    if (sentence.trim().isEmpty || matched.trim().isEmpty) {
+      return _escape(sentence);
+    }
+    final index = sentence.indexOf(matched);
+    if (index < 0) return _escape(sentence);
+    return [
+      _escape(sentence.substring(0, index)),
+      '<b>${_escape(matched)}</b>',
+      _escape(sentence.substring(index + matched.length)),
+    ].join();
+  }
+
+  static String _safeMediaName(String value, {required String extension}) {
     final safe = value
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    return '${safe.isEmpty ? 'mangayomi-mining' : safe}.png';
+    return '${safe.isEmpty ? 'mangayomi-mining' : safe}.$extension';
   }
 
   static String _escape(String value) {
     return const HtmlEscape(HtmlEscapeMode.element).convert(value);
   }
+
+  static const _maxScreenshotUploadBytes = 4 * 1024 * 1024;
+  static const _absoluteScreenshotUploadBytes = 8 * 1024 * 1024;
+  static const _maxScreenshotDimension = 1280;
+
+  static Future<Uint8List?> _resizeScreenshot(Uint8List bytes) async {
+    ui.ImmutableBuffer? buffer;
+    ui.ImageDescriptor? descriptor;
+    ui.Codec? codec;
+    ui.Image? image;
+    try {
+      buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+      descriptor = await ui.ImageDescriptor.encoded(buffer);
+      final width = descriptor.width;
+      final height = descriptor.height;
+      final longest = width > height ? width : height;
+      if (longest <= _maxScreenshotDimension) return null;
+      final scale = _maxScreenshotDimension / longest;
+      codec = await descriptor.instantiateCodec(
+        targetWidth: (width * scale).round().clamp(1, width),
+        targetHeight: (height * scale).round().clamp(1, height),
+      );
+      final frame = await codec.getNextFrame();
+      image = frame.image;
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      return data?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    } finally {
+      image?.dispose();
+      codec?.dispose();
+      descriptor?.dispose();
+      buffer?.dispose();
+    }
+  }
+
+  static String _extensionForImage(Uint8List bytes) {
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4e &&
+        bytes[3] == 0x47) {
+      return 'png';
+    }
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xff &&
+        bytes[1] == 0xd8 &&
+        bytes[2] == 0xff) {
+      return 'jpg';
+    }
+    if (bytes.length >= 12 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
+      return 'webp';
+    }
+    return 'png';
+  }
+}
+
+class _ScreenshotPayload {
+  const _ScreenshotPayload(this.bytes, this.extension);
+
+  final Uint8List bytes;
+  final String extension;
 }

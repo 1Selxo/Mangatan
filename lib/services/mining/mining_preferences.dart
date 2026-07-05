@@ -196,14 +196,14 @@ class MiningPreferences {
   }
 
   static Future<double> getOcrOverlayOpacity() async {
-    return ((await _boxOrNull())?.get(_ocrOverlayOpacity, defaultValue: 0.72)
+    return ((await _boxOrNull())?.get(_ocrOverlayOpacity, defaultValue: 0.0)
                 as num? ??
-            0.72)
+            0.0)
         .toDouble();
   }
 
   static Future<void> setOcrOverlayOpacity(double value) async {
-    await (await _boxOrNull())?.put(_ocrOverlayOpacity, value.clamp(0.1, 1.0));
+    await (await _boxOrNull())?.put(_ocrOverlayOpacity, value.clamp(0.0, 1.0));
   }
 
   static Future<double> getOcrBoxScale() async {
@@ -244,7 +244,7 @@ class MiningPreferences {
   }
 
   static Future<bool> getOcrOutlineVisible() async {
-    return (await _boxOrNull())?.get(_ocrOutlineVisible, defaultValue: true)
+    return (await _boxOrNull())?.get(_ocrOutlineVisible, defaultValue: false)
             as bool? ??
         true;
   }

@@ -207,6 +207,7 @@ class _MangaChapterPageGalleryState
       );
     }
     disposePreloadManager();
+    ReaderOcrState.cancelScan();
     _readerController.keepAliveLink?.close();
     WakelockPlus.disable();
     super.dispose();
@@ -592,6 +593,7 @@ class _MangaChapterPageGalleryState
                             }
                           : null,
                     ),
+                    const ReaderOcrProgressHud(),
                     ReaderBottomBar(
                       chapter: chapter,
                       isVisible: _isView,
@@ -1116,6 +1118,20 @@ class _MangaChapterPageGalleryState
           if (ref.read(cropBordersStateProvider)) _processCropBorders();
         }
       },
+    );
+
+    final chapterPages = pages
+        .where((page) => page.chapter?.id == chapter.id)
+        .toList();
+    unawaited(
+      ReaderOcrState.scanChapter(
+        chapterPages,
+        startIndex: _readerController.getPageIndex(),
+        preparePage: (page) async {
+          if (!mounted) return;
+          await precacheImage(page.getImageProvider(ref, true), context);
+        },
+      ),
     );
 
     // Kick off ordered prefetch before the first frame so lower-indexed pages

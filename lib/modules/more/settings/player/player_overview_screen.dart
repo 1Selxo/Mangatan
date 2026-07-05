@@ -21,6 +21,12 @@ class PlayerOverviewScreen extends StatelessWidget {
               onTap: () => context.push('/playerMode'),
             ),
             ListTileWidget(
+              title: 'Subtitles & Jimaku',
+              subtitle: 'Jimaku API key and automatic subtitle lookup',
+              icon: Icons.subtitles_outlined,
+              onTap: () => context.push('/playerSubtitles'),
+            ),
+            ListTileWidget(
               title: l10n.decoder,
               subtitle: l10n.decoder_info,
               icon: Icons.memory_outlined,

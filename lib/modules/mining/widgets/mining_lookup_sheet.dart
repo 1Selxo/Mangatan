@@ -75,6 +75,10 @@ class _MiningLookupSheetState extends State<MiningLookupSheet> {
     setState(() => _exporting = true);
     try {
       final profile = await MiningPreferences.getAnkiProfile();
+      if (!profile.ankiEnabled) {
+        botToast('Anki export is disabled in Dictionary settings', second: 4);
+        return;
+      }
       final endpoint = await MiningPreferences.getAnkiEndpoint();
       final context = widget.miningContext.sentence.trim().isEmpty
           ? widget.miningContext.copyWith(sentence: _controller.text)

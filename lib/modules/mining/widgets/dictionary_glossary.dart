@@ -10,11 +10,15 @@ class DictionaryGlossary extends StatefulWidget {
     required this.rawGlossary,
     required this.dictionaryName,
     this.dictionaryCss = '',
+    this.customCss = '',
+    this.fontSize = 14,
   });
 
   final String rawGlossary;
   final String dictionaryName;
   final String dictionaryCss;
+  final String customCss;
+  final double fontSize;
 
   @override
   State<DictionaryGlossary> createState() => _DictionaryGlossaryState();
@@ -61,6 +65,7 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
       data: yomitanGlossaryToHtml(
         widget.rawGlossary,
         dictionaryCss: widget.dictionaryCss,
+        customCss: widget.customCss,
         mediaDataUris: _media,
       ),
       shrinkWrap: true,
@@ -69,7 +74,7 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
           color: Theme.of(context).colorScheme.onSurface,
-          fontSize: FontSize(14),
+          fontSize: FontSize(widget.fontSize),
         ),
         '.dictionary-glossary': Style(
           margin: Margins.zero,
@@ -84,11 +89,16 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
 String yomitanGlossaryToHtml(
   String rawGlossary, {
   String dictionaryCss = '',
+  String customCss = '',
   Map<String, String> mediaDataUris = const {},
 }) {
   final decoded = _decodeGlossary(rawGlossary);
   final content = _renderGlossaryValue(decoded, mediaDataUris);
   final css = dictionaryCss.replaceAll(
+    RegExp(r'</style', caseSensitive: false),
+    '',
+  );
+  final userCss = customCss.replaceAll(
     RegExp(r'</style', caseSensitive: false),
     '',
   );
@@ -102,6 +112,7 @@ String yomitanGlossaryToHtml(
 .gloss-sc-td, .gloss-sc-th { padding: .2em .4em; }
 .gloss-image { max-width: 100%; height: auto; }
 $css
+$userCss
 </style>
 <div class="dictionary-glossary">$content</div>
 ''';

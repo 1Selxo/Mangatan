@@ -58,6 +58,7 @@ import 'package:mangayomi/modules/more/settings/browse/browse_screen.dart';
 import 'package:mangayomi/modules/more/settings/browse/extension_server_screen.dart';
 import 'package:mangayomi/modules/more/settings/general/general_screen.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_screen.dart';
+import 'package:mangayomi/modules/more/settings/player/player_subtitle_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
 import 'package:mangayomi/modules/more/settings/security/security_screen.dart';
@@ -226,6 +227,7 @@ class RouterNotifier extends ChangeNotifier {
     ),
     _genericRoute(name: "playerOverview", child: const PlayerOverviewScreen()),
     _genericRoute(name: "playerMode", child: const PlayerScreen()),
+    _genericRoute(name: "playerSubtitles", child: const PlayerSubtitleScreen()),
     _genericRoute<int>(
       name: "codeEditor",
       builder: (sourceId) => CodeEditorPage(sourceId: sourceId),

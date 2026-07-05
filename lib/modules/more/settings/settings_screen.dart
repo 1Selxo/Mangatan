@@ -42,6 +42,12 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => context.push('/playerOverview'),
             ),
             ListTileWidget(
+              title: 'Subtitles & Jimaku',
+              subtitle: 'API key and automatic subtitle lookup',
+              icon: Icons.subtitles_outlined,
+              onTap: () => context.push('/playerSubtitles'),
+            ),
+            ListTileWidget(
               title: l10n.downloads,
               icon: Icons.download_outlined,
               onTap: () => context.push('/downloads'),

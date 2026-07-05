@@ -300,18 +300,6 @@ class _MobileControllerWidgetState
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Consumer(
-          builder: (context, ref, _) => Positioned(
-            child: CustomSubtitleView(
-              controller: widget.videoController,
-              configuration: SubtitleViewConfiguration(
-                style: subtileTextStyle(ref),
-              ),
-              paintSubtitle: !ref.read(useLibassStateProvider),
-              miningContextBuilder: widget.subtitleMiningContextBuilder,
-            ),
-          ),
-        ),
         Focus(
           autofocus: true,
           child: Stack(
@@ -712,6 +700,18 @@ class _MobileControllerWidgetState
                   ),
                 ),
             ],
+          ),
+        ),
+        Consumer(
+          builder: (context, ref, _) => Positioned(
+            child: CustomSubtitleView(
+              controller: widget.videoController,
+              configuration: SubtitleViewConfiguration(
+                style: subtileTextStyle(ref),
+              ),
+              paintSubtitle: !ref.read(useLibassStateProvider),
+              miningContextBuilder: widget.subtitleMiningContextBuilder,
+            ),
           ),
         ),
       ],

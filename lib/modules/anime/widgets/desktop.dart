@@ -272,18 +272,6 @@ class _DesktopControllerWidgetState
       },
       child: Stack(
         children: [
-          Consumer(
-            builder: (context, ref, _) => Positioned(
-              child: CustomSubtitleView(
-                controller: widget.videoController,
-                configuration: SubtitleViewConfiguration(
-                  style: subtileTextStyle(ref),
-                ),
-                paintSubtitle: !ref.read(useLibassStateProvider),
-                miningContextBuilder: widget.subtitleMiningContextBuilder,
-              ),
-            ),
-          ),
           Focus(
             autofocus: true,
             child: Listener(
@@ -557,6 +545,18 @@ class _DesktopControllerWidgetState
                     ],
                   ),
                 ),
+              ),
+            ),
+          ),
+          Consumer(
+            builder: (context, ref, _) => Positioned(
+              child: CustomSubtitleView(
+                controller: widget.videoController,
+                configuration: SubtitleViewConfiguration(
+                  style: subtileTextStyle(ref),
+                ),
+                paintSubtitle: !ref.read(useLibassStateProvider),
+                miningContextBuilder: widget.subtitleMiningContextBuilder,
               ),
             ),
           ),

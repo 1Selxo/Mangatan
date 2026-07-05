@@ -781,7 +781,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (_jimakuAutoLoadAttempted || _jimakuLoading) return;
     _jimakuAutoLoadAttempted = true;
     if (!await MiningPreferences.getAutoJimakuEnabled()) return;
-    if (_firstVid.subtitles?.isNotEmpty ?? false) return;
     final apiKey = await MiningPreferences.getJimakuApiKey();
     if (apiKey.trim().isEmpty) return;
     await _loadJimakuSubtitle(apiKey: apiKey, showFeedback: false);

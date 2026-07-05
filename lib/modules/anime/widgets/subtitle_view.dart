@@ -10,7 +10,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
-import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -38,6 +38,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   late TextAlign textAlign = widget.configuration.textAlign;
   late EdgeInsets padding = widget.configuration.padding;
   late Duration duration = const Duration(milliseconds: 100);
+  final GlobalKey _subtitleTextKey = GlobalKey();
 
   StreamSubscription<List<String>>? subscription;
 
@@ -74,6 +75,66 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     });
   }
 
+  Future<void> _showLookup(
+    BuildContext context,
+    TapUpDetails details,
+    String subtitleText,
+    TextStyle subtitleStyle,
+    TextScaler textScaler,
+  ) async {
+    final builder = widget.miningContextBuilder;
+    if (builder == null || subtitleText.trim().isEmpty) return;
+    final textBox =
+        _subtitleTextKey.currentContext?.findRenderObject() as RenderBox?;
+    final lookupText = textBox == null
+        ? subtitleText.trim()
+        : _lookupTextAtPosition(
+            context: context,
+            box: textBox,
+            globalPosition: details.globalPosition,
+            subtitleText: subtitleText,
+            subtitleStyle: subtitleStyle,
+            textScaler: textScaler,
+          );
+    if (lookupText.trim().isEmpty || !context.mounted) return;
+    final anchor = textBox == null
+        ? Rect.fromLTWH(
+            details.globalPosition.dx,
+            details.globalPosition.dy,
+            1,
+            1,
+          )
+        : textBox.localToGlobal(Offset.zero) & textBox.size;
+    await DictionaryLookupPopup.show(
+      context: context,
+      anchor: anchor,
+      text: lookupText,
+      miningContext: builder(subtitleText),
+    );
+  }
+
+  String _lookupTextAtPosition({
+    required BuildContext context,
+    required RenderBox box,
+    required Offset globalPosition,
+    required String subtitleText,
+    required TextStyle subtitleStyle,
+    required TextScaler textScaler,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: subtitleText, style: subtitleStyle),
+      textDirection: Directionality.of(context),
+      textAlign: textAlign,
+      textScaler: textScaler,
+    )..layout(maxWidth: box.size.width);
+    final position = painter
+        .getPositionForOffset(box.globalToLocal(globalPosition))
+        .offset
+        .clamp(0, subtitleText.length)
+        .toInt();
+    return _extractSubtitleLookupString(subtitleText, position);
+  }
+
   @override
   Widget build(BuildContext context) {
     subtitle = widget.controller.player.state.subtitle;
@@ -102,32 +163,29 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
                 shadows: const [],
               );
         final text = Text(
+          key: _subtitleTextKey,
           subtitleText,
           style: subtitleStyle,
           textAlign: textAlign,
           textScaler: textScaler,
         );
-        return Material(
-          color: Colors.transparent,
-          child: AnimatedContainer(
-            padding: padding,
-            duration: duration,
+        return AnimatedPadding(
+          padding: padding,
+          duration: duration,
+          child: Align(
             alignment: Alignment.bottomCenter,
             child:
                 subtitleText.trim().isEmpty ||
                     widget.miningContextBuilder == null
                 ? text
                 : GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onLongPress: () {
-                      MiningLookupSheet.show(
-                        context: context,
-                        text: subtitleText,
-                        miningContext: widget.miningContextBuilder!(
-                          subtitleText,
-                        ),
-                      );
-                    },
+                    onTapUp: (details) => _showLookup(
+                      context,
+                      details,
+                      subtitleText,
+                      subtitleStyle,
+                      textScaler,
+                    ),
                     child: text,
                   ),
           ),
@@ -135,6 +193,40 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       },
     );
   }
+}
+
+String _extractSubtitleLookupString(String text, int offset) {
+  if (text.isEmpty) return '';
+  var start = offset.clamp(0, text.length - 1).toInt();
+  while (start < text.length && _isLookupBoundary(text[start])) {
+    start++;
+  }
+  if (start >= text.length) return '';
+  if (_isAsciiWord(text[start])) {
+    while (start > 0 && _isAsciiWord(text[start - 1])) {
+      start--;
+    }
+  }
+  var end = start;
+  while (end < text.length &&
+      !_isLookupBoundary(text[end]) &&
+      end - start < 80) {
+    end++;
+  }
+  return text.substring(start, end).trim();
+}
+
+bool _isAsciiWord(String value) {
+  final code = value.codeUnitAt(0);
+  return (code >= 0x30 && code <= 0x39) ||
+      (code >= 0x41 && code <= 0x5a) ||
+      (code >= 0x61 && code <= 0x7a) ||
+      code == 0x27 ||
+      code == 0x2d;
+}
+
+bool _isLookupBoundary(String value) {
+  return RegExp(r'[\s、。！？!?「」『』（）()\[\]{}.,;:・…]').hasMatch(value);
 }
 
 TextStyle subtileTextStyle(WidgetRef ref) {

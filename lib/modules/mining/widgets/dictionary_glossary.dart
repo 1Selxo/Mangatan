@@ -104,13 +104,49 @@ String yomitanGlossaryToHtml(
   );
   return '''
 <style>
-.dictionary-glossary { margin: 0; padding: 0; }
+.dictionary-glossary {
+  --font-size-no-units: ${14};
+  --line-height: 1.4;
+  --list-padding1: 1.4em;
+  --list-padding2: var(--list-padding1);
+  --text-color: currentColor;
+  --text-color-light1: #666;
+  --text-color-light2: #777;
+  --background-color-dark1: rgba(128, 128, 128, .18);
+  color: var(--text-color);
+  line-height: var(--line-height);
+  margin: 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
 .glossary-item { margin: 0 0 .35em 0; }
+.glossary-item:last-child { margin-bottom: 0; }
 .structured-content { white-space: normal; }
 .gloss-sc-table-container { overflow-x: auto; }
-.gloss-sc-table { border-collapse: collapse; }
-.gloss-sc-td, .gloss-sc-th { padding: .2em .4em; }
-.gloss-image { max-width: 100%; height: auto; }
+.gloss-sc-table { border-collapse: collapse; table-layout: auto; }
+.gloss-sc-thead, .gloss-sc-tfoot, .gloss-sc-th {
+  font-weight: bold;
+  background-color: var(--background-color-dark1);
+}
+.gloss-sc-td, .gloss-sc-th {
+  border: 1px solid var(--text-color-light2);
+  padding: .25em;
+  vertical-align: top;
+}
+.glossary-list, .dictionary-glossary ul, .dictionary-glossary ol {
+  margin: .15em 0;
+  padding-left: var(--list-padding1);
+}
+.dictionary-glossary li { margin: .08em 0; }
+.gloss-image-link, .gloss-image-container {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+.gloss-image-container { position: relative; overflow: hidden; line-height: 0; }
+.gloss-image { display: inline-block; max-width: 100%; height: auto; object-fit: contain; }
+.gloss-image-link[data-appearance="monochrome"] .gloss-image { filter: grayscale(1); }
+.gloss-image-unavailable { color: var(--text-color-light1); font-style: italic; }
 $css
 $userCss
 </style>
@@ -168,7 +204,7 @@ String _renderGlossaryValue(Object? value, Map<String, String> media) {
 }
 
 String _renderDefinition(Object? value, Map<String, String> media) {
-  if (value is String) return _escapeText(value);
+  if (value is String) return _renderText(value);
   if (value is List) {
     return '<ul class="glossary-list">${value.map((item) => '<li>${_renderDefinition(item, media)}</li>').join()}</ul>';
   }
@@ -185,8 +221,12 @@ String _renderDefinition(Object? value, Map<String, String> media) {
 }
 
 String _renderNode(Object? value, Map<String, String> media) {
-  if (value is String) return _escapeText(value);
+  if (value is String) return _renderText(value);
   if (value is List) {
+    final strings = value.every((item) => item is String);
+    if (strings && value.length > 1) {
+      return '<ul class="glossary-list">${value.map((item) => '<li>${_renderText(item as String)}</li>').join()}</ul>';
+    }
     return value.map((item) => _renderNode(item, media)).join();
   }
   if (value is! Map) return '';
@@ -213,6 +253,13 @@ String _renderNode(Object? value, Map<String, String> media) {
     'summary',
     'img',
     'a',
+    'code',
+    'em',
+    'strong',
+    'small',
+    'sub',
+    'sup',
+    's',
   };
   if (!allowed.contains(tag)) return _renderNode(value['content'], media);
   if (tag == 'img') return _renderImage(value, media);
@@ -222,8 +269,10 @@ String _renderNode(Object? value, Map<String, String> media) {
   if (data is Map) {
     for (final entry in data.entries) {
       if (entry.key.toString().isEmpty || entry.value is! String) continue;
+      final key = entry.key.toString();
+      final isCjk = RegExp(r'^[\u3000-\u9fff\uf900-\ufaff]').hasMatch(key);
       attributes.add(
-        'data-sc-${_kebabCase(entry.key.toString())}="${_escapeAttribute(entry.value.toString())}"',
+        'data-sc${isCjk ? '' : '-'}${isCjk ? key : _kebabCase(key)}="${_escapeAttribute(entry.value.toString())}"',
       );
     }
   }
@@ -275,8 +324,15 @@ String _renderImage(Map value, Map<String, String> media) {
     style.add('image-rendering:${value['imageRendering']}');
   }
   if (style.isNotEmpty) attributes.add('style="${style.join(';')}"');
-  return '<img ${attributes.join(' ')}>';
+  final appearance = _escapeAttribute(
+    value['appearance']?.toString() ?? 'auto',
+  );
+  final background = value['background'] == true ? 'true' : 'false';
+  return '<span class="gloss-image-link" data-appearance="$appearance" data-background="$background"><span class="gloss-image-container"><img ${attributes.join(' ')}></span></span>';
 }
+
+String _renderText(String value) =>
+    _escapeText(value).replaceAll(RegExp(r'\r?\n'), '<br>');
 
 String _inlineStyle(Object? value) {
   if (value is! Map) return '';

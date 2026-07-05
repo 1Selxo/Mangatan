@@ -3,6 +3,65 @@ import 'package:mangayomi/services/mining/anki_markers.dart';
 
 enum OcrEnginePreference { automatic, googleLens, mokuroOnly }
 
+enum DictionaryThemePreference { system, light, dark, black }
+
+class DictionaryPopupPreferences {
+  const DictionaryPopupPreferences({
+    required this.width,
+    required this.height,
+    required this.fontSize,
+    required this.theme,
+    required this.eInkMode,
+    required this.paginatedScrolling,
+    required this.customCss,
+    required this.showFrequencyHarmonic,
+    required this.showFrequencyAverage,
+    required this.showPitchNumber,
+    required this.showPitchText,
+  });
+
+  final double width;
+  final double height;
+  final double fontSize;
+  final DictionaryThemePreference theme;
+  final bool eInkMode;
+  final bool paginatedScrolling;
+  final String customCss;
+  final bool showFrequencyHarmonic;
+  final bool showFrequencyAverage;
+  final bool showPitchNumber;
+  final bool showPitchText;
+
+  DictionaryPopupPreferences copyWith({
+    double? width,
+    double? height,
+    double? fontSize,
+    DictionaryThemePreference? theme,
+    bool? eInkMode,
+    bool? paginatedScrolling,
+    String? customCss,
+    bool? showFrequencyHarmonic,
+    bool? showFrequencyAverage,
+    bool? showPitchNumber,
+    bool? showPitchText,
+  }) {
+    return DictionaryPopupPreferences(
+      width: width ?? this.width,
+      height: height ?? this.height,
+      fontSize: fontSize ?? this.fontSize,
+      theme: theme ?? this.theme,
+      eInkMode: eInkMode ?? this.eInkMode,
+      paginatedScrolling: paginatedScrolling ?? this.paginatedScrolling,
+      customCss: customCss ?? this.customCss,
+      showFrequencyHarmonic:
+          showFrequencyHarmonic ?? this.showFrequencyHarmonic,
+      showFrequencyAverage: showFrequencyAverage ?? this.showFrequencyAverage,
+      showPitchNumber: showPitchNumber ?? this.showPitchNumber,
+      showPitchText: showPitchText ?? this.showPitchText,
+    );
+  }
+}
+
 class MiningPreferences {
   static const _boxName = 'mining_preferences';
   static const _jimakuApiKey = 'jimaku_api_key';
@@ -15,6 +74,19 @@ class MiningPreferences {
   static const _ocrOverlayOpacity = 'ocr_overlay_opacity';
   static const _ocrBoxScale = 'ocr_box_scale';
   static const _ocrOutlineVisible = 'ocr_outline_visible';
+  static const _ocrBoxScaleX = 'ocr_box_scale_x';
+  static const _ocrBoxScaleY = 'ocr_box_scale_y';
+  static const _dictionaryPopupWidth = 'dictionary_popup_width';
+  static const _dictionaryPopupHeight = 'dictionary_popup_height';
+  static const _dictionaryFontSize = 'dictionary_font_size';
+  static const _dictionaryTheme = 'dictionary_theme';
+  static const _dictionaryEInk = 'dictionary_eink';
+  static const _dictionaryPaginated = 'dictionary_paginated';
+  static const _dictionaryCustomCss = 'dictionary_custom_css';
+  static const _showFrequencyHarmonic = 'dictionary_frequency_harmonic';
+  static const _showFrequencyAverage = 'dictionary_frequency_average';
+  static const _showPitchNumber = 'dictionary_pitch_number';
+  static const _showPitchText = 'dictionary_pitch_text';
 
   MiningPreferences._();
 
@@ -145,6 +217,32 @@ class MiningPreferences {
     await (await _boxOrNull())?.put(_ocrBoxScale, value.clamp(0.8, 1.5));
   }
 
+  static Future<double> getOcrBoxScaleX() async {
+    final box = await _boxOrNull();
+    return ((box?.get(_ocrBoxScaleX) ??
+                box?.get(_ocrBoxScale, defaultValue: 1.0) ??
+                1.0)
+            as num)
+        .toDouble();
+  }
+
+  static Future<void> setOcrBoxScaleX(double value) async {
+    await (await _boxOrNull())?.put(_ocrBoxScaleX, value.clamp(0.8, 1.5));
+  }
+
+  static Future<double> getOcrBoxScaleY() async {
+    final box = await _boxOrNull();
+    return ((box?.get(_ocrBoxScaleY) ??
+                box?.get(_ocrBoxScale, defaultValue: 1.0) ??
+                1.0)
+            as num)
+        .toDouble();
+  }
+
+  static Future<void> setOcrBoxScaleY(double value) async {
+    await (await _boxOrNull())?.put(_ocrBoxScaleY, value.clamp(0.8, 1.5));
+  }
+
   static Future<bool> getOcrOutlineVisible() async {
     return (await _boxOrNull())?.get(_ocrOutlineVisible, defaultValue: true)
             as bool? ??
@@ -154,6 +252,82 @@ class MiningPreferences {
   static Future<void> setOcrOutlineVisible(bool value) async {
     await (await _boxOrNull())?.put(_ocrOutlineVisible, value);
   }
+
+  static Future<DictionaryPopupPreferences>
+  getDictionaryPopupPreferences() async {
+    final box = await _boxOrNull();
+    final themeName =
+        box?.get(
+              _dictionaryTheme,
+              defaultValue: DictionaryThemePreference.system.name,
+            )
+            as String?;
+    return DictionaryPopupPreferences(
+      width:
+          ((box?.get(_dictionaryPopupWidth, defaultValue: 430) as num?) ?? 430)
+              .toDouble(),
+      height:
+          ((box?.get(_dictionaryPopupHeight, defaultValue: 360) as num?) ?? 360)
+              .toDouble(),
+      fontSize:
+          ((box?.get(_dictionaryFontSize, defaultValue: 14) as num?) ?? 14)
+              .toDouble(),
+      theme: DictionaryThemePreference.values.firstWhere(
+        (value) => value.name == themeName,
+        orElse: () => DictionaryThemePreference.system,
+      ),
+      eInkMode:
+          box?.get(_dictionaryEInk, defaultValue: false) as bool? ?? false,
+      paginatedScrolling:
+          box?.get(_dictionaryPaginated, defaultValue: false) as bool? ?? false,
+      customCss:
+          box?.get(_dictionaryCustomCss, defaultValue: '') as String? ?? '',
+      showFrequencyHarmonic:
+          box?.get(_showFrequencyHarmonic, defaultValue: false) as bool? ??
+          false,
+      showFrequencyAverage:
+          box?.get(_showFrequencyAverage, defaultValue: false) as bool? ??
+          false,
+      showPitchNumber:
+          box?.get(_showPitchNumber, defaultValue: true) as bool? ?? true,
+      showPitchText:
+          box?.get(_showPitchText, defaultValue: true) as bool? ?? true,
+    );
+  }
+
+  static Future<void> setDictionaryPopupWidth(double value) async =>
+      (await _boxOrNull())?.put(_dictionaryPopupWidth, value.clamp(280, 720));
+
+  static Future<void> setDictionaryPopupHeight(double value) async =>
+      (await _boxOrNull())?.put(_dictionaryPopupHeight, value.clamp(240, 720));
+
+  static Future<void> setDictionaryFontSize(double value) async =>
+      (await _boxOrNull())?.put(_dictionaryFontSize, value.clamp(11, 24));
+
+  static Future<void> setDictionaryTheme(
+    DictionaryThemePreference value,
+  ) async => (await _boxOrNull())?.put(_dictionaryTheme, value.name);
+
+  static Future<void> setDictionaryEInkMode(bool value) async =>
+      (await _boxOrNull())?.put(_dictionaryEInk, value);
+
+  static Future<void> setDictionaryPaginatedScrolling(bool value) async =>
+      (await _boxOrNull())?.put(_dictionaryPaginated, value);
+
+  static Future<void> setDictionaryCustomCss(String value) async =>
+      (await _boxOrNull())?.put(_dictionaryCustomCss, value);
+
+  static Future<void> setShowFrequencyHarmonic(bool value) async =>
+      (await _boxOrNull())?.put(_showFrequencyHarmonic, value);
+
+  static Future<void> setShowFrequencyAverage(bool value) async =>
+      (await _boxOrNull())?.put(_showFrequencyAverage, value);
+
+  static Future<void> setShowPitchNumber(bool value) async =>
+      (await _boxOrNull())?.put(_showPitchNumber, value);
+
+  static Future<void> setShowPitchText(bool value) async =>
+      (await _boxOrNull())?.put(_showPitchText, value);
 
   static String _jimakuTitleKey(int? mediaId) {
     return 'jimaku_title_${mediaId ?? 'global'}';

@@ -11,6 +11,7 @@ void main() {
     final html = yomitanGlossaryToHtml(
       raw,
       dictionaryCss: '.gloss-sc-li { color: red; }',
+      customCss: '.dictionary-glossary { font-weight: bold; }',
     );
 
     expect(html, contains('class="gloss-sc-ul"'));
@@ -18,6 +19,7 @@ void main() {
     expect(html, contains('style="list-style-type:circle"'));
     expect(html, contains('<li class="gloss-sc-li">what!</li>'));
     expect(html, contains('.gloss-sc-li { color: red; }'));
+    expect(html, contains('font-weight: bold'));
     expect(html, isNot(contains('&quot;type&quot;')));
   });
 

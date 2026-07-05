@@ -68,6 +68,28 @@ class AnkiMiningProfile {
     );
   }
 
+  AnkiMiningProfile copyWith({
+    bool? ankiEnabled,
+    String? deckName,
+    String? modelName,
+    List<String>? tags,
+    bool? duplicateCheck,
+    String? duplicateScope,
+    bool? syncOnCreate,
+    Map<String, String>? fieldMap,
+  }) {
+    return AnkiMiningProfile(
+      ankiEnabled: ankiEnabled ?? this.ankiEnabled,
+      deckName: deckName ?? this.deckName,
+      modelName: modelName ?? this.modelName,
+      tags: tags ?? this.tags,
+      duplicateCheck: duplicateCheck ?? this.duplicateCheck,
+      duplicateScope: duplicateScope ?? this.duplicateScope,
+      syncOnCreate: syncOnCreate ?? this.syncOnCreate,
+      fieldMap: fieldMap ?? this.fieldMap,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'ankiEnabled': ankiEnabled,

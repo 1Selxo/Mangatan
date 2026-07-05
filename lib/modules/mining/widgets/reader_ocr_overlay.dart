@@ -100,7 +100,7 @@ class ReaderOcrController extends ChangeNotifier {
     final page = _page;
     if (!enabled || page == null) return;
     for (final block in page.blocks) {
-      final rect = _blockRect(block, imageRect, page.boxScale);
+      final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
       if (rect.isEmpty) continue;
       final active = identical(block, _activeBlock);
       canvas.drawRect(
@@ -131,7 +131,7 @@ class ReaderOcrController extends ChangeNotifier {
     final imageRect = _imageRect;
     if (!enabled || page == null || imageRect == null) return false;
     for (final block in page.blocks.reversed) {
-      final rect = _blockRect(block, imageRect, page.boxScale);
+      final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
       if (!rect.contains(localPosition)) continue;
       final rawOffset = _characterOffset(
         block,
@@ -157,7 +157,7 @@ class ReaderOcrController extends ChangeNotifier {
           box?.localToGlobal(rect.bottomRight) ?? rect.bottomRight;
       final bytes = data.cropImage ?? await data.getImageBytes;
       if (!context.mounted) return true;
-      ReaderOcrLookupPopup.show(
+      await ReaderOcrLookupPopup.show(
         context: context,
         anchor: Rect.fromPoints(topLeft, bottomRight),
         text: lookup,
@@ -209,12 +209,14 @@ class ReaderOcrController extends ChangeNotifier {
   }) async {
     final values = await Future.wait<dynamic>([
       MiningPreferences.getOcrOverlayOpacity(),
-      MiningPreferences.getOcrBoxScale(),
+      MiningPreferences.getOcrBoxScaleX(),
+      MiningPreferences.getOcrBoxScaleY(),
       MiningPreferences.getOcrOutlineVisible(),
     ]);
     final opacity = values[0] as double;
-    final boxScale = values[1] as double;
-    final outlineVisible = values[2] as bool;
+    final boxScaleX = values[1] as double;
+    final boxScaleY = values[2] as double;
+    final outlineVisible = values[3] as bool;
 
     if (engine != OcrEnginePreference.googleLens) {
       const parser = MokuroParser();
@@ -228,7 +230,8 @@ class ReaderOcrController extends ChangeNotifier {
           return _ReaderOcrPage(
             blocks: blocks,
             opacity: opacity,
-            boxScale: boxScale,
+            boxScaleX: boxScaleX,
+            boxScaleY: boxScaleY,
             outlineVisible: outlineVisible,
           );
         }
@@ -237,7 +240,8 @@ class ReaderOcrController extends ChangeNotifier {
         return _ReaderOcrPage(
           blocks: const [],
           opacity: opacity,
-          boxScale: boxScale,
+          boxScaleX: boxScaleX,
+          boxScaleY: boxScaleY,
           outlineVisible: outlineVisible,
         );
       }
@@ -255,7 +259,8 @@ class ReaderOcrController extends ChangeNotifier {
       return _ReaderOcrPage(
         blocks: result.blocks,
         opacity: opacity,
-        boxScale: boxScale,
+        boxScaleX: boxScaleX,
+        boxScaleY: boxScaleY,
         outlineVisible: outlineVisible,
       );
     } finally {
@@ -263,14 +268,19 @@ class ReaderOcrController extends ChangeNotifier {
     }
   }
 
-  Rect _blockRect(OcrTextBlock block, Rect imageRect, double scale) {
+  Rect _blockRect(
+    OcrTextBlock block,
+    Rect imageRect,
+    double scaleX,
+    double scaleY,
+  ) {
     final center = Offset(
       imageRect.left + (block.xmin + block.xmax) * imageRect.width / 2,
       imageRect.top + (block.ymin + block.ymax) * imageRect.height / 2,
     );
     final size = Size(
-      (block.xmax - block.xmin) * imageRect.width * scale,
-      (block.ymax - block.ymin) * imageRect.height * scale,
+      (block.xmax - block.xmin) * imageRect.width * scaleX,
+      (block.ymax - block.ymin) * imageRect.height * scaleY,
     );
     return Rect.fromCenter(
       center: center,
@@ -346,24 +356,28 @@ class ReaderOcrLookupPopup extends StatefulWidget {
     required this.miningContext,
     required this.onMatchChanged,
     required this.onClose,
+    required this.preferences,
   });
 
   final String text;
   final MiningContext miningContext;
   final ValueChanged<int> onMatchChanged;
   final VoidCallback onClose;
+  final DictionaryPopupPreferences preferences;
 
-  static void show({
+  static Future<void> show({
     required BuildContext context,
     required Rect anchor,
     required String text,
     required MiningContext miningContext,
     required ValueChanged<int> onMatchChanged,
-  }) {
+  }) async {
+    final preferences = await MiningPreferences.getDictionaryPopupPreferences();
+    if (!context.mounted) return;
     final overlay = Overlay.of(context, rootOverlay: true);
     final screen = MediaQuery.sizeOf(context);
-    final width = math.min(430.0, screen.width - 24);
-    final height = math.min(360.0, screen.height * 0.48);
+    final width = math.min(preferences.width, screen.width - 24);
+    final height = math.min(preferences.height, screen.height - 24);
     final left = (anchor.center.dx - width / 2).clamp(
       12.0,
       screen.width - width - 12,
@@ -393,6 +407,7 @@ class ReaderOcrLookupPopup extends StatefulWidget {
               miningContext: miningContext,
               onMatchChanged: onMatchChanged,
               onClose: entry.remove,
+              preferences: preferences,
             ),
           ),
         ],
@@ -432,6 +447,10 @@ class _ReaderOcrLookupPopupState extends State<ReaderOcrLookupPopup> {
     setState(() => _exporting = true);
     try {
       final profile = await MiningPreferences.getAnkiProfile();
+      if (!profile.ankiEnabled) {
+        botToast('Anki export is disabled in Dictionary settings', second: 4);
+        return;
+      }
       final draft = await const AnkiCardBuilder().build(
         result: result,
         context: widget.miningContext,
@@ -455,117 +474,189 @@ class _ReaderOcrLookupPopupState extends State<ReaderOcrLookupPopup> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 12,
-      clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.circular(8),
-      color: Theme.of(context).colorScheme.surface,
-      child: Column(
-        children: [
-          SizedBox(
-            height: 44,
-            child: Row(
-              children: [
-                const SizedBox(width: 12),
-                const Icon(Icons.manage_search, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    widget.text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
+    final preferences = widget.preferences;
+    final baseTheme = Theme.of(context);
+    final popupTheme = switch (preferences.theme) {
+      DictionaryThemePreference.light => ThemeData.light(),
+      DictionaryThemePreference.dark => ThemeData.dark(),
+      DictionaryThemePreference.black => ThemeData.dark().copyWith(
+        colorScheme: const ColorScheme.dark(surface: Colors.black),
+      ),
+      DictionaryThemePreference.system => baseTheme,
+    };
+    return Theme(
+      data: popupTheme.copyWith(
+        textTheme: popupTheme.textTheme.apply(
+          fontSizeFactor: preferences.fontSize / 14,
+        ),
+      ),
+      child: Material(
+        elevation: preferences.eInkMode ? 0 : 12,
+        clipBehavior: Clip.antiAlias,
+        borderRadius: BorderRadius.circular(preferences.eInkMode ? 0 : 8),
+        color: popupTheme.colorScheme.surface,
+        child: Column(
+          children: [
+            SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  const Icon(Icons.manage_search, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Close',
-                  onPressed: widget.onClose,
-                  icon: const Icon(Icons.close, size: 20),
-                ),
-              ],
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: widget.onClose,
+                    icon: const Icon(Icons.close, size: 20),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: FutureBuilder<_LookupPayload>(
-              future: _results,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Lookup failed: ${snapshot.error}'),
-                  );
-                }
-                final payload = snapshot.data;
-                final results = payload?.results ?? const [];
-                if (results.isEmpty) {
-                  return const Center(
-                    child: Text('No dictionary results found.'),
-                  );
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: results.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final result = results[index];
-                    final term = result.term;
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: term.expression,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      if (term.reading.isNotEmpty)
-                                        TextSpan(text: '  ${term.reading}'),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                for (final glossary in term.glossaries.take(3))
-                                  DictionaryGlossary(
-                                    rawGlossary: glossary.glossary,
-                                    dictionaryName: glossary.dictName,
-                                    dictionaryCss:
-                                        payload?.styles[glossary.dictName] ??
-                                        '',
-                                  ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Add to Anki',
-                            onPressed: _exporting
-                                ? null
-                                : () => _export(result),
-                            icon: const Icon(Icons.note_add_outlined, size: 20),
-                          ),
-                        ],
-                      ),
+            const Divider(height: 1),
+            Expanded(
+              child: FutureBuilder<_LookupPayload>(
+                future: _results,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Lookup failed: ${snapshot.error}'),
                     );
-                  },
-                );
-              },
+                  }
+                  final payload = snapshot.data;
+                  final results = payload?.results ?? const [];
+                  if (results.isEmpty) {
+                    return const Center(
+                      child: Text('No dictionary results found.'),
+                    );
+                  }
+                  return ListView.separated(
+                    physics: preferences.paginatedScrolling
+                        ? const PageScrollPhysics()
+                        : null,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: results.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final result = results[index];
+                      final term = result.term;
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: term.expression,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        if (term.reading.isNotEmpty)
+                                          TextSpan(text: '  ${term.reading}'),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  for (final glossary in term.glossaries.take(
+                                    3,
+                                  ))
+                                    DictionaryGlossary(
+                                      rawGlossary: glossary.glossary,
+                                      dictionaryName: glossary.dictName,
+                                      dictionaryCss:
+                                          payload?.styles[glossary.dictName] ??
+                                          '',
+                                      customCss: preferences.customCss,
+                                      fontSize: preferences.fontSize,
+                                    ),
+                                  if (preferences.showFrequencyHarmonic &&
+                                      term.frequencies.isNotEmpty)
+                                    Text(
+                                      'Frequency harmonic: ${_frequencyHarmonic(term.frequencies).toStringAsFixed(1)}',
+                                    ),
+                                  if (preferences.showFrequencyAverage &&
+                                      term.frequencies.isNotEmpty)
+                                    Text(
+                                      'Frequency average: ${_frequencyAverage(term.frequencies).toStringAsFixed(1)}',
+                                    ),
+                                  if ((preferences.showPitchNumber ||
+                                          preferences.showPitchText) &&
+                                      term.pitches.isNotEmpty)
+                                    for (final pitch in term.pitches)
+                                      Text(
+                                        [
+                                              pitch.dictName,
+                                              if (preferences.showPitchNumber)
+                                                pitch.pitchPositions.join(', '),
+                                              if (preferences.showPitchText)
+                                                pitch.transcriptions.join(', '),
+                                            ]
+                                            .where((value) => value.isNotEmpty)
+                                            .join(' - '),
+                                      ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Add to Anki',
+                              onPressed: _exporting
+                                  ? null
+                                  : () => _export(result),
+                              icon: const Icon(
+                                Icons.note_add_outlined,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+List<int> _frequencyValues(List<HoshiFrequencyEntry> entries) => entries
+    .expand((entry) => entry.frequencies)
+    .map((frequency) => frequency.value)
+    .where((value) => value > 0)
+    .toSet()
+    .toList();
+
+double _frequencyHarmonic(List<HoshiFrequencyEntry> entries) {
+  final values = _frequencyValues(entries);
+  if (values.isEmpty) return 0;
+  return values.length /
+      values.fold<double>(0, (sum, value) => sum + 1 / value);
+}
+
+double _frequencyAverage(List<HoshiFrequencyEntry> entries) {
+  final values = _frequencyValues(entries);
+  if (values.isEmpty) return 0;
+  return values.reduce((a, b) => a + b) / values.length;
 }
 
 class _LookupPayload {
@@ -579,13 +670,15 @@ class _ReaderOcrPage {
   const _ReaderOcrPage({
     required this.blocks,
     required this.opacity,
-    required this.boxScale,
+    required this.boxScaleX,
+    required this.boxScaleY,
     required this.outlineVisible,
   });
 
   final List<OcrTextBlock> blocks;
   final double opacity;
-  final double boxScale;
+  final double boxScaleX;
+  final double boxScaleY;
   final bool outlineVisible;
 }
 

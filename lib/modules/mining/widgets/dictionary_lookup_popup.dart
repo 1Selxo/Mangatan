@@ -81,14 +81,7 @@ class DictionaryLookupPopup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final baseTheme = Theme.of(context);
-    final popupTheme = switch (preferences.theme) {
-      DictionaryThemePreference.light => ThemeData.light(),
-      DictionaryThemePreference.dark => ThemeData.dark(),
-      DictionaryThemePreference.black => ThemeData.dark().copyWith(
-        colorScheme: const ColorScheme.dark(surface: Colors.black),
-      ),
-      DictionaryThemePreference.system => baseTheme,
-    };
+    final popupTheme = _popupTheme(baseTheme, preferences.theme);
     return Theme(
       data: popupTheme.copyWith(
         textTheme: popupTheme.textTheme.apply(
@@ -103,29 +96,30 @@ class DictionaryLookupPopup extends StatelessWidget {
         child: Column(
           children: [
             SizedBox(
-              height: 44,
+              height: 34,
               child: Row(
                 children: [
                   const SizedBox(width: 12),
-                  const Icon(Icons.manage_search, size: 20),
+                  const Icon(Icons.manage_search, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       text,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
                   IconButton(
                     tooltip: 'Close',
                     onPressed: onClose,
+                    visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.close, size: 20),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: popupTheme.dividerColor),
             Expanded(
               child: DictionaryLookupResultsView(
                 text: text,
@@ -135,7 +129,7 @@ class DictionaryLookupPopup extends StatelessWidget {
                 physics: preferences.paginatedScrolling
                     ? const PageScrollPhysics()
                     : null,
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 2),
                 compact: true,
               ),
             ),
@@ -285,7 +279,8 @@ class _DictionaryLookupResultsViewState
           shrinkWrap: widget.shrinkWrap,
           padding: widget.padding,
           itemCount: results.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
+          separatorBuilder: (_, _) =>
+              Divider(height: 1, color: Theme.of(context).dividerColor),
           itemBuilder: (context, index) {
             final result = results[index];
             return _LookupResultTile(
@@ -326,43 +321,77 @@ class _LookupResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final term = result.term;
-    final termTags = _uniqueTags(
+    final senseTermTags = _uniqueTags(
       term.glossaries.expand((entry) => _splitTags(entry.termTags)),
-    );
+    ).toSet();
     final rules = _splitTags(term.rules);
+    final globalRules = [
+      for (final rule in rules)
+        if (!senseTermTags.contains(rule)) rule,
+    ];
+    final hasMultipleSenses = term.glossaries.length > 1;
     return Padding(
-      padding: EdgeInsets.fromLTRB(12, compact ? 8 : 12, 6, compact ? 8 : 12),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(10, compact ? 8 : 12, 6, compact ? 8 : 12),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _LookupEntryMarker(result: result),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _TermHeading(
+                  term: term,
+                  result: result,
+                  compact: compact,
+                ),
+              ),
+              if (showAnkiButton)
+                IconButton(
+                  tooltip: 'Add to Anki',
+                  onPressed: exporting ? null : onExport,
+                  visualDensity: VisualDensity.compact,
+                  icon: exporting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.note_add_outlined, size: 20),
+                ),
+            ],
+          ),
+          if (globalRules.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Wrap(
+                spacing: 5,
+                runSpacing: 5,
+                children: [
+                  for (final rule in globalRules)
+                    _LookupChip(label: rule, kind: _ChipKind.rule),
+                ],
+              ),
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.only(left: 22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _TermHeading(term: term, result: result, compact: compact),
-                if (termTags.isNotEmpty || rules.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 5,
-                    runSpacing: 5,
-                    children: [
-                      for (final tag in termTags)
-                        _LookupChip(label: tag, kind: _ChipKind.tag),
-                      for (final rule in rules)
-                        _LookupChip(label: rule, kind: _ChipKind.rule),
-                    ],
-                  ),
-                ],
                 _DeinflectionTrace(result: result),
-                SizedBox(height: compact ? 6 : 10),
+                SizedBox(height: compact ? 5 : 8),
                 for (final indexed in term.glossaries.indexed)
                   _GlossarySense(
                     index: indexed.$1 + 1,
+                    showIndex: hasMultipleSenses,
                     glossary: indexed.$2,
                     styles: styles,
                     preferences: preferences,
                     compact: compact,
-                    hiddenTermTags: termTags.toSet(),
+                    hiddenTermTags: const {},
                   ),
                 if (term.frequencies.isNotEmpty || term.pitches.isNotEmpty) ...[
                   SizedBox(height: compact ? 6 : 10),
@@ -371,19 +400,34 @@ class _LookupResultTile extends StatelessWidget {
               ],
             ),
           ),
-          if (showAnkiButton)
-            IconButton(
-              tooltip: 'Add to Anki',
-              onPressed: exporting ? null : onExport,
-              icon: exporting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.note_add_outlined, size: 20),
-            ),
         ],
+      ),
+    );
+  }
+}
+
+class _LookupEntryMarker extends StatelessWidget {
+  const _LookupEntryMarker({required this.result});
+
+  final HoshiLookupResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTransform =
+        result.trace.isNotEmpty ||
+        (result.matched.trim().isNotEmpty &&
+            result.deinflected.trim().isNotEmpty &&
+            result.matched.trim() != result.deinflected.trim());
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Icon(
+        hasTransform ? Icons.arrow_right : Icons.circle,
+        size: hasTransform ? 18 : 6,
+        color: hasTransform
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
       ),
     );
   }
@@ -405,8 +449,8 @@ class _TermHeading extends StatelessWidget {
     final reading = term.reading.trim();
     final showReading = reading.isNotEmpty && reading != term.expression;
     final titleStyle = compact
-        ? Theme.of(context).textTheme.titleMedium
-        : Theme.of(context).textTheme.headlineSmall;
+        ? Theme.of(context).textTheme.headlineSmall
+        : Theme.of(context).textTheme.headlineMedium;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -415,18 +459,16 @@ class _TermHeading extends StatelessWidget {
             reading,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.primary,
+              height: 1,
             ),
           ),
         Text(
           term.expression,
-          style: titleStyle?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        if (result.matched.trim().isNotEmpty &&
-            result.matched != term.expression)
-          Text(
-            'matched ${result.matched}',
-            style: Theme.of(context).textTheme.bodySmall,
+          style: titleStyle?.copyWith(
+            fontWeight: FontWeight.w400,
+            height: 1.05,
           ),
+        ),
       ],
     );
   }
@@ -446,35 +488,48 @@ class _DeinflectionTrace extends StatelessWidget {
     if (!hasProcess && result.trace.isEmpty && result.preprocessorSteps == 0) {
       return const SizedBox.shrink();
     }
+    final processText = hasProcess ? '$matched -> $deinflected' : '';
+    final traceLabels = [
+      for (final group in result.trace)
+        if (group.name.trim().isNotEmpty) group.name.trim(),
+    ];
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (hasProcess)
-            Text(
-              'Deinflected $matched -> $deinflected',
-              style: Theme.of(context).textTheme.bodySmall,
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Tooltip(
+        message: [
+          if (processText.isNotEmpty) processText,
+          for (final group in result.trace)
+            if (group.description.trim().isNotEmpty)
+              '${group.name}: ${group.description}',
+        ].join('\n'),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.extension_outlined,
+              size: 15,
+              color: Colors.lightGreenAccent.shade400,
             ),
-          Wrap(
-            spacing: 5,
-            runSpacing: 5,
-            children: [
-              for (final group in result.trace)
-                Tooltip(
-                  message: group.description.trim().isEmpty
-                      ? group.name
-                      : group.description,
-                  child: _LookupChip(label: group.name, kind: _ChipKind.trace),
-                ),
-              if (result.preprocessorSteps > 0)
-                _LookupChip(
-                  label: '${result.preprocessorSteps} preprocess',
-                  kind: _ChipKind.trace,
-                ),
-            ],
-          ),
-        ],
+            const SizedBox(width: 5),
+            Expanded(
+              child: Wrap(
+                spacing: 5,
+                runSpacing: 5,
+                children: [
+                  if (traceLabels.isEmpty && processText.isNotEmpty)
+                    _LookupChip(label: processText, kind: _ChipKind.trace),
+                  for (final label in traceLabels)
+                    _LookupChip(label: label, kind: _ChipKind.trace),
+                  if (result.preprocessorSteps > 0)
+                    _LookupChip(
+                      label: '${result.preprocessorSteps} preprocess',
+                      kind: _ChipKind.trace,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -483,6 +538,7 @@ class _DeinflectionTrace extends StatelessWidget {
 class _GlossarySense extends StatelessWidget {
   const _GlossarySense({
     required this.index,
+    required this.showIndex,
     required this.glossary,
     required this.styles,
     required this.preferences,
@@ -491,6 +547,7 @@ class _GlossarySense extends StatelessWidget {
   });
 
   final int index;
+  final bool showIndex;
   final HoshiGlossaryEntry glossary;
   final Map<String, String> styles;
   final DictionaryPopupPreferences preferences;
@@ -507,24 +564,23 @@ class _GlossarySense extends StatelessWidget {
       glossary.definitionTags,
     ).where((tag) => tag != index.toString() && seen.add(tag)).toList();
     return Padding(
-      padding: EdgeInsets.only(bottom: compact ? 6 : 10),
+      padding: EdgeInsets.only(bottom: compact ? 8 : 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(5),
-              color: Theme.of(context).colorScheme.secondaryContainer,
-            ),
-            child: Text(
-              '$index',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
+          SizedBox(
+            width: showIndex ? 30 : 12,
+            child: showIndex
+                ? Text(
+                    '$index.',
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 7),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,7 +603,7 @@ class _GlossarySense extends StatelessWidget {
                 if (termTags.isNotEmpty ||
                     definitionTags.isNotEmpty ||
                     glossary.dictName.trim().isNotEmpty)
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                 DictionaryGlossary(
                   rawGlossary: glossary.glossary,
                   dictionaryName: glossary.dictName,
@@ -623,10 +679,10 @@ class _LookupChip extends StatelessWidget {
     final colors = _chipColors(context, kind);
     return Container(
       constraints: const BoxConstraints(maxWidth: 220),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: colors.$1,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         label,
@@ -677,21 +733,55 @@ class _LookupPayload {
 
 enum _ChipKind { tag, rule, definition, dictionary, trace, frequency, pitch }
 
+ThemeData _popupTheme(
+  ThemeData baseTheme,
+  DictionaryThemePreference preference,
+) {
+  final dark = ThemeData.dark().copyWith(
+    colorScheme: const ColorScheme.dark(
+      surface: Color(0xff1f1f1f),
+      surfaceContainerHighest: Color(0xff303134),
+      onSurface: Color(0xfff1f3f4),
+      onSurfaceVariant: Color(0xffbdc1c6),
+      primary: Color(0xff8ab4f8),
+    ),
+    dividerColor: const Color(0xff343536),
+    scaffoldBackgroundColor: const Color(0xff1f1f1f),
+  );
+  return switch (preference) {
+    DictionaryThemePreference.light => ThemeData.light(),
+    DictionaryThemePreference.dark => dark,
+    DictionaryThemePreference.black => dark.copyWith(
+      colorScheme: dark.colorScheme.copyWith(surface: Colors.black),
+      scaffoldBackgroundColor: Colors.black,
+    ),
+    DictionaryThemePreference.system =>
+      baseTheme.brightness == Brightness.dark ? baseTheme : dark,
+  };
+}
+
 (Color, Color) _chipColors(BuildContext context, _ChipKind kind) {
   final scheme = Theme.of(context).colorScheme;
+  final dark = Theme.of(context).brightness == Brightness.dark;
   return switch (kind) {
-    _ChipKind.dictionary => (const Color(0xff8e49c7), Colors.white),
+    _ChipKind.dictionary => (const Color(0xff9c59d1), Colors.white),
     _ChipKind.tag => (const Color(0xff2f8fbd), Colors.white),
-    _ChipKind.rule => (scheme.secondaryContainer, scheme.onSecondaryContainer),
+    _ChipKind.rule => (
+      dark ? const Color(0xff5f6368) : scheme.secondaryContainer,
+      dark ? Colors.white : scheme.onSecondaryContainer,
+    ),
     _ChipKind.definition => (
-      scheme.tertiaryContainer,
-      scheme.onTertiaryContainer,
+      dark ? const Color(0xff5f6368) : scheme.tertiaryContainer,
+      dark ? Colors.white : scheme.onTertiaryContainer,
     ),
     _ChipKind.trace => (
-      scheme.surfaceContainerHighest,
-      scheme.onSurfaceVariant,
+      dark ? const Color(0xff3c4043) : scheme.surfaceContainerHighest,
+      dark ? const Color(0xffe8eaed) : scheme.onSurfaceVariant,
     ),
-    _ChipKind.frequency => (scheme.primaryContainer, scheme.onPrimaryContainer),
+    _ChipKind.frequency => (
+      dark ? const Color(0xff3c4043) : scheme.primaryContainer,
+      dark ? const Color(0xffe8eaed) : scheme.onPrimaryContainer,
+    ),
     _ChipKind.pitch => (scheme.errorContainer, scheme.onErrorContainer),
   };
 }

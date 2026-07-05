@@ -8,7 +8,6 @@ import 'package:mangayomi/modules/anime/anime_player_view.dart';
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
-import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -555,7 +554,7 @@ class _DesktopControllerWidgetState
                 configuration: SubtitleViewConfiguration(
                   style: subtileTextStyle(ref),
                 ),
-                paintSubtitle: !ref.read(useLibassStateProvider),
+                paintSubtitle: true,
                 miningContextBuilder: widget.subtitleMiningContextBuilder,
               ),
             ),

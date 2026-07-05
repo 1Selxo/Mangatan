@@ -709,7 +709,7 @@ class _MobileControllerWidgetState
               configuration: SubtitleViewConfiguration(
                 style: subtileTextStyle(ref),
               ),
-              paintSubtitle: !ref.read(useLibassStateProvider),
+              paintSubtitle: true,
               miningContextBuilder: widget.subtitleMiningContextBuilder,
             ),
           ),

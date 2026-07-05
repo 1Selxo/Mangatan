@@ -219,6 +219,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
           "audio-channels": audioChannel.mpvName,
         if (audioChannel == AudioChannel.reverseStereo)
           "af": audioChannel.mpvName,
+        "sub-visibility": "no",
       },
       observeProperties: {
         "user-data/aniyomi/show_text": generated.mpv_format.MPV_FORMAT_NODE,
@@ -285,6 +286,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   final ValueNotifier<String> _selectedShader = ValueNotifier("");
   final ValueNotifier<ActiveCustomButton?> _customButton = ValueNotifier(null);
   final ValueNotifier<List<CustomButton>?> _customButtons = ValueNotifier(null);
+  Timer? _nativeSubtitlePaintTimer;
   late final ValueNotifier<_AniSkipPhase> _skipPhase = ValueNotifier(
     _AniSkipPhase.none,
   );
@@ -710,6 +712,29 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _setSkipPhase(currentSecs);
   }
 
+  Future<void> _setSubtitleTrack(SubtitleTrack track) async {
+    await _player.setSubtitleTrack(track);
+    _hideNativeSubtitlePaintSoon();
+  }
+
+  void _hideNativeSubtitlePaintSoon() {
+    unawaited(_hideNativeSubtitlePaint());
+    _nativeSubtitlePaintTimer?.cancel();
+    _nativeSubtitlePaintTimer = Timer(
+      const Duration(milliseconds: 250),
+      () => unawaited(_hideNativeSubtitlePaint()),
+    );
+  }
+
+  Future<void> _hideNativeSubtitlePaint() async {
+    try {
+      final platform = _player.platform;
+      if (platform is NativePlayer) {
+        await platform.setProperty('sub-visibility', 'no');
+      }
+    } catch (_) {}
+  }
+
   void _setCurrentAudSub(Duration position, int secs) {
     final totalSecs = _player.state.duration.inSeconds;
     _isCompleted.value = (totalSecs - secs) <= 10;
@@ -727,7 +752,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           final track = (file.startsWith("http") || file.startsWith("file"))
               ? SubtitleTrack.uri(file, title: label, language: label)
               : SubtitleTrack.data(file, title: label, language: label);
-          _player.setSubtitleTrack(track);
+          unawaited(_setSubtitleTrack(track));
         } catch (_) {}
         if (_firstVid.audios?.isNotEmpty ?? false) {
           try {
@@ -889,7 +914,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           file: files.first,
           outputDirectory: outputDir,
         );
-        await _player.setSubtitleTrack(
+        await _setSubtitleTrack(
           SubtitleTrack.uri(
             subtitleFile.path,
             title: 'Jimaku ${files.first.name}',
@@ -1132,6 +1157,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _currentPosition.removeListener(_updateRpcTimestamp);
     _subDelayController.removeListener(_onSubDelayChanged);
     _subSpeedController.removeListener(_onSubSpeedChanged);
+    _nativeSubtitlePaintTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _setCurrentPosition(true, saveWatchTime: true);
     _player.stop();
@@ -1492,7 +1518,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               onTap: () {
                 Navigator.pop(context);
                 try {
-                  _player.setSubtitleTrack(sub.subtitle!);
+                  unawaited(_setSubtitleTrack(sub.subtitle!));
                 } catch (_) {}
               },
               child: textWidget(title, selected),
@@ -1507,7 +1533,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 );
 
                 if (result != null && context.mounted) {
-                  _player.setSubtitleTrack(
+                  await _setSubtitleTrack(
                     SubtitleTrack.uri(result.files.first.path!),
                   );
                 }
@@ -1532,7 +1558,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                         )
                         as ImdbSubtitle?;
                 if (subtitle != null && context.mounted) {
-                  _player.setSubtitleTrack(
+                  await _setSubtitleTrack(
                     SubtitleTrack.uri(
                       subtitle.url!,
                       title: subtitle.language,

@@ -321,6 +321,7 @@ class _LookupResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final term = result.term;
+    final glossaryGroups = _groupGlossariesByDictionary(term.glossaries);
     final senseTermTags = _uniqueTags(
       term.glossaries.expand((entry) => _splitTags(entry.termTags)),
     ).toSet();
@@ -329,7 +330,6 @@ class _LookupResultTile extends StatelessWidget {
       for (final rule in rules)
         if (!senseTermTags.contains(rule)) rule,
     ];
-    final hasMultipleSenses = term.glossaries.length > 1;
     return Padding(
       padding: EdgeInsets.fromLTRB(10, compact ? 8 : 12, 6, compact ? 8 : 12),
       child: Column(
@@ -383,23 +383,132 @@ class _LookupResultTile extends StatelessWidget {
               children: [
                 _DeinflectionTrace(result: result),
                 SizedBox(height: compact ? 5 : 8),
-                for (final indexed in term.glossaries.indexed)
-                  _GlossarySense(
-                    index: indexed.$1 + 1,
-                    showIndex: hasMultipleSenses,
-                    glossary: indexed.$2,
+                if (term.frequencies.isNotEmpty || term.pitches.isNotEmpty) ...[
+                  _FrequencyAndPitchBlock(term: term, preferences: preferences),
+                  SizedBox(height: compact ? 6 : 9),
+                ],
+                for (final group in glossaryGroups)
+                  _DictionaryGlossaryGroup(
+                    group: group,
                     styles: styles,
                     preferences: preferences,
                     compact: compact,
-                    hiddenTermTags: const {},
                   ),
-                if (term.frequencies.isNotEmpty || term.pitches.isNotEmpty) ...[
-                  SizedBox(height: compact ? 6 : 10),
-                  _FrequencyAndPitchBlock(term: term, preferences: preferences),
-                ],
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DictionaryGlossaryGroup extends StatefulWidget {
+  const _DictionaryGlossaryGroup({
+    required this.group,
+    required this.styles,
+    required this.preferences,
+    required this.compact,
+  });
+
+  final _GlossaryGroup group;
+  final Map<String, String> styles;
+  final DictionaryPopupPreferences preferences;
+  final bool compact;
+
+  @override
+  State<_DictionaryGlossaryGroup> createState() =>
+      _DictionaryGlossaryGroupState();
+}
+
+class _DictionaryGlossaryGroupState extends State<_DictionaryGlossaryGroup> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final group = widget.group;
+    final termTags = _uniqueTags(
+      group.entries.expand((entry) => _splitTags(entry.termTags)),
+    );
+    final hasMultipleSenses = group.entries.length > 1;
+    final dictionaryName = group.dictionaryName.trim().isEmpty
+        ? 'Dictionary'
+        : group.dictionaryName.trim();
+
+    return Container(
+      margin: EdgeInsets.only(bottom: widget.compact ? 6 : 9),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest.withValues(alpha: 0.72),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 5, 8, 4),
+              child: Row(
+                children: [
+                  Icon(
+                    _expanded ? Icons.arrow_drop_down : Icons.arrow_right,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: Text(
+                      dictionaryName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                widget.compact ? 9 : 11,
+                2,
+                widget.compact ? 9 : 11,
+                widget.compact ? 7 : 10,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (termTags.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        for (final tag in termTags)
+                          _LookupChip(label: tag, kind: _ChipKind.tag),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                  ],
+                  for (final indexed in group.entries.indexed)
+                    _GlossarySense(
+                      index: indexed.$1 + 1,
+                      showIndex: hasMultipleSenses,
+                      glossary: indexed.$2,
+                      styles: widget.styles,
+                      preferences: widget.preferences,
+                      compact: widget.compact,
+                      hiddenTermTags: termTags.toSet(),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -593,16 +702,9 @@ class _GlossarySense extends StatelessWidget {
                       _LookupChip(label: tag, kind: _ChipKind.tag),
                     for (final tag in definitionTags)
                       _LookupChip(label: tag, kind: _ChipKind.definition),
-                    if (glossary.dictName.trim().isNotEmpty)
-                      _LookupChip(
-                        label: glossary.dictName,
-                        kind: _ChipKind.dictionary,
-                      ),
                   ],
                 ),
-                if (termTags.isNotEmpty ||
-                    definitionTags.isNotEmpty ||
-                    glossary.dictName.trim().isNotEmpty)
+                if (termTags.isNotEmpty || definitionTags.isNotEmpty)
                   const SizedBox(height: 4),
                 DictionaryGlossary(
                   rawGlossary: glossary.glossary,
@@ -729,6 +831,26 @@ class _LookupPayload {
   final List<HoshiLookupResult> results;
   final Map<String, String> styles;
   final DictionaryPopupPreferences preferences;
+}
+
+class _GlossaryGroup {
+  const _GlossaryGroup({required this.dictionaryName, required this.entries});
+
+  final String dictionaryName;
+  final List<HoshiGlossaryEntry> entries;
+}
+
+List<_GlossaryGroup> _groupGlossariesByDictionary(
+  List<HoshiGlossaryEntry> glossaries,
+) {
+  final grouped = <String, List<HoshiGlossaryEntry>>{};
+  for (final glossary in glossaries) {
+    grouped.putIfAbsent(glossary.dictName, () => []).add(glossary);
+  }
+  return [
+    for (final entry in grouped.entries)
+      _GlossaryGroup(dictionaryName: entry.key, entries: entry.value),
+  ];
 }
 
 enum _ChipKind { tag, rule, definition, dictionary, trace, frequency, pitch }

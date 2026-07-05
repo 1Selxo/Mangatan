@@ -1,5 +1,6 @@
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'reader_state_provider.g.dart';
 
@@ -167,7 +168,7 @@ class UsePageTapZonesState extends _$UsePageTapZonesState {
 class FullScreenReaderState extends _$FullScreenReaderState {
   @override
   bool build() {
-    return isar.settings.getSync(227)!.fullScreenReader ?? true;
+    return isar.settings.getSync(227)!.fullScreenReader ?? isMobile;
   }
 
   void set(bool value) {

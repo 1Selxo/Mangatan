@@ -511,7 +511,7 @@ class Settings {
     this.cfProxyUrl = "",
     this.btServerAddress = "127.0.0.1",
     this.btServerPort,
-    this.fullScreenReader = true,
+    this.fullScreenReader = false,
     this.enableCustomColorFilter = false,
     this.customColorFilter,
     this.colorFilterBlendMode = ColorFilterBlendMode.none,

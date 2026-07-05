@@ -10,6 +10,7 @@ import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/mokuro_parser.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
+import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 
 class ReaderOcrState {
@@ -213,7 +214,8 @@ class ReaderOcrController extends ChangeNotifier {
     final boxScaleY = values[2] as double;
     final outlineVisible = values[3] as bool;
 
-    if (engine != OcrEnginePreference.googleLens) {
+    if (engine != OcrEnginePreference.googleLens &&
+        engine != OcrEnginePreference.screenAi) {
       const parser = MokuroParser();
       final volume = await parser.findForReaderPage(data);
       final mokuroPage = volume == null
@@ -248,6 +250,33 @@ class ReaderOcrController extends ChangeNotifier {
       bytes = data.cropImage ?? await data.getImageBytes;
     }
     if (bytes == null) throw StateError('Page image is not cached yet');
+    final shouldTryScreenAi =
+        engine == OcrEnginePreference.screenAi ||
+        (engine == OcrEnginePreference.automatic &&
+            await ScreenAiOcrClient.isAvailable());
+    if (shouldTryScreenAi) {
+      try {
+        final client = ScreenAiOcrClient();
+        try {
+          final result = await client.recognize(bytes);
+          if (result.blocks.isNotEmpty ||
+              engine == OcrEnginePreference.screenAi) {
+            return _ReaderOcrPage(
+              blocks: result.blocks,
+              opacity: opacity,
+              boxScaleX: boxScaleX,
+              boxScaleY: boxScaleY,
+              outlineVisible: outlineVisible,
+            );
+          }
+        } finally {
+          client.close();
+        }
+      } catch (_) {
+        if (engine == OcrEnginePreference.screenAi) rethrow;
+      }
+    }
+
     final client = ChromeLensOcrClient();
     try {
       final result = await client.recognize(bytes, language: language);

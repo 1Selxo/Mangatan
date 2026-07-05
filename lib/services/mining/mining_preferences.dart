@@ -1,7 +1,7 @@
 import 'package:hive_flutter/adapters.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 
-enum OcrEnginePreference { automatic, googleLens, mokuroOnly }
+enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }
 
 enum DictionaryThemePreference { system, light, dark, black }
 

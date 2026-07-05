@@ -224,6 +224,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       anchor: anchor,
       text: selection.text,
       miningContext: builder(subtitleText),
+      dismissOnOutsideTap: !hoverTriggered,
       onMatchChanged: (count) {
         if (!mounted || count <= 0) return;
         setState(() {

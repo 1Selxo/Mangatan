@@ -50,6 +50,7 @@ class _DictionaryPopupHostController {
     required Rect anchor,
     required String text,
     required MiningContext miningContext,
+    bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) async {
@@ -60,6 +61,7 @@ class _DictionaryPopupHostController {
       anchor: anchor,
       text: text,
       miningContext: miningContext,
+      dismissOnOutsideTap: dismissOnOutsideTap,
       onMatchChanged: onMatchChanged,
       onHoverChanged: onHoverChanged,
     );
@@ -99,6 +101,7 @@ class _DictionaryPopupOverlayHostState
   double _top = 0;
   late double _width;
   late double _height;
+  bool _dismissOnOutsideTap = true;
 
   @override
   void initState() {
@@ -113,6 +116,7 @@ class _DictionaryPopupOverlayHostState
     required Rect anchor,
     required String text,
     required MiningContext miningContext,
+    required bool dismissOnOutsideTap,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) {
@@ -136,6 +140,7 @@ class _DictionaryPopupOverlayHostState
       );
       _dismissed = completer;
       _visible = true;
+      _dismissOnOutsideTap = dismissOnOutsideTap;
       _left = left;
       _top = top;
       _width = width;
@@ -151,6 +156,7 @@ class _DictionaryPopupOverlayHostState
     }
     setState(() {
       _visible = false;
+      _dismissOnOutsideTap = true;
       _left = -_width - 100;
       _top = 0;
     });
@@ -169,7 +175,7 @@ class _DictionaryPopupOverlayHostState
     final popupTheme = _popupTheme(Theme.of(context), widget.preferences.theme);
     return Stack(
       children: [
-        if (_visible)
+        if (_visible && _dismissOnOutsideTap)
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -244,6 +250,7 @@ class DictionaryLookupPopup extends StatelessWidget {
     required Rect anchor,
     required String text,
     required MiningContext miningContext,
+    bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) async {
@@ -254,6 +261,7 @@ class DictionaryLookupPopup extends StatelessWidget {
       anchor: anchor,
       text: lookupText,
       miningContext: miningContext,
+      dismissOnOutsideTap: dismissOnOutsideTap,
       onMatchChanged: onMatchChanged,
       onHoverChanged: onHoverChanged,
     );

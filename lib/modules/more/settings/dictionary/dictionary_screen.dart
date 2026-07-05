@@ -8,6 +8,7 @@ import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
+import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 
 class DictionaryScreen extends StatefulWidget {
   const DictionaryScreen({super.key});
@@ -25,6 +26,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   double _boxScaleY = 1;
   bool _outlineVisible = true;
   bool _overlayEnabled = true;
+  bool _screenAiAvailable = false;
   bool _loading = true;
   bool _importing = false;
   late DictionaryPopupPreferences _popupPreferences;
@@ -50,6 +52,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getDictionaryPopupPreferences(),
       MiningPreferences.getAnkiProfile(),
       MiningPreferences.getAnkiEndpoint(),
+      ScreenAiOcrClient.isAvailable(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -64,6 +67,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _popupPreferences = values[8] as DictionaryPopupPreferences;
       _ankiProfile = values[9] as AnkiMiningProfile;
       _ankiEndpoint = values[10] as Uri;
+      _screenAiAvailable = values[11] as bool;
       _loading = false;
     });
   }
@@ -433,7 +437,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     items: const [
                       DropdownMenuItem(
                         value: OcrEnginePreference.automatic,
-                        child: Text('Automatic (Mokuro, then Google Lens)'),
+                        child: Text(
+                          'Automatic (Mokuro, ScreenAI, Google Lens)',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: OcrEnginePreference.screenAi,
+                        child: Text('ScreenAI (local Chrome)'),
                       ),
                       DropdownMenuItem(
                         value: OcrEnginePreference.googleLens,
@@ -452,6 +462,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                ListTile(
+                  leading: Icon(
+                    _screenAiAvailable
+                        ? Icons.offline_bolt_outlined
+                        : Icons.download_for_offline_outlined,
+                  ),
+                  title: const Text('ScreenAI OCR'),
+                  subtitle: Text(
+                    _screenAiAvailable
+                        ? 'Local Chrome ScreenAI component detected. Runs on device.'
+                        : 'Local Chrome ScreenAI component was not detected.',
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: DropdownButtonFormField<String>(

@@ -45,6 +45,11 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             ListTileWidget(
+              title: 'Dictionary & OCR',
+              icon: Icons.menu_book_outlined,
+              onTap: () => context.push('/dictionary'),
+            ),
+            ListTileWidget(
               title: l10n.player,
               icon: Icons.play_circle_outline_outlined,
               onTap: () => context.push('/playerOverview'),

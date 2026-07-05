@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts/native.dart' as hoshidicts;
 
@@ -9,6 +10,7 @@ class HoshidictsLookupBackend {
   static final HoshidictsLookupBackend instance = HoshidictsLookupBackend._();
 
   hoshidicts.HoshiLookupSession? _session;
+  bool _configured = false;
 
   bool get hasSession => _session != null;
 
@@ -36,6 +38,19 @@ class HoshidictsLookupBackend {
       freqPaths: freqPaths,
       pitchPaths: pitchPaths,
     );
+    _configured = true;
+  }
+
+  Future<void> reloadFromStorage() async {
+    final paths = await DictionaryStorage.instance.paths();
+    final session = _session ??= await hoshidicts.createLookupSession();
+    await hoshidicts.rebuildQuery(
+      session: session,
+      termPaths: paths.termPaths,
+      freqPaths: paths.frequencyPaths,
+      pitchPaths: paths.pitchPaths,
+    );
+    _configured = true;
   }
 
   Future<List<HoshiLookupResult>> lookup(
@@ -73,9 +88,14 @@ class HoshidictsLookupBackend {
 
   void clearSession() {
     _session = null;
+    _configured = false;
   }
 
   Future<hoshidicts.HoshiLookupSession> _ensureSession() async {
-    return _session ??= await hoshidicts.createLookupSession();
+    final session = _session ??= await hoshidicts.createLookupSession();
+    if (!_configured) {
+      await reloadFromStorage();
+    }
+    return session;
   }
 }

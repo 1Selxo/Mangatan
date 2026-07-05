@@ -47,6 +47,9 @@ class ReaderAppBar extends ConsumerWidget {
   /// Callback when web view button is pressed
   final VoidCallback? onWebViewPressed;
 
+  /// Callback that opens the OCR overlay for the visible page.
+  final VoidCallback? onOcrPressed;
+
   /// Background color getter
   final Color Function(BuildContext) backgroundColor;
 
@@ -60,6 +63,7 @@ class ReaderAppBar extends ConsumerWidget {
     required this.onBackPressed,
     required this.onBookmarkPressed,
     this.onWebViewPressed,
+    this.onOcrPressed,
     required this.backgroundColor,
   });
 
@@ -123,6 +127,13 @@ class ReaderAppBar extends ConsumerWidget {
 
   List<Widget> _buildActions(BuildContext context, bool isLocalArchive) {
     return [
+      if (onOcrPressed != null)
+        IconButton(
+          tooltip: 'OCR overlay',
+          onPressed: onOcrPressed,
+          icon: const Icon(Icons.document_scanner_outlined),
+        ),
+
       // Chapter list button
       btnToShowChapterListDialog(context, context.l10n.chapters, chapter),
 

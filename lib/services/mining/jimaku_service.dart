@@ -86,6 +86,23 @@ class JimakuMediaGuess {
   }
 }
 
+class JimakuSearchCandidate {
+  final String query;
+  final JimakuMediaGuess guess;
+  final List<String> scoringTitles;
+
+  const JimakuSearchCandidate({
+    required this.query,
+    required this.guess,
+    required this.scoringTitles,
+  });
+
+  String get displayName {
+    final suffix = query == guess.title ? '' : ' via "$query"';
+    return '${guess.displayName}$suffix';
+  }
+}
+
 class JimakuSubtitleService {
   static const _baseUrl = 'https://jimaku.cc/api';
 
@@ -214,6 +231,130 @@ JimakuMediaGuess? guessJimakuMedia(String value) {
   );
 }
 
+List<JimakuSearchCandidate> buildJimakuSearchCandidates({
+  required Iterable<String> values,
+  String titleOverride = '',
+}) {
+  final parsed = values
+      .map(_parseJimakuName)
+      .whereType<_ParsedJimakuName>()
+      .toList();
+  final firstParsed = parsed.firstOrNull;
+  final episodeCandidates = parsed
+      .expand((item) => item.episodeCandidates)
+      .toSet();
+  final episode = parsed
+      .map((item) => item.episode)
+      .whereType<int>()
+      .firstOrNull;
+  final season = parsed.map((item) => item.season).whereType<int>().firstOrNull;
+  final candidates = <JimakuSearchCandidate>[];
+
+  void addCandidate({
+    required String query,
+    required String title,
+    int? candidateSeason,
+    int? candidateEpisode,
+    Set<int> candidateEpisodeCandidates = const {},
+    Iterable<String> scoringTitles = const [],
+  }) {
+    final cleanedQuery = query.cleanJimakuTitle(keepSeason: true);
+    final cleanedTitle = title.cleanJimakuTitle(keepSeason: true);
+    if (cleanedQuery.normalizedJimakuText().length < 2 ||
+        cleanedTitle.normalizedJimakuText().length < 2) {
+      return;
+    }
+    final allScoringTitles =
+        [
+              cleanedTitle,
+              cleanedTitle.withoutSeasonDescriptor(),
+              cleanedQuery,
+              cleanedQuery.withoutSeasonDescriptor(),
+              ...scoringTitles,
+            ]
+            .map((item) => item.cleanJimakuTitle(keepSeason: true))
+            .where((item) => item.normalizedJimakuText().length >= 2)
+            .toList();
+    final uniqueScoringTitles = _uniqueStrings(allScoringTitles);
+    final guess = JimakuMediaGuess(
+      title: cleanedTitle,
+      season: candidateSeason ?? season,
+      episode: candidateEpisode ?? episode,
+      episodeCandidates: {...episodeCandidates, ...candidateEpisodeCandidates},
+    );
+    final duplicate = candidates.any((candidate) {
+      return candidate.query.normalizedJimakuText() ==
+              cleanedQuery.normalizedJimakuText() &&
+          candidate.guess.title.normalizedJimakuText() ==
+              guess.title.normalizedJimakuText() &&
+          candidate.guess.season == guess.season &&
+          candidate.guess.episode == guess.episode;
+    });
+    if (!duplicate) {
+      candidates.add(
+        JimakuSearchCandidate(
+          query: cleanedQuery,
+          guess: guess,
+          scoringTitles: uniqueScoringTitles,
+        ),
+      );
+    }
+  }
+
+  final override = titleOverride.trim();
+  if (override.isNotEmpty) {
+    final overrideParsed = _parseJimakuName(override);
+    final title = overrideParsed?.titleWithSeason ?? override;
+    addCandidate(
+      query: title,
+      title: title,
+      candidateSeason: overrideParsed?.season,
+      candidateEpisode: overrideParsed?.episode,
+      candidateEpisodeCandidates: overrideParsed?.episodeCandidates ?? const {},
+      scoringTitles: [
+        if (firstParsed != null) firstParsed.titleWithSeason,
+        if (firstParsed != null) firstParsed.title,
+      ],
+    );
+    final titleWithoutSeason = title.withoutSeasonDescriptor();
+    if (titleWithoutSeason != title) {
+      addCandidate(
+        query: titleWithoutSeason,
+        title: title,
+        candidateSeason: overrideParsed?.season,
+        candidateEpisode: overrideParsed?.episode,
+        candidateEpisodeCandidates:
+            overrideParsed?.episodeCandidates ?? const {},
+        scoringTitles: [title],
+      );
+    }
+    return candidates;
+  }
+
+  for (final item in parsed) {
+    addCandidate(
+      query: item.titleWithSeason,
+      title: item.titleWithSeason,
+      candidateSeason: item.season,
+      candidateEpisode: item.episode,
+      candidateEpisodeCandidates: item.episodeCandidates,
+      scoringTitles: [item.title],
+    );
+    if (item.title != item.titleWithSeason) {
+      addCandidate(
+        query: item.title,
+        title: item.titleWithSeason,
+        candidateSeason: item.season,
+        candidateEpisode: item.episode,
+        candidateEpisodeCandidates: item.episodeCandidates,
+        scoringTitles: [item.titleWithSeason],
+      );
+    }
+  }
+
+  return candidates;
+}
+
 JimakuEntry? selectBestJimakuEntry(List<JimakuEntry> entries, String title) {
   if (entries.isEmpty) return null;
   if (entries.length == 1) return entries.first;
@@ -231,6 +372,28 @@ JimakuEntry? selectBestJimakuEntry(List<JimakuEntry> entries, String title) {
   final ranked = [...entries]
     ..sort((a, b) {
       return _entryScore(b, title).compareTo(_entryScore(a, title));
+    });
+  return ranked.first;
+}
+
+JimakuEntry? selectBestJimakuEntryForTitles(
+  List<JimakuEntry> entries,
+  Iterable<String> titles,
+) {
+  if (entries.isEmpty) return null;
+  if (entries.length == 1) return entries.first;
+  final cleanedTitles = _uniqueStrings(
+    titles
+        .map((title) => title.cleanJimakuTitle(keepSeason: true))
+        .where((title) => title.normalizedJimakuText().length >= 2),
+  );
+  if (cleanedTitles.isEmpty) return entries.first;
+  final ranked = [...entries]
+    ..sort((a, b) {
+      return _bestEntryScore(
+        b,
+        cleanedTitles,
+      ).compareTo(_bestEntryScore(a, cleanedTitles));
     });
   return ranked.first;
 }
@@ -305,6 +468,10 @@ final _seasonRegexes = [
     r'\b(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione|temp|s)\.?\s*(\d{1,3})\b',
     caseSensitive: false,
   ),
+  RegExp(
+    r'\b(\d{1,3})(?:st|nd|rd|th)?[._ -]*(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione)\b',
+    caseSensitive: false,
+  ),
 ];
 
 final _knownExtensionRegex = RegExp(
@@ -320,7 +487,11 @@ final _episodeCleanupRegex = RegExp(
   caseSensitive: false,
 );
 final _seasonCleanupRegex = RegExp(
-  r'\bseason[ ._-]*\d{1,3}\b',
+  r'\b(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione|temp|s)[ ._-]*\d{1,3}\b|\b\d{1,3}(?:st|nd|rd|th)?[ ._-]*(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione)\b',
+  caseSensitive: false,
+);
+final _trailingBareEpisodeWordRegex = RegExp(
+  r'\s*(?:[-._]+\s*)?(?:ep|eps|episode|episodes|e)\.?\s*$',
   caseSensitive: false,
 );
 final _releaseTailRegex = RegExp(
@@ -431,21 +602,29 @@ extension _JimakuStringParsing on String {
     return this;
   }
 
-  String cleanJimakuTitle() {
+  String cleanJimakuTitle({bool keepSeason = false}) {
     return replaceAll(_knownExtensionRegex, '')
         .replaceAll(_leadingReleaseGroupRegex, ' ')
         .replaceAll(_hashRegex, ' ')
         .replaceAll(_websiteRegex, ' ')
         .replaceAll(_episodeCleanupRegex, ' ')
-        .replaceAll(_seasonCleanupRegex, ' ')
+        .replaceAll(keepSeason ? _neverRegex : _seasonCleanupRegex, ' ')
         .replaceAll(_releaseTailRegex, ' ')
         .replaceAll(_filenameJunkRegex, ' ')
         .replaceAll(_subtitleLanguageSuffixRegex, ' ')
         .replaceAll(_trailingEpisodeCleanupRegex, ' ')
+        .replaceAll(_trailingBareEpisodeWordRegex, ' ')
         .replaceAll(_trailingReleaseGroupRegex, ' ')
         .replaceAll(RegExp(r'[._-]+'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
+  }
+
+  String withoutSeasonDescriptor() {
+    return replaceAll(
+      _seasonCleanupRegex,
+      ' ',
+    ).replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   String normalizedJimakuText() {
@@ -467,6 +646,33 @@ extension _JimakuStringParsing on String {
 
 bool _isValidEpisode(int value) => value >= 0 && value <= 9999;
 
+_ParsedJimakuName? _parseJimakuName(String value) {
+  final withoutExtension = value.toJimakuFilename().replaceAll(
+    _knownExtensionRegex,
+    '',
+  );
+  final season = _seasonRegexes
+      .map((regex) => regex.firstMatch(withoutExtension)?.group(1))
+      .map((value) => int.tryParse(value ?? ''))
+      .whereType<int>()
+      .firstOrNull;
+  final episodes = withoutExtension.jimakuEpisodeNumbers();
+  final seed = withoutExtension.preferredJimakuTitleSeed();
+  final titleWithSeason = seed.cleanJimakuTitle(keepSeason: true);
+  final title = titleWithSeason.withoutSeasonDescriptor();
+  if (titleWithSeason.normalizedJimakuText().length < 2 &&
+      title.normalizedJimakuText().length < 2) {
+    return null;
+  }
+  return _ParsedJimakuName(
+    titleWithSeason: titleWithSeason,
+    title: title.normalizedJimakuText().length >= 2 ? title : titleWithSeason,
+    episode: episodes.$1,
+    season: season,
+    episodeCandidates: episodes.$2,
+  );
+}
+
 int _entryScore(JimakuEntry entry, String title) {
   final target = title.normalizedJimakuText();
   var best = 0;
@@ -482,6 +688,15 @@ int _entryScore(JimakuEntry entry, String title) {
         : normalized.contains(target) || target.contains(normalized)
         ? 90
         : _tokenScore(target, normalized);
+    if (score > best) best = score;
+  }
+  return best;
+}
+
+int _bestEntryScore(JimakuEntry entry, Iterable<String> titles) {
+  var best = 0;
+  for (final title in titles) {
+    final score = _entryScore(entry, title);
     if (score > best) best = score;
   }
   return best;
@@ -557,6 +772,35 @@ Uri _absoluteJimakuUri(String value) {
   final prefix = value.startsWith('/') ? '' : '/';
   return Uri.parse('https://jimaku.cc$prefix$value');
 }
+
+List<String> _uniqueStrings(Iterable<String> values) {
+  final seen = <String>{};
+  final result = <String>[];
+  for (final value in values) {
+    final normalized = value.normalizedJimakuText();
+    if (normalized.isEmpty || !seen.add(normalized)) continue;
+    result.add(value);
+  }
+  return result;
+}
+
+class _ParsedJimakuName {
+  final String titleWithSeason;
+  final String title;
+  final int? episode;
+  final int? season;
+  final Set<int> episodeCandidates;
+
+  const _ParsedJimakuName({
+    required this.titleWithSeason,
+    required this.title,
+    required this.episode,
+    required this.season,
+    required this.episodeCandidates,
+  });
+}
+
+final _neverRegex = RegExp(r'a^');
 
 extension _FirstOrNull<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;

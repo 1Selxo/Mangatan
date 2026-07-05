@@ -362,6 +362,7 @@ class _LookupResultTile extends StatelessWidget {
                     styles: styles,
                     preferences: preferences,
                     compact: compact,
+                    hiddenTermTags: termTags.toSet(),
                   ),
                 if (term.frequencies.isNotEmpty || term.pitches.isNotEmpty) ...[
                   SizedBox(height: compact ? 6 : 10),
@@ -486,6 +487,7 @@ class _GlossarySense extends StatelessWidget {
     required this.styles,
     required this.preferences,
     required this.compact,
+    required this.hiddenTermTags,
   });
 
   final int index;
@@ -493,11 +495,17 @@ class _GlossarySense extends StatelessWidget {
   final Map<String, String> styles;
   final DictionaryPopupPreferences preferences;
   final bool compact;
+  final Set<String> hiddenTermTags;
 
   @override
   Widget build(BuildContext context) {
-    final definitionTags = _splitTags(glossary.definitionTags);
-    final termTags = _splitTags(glossary.termTags);
+    final seen = <String>{...hiddenTermTags};
+    final termTags = _splitTags(
+      glossary.termTags,
+    ).where((tag) => seen.add(tag)).toList();
+    final definitionTags = _splitTags(
+      glossary.definitionTags,
+    ).where((tag) => tag != index.toString() && seen.add(tag)).toList();
     return Padding(
       padding: EdgeInsets.only(bottom: compact ? 6 : 10),
       child: Row(

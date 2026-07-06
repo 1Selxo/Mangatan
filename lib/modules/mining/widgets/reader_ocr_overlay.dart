@@ -361,8 +361,16 @@ class ReaderOcrController extends ChangeNotifier {
     final imageContext = imageKey.currentContext;
     final box = imageContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.attached || !box.hasSize) return false;
+    final imageRect = _imageRect;
+    if (imageRect == null || imageRect.isEmpty) return false;
     final localPosition = box.globalToLocal(globalPosition);
-    if (!(Offset.zero & box.size).contains(localPosition)) return false;
+    // Double-page and zoom wrappers can transform the painted image without
+    // changing this child render box's layout size.
+    final hitSlop = math.max(
+      8.0,
+      math.max(imageRect.width, imageRect.height) * 0.002,
+    );
+    if (!imageRect.inflate(hitSlop).contains(localPosition)) return false;
     return handleTap(imageContext!, localPosition);
   }
 

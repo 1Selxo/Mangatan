@@ -56,7 +56,14 @@ class ReaderOcrState {
     for (final controller in _controllers.toList().reversed) {
       if (await controller.handleGlobalTap(globalPosition)) return true;
     }
+    clearActive();
     return false;
+  }
+
+  static void clearActive() {
+    for (final controller in _controllers.toList()) {
+      controller._clearActive();
+    }
   }
 
   static Future<void> scanChapter(
@@ -361,6 +368,16 @@ class ReaderOcrController extends ChangeNotifier {
 
   void _enabledChanged() {
     if (enabled) load();
+    if (!_disposed) notifyListeners();
+  }
+
+  void _clearActive() {
+    if (_activeBlock == null && _activeOffset < 0 && _matchLength == 0) {
+      return;
+    }
+    _activeBlock = null;
+    _activeOffset = -1;
+    _matchLength = 0;
     if (!_disposed) notifyListeners();
   }
 

@@ -37,11 +37,8 @@ class AboutScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Image.asset(
-                      "assets/app_icons/icon.png",
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? Colors.black
-                          : Colors.white,
-                      fit: BoxFit.cover,
+                      "assets/app_icons/icon-red.png",
+                      fit: BoxFit.contain,
                       height: 100,
                     ),
                   ),
@@ -160,9 +157,7 @@ class AboutScreen extends ConsumerWidget {
                           IconButton(
                             onPressed: () {
                               _launchInBrowser(
-                                Uri.parse(
-                                  'https://github.com/kodjodevf/mangayomi',
-                                ),
+                                Uri.parse('https://github.com/1Selxo/Mangatan'),
                               );
                             },
                             icon: const Padding(
@@ -174,7 +169,7 @@ class AboutScreen extends ConsumerWidget {
                             onPressed: () {
                               _launchInBrowser(
                                 Uri.parse(
-                                  'https://discord.com/invite/EjfBuYahsP',
+                                  'https://discord.com/invite/Ak2sW9Nvr9',
                                 ),
                               );
                             },

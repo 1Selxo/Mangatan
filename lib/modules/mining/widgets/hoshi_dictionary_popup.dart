@@ -53,6 +53,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<_HoshiPopupData> _loadShell() async {
+    final theme = Theme.of(context);
     final dark = _isDarkPopup(context, widget.preferences.theme);
     final values = await Future.wait<dynamic>([
       rootBundle.loadString('assets/hoshi_popup/popup.css'),
@@ -69,6 +70,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         popupJs: values[1] as String,
         selectionJs: values[2] as String,
         preferences: widget.preferences,
+        theme: theme,
         dark: dark,
       ),
       styles: {for (final style in styles) style.dictName: style.styles},
@@ -393,6 +395,11 @@ String hoshiReplaceRenderScriptForEntries(List<Map<String, dynamic>> entries) =>
     'window.entryCount = window.lookupEntries.length;'
     'const container = document.getElementById("entries-container");'
     'if (container) container.textContent = "";'
+    'if (window.entryCount === 0) {'
+    'if (container) container.innerHTML = '
+    '"<div class=\\"popup-empty\\">No dictionary results found.</div>";'
+    'return;'
+    '}'
     'window.renderPopup();'
     '})();';
 
@@ -445,11 +452,37 @@ String buildHoshiPopupHtml({
   required String popupJs,
   required String selectionJs,
   required DictionaryPopupPreferences preferences,
+  required ThemeData theme,
   required bool dark,
 }) {
   final scale = preferences.fontSize / 15;
   final customCss = jsonEncode(preferences.customCss);
   final colorScheme = dark ? 'dark' : 'light';
+  final scheme = theme.colorScheme;
+  final background = _cssColor(
+    preferences.theme == DictionaryThemePreference.black
+        ? Colors.black
+        : scheme.surface,
+  );
+  final elevatedBase = preferences.theme == DictionaryThemePreference.black
+      ? const Color(0xff151515)
+      : Color.alphaBlend(
+          scheme.surfaceContainerHighest.withValues(alpha: dark ? 0.42 : 0.28),
+          scheme.surface,
+        );
+  final elevated = _cssColor(elevatedBase);
+  final text = _cssColor(
+    preferences.theme == DictionaryThemePreference.black
+        ? Colors.white
+        : scheme.onSurface,
+  );
+  final muted1 = _cssColor(scheme.onSurfaceVariant);
+  final muted2 = _cssColor(scheme.onSurfaceVariant.withValues(alpha: 0.84));
+  final muted3 = _cssColor(scheme.onSurfaceVariant.withValues(alpha: 0.70));
+  final muted4 = _cssColor(scheme.onSurfaceVariant.withValues(alpha: 0.56));
+  final primary = _cssColor(scheme.primary);
+  final primaryContainer = _cssColor(scheme.primaryContainer);
+  final onPrimaryContainer = _cssColor(scheme.onPrimaryContainer);
   const nativeHandlers = [
     'getEntries',
     'lookupRedirect',
@@ -457,15 +490,48 @@ String buildHoshiPopupHtml({
     'mineEntry',
     'openLink',
   ];
-  return '''<!DOCTYPE html>
+  final html =
+      '''<!DOCTYPE html>
 <html style="color-scheme: $colorScheme">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>$popupCss</style>
   <style>
-    html, body { --popup-scale: $scale; min-height: 100%; }
+    html, body {
+      --popup-scale: $scale;
+      --background-color: $background;
+      --background-color-light: $background;
+      --background-color-dark1: $elevated;
+      --text-color: $text;
+      --text-color-light1: $muted1;
+      --text-color-light2: $muted2;
+      --text-color-light3: $muted3;
+      --text-color-light4: $muted4;
+      --accent-color: $primary;
+      --freq-tag-color: $primary;
+      --pitch-tag-color: $primary;
+      --expr-tag-color: $primaryContainer;
+      --expr-tag-text-color: $onPrimaryContainer;
+      min-height: 100%;
+    }
     html { overflow-x: hidden; overflow-y: auto; }
     body { min-height: 101%; }
+    .entry, .entry * { color: var(--text-color); }
+    .dict-label, .deinflection-tag, .glossary-tag { color: var(--text-color-light1); }
+    .glossary-group {
+      background-color: $elevated;
+      color: var(--text-color);
+      box-shadow: none;
+    }
+    .glossary-content, .glossary-content * { color: var(--text-color); }
+    .tag-row, .tag-row * { color: var(--text-color-light1); }
+    .popup-empty {
+      min-height: calc(140px * var(--popup-scale));
+      display: grid;
+      place-items: center;
+      color: var(--text-color-light2);
+      font-size: calc(14px * var(--popup-scale));
+    }
     .button-slot { cursor: pointer; display: grid; place-items: center; color: var(--text-color-light2); }
     .button-slot::before { content: '+'; font: 500 calc(25px * var(--popup-scale))/1 sans-serif; }
     .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }
@@ -517,6 +583,17 @@ String buildHoshiPopupHtml({
   <div class="overlay"><div class="overlay-close" onclick="closeOverlay()">×</div><div class="overlay-content"></div></div>
 </body>
 </html>''';
+  return html
+      .replaceFirst(
+        RegExp(r'\.button-slot\[data-state="duplicate"\]::before \{[^}]*\}'),
+        '.button-slot[data-state="duplicate"]::before { content: "\\2713"; font-size: calc(19px * var(--popup-scale)); }',
+      )
+      .replaceFirst(
+        RegExp(
+          r'<div class="overlay-close" onclick="closeOverlay\(\)">.*?<div class="overlay-content">',
+        ),
+        '<div class="overlay-close" onclick="closeOverlay()">&times;</div><div class="overlay-content">',
+      );
 }
 
 bool _isDarkPopup(BuildContext context, DictionaryThemePreference preference) =>
@@ -526,6 +603,11 @@ bool _isDarkPopup(BuildContext context, DictionaryThemePreference preference) =>
       DictionaryThemePreference.system =>
         Theme.of(context).brightness == Brightness.dark,
     };
+
+String _cssColor(Color color) {
+  final rgb = color.toARGB32() & 0x00ffffff;
+  return '#${rgb.toRadixString(16).padLeft(6, '0')}';
+}
 
 String _mediaMimeType(String path) =>
     switch (path.split('.').last.toLowerCase()) {

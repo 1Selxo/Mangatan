@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
@@ -82,6 +83,7 @@ void main() {
       popupJs: 'window.renderPopup = function() {};',
       selectionJs: 'window.hoshiSelection = {};',
       preferences: preferences,
+      theme: ThemeData.dark(),
       dark: true,
     );
 

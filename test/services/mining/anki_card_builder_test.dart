@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -117,6 +118,98 @@ void main() {
     expect(draft.fields['WordAudio'], '[sound:taberu.mp3]');
     expect(draft.mediaFiles, [audio]);
   });
+
+  test(
+    'fills Chimahon/Yomitan-style dictionary single glossary markers',
+    () async {
+      final result = HoshiLookupResult(
+        matched: '食べる',
+        deinflected: '食べる',
+        trace: const [],
+        preprocessorSteps: 0,
+        term: const HoshiTermResult(
+          expression: '食べる',
+          reading: 'たべる',
+          rules: 'v1',
+          score: 1,
+          glossaries: [
+            HoshiGlossaryEntry(
+              dictName: 'JMdict (English)',
+              glossary: 'to eat',
+              definitionTags: 'v1',
+              termTags: '',
+            ),
+            HoshiGlossaryEntry(
+              dictName: '大辞林',
+              glossary: '食物を口に入れる',
+              definitionTags: '',
+              termTags: '',
+            ),
+            HoshiGlossaryEntry(
+              dictName: 'JMdict (English)',
+              glossary: 'to consume',
+              definitionTags: 'v1',
+              termTags: '',
+            ),
+          ],
+          frequencies: [],
+          pitches: [],
+        ),
+      );
+
+      final draft = await const AnkiCardBuilder().build(
+        result: result,
+        context: const MiningContext(sentence: 'パンを食べる。'),
+        profile: const AnkiMiningProfile(
+          fieldMap: {
+            'Rendered': '{single-glossary-jmdict-english}',
+            'Substring': '{single-glossary-jmdict}',
+            'NoDictionary': '{single-glossary-jmdict-english-no-dictionary}',
+            'Brief': '{single-glossary-jmdict-english-brief}',
+            'FirstBrief': '{single-glossary-jmdict-first-brief}',
+            'Plain': '{single-glossary-jmdict-english-plain}',
+            'PlainNoDictionary':
+                '{single-glossary-jmdict-english-plain-no-dictionary}',
+            'AllFirstPlain': '{single-glossary-all-first-plain}',
+            'Cjk': '{single-glossary-大辞林}',
+            'Selected': AnkiMarker.selectedGlossary,
+          },
+        ),
+        renderedContent: {
+          'selectedDictionary': '大辞林',
+          'singleGlossaries': jsonEncode({
+            'JMdict (English)': '<div>rendered jmdict</div>',
+            '大辞林': '<div>rendered daijirin</div>',
+          }),
+        },
+      );
+
+      expect(draft.fields['Rendered'], '<div>rendered jmdict</div>');
+      expect(draft.fields['Substring'], '<div>rendered jmdict</div>');
+      expect(draft.fields['NoDictionary'], contains('to eat'));
+      expect(draft.fields['NoDictionary'], isNot(contains('JMdict')));
+      expect(draft.fields['Brief'], contains('to consume'));
+      expect(draft.fields['Brief'], isNot(contains('JMdict')));
+      expect(draft.fields['FirstBrief'], '<ol><li>to eat</li></ol>');
+      expect(
+        draft.fields['Plain'],
+        '(JMdict (English))<br>to eat<br>(JMdict (English))<br>to consume',
+      );
+      expect(draft.fields['PlainNoDictionary'], 'to eat<br>to consume');
+      expect(draft.fields['AllFirstPlain'], '(JMdict (English))<br>to eat');
+      expect(draft.fields['Cjk'], '<div>rendered daijirin</div>');
+      expect(draft.fields['Selected'], '<div>rendered daijirin</div>');
+      expect(
+        AnkiMarker.singleGlossaryTemplatesForDictionaries(const [
+          'JMdict (English)',
+        ]),
+        const {
+          'Single glossary: JMdict (English)':
+              '{single-glossary-jmdict-english}',
+        },
+      );
+    },
+  );
 
   test(
     'keeps screenshots out of DefinitionPicture even for old profiles',

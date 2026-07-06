@@ -36,13 +36,27 @@ class AnkiCardBuilder {
       return value is String && value.isNotEmpty ? value : fallback;
     }
 
+    final renderedSingleGlossaries = _renderedSingleGlossaries(
+      renderedContent['singleGlossaries'],
+    );
     final glossary = rendered('glossary', _glossary(result.term.glossaries));
     final glossaryPlain = _glossaryPlain(result.term.glossaries);
-    final selectedGlossaryHtml = rendered(
-      'glossaryFirst',
-      _glossary(selectedGlossary),
-    );
-    final selectedGlossaryPlain = _glossaryPlain(selectedGlossary);
+    final selectedDictionary =
+        renderedContent['selectedDictionary']?.toString().trim() ?? '';
+    final selectedGlossaryEntries = selectedDictionary.isEmpty
+        ? selectedGlossary
+        : _filterGlossaries(result.term.glossaries, selectedDictionary);
+    final effectiveSelectedGlossary = selectedGlossaryEntries.isEmpty
+        ? selectedGlossary
+        : selectedGlossaryEntries;
+    final selectedGlossaryHtml = selectedDictionary.isEmpty
+        ? rendered('glossaryFirst', _glossary(selectedGlossary))
+        : _renderedGlossaryForSingleDictionary(
+                effectiveSelectedGlossary,
+                renderedSingleGlossaries,
+              ) ??
+              _glossary(effectiveSelectedGlossary);
+    final selectedGlossaryPlain = _glossaryPlain(effectiveSelectedGlossary);
     final frequencySummary = rendered(
       'freqHarmonicRank',
       _frequencySummary(result.term.frequencies),
@@ -146,6 +160,11 @@ class AnkiCardBuilder {
       for (final replacement in replacements.entries) {
         value = value.replaceAll(replacement.key, replacement.value);
       }
+      value = _replaceDynamicMarkers(
+        value,
+        result.term.glossaries,
+        renderedSingleGlossaries,
+      );
       return MapEntry(field, value);
     });
 
@@ -194,10 +213,15 @@ class AnkiCardBuilder {
     return '$expression[$reading]';
   }
 
-  static String _glossary(Iterable<HoshiGlossaryEntry> entries) {
+  static String _glossary(
+    Iterable<HoshiGlossaryEntry> entries, {
+    bool includeDictionary = true,
+    bool brief = false,
+  }) {
     final rows = entries.where((entry) => entry.glossary.trim().isNotEmpty).map(
       (entry) {
-        final dict = entry.dictName.trim().isEmpty
+        final dict =
+            brief || !includeDictionary || entry.dictName.trim().isEmpty
             ? ''
             : '<span class="dict">${_escape(entry.dictName)}</span> ';
         return '<li>$dict${_escape(entry.glossary)}</li>';
@@ -206,12 +230,149 @@ class AnkiCardBuilder {
     return rows.isEmpty ? '' : '<ol>$rows</ol>';
   }
 
-  static String _glossaryPlain(Iterable<HoshiGlossaryEntry> entries) {
+  static String _glossaryPlain(
+    Iterable<HoshiGlossaryEntry> entries, {
+    bool includeDictionary = false,
+  }) {
     return entries
-        .map((entry) => entry.glossary.trim())
-        .where((entry) => entry.isNotEmpty)
-        .map(_escape)
+        .where((entry) => entry.glossary.trim().isNotEmpty)
+        .map((entry) {
+          final glossary = _escape(entry.glossary.trim());
+          final dictionary = entry.dictName.trim();
+          if (!includeDictionary || dictionary.isEmpty) return glossary;
+          return '(${_escape(dictionary)})<br>$glossary';
+        })
         .join('<br>');
+  }
+
+  static Map<String, String> _renderedSingleGlossaries(Object? value) {
+    Object? decoded = value;
+    if (value is String) {
+      if (value.trim().isEmpty) return const {};
+      try {
+        decoded = jsonDecode(value);
+      } on FormatException {
+        return const {};
+      }
+    }
+    if (decoded is! Map) return const {};
+    final glossaries = <String, String>{};
+    decoded.forEach((key, value) {
+      if (value is String && value.trim().isNotEmpty) {
+        glossaries[key.toString()] = value;
+      }
+    });
+    return glossaries;
+  }
+
+  static String _replaceDynamicMarkers(
+    String value,
+    Iterable<HoshiGlossaryEntry> entries,
+    Map<String, String> renderedSingleGlossaries,
+  ) {
+    return value.replaceAllMapped(_markerPattern, (match) {
+      final marker = match.group(1);
+      if (marker == null) return match.group(0) ?? '';
+      final dynamicValue = _parseSingleGlossaryMarker(
+        marker,
+        entries,
+        renderedSingleGlossaries,
+      );
+      return dynamicValue ?? match.group(0) ?? '';
+    });
+  }
+
+  static String? _parseSingleGlossaryMarker(
+    String marker,
+    Iterable<HoshiGlossaryEntry> entries,
+    Map<String, String> renderedSingleGlossaries,
+  ) {
+    const prefix = 'single-glossary-';
+    if (!marker.startsWith(prefix)) return null;
+
+    final rest = marker.substring(prefix.length);
+    if (rest.trim().isEmpty) return '';
+
+    final tokens = rest.split('-').where((token) => token.isNotEmpty).toList();
+    var brief = false;
+    var firstOnly = false;
+    var plain = false;
+    var noDictionary = false;
+    while (tokens.isNotEmpty) {
+      final suffix = tokens.last.toLowerCase();
+      if (suffix == 'brief') {
+        brief = true;
+        tokens.removeLast();
+      } else if (suffix == 'first') {
+        firstOnly = true;
+        tokens.removeLast();
+      } else if (suffix == 'plain') {
+        plain = true;
+        tokens.removeLast();
+      } else if (tokens.length >= 2 &&
+          tokens[tokens.length - 2].toLowerCase() == 'no' &&
+          suffix == 'dictionary') {
+        noDictionary = true;
+        tokens.removeLast();
+        tokens.removeLast();
+      } else {
+        break;
+      }
+    }
+
+    final dictionaryKey = tokens.join('-').trim();
+    if (dictionaryKey.isEmpty) return '';
+
+    final filtered = dictionaryKey.toLowerCase() == 'all'
+        ? entries.where((entry) => entry.glossary.trim().isNotEmpty).toList()
+        : _filterGlossaries(entries, dictionaryKey);
+    final selected = firstOnly ? filtered.take(1).toList() : filtered;
+    if (selected.isEmpty) return '';
+
+    if (plain) {
+      return _glossaryPlain(selected, includeDictionary: !noDictionary);
+    }
+
+    if (!brief && !noDictionary && !firstOnly) {
+      final rendered = _renderedGlossaryForSingleDictionary(
+        selected,
+        renderedSingleGlossaries,
+      );
+      if (rendered != null) return rendered;
+    }
+
+    return _glossary(selected, includeDictionary: !noDictionary, brief: brief);
+  }
+
+  static List<HoshiGlossaryEntry> _filterGlossaries(
+    Iterable<HoshiGlossaryEntry> entries,
+    String dictionaryFilter,
+  ) {
+    final filter = dictionaryFilter.trim().toLowerCase();
+    if (filter.isEmpty) return const [];
+    return entries.where((entry) {
+      if (entry.glossary.trim().isEmpty) return false;
+      final dictionary = entry.dictName.trim();
+      if (dictionary.isEmpty) return false;
+      final dictionaryLower = dictionary.toLowerCase();
+      final dictionaryKebab = AnkiMarker.kebabCase(dictionary);
+      return dictionaryLower.contains(filter) ||
+          dictionaryKebab == filter ||
+          dictionaryKebab.contains(filter);
+    }).toList();
+  }
+
+  static String? _renderedGlossaryForSingleDictionary(
+    Iterable<HoshiGlossaryEntry> entries,
+    Map<String, String> renderedSingleGlossaries,
+  ) {
+    final dictionaries = entries
+        .map((entry) => entry.dictName.trim())
+        .where((dictionary) => dictionary.isNotEmpty)
+        .toSet();
+    if (dictionaries.length != 1) return null;
+    final rendered = renderedSingleGlossaries[dictionaries.first];
+    return rendered != null && rendered.trim().isNotEmpty ? rendered : null;
   }
 
   static String _frequencies(List<HoshiFrequencyEntry> entries) {
@@ -298,6 +459,8 @@ class AnkiCardBuilder {
 
   static String _normalizeFieldName(String value) =>
       value.trim().toLowerCase().replaceAll(RegExp(r'[\s_\-]+'), '');
+
+  static final _markerPattern = RegExp(r'\{([^{}]+)\}');
 
   static const _maxScreenshotUploadBytes = 4 * 1024 * 1024;
   static const _absoluteScreenshotUploadBytes = 8 * 1024 * 1024;

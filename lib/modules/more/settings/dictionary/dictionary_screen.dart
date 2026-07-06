@@ -144,6 +144,42 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     await _load();
   }
 
+  Future<void> _saveDictionaryOrder(
+    List<InstalledDictionary> dictionaries,
+  ) async {
+    final previous = _dictionaries;
+    setState(() => _dictionaries = dictionaries);
+    try {
+      await DictionaryStorage.instance.reorder(
+        dictionaries.map((dictionary) => dictionary.name).toList(),
+      );
+      await HoshidictsLookupBackend.instance.reloadFromStorage();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _dictionaries = previous);
+      botToast('Could not reorder dictionaries: $error', second: 5);
+    }
+  }
+
+  void _reorderDictionaries(int oldIndex, int newIndex) {
+    if (oldIndex == newIndex) return;
+    final dictionaries = [..._dictionaries];
+    final moved = dictionaries.removeAt(oldIndex);
+    dictionaries.insert(newIndex, moved);
+    unawaited(_saveDictionaryOrder(dictionaries));
+  }
+
+  Future<void> _moveDictionary(int index, int offset) async {
+    final target = index + offset;
+    if (target < 0 || target >= _dictionaries.length || target == index) {
+      return;
+    }
+    final dictionaries = [..._dictionaries];
+    final moved = dictionaries.removeAt(index);
+    dictionaries.insert(target, moved);
+    await _saveDictionaryOrder(dictionaries);
+  }
+
   Future<String?> _editText({
     required String title,
     required String value,
@@ -408,23 +444,26 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ),
                   )
                 else
-                  for (final dictionary in _dictionaries)
-                    ListTile(
-                      leading: const Icon(Icons.menu_book_outlined),
-                      title: Text(dictionary.name),
-                      subtitle: Text(
-                        [
-                          if (dictionary.hasTerms) 'Terms',
-                          if (dictionary.hasFrequencies) 'Frequency',
-                          if (dictionary.hasPitch) 'Pitch',
-                        ].join(' • '),
-                      ),
-                      trailing: IconButton(
-                        tooltip: 'Remove dictionary',
-                        onPressed: () => _deleteDictionary(dictionary),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    ),
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: _dictionaries.length,
+                    onReorderItem: _reorderDictionaries,
+                    itemBuilder: (context, index) {
+                      final dictionary = _dictionaries[index];
+                      return _DictionaryListTile(
+                        key: ValueKey(dictionary.name),
+                        dictionary: dictionary,
+                        index: index,
+                        canMoveUp: index > 0,
+                        canMoveDown: index < _dictionaries.length - 1,
+                        onMoveUp: () => _moveDictionary(index, -1),
+                        onMoveDown: () => _moveDictionary(index, 1),
+                        onDelete: () => _deleteDictionary(dictionary),
+                      );
+                    },
+                  ),
                 const Divider(height: 24),
                 const _SectionHeader('Popup appearance'),
                 _SliderSetting(
@@ -1041,6 +1080,80 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 const SizedBox(height: 24),
               ],
             ),
+    );
+  }
+}
+
+class _DictionaryListTile extends StatelessWidget {
+  const _DictionaryListTile({
+    super.key,
+    required this.dictionary,
+    required this.index,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onDelete,
+  });
+
+  final InstalledDictionary dictionary;
+  final int index;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final capabilities = [
+      if (dictionary.hasTerms) 'Terms',
+      if (dictionary.hasFrequencies) 'Frequency',
+      if (dictionary.hasPitch) 'Pitch',
+    ];
+    return ListTile(
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ReorderableDragStartListener(
+            index: index,
+            child: const Tooltip(
+              message: 'Drag to reorder dictionary',
+              child: Icon(Icons.drag_indicator),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Icon(Icons.menu_book_outlined),
+        ],
+      ),
+      title: Text(
+        dictionary.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        capabilities.isEmpty ? 'No lookup data' : capabilities.join(' • '),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Move dictionary up',
+            onPressed: canMoveUp ? onMoveUp : null,
+            icon: const Icon(Icons.keyboard_arrow_up),
+          ),
+          IconButton(
+            tooltip: 'Move dictionary down',
+            onPressed: canMoveDown ? onMoveDown : null,
+            icon: const Icon(Icons.keyboard_arrow_down),
+          ),
+          IconButton(
+            tooltip: 'Remove dictionary',
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
     );
   }
 }

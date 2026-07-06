@@ -5,6 +5,51 @@ enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }
 
 enum DictionaryThemePreference { system, light, dark, black }
 
+enum AnkiAudioSourceType { customUrl, customJson }
+
+class AnkiAudioPreferences {
+  const AnkiAudioPreferences({
+    required this.enabled,
+    required this.sourceType,
+    required this.url,
+    required this.timeout,
+    required this.language,
+  });
+
+  static const defaultUrl =
+      'http://127.0.0.1:5050/?term={term}&reading={reading}';
+
+  static const defaults = AnkiAudioPreferences(
+    enabled: false,
+    sourceType: AnkiAudioSourceType.customJson,
+    url: defaultUrl,
+    timeout: Duration(milliseconds: 5000),
+    language: 'ja',
+  );
+
+  final bool enabled;
+  final AnkiAudioSourceType sourceType;
+  final String url;
+  final Duration timeout;
+  final String language;
+
+  AnkiAudioPreferences copyWith({
+    bool? enabled,
+    AnkiAudioSourceType? sourceType,
+    String? url,
+    Duration? timeout,
+    String? language,
+  }) {
+    return AnkiAudioPreferences(
+      enabled: enabled ?? this.enabled,
+      sourceType: sourceType ?? this.sourceType,
+      url: url ?? this.url,
+      timeout: timeout ?? this.timeout,
+      language: language ?? this.language,
+    );
+  }
+}
+
 class DictionaryPopupPreferences {
   const DictionaryPopupPreferences({
     required this.width,
@@ -68,6 +113,11 @@ class MiningPreferences {
   static const _autoJimaku = 'auto_jimaku';
   static const _ankiEndpoint = 'anki_endpoint';
   static const _ankiProfile = 'anki_profile';
+  static const _ankiAudioEnabled = 'anki_audio_enabled';
+  static const _ankiAudioSourceType = 'anki_audio_source_type';
+  static const _ankiAudioUrl = 'anki_audio_url';
+  static const _ankiAudioTimeoutMs = 'anki_audio_timeout_ms';
+  static const _ankiAudioLanguage = 'anki_audio_language';
   static const _ocrEngine = 'ocr_engine';
   static const _ocrOverlayEnabled = 'ocr_overlay_enabled';
   static const _ocrLanguage = 'ocr_language';
@@ -155,6 +205,46 @@ class MiningPreferences {
 
   static Future<void> setAnkiProfile(AnkiMiningProfile profile) async {
     await (await _boxOrNull())?.put(_ankiProfile, profile.toJson());
+  }
+
+  static Future<AnkiAudioPreferences> getAnkiAudioPreferences() async {
+    final box = await _boxOrNull();
+    final sourceTypeName =
+        box?.get(
+              _ankiAudioSourceType,
+              defaultValue: AnkiAudioSourceType.customJson.name,
+            )
+            as String? ??
+        AnkiAudioSourceType.customJson.name;
+    return AnkiAudioPreferences(
+      enabled:
+          box?.get(_ankiAudioEnabled, defaultValue: false) as bool? ?? false,
+      sourceType: AnkiAudioSourceType.values.firstWhere(
+        (value) => value.name == sourceTypeName,
+        orElse: () => AnkiAudioSourceType.customJson,
+      ),
+      url:
+          box?.get(_ankiAudioUrl, defaultValue: AnkiAudioPreferences.defaultUrl)
+              as String? ??
+          AnkiAudioPreferences.defaultUrl,
+      timeout: Duration(
+        milliseconds:
+            (box?.get(_ankiAudioTimeoutMs, defaultValue: 5000) as int?) ?? 5000,
+      ),
+      language:
+          box?.get(_ankiAudioLanguage, defaultValue: 'ja') as String? ?? 'ja',
+    );
+  }
+
+  static Future<void> setAnkiAudioPreferences(
+    AnkiAudioPreferences preferences,
+  ) async {
+    final box = await _boxOrNull();
+    await box?.put(_ankiAudioEnabled, preferences.enabled);
+    await box?.put(_ankiAudioSourceType, preferences.sourceType.name);
+    await box?.put(_ankiAudioUrl, preferences.url.trim());
+    await box?.put(_ankiAudioTimeoutMs, preferences.timeout.inMilliseconds);
+    await box?.put(_ankiAudioLanguage, preferences.language.trim());
   }
 
   static Future<OcrEnginePreference> getOcrEngine() async {

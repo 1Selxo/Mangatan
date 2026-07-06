@@ -9,6 +9,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -154,12 +155,20 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       final dictionaryMedia = await _loadAnkiDictionaryMedia(
         content['dictionaryMedia'],
       );
+      final audioPreferences =
+          await MiningPreferences.getAnkiAudioPreferences();
+      final wordAudio = await AnkiAudioService().fetchTermAudio(
+        term: result.term.expression,
+        reading: result.term.reading,
+        preferences: audioPreferences,
+      );
       final draft = await const AnkiCardBuilder().build(
         result: result,
         context: miningContext,
         profile: profile,
         renderedContent: content,
         dictionaryMedia: dictionaryMedia,
+        wordAudio: wordAudio,
       );
       final noteId =
           await AnkiConnectService(

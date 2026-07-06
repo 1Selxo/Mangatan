@@ -73,6 +73,51 @@ void main() {
     expect(draft.mediaFiles, [media]);
   });
 
+  test('fills audio markers and attaches audio media', () async {
+    final result = HoshiLookupResult(
+      matched: '食べる',
+      deinflected: '食べる',
+      trace: const [],
+      preprocessorSteps: 0,
+      term: const HoshiTermResult(
+        expression: '食べる',
+        reading: 'たべる',
+        rules: 'v1',
+        score: 1,
+        glossaries: [
+          HoshiGlossaryEntry(
+            dictName: 'JMdict',
+            glossary: 'to eat',
+            definitionTags: 'v1',
+            termTags: '',
+          ),
+        ],
+        frequencies: [],
+        pitches: [],
+      ),
+    );
+    final audio = AnkiMediaFile(
+      filename: 'taberu.mp3',
+      bytes: Uint8List.fromList([0x49, 0x44, 0x33]),
+    );
+
+    final draft = await const AnkiCardBuilder().build(
+      result: result,
+      context: const MiningContext(sentence: 'パンを食べる。'),
+      profile: const AnkiMiningProfile(
+        fieldMap: {
+          'Audio': AnkiMarker.audio,
+          'WordAudio': AnkiMarker.wordAudio,
+        },
+      ),
+      wordAudio: audio,
+    );
+
+    expect(draft.fields['Audio'], '[sound:taberu.mp3]');
+    expect(draft.fields['WordAudio'], '[sound:taberu.mp3]');
+    expect(draft.mediaFiles, [audio]);
+  });
+
   test(
     'keeps screenshots out of DefinitionPicture even for old profiles',
     () async {

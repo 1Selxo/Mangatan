@@ -307,6 +307,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       botToast('Connect to Anki first to fetch note fields', second: 4);
       return;
     }
+    final dictionaryTemplates =
+        AnkiMarker.singleGlossaryTemplatesForDictionaries(
+          _dictionaries
+              .where((dictionary) => dictionary.hasTerms)
+              .map((dictionary) => dictionary.name),
+        );
     var map = _autoMapFields(fields, _ankiProfile.fieldMap);
     final saved = await showDialog<Map<String, String>>(
       context: context,
@@ -327,6 +333,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     return _AnkiFieldTemplatePicker(
                       fieldName: field,
                       value: value,
+                      dynamicTemplates: dictionaryTemplates,
                       onChanged: (next) {
                         setDialogState(() => map = {...map, field: next});
                       },
@@ -1042,12 +1049,14 @@ class _AnkiFieldTemplatePicker extends StatelessWidget {
   const _AnkiFieldTemplatePicker({
     required this.fieldName,
     required this.value,
+    required this.dynamicTemplates,
     required this.onChanged,
     required this.onEditCustom,
   });
 
   final String fieldName;
   final String value;
+  final Map<String, String> dynamicTemplates;
   final ValueChanged<String> onChanged;
   final VoidCallback onEditCustom;
 
@@ -1056,6 +1065,7 @@ class _AnkiFieldTemplatePicker extends StatelessWidget {
     final templates = <String, String>{
       'Leave empty': '',
       ...AnkiMarker.standardTemplates,
+      ...dynamicTemplates,
     };
     final isStandard = templates.containsValue(value);
     final items = <DropdownMenuItem<String>>[

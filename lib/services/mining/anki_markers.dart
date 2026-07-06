@@ -76,6 +76,37 @@ class AnkiMarker {
     'Selection text': popupSelectionText,
   };
 
+  static Map<String, String> singleGlossaryTemplatesForDictionaries(
+    Iterable<String> dictionaries,
+  ) {
+    final templates = <String, String>{};
+    final usedMarkers = <String>{};
+    for (final dictionary in dictionaries) {
+      final marker = singleGlossaryMarkerForDictionary(dictionary);
+      if (marker == null || !usedMarkers.add(marker)) continue;
+      templates['Single glossary: $dictionary'] = marker;
+    }
+    return templates;
+  }
+
+  static String? singleGlossaryMarkerForDictionary(
+    String dictionary, {
+    String suffix = '',
+  }) {
+    final name = kebabCase(dictionary);
+    if (name.isEmpty) return null;
+    return '{single-glossary-$name$suffix}';
+  }
+
+  static String kebabCase(String value) {
+    return value
+        .replaceAll(RegExp(r'[\s_\u3000]'), '-')
+        .replaceAll(RegExp(r'[^\p{L}\p{N}-]', unicode: true), '')
+        .replaceAll(RegExp(r'--+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '')
+        .toLowerCase();
+  }
+
   static String? autoDetectTemplate(String fieldName, int fieldIndex) {
     final lapis = _lapisFieldMap[fieldName.toLowerCase()];
     if (lapis != null) return lapis;

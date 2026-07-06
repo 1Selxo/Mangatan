@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
@@ -23,6 +24,7 @@ class ImageViewWebtoon extends StatelessWidget {
   final Function(bool) onFailedToLoadImage;
   final BackgroundColor backgroundColor;
   final bool isDoublePageMode;
+  final PageMode pageMode;
   final bool isHorizontalContinuous;
   final ReaderMode readerMode;
   final PhotoViewController photoViewController;
@@ -50,6 +52,7 @@ class ImageViewWebtoon extends StatelessWidget {
     required this.onFailedToLoadImage,
     required this.backgroundColor,
     required this.isDoublePageMode,
+    required this.pageMode,
     required this.isHorizontalContinuous,
     required this.readerMode,
     required this.photoViewController,
@@ -79,7 +82,7 @@ class ImageViewWebtoon extends StatelessWidget {
           minCacheExtent: minCacheExtent,
           initialScrollIndex: initialScrollIndex,
           itemCount: isDoublePageMode && !isHorizontalContinuous
-              ? (pages.length / 2).ceil()
+              ? doublePageViewCount(pages.length, pageMode)
               : pages.length,
           physics: physics,
           itemScrollController: itemScrollController,
@@ -93,9 +96,12 @@ class ImageViewWebtoon extends StatelessWidget {
   }
 
   Widget _buildItem(BuildContext context, int index) {
-    final currentPage = pages[index];
+    final currentActualIndex = isDoublePageMode && !isHorizontalContinuous
+        ? doublePageViewToActualIndex(index, pages.length, pageMode)
+        : index;
+    final currentPage = pages[currentActualIndex];
     final uniqueKey = ValueKey(
-      '${currentPage.chapter?.id ?? "trans"}-${currentPage.index ?? index}',
+      '${currentPage.chapter?.id ?? "trans"}-${currentPage.index ?? currentActualIndex}',
     );
 
     return KeyedSubtree(
@@ -146,13 +152,7 @@ class ImageViewWebtoon extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final int index1 = index * 2;
-    final int index2 = index1 + 1;
-
-    final List<UChapDataPreload?> datas = [
-      index1 < pageLength ? pages[index1] : null,
-      index2 < pageLength ? pages[index2] : null,
-    ];
+    final datas = doublePageSpreadItems(pages, index, pageMode);
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,

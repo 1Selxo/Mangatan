@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_value_indicator_shape.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
@@ -102,7 +103,38 @@ class ReaderBottomBar extends ConsumerWidget {
     required this.backgroundColor,
   });
 
-  bool get _isDoublePageMode => currentPageMode == PageMode.doublePage;
+  bool get _isDoublePageMode => currentPageMode?.isDoublePage ?? false;
+
+  String get _pageModeTooltip {
+    return switch (currentPageMode) {
+      PageMode.doublePage => 'Double page',
+      PageMode.doublePageCover => 'Double page with cover offset',
+      _ => 'Single page',
+    };
+  }
+
+  Widget get _pageModeIcon {
+    if (currentPageMode == PageMode.doublePageCover) {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(CupertinoIcons.book_solid),
+          Positioned(
+            right: -3,
+            bottom: -3,
+            child: Icon(
+              Icons.filter_1,
+              size: 13,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
+      );
+    }
+    return Icon(
+      _isDoublePageMode ? CupertinoIcons.book_solid : CupertinoIcons.book,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -392,11 +424,8 @@ class ReaderBottomBar extends ConsumerWidget {
           // Double page mode button
           IconButton(
             onPressed: !isHorizontalContinuous ? onPageModeToggle : null,
-            icon: Icon(
-              _isDoublePageMode
-                  ? CupertinoIcons.book_solid
-                  : CupertinoIcons.book,
-            ),
+            tooltip: _pageModeTooltip,
+            icon: _pageModeIcon,
           ),
 
           // Settings button
@@ -433,8 +462,8 @@ class PageNumberOverlay extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final label = pageMode == PageMode.doublePage && currentIndex > 0
-        ? _getDoublePageLabel()
+    final label = pageMode.isDoublePage
+        ? doublePageIndexLabel(currentIndex, totalPages, pageMode)
         : '${currentIndex + 1}';
 
     return Align(
@@ -457,16 +486,5 @@ class PageNumberOverlay extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _getDoublePageLabel() {
-    final index1 = currentIndex * 2;
-    final index2 = index1 + 1;
-
-    if (index1 >= totalPages) {
-      return '$totalPages';
-    }
-
-    return index2 >= totalPages ? '$totalPages' : '$index1-$index2';
   }
 }

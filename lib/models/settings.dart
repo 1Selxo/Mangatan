@@ -1288,7 +1288,14 @@ extension ReaderModeExtension on ReaderMode {
 
 enum NovelTextAlign { left, center, right, block }
 
-enum PageMode { onePage, doublePage }
+enum PageMode { onePage, doublePage, doublePageCover }
+
+extension PageModeExtension on PageMode {
+  bool get isDoublePage =>
+      this == PageMode.doublePage || this == PageMode.doublePageCover;
+
+  bool get usesCoverOffset => this == PageMode.doublePageCover;
+}
 
 @embedded
 class FilterScanlator {

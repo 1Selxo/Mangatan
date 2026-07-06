@@ -18,6 +18,7 @@ import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
 import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
 import 'package:mangayomi/modules/manga/reader/services/page_navigation_service.dart';
+import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_memory_management.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_app_bar.dart';
@@ -245,9 +246,9 @@ class _MangaChapterPageGalleryState
   late final PageMode _initialPageMode = _readerController.getPageMode();
   late final ReaderMode _initialReaderMode = _readerController.getReaderMode();
   late int? _currentIndex =
-      _initialPageMode == PageMode.doublePage &&
+      _initialPageMode.isDoublePage &&
           !_initialReaderMode.isHorizontalContinuous
-      ? _initialActualIndex ~/ 2
+      ? actualIndexToDoublePageView(_initialActualIndex, _initialPageMode)
       : _initialActualIndex;
   late final ValueNotifier<int> _currentPageDisplayIndex = ValueNotifier(
     _initialActualIndex,
@@ -460,8 +461,9 @@ class _MangaChapterPageGalleryState
                             },
                             backgroundColor: backgroundColor,
                             isDoublePageMode:
-                                _pageMode == PageMode.doublePage &&
+                                (_pageMode?.isDoublePage ?? false) &&
                                 !isHorizontalContinuous,
+                            pageMode: _pageMode ?? PageMode.onePage,
                             isHorizontalContinuous: isHorizontalContinuous,
                             readerMode: ref.watch(_currentReaderMode)!,
                             photoViewController: _photoViewController,
@@ -486,7 +488,7 @@ class _MangaChapterPageGalleryState
                             color: getBackgroundColor(backgroundColor),
                             shadowColor: getBackgroundColor(backgroundColor),
                             child:
-                                (_pageMode == PageMode.doublePage &&
+                                ((_pageMode?.isDoublePage ?? false) &&
                                     !isHorizontalContinuous)
                                 ? ExtendedImageGesturePageView.builder(
                                     controller: _extendedController,
@@ -495,16 +497,11 @@ class _MangaChapterPageGalleryState
                                     physics: const ClampingScrollPhysics(),
                                     canScrollPage: (_) => true,
                                     itemBuilder: (context, index) {
-                                      int index1 = index * 2;
-                                      int index2 = index1 + 1;
-                                      final pageList = [
-                                        index1 < pages.length
-                                            ? pages[index1]
-                                            : null,
-                                        index2 < pages.length
-                                            ? pages[index2]
-                                            : null,
-                                      ];
+                                      final pageList = doublePageSpreadItems(
+                                        pages,
+                                        index,
+                                        _pageMode ?? PageMode.doublePage,
+                                      );
                                       return DoublePageView.paged(
                                         pages: _isReverseHorizontal
                                             ? pageList.reversed.toList()
@@ -526,7 +523,10 @@ class _MangaChapterPageGalleryState
                                         },
                                       );
                                     },
-                                    itemCount: (pages.length / 2).ceil(),
+                                    itemCount: doublePageViewCount(
+                                      pages.length,
+                                      _pageMode ?? PageMode.doublePage,
+                                    ),
                                     onPageChanged: _onPageChanged,
                                   )
                                 : ExtendedImageGesturePageView.builder(
@@ -643,23 +643,18 @@ class _MangaChapterPageGalleryState
                             _currentIndex!,
                           );
                           final pageIdx = pages[actualIdx].index ?? 0;
-                          // Compute target index for the new mode
-                          final int targetIndex;
-                          if (_pageMode == PageMode.onePage) {
-                            // Switching to double page: convert actual index to page view index
-                            targetIndex = pageIdx ~/ 2;
-                          } else {
-                            // Switching to single page: use the actual page index
-                            targetIndex = pageIdx;
-                          }
+                          final newPageMode = _nextPageMode(_pageMode);
+                          final targetIndex = newPageMode.isDoublePage
+                              ? actualIndexToDoublePageView(
+                                  pageIdx,
+                                  newPageMode,
+                                )
+                              : pageIdx;
+                          _readerController.setPageMode(newPageMode);
                           navigationService.jumpToPage(
                             index: targetIndex,
                             readerMode: ref.read(_currentReaderMode)!,
                           );
-                          PageMode newPageMode = _pageMode == PageMode.onePage
-                              ? PageMode.doublePage
-                              : PageMode.onePage;
-                          _readerController.setPageMode(newPageMode);
                           if (mounted) {
                             setState(() {
                               _pageMode = newPageMode;
@@ -919,9 +914,9 @@ class _MangaChapterPageGalleryState
     });
     final currentReaderMode = ref.read(_currentReaderMode);
     final pagesLength =
-        (_pageMode == PageMode.doublePage &&
+        ((_pageMode?.isDoublePage ?? false) &&
             !(currentReaderMode?.isHorizontalContinuous ?? false))
-        ? (pages.length / 2).ceil()
+        ? doublePageViewCount(pages.length, _pageMode!)
         : pages.length;
     if (_currentIndex! >= 0 && _currentIndex! < pagesLength) {
       final actualIndex = _pageViewToActualIndex(_currentIndex!);
@@ -1524,14 +1519,21 @@ class _MangaChapterPageGalleryState
     }
   }
 
+  PageMode _nextPageMode(PageMode? current) {
+    return switch (current) {
+      PageMode.onePage || null => PageMode.doublePage,
+      PageMode.doublePage => PageMode.doublePageCover,
+      PageMode.doublePageCover => PageMode.onePage,
+    };
+  }
+
   String _currentIndexLabel(int index) {
-    if (_pageMode != PageMode.doublePage) {
+    final pageMode = _pageMode ?? PageMode.onePage;
+    if (!pageMode.isDoublePage) {
       return "${index + 1}";
     }
     int pageLength = _readerController.getPageLength(_chapterUrlModel.pageUrls);
-    int page1 = index + 1;
-    int page2 = index + 2;
-    return page2 > pageLength ? "$pageLength" : "$page1-$page2";
+    return doublePageIndexLabel(index, pageLength, pageMode);
   }
 
   int _geCurrentIndex(int index) {
@@ -1542,37 +1544,44 @@ class _MangaChapterPageGalleryState
   /// Horizontal continuous mode does NOT use double page layout.
   /// Uses ref.read() so cannot be called during dispose.
   bool get _isDoublePageActive =>
-      _pageMode == PageMode.doublePage &&
+      (_pageMode?.isDoublePage ?? false) &&
       !(ref.read(_currentReaderMode)?.isHorizontalContinuous ?? false);
 
   /// Safe version of _isDoublePageActive that uses cached reader mode.
   /// Safe to call during dispose without Riverpod assertion errors.
   bool get _isDoublePageActiveSync =>
-      _pageMode == PageMode.doublePage &&
+      (_pageMode?.isDoublePage ?? false) &&
       !(_cachedReaderMode?.isHorizontalContinuous ?? false);
 
   /// Converts a page view index (from ExtendedPageController) to the actual
   /// index in the [pages] array for double page mode.
-  ///
-  /// In double page mode:
-  ///   PV 0 → pages[0] (first page shown solo)
-  ///   PV n (n>0) → pages[2n-1] (first page of the pair)
   int _pageViewToActualIndex(int pageViewIndex) {
     if (!_isDoublePageActive) return pageViewIndex;
-    return (pageViewIndex * 2).clamp(0, pages.length - 1);
+    return doublePageViewToActualIndex(
+      pageViewIndex,
+      pages.length,
+      _pageMode ?? PageMode.doublePage,
+    );
   }
 
   /// Safe version that uses cached reader mode for use in dispose.
   int _pageViewToActualIndexSync(int pageViewIndex) {
     if (!_isDoublePageActiveSync) return pageViewIndex;
-    return (pageViewIndex * 2).clamp(0, pages.length - 1);
+    return doublePageViewToActualIndex(
+      pageViewIndex,
+      pages.length,
+      _pageMode ?? PageMode.doublePage,
+    );
   }
 
   /// Converts an actual [pages] array index to a page view index
   /// for double page mode.
   int _actualToPageViewIndex(int actualIndex) {
     if (!_isDoublePageActive) return actualIndex;
-    return actualIndex ~/ 2;
+    return actualIndexToDoublePageView(
+      actualIndex,
+      _pageMode ?? PageMode.doublePage,
+    );
   }
 
   int _actualToViewIndexForMode(
@@ -1582,17 +1591,21 @@ class _MangaChapterPageGalleryState
   }) {
     if (pages.isEmpty) return 0;
     final isDoublePage =
-        pageMode == PageMode.doublePage && !readerMode.isHorizontalContinuous;
+        (pageMode?.isDoublePage ?? false) && !readerMode.isHorizontalContinuous;
     if (!isDoublePage) return actualIndex.clamp(0, pages.length - 1).toInt();
-    final pairCount = (pages.length / 2).ceil();
+    final pairCount = doublePageViewCount(pages.length, pageMode!);
     if (pairCount <= 0) return 0;
-    return (actualIndex ~/ 2).clamp(0, pairCount - 1).toInt();
+    return actualIndexToDoublePageView(
+      actualIndex,
+      pageMode,
+    ).clamp(0, pairCount - 1).toInt();
   }
 
   /// Total page count as seen by the page view controller.
-  /// In double page mode, each PV page shows 2 actual pages.
-  int get _pageViewPageCount =>
-      _isDoublePageActive ? (pages.length / 2).ceil() : pages.length;
+  /// In double page mode, each page view entry maps to a spread.
+  int get _pageViewPageCount => _isDoublePageActive
+      ? doublePageViewCount(pages.length, _pageMode ?? PageMode.doublePage)
+      : pages.length;
 
   bool _isContinuousMode([ReaderMode? mode]) {
     final readerMode = mode ?? ref.read(_currentReaderMode);

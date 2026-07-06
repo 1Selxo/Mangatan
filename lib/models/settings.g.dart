@@ -24368,10 +24368,15 @@ P _personalPageModeDeserializeProp<P>(
   }
 }
 
-const _PersonalPageModepageModeEnumValueMap = {'onePage': 0, 'doublePage': 1};
+const _PersonalPageModepageModeEnumValueMap = {
+  'onePage': 0,
+  'doublePage': 1,
+  'doublePageCover': 2,
+};
 const _PersonalPageModepageModeValueEnumMap = {
   0: PageMode.onePage,
   1: PageMode.doublePage,
+  2: PageMode.doublePageCover,
 };
 
 extension PersonalPageModeQueryFilter

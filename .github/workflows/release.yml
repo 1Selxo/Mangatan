@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: checkout branch
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: setup flutter
         uses: subosito/flutter-action@v2
@@ -90,6 +92,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -161,6 +165,8 @@ jobs:
     steps:
       - name: checkout branch
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: setup flutter
         uses: subosito/flutter-action@v2
@@ -204,6 +210,8 @@ jobs:
     steps:
       - name: checkout branch
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: setup flutter
         uses: subosito/flutter-action@v2
@@ -264,6 +272,8 @@ jobs:
     steps:
       - name: checkout branch
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install dependencies
         run: |
@@ -411,6 +421,8 @@ jobs:
     steps:
       - name: checkout branch
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install dependencies
         run: |

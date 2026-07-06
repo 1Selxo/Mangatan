@@ -11,6 +11,7 @@ endif()
 
 set(HOSHIDICTS_ROOT "${MANGAYOMI_PROJECT_ROOT}/third_party/hoshidicts")
 set(HOSHIDICTS_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(HOSHIDICTS_RANGES_TO_HEADER "${HOSHIDICTS_GENERATED_DIR}/hoshidicts_ranges_to_compat.hpp")
 
 add_subdirectory(
     "${HOSHIDICTS_ROOT}"
@@ -31,6 +32,27 @@ set(HOSHIDICTS_TEXT_PROCESSOR_PATCHED "${HOSHIDICTS_GENERATED_DIR}/text_processo
 set(HOSHIDICTS_KANJI_MAPPING_HEADER "${HOSHIDICTS_GENERATED_DIR}/hoshidicts_full_list_embedded.hpp")
 
 file(MAKE_DIRECTORY "${HOSHIDICTS_GENERATED_DIR}")
+file(WRITE "${HOSHIDICTS_RANGES_TO_HEADER}"
+    "#pragma once\n"
+    "#include <ranges>\n"
+    "#include <vector>\n"
+    "#ifndef __cpp_lib_ranges_to_container\n"
+    "namespace std::ranges {\n"
+    "template <template <class...> class Container>\n"
+    "struct hoshidicts_to_closure {\n"
+    "    template <input_range Range>\n"
+    "    friend auto operator|(Range&& range, const hoshidicts_to_closure&) {\n"
+    "        using value_type = range_value_t<Range>;\n"
+    "        return Container<value_type>(begin(range), end(range));\n"
+    "    }\n"
+    "};\n"
+    "template <template <class...> class Container>\n"
+    "constexpr auto to() {\n"
+    "    return hoshidicts_to_closure<Container>{};\n"
+    "}\n"
+    "}\n"
+    "#endif\n"
+)
 file(READ "${HOSHIDICTS_TEXT_PROCESSOR_SOURCE}" HOSHIDICTS_TEXT_PROCESSOR_CONTENT)
 string(REPLACE
     "#include <utf8.h>"
@@ -77,6 +99,11 @@ target_include_directories(hoshidicts PRIVATE
     "${HOSHIDICTS_GENERATED_DIR}"
     "${HOSHIDICTS_ROOT}/src/text_processor"
 )
+if(MSVC)
+    target_compile_options(hoshidicts PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/FI${HOSHIDICTS_RANGES_TO_HEADER}>")
+else()
+    target_compile_options(hoshidicts PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-include>" "$<$<COMPILE_LANGUAGE:CXX>:${HOSHIDICTS_RANGES_TO_HEADER}>")
+endif()
 
 add_library(hoshidicts_bridge STATIC
     hoshidicts_c_api.cpp

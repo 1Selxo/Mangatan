@@ -14,7 +14,7 @@ import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 /// getter, so no extra boilerplate is needed in normal cases.
 ///
 /// [incognitoMode] and [getIsarSetting] are concrete in the mixin but can be
-/// overridden — [ReaderController] overrides [getIsarSetting] to add caching.
+/// overridden by controllers that need specialized behavior.
 mixin ChapterControllerMixin {
   // ---------------------------------------------------------------------------
   // Contract – provided by the Riverpod-generated superclass

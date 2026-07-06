@@ -2051,10 +2051,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tracked => 'Tracked';
 
   @override
-  String get auth_unlock_msg => 'Authenticate to unlock Mangayomi';
+  String get auth_unlock_msg => 'Authenticate to unlock Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi is locked';
+  String get app_locked => 'Mangatan is locked';
 
   @override
   String get auth_to_continue => 'Authenticate to continue';

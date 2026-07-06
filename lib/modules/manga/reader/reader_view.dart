@@ -1120,19 +1120,7 @@ class _MangaChapterPageGalleryState
       },
     );
 
-    final chapterPages = pages
-        .where((page) => page.chapter?.id == chapter.id)
-        .toList();
-    unawaited(
-      ReaderOcrState.scanChapter(
-        chapterPages,
-        startIndex: _readerController.getPageIndex(),
-        preparePage: (page) async {
-          if (!mounted) return;
-          await precacheImage(page.getImageProvider(ref, true), context);
-        },
-      ),
-    );
+    _scanCurrentChapterOcr(actualIndex: _readerController.getPageIndex());
 
     // Kick off ordered prefetch before the first frame so lower-indexed pages
     // win the HTTP race against the simultaneous widget-driven loads.
@@ -1168,6 +1156,34 @@ class _MangaChapterPageGalleryState
         (readerMode.isHorizontalPaged || readerMode == ReaderMode.vertical)) {
       _onPageChanged(0);
     }
+  }
+
+  void _scanCurrentChapterOcr({int? actualIndex}) {
+    if (!mounted || pages.isEmpty) return;
+    final startActualIndex = (actualIndex ?? _currentIndex ?? 0)
+        .clamp(0, pages.length - 1)
+        .toInt();
+    final startPage = pages[startActualIndex];
+    final chapterPages = pages
+        .where((page) => page.chapter?.id == chapter.id)
+        .toList();
+    if (chapterPages.isEmpty) return;
+    var startIndex = chapterPages.indexWhere(
+      (page) =>
+          identical(page, startPage) ||
+          (page.pageIndex != null && page.pageIndex == startPage.pageIndex),
+    );
+    if (startIndex < 0) startIndex = 0;
+    unawaited(
+      ReaderOcrState.scanChapter(
+        chapterPages,
+        startIndex: startIndex,
+        preparePage: (page) async {
+          if (!mounted) return;
+          await precacheImage(page.getImageProvider(ref, true), context);
+        },
+      ),
+    );
   }
 
   /// Warms Flutter's [ImageCache] in page order before the widget tree renders.
@@ -1338,6 +1354,7 @@ class _MangaChapterPageGalleryState
 
     // Prefetch pages in order for the new page window
     _prefetchPagesInOrder();
+    _scanCurrentChapterOcr(actualIndex: actualIndex);
   }
 
   late final _pageOffset = ValueNotifier(
@@ -1426,6 +1443,7 @@ class _MangaChapterPageGalleryState
         curve: Curves.ease,
       );
     }
+    _scanCurrentChapterOcr(actualIndex: index);
   }
 
   void _processCropBordersByIndex(int index) async {

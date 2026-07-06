@@ -2064,10 +2064,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tracked => 'تتبع';
 
   @override
-  String get auth_unlock_msg => 'المصادقة لفتح قفل Mangayomi';
+  String get auth_unlock_msg => 'المصادقة لفتح قفل Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi مقفول';
+  String get app_locked => 'Mangatan مقفول';
 
   @override
   String get auth_to_continue => 'المصادقة للمتابعة';

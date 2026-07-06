@@ -2062,10 +2062,10 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get auth_unlock_msg =>
-      'Mangayomi\'yi kilitlemek için kimliğinizi doğrulayın';
+      'Mangatan\'yi kilitlemek için kimliğinizi doğrulayın';
 
   @override
-  String get app_locked => 'Mangayomi kilitli';
+  String get app_locked => 'Mangatan kilitli';
 
   @override
   String get auth_to_continue => 'Devam etmek için kimliğinizi doğrulayın';

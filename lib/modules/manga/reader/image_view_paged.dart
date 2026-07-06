@@ -37,7 +37,12 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
   )..addListener(_repaint);
 
   void _repaint() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _imageKey.currentContext?.findRenderObject()?.markNeedsPaint();
+    });
   }
 
   @override
@@ -62,6 +67,7 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
 
   @override
   Widget build(BuildContext context) {
+    _ocr.updateTheme(Theme.of(context).colorScheme.primary);
     final scaleType = ref.watch(scaleTypeStateProvider);
     final image = widget.data.getImageProvider(ref, true);
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);

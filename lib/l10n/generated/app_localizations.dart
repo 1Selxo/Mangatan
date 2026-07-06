@@ -3818,13 +3818,13 @@ abstract class AppLocalizations {
   /// No description provided for @auth_unlock_msg.
   ///
   /// In en, this message translates to:
-  /// **'Authenticate to unlock Mangayomi'**
+  /// **'Authenticate to unlock Mangatan'**
   String get auth_unlock_msg;
 
   /// No description provided for @app_locked.
   ///
   /// In en, this message translates to:
-  /// **'Mangayomi is locked'**
+  /// **'Mangatan is locked'**
   String get app_locked;
 
   /// No description provided for @auth_to_continue.

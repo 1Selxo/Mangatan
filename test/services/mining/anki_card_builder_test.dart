@@ -72,4 +72,58 @@ void main() {
     expect(draft.fields['FreqSort'], '10');
     expect(draft.mediaFiles, [media]);
   });
+
+  test(
+    'keeps screenshots out of DefinitionPicture even for old profiles',
+    () async {
+      final result = HoshiLookupResult(
+        matched: '割方',
+        deinflected: '割方',
+        trace: const [],
+        preprocessorSteps: 0,
+        term: const HoshiTermResult(
+          expression: '割方',
+          reading: 'わりかた',
+          rules: 'adv',
+          score: 1,
+          glossaries: [
+            HoshiGlossaryEntry(
+              dictName: 'JMdict',
+              glossary: 'comparatively',
+              definitionTags: 'adv',
+              termTags: '',
+            ),
+          ],
+          frequencies: [],
+          pitches: [],
+        ),
+      );
+
+      final draft = await const AnkiCardBuilder().build(
+        result: result,
+        context: MiningContext(
+          sentence: '割方わかった',
+          imageBytesLoader: () async => Uint8List.fromList([
+            0x89,
+            0x50,
+            0x4e,
+            0x47,
+            0x0d,
+            0x0a,
+            0x1a,
+            0x0a,
+          ]),
+        ),
+        profile: const AnkiMiningProfile(
+          fieldMap: {
+            'DefinitionPicture': AnkiMarker.screenshot,
+            'Picture': AnkiMarker.screenshot,
+          },
+        ),
+      );
+
+      expect(draft.fields['DefinitionPicture'], isEmpty);
+      expect(draft.fields['Picture'], contains('<img src="'));
+    },
+  );
 }

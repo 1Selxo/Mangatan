@@ -40,7 +40,12 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
   )..addListener(_repaint);
 
   void _repaint() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _imageKey.currentContext?.findRenderObject()?.markNeedsPaint();
+    });
   }
 
   @override
@@ -65,6 +70,7 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
 
   @override
   Widget build(BuildContext context) {
+    _ocr.updateTheme(Theme.of(context).colorScheme.primary);
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);
     final imageWidget = ValueListenableBuilder<bool>(
       valueListenable: widget.isScrolling,

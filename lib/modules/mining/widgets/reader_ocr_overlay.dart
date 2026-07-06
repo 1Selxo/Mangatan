@@ -172,10 +172,17 @@ class ReaderOcrController extends ChangeNotifier {
   OcrTextBlock? _activeBlock;
   int _activeOffset = -1;
   int _matchLength = 0;
+  Color _highlightColor = const Color(0xff8ab4f8);
+  Color _outlineColor = const Color(0xff8ab4f8);
   bool _loading = false;
   bool _disposed = false;
 
   bool get enabled => ReaderOcrState.enabled.value;
+
+  void updateTheme(Color primary) {
+    _highlightColor = primary;
+    _outlineColor = primary;
+  }
 
   Future<void> load() async {
     if (!enabled || _loading || _page != null || data.isTransitionPage) return;
@@ -509,7 +516,7 @@ class ReaderOcrController extends ChangeNotifier {
     if (highlight != null && !highlight.isEmpty) {
       canvas.drawRect(
         highlight.intersect(rect),
-        Paint()..color = Colors.amberAccent.withValues(alpha: 0.56),
+        Paint()..color = _highlightColor.withValues(alpha: 0.45),
       );
     }
     if (outlineVisible && active) {
@@ -518,7 +525,7 @@ class ReaderOcrController extends ChangeNotifier {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = active ? 2 : 1
-          ..color = active ? Colors.amber.shade700 : Colors.transparent,
+          ..color = active ? _outlineColor : Colors.transparent,
       );
     }
     if (textAlpha > 0.01) {

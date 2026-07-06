@@ -278,9 +278,9 @@ class _DoublePageViewState extends State<DoublePageView>
     );
   }
 
-  Widget _buildCompletedState(ExtendedImageState state) {
+  Widget? _buildCompletedState(ExtendedImageState state) {
     widget.onFailedToLoadImage?.call(false);
-    return Image(image: state.imageProvider);
+    return null;
   }
 
   Widget _buildFailedState(ExtendedImageState state, dynamic l10n) {

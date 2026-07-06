@@ -2081,10 +2081,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get auth_unlock_msg =>
-      'Authentifiez-vous pour déverrouiller Mangayomi';
+      'Authentifiez-vous pour déverrouiller Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi est verrouillé';
+  String get app_locked => 'Mangatan est verrouillé';
 
   @override
   String get auth_to_continue => 'Authentifiez-vous pour continuer';

@@ -2091,10 +2091,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get auth_unlock_msg =>
-      'Аутентифицируйтесь, чтобы разблокировать Mangayomi';
+      'Аутентифицируйтесь, чтобы разблокировать Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi заблокирован';
+  String get app_locked => 'Mangatan заблокирован';
 
   @override
   String get auth_to_continue => 'Аутентифицируйтесь, чтобы продолжить';

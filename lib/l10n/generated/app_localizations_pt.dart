@@ -2075,10 +2075,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get tracked => 'Rastreado';
 
   @override
-  String get auth_unlock_msg => 'Autentique-se para desbloquear Mangayomi';
+  String get auth_unlock_msg => 'Autentique-se para desbloquear Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi está bloqueado';
+  String get app_locked => 'Mangatan está bloqueado';
 
   @override
   String get auth_to_continue => 'Autentique-se para continuar';
@@ -4437,10 +4437,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get tracked => 'Rastreado';
 
   @override
-  String get auth_unlock_msg => 'Autentique-se para desbloquear Mangayomi';
+  String get auth_unlock_msg => 'Autentique-se para desbloquear Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi está bloqueado';
+  String get app_locked => 'Mangatan está bloqueado';
 
   @override
   String get auth_to_continue => 'Autentique-se para continuar';

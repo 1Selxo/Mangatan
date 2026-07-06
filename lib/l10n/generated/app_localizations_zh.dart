@@ -1998,10 +1998,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tracked => '已追踪';
 
   @override
-  String get auth_unlock_msg => '验证以解锁Mangayomi';
+  String get auth_unlock_msg => '验证以解锁Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi已锁定';
+  String get app_locked => 'Mangatan已锁定';
 
   @override
   String get auth_to_continue => '验证以继续';

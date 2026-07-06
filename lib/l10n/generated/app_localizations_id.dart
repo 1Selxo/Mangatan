@@ -2062,10 +2062,10 @@ class AppLocalizationsId extends AppLocalizations {
   String get tracked => 'Dilacak';
 
   @override
-  String get auth_unlock_msg => 'Autentikasi untuk membuka kunci Mangayomi';
+  String get auth_unlock_msg => 'Autentikasi untuk membuka kunci Mangatan';
 
   @override
-  String get app_locked => 'Mangayomi terkunci';
+  String get app_locked => 'Mangatan terkunci';
 
   @override
   String get auth_to_continue => 'Autentikasi untuk melanjutkan';

@@ -1015,26 +1015,48 @@ ThemeData _popupTheme(
   ThemeData baseTheme,
   DictionaryThemePreference preference,
 ) {
+  final baseScheme = baseTheme.colorScheme;
+  final light = ThemeData.light().copyWith(
+    colorScheme: ColorScheme.light(
+      primary: baseScheme.primary,
+      primaryContainer: baseScheme.primaryContainer,
+      onPrimaryContainer: baseScheme.onPrimaryContainer,
+      secondaryContainer: baseScheme.secondaryContainer,
+      onSecondaryContainer: baseScheme.onSecondaryContainer,
+      tertiaryContainer: baseScheme.tertiaryContainer,
+      onTertiaryContainer: baseScheme.onTertiaryContainer,
+      errorContainer: baseScheme.errorContainer,
+      onErrorContainer: baseScheme.onErrorContainer,
+    ),
+  );
   final dark = ThemeData.dark().copyWith(
-    colorScheme: const ColorScheme.dark(
-      surface: Color(0xff1f1f1f),
-      surfaceContainerHighest: Color(0xff303134),
-      onSurface: Color(0xfff1f3f4),
-      onSurfaceVariant: Color(0xffbdc1c6),
-      primary: Color(0xff8ab4f8),
+    colorScheme: ColorScheme.dark(
+      surface: const Color(0xff1f1f1f),
+      surfaceContainerHighest: const Color(0xff303134),
+      onSurface: const Color(0xfff1f3f4),
+      onSurfaceVariant: const Color(0xffbdc1c6),
+      primary: baseScheme.primary,
+      primaryContainer: baseScheme.primaryContainer,
+      onPrimaryContainer: baseScheme.onPrimaryContainer,
+      secondaryContainer: baseScheme.secondaryContainer,
+      onSecondaryContainer: baseScheme.onSecondaryContainer,
+      tertiaryContainer: baseScheme.tertiaryContainer,
+      onTertiaryContainer: baseScheme.onTertiaryContainer,
+      errorContainer: baseScheme.errorContainer,
+      onErrorContainer: baseScheme.onErrorContainer,
     ),
     dividerColor: const Color(0xff343536),
     scaffoldBackgroundColor: const Color(0xff1f1f1f),
   );
   return switch (preference) {
-    DictionaryThemePreference.light => ThemeData.light(),
+    DictionaryThemePreference.light =>
+      baseTheme.brightness == Brightness.light ? baseTheme : light,
     DictionaryThemePreference.dark => dark,
     DictionaryThemePreference.black => dark.copyWith(
       colorScheme: dark.colorScheme.copyWith(surface: Colors.black),
       scaffoldBackgroundColor: Colors.black,
     ),
-    DictionaryThemePreference.system =>
-      baseTheme.brightness == Brightness.dark ? baseTheme : dark,
+    DictionaryThemePreference.system => baseTheme,
   };
 }
 

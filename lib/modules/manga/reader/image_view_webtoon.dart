@@ -78,7 +78,9 @@ class ImageViewWebtoon extends StatelessWidget {
           reverse: reverse,
           minCacheExtent: minCacheExtent,
           initialScrollIndex: initialScrollIndex,
-          itemCount: pages.length,
+          itemCount: isDoublePageMode && !isHorizontalContinuous
+              ? (pages.length / 2).ceil()
+              : pages.length,
           physics: physics,
           itemScrollController: itemScrollController,
           scrollOffsetController: scrollOffsetController,
@@ -144,15 +146,13 @@ class ImageViewWebtoon extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final int index1 = index * 2 - 1;
+    final int index1 = index * 2;
     final int index2 = index1 + 1;
 
-    final List<UChapDataPreload?> datas = index == 0
-        ? [pages[0], null]
-        : [
-            index1 < pageLength ? pages[index1] : null,
-            index2 < pageLength ? pages[index2] : null,
-          ];
+    final List<UChapDataPreload?> datas = [
+      index1 < pageLength ? pages[index1] : null,
+      index2 < pageLength ? pages[index2] : null,
+    ];
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,

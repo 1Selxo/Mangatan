@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -306,6 +307,16 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return current;
   }
 
+  void _scrollPopupBy(Offset delta) {
+    if (!_webReady || delta == Offset.zero) return;
+    unawaited(
+      _evaluateJavascript(
+        'window.scrollBy(${delta.dx.toStringAsFixed(2)}, '
+        '${delta.dy.toStringAsFixed(2)});',
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_HoshiPopupData>(
@@ -318,34 +329,43 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           return Center(child: Text('Lookup failed: ${snapshot.error}'));
         }
         final data = snapshot.data!;
-        return InAppWebView(
-          webViewEnvironment: webViewEnvironment,
-          initialData: InAppWebViewInitialData(
-            data: data.html,
-            baseUrl: WebUri('https://hoshi-popup.local/'),
-          ),
-          initialSettings: InAppWebViewSettings(
-            transparentBackground: true,
-            resourceCustomSchemes: _usesStableCustomSchemes
-                ? const ['image']
-                : const [],
-            supportZoom: false,
-            disableHorizontalScroll: true,
-            horizontalScrollBarEnabled: false,
-            isInspectable: kDebugMode,
-          ),
-          onWebViewCreated: (controller) {
-            _controller = controller;
-            _registerHandlers(controller);
+        return Listener(
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent) {
+              _scrollPopupBy(event.scrollDelta);
+            }
           },
-          onLoadStop: (_, _) async {
-            _webReady = true;
-            await _render(data);
-            await _lookupAndRender(widget.text, notifyMatch: true);
-          },
-          onLoadResourceWithCustomScheme: _usesStableCustomSchemes
-              ? (_, request) => _loadDictionaryMedia(request)
-              : null,
+          onPointerPanZoomUpdate: (event) => _scrollPopupBy(event.panDelta),
+          child: InAppWebView(
+            webViewEnvironment: webViewEnvironment,
+            initialData: InAppWebViewInitialData(
+              data: data.html,
+              baseUrl: WebUri('https://hoshi-popup.local/'),
+            ),
+            initialSettings: InAppWebViewSettings(
+              transparentBackground: true,
+              resourceCustomSchemes: _usesStableCustomSchemes
+                  ? const ['image']
+                  : const [],
+              supportZoom: false,
+              disableHorizontalScroll: true,
+              horizontalScrollBarEnabled: false,
+              verticalScrollBarEnabled: true,
+              isInspectable: kDebugMode,
+            ),
+            onWebViewCreated: (controller) {
+              _controller = controller;
+              _registerHandlers(controller);
+            },
+            onLoadStop: (_, _) async {
+              _webReady = true;
+              await _render(data);
+              await _lookupAndRender(widget.text, notifyMatch: true);
+            },
+            onLoadResourceWithCustomScheme: _usesStableCustomSchemes
+                ? (_, request) => _loadDictionaryMedia(request)
+                : null,
+          ),
         );
       },
     );
@@ -443,7 +463,9 @@ String buildHoshiPopupHtml({
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>$popupCss</style>
   <style>
-    html, body { --popup-scale: $scale; }
+    html, body { --popup-scale: $scale; min-height: 100%; }
+    html { overflow-x: hidden; overflow-y: auto; }
+    body { min-height: 101%; }
     .button-slot { cursor: pointer; display: grid; place-items: center; color: var(--text-color-light2); }
     .button-slot::before { content: '+'; font: 500 calc(25px * var(--popup-scale))/1 sans-serif; }
     .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }

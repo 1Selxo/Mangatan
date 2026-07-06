@@ -135,6 +135,9 @@ class AnkiCardBuilder {
     };
 
     final fields = profile.fieldMap.map((field, template) {
+      if (_normalizeFieldName(field) == 'definitionpicture') {
+        return MapEntry(field, '');
+      }
       var value = template;
       for (final replacement in replacements.entries) {
         value = value.replaceAll(replacement.key, replacement.value);
@@ -282,6 +285,9 @@ class AnkiCardBuilder {
   static String _escape(String value) {
     return const HtmlEscape(HtmlEscapeMode.element).convert(value);
   }
+
+  static String _normalizeFieldName(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'[\s_\-]+'), '');
 
   static const _maxScreenshotUploadBytes = 4 * 1024 * 1024;
   static const _absoluteScreenshotUploadBytes = 8 * 1024 * 1024;

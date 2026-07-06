@@ -1,18 +1,21 @@
-import 'dart:async';
-
-import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
+import 'package:extended_image/extended_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/manga/reader/image_view_paged.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_colors.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_paged.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_vertical.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
+import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
-import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart';
-import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
 
 /// Unified double page view for both paged and continuous reading modes.
 ///
@@ -30,6 +33,7 @@ class DoublePageView extends StatefulWidget {
 
   /// Callback for image load failure state.
   final Function(bool)? onFailedToLoadImage;
+  final VoidCallback? onRefreshMihonPages;
 
   /// Whether to use the paged mode (with PhotoView zoom) or vertical mode.
   ///
@@ -40,14 +44,8 @@ class DoublePageView extends StatefulWidget {
   /// Whether to add top padding for the first page (vertical mode only).
   final bool addTopPadding;
 
-  /// The scroll direction of the parent PageView (for gesture interception).
-  final Axis scrollDirection;
-
-  /// Callback when the zoom state changes.
-  final Function(bool isZoomed)? onZoomChanged;
-
-  /// Callback when the PhotoViewController is created/disposed.
-  final void Function(PhotoViewController? controller)? onControllerCreated;
+  /// Controls the left-to-right order of pages within a spread.
+  final ReadingDirection readingDirection;
 
   const DoublePageView({
     super.key,
@@ -55,11 +53,10 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
+    this.onRefreshMihonPages,
     this.isPagedMode = true,
     this.addTopPadding = true,
-    this.scrollDirection = Axis.horizontal,
-    this.onZoomChanged,
-    this.onControllerCreated,
+    this.readingDirection = ReadingDirection.leftToRight,
   });
 
   /// Creates a paged mode double page view.
@@ -69,9 +66,8 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
-    required this.scrollDirection,
-    this.onZoomChanged,
-    this.onControllerCreated,
+    this.onRefreshMihonPages,
+    this.readingDirection = ReadingDirection.leftToRight,
   }) : isPagedMode = true,
        addTopPadding = false;
 
@@ -82,17 +78,16 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
+    this.onRefreshMihonPages,
     this.addTopPadding = true,
-  }) : isPagedMode = false,
-       scrollDirection = Axis.vertical,
-       onZoomChanged = null,
-       onControllerCreated = null;
+    this.readingDirection = ReadingDirection.leftToRight,
+  }) : isPagedMode = false;
 
   @override
-  State<DoublePageView> createState() => _DoublePageViewState();
+  State<DoublePageView> createState() => DoublePageViewState();
 }
 
-class _DoublePageViewState extends State<DoublePageView>
+class DoublePageViewState extends State<DoublePageView>
     with TickerProviderStateMixin {
   // Controllers for paged mode zoom
   late AnimationController _scaleAnimationController;
@@ -102,7 +97,6 @@ class _DoublePageViewState extends State<DoublePageView>
   final PhotoViewController _photoViewController = PhotoViewController();
   final PhotoViewScaleStateController _photoViewScaleStateController =
       PhotoViewScaleStateController();
-  StreamSubscription? _zoomSubscription;
 
   Duration _doubleTapAnimationDuration() {
     final doubleTapAnimationValue =
@@ -112,16 +106,6 @@ class _DoublePageViewState extends State<DoublePageView>
       1 => const Duration(milliseconds: 800),
       _ => const Duration(milliseconds: 200),
     };
-  }
-
-  void _onScaleEnd(
-    BuildContext context,
-    ScaleEndDetails details,
-    PhotoViewControllerValue controllerValue,
-  ) {
-    if (controllerValue.scale! < 1) {
-      _photoViewScaleStateController.reset();
-    }
   }
 
   double get pixelRatio => View.of(context).devicePixelRatio;
@@ -138,10 +122,7 @@ class _DoublePageViewState extends State<DoublePageView>
   void initState() {
     super.initState();
     if (widget.isPagedMode) {
-      _scaleAnimationController = AnimationController(
-        duration: _doubleTapAnimationDuration(),
-        vsync: this,
-      );
+      _scaleAnimationController = AnimationController(vsync: this);
       _animation = Tween(begin: 1.0, end: 2.0).animate(
         CurvedAnimation(curve: Curves.ease, parent: _scaleAnimationController),
       );
@@ -149,25 +130,14 @@ class _DoublePageViewState extends State<DoublePageView>
         _photoViewController.scale = _animation.value;
       };
       _animation.addListener(_animationListener);
-
-      _zoomSubscription = _photoViewController.outputStateStream.listen((
-        value,
-      ) {
-        final isZoomed = value.scale! > 1.01;
-        widget.onZoomChanged?.call(isZoomed);
-      });
-
-      widget.onControllerCreated?.call(_photoViewController);
     }
   }
 
   @override
   void dispose() {
     if (widget.isPagedMode) {
-      widget.onControllerCreated?.call(null);
       _animation.removeListener(_animationListener);
       _scaleAnimationController.dispose();
-      _zoomSubscription?.cancel();
       _photoViewController.dispose();
       _photoViewScaleStateController.dispose();
     }
@@ -179,6 +149,7 @@ class _DoublePageViewState extends State<DoublePageView>
 
     setState(() {
       if (_scaleAnimationController.isAnimating) return;
+      _scaleAnimationController.duration = _doubleTapAnimationDuration();
 
       if (_photoViewController.scale == 1.0) {
         _scalePosition = _computeAlignmentByTapOffset(tapPosition);
@@ -231,20 +202,43 @@ class _DoublePageViewState extends State<DoublePageView>
   }
 
   Widget _buildPagedMode() {
-    return PhotoViewGestureDetectorScope(
-      axis: widget.scrollDirection,
-      child: PhotoView.customChild(
-        controller: _photoViewController,
-        scaleStateController: _photoViewScaleStateController,
-        basePosition: _scalePosition,
-        onScaleEnd: _onScaleEnd,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onDoubleTapDown: (details) => _toggleScale(details.globalPosition),
-          onDoubleTap: () {},
-          child: _buildPageRow(),
-        ),
+    return LayoutBuilder(
+      builder: (zoomContext, _) => PhotoViewGallery.builder(
+        backgroundDecoration: const BoxDecoration(color: Colors.transparent),
+        itemCount: 1,
+        builder: (context, _) {
+          return PhotoViewGalleryPageOptions.customChild(
+            controller: _photoViewController,
+            scaleStateController: _photoViewScaleStateController,
+            basePosition: _scalePosition,
+            minScale: readerMinimumZoomScale,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerSignal: (event) =>
+                  registerModifierWheelZoom(event, zoomContext: zoomContext),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onDoubleTapDown: (details) =>
+                    _toggleScale(details.globalPosition),
+                onDoubleTap: () {},
+                child: _buildPageRow(),
+              ),
+            ),
+          );
+        },
       ),
+    );
+  }
+
+  bool registerModifierWheelZoom(
+    PointerSignalEvent event, {
+    BuildContext? zoomContext,
+  }) {
+    return registerReaderModifierWheelZoom(
+      event,
+      zoomContext: zoomContext ?? context,
+      photoViewController: _photoViewController,
+      basePosition: _scalePosition,
     );
   }
 
@@ -261,13 +255,14 @@ class _DoublePageViewState extends State<DoublePageView>
   }
 
   Widget _buildPageRow() {
+    final pages = widget.readingDirection.isRtl
+        ? widget.pages.reversed
+        : widget.pages;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (widget.pages.isNotEmpty && widget.pages[0] != null)
-          Flexible(child: _buildPageImage(widget.pages[0]!)),
-        if (widget.pages.length > 1 && widget.pages[1] != null)
-          Flexible(child: _buildPageImage(widget.pages[1]!)),
+        for (final page in pages)
+          if (page != null) Flexible(child: _buildPageImage(page)),
       ],
     );
   }
@@ -276,27 +271,25 @@ class _DoublePageViewState extends State<DoublePageView>
     final l10n = l10nLocalizations(context)!;
     final onLongPress = widget.onLongPressData ?? (_) {};
 
-    return ImageViewVertical(
+    return ImageViewPaged(
       data: pageData,
-      failedToLoadImage: (val) {
-        widget.onFailedToLoadImage?.call(val);
-      },
-      onLongPressData: onLongPress,
-      isHorizontal: true,
+      enableGestures: false,
+      normalizeOcrPaintCoordinates: true,
       loadStateChanged: (state) {
-        switch (state.loadState) {
+        switch (state.extendedImageLoadState) {
           case LoadState.loading:
             return _buildLoadingState(state);
           case LoadState.completed:
             return _buildCompletedState(state);
           case LoadState.failed:
-            return _buildFailedState(state, l10n);
+            return _buildFailedState(state, l10n, pageData);
         }
       },
+      onLongPressData: onLongPress,
     );
   }
 
-  Widget _buildLoadingState(SubsamplingImageState state) {
+  Widget _buildLoadingState(ExtendedImageState state) {
     final loadingProgress = state.loadingProgress;
     final progress = loadingProgress?.expectedTotalBytes != null
         ? loadingProgress!.cumulativeBytesLoaded /
@@ -310,50 +303,72 @@ class _DoublePageViewState extends State<DoublePageView>
     );
   }
 
-  Widget? _buildCompletedState(SubsamplingImageState state) {
+  Widget? _buildCompletedState(ExtendedImageState state) {
     widget.onFailedToLoadImage?.call(false);
-    return null; // Affiche l'image via MinSubsamplingImage
+    return null;
   }
 
-  Widget _buildFailedState(SubsamplingImageState state, dynamic l10n) {
+  Widget _buildFailedState(
+    ExtendedImageState state,
+    dynamic l10n,
+    UChapDataPreload pageData,
+  ) {
     widget.onFailedToLoadImage?.call(true);
+    final backgroundColor =
+        getBackgroundColor(widget.backgroundColor) ??
+        Theme.of(context).scaffoldBackgroundColor;
 
     return Container(
-      color: getBackgroundColor(widget.backgroundColor),
+      color: backgroundColor,
       height: context.height(0.8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             l10n.image_loading_error,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            style: TextStyle(
+              color: readerErrorForegroundColor(backgroundColor),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: _buildRetryButton(state, l10n),
+            child: _buildRetryButton(state, l10n, pageData),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRetryButton(SubsamplingImageState state, dynamic l10n) {
+  Widget _buildRetryButton(
+    ExtendedImageState state,
+    dynamic l10n,
+    UChapDataPreload pageData,
+  ) {
+    void retry() {
+      widget.onFailedToLoadImage?.call(false);
+      final url = pageData.pageUrl?.url;
+      if (url != null &&
+          isTransientMihonImageUrl(url) &&
+          widget.onRefreshMihonPages != null) {
+        widget.onRefreshMihonPages!();
+        return;
+      }
+      state.reLoadImage();
+    }
+
     return GestureDetector(
-      onLongPress: () {
-        state.reLoadImage();
-        widget.onFailedToLoadImage?.call(false);
-      },
-      onTap: () {
-        state.reLoadImage();
-        widget.onFailedToLoadImage?.call(false);
-      },
+      onLongPress: retry,
+      onTap: retry,
       child: Container(
         decoration: BoxDecoration(
           color: context.primaryColor,
           borderRadius: BorderRadius.circular(30),
         ),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Text(l10n.retry),
+        child: Text(
+          l10n.retry,
+          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+        ),
       ),
     );
   }

@@ -23,11 +23,11 @@ class DiscordRPC {
 
   /// Instance of the current RPC activity
   final RpcActivity activity = RpcActivity(
-    assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangayomi"),
+    assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangatan"),
     buttons: [
       const RPCButton(
-        label: "Get Mangayomi",
-        url: "https://github.com/kodjodevf/mangayomi",
+        label: "Get Mangatan",
+        url: "https://github.com/1Selxo/Mangatan",
       ),
       const RPCButton(
         label: "Join us",
@@ -75,7 +75,7 @@ class DiscordRPC {
     await updateActivity(
       details: "Idle",
       state: "-----",
-      assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangayomi"),
+      assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangatan"),
     );
   }
 
@@ -99,15 +99,15 @@ class DiscordRPC {
               largeImage: imageUrl,
               largeText: rpcShowTitle ? chapter.manga.value!.name : "-----",
               smallImage: "app-icon",
-              smallText: "Mangayomi",
+              smallText: "Mangatan",
             )
-          : const RPCAssets(largeImage: "app-icon", largeText: "Mangayomi"),
+          : const RPCAssets(largeImage: "app-icon", largeText: "Mangatan"),
     );
   }
 
   Future<void> showLargeImage() async {
     await updateActivity(
-      assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangayomi"),
+      assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangatan"),
     );
   }
 
@@ -117,7 +117,7 @@ class DiscordRPC {
         largeImage: largeImage,
         largeText: largeText,
         smallImage: "app-icon",
-        smallText: "Mangayomi",
+        smallText: "Mangatan",
       ),
     );
   }

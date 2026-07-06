@@ -96,6 +96,38 @@ void main() {
     expect(html, contains('flutter_inappwebview.callHandler'));
   });
 
+  test('keeps frequency and pitch labels white on accent tags', () {
+    const preferences = DictionaryPopupPreferences(
+      width: 540,
+      height: 450,
+      fontSize: 15,
+      theme: DictionaryThemePreference.light,
+      eInkMode: false,
+      paginatedScrolling: false,
+      customCss: '',
+      showFrequencyHarmonic: true,
+      showFrequencyAverage: false,
+      showPitchNumber: true,
+      showPitchText: true,
+    );
+
+    final html = buildHoshiPopupHtml(
+      popupCss: '/* upstream popup css */',
+      popupJs: 'window.renderPopup = function() {};',
+      selectionJs: 'window.hoshiSelection = {};',
+      preferences: preferences,
+      theme: ThemeData.light(),
+      dark: false,
+    );
+    final globalColorRule = html.indexOf('.entry, .entry *');
+    final labelColorRule = html.indexOf(
+      '.frequency-dict-label, .pitch-dict-label { color: #fff; }',
+    );
+
+    expect(labelColorRule, isNonNegative);
+    expect(labelColorRule, greaterThan(globalColorRule));
+  });
+
   test('bundles the upstream Hoshi renderer and license', () async {
     final popup = await rootBundle.loadString('assets/hoshi_popup/popup.js');
     final css = await rootBundle.loadString('assets/hoshi_popup/popup.css');

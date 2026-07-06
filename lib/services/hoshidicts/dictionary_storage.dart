@@ -73,25 +73,45 @@ class DictionaryStorage {
     required BigInt termCount,
     required BigInt frequencyCount,
     required BigInt pitchCount,
+    Directory? root,
   }) async {
-    final root = await rootDirectory;
-    final manifest = await _readManifest(root);
+    final directory = root ?? await rootDirectory;
+    final manifest = await _readManifest(directory);
+    final names = await _dictionaryNames(directory);
+    final preferredOrder = [
+      for (final dictionaryName in _orderedNames(names, manifest))
+        if (dictionaryName != name) dictionaryName,
+      name,
+    ];
     manifest[name] = {
       'terms': termCount > BigInt.zero,
       'frequencies': frequencyCount > BigInt.zero,
       'pitch': pitchCount > BigInt.zero,
     };
-    await _writeManifest(root, manifest);
+    _writeOrder(manifest, names, preferredOrder);
+    await _writeManifest(directory, manifest);
   }
 
-  Future<void> delete(String name) async {
-    final root = await rootDirectory;
-    final directory = Directory(p.join(root.path, name));
-    if (await directory.exists()) {
-      await directory.delete(recursive: true);
+  Future<void> delete(String name, {Directory? root}) async {
+    final rootDirectory = root ?? await this.rootDirectory;
+    final dictionaryDirectory = Directory(p.join(rootDirectory.path, name));
+    if (await dictionaryDirectory.exists()) {
+      await dictionaryDirectory.delete(recursive: true);
     }
-    final manifest = await _readManifest(root);
-    if (manifest.remove(name) != null) await _writeManifest(root, manifest);
+    final manifest = await _readManifest(rootDirectory);
+    if (manifest.remove(name) != null) {
+      final names = await _dictionaryNames(rootDirectory);
+      _writeOrder(manifest, names, _orderedNames(names, manifest));
+      await _writeManifest(rootDirectory, manifest);
+    }
+  }
+
+  Future<void> reorder(List<String> names, {Directory? root}) async {
+    final directory = root ?? await rootDirectory;
+    final manifest = await _readManifest(directory);
+    final installedNames = await _dictionaryNames(directory);
+    _writeOrder(manifest, installedNames, names);
+    await _writeManifest(directory, manifest);
   }
 
   Future<List<InstalledDictionary>> _installedFromRoot(Directory root) async {
@@ -107,9 +127,18 @@ class DictionaryStorage {
       return const {'term', 'frequency', 'pitch'}.contains(name) ||
           !File(p.join(directory.path, 'index.json')).existsSync();
     });
-    directories.sort(
-      (a, b) => p.basename(a.path).compareTo(p.basename(b.path)),
+    final orderedNames = _orderedNames(
+      directories.map((directory) => p.basename(directory.path)).toList(),
+      manifest,
     );
+    final orderByName = {
+      for (final indexed in orderedNames.indexed) indexed.$2: indexed.$1,
+    };
+    directories.sort((a, b) {
+      return (orderByName[p.basename(a.path)] ?? 0).compareTo(
+        orderByName[p.basename(b.path)] ?? 0,
+      );
+    });
 
     return [
       for (final directory in directories)
@@ -132,6 +161,67 @@ class DictionaryStorage {
       hasFrequencies: metadata?['frequencies'] as bool? ?? false,
       hasPitch: metadata?['pitch'] as bool? ?? false,
     );
+  }
+
+  Future<List<String>> _dictionaryNames(Directory root) async {
+    if (!await root.exists()) return const [];
+    final directories = await root
+        .list()
+        .where((entity) => entity is Directory)
+        .cast<Directory>()
+        .toList();
+    final names = <String>[];
+    for (final directory in directories) {
+      final name = p.basename(directory.path);
+      if (const {'term', 'frequency', 'pitch'}.contains(name)) continue;
+      if (!File(p.join(directory.path, 'index.json')).existsSync()) continue;
+      names.add(name);
+    }
+    names.sort();
+    return names;
+  }
+
+  List<String> _orderedNames(
+    List<String> names,
+    Map<String, Map<String, dynamic>> manifest,
+  ) {
+    final fallback = [...names]..sort();
+    final fallbackIndex = {
+      for (final indexed in fallback.indexed) indexed.$2: indexed.$1,
+    };
+    final ordered = [...names];
+    ordered.sort((a, b) {
+      final aOrder = manifest[a]?['order'];
+      final bOrder = manifest[b]?['order'];
+      if (aOrder is int && bOrder is int && aOrder != bOrder) {
+        return aOrder.compareTo(bOrder);
+      }
+      if (aOrder is int && bOrder is! int) return -1;
+      if (aOrder is! int && bOrder is int) return 1;
+      return (fallbackIndex[a] ?? 0).compareTo(fallbackIndex[b] ?? 0);
+    });
+    return ordered;
+  }
+
+  void _writeOrder(
+    Map<String, Map<String, dynamic>> manifest,
+    List<String> installedNames,
+    List<String> preferredOrder,
+  ) {
+    final installed = installedNames.toSet();
+    final ordered = <String>[];
+    for (final name in preferredOrder) {
+      if (installed.contains(name) && !ordered.contains(name)) {
+        ordered.add(name);
+      }
+    }
+    for (final name in installedNames) {
+      if (!ordered.contains(name)) ordered.add(name);
+    }
+    for (final indexed in ordered.indexed) {
+      manifest.putIfAbsent(indexed.$2, () => <String, dynamic>{})['order'] =
+          indexed.$1;
+    }
   }
 
   Future<Map<String, Map<String, dynamic>>> _readManifest(

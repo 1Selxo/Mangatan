@@ -15,6 +15,7 @@ class AnkiCardBuilder {
     AnkiMiningProfile profile = const AnkiMiningProfile(),
     Map<String, dynamic> renderedContent = const {},
     List<AnkiMediaFile> dictionaryMedia = const [],
+    AnkiMediaFile? wordAudio,
   }) async {
     final screenshot = await _loadScreenshot(context);
     final screenshotName = screenshot == null
@@ -47,6 +48,9 @@ class AnkiCardBuilder {
       _frequencySummary(result.term.frequencies),
     );
     final cloze = _cloze(context.sentence, result.matched);
+    final wordAudioTag = wordAudio == null
+        ? ''
+        : '[sound:${_soundFilename(wordAudio.filename)}]';
     final replacements = <String, String>{
       AnkiMarker.expression: _escape(result.term.expression),
       AnkiMarker.reading: _escape(result.term.reading),
@@ -58,7 +62,7 @@ class AnkiCardBuilder {
         'furiganaPlain',
         _furiganaPlain(result.term.expression, result.term.reading),
       ),
-      AnkiMarker.audio: '',
+      AnkiMarker.audio: wordAudioTag,
       AnkiMarker.glossary: glossary,
       AnkiMarker.glossaryBrief: selectedGlossaryHtml,
       AnkiMarker.glossaryPlain: glossaryPlain,
@@ -119,7 +123,7 @@ class AnkiCardBuilder {
       AnkiMarker.screenshot: screenshotName == null
           ? ''
           : '<img src="$screenshotName">',
-      AnkiMarker.wordAudio: '',
+      AnkiMarker.wordAudio: wordAudioTag,
       AnkiMarker.sentenceAudio: '',
       AnkiMarker.url: _escape(context.sourceUri?.toString() ?? ''),
       AnkiMarker.book: _escape(context.sourceTitle),
@@ -153,7 +157,9 @@ class AnkiCardBuilder {
       tags: profile.tags,
       screenshotBytes: screenshot?.bytes,
       screenshotFileName: screenshotName,
-      mediaFiles: dictionaryMedia,
+      mediaFiles: wordAudio == null
+          ? dictionaryMedia
+          : [...dictionaryMedia, wordAudio],
     );
   }
 
@@ -280,6 +286,10 @@ class AnkiCardBuilder {
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     return '${safe.isEmpty ? 'mangayomi-mining' : safe}.$extension';
+  }
+
+  static String _soundFilename(String value) {
+    return value.replaceAll(']', '_');
   }
 
   static String _escape(String value) {

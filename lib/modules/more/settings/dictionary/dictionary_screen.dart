@@ -32,6 +32,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _importing = false;
   late DictionaryPopupPreferences _popupPreferences;
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
+  AnkiAudioPreferences _ankiAudioPreferences = AnkiAudioPreferences.defaults;
   Uri _ankiEndpoint = Uri.parse('http://127.0.0.1:8765');
   int? _ankiVersion;
   List<String> _ankiDecks = const [];
@@ -58,6 +59,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getOcrOverlayEnabled(),
       MiningPreferences.getDictionaryPopupPreferences(),
       MiningPreferences.getAnkiProfile(),
+      MiningPreferences.getAnkiAudioPreferences(),
       MiningPreferences.getAnkiEndpoint(),
       ScreenAiOcrClient.isAvailable(),
     ]);
@@ -73,8 +75,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _overlayEnabled = values[7] as bool;
       _popupPreferences = values[8] as DictionaryPopupPreferences;
       _ankiProfile = values[9] as AnkiMiningProfile;
-      _ankiEndpoint = values[10] as Uri;
-      _screenAiAvailable = values[11] as bool;
+      _ankiAudioPreferences = values[10] as AnkiAudioPreferences;
+      _ankiEndpoint = values[11] as Uri;
+      _screenAiAvailable = values[12] as bool;
       _loading = false;
     });
     unawaited(_refreshAnki(silent: true));
@@ -180,6 +183,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   Future<void> _saveAnki(AnkiMiningProfile profile) async {
     setState(() => _ankiProfile = profile);
     await MiningPreferences.setAnkiProfile(profile);
+  }
+
+  Future<void> _saveAnkiAudio(AnkiAudioPreferences preferences) async {
+    setState(() => _ankiAudioPreferences = preferences);
+    await MiningPreferences.setAnkiAudioPreferences(preferences);
   }
 
   Future<void> _refreshAnki({bool silent = false}) async {
@@ -747,6 +755,107 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   onChanged: (value) =>
                       _saveAnki(_ankiProfile.copyWith(ankiEnabled: value)),
                 ),
+                const _SectionHeader('Anki audio'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.volume_up_outlined),
+                  title: const Text('Add word audio'),
+                  subtitle: const Text(
+                    'Fills {audio} and {word-audio} with the first audio source match',
+                  ),
+                  value: _ankiAudioPreferences.enabled,
+                  onChanged: (value) => _saveAnkiAudio(
+                    _ankiAudioPreferences.copyWith(enabled: value),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<AnkiAudioSourceType>(
+                    initialValue: _ankiAudioPreferences.sourceType,
+                    decoration: const InputDecoration(
+                      labelText: 'Audio source type',
+                      prefixIcon: Icon(Icons.graphic_eq_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: AnkiAudioSourceType.customJson,
+                        child: Text('Custom URL (JSON)'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiAudioSourceType.customUrl,
+                        child: Text('Custom URL'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _saveAnkiAudio(
+                        _ankiAudioPreferences.copyWith(sourceType: value),
+                      );
+                    },
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.link_outlined),
+                  title: const Text('Audio source URL'),
+                  subtitle: Text(
+                    _ankiAudioPreferences.url,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.edit_outlined),
+                  onTap: () async {
+                    final value = await _editText(
+                      title: 'Audio source URL',
+                      value: _ankiAudioPreferences.url,
+                      hint: AnkiAudioPreferences.defaultUrl,
+                      maxLines: 3,
+                    );
+                    if (value == null || value.trim().isEmpty) return;
+                    await _saveAnkiAudio(
+                      _ankiAudioPreferences.copyWith(url: value.trim()),
+                    );
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _ankiAudioPreferences.language,
+                    decoration: const InputDecoration(
+                      labelText: 'Audio language',
+                      prefixIcon: Icon(Icons.language_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ja', child: Text('Japanese')),
+                      DropdownMenuItem(value: 'en', child: Text('English')),
+                      DropdownMenuItem(value: 'zh', child: Text('Chinese')),
+                      DropdownMenuItem(value: 'ko', child: Text('Korean')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _saveAnkiAudio(
+                        _ankiAudioPreferences.copyWith(language: value),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _SliderSetting(
+                  title: 'Audio timeout',
+                  value: _ankiAudioPreferences.timeout.inMilliseconds
+                      .toDouble(),
+                  min: 1000,
+                  max: 15000,
+                  divisions: 14,
+                  label:
+                      '${(_ankiAudioPreferences.timeout.inMilliseconds / 1000).round()} s',
+                  onChanged: (value) {
+                    _saveAnkiAudio(
+                      _ankiAudioPreferences.copyWith(
+                        timeout: Duration(milliseconds: value.round()),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 24),
                 ListTile(
                   leading: const Icon(Icons.link),
                   title: const Text('AnkiConnect address'),

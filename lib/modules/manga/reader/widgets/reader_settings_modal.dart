@@ -457,6 +457,27 @@ class _GeneralTab extends ConsumerWidget {
               },
             ),
 
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderOcrState.lookupOnHover,
+              builder: (context, lookupOnHover, _) {
+                return SwitchListTile(
+                  value: lookupOnHover,
+                  title: Text(
+                    'Lookup OCR text on hover',
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    unawaited(ReaderOcrState.setLookupOnHover(value));
+                  },
+                );
+              },
+            ),
+
             // Animate Page Transitions
             SwitchListTile(
               value: animatePageTransitions,

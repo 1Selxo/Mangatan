@@ -20,10 +20,16 @@ class ReaderOcrState {
 
   static final enabled = ValueNotifier<bool>(true);
   static final outlineVisible = ValueNotifier<bool>(false);
+  static final lookupOnHover = ValueNotifier<bool>(false);
   static bool _initialized = false;
   static Future<void>? _initializing;
   static final Set<ReaderOcrController> _controllers = {};
   static final progress = ValueNotifier<ReaderOcrProgress?>(null);
+  static DictionaryPopupHandle? _hoverPopup;
+  static Timer? _hoverDismissTimer;
+  static String? _hoverLookupKey;
+  static bool _hoveringPopup = false;
+  static int _hoverGeneration = 0;
   static int _scanGeneration = 0;
   static int _paintGeneration = 0;
   static List<UChapDataPreload> _lastScanPages = const [];
@@ -42,9 +48,11 @@ class ReaderOcrState {
       final values = await Future.wait<dynamic>([
         MiningPreferences.getOcrOverlayEnabled(),
         MiningPreferences.getOcrOutlineVisible(),
+        MiningPreferences.getOcrLookupOnHover(),
       ]);
       enabled.value = values[0] as bool;
       outlineVisible.value = values[1] as bool;
+      lookupOnHover.value = values[2] as bool;
       _initialized = true;
     } finally {
       _initializing = null;
@@ -55,6 +63,7 @@ class ReaderOcrState {
     enabled.value = value;
     await MiningPreferences.setOcrOverlayEnabled(value);
     if (!value) {
+      _dismissHoverPopup();
       cancelScan(clearLast: false);
     } else if (_lastScanPages.isNotEmpty) {
       unawaited(
@@ -75,31 +84,120 @@ class ReaderOcrState {
     await MiningPreferences.setOcrOutlineVisible(value);
   }
 
+  static Future<void> setLookupOnHover(bool value) async {
+    await initialize();
+    lookupOnHover.value = value;
+    await MiningPreferences.setOcrLookupOnHover(value);
+    if (!value) _dismissHoverPopup();
+  }
+
   static Future<bool> handleTap(Offset globalPosition) async {
-    if (!enabled.value) return false;
+    if (!enabled.value || lookupOnHover.value) return false;
+    final hit = _bestGlobalHit(globalPosition);
+    if (hit == null) {
+      clearActive();
+      return false;
+    }
+    _activateGlobalHit(hit);
+    return hit.controller._activateHit(hit.context, hit.tapHit);
+  }
+
+  static Future<bool> handleHover(Offset globalPosition) async {
+    if (!enabled.value || !lookupOnHover.value) return false;
+    final hit = _bestGlobalHit(globalPosition);
+    if (hit == null) {
+      _scheduleHoverDismiss();
+      return false;
+    }
+    _hoverDismissTimer?.cancel();
+    _activateGlobalHit(hit);
+    return hit.controller._activateHit(
+      hit.context,
+      hit.tapHit,
+      triggeredByHover: true,
+    );
+  }
+
+  static void handleHoverExit() {
+    if (lookupOnHover.value) _scheduleHoverDismiss();
+  }
+
+  static _GlobalOcrHit? _bestGlobalHit(Offset globalPosition) {
     final hits = <_GlobalOcrHit>[];
     for (final controller in _controllers.toList()) {
       final hit = controller._hitTestGlobal(globalPosition);
       if (hit != null) hits.add(hit);
     }
-    if (hits.isNotEmpty) {
-      hits.sort((a, b) {
-        final areaCompare = a.globalBlockRectArea.compareTo(
-          b.globalBlockRectArea,
-        );
-        if (areaCompare != 0) return areaCompare;
-        return b.controller._paintOrder.compareTo(a.controller._paintOrder);
-      });
-      final hit = hits.first;
-      for (final controller in _controllers.toList()) {
-        if (!identical(controller, hit.controller)) {
-          controller._clearActive();
-        }
+    if (hits.isEmpty) return null;
+    hits.sort((a, b) {
+      final areaCompare = a.globalBlockRectArea.compareTo(
+        b.globalBlockRectArea,
+      );
+      if (areaCompare != 0) return areaCompare;
+      return b.controller._paintOrder.compareTo(a.controller._paintOrder);
+    });
+    return hits.first;
+  }
+
+  static void _activateGlobalHit(_GlobalOcrHit hit) {
+    for (final controller in _controllers.toList()) {
+      if (!identical(controller, hit.controller)) {
+        controller._clearActive();
       }
-      return hit.controller._activateHit(hit.context, hit.tapHit);
     }
-    clearActive();
-    return false;
+  }
+
+  static int? _beginHoverLookup(String key) {
+    if (_hoverLookupKey == key) return null;
+    _hoverLookupKey = key;
+    _hoverDismissTimer?.cancel();
+    return ++_hoverGeneration;
+  }
+
+  static bool _isCurrentHoverLookup(int generation, String key) {
+    return lookupOnHover.value &&
+        _hoverGeneration == generation &&
+        _hoverLookupKey == key;
+  }
+
+  static void _setHoverPopup(
+    DictionaryPopupHandle? handle,
+    int generation,
+    String key,
+  ) {
+    if (!_isCurrentHoverLookup(generation, key)) {
+      handle?.dismiss();
+      return;
+    }
+    _hoverPopup = handle;
+  }
+
+  static void _setHoveringPopup(bool value) {
+    _hoveringPopup = value;
+    if (value) {
+      _hoverDismissTimer?.cancel();
+    } else {
+      _scheduleHoverDismiss();
+    }
+  }
+
+  static void _scheduleHoverDismiss() {
+    _hoverDismissTimer?.cancel();
+    _hoverDismissTimer = Timer(const Duration(milliseconds: 250), () {
+      if (_hoveringPopup) return;
+      _dismissHoverPopup();
+      clearActive();
+    });
+  }
+
+  static void _dismissHoverPopup() {
+    _hoverDismissTimer?.cancel();
+    _hoverDismissTimer = null;
+    _hoverLookupKey = null;
+    _hoverGeneration++;
+    _hoveringPopup = false;
+    _hoverPopup?.dismiss();
+    _hoverPopup = null;
   }
 
   static void clearActive() {
@@ -274,8 +372,15 @@ class ReaderOcrController extends ChangeNotifier {
     }
   }
 
-  void paint(Canvas canvas, Rect imageRect, ui.Image image, Paint paint) {
-    _imageRect = imageRect;
+  void paint(
+    Canvas canvas,
+    Rect imageRect,
+    ui.Image image,
+    Paint paint, {
+    Rect? hitTestImageRect,
+  }) {
+    final hitImageRect = hitTestImageRect ?? imageRect;
+    _imageRect = hitImageRect;
     _paintOrder = ++ReaderOcrState._paintGeneration;
     final page = _page;
     if (!enabled || page == null) {
@@ -287,6 +392,12 @@ class ReaderOcrController extends ChangeNotifier {
     for (final block in page.blocks) {
       final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
       if (rect.isEmpty) continue;
+      final hitRect = _blockRect(
+        block,
+        hitImageRect,
+        page.boxScaleX,
+        page.boxScaleY,
+      );
       final active = identical(block, _activeBlock);
       final lineBoxes = _lineBoxes(
         block,
@@ -294,8 +405,14 @@ class ReaderOcrController extends ChangeNotifier {
         page.boxScaleX,
         page.boxScaleY,
       );
+      final hitLineBoxes = _lineBoxes(
+        block,
+        hitImageRect,
+        page.boxScaleX,
+        page.boxScaleY,
+      );
       paintedBlocks.add(
-        _PaintedOcrBlock(block: block, rect: rect, lineBoxes: lineBoxes),
+        _PaintedOcrBlock(block: block, rect: hitRect, lineBoxes: hitLineBoxes),
       );
       if (lineBoxes.isEmpty) {
         _paintOcrBox(
@@ -480,7 +597,11 @@ class ReaderOcrController extends ChangeNotifier {
     return lineStart + char.toInt();
   }
 
-  Future<bool> _activateHit(BuildContext context, _OcrTapHit hit) async {
+  Future<bool> _activateHit(
+    BuildContext context,
+    _OcrTapHit hit, {
+    bool triggeredByHover = false,
+  }) async {
     final block = hit.block;
     final rawOffset = hit.rawOffset;
     final ordered = _orderedBlock(block);
@@ -490,6 +611,7 @@ class ReaderOcrController extends ChangeNotifier {
       rawOffset,
     ).clamp(0, ordered.length - 1);
     if (!_isLookupStartChar(ordered[orderedOffset])) {
+      if (triggeredByHover) ReaderOcrState._dismissHoverPopup();
       _activeBlock = block;
       _activeOffset = rawOffset;
       _matchLength = 0;
@@ -497,18 +619,33 @@ class ReaderOcrController extends ChangeNotifier {
       return true;
     }
     final lookup = _extractOcrLookupString(ordered, orderedOffset);
+    final hoverKey = triggeredByHover
+        ? '${identityHashCode(this)}:${identityHashCode(block)}:'
+              '$orderedOffset:$lookup'
+        : null;
+    final hoverGeneration = hoverKey == null
+        ? null
+        : ReaderOcrState._beginHoverLookup(hoverKey);
+    if (triggeredByHover && hoverGeneration == null) return true;
     _activeBlock = block;
     _activeOffset = rawOffset;
     _matchLength = 0;
     notifyListeners();
-    if (lookup.isEmpty || !context.mounted) return true;
+    if (lookup.isEmpty || !context.mounted) {
+      if (triggeredByHover) ReaderOcrState._dismissHoverPopup();
+      return true;
+    }
 
     final anchor = hit.blockRectIsGlobal
         ? hit.blockRect
         : _localAnchorFor(context, hit.blockRect);
     final bytes = data.cropImage ?? await data.getImageBytes;
     if (!context.mounted) return true;
-    await DictionaryLookupPopup.show(
+    if (triggeredByHover &&
+        !ReaderOcrState._isCurrentHoverLookup(hoverGeneration!, hoverKey!)) {
+      return true;
+    }
+    final handle = await DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
       text: lookup,
@@ -525,7 +662,14 @@ class ReaderOcrController extends ChangeNotifier {
         _matchLength = math.max(0, length);
         if (!_disposed) notifyListeners();
       },
+      dismissOnOutsideTap: !triggeredByHover,
+      onHoverChanged: triggeredByHover
+          ? ReaderOcrState._setHoveringPopup
+          : null,
     );
+    if (triggeredByHover) {
+      ReaderOcrState._setHoverPopup(handle, hoverGeneration!, hoverKey!);
+    }
     return true;
   }
 
@@ -1030,6 +1174,18 @@ bool _looksVertical(OcrLineGeometry geo) {
   final width = geo.xmax - geo.xmin;
   if (width <= 0) return false;
   return (geo.ymax - geo.ymin) / width > 1.2;
+}
+
+Rect readerOcrHitTestImageRect({
+  required Rect paintedImageRect,
+  required Size renderBoxSize,
+  required bool normalizePaintCoordinates,
+}) {
+  if (!normalizePaintCoordinates) return paintedImageRect;
+  return Alignment.center.inscribe(
+    paintedImageRect.size,
+    Offset.zero & renderBoxSize,
+  );
 }
 
 class _OcrLineBox {

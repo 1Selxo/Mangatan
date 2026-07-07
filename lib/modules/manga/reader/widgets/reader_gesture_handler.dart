@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
@@ -79,7 +81,7 @@ class ReaderGestureHandler extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (navigationLayout) {
+    final zones = switch (navigationLayout) {
       1 => _buildLShaped(context),
       2 => _buildKindle(context),
       3 => _buildEdge(context),
@@ -87,6 +89,14 @@ class ReaderGestureHandler extends StatelessWidget {
       5 => _buildDisabled(context),
       _ => _buildDefault(context),
     };
+    return MouseRegion(
+      opaque: false,
+      onHover: (event) {
+        unawaited(ReaderOcrState.handleHover(event.position));
+      },
+      onExit: (_) => ReaderOcrState.handleHoverExit(),
+      child: zones,
+    );
   }
 
   // ── helpers ──

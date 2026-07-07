@@ -25,6 +25,7 @@ class ReaderOcrState {
   static final Set<ReaderOcrController> _controllers = {};
   static final progress = ValueNotifier<ReaderOcrProgress?>(null);
   static int _scanGeneration = 0;
+  static int _paintGeneration = 0;
   static List<UChapDataPreload> _lastScanPages = const [];
   static int _lastStartIndex = 0;
   static Future<void> Function(UChapDataPreload)? _lastPreparePage;
@@ -76,8 +77,26 @@ class ReaderOcrState {
 
   static Future<bool> handleTap(Offset globalPosition) async {
     if (!enabled.value) return false;
-    for (final controller in _controllers.toList().reversed) {
-      if (await controller.handleGlobalTap(globalPosition)) return true;
+    final hits = <_GlobalOcrHit>[];
+    for (final controller in _controllers.toList()) {
+      final hit = controller._hitTestGlobal(globalPosition);
+      if (hit != null) hits.add(hit);
+    }
+    if (hits.isNotEmpty) {
+      hits.sort((a, b) {
+        final areaCompare = a.globalBlockRectArea.compareTo(
+          b.globalBlockRectArea,
+        );
+        if (areaCompare != 0) return areaCompare;
+        return b.controller._paintOrder.compareTo(a.controller._paintOrder);
+      });
+      final hit = hits.first;
+      for (final controller in _controllers.toList()) {
+        if (!identical(controller, hit.controller)) {
+          controller._clearActive();
+        }
+      }
+      return hit.controller._activateHit(hit.context, hit.tapHit);
     }
     clearActive();
     return false;
@@ -200,9 +219,11 @@ class ReaderOcrController extends ChangeNotifier {
   final GlobalKey imageKey;
   _ReaderOcrPage? _page;
   Rect? _imageRect;
+  List<_PaintedOcrBlock> _paintedBlocks = const [];
   OcrTextBlock? _activeBlock;
   int _activeOffset = -1;
   int _matchLength = 0;
+  int _paintOrder = 0;
   Color _highlightColor = const Color(0xff8ab4f8);
   Color _outlineColor = const Color(0xff8ab4f8);
   bool _loading = false;
@@ -255,9 +276,13 @@ class ReaderOcrController extends ChangeNotifier {
 
   void paint(Canvas canvas, Rect imageRect, ui.Image image, Paint paint) {
     _imageRect = imageRect;
+    _paintOrder = ++ReaderOcrState._paintGeneration;
     final page = _page;
-    if (!enabled) return;
-    if (page == null) return;
+    if (!enabled || page == null) {
+      _paintedBlocks = const [];
+      return;
+    }
+    final paintedBlocks = <_PaintedOcrBlock>[];
     final outlineVisible = ReaderOcrState.outlineVisible.value;
     for (final block in page.blocks) {
       final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
@@ -268,6 +293,9 @@ class ReaderOcrController extends ChangeNotifier {
         imageRect,
         page.boxScaleX,
         page.boxScaleY,
+      );
+      paintedBlocks.add(
+        _PaintedOcrBlock(block: block, rect: rect, lineBoxes: lineBoxes),
       );
       if (lineBoxes.isEmpty) {
         _paintOcrBox(
@@ -318,89 +346,211 @@ class ReaderOcrController extends ChangeNotifier {
         _paintOcrOutline(canvas, rect, active: active);
       }
     }
+    _paintedBlocks = paintedBlocks;
   }
 
   Future<bool> handleTap(BuildContext context, Offset localPosition) async {
-    final page = _page;
+    final hit = _hitTestLocal(localPosition);
+    if (hit == null) return false;
+    return _activateHit(context, hit);
+  }
+
+  Future<bool> handleGlobalTap(Offset globalPosition) async {
+    final hit = _hitTestGlobal(globalPosition);
+    if (hit == null) return false;
+    return _activateHit(hit.context, hit.tapHit);
+  }
+
+  _OcrTapHit? _hitTestLocal(Offset localPosition) {
     final imageRect = _imageRect;
-    if (!enabled || page == null || imageRect == null) return false;
-    for (final block in page.blocks.reversed) {
-      final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
-      final hit = _hitTestBlock(
-        block,
+    if (!enabled || imageRect == null || imageRect.isEmpty) return null;
+    final hitSlop = _hitSlopFor(imageRect);
+    if (!imageRect.inflate(hitSlop).contains(localPosition)) return null;
+    for (final painted in _paintedBlocks.reversed) {
+      final hit = _hitTestPaintedBlock(
+        painted,
         localPosition,
-        imageRect,
-        page.boxScaleX,
-        page.boxScaleY,
+        blockRect: painted.rect,
+        hitSlop: 0,
       );
-      if (hit == null && !rect.contains(localPosition)) continue;
-      final rawOffset =
-          hit?.rawOffset ??
-          _characterOffset(block, localPosition - rect.topLeft, rect.size);
-      final ordered = _orderedBlock(block);
-      if (ordered.isEmpty) return true;
-      final orderedOffset = _toOrderedOffset(
-        block,
-        rawOffset,
-      ).clamp(0, ordered.length - 1);
-      if (!_isLookupStartChar(ordered[orderedOffset])) {
-        _activeBlock = block;
-        _activeOffset = rawOffset;
-        _matchLength = 0;
-        notifyListeners();
-        return true;
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
+  _GlobalOcrHit? _hitTestGlobal(Offset globalPosition) {
+    final context = imageKey.currentContext;
+    final box = context?.findRenderObject() as RenderBox?;
+    final imageRect = _imageRect;
+    if (!enabled ||
+        context == null ||
+        box == null ||
+        !box.attached ||
+        !box.hasSize ||
+        imageRect == null ||
+        imageRect.isEmpty) {
+      return null;
+    }
+
+    final imageGlobalRect = _localRectToGlobal(box, imageRect);
+    final hitSlop = _hitSlopFor(imageGlobalRect);
+    if (!imageGlobalRect.inflate(hitSlop).contains(globalPosition)) {
+      return null;
+    }
+
+    // Route taps through the same painted rectangles users see. In double-page
+    // and zoomed layouts, recomputing a separate local hit region can drift.
+    for (final painted in _paintedBlocks.reversed) {
+      final blockGlobalRect = _localRectToGlobal(box, painted.rect);
+      final hit = _hitTestPaintedBlock(
+        painted,
+        globalPosition,
+        blockRect: blockGlobalRect,
+        blockRectIsGlobal: true,
+        lineRectMapper: (rect) => _localRectToGlobal(box, rect),
+        hitSlop: 0,
+      );
+      if (hit != null) {
+        return _GlobalOcrHit(
+          controller: this,
+          context: context,
+          tapHit: hit,
+          globalBlockRect: blockGlobalRect,
+        );
       }
-      final lookup = _extractOcrLookupString(ordered, orderedOffset);
+    }
+    return null;
+  }
+
+  _OcrTapHit? _hitTestPaintedBlock(
+    _PaintedOcrBlock painted,
+    Offset position, {
+    required Rect blockRect,
+    bool blockRectIsGlobal = false,
+    Rect Function(Rect rect)? lineRectMapper,
+    required double hitSlop,
+  }) {
+    var lineStart = 0;
+    for (final lineBox in painted.lineBoxes) {
+      final lineRect = lineRectMapper?.call(lineBox.rect) ?? lineBox.rect;
+      if (lineRect.inflate(hitSlop).contains(position)) {
+        final rawOffset = _characterOffsetForLine(
+          lineBox,
+          position - lineRect.topLeft,
+          lineRect.size,
+          lineStart,
+        );
+        return _OcrTapHit(
+          block: painted.block,
+          rawOffset: rawOffset,
+          blockRect: blockRect,
+          blockRectIsGlobal: blockRectIsGlobal,
+        );
+      }
+      lineStart += lineBox.text.length;
+    }
+
+    if (!blockRect.inflate(hitSlop).contains(position)) return null;
+    return _OcrTapHit(
+      block: painted.block,
+      rawOffset: _characterOffset(
+        painted.block,
+        position - blockRect.topLeft,
+        blockRect.size,
+      ),
+      blockRect: blockRect,
+      blockRectIsGlobal: blockRectIsGlobal,
+    );
+  }
+
+  int _characterOffsetForLine(
+    _OcrLineBox lineBox,
+    Offset local,
+    Size size,
+    int lineStart,
+  ) {
+    final line = lineBox.text;
+    final char = lineBox.vertical
+        ? (local.dy / math.max(1, size.height / math.max(1, line.length)))
+              .floor()
+              .clamp(0, math.max(0, line.length - 1))
+        : (local.dx / math.max(1, size.width / math.max(1, line.length)))
+              .floor()
+              .clamp(0, math.max(0, line.length - 1));
+    return lineStart + char.toInt();
+  }
+
+  Future<bool> _activateHit(BuildContext context, _OcrTapHit hit) async {
+    final block = hit.block;
+    final rawOffset = hit.rawOffset;
+    final ordered = _orderedBlock(block);
+    if (ordered.isEmpty) return true;
+    final orderedOffset = _toOrderedOffset(
+      block,
+      rawOffset,
+    ).clamp(0, ordered.length - 1);
+    if (!_isLookupStartChar(ordered[orderedOffset])) {
       _activeBlock = block;
       _activeOffset = rawOffset;
       _matchLength = 0;
       notifyListeners();
-      if (lookup.isEmpty || !context.mounted) return true;
-
-      final box = context.findRenderObject() as RenderBox?;
-      final topLeft = box?.localToGlobal(rect.topLeft) ?? rect.topLeft;
-      final bottomRight =
-          box?.localToGlobal(rect.bottomRight) ?? rect.bottomRight;
-      final bytes = data.cropImage ?? await data.getImageBytes;
-      if (!context.mounted) return true;
-      await DictionaryLookupPopup.show(
-        context: context,
-        anchor: Rect.fromPoints(topLeft, bottomRight),
-        text: lookup,
-        miningContext: MiningContext(
-          mediaType: MiningMediaType.manga,
-          sourceTitle: data.chapter?.manga.value?.name ?? data.mangaName ?? '',
-          chapterTitle: data.chapter?.name ?? '',
-          sentence: ordered,
-          pageIndex: data.pageIndex,
-          sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
-          imageBytesLoader: () async => bytes,
-        ),
-        onMatchChanged: (length) {
-          _matchLength = math.max(0, length);
-          if (!_disposed) notifyListeners();
-        },
-      );
       return true;
     }
-    return false;
+    final lookup = _extractOcrLookupString(ordered, orderedOffset);
+    _activeBlock = block;
+    _activeOffset = rawOffset;
+    _matchLength = 0;
+    notifyListeners();
+    if (lookup.isEmpty || !context.mounted) return true;
+
+    final anchor = hit.blockRectIsGlobal
+        ? hit.blockRect
+        : _localAnchorFor(context, hit.blockRect);
+    final bytes = data.cropImage ?? await data.getImageBytes;
+    if (!context.mounted) return true;
+    await DictionaryLookupPopup.show(
+      context: context,
+      anchor: anchor,
+      text: lookup,
+      miningContext: MiningContext(
+        mediaType: MiningMediaType.manga,
+        sourceTitle: data.chapter?.manga.value?.name ?? data.mangaName ?? '',
+        chapterTitle: data.chapter?.name ?? '',
+        sentence: ordered,
+        pageIndex: data.pageIndex,
+        sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
+        imageBytesLoader: () async => bytes,
+      ),
+      onMatchChanged: (length) {
+        _matchLength = math.max(0, length);
+        if (!_disposed) notifyListeners();
+      },
+    );
+    return true;
   }
 
-  Future<bool> handleGlobalTap(Offset globalPosition) async {
-    final imageContext = imageKey.currentContext;
-    final box = imageContext?.findRenderObject() as RenderBox?;
-    if (box == null || !box.attached || !box.hasSize) return false;
-    final imageRect = _imageRect;
-    if (imageRect == null || imageRect.isEmpty) return false;
-    final localPosition = box.globalToLocal(globalPosition);
-    // Double-page and zoom wrappers can transform the painted image without
-    // changing this child render box's layout size.
-    final hitSlop = math.max(
-      8.0,
-      math.max(imageRect.width, imageRect.height) * 0.002,
+  Rect _localRectToGlobal(RenderBox box, Rect rect) {
+    final points = [
+      box.localToGlobal(rect.topLeft),
+      box.localToGlobal(rect.topRight),
+      box.localToGlobal(rect.bottomLeft),
+      box.localToGlobal(rect.bottomRight),
+    ];
+    return Rect.fromLTRB(
+      points.map((point) => point.dx).reduce(math.min),
+      points.map((point) => point.dy).reduce(math.min),
+      points.map((point) => point.dx).reduce(math.max),
+      points.map((point) => point.dy).reduce(math.max),
     );
-    if (!imageRect.inflate(hitSlop).contains(localPosition)) return false;
-    return handleTap(imageContext!, localPosition);
+  }
+
+  double _hitSlopFor(Rect rect) =>
+      math.max(8.0, math.max(rect.width, rect.height) * 0.002);
+
+  Rect _localAnchorFor(BuildContext context, Rect rect) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return rect;
+    return _localRectToGlobal(box, rect);
   }
 
   void _enabledChanged() {
@@ -745,35 +895,6 @@ class ReaderOcrController extends ChangeNotifier {
       height: size.height,
     ).intersect(imageRect);
   }
-
-  _OcrHit? _hitTestBlock(
-    OcrTextBlock block,
-    Offset localPosition,
-    Rect imageRect,
-    double scaleX,
-    double scaleY,
-  ) {
-    final boxes = _lineBoxes(block, imageRect, scaleX, scaleY);
-    var lineStart = 0;
-    for (final box in boxes) {
-      final line = box.text;
-      if (box.rect.contains(localPosition)) {
-        final local = localPosition - box.rect.topLeft;
-        final char = box.vertical
-            ? (local.dy /
-                      math.max(1, box.rect.height / math.max(1, line.length)))
-                  .floor()
-                  .clamp(0, math.max(0, line.length - 1))
-            : (local.dx /
-                      math.max(1, box.rect.width / math.max(1, line.length)))
-                  .floor()
-                  .clamp(0, math.max(0, line.length - 1));
-        return _OcrHit(lineStart + char.toInt());
-      }
-      lineStart += line.length;
-    }
-    return null;
-  }
 }
 
 class _ReaderOcrPage {
@@ -925,8 +1046,45 @@ class _OcrLineBox {
   final double rotation;
 }
 
-class _OcrHit {
-  const _OcrHit(this.rawOffset);
+class _PaintedOcrBlock {
+  const _PaintedOcrBlock({
+    required this.block,
+    required this.rect,
+    required this.lineBoxes,
+  });
 
+  final OcrTextBlock block;
+  final Rect rect;
+  final List<_OcrLineBox> lineBoxes;
+}
+
+class _OcrTapHit {
+  const _OcrTapHit({
+    required this.block,
+    required this.rawOffset,
+    required this.blockRect,
+    this.blockRectIsGlobal = false,
+  });
+
+  final OcrTextBlock block;
   final int rawOffset;
+  final Rect blockRect;
+  final bool blockRectIsGlobal;
+}
+
+class _GlobalOcrHit {
+  const _GlobalOcrHit({
+    required this.controller,
+    required this.context,
+    required this.tapHit,
+    required this.globalBlockRect,
+  });
+
+  final ReaderOcrController controller;
+  final BuildContext context;
+  final _OcrTapHit tapHit;
+  final Rect globalBlockRect;
+
+  double get globalBlockRectArea =>
+      globalBlockRect.width.abs() * globalBlockRect.height.abs();
 }

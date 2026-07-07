@@ -19,7 +19,9 @@ class ReaderOcrState {
   ReaderOcrState._();
 
   static final enabled = ValueNotifier<bool>(true);
+  static final outlineVisible = ValueNotifier<bool>(false);
   static bool _initialized = false;
+  static Future<void>? _initializing;
   static final Set<ReaderOcrController> _controllers = {};
   static final progress = ValueNotifier<ReaderOcrProgress?>(null);
   static int _scanGeneration = 0;
@@ -29,8 +31,23 @@ class ReaderOcrState {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    _initialized = true;
-    enabled.value = await MiningPreferences.getOcrOverlayEnabled();
+    if (_initializing != null) return _initializing;
+    _initializing = _loadPreferences();
+    return _initializing;
+  }
+
+  static Future<void> _loadPreferences() async {
+    try {
+      final values = await Future.wait<dynamic>([
+        MiningPreferences.getOcrOverlayEnabled(),
+        MiningPreferences.getOcrOutlineVisible(),
+      ]);
+      enabled.value = values[0] as bool;
+      outlineVisible.value = values[1] as bool;
+      _initialized = true;
+    } finally {
+      _initializing = null;
+    }
   }
 
   static Future<void> setEnabled(bool value) async {
@@ -50,6 +67,12 @@ class ReaderOcrState {
   }
 
   static Future<void> toggle() => setEnabled(!enabled.value);
+
+  static Future<void> setOutlineVisible(bool value) async {
+    await initialize();
+    outlineVisible.value = value;
+    await MiningPreferences.setOcrOutlineVisible(value);
+  }
 
   static Future<bool> handleTap(Offset globalPosition) async {
     if (!enabled.value) return false;
@@ -166,8 +189,9 @@ class ReaderOcrProgressHud extends StatelessWidget {
 class ReaderOcrController extends ChangeNotifier {
   ReaderOcrController(this.data, {required this.imageKey}) {
     ReaderOcrState.enabled.addListener(_enabledChanged);
+    ReaderOcrState.outlineVisible.addListener(_outlineVisibleChanged);
     ReaderOcrState._controllers.add(this);
-    ReaderOcrState.initialize();
+    unawaited(ReaderOcrState.initialize());
   }
 
   static final Map<String, Future<_ReaderOcrPage>> _cache = {};
@@ -234,6 +258,7 @@ class ReaderOcrController extends ChangeNotifier {
     final page = _page;
     if (!enabled) return;
     if (page == null) return;
+    final outlineVisible = ReaderOcrState.outlineVisible.value;
     for (final block in page.blocks) {
       final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
       if (rect.isEmpty) continue;
@@ -252,7 +277,7 @@ class ReaderOcrController extends ChangeNotifier {
           vertical: block.vertical,
           active: active,
           opacity: page.opacity,
-          outlineVisible: page.outlineVisible,
+          outlineVisible: outlineVisible,
           highlight: active
               ? _lineHighlightFor(
                   lineStart: 0,
@@ -275,7 +300,7 @@ class ReaderOcrController extends ChangeNotifier {
           vertical: lineBox.vertical,
           active: active,
           opacity: page.opacity,
-          outlineVisible: page.outlineVisible,
+          outlineVisible: outlineVisible,
           rotation: lineBox.rotation,
           highlight: active
               ? _lineHighlightFor(
@@ -379,6 +404,10 @@ class ReaderOcrController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  void _outlineVisibleChanged() {
+    if (!_disposed) notifyListeners();
+  }
+
   void _clearActive() {
     if (_activeBlock == null && _activeOffset < 0 && _matchLength == 0) {
       return;
@@ -393,6 +422,7 @@ class ReaderOcrController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     ReaderOcrState.enabled.removeListener(_enabledChanged);
+    ReaderOcrState.outlineVisible.removeListener(_outlineVisibleChanged);
     ReaderOcrState._controllers.remove(this);
     super.dispose();
   }
@@ -406,12 +436,10 @@ class ReaderOcrController extends ChangeNotifier {
       MiningPreferences.getOcrOverlayOpacity(),
       MiningPreferences.getOcrBoxScaleX(),
       MiningPreferences.getOcrBoxScaleY(),
-      MiningPreferences.getOcrOutlineVisible(),
     ]);
     final opacity = values[0] as double;
     final boxScaleX = values[1] as double;
     final boxScaleY = values[2] as double;
-    final outlineVisible = values[3] as bool;
 
     if (engine != OcrEnginePreference.googleLens &&
         engine != OcrEnginePreference.screenAi) {
@@ -428,7 +456,6 @@ class ReaderOcrController extends ChangeNotifier {
             opacity: opacity,
             boxScaleX: boxScaleX,
             boxScaleY: boxScaleY,
-            outlineVisible: outlineVisible,
           );
         }
       }
@@ -438,7 +465,6 @@ class ReaderOcrController extends ChangeNotifier {
           opacity: opacity,
           boxScaleX: boxScaleX,
           boxScaleY: boxScaleY,
-          outlineVisible: outlineVisible,
         );
       }
     }
@@ -465,7 +491,6 @@ class ReaderOcrController extends ChangeNotifier {
               opacity: opacity,
               boxScaleX: boxScaleX,
               boxScaleY: boxScaleY,
-              outlineVisible: outlineVisible,
             );
           }
         } finally {
@@ -484,7 +509,6 @@ class ReaderOcrController extends ChangeNotifier {
         opacity: opacity,
         boxScaleX: boxScaleX,
         boxScaleY: boxScaleY,
-        outlineVisible: outlineVisible,
       );
     } finally {
       client.close();
@@ -754,14 +778,12 @@ class _ReaderOcrPage {
     required this.opacity,
     required this.boxScaleX,
     required this.boxScaleY,
-    required this.outlineVisible,
   });
 
   final List<OcrTextBlock> blocks;
   final double opacity;
   final double boxScaleX;
   final double boxScaleY;
-  final bool outlineVisible;
 }
 
 List<int> _orderedLineIndices(OcrTextBlock block) {

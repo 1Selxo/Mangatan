@@ -782,7 +782,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   value: _outlineVisible,
                   onChanged: (value) {
                     setState(() => _outlineVisible = value);
-                    MiningPreferences.setOcrOutlineVisible(value);
+                    unawaited(ReaderOcrState.setOutlineVisible(value));
                   },
                 ),
                 const ListTile(

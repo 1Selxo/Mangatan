@@ -58,13 +58,11 @@ class ReaderKeyboardHandler {
 
       case LogicalKeyboardKey.keyN:
       case LogicalKeyboardKey.pageDown:
-      case LogicalKeyboardKey.shiftRight:
         onNextChapter?.call();
         return true;
 
       case LogicalKeyboardKey.keyP:
       case LogicalKeyboardKey.pageUp:
-      case LogicalKeyboardKey.shiftLeft:
         onPreviousChapter?.call();
         return true;
 

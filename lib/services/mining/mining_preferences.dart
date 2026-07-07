@@ -124,6 +124,7 @@ class MiningPreferences {
   static const _ocrOverlayOpacity = 'ocr_overlay_opacity';
   static const _ocrBoxScale = 'ocr_box_scale';
   static const _ocrOutlineVisible = 'ocr_outline_visible';
+  static const _ocrLookupOnHover = 'ocr_lookup_on_hover';
   static const _ocrBoxScaleX = 'ocr_box_scale_x';
   static const _ocrBoxScaleY = 'ocr_box_scale_y';
   static const _dictionaryPopupWidth = 'dictionary_popup_width';
@@ -341,6 +342,16 @@ class MiningPreferences {
 
   static Future<void> setOcrOutlineVisible(bool value) async {
     await (await _boxOrNull())?.put(_ocrOutlineVisible, value);
+  }
+
+  static Future<bool> getOcrLookupOnHover() async {
+    return (await _boxOrNull())?.get(_ocrLookupOnHover, defaultValue: false)
+            as bool? ??
+        false;
+  }
+
+  static Future<void> setOcrLookupOnHover(bool value) async {
+    await (await _boxOrNull())?.put(_ocrLookupOnHover, value);
   }
 
   static Future<DictionaryPopupPreferences>

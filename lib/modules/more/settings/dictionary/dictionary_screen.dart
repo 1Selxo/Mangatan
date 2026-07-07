@@ -26,6 +26,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   double _boxScale = 1;
   double _boxScaleY = 1;
   bool _outlineVisible = true;
+  bool _lookupOnHover = false;
   bool _overlayEnabled = true;
   bool _screenAiAvailable = false;
   bool _loading = true;
@@ -56,6 +57,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getOcrBoxScaleX(),
       MiningPreferences.getOcrBoxScaleY(),
       MiningPreferences.getOcrOutlineVisible(),
+      MiningPreferences.getOcrLookupOnHover(),
       MiningPreferences.getOcrOverlayEnabled(),
       MiningPreferences.getDictionaryPopupPreferences(),
       MiningPreferences.getAnkiProfile(),
@@ -72,12 +74,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _boxScale = values[4] as double;
       _boxScaleY = values[5] as double;
       _outlineVisible = values[6] as bool;
-      _overlayEnabled = values[7] as bool;
-      _popupPreferences = values[8] as DictionaryPopupPreferences;
-      _ankiProfile = values[9] as AnkiMiningProfile;
-      _ankiAudioPreferences = values[10] as AnkiAudioPreferences;
-      _ankiEndpoint = values[11] as Uri;
-      _screenAiAvailable = values[12] as bool;
+      _lookupOnHover = values[7] as bool;
+      _overlayEnabled = values[8] as bool;
+      _popupPreferences = values[9] as DictionaryPopupPreferences;
+      _ankiProfile = values[10] as AnkiMiningProfile;
+      _ankiAudioPreferences = values[11] as AnkiAudioPreferences;
+      _ankiEndpoint = values[12] as Uri;
+      _screenAiAvailable = values[13] as bool;
       _loading = false;
     });
     unawaited(_refreshAnki(silent: true));
@@ -783,6 +786,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   onChanged: (value) {
                     setState(() => _outlineVisible = value);
                     unawaited(ReaderOcrState.setOutlineVisible(value));
+                  },
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.mouse),
+                  title: const Text('Lookup OCR text on hover'),
+                  subtitle: const Text(
+                    'Open dictionary popups by hovering OCR text instead of tapping it',
+                  ),
+                  value: _lookupOnHover,
+                  onChanged: (value) {
+                    setState(() => _lookupOnHover = value);
+                    unawaited(ReaderOcrState.setLookupOnHover(value));
                   },
                 ),
                 const ListTile(

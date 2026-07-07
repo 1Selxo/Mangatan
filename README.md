@@ -81,6 +81,21 @@ Now you can run and build this app just like any other Flutter projects.
 flutter run
 ```
 
+### macOS quick build
+
+On macOS, use the helper script to build the desktop app and open it:
+
+```bash
+./scripts/build_macos.sh
+```
+
+Useful options:
+
+```bash
+./scripts/build_macos.sh --release
+./scripts/build_macos.sh --clean --no-open
+```
+
 
 
 ## License

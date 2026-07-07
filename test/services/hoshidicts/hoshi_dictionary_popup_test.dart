@@ -120,12 +120,14 @@ void main() {
       dark: false,
     );
     final globalColorRule = html.indexOf('.entry, .entry *');
+    final tagRowColorRule = html.indexOf('.tag-row, .tag-row *');
     final labelColorRule = html.indexOf(
       '.frequency-dict-label, .pitch-dict-label { color: #fff; }',
     );
 
     expect(labelColorRule, isNonNegative);
     expect(labelColorRule, greaterThan(globalColorRule));
+    expect(labelColorRule, greaterThan(tagRowColorRule));
   });
 
   test('bundles the upstream Hoshi renderer and license', () async {

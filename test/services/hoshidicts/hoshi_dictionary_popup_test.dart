@@ -138,6 +138,7 @@ void main() {
     expect(popup, contains('window.renderPopup = function()'));
     expect(popup, contains('SPDX-License-Identifier: GPL-3.0-or-later'));
     expect(css, contains('.glossary-group'));
+    expect(css, contains('.glossary-content .gloss-sc-summary::marker'));
     expect(css, contains('.pronunciation-mora'));
     expect(license, contains('GNU GENERAL PUBLIC LICENSE'));
   });

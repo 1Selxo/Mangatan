@@ -527,15 +527,15 @@ String buildHoshiPopupHtml({
     body { min-height: 101%; }
 	    .entry, .entry * { color: var(--text-color); }
 	    .dict-label, .deinflection-tag, .glossary-tag { color: var(--text-color-light1); }
-	    .frequency-dict-label, .pitch-dict-label { color: #fff; }
 	    .glossary-group {
-      background-color: $elevated;
-      color: var(--text-color);
-      box-shadow: none;
-    }
-    .glossary-content, .glossary-content * { color: var(--text-color); }
-    .tag-row, .tag-row * { color: var(--text-color-light1); }
-    .popup-empty {
+	      background-color: $elevated;
+	      color: var(--text-color);
+	      box-shadow: none;
+	    }
+	    .glossary-content, .glossary-content * { color: var(--text-color); }
+	    .tag-row, .tag-row * { color: var(--text-color-light1); }
+	    .frequency-dict-label, .pitch-dict-label { color: #fff; }
+	    .popup-empty {
       min-height: calc(140px * var(--popup-scale));
       display: grid;
       place-items: center;

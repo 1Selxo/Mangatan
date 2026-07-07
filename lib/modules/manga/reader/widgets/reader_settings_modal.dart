@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_popup_menu_button.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
@@ -62,6 +64,7 @@ class ReaderSettingsModal {
     }
 
     final l10n = l10nLocalizations(context)!;
+    unawaited(ReaderOcrState.initialize());
 
     await customDraggableTabBar(
       tabs: [
@@ -430,6 +433,27 @@ class _GeneralTab extends ConsumerWidget {
               ),
               onChanged: (value) {
                 ref.read(showPagesNumberStateProvider.notifier).set(value);
+              },
+            ),
+
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderOcrState.outlineVisible,
+              builder: (context, outlineVisible, _) {
+                return SwitchListTile(
+                  value: outlineVisible,
+                  title: Text(
+                    'Show OCR box outlines',
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    unawaited(ReaderOcrState.setOutlineVisible(value));
+                  },
+                );
               },
             ),
 

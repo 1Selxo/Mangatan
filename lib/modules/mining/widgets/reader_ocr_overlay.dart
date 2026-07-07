@@ -277,7 +277,6 @@ class ReaderOcrController extends ChangeNotifier {
           vertical: block.vertical,
           active: active,
           opacity: page.opacity,
-          outlineVisible: outlineVisible,
           highlight: active
               ? _lineHighlightFor(
                   lineStart: 0,
@@ -287,6 +286,9 @@ class ReaderOcrController extends ChangeNotifier {
                 )
               : null,
         );
+        if (outlineVisible) {
+          _paintOcrOutline(canvas, rect, active: active);
+        }
         continue;
       }
 
@@ -300,7 +302,6 @@ class ReaderOcrController extends ChangeNotifier {
           vertical: lineBox.vertical,
           active: active,
           opacity: page.opacity,
-          outlineVisible: outlineVisible,
           rotation: lineBox.rotation,
           highlight: active
               ? _lineHighlightFor(
@@ -312,6 +313,9 @@ class ReaderOcrController extends ChangeNotifier {
               : null,
         );
         lineStart += lineLength;
+      }
+      if (outlineVisible) {
+        _paintOcrOutline(canvas, rect, active: active);
       }
     }
   }
@@ -543,7 +547,6 @@ class ReaderOcrController extends ChangeNotifier {
     required bool vertical,
     required bool active,
     required double opacity,
-    required bool outlineVisible,
     Rect? highlight,
     double rotation = 0,
   }) {
@@ -568,15 +571,6 @@ class ReaderOcrController extends ChangeNotifier {
         Paint()..color = _highlightColor.withValues(alpha: 0.45),
       );
     }
-    if (outlineVisible && active) {
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = active ? 2 : 1
-          ..color = active ? _outlineColor : Colors.transparent,
-      );
-    }
     if (textAlpha > 0.01) {
       if (vertical) {
         _paintVerticalText(canvas, rect, text, textAlpha);
@@ -585,6 +579,16 @@ class ReaderOcrController extends ChangeNotifier {
       }
     }
     canvas.restore();
+  }
+
+  void _paintOcrOutline(Canvas canvas, Rect rect, {required bool active}) {
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = active ? 2 : 1.5
+        ..color = _outlineColor.withValues(alpha: active ? 1.0 : 0.70),
+    );
   }
 
   void _paintHorizontalText(

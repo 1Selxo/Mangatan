@@ -311,6 +311,18 @@ a {
     line-height: 1;
 }
 
+.glossary-content .gloss-sc-summary {
+    list-style: none;
+}
+
+.glossary-content .gloss-sc-summary::marker {
+    content: '';
+}
+
+.glossary-content .gloss-sc-summary::-webkit-details-marker {
+    display: none;
+}
+
 .gloss-sc-table-container {
     display: block;
 }

@@ -250,6 +250,7 @@ class _DoublePageViewState extends State<DoublePageView>
 
     return ImageViewPaged(
       data: pageData,
+      normalizeOcrPaintCoordinates: true,
       loadStateChanged: (state) {
         switch (state.extendedImageLoadState) {
           case LoadState.loading:

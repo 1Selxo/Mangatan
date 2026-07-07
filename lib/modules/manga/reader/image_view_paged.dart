@@ -16,6 +16,7 @@ class ImageViewPaged extends ConsumerStatefulWidget {
   final Function(ExtendedImageGestureState state)? onDoubleTap;
   final GestureConfig Function(ExtendedImageState state)?
   initGestureConfigHandler;
+  final bool normalizeOcrPaintCoordinates;
   const ImageViewPaged({
     super.key,
     required this.data,
@@ -23,6 +24,7 @@ class ImageViewPaged extends ConsumerStatefulWidget {
     required this.loadStateChanged,
     this.onDoubleTap,
     this.initGestureConfigHandler,
+    this.normalizeOcrPaintCoordinates = false,
   });
 
   @override
@@ -115,6 +117,17 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
       effectiveGestureHandler = widget.initGestureConfigHandler;
     }
 
+    Rect? ocrHitTestImageRect(Rect paintedRect) {
+      if (!widget.normalizeOcrPaintCoordinates) return null;
+      final box = _imageKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return null;
+      return readerOcrHitTestImageRect(
+        paintedImageRect: paintedRect,
+        renderBoxSize: box.size,
+        normalizePaintCoordinates: true,
+      );
+    }
+
     return applyReaderColorFilter(
       GestureDetector(
         onLongPress: () => widget.onLongPressData.call(widget.data),
@@ -135,7 +148,15 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
           },
           initGestureConfigHandler: effectiveGestureHandler,
           onDoubleTap: widget.onDoubleTap,
-          afterPaintImage: _ocr.paint,
+          afterPaintImage: (canvas, rect, image, paint) {
+            _ocr.paint(
+              canvas,
+              rect,
+              image,
+              paint,
+              hitTestImageRect: ocrHitTestImageRect(rect),
+            );
+          },
         ),
       ),
       ref,

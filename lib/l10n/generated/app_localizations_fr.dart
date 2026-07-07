@@ -2080,8 +2080,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get tracked => 'Suivi';
 
   @override
-  String get auth_unlock_msg =>
-      'Authentifiez-vous pour déverrouiller Mangatan';
+  String get auth_unlock_msg => 'Authentifiez-vous pour déverrouiller Mangatan';
 
   @override
   String get app_locked => 'Mangatan est verrouillé';

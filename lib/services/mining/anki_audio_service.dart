@@ -6,10 +6,12 @@ import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 
 class AnkiAudioService {
-  // ignore: prefer_initializing_formals
-  AnkiAudioService({http.Client? client}) : _client = client;
+  AnkiAudioService({http.Client? client, bool? closeClient})
+    : _client = client,
+      _closeClient = closeClient ?? client == null;
 
   final http.Client? _client;
+  final bool _closeClient;
 
   Future<AnkiMediaFile?> fetchTermAudio({
     required String term,
@@ -25,7 +27,7 @@ class AnkiAudioService {
         reading: reading,
         language: preferences.language,
       );
-      return switch (preferences.sourceType) {
+      return await switch (preferences.sourceType) {
         AnkiAudioSourceType.customUrl => _downloadAudio(
           client,
           sourceUri,
@@ -44,7 +46,38 @@ class AnkiAudioService {
     } catch (_) {
       return null;
     } finally {
-      if (_client == null) client.close();
+      if (_closeClient) client.close();
+    }
+  }
+
+  Future<List<AnkiAudioSourceResult>> resolveTermAudioSources({
+    required String term,
+    required String reading,
+    required AnkiAudioPreferences preferences,
+  }) async {
+    if (!preferences.enabled || preferences.url.trim().isEmpty) return const [];
+    final client = _client ?? http.Client();
+    try {
+      final sourceUri = _templateUri(
+        preferences.url,
+        term: term,
+        reading: reading,
+        language: preferences.language,
+      );
+      return await switch (preferences.sourceType) {
+        AnkiAudioSourceType.customUrl => Future.value([
+          AnkiAudioSourceResult(name: _sourceName(sourceUri), url: sourceUri),
+        ]),
+        AnkiAudioSourceType.customJson => _fetchCustomJsonSources(
+          client,
+          sourceUri,
+          timeout: preferences.timeout,
+        ),
+      };
+    } catch (_) {
+      return const [];
+    } finally {
+      if (_closeClient) client.close();
     }
   }
 
@@ -55,20 +88,15 @@ class AnkiAudioService {
     required String reading,
     required Duration timeout,
   }) async {
-    final response = await client.get(sourceUri).timeout(timeout);
-    if (response.statusCode < 200 || response.statusCode >= 300) return null;
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    if (decoded is! Map || decoded['type'] != 'audioSourceList') return null;
-    final rawSources = decoded['audioSources'];
-    if (rawSources is! List) return null;
-    for (final source in rawSources) {
-      if (source is! Map) continue;
-      final rawUrl = source['url']?.toString();
-      if (rawUrl == null || rawUrl.trim().isEmpty) continue;
-      final audioUri = sourceUri.resolve(rawUrl);
-      final media = await _downloadAudio(
+    final sources = await _fetchCustomJsonSources(
+      client,
+      sourceUri,
+      timeout: timeout,
+    );
+    for (final source in sources) {
+      final media = await _tryDownloadAudio(
         client,
-        audioUri,
+        source.url,
         term: term,
         reading: reading,
         timeout: timeout,
@@ -76,6 +104,57 @@ class AnkiAudioService {
       if (media != null) return media;
     }
     return null;
+  }
+
+  Future<List<AnkiAudioSourceResult>> _fetchCustomJsonSources(
+    http.Client client,
+    Uri sourceUri, {
+    required Duration timeout,
+  }) async {
+    final response = await client.get(sourceUri).timeout(timeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return const [];
+    }
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (decoded is! Map || decoded['type'] != 'audioSourceList') {
+      return const [];
+    }
+    final rawSources = decoded['audioSources'];
+    if (rawSources is! List) return const [];
+    final sources = <AnkiAudioSourceResult>[];
+    for (final (index, source) in rawSources.indexed) {
+      if (source is! Map) continue;
+      final rawUrl = source['url']?.toString();
+      if (rawUrl == null || rawUrl.trim().isEmpty) continue;
+      final uri = sourceUri.resolve(rawUrl);
+      sources.add(
+        AnkiAudioSourceResult(
+          name: _sourceName(uri, source['name']?.toString(), index),
+          url: uri,
+        ),
+      );
+    }
+    return sources;
+  }
+
+  Future<AnkiMediaFile?> _tryDownloadAudio(
+    http.Client client,
+    Uri uri, {
+    required String term,
+    required String reading,
+    required Duration timeout,
+  }) async {
+    try {
+      return await _downloadAudio(
+        client,
+        uri,
+        term: term,
+        reading: reading,
+        timeout: timeout,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<AnkiMediaFile?> _downloadAudio(
@@ -154,4 +233,23 @@ class AnkiAudioService {
     final prefix = base.isEmpty ? 'mangayomi-audio' : base;
     return '$prefix-${DateTime.now().millisecondsSinceEpoch}.$extension';
   }
+
+  String _sourceName(Uri uri, [String? rawName, int? index]) {
+    final name = rawName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final filename = uri.pathSegments.isEmpty
+        ? ''
+        : uri.pathSegments.last.trim();
+    if (filename.isNotEmpty) return filename;
+    return index == null ? 'Audio' : 'Audio ${index + 1}';
+  }
+}
+
+class AnkiAudioSourceResult {
+  const AnkiAudioSourceResult({required this.name, required this.url});
+
+  final String name;
+  final Uri url;
+
+  Map<String, String> toJson() => {'name': name, 'url': url.toString()};
 }

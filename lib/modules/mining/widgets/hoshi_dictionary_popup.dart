@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
@@ -44,6 +45,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   bool _webReady = false;
   int _lookupGeneration = 0;
   Future<void> _javascriptQueue = Future<void>.value();
+  Player? _audioPlayer;
 
   @override
   void didUpdateWidget(covariant HoshiDictionaryPopup oldWidget) {
@@ -60,16 +62,18 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       rootBundle.loadString('assets/hoshi_popup/popup.css'),
       rootBundle.loadString('assets/hoshi_popup/popup.js'),
       rootBundle.loadString('assets/hoshi_popup/selection.js'),
+      MiningPreferences.getAnkiAudioPreferences(),
       HoshidictsLookupBackend.instance.getStyles().catchError(
         (_) => <HoshiDictionaryStyle>[],
       ),
     ]);
-    final styles = values[3] as List<HoshiDictionaryStyle>;
+    final styles = values[4] as List<HoshiDictionaryStyle>;
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
         popupCss: values[0] as String,
         popupJs: values[1] as String,
         selectionJs: values[2] as String,
+        audioPreferences: values[3] as AnkiAudioPreferences,
         preferences: widget.preferences,
         theme: theme,
         dark: dark,
@@ -259,6 +263,14 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       callback: (arguments) => _mine(_argumentMap(arguments)),
     );
     controller.addJavaScriptHandler(
+      handlerName: 'getTermAudioSources',
+      callback: (arguments) => _getTermAudioSources(_argumentMap(arguments)),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'playWordAudio',
+      callback: (arguments) => _playWordAudio(_argumentMap(arguments)),
+    );
+    controller.addJavaScriptHandler(
       handlerName: 'openLink',
       callback: (arguments) async {
         if (arguments.isEmpty) return false;
@@ -266,13 +278,38 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         return uri != null && await launchUrl(uri);
       },
     );
-    for (final name in const [
-      'tapOutside',
-      'swipeDismiss',
-      'buttonRects',
-      'playWordAudio',
-    ]) {
+    for (final name in const ['tapOutside', 'swipeDismiss', 'buttonRects']) {
       controller.addJavaScriptHandler(handlerName: name, callback: (_) => null);
+    }
+  }
+
+  Future<List<Map<String, String>>> _getTermAudioSources(
+    Map<String, dynamic> content,
+  ) async {
+    final expression = content['expression']?.toString() ?? '';
+    if (expression.trim().isEmpty) return const [];
+    final reading = content['reading']?.toString() ?? expression;
+    final preferences = await MiningPreferences.getAnkiAudioPreferences();
+    final sources = await AnkiAudioService().resolveTermAudioSources(
+      term: expression,
+      reading: reading,
+      preferences: preferences,
+    );
+    return [for (final source in sources) source.toJson()];
+  }
+
+  Future<bool> _playWordAudio(Map<String, dynamic> content) async {
+    final url = content['url']?.toString() ?? '';
+    if (url.trim().isEmpty) return false;
+    try {
+      final player = _audioPlayer ??= Player();
+      if (content['mode']?.toString() == 'interrupt') {
+        await player.stop();
+      }
+      await player.open(Media(url));
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -326,6 +363,12 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         '${delta.dy.toStringAsFixed(2)});',
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer?.dispose();
+    super.dispose();
   }
 
   @override
@@ -460,6 +503,7 @@ String buildHoshiPopupHtml({
   required String popupCss,
   required String popupJs,
   required String selectionJs,
+  required AnkiAudioPreferences audioPreferences,
   required DictionaryPopupPreferences preferences,
   required ThemeData theme,
   required bool dark,
@@ -492,12 +536,18 @@ String buildHoshiPopupHtml({
   final primary = _cssColor(scheme.primary);
   final primaryContainer = _cssColor(scheme.primaryContainer);
   final onPrimaryContainer = _cssColor(scheme.onPrimaryContainer);
+  final audioSources =
+      audioPreferences.enabled && audioPreferences.url.trim().isNotEmpty
+      ? [audioPreferences.url.trim()]
+      : const <String>[];
   const nativeHandlers = [
     'getEntries',
     'lookupRedirect',
     'textSelected',
     'mineEntry',
     'openLink',
+    'getTermAudioSources',
+    'playWordAudio',
   ];
   final html =
       '''<!DOCTYPE html>
@@ -535,18 +585,43 @@ String buildHoshiPopupHtml({
 	    .glossary-content, .glossary-content * { color: var(--text-color); }
 	    .tag-row, .tag-row * { color: var(--text-color-light1); }
 	    .frequency-dict-label, .pitch-dict-label { color: #fff; }
-	    .popup-empty {
-      min-height: calc(140px * var(--popup-scale));
-      display: grid;
-      place-items: center;
-      color: var(--text-color-light2);
-      font-size: calc(14px * var(--popup-scale));
-    }
-    .button-slot { cursor: pointer; display: grid; place-items: center; color: var(--text-color-light2); }
-    .button-slot::before { content: '+'; font: 500 calc(25px * var(--popup-scale))/1 sans-serif; }
-    .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }
-    .button-slot[data-enabled="false"] { opacity: .45; pointer-events: none; }
-  </style>
+		    .popup-empty {
+	      min-height: calc(140px * var(--popup-scale));
+	      display: grid;
+	      place-items: center;
+	      color: var(--text-color-light2);
+	      font-size: calc(14px * var(--popup-scale));
+	    }
+		    .button-slot { cursor: pointer; display: grid; place-items: center; color: var(--text-color-light2); }
+		    .button-slot::before { content: none; }
+		    .button-slot[data-state="loading"] .slot-icon,
+		    .button-slot[data-state="error"] .slot-icon,
+		    .button-slot[data-state="duplicate"] .slot-icon { display: none; }
+		    .slot-icon {
+		      display: block;
+		      width: calc(23px * var(--popup-scale));
+		      height: calc(23px * var(--popup-scale));
+		      color: inherit;
+		      overflow: visible;
+		    }
+		    .plus-line {
+		      fill: currentColor;
+		      shape-rendering: crispEdges;
+		    }
+		    .audio-icon { transform: translate(calc(1px * var(--popup-scale)), calc(1px * var(--popup-scale))); }
+		    .audio-speaker-body { fill: currentColor; }
+			    .audio-wave {
+			      fill: none;
+			      stroke: currentColor;
+		      stroke-width: 2;
+		      stroke-linecap: round;
+		      stroke-linejoin: round;
+		    }
+		    .button-slot[data-state="loading"]::before { content: '…'; font-size: calc(18px * var(--popup-scale)); }
+		    .button-slot[data-state="error"]::before { content: '!'; font-size: calc(18px * var(--popup-scale)); }
+		    .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }
+	    .button-slot[data-enabled="false"] { opacity: .45; pointer-events: none; }
+	  </style>
   <script>
     window.collapseMode = 'Expand All';
     window.expandFirstDictionary = true;
@@ -557,10 +632,12 @@ String buildHoshiPopupHtml({
     window.harmonicFrequency = ${preferences.showFrequencyHarmonic};
     window.deduplicatePitchAccents = true;
     window.compactPitchAccents = false;
-    window.audioSources = [];
-    window.audioEnableAutoplay = false;
-    window.audioPlaybackMode = 'interrupt';
-    window.needsAudio = false;
+	    window.audioSources = ${jsonEncode(audioSources)};
+	    window.audioSourceType = ${jsonEncode(audioPreferences.sourceType.name)};
+	    window.audioSourceLanguage = ${jsonEncode(audioPreferences.language)};
+	    window.audioEnableAutoplay = false;
+	    window.audioPlaybackMode = 'interrupt';
+	    window.needsAudio = ${audioSources.isNotEmpty};
     window.allowDupes = false;
     window.useAnkiConnect = true;
     window.enableBackgroundDuplicateChecks = false;
@@ -577,14 +654,21 @@ String buildHoshiPopupHtml({
     })})};
     document.addEventListener('click', (event) => {
       const slot = event.target.closest?.('.button-slot');
-      if (!slot || slot.dataset.enabled === 'false') return;
-      event.preventDefault();
-      event.stopPropagation();
-      const index = Number(slot.dataset.entryIndex);
-      if (slot.dataset.kind === 'mine') mineEntryAtIndex(index);
-      if (slot.dataset.kind === 'audio') playEntryAudio(index);
-    }, true);
-  </script>
+	      if (!slot || slot.dataset.enabled === 'false') return;
+	      event.preventDefault();
+	      event.stopPropagation();
+	      const index = Number(slot.dataset.entryIndex);
+	      if (slot.dataset.kind === 'mine') mineEntryAtIndex(index);
+	      if (slot.dataset.kind === 'audio') playEntryAudio(index);
+	    }, true);
+	    document.addEventListener('contextmenu', (event) => {
+	      const slot = event.target.closest?.('.button-slot[data-kind="audio"]');
+	      if (!slot || slot.dataset.enabled === 'false') return;
+	      event.preventDefault();
+	      event.stopPropagation();
+	      showAudioSourceMenu(Number(slot.dataset.entryIndex), event.clientX, event.clientY);
+	    }, true);
+	  </script>
   <script>$selectionJs</script>
   <script>$popupJs</script>
 </head>

@@ -149,6 +149,17 @@ void main() {
     );
   });
 
+  test('resets popup audio caches when replacing lookup results', () {
+    expect(
+      hoshiReplaceRenderScript(2),
+      startsWith('window.resetHoshiAudioCaches?.();'),
+    );
+    expect(
+      hoshiReplaceRenderScriptForEntries(const []),
+      contains('window.resetHoshiAudioCaches?.();'),
+    );
+  });
+
   test('keeps frequency and pitch labels white on accent tags', () {
     const preferences = DictionaryPopupPreferences(
       width: 540,
@@ -195,6 +206,11 @@ void main() {
     expect(popup, contains('M10 3h3v17h-3zM3 10h17v3H3z'));
     expect(popup, contains('audio-speaker-body'));
     expect(popup, contains('M3 9v6h4l5 4V5L7 9H3z'));
+    expect(popup, contains('window.resetHoshiAudioCaches = resetAudioCaches'));
+    expect(popup, contains('const audioKey = audioCacheKey(entry);'));
+    expect(popup, contains('audioUrls[audioKey]'));
+    expect(popup, isNot(contains('audioUrls[idx]')));
+    expect(popup, isNot(contains('audioUrls[entryIndex]')));
     expect(css, contains('.glossary-group'));
     expect(css, contains('.glossary-content .gloss-sc-summary::marker'));
     expect(css, contains('.pronunciation-mora'));

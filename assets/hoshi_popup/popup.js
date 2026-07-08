@@ -18,6 +18,7 @@ const NUMERIC_TAG = /^\d+$/;
 // this might not cover every tag
 const POS_TAGS = new Set(['n', 'adj-i', 'adj-na', 'adj-no', 'v1', 'vk', 'vs', 'vs-i', 'vs-s', 'vz', 'vi', 'vt']);
 let audioUrls = {};
+let audioSourceResults = {};
 let lastSelection = '';
 let currentDictionaryMedia = null;
 let selectedDictionaries = {};
@@ -37,6 +38,41 @@ function el(tag, props = {}, children = []) {
     }
     
     return element;
+}
+
+function svgEl(tag, props = {}, children = []) {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(props)) {
+        element.setAttribute(key, value);
+    }
+    if (children.length) {
+        element.append(...children);
+    }
+    return element;
+}
+
+function createAudioIcon() {
+    return svgEl('svg', {
+        class: 'slot-icon audio-icon',
+        viewBox: '0 0 24 24',
+        'aria-hidden': 'true',
+        focusable: 'false'
+    }, [
+        svgEl('path', { class: 'audio-speaker-body', d: 'M3 9v6h4l5 4V5L7 9H3z' }),
+        svgEl('path', { class: 'audio-wave', d: 'M16 8.5a5 5 0 0 1 0 7' }),
+        svgEl('path', { class: 'audio-wave', d: 'M19 5a9 9 0 0 1 0 14' })
+    ]);
+}
+
+function createPlusIcon() {
+    return svgEl('svg', {
+        class: 'slot-icon plus-icon',
+        viewBox: '0 0 23 23',
+        'aria-hidden': 'true',
+        focusable: 'false'
+    }, [
+        svgEl('path', { class: 'plus-line', d: 'M10 3h3v17h-3zM3 10h17v3H3z' })
+    ]);
 }
 
 function toHiragana(text) {
@@ -1179,39 +1215,113 @@ function createTags(entry) {
 }
 
 async function fetchAudioUrl(expression, reading) {
-    const templates = window.audioSources;
-    if (!templates?.length) return null;
-    
-    for (const template of templates) {
-        const url = template
-        .replace('{term}', encodeURIComponent(expression))
-        .replace('{reading}', encodeURIComponent(reading));
-        try {
-            const response = await fetch(`audio://?url=${encodeURIComponent(url)}`);
-            const data = await response.json();
-            if (data.type === 'audioSourceList' && data.audioSources?.[0]?.url) {
-                return data.audioSources[0].url;
-            }
-        } catch {}
-    }
-    return null;
+    const sources = await resolveEntryAudioSources({ expression, reading });
+    return sources[0]?.url || null;
 }
 
-function playWordAudio(audioUrl) {
+async function playWordAudio(audioUrl) {
     const playHandler = window.webkit?.messageHandlers?.playWordAudio;
     if (!playHandler) {
         return false;
     }
     
     try {
-        playHandler.postMessage({
+        return await playHandler.postMessage({
             url: audioUrl,
             mode: window.audioPlaybackMode || 'interrupt'
         });
-        return true;
     } catch {
         return false;
     }
+}
+
+function audioCacheKey(entry) {
+    return `${entry?.expression || ''}\u0000${entry?.reading || ''}`;
+}
+
+async function resolveEntryAudioSources(entry) {
+    if (!entry || !window.audioSources?.length) { return []; }
+    const key = audioCacheKey(entry);
+    if (audioSourceResults[key]) { return audioSourceResults[key]; }
+    let sources = [];
+    try {
+        sources = await webkit.messageHandlers.getTermAudioSources.postMessage({
+            expression: entry.expression || '',
+            reading: entry.reading || entry.expression || ''
+        });
+    } catch {}
+    audioSourceResults[key] = Array.isArray(sources) ? sources.filter(source => source?.url) : [];
+    return audioSourceResults[key];
+}
+
+function hideAudioSourceMenu() {
+    document.querySelector('.audio-source-menu')?.remove();
+}
+
+function positionAudioSourceMenu(menu, x, y) {
+    const margin = 6;
+    const rect = menu.getBoundingClientRect();
+    const left = Math.min(Math.max(margin, x), window.innerWidth - rect.width - margin);
+    const top = Math.min(Math.max(margin, y), window.innerHeight - rect.height - margin);
+    menu.style.left = `${Math.max(margin, left)}px`;
+    menu.style.top = `${Math.max(margin, top)}px`;
+}
+
+function audioSourceMenuRow(label, onClick, disabled = false) {
+    const row = el('button', {
+        type: 'button',
+        className: 'audio-source-menu-row',
+        disabled
+    });
+    row.textContent = label;
+    if (!disabled) {
+        row.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            await onClick();
+        });
+    }
+    return row;
+}
+
+async function playResolvedAudioSource(entryIndex, url) {
+    const audioSlot = getButtonSlot('audio', entryIndex);
+    updateButtonSlot(audioSlot, { state: 'loading' });
+    const played = await playWordAudio(url);
+    updateButtonSlot(audioSlot, { state: played ? 'default' : 'error' });
+    if (!played) {
+        setTimeout(() => updateButtonSlot(audioSlot, { state: 'default' }), 1500);
+    }
+    return played;
+}
+
+async function showAudioSourceMenu(entryIndex, x, y) {
+    const entry = window.lookupEntries?.[entryIndex];
+    if (!entry) { return; }
+    hideAudioSourceMenu();
+
+    const menu = el('div', { className: 'audio-source-menu' }, [
+        audioSourceMenuRow('Loading...', async () => {}, true)
+    ]);
+    document.body.appendChild(menu);
+    positionAudioSourceMenu(menu, x, y);
+
+    const sources = await resolveEntryAudioSources(entry);
+    if (!menu.isConnected) { return; }
+    menu.textContent = '';
+
+    if (!sources.length) {
+        menu.appendChild(audioSourceMenuRow('No audio found', async () => {}, true));
+    } else {
+        sources.forEach((source, index) => {
+            const label = source.name || source.url || `Audio ${index + 1}`;
+            menu.appendChild(audioSourceMenuRow(label, async () => {
+                await playResolvedAudioSource(entryIndex, source.url);
+                hideAudioSourceMenu();
+            }));
+        });
+    }
+    positionAudioSourceMenu(menu, x, y);
 }
 
 function reportButtonRects() {
@@ -1232,12 +1342,18 @@ function reportButtonRects() {
 }
 
 function createButtonSlot(kind, entryIndex, enabled = true) {
-    return el('span', {
+    const slot = el('span', {
         className: 'button-slot',
         'data-kind': kind,
         'data-entry-index': entryIndex,
         'data-enabled': String(enabled)
     });
+    if (kind === 'audio') {
+        slot.appendChild(createAudioIcon());
+    } else if (kind === 'mine') {
+        slot.appendChild(createPlusIcon());
+    }
+    return slot;
 }
 
 function getButtonSlot(kind, entryIndex) {
@@ -1256,10 +1372,15 @@ async function playEntryAudio(entryIndex) {
     if (!entry) { return; }
     const audioSlot = getButtonSlot('audio', entryIndex);
     
+    updateButtonSlot(audioSlot, { state: 'loading' });
     if (!audioUrls[entryIndex]) {
-        audioUrls[entryIndex] = await fetchAudioUrl(entry.expression, entry.reading);
+        const sources = await resolveEntryAudioSources(entry);
+        audioUrls[entryIndex] = sources[0]?.url || '';
     }
-    if (!audioUrls[entryIndex] || !playWordAudio(audioUrls[entryIndex])) {
+    const played = audioUrls[entryIndex] ? await playWordAudio(audioUrls[entryIndex]) : false;
+    if (played) {
+        updateButtonSlot(audioSlot, { state: 'default' });
+    } else {
         updateButtonSlot(audioSlot, { state: 'error' });
         setTimeout(() => updateButtonSlot(audioSlot, { state: 'default' }), 1500);
     }
@@ -1310,11 +1431,6 @@ function createEntryHeader(entry, idx) {
     }
     
     const buttonsContainer = el('div', { className: 'header-buttons' });
-    
-    if (window.audioSources?.length) {
-        buttonsContainer.appendChild(createButtonSlot('audio', idx));
-    }
-    
     const mineSlot = createButtonSlot('mine', idx, false);
     buttonsContainer.appendChild(mineSlot);
     webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
@@ -1323,6 +1439,10 @@ function createEntryHeader(entry, idx) {
             enabled: !(isDuplicate && !window.allowDupes)
         });
     });
+
+    if (window.audioSources?.length) {
+        buttonsContainer.appendChild(createButtonSlot('audio', idx));
+    }
     
     header.appendChild(buttonsContainer);
     requestAnimationFrame(reportButtonRects);
@@ -1435,7 +1555,9 @@ function redirect(count) {
     window.lookupEntries = undefined;
     window.entryCount = count;
     audioUrls = {};
+    audioSourceResults = {};
     selectedDictionaries = {};
+    hideAudioSourceMenu();
     document.getElementById('entries-container').innerHTML = '';
     reportButtonRects();
     window.renderPopup();
@@ -1463,7 +1585,9 @@ function restore(s) {
     window.lookupEntries = s.lookupEntries;
     window.entryCount = s.entryCount;
     audioUrls = {};
+    audioSourceResults = {};
     selectedDictionaries = {};
+    hideAudioSourceMenu();
     requestAnimationFrame(reportButtonRects);
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = s.scrollTop;
@@ -1527,8 +1651,15 @@ function observeMasonry(root) {
 }
 
 window.addEventListener('resize', () => {
+    hideAudioSourceMenu();
     requestAnimationFrame(reportButtonRects);
     scheduleMasonry();
+});
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest?.('.audio-source-menu')) {
+        hideAudioSourceMenu();
+    }
 });
 
 document.addEventListener('toggle', () => requestAnimationFrame(reportButtonRects), true);

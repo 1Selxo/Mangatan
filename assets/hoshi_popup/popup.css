@@ -88,6 +88,45 @@ body {
     height: calc(28px * var(--popup-scale));
 }
 
+.audio-source-menu {
+    position: fixed;
+    z-index: 1000;
+    min-width: calc(150px * var(--popup-scale));
+    max-width: calc(280px * var(--popup-scale));
+    padding: calc(4px * var(--popup-scale));
+    border: calc(1px * var(--popup-scale)) solid rgba(128, 128, 128, 0.38);
+    border-radius: calc(4px * var(--popup-scale));
+    background: var(--background-color-dark1);
+    box-shadow: 0 calc(3px * var(--popup-scale)) calc(10px * var(--popup-scale)) rgba(0, 0, 0, 0.22);
+}
+
+.audio-source-menu-row {
+    display: block;
+    width: 100%;
+    min-height: calc(26px * var(--popup-scale));
+    padding: calc(4px * var(--popup-scale)) calc(7px * var(--popup-scale));
+    border: 0;
+    border-radius: calc(3px * var(--popup-scale));
+    background: transparent;
+    color: var(--text-color);
+    font: inherit;
+    font-size: calc(13px * var(--popup-scale));
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.audio-source-menu-row:hover:not(:disabled) {
+    background: rgba(128, 128, 128, 0.18);
+}
+
+.audio-source-menu-row:disabled {
+    color: var(--text-color-light3);
+    cursor: default;
+}
+
 .entry-tags {
     margin-top: calc(-4px * var(--popup-scale));
     -webkit-user-select: none;

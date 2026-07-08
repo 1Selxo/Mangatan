@@ -82,6 +82,7 @@ void main() {
       popupCss: '/* upstream popup css */',
       popupJs: 'window.renderPopup = function() {};',
       selectionJs: 'window.hoshiSelection = {};',
+      audioPreferences: AnkiAudioPreferences.defaults,
       preferences: preferences,
       theme: ThemeData.dark(),
       dark: true,
@@ -93,7 +94,59 @@ void main() {
     expect(html, contains('window.hoshiSelection = {};'));
     expect(html, contains("window.collapseMode = 'Expand All'"));
     expect(html, contains('window.harmonicFrequency = true'));
+    expect(html, contains('window.audioSources = [];'));
     expect(html, contains('flutter_inappwebview.callHandler'));
+    expect(html, contains('getTermAudioSources'));
+    expect(html, contains('playWordAudio'));
+    expect(html, contains('.plus-line'));
+    expect(html, contains('.audio-icon'));
+    expect(html, contains('.audio-speaker-body'));
+    expect(html, isNot(contains('\u{1F50A}')));
+  });
+
+  test('injects enabled audio preferences into popup document', () {
+    const preferences = DictionaryPopupPreferences(
+      width: 540,
+      height: 450,
+      fontSize: 15,
+      theme: DictionaryThemePreference.light,
+      eInkMode: false,
+      paginatedScrolling: false,
+      customCss: '',
+      showFrequencyHarmonic: true,
+      showFrequencyAverage: false,
+      showPitchNumber: true,
+      showPitchText: true,
+    );
+
+    final html = buildHoshiPopupHtml(
+      popupCss: '/* upstream popup css */',
+      popupJs: 'window.renderPopup = function() {};',
+      selectionJs: 'window.hoshiSelection = {};',
+      audioPreferences: const AnkiAudioPreferences(
+        enabled: true,
+        sourceType: AnkiAudioSourceType.customJson,
+        url: 'http://localhost:5050/?term={term}&reading={reading}',
+        timeout: Duration(seconds: 5),
+        language: 'ja',
+      ),
+      preferences: preferences,
+      theme: ThemeData.light(),
+      dark: false,
+    );
+
+    expect(
+      html,
+      contains(
+        'window.audioSources = ["http://localhost:5050/?term={term}&reading={reading}"];',
+      ),
+    );
+    expect(html, contains('window.audioSourceType = "customJson";'));
+    expect(html, contains('window.needsAudio = true;'));
+    expect(
+      html,
+      contains("showAudioSourceMenu(Number(slot.dataset.entryIndex)"),
+    );
   });
 
   test('keeps frequency and pitch labels white on accent tags', () {
@@ -115,6 +168,7 @@ void main() {
       popupCss: '/* upstream popup css */',
       popupJs: 'window.renderPopup = function() {};',
       selectionJs: 'window.hoshiSelection = {};',
+      audioPreferences: AnkiAudioPreferences.defaults,
       preferences: preferences,
       theme: ThemeData.light(),
       dark: false,
@@ -137,6 +191,10 @@ void main() {
 
     expect(popup, contains('window.renderPopup = function()'));
     expect(popup, contains('SPDX-License-Identifier: GPL-3.0-or-later'));
+    expect(popup, contains('plus-icon'));
+    expect(popup, contains('M10 3h3v17h-3zM3 10h17v3H3z'));
+    expect(popup, contains('audio-speaker-body'));
+    expect(popup, contains('M3 9v6h4l5 4V5L7 9H3z'));
     expect(css, contains('.glossary-group'));
     expect(css, contains('.glossary-content .gloss-sc-summary::marker'));
     expect(css, contains('.pronunciation-mora'));

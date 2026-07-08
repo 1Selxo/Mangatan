@@ -843,11 +843,12 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
     const pitchPositions = constructPitchPositionHtml(pitches);
     const pitchCategories = constructPitchCategories(pitches, reading, rules);
     
-    if (!audioUrls[idx] && window.audioSources?.length && window.needsAudio) {
-        audioUrls[idx] = await fetchAudioUrl(expression, reading || expression);
+    const audioKey = audioCacheKey({ expression, reading: reading || expression });
+    if (!audioUrls[audioKey] && window.audioSources?.length && window.needsAudio) {
+        audioUrls[audioKey] = await fetchAudioUrl(expression, reading || expression);
     }
     
-    const audio = audioUrls[idx] || '';
+    const audio = audioUrls[audioKey] || '';
     
     return await webkit.messageHandlers.mineEntry.postMessage({
         expression,
@@ -1235,8 +1236,16 @@ async function playWordAudio(audioUrl) {
     }
 }
 
+function resetAudioCaches() {
+    audioUrls = {};
+    audioSourceResults = {};
+    hideAudioSourceMenu();
+}
+window.resetHoshiAudioCaches = resetAudioCaches;
+
 function audioCacheKey(entry) {
-    return `${entry?.expression || ''}\u0000${entry?.reading || ''}`;
+    const expression = entry?.expression || '';
+    return `${expression}\u0000${entry?.reading || expression}`;
 }
 
 async function resolveEntryAudioSources(entry) {
@@ -1371,13 +1380,14 @@ async function playEntryAudio(entryIndex) {
     const entry = window.lookupEntries?.[entryIndex];
     if (!entry) { return; }
     const audioSlot = getButtonSlot('audio', entryIndex);
+    const audioKey = audioCacheKey(entry);
     
     updateButtonSlot(audioSlot, { state: 'loading' });
-    if (!audioUrls[entryIndex]) {
+    if (!audioUrls[audioKey]) {
         const sources = await resolveEntryAudioSources(entry);
-        audioUrls[entryIndex] = sources[0]?.url || '';
+        audioUrls[audioKey] = sources[0]?.url || '';
     }
-    const played = audioUrls[entryIndex] ? await playWordAudio(audioUrls[entryIndex]) : false;
+    const played = audioUrls[audioKey] ? await playWordAudio(audioUrls[audioKey]) : false;
     if (played) {
         updateButtonSlot(audioSlot, { state: 'default' });
     } else {
@@ -1554,10 +1564,8 @@ function redirect(count) {
     forwardStack.length = 0;
     window.lookupEntries = undefined;
     window.entryCount = count;
-    audioUrls = {};
-    audioSourceResults = {};
+    resetAudioCaches();
     selectedDictionaries = {};
-    hideAudioSourceMenu();
     document.getElementById('entries-container').innerHTML = '';
     reportButtonRects();
     window.renderPopup();
@@ -1584,10 +1592,8 @@ function restore(s) {
     container.replaceChildren(...s.nodes);
     window.lookupEntries = s.lookupEntries;
     window.entryCount = s.entryCount;
-    audioUrls = {};
-    audioSourceResults = {};
+    resetAudioCaches();
     selectedDictionaries = {};
-    hideAudioSourceMenu();
     requestAnimationFrame(reportButtonRects);
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = s.scrollTop;

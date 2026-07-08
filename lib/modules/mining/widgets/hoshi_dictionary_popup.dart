@@ -433,6 +433,7 @@ Map<String, dynamic> _argumentMap(List<dynamic> arguments) {
 
 @visibleForTesting
 String hoshiReplaceRenderScript(int entryCount) =>
+    'window.resetHoshiAudioCaches?.();'
     'window.lookupEntries = undefined;'
     'window.entryCount = $entryCount;'
     'document.getElementById("entries-container").innerHTML = "";'
@@ -443,6 +444,7 @@ String hoshiReplaceRenderScriptForEntries(List<Map<String, dynamic>> entries) =>
     '(function(){'
     'window.__mangayomiHoshiRenderToken = '
     '(window.__mangayomiHoshiRenderToken || 0) + 1;'
+    'window.resetHoshiAudioCaches?.();'
     'window.lookupEntries = ${jsonEncode(entries)};'
     'window.entryCount = window.lookupEntries.length;'
     'const container = document.getElementById("entries-container");'

@@ -139,6 +139,78 @@ class _FontSettingWidgetState extends ConsumerState<FontSettingWidget> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              iconButton(
+                Icons.vertical_align_top,
+                () {
+                  ref
+                      .read(subtitleSettingsStateProvider.notifier)
+                      .set(
+                        subtitleSettings
+                          ..position = (subtitleSettings.position ?? 0) + 10,
+                        true,
+                      );
+                  setState(() {});
+                },
+                backgroundColor: context.dynamicWhiteBlackColor,
+                iconColors: context.isLight ? Colors.white : Colors.black,
+                size: 25,
+              ),
+              SizedBox(
+                width: 200,
+                child: TextFormField(
+                  controller: TextEditingController(
+                    text: (subtitleSettings.position ?? 0).toString(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: true,
+                  ),
+                  onChanged: (value) {
+                    final position = int.tryParse(value);
+                    if (position != null) {
+                      ref
+                          .read(subtitleSettingsStateProvider.notifier)
+                          .set(subtitleSettings..position = position, true);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: context.l10n.subtitle_position,
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.transparent,
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: context.dynamicThemeColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: context.dynamicThemeColor),
+                    ),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: context.dynamicThemeColor),
+                    ),
+                  ),
+                ),
+              ),
+              iconButton(
+                Icons.vertical_align_bottom,
+                () {
+                  ref
+                      .read(subtitleSettingsStateProvider.notifier)
+                      .set(
+                        subtitleSettings
+                          ..position = (subtitleSettings.position ?? 0) - 10,
+                        true,
+                      );
+                  setState(() {});
+                },
+                backgroundColor: context.dynamicWhiteBlackColor,
+                iconColors: context.isLight ? Colors.white : Colors.black,
+                size: 25,
+              ),
+            ],
+          ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text(
@@ -155,7 +227,8 @@ class _FontSettingWidgetState extends ConsumerState<FontSettingWidget> {
                     subtitleSettings
                       ..useItalic = false
                       ..useBold = false
-                      ..fontSize = 45,
+                      ..fontSize = 45
+                      ..position = 0,
                     true,
                   );
               setState(() {});

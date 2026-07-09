@@ -590,6 +590,7 @@
   "font": "Font",
   "color": "Color",
   "font_size": "Font size",
+  "subtitle_position": "Subtitle position",
   "text": "Text",
   "border": "Border",
   "background": "Background",

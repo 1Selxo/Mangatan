@@ -21,6 +21,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
@@ -263,11 +264,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   late final _firstVid = widget.videos.first;
   late final ValueNotifier<VideoPrefs?> _video = ValueNotifier(
     VideoPrefs(
-      videoTrack: VideoTrack(
-        _firstVid.originalUrl,
-        _firstVid.quality,
-        _firstVid.quality,
-      ),
+      videoTrack: videoTrackFromVideo(_firstVid),
       headers: _firstVid.headers,
     ),
   );
@@ -1246,7 +1243,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       for (var video in widget.videos) {
         videoQuality.add(
           VideoPrefs(
-            videoTrack: VideoTrack(video.url, video.quality, video.quality),
+            videoTrack: videoTrackFromVideo(video),
             headers: video.headers,
             isLocal: false,
           ),

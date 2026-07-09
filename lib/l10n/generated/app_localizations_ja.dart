@@ -1496,6 +1496,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get font_size => 'フォントサイズ';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
   String get text => 'テキスト';
 
   @override

@@ -1520,6 +1520,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get font_size => 'Schriftgröße';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
   String get text => 'Text';
 
   @override

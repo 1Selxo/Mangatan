@@ -11,6 +11,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
@@ -23,6 +24,7 @@ class CustomSubtitleView extends ConsumerStatefulWidget {
   final SubtitleViewConfiguration configuration;
   final MiningContext Function(String text)? miningContextBuilder;
   final bool paintSubtitle;
+  final double verticalOffset;
 
   const CustomSubtitleView({
     super.key,
@@ -30,6 +32,7 @@ class CustomSubtitleView extends ConsumerStatefulWidget {
     required this.configuration,
     this.miningContextBuilder,
     this.paintSubtitle = true,
+    this.verticalOffset = 0,
   });
 
   @override
@@ -154,24 +157,22 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     }
   }
 
+  RenderParagraph? get _visibleSubtitleParagraph {
+    final renderObject = _subtitleTextKey.currentContext?.findRenderObject();
+    return renderObject is RenderParagraph ? renderObject : null;
+  }
+
   _SubtitleLookupSelection? _selectionAtPosition({
-    required BuildContext context,
     required Offset globalPosition,
     required String subtitleText,
-    required TextStyle subtitleStyle,
-    required TextScaler textScaler,
   }) {
     if (subtitleText.trim().isEmpty) return null;
-    final textBox =
-        _subtitleTextKey.currentContext?.findRenderObject() as RenderBox?;
-    if (textBox == null) return null;
+    final paragraph = _visibleSubtitleParagraph;
+    if (paragraph == null) return null;
     final selection = _lookupTextAtPosition(
-      context: context,
-      box: textBox,
+      paragraph: paragraph,
       globalPosition: globalPosition,
       subtitleText: subtitleText,
-      subtitleStyle: subtitleStyle,
-      textScaler: textScaler,
     );
     if (selection.text.trim().isEmpty) {
       if (_highlightStart != -1 || _highlightEnd != -1) {
@@ -185,40 +186,27 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   Future<DictionaryPopupHandle?> _showLookupAtPosition(
     BuildContext context,
     Offset globalPosition,
-    String subtitleText,
-    TextStyle subtitleStyle,
-    TextScaler textScaler, {
+    String subtitleText, {
     bool hoverTriggered = false,
   }) async {
     final builder = widget.miningContextBuilder;
     if (builder == null || subtitleText.trim().isEmpty) return null;
-    final textBox =
-        _subtitleTextKey.currentContext?.findRenderObject() as RenderBox?;
-    final selection = textBox == null
+    final paragraph = _visibleSubtitleParagraph;
+    final selection = paragraph == null
         ? _SubtitleLookupSelection(
             text: subtitleText.trim(),
             start: 0,
             end: subtitleText.trim().length,
           )
         : _lookupTextAtPosition(
-            context: context,
-            box: textBox,
+            paragraph: paragraph,
             globalPosition: globalPosition,
             subtitleText: subtitleText,
-            subtitleStyle: subtitleStyle,
-            textScaler: textScaler,
           );
     if (selection.text.trim().isEmpty || !context.mounted) return null;
-    final anchor = textBox == null
+    final anchor = paragraph == null
         ? Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1)
-        : _lookupAnchorRect(
-            context: context,
-            box: textBox,
-            subtitleText: subtitleText,
-            subtitleStyle: subtitleStyle,
-            textScaler: textScaler,
-            selection: selection,
-          );
+        : _lookupAnchorRect(paragraph: paragraph, selection: selection);
     return DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
@@ -243,17 +231,12 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     required BuildContext context,
     required Offset globalPosition,
     required String subtitleText,
-    required TextStyle subtitleStyle,
-    required TextScaler textScaler,
   }) {
     _subtitleHovered = true;
     _hoverExitTimer?.cancel();
     final selection = _selectionAtPosition(
-      context: context,
       globalPosition: globalPosition,
       subtitleText: subtitleText,
-      subtitleStyle: subtitleStyle,
-      textScaler: textScaler,
     );
     if (selection == null) {
       _scheduleHoverDismiss();
@@ -271,8 +254,6 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
           context: context,
           selection: selection,
           subtitleText: subtitleText,
-          subtitleStyle: subtitleStyle,
-          textScaler: textScaler,
           globalPosition: globalPosition,
         ),
       );
@@ -283,8 +264,6 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     required BuildContext context,
     required _SubtitleLookupSelection selection,
     required String subtitleText,
-    required TextStyle subtitleStyle,
-    required TextScaler textScaler,
     required Offset globalPosition,
   }) async {
     if (!mounted ||
@@ -307,8 +286,6 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       context,
       globalPosition,
       subtitleText,
-      subtitleStyle,
-      textScaler,
       hoverTriggered: true,
     );
     if (!mounted ||
@@ -373,56 +350,32 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   }
 
   Rect _lookupAnchorRect({
-    required BuildContext context,
-    required RenderBox box,
-    required String subtitleText,
-    required TextStyle subtitleStyle,
-    required TextScaler textScaler,
+    required RenderParagraph paragraph,
     required _SubtitleLookupSelection selection,
   }) {
-    final painter = _subtitleTextPainter(
-      context: context,
-      subtitleText: subtitleText,
-      subtitleStyle: subtitleStyle,
-      textScaler: textScaler,
-      textAlign: textAlign,
-      maxWidth: box.size.width,
-    );
-    final rects = _textSelectionRects(
-      painter,
-      subtitleText,
+    final rects = _paragraphSelectionRects(
+      paragraph,
       selection.start,
       selection.end,
     );
     if (rects.isEmpty) {
-      return box.localToGlobal(Offset.zero) & box.size;
+      return paragraph.localToGlobal(Offset.zero) & paragraph.size;
     }
     final local = rects.reduce(
       (value, element) => value.expandToInclude(element),
     );
-    return box.localToGlobal(local.topLeft) & local.size;
+    return paragraph.localToGlobal(local.topLeft) & local.size;
   }
 
   _SubtitleLookupSelection _lookupTextAtPosition({
-    required BuildContext context,
-    required RenderBox box,
+    required RenderParagraph paragraph,
     required Offset globalPosition,
     required String subtitleText,
-    required TextStyle subtitleStyle,
-    required TextScaler textScaler,
   }) {
-    final painter = _subtitleTextPainter(
-      context: context,
-      subtitleText: subtitleText,
-      subtitleStyle: subtitleStyle,
-      textScaler: textScaler,
-      textAlign: textAlign,
-      maxWidth: box.size.width,
-    );
     final position = _nearestLookupOffset(
-      painter,
+      paragraph,
       subtitleText,
-      box.globalToLocal(globalPosition),
+      paragraph.globalToLocal(globalPosition),
     );
     if (position == null) {
       return const _SubtitleLookupSelection(text: '', start: 0, end: 0);
@@ -458,7 +411,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
               );
         final subtitleStyle = _subtitleFillStyle(rawSubtitleStyle);
         final text = _CrispSubtitleText(
-          key: _subtitleTextKey,
+          textKey: _subtitleTextKey,
           text: subtitleText,
           style: subtitleStyle,
           textAlign: textAlign,
@@ -472,61 +425,58 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
           duration: duration,
           child: Align(
             alignment: Alignment.bottomCenter,
-            child:
-                subtitleText.trim().isEmpty ||
-                    widget.miningContextBuilder == null
-                ? text
-                : MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    onEnter: (_) {
-                      if (_desktopHoverEnabled) _subtitleHovered = true;
-                    },
-                    onHover: (event) {
-                      if (_desktopHoverEnabled) {
-                        _handleSubtitleHover(
-                          context: context,
-                          globalPosition: event.position,
-                          subtitleText: subtitleText,
-                          subtitleStyle: subtitleStyle,
-                          textScaler: textScaler,
-                        );
-                      } else {
-                        _selectionAtPosition(
-                          context: context,
-                          globalPosition: event.position,
-                          subtitleText: subtitleText,
-                          subtitleStyle: subtitleStyle,
-                          textScaler: textScaler,
-                        );
-                        _clearHighlightIfNeeded();
-                      }
-                    },
-                    onExit: (_) {
-                      if (_desktopHoverEnabled) {
-                        _subtitleHovered = false;
-                        _scheduleHoverDismiss();
-                      } else if (_highlightStart != -1 || _highlightEnd != -1) {
-                        setState(_clearHighlight);
-                      }
-                    },
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTapDown: (_) => _clearHighlightIfNeeded(),
-                      onTapUp: (details) {
-                        _hoverLookupTimer?.cancel();
-                        unawaited(
-                          _showLookupAtPosition(
-                            context,
-                            details.globalPosition,
-                            subtitleText,
-                            subtitleStyle,
-                            textScaler,
-                          ),
-                        );
+            child: Transform.translate(
+              offset: subtitleOffsetForPosition(widget.verticalOffset),
+              child:
+                  subtitleText.trim().isEmpty ||
+                      widget.miningContextBuilder == null
+                  ? text
+                  : MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (_) {
+                        if (_desktopHoverEnabled) _subtitleHovered = true;
                       },
-                      child: text,
+                      onHover: (event) {
+                        if (_desktopHoverEnabled) {
+                          _handleSubtitleHover(
+                            context: context,
+                            globalPosition: event.position,
+                            subtitleText: subtitleText,
+                          );
+                        } else {
+                          _selectionAtPosition(
+                            globalPosition: event.position,
+                            subtitleText: subtitleText,
+                          );
+                          _clearHighlightIfNeeded();
+                        }
+                      },
+                      onExit: (_) {
+                        if (_desktopHoverEnabled) {
+                          _subtitleHovered = false;
+                          _scheduleHoverDismiss();
+                        } else if (_highlightStart != -1 ||
+                            _highlightEnd != -1) {
+                          setState(_clearHighlight);
+                        }
+                      },
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTapDown: (_) => _clearHighlightIfNeeded(),
+                        onTapUp: (details) {
+                          _hoverLookupTimer?.cancel();
+                          unawaited(
+                            _showLookupAtPosition(
+                              context,
+                              details.globalPosition,
+                              subtitleText,
+                            ),
+                          );
+                        },
+                        child: text,
+                      ),
                     ),
-                  ),
+            ),
           ),
         );
       },
@@ -565,6 +515,16 @@ _SubtitleLookupSelection _extractSubtitleLookupSelection(
     end: end,
   );
 }
+
+const _subtitleSeekBarClearance = 12.0;
+
+double subtitleBottomInsetForSeekBar({
+  required double playerHeight,
+  required double seekBarTop,
+}) => max(0, playerHeight - seekBarTop + _subtitleSeekBarClearance);
+
+/// Positive positions move subtitles up; negative positions move them down.
+Offset subtitleOffsetForPosition(double position) => Offset(0, -position);
 
 @visibleForTesting
 ({String text, int start, int end}) subtitleLookupSelectionForTesting(
@@ -608,26 +568,16 @@ bool _sameSelection(
   _SubtitleLookupSelection right,
 ) => left != null && left.start == right.start && left.end == right.end;
 
-TextPainter _subtitleTextPainter({
-  required BuildContext context,
-  required String subtitleText,
-  required TextStyle subtitleStyle,
-  required TextScaler textScaler,
-  required TextAlign textAlign,
-  required double maxWidth,
-}) => TextPainter(
-  text: TextSpan(text: subtitleText, style: subtitleStyle),
-  textDirection: Directionality.of(context),
-  textAlign: textAlign,
-  textScaler: textScaler,
-)..layout(maxWidth: maxWidth);
-
-int? _nearestLookupOffset(TextPainter painter, String text, Offset position) {
+int? _nearestLookupOffset(
+  RenderParagraph paragraph,
+  String text,
+  Offset position,
+) {
   int? nearest;
   double nearestScore = double.infinity;
   for (var offset = 0; offset < text.length; offset++) {
     if (_isLookupBoundary(text[offset])) continue;
-    final boxes = painter.getBoxesForSelection(
+    final boxes = paragraph.getBoxesForSelection(
       TextSelection(baseOffset: offset, extentOffset: offset + 1),
       boxHeightStyle: ui.BoxHeightStyle.tight,
       boxWidthStyle: ui.BoxWidthStyle.tight,
@@ -659,6 +609,23 @@ int? _nearestLookupOffset(TextPainter painter, String text, Offset position) {
     }
   }
   return nearest;
+}
+
+List<Rect> _paragraphSelectionRects(
+  RenderParagraph paragraph,
+  int start,
+  int end,
+) {
+  if (start >= end) return const [];
+  return paragraph
+      .getBoxesForSelection(
+        TextSelection(baseOffset: start, extentOffset: end),
+        boxHeightStyle: ui.BoxHeightStyle.tight,
+        boxWidthStyle: ui.BoxWidthStyle.tight,
+      )
+      .map((box) => box.toRect())
+      .where((rect) => rect.width > 0 && rect.height > 0)
+      .toList();
 }
 
 List<Rect> _textSelectionRects(
@@ -716,7 +683,7 @@ bool _isLookupBoundary(String value) {
 
 class _CrispSubtitleText extends StatelessWidget {
   const _CrispSubtitleText({
-    super.key,
+    required this.textKey,
     required this.text,
     required this.style,
     required this.textAlign,
@@ -726,6 +693,7 @@ class _CrispSubtitleText extends StatelessWidget {
     required this.highlightEnd,
   });
 
+  final GlobalKey textKey;
   final String text;
   final TextStyle style;
   final TextAlign textAlign;
@@ -738,27 +706,27 @@ class _CrispSubtitleText extends StatelessWidget {
   Widget build(BuildContext context) {
     final fillColor = style.color ?? Colors.white;
     final outlineVisible = fillColor.a > 0 && outlineColor.a > 0;
+    final highlightColor = highlightStart >= 0 && highlightEnd > highlightStart
+        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.45)
+        : null;
+    final highlightStyle = style.copyWith(
+      color: Colors.transparent,
+      backgroundColor: Colors.transparent,
+    );
     return Stack(
       alignment: Alignment.center,
       children: [
-        if (highlightStart >= 0 && highlightEnd > highlightStart)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _SubtitleHighlightPainter(
-                  text: text,
-                  style: style,
-                  textAlign: textAlign,
-                  textScaler: textScaler,
-                  textDirection: Directionality.of(context),
-                  start: highlightStart,
-                  end: highlightEnd,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.45),
-                ),
-              ),
+        if (highlightColor != null)
+          Text.rich(
+            _subtitleSpan(
+              text: text,
+              style: highlightStyle,
+              highlightStart: highlightStart,
+              highlightEnd: highlightEnd,
+              highlightColor: highlightColor,
             ),
+            textAlign: textAlign,
+            textScaler: textScaler,
           ),
         if (outlineVisible)
           Text.rich(
@@ -773,11 +741,12 @@ class _CrispSubtitleText extends StatelessWidget {
             textScaler: textScaler,
           ),
         Text.rich(
+          key: textKey,
           _subtitleSpan(
             text: text,
             style: style,
-            highlightStart: highlightStart,
-            highlightEnd: highlightEnd,
+            highlightStart: -1,
+            highlightEnd: -1,
           ),
           textAlign: textAlign,
           textScaler: textScaler,
@@ -792,6 +761,7 @@ TextSpan _subtitleSpan({
   required TextStyle style,
   required int highlightStart,
   required int highlightEnd,
+  Color? highlightColor,
 }) {
   final start = highlightStart.clamp(0, text.length).toInt();
   final end = highlightEnd.clamp(start, text.length).toInt();
@@ -800,66 +770,15 @@ TextSpan _subtitleSpan({
     style: style,
     children: [
       if (start > 0) TextSpan(text: text.substring(0, start)),
-      TextSpan(text: text.substring(start, end), style: style),
+      TextSpan(
+        text: text.substring(start, end),
+        style: highlightColor == null
+            ? style
+            : style.copyWith(backgroundColor: highlightColor),
+      ),
       if (end < text.length) TextSpan(text: text.substring(end)),
     ],
   );
-}
-
-class _SubtitleHighlightPainter extends CustomPainter {
-  const _SubtitleHighlightPainter({
-    required this.text,
-    required this.style,
-    required this.textAlign,
-    required this.textScaler,
-    required this.textDirection,
-    required this.start,
-    required this.end,
-    required this.color,
-  });
-
-  final String text;
-  final TextStyle style;
-  final TextAlign textAlign;
-  final TextScaler textScaler;
-  final TextDirection textDirection;
-  final int start;
-  final int end;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: textDirection,
-      textAlign: textAlign,
-      textScaler: textScaler,
-    )..layout(maxWidth: size.width);
-    final paint = Paint()..color = color;
-    for (final rect in _textSelectionRects(painter, text, start, end)) {
-      final padded = Rect.fromLTRB(
-        rect.left - 2,
-        rect.top - 1,
-        rect.right + 2,
-        rect.bottom + 1,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(padded, const Radius.circular(6)),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SubtitleHighlightPainter oldDelegate) =>
-      oldDelegate.text != text ||
-      oldDelegate.style != style ||
-      oldDelegate.textAlign != textAlign ||
-      oldDelegate.textScaler != textScaler ||
-      oldDelegate.textDirection != textDirection ||
-      oldDelegate.start != start ||
-      oldDelegate.end != end ||
-      oldDelegate.color != color;
 }
 
 TextStyle _subtitleFillStyle(TextStyle style) {

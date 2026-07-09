@@ -25715,29 +25715,30 @@ const PlayerSubtitleSettingsSchema = Schema(
       type: IsarType.long,
     ),
     r'fontSize': PropertySchema(id: 8, name: r'fontSize', type: IsarType.long),
+    r'position': PropertySchema(id: 9, name: r'position', type: IsarType.long),
     r'textColorA': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'textColorA',
       type: IsarType.long,
     ),
     r'textColorB': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'textColorB',
       type: IsarType.long,
     ),
     r'textColorG': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'textColorG',
       type: IsarType.long,
     ),
     r'textColorR': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'textColorR',
       type: IsarType.long,
     ),
-    r'useBold': PropertySchema(id: 13, name: r'useBold', type: IsarType.bool),
+    r'useBold': PropertySchema(id: 14, name: r'useBold', type: IsarType.bool),
     r'useItalic': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'useItalic',
       type: IsarType.bool,
     ),
@@ -25773,12 +25774,13 @@ void _playerSubtitleSettingsSerialize(
   writer.writeLong(offsets[6], object.borderColorG);
   writer.writeLong(offsets[7], object.borderColorR);
   writer.writeLong(offsets[8], object.fontSize);
-  writer.writeLong(offsets[9], object.textColorA);
-  writer.writeLong(offsets[10], object.textColorB);
-  writer.writeLong(offsets[11], object.textColorG);
-  writer.writeLong(offsets[12], object.textColorR);
-  writer.writeBool(offsets[13], object.useBold);
-  writer.writeBool(offsets[14], object.useItalic);
+  writer.writeLong(offsets[9], object.position);
+  writer.writeLong(offsets[10], object.textColorA);
+  writer.writeLong(offsets[11], object.textColorB);
+  writer.writeLong(offsets[12], object.textColorG);
+  writer.writeLong(offsets[13], object.textColorR);
+  writer.writeBool(offsets[14], object.useBold);
+  writer.writeBool(offsets[15], object.useItalic);
 }
 
 PlayerSubtitleSettings _playerSubtitleSettingsDeserialize(
@@ -25797,12 +25799,13 @@ PlayerSubtitleSettings _playerSubtitleSettingsDeserialize(
     borderColorG: reader.readLongOrNull(offsets[6]),
     borderColorR: reader.readLongOrNull(offsets[7]),
     fontSize: reader.readLongOrNull(offsets[8]),
-    textColorA: reader.readLongOrNull(offsets[9]),
-    textColorB: reader.readLongOrNull(offsets[10]),
-    textColorG: reader.readLongOrNull(offsets[11]),
-    textColorR: reader.readLongOrNull(offsets[12]),
-    useBold: reader.readBoolOrNull(offsets[13]),
-    useItalic: reader.readBoolOrNull(offsets[14]),
+    position: reader.readLongOrNull(offsets[9]),
+    textColorA: reader.readLongOrNull(offsets[10]),
+    textColorB: reader.readLongOrNull(offsets[11]),
+    textColorG: reader.readLongOrNull(offsets[12]),
+    textColorR: reader.readLongOrNull(offsets[13]),
+    useBold: reader.readBoolOrNull(offsets[14]),
+    useItalic: reader.readBoolOrNull(offsets[15]),
   );
   return object;
 }
@@ -25841,8 +25844,10 @@ P _playerSubtitleSettingsDeserializeProp<P>(
     case 12:
       return (reader.readLongOrNull(offset)) as P;
     case 13:
-      return (reader.readBoolOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 14:
+      return (reader.readBoolOrNull(offset)) as P;
+    case 15:
       return (reader.readBoolOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -26720,6 +26725,103 @@ extension PlayerSubtitleSettingsQueryFilter
       return query.addFilterCondition(
         FilterCondition.between(
           property: r'fontSize',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    PlayerSubtitleSettings,
+    PlayerSubtitleSettings,
+    QAfterFilterCondition
+  >
+  positionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'position'),
+      );
+    });
+  }
+
+  QueryBuilder<
+    PlayerSubtitleSettings,
+    PlayerSubtitleSettings,
+    QAfterFilterCondition
+  >
+  positionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'position'),
+      );
+    });
+  }
+
+  QueryBuilder<
+    PlayerSubtitleSettings,
+    PlayerSubtitleSettings,
+    QAfterFilterCondition
+  >
+  positionEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'position', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<
+    PlayerSubtitleSettings,
+    PlayerSubtitleSettings,
+    QAfterFilterCondition
+  >
+  positionGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'position',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    PlayerSubtitleSettings,
+    PlayerSubtitleSettings,
+    QAfterFilterCondition
+  >
+  positionLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'position',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    PlayerSubtitleSettings,
+    PlayerSubtitleSettings,
+    QAfterFilterCondition
+  >
+  positionBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'position',
           lower: lower,
           includeLower: includeLower,
           upper: upper,

@@ -1351,6 +1351,7 @@ class CustomColorFilter {
 @embedded
 class PlayerSubtitleSettings {
   int? fontSize;
+  int? position;
   bool? useBold;
   bool? useItalic;
   int? textColorA;
@@ -1367,6 +1368,7 @@ class PlayerSubtitleSettings {
   int? backgroundColorB;
   PlayerSubtitleSettings({
     this.fontSize = 45,
+    this.position = 0,
     this.useBold = true,
     this.useItalic = false,
     this.textColorA = 255,
@@ -1384,6 +1386,7 @@ class PlayerSubtitleSettings {
   });
   PlayerSubtitleSettings.fromJson(Map<String, dynamic> json) {
     fontSize = json['fontSize'];
+    position = json['position'] ?? 0;
     useBold = json['useBold'];
     useItalic = json['useItalic'];
     textColorA = json['textColorA'];
@@ -1402,6 +1405,7 @@ class PlayerSubtitleSettings {
 
   Map<String, dynamic> toJson() => {
     'fontSize': fontSize,
+    'position': position,
     'useBold': useBold,
     'useItalic': useItalic,
     'textColorA': textColorA,

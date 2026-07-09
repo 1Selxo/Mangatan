@@ -2831,6 +2831,12 @@ abstract class AppLocalizations {
   /// **'Font size'**
   String get font_size;
 
+  /// No description provided for @subtitle_position.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle position'**
+  String get subtitle_position;
+
   /// No description provided for @text.
   ///
   /// In en, this message translates to:

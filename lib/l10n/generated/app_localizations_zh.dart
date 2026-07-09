@@ -1479,6 +1479,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get font_size => '字号';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
   String get text => '文本';
 
   @override

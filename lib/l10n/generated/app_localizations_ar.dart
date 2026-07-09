@@ -1525,6 +1525,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get font_size => 'حجم الخط';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
   String get text => 'النص';
 
   @override

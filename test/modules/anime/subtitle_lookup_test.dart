@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
 
@@ -34,6 +35,29 @@ void main() {
     expect(match, hasLength(1));
     expect(fullTail, hasLength(1));
     expect(match.single.width, lessThan(fullTail.single.width));
+  });
+
+  test('subtitle zero position clears the seek bar at every player size', () {
+    final largeInset = subtitleBottomInsetForSeekBar(
+      playerHeight: 1440,
+      seekBarTop: 1300,
+    );
+    final compactInset = subtitleBottomInsetForSeekBar(
+      playerHeight: 360,
+      seekBarTop: 220,
+    );
+
+    expect(1440 - largeInset, lessThan(1300));
+    expect(360 - compactInset, lessThan(220));
+    expect(subtitleOffsetForPosition(0), Offset.zero);
+    expect(subtitleOffsetForPosition(-40), const Offset(0, 40));
+  });
+
+  test('legacy subtitle settings default position to zero', () {
+    final settings = PlayerSubtitleSettings.fromJson({'fontSize': 45});
+
+    expect(settings.position, 0);
+    expect(settings.toJson()['position'], 0);
   });
 
   test(

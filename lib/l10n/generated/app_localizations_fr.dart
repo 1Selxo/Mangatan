@@ -1527,6 +1527,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get font_size => 'Taille de police';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
   String get text => 'Texte';
 
   @override

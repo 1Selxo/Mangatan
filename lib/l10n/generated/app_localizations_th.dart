@@ -1513,6 +1513,9 @@ class AppLocalizationsTh extends AppLocalizations {
   String get font_size => 'ขนาดอักษร';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
   String get text => 'อักษร';
 
   @override

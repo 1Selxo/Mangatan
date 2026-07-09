@@ -1517,6 +1517,9 @@ class AppLocalizationsId extends AppLocalizations {
   String get font_size => 'Ukuran Huruf';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
   String get text => 'Teks';
 
   @override

@@ -8,6 +8,7 @@ import 'package:mangayomi/eval/model/m_chapter.dart';
 import 'package:mangayomi/eval/model/m_manga.dart';
 import 'package:mangayomi/eval/model/m_pages.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
+import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -56,7 +57,7 @@ class MihonExtensionService implements ExtensionService {
         "method": "getPopular$name",
         "page": page + 1,
         "search": "",
-        "preferences": getSourcePreferences(),
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       }),
       headers: getCookie(),
@@ -93,7 +94,7 @@ class MihonExtensionService implements ExtensionService {
         "method": "getLatest$name",
         "page": page + 1,
         "search": "",
-        "preferences": getSourcePreferences(),
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       }),
       headers: getCookie(),
@@ -131,7 +132,7 @@ class MihonExtensionService implements ExtensionService {
         "page": max(1, page),
         "search": query,
         "filterList": _convertFilters(filters),
-        "preferences": getSourcePreferences(),
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       }),
       headers: getCookie(),
@@ -168,7 +169,7 @@ class MihonExtensionService implements ExtensionService {
         "method": "getDetails$name",
         if (source.itemType == ItemType.manga) "mangaData": {"url": url},
         if (source.itemType == ItemType.anime) "animeData": {"url": url},
-        "preferences": getSourcePreferences(),
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       }),
       headers: getCookie(),
@@ -205,7 +206,7 @@ class MihonExtensionService implements ExtensionService {
             : "getChapterList",
         if (source.itemType == ItemType.manga) "mangaData": {"url": url},
         if (source.itemType == ItemType.anime) "animeData": {"url": url},
-        "preferences": getSourcePreferences(),
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       }),
       headers: getCookie(),
@@ -233,7 +234,7 @@ class MihonExtensionService implements ExtensionService {
       body: jsonEncode({
         "method": "getPageList",
         "chapterData": {"url": url},
-        "preferences": getSourcePreferences(),
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       }),
       headers: getCookie(),
@@ -250,7 +251,7 @@ class MihonExtensionService implements ExtensionService {
       body: jsonEncode({
         "method": "getVideoList",
         "episodeData": {"url": url},
-        "preferences": getSourcePreferences(),
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       }),
       headers: getCookie(),

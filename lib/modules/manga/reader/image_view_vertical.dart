@@ -72,6 +72,17 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
   Widget build(BuildContext context) {
     _ocr.updateTheme(Theme.of(context).colorScheme.primary);
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);
+
+    Rect? ocrHitTestImageRect(Rect paintedRect) {
+      final box = _imageKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return null;
+      return readerOcrHitTestImageRect(
+        paintedImageRect: paintedRect,
+        renderBoxSize: box.size,
+        normalizePaintCoordinates: true,
+      );
+    }
+
     final imageWidget = ValueListenableBuilder<bool>(
       valueListenable: widget.isScrolling,
       builder: (context, scrolling, _) => ExtendedImage(
@@ -162,7 +173,15 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
           }
           return null;
         },
-        afterPaintImage: _ocr.paint,
+        afterPaintImage: (canvas, rect, image, paint) {
+          _ocr.paint(
+            canvas,
+            rect,
+            image,
+            paint,
+            hitTestImageRect: ocrHitTestImageRect(rect),
+          );
+        },
       ),
     );
     return applyReaderColorFilter(

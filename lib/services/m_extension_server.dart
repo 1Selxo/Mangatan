@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,9 +14,15 @@ class MExtensionServerPlatform {
   MExtensionServerPlatform(this.ref);
 
   Future<bool> check() async {
-    if (_baseUrl == "http://127.0.0.1:0") return false;
+    return _checkHealth(_baseUrl);
+  }
+
+  Future<bool> _checkHealth(String baseUrl) async {
+    if (baseUrl == "http://127.0.0.1:0") return false;
     try {
-      final res = await http.get(Uri.parse("$_baseUrl/"));
+      final res = await http
+          .get(Uri.parse("$baseUrl/"))
+          .timeout(const Duration(seconds: 2));
       if (res.statusCode == 200) {
         return true;
       }
@@ -27,7 +34,15 @@ class MExtensionServerPlatform {
 
   Future<void> startServer() async {
     try {
-      final isRunning = await check();
+      final currentBaseUrl = _baseUrl;
+      var isRunning = await _checkHealth(currentBaseUrl);
+      if (isDesktop &&
+          isRunning &&
+          _isLoopbackServer(currentBaseUrl) &&
+          !await _supportsMangatanMihonBridge(currentBaseUrl)) {
+        await _stopDesktopServer(currentBaseUrl);
+        isRunning = false;
+      }
       if (!isRunning) {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         final port = server.port;
@@ -51,9 +66,15 @@ class MExtensionServerPlatform {
         } else {
           await MExtensionServer().startServer(port);
         }
-        ref
-            .read(androidProxyServerStateProvider.notifier)
-            .set("http://127.0.0.1:$port");
+        final baseUrl = "http://127.0.0.1:$port";
+        if (isDesktop && !await _waitForMangatanMihonBridge(baseUrl)) {
+          await _stopDesktopServer(baseUrl);
+          ref
+              .read(androidProxyServerStateProvider.notifier)
+              .set("http://127.0.0.1:0");
+          return;
+        }
+        ref.read(androidProxyServerStateProvider.notifier).set(baseUrl);
       }
     } catch (e) {
       if (kDebugMode) {
@@ -69,4 +90,47 @@ class MExtensionServerPlatform {
   }
 
   String get _baseUrl => ref.watch(androidProxyServerStateProvider);
+
+  bool _isLoopbackServer(String baseUrl) {
+    final host = Uri.tryParse(baseUrl)?.host;
+    return host == InternetAddress.loopbackIPv4.address || host == 'localhost';
+  }
+
+  Future<bool> _supportsMangatanMihonBridge(String baseUrl) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/capabilities'))
+          .timeout(const Duration(seconds: 2));
+      if (response.statusCode != 200) return false;
+      final capabilities = jsonDecode(response.body) as Map<String, dynamic>;
+      return (capabilities['mangatanMihonBridge'] as num?)?.toInt() == 1 &&
+          capabilities['sourceFactory'] == true &&
+          capabilities['preferenceCallbacks'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _waitForMangatanMihonBridge(String baseUrl) async {
+    for (var attempt = 0; attempt < 40; attempt++) {
+      if (await _supportsMangatanMihonBridge(baseUrl)) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return false;
+  }
+
+  Future<void> _stopDesktopServer(String baseUrl) async {
+    try {
+      await http
+          .get(Uri.parse('$baseUrl/stop'))
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {}
+    try {
+      await MExtensionServer().stopServer();
+    } catch (_) {}
+    for (var attempt = 0; attempt < 20; attempt++) {
+      if (!await _checkHealth(baseUrl)) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
 }

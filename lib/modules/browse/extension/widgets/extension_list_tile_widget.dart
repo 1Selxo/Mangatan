@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:isar_community/isar.dart';
-import 'package:mangayomi/eval/model/source_preference.dart';
-import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
+import 'package:mangayomi/services/uninstall_extension.dart';
 import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
@@ -30,12 +28,22 @@ class ExtensionListTileWidget extends ConsumerStatefulWidget {
 class _ExtensionListTileWidgetState
     extends ConsumerState<ExtensionListTileWidget> {
   bool _isLoading = false;
-  late final bool _updateAvailable;
-  late final bool _sourceNotEmpty;
+  late bool _updateAvailable;
+  late bool _sourceNotEmpty;
 
   @override
   void initState() {
     super.initState();
+    _updateState();
+  }
+
+  @override
+  void didUpdateWidget(covariant ExtensionListTileWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateState();
+  }
+
+  void _updateState() {
     _updateAvailable =
         compareVersions(widget.source.version!, widget.source.versionLast!) < 0;
     _sourceNotEmpty =
@@ -118,53 +126,24 @@ class _ExtensionListTileWidgetState
                                 const SizedBox(width: 15),
                                 TextButton(
                                   onPressed: () {
-                                    final sourcePrefsIds = isar
-                                        .sourcePreferences
-                                        .filter()
-                                        .sourceIdEqualTo(widget.source.id!)
-                                        .findAllSync()
-                                        .map((e) => e.id!)
-                                        .toList();
-                                    final sourcePrefsStringIds = isar
-                                        .sourcePreferenceStringValues
-                                        .filter()
-                                        .sourceIdEqualTo(widget.source.id!)
-                                        .findAllSync()
-                                        .map((e) => e.id)
-                                        .toList();
-                                    isar.writeTxnSync(() {
-                                      if (widget.source.isObsolete ?? false) {
-                                        isar.sources.deleteSync(
-                                          widget.source.id!,
-                                        );
-                                        ref
-                                            .read(
-                                              synchingProvider(
-                                                syncId: 1,
-                                              ).notifier,
-                                            )
-                                            .addChangedPart(
-                                              ActionType.removeExtension,
-                                              widget.source.id,
-                                              "{}",
-                                              false,
-                                            );
-                                      } else {
-                                        isar.sources.putSync(
-                                          widget.source
-                                            ..sourceCode = ""
-                                            ..isAdded = false
-                                            ..isPinned = false
-                                            ..updatedAt = DateTime.now()
-                                                .millisecondsSinceEpoch,
-                                        );
-                                      }
-                                      isar.sourcePreferences.deleteAllSync(
-                                        sourcePrefsIds,
-                                      );
-                                      isar.sourcePreferenceStringValues
-                                          .deleteAllSync(sourcePrefsStringIds);
-                                    });
+                                    final result = uninstallExtension(
+                                      widget.source,
+                                    );
+                                    for (final sourceId
+                                        in result.removedObsoleteSourceIds) {
+                                      ref
+                                          .read(
+                                            synchingProvider(
+                                              syncId: 1,
+                                            ).notifier,
+                                          )
+                                          .addChangedPart(
+                                            ActionType.removeExtension,
+                                            sourceId,
+                                            "{}",
+                                            false,
+                                          );
+                                    }
 
                                     Navigator.pop(ctx);
                                   },

@@ -4,6 +4,7 @@ import 'package:http_interceptor/http_interceptor.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/filter.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
+import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -63,6 +64,11 @@ Future<void> fetchSourcesList({
               ..baseUrl = source['baseUrl']
               ..sourceCodeUrl = "$repoUrl/apk/${e['apk']}"
               ..sourceCodeLanguage = SourceCodeLanguage.mihon
+              ..repo = repo
+              ..additionalParams = encodeMihonSourceMetadata(
+                sourceId: source['id'],
+                packageName: e['pkg'],
+              )
               ..itemType =
                   (e['pkg'] as String).startsWith(
                     "eu.kanade.tachiyomi.animeextension",
@@ -73,7 +79,7 @@ Future<void> fetchSourcesList({
               ..notes = Platform.isAndroid
                   ? null
                   : "Requires Android Proxy Server (ApkBridge) for installing and using the extensions!";
-            src.id = 'mihon-${source['id']}'.hashCode;
+            src.id = mihonLocalSourceId(source['id']);
             yield src;
           }
         } else if (e['id'] is String &&
@@ -127,25 +133,92 @@ Future<void> fetchSourcesList({
       orElse: () => Source(),
     );
     if (matchingSource.id != null && matchingSource.sourceCodeUrl!.isNotEmpty) {
-      await _updateSource(matchingSource, androidProxyServer, repo, itemType);
+      final installGroup =
+          matchingSource.sourceCodeLanguage == SourceCodeLanguage.mihon
+          ? sourceList
+                .where(
+                  (source) =>
+                      belongsToSameMihonExtension(matchingSource, source),
+                )
+                .toList()
+          : [matchingSource];
+      await _updateSources(installGroup, androidProxyServer, repo, itemType);
     }
   } else {
+    final updateGroups = <String, List<Source>>{};
     for (var source in sourceList) {
       final existingSource = await isar.sources.get(source.id!);
       if (existingSource == null) {
         await _addNewSource(source, repo, itemType);
         continue;
       }
+      final existingMihonMetadata = mihonSourceMetadata(existingSource);
+      final catalogMihonMetadata = mihonSourceMetadata(source);
+      final updatedAdditionalParams = catalogMihonMetadata == null
+          ? source.additionalParams
+          : encodeMihonSourceMetadata(
+              sourceId: catalogMihonMetadata.sourceId,
+              packageName: catalogMihonMetadata.packageName,
+              factoryAvailable: existingMihonMetadata?.factoryAvailable ?? true,
+            );
+      if (source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
+          existingSource.additionalParams != updatedAdditionalParams) {
+        await isar.writeTxn(() async {
+          isar.sources.put(
+            existingSource
+              ..additionalParams = updatedAdditionalParams
+              ..sourceCodeUrl = source.sourceCodeUrl
+              ..repo = repo,
+          );
+        });
+      }
       final shouldUpdate =
-          existingSource.isAdded! &&
+          (existingSource.isAdded ?? false) &&
           compareVersions(existingSource.version!, source.version!) < 0;
       if (!shouldUpdate) continue;
       if (autoUpdateExtensions) {
-        await _updateSource(source, androidProxyServer, repo, itemType);
+        final groupKey = source.sourceCodeLanguage == SourceCodeLanguage.mihon
+            ? mihonExtensionGroupKey(source)
+            : source.id.toString();
+        updateGroups.putIfAbsent(groupKey, () => []).add(source);
       } else {
         await isar.writeTxn(() async {
           isar.sources.put(existingSource..versionLast = source.version);
         });
+      }
+    }
+    for (final group in updateGroups.values) {
+      final fullGroup =
+          group.first.sourceCodeLanguage == SourceCodeLanguage.mihon
+          ? sourceList
+                .where(
+                  (source) => belongsToSameMihonExtension(group.first, source),
+                )
+                .toList()
+          : group;
+      await _updateSources(fullGroup, androidProxyServer, repo, itemType);
+    }
+
+    final mihonGroups = <String, List<Source>>{};
+    for (final source in sourceList.where(
+      (source) => source.sourceCodeLanguage == SourceCodeLanguage.mihon,
+    )) {
+      mihonGroups
+          .putIfAbsent(mihonExtensionGroupKey(source), () => [])
+          .add(source);
+    }
+    for (final group in mihonGroups.values) {
+      final installedStates = await Future.wait(
+        group.map((source) => isar.sources.get(source.id!)),
+      );
+      final hasInstalledSource = installedStates.any(
+        (source) => source?.isAdded ?? false,
+      );
+      final hasMissingSibling = installedStates.any(
+        (source) => !(source?.isAdded ?? false),
+      );
+      if (hasInstalledSource && hasMissingSibling) {
+        await _updateSources(group, androidProxyServer, repo, itemType);
       }
     }
   }
@@ -153,77 +226,156 @@ Future<void> fetchSourcesList({
   checkIfSourceIsObsolete(sourceList, repo!, itemType);
 }
 
-Future<void> _updateSource(
-  Source source,
+Future<void> _updateSources(
+  List<Source> sources,
   String androidProxyServer,
   Repo? repo,
   ItemType itemType,
 ) async {
+  if (sources.isEmpty) return;
+  final sourcesToUpdate = List<Source>.of(sources);
+  if (sources.first.sourceCodeLanguage == SourceCodeLanguage.mihon) {
+    final knownIds = sources.map((source) => source.id).toSet();
+    final storedGroup = await isar.sources
+        .filter()
+        .sourceCodeUrlEqualTo(sources.first.sourceCodeUrl)
+        .findAll();
+    for (final storedSource in storedGroup) {
+      if (knownIds.contains(storedSource.id) ||
+          !belongsToSameMihonExtension(sources.first, storedSource)) {
+        continue;
+      }
+      storedSource
+        ..sourceCodeUrl = sources.first.sourceCodeUrl
+        ..version = sources.first.version
+        ..versionLast = sources.first.version
+        ..iconUrl = sources.first.iconUrl
+        ..appMinVerReq = sources.first.appMinVerReq
+        ..repo = repo;
+      sourcesToUpdate.add(storedSource);
+    }
+  }
+
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
-  final req = await http.get(Uri.parse(source.sourceCodeUrl!));
-  final sourceCode = source.sourceCodeLanguage == SourceCodeLanguage.mihon
+  final req = await http.get(Uri.parse(sources.first.sourceCodeUrl!));
+  final sourceCode =
+      sources.first.sourceCodeLanguage == SourceCodeLanguage.mihon
       ? base64.encode(req.bodyBytes)
       : req.body;
 
-  Map<String, String> headers = {};
-  bool? supportLatest;
-  FilterList? filterList;
-  List<SourcePreference>? preferenceList;
-  source.sourceCode = sourceCode;
-  if (source.sourceCodeLanguage == SourceCodeLanguage.mihon) {
-    headers = await fetchHeadersDalvik(http, source, androidProxyServer);
-    supportLatest = await fetchSupportLatestDalvik(
-      http,
-      source,
-      androidProxyServer,
+  final updatedSources = <Source>[];
+  for (final source in sourcesToUpdate) {
+    final existingSource = await isar.sources.get(source.id!);
+    final incomingMetadata = mihonSourceMetadata(source);
+    final installedMetadata = existingSource == null
+        ? null
+        : mihonSourceMetadata(existingSource);
+    final additionalParams = incomingMetadata == null
+        ? source.additionalParams ?? ''
+        : encodeMihonSourceMetadata(
+            sourceId: incomingMetadata.sourceId,
+            packageName: incomingMetadata.packageName,
+            factoryAvailable:
+                installedMetadata?.factoryAvailable ??
+                incomingMetadata.factoryAvailable,
+          );
+    final existingPreferences = _decodePreferences(
+      existingSource?.preferenceList,
     );
-    filterList = await fetchFilterListDalvik(http, source, androidProxyServer);
-    preferenceList = await fetchPreferencesDalvik(
-      http,
-      source,
-      androidProxyServer,
-    );
-  } else {
-    headers = await getIsolateService.get<Map<String, String>>(
-      source: source,
-      serviceType: 'getHeaders',
+
+    Map<String, String> headers = {};
+    bool? supportLatest;
+    FilterList? filterList;
+    List<SourcePreference>? preferenceList;
+    source.sourceCode = sourceCode;
+    if (source.sourceCodeLanguage == SourceCodeLanguage.mihon) {
+      headers = await fetchHeadersDalvik(
+        http,
+        source,
+        androidProxyServer,
+        preferences: existingPreferences,
+      );
+      supportLatest = await fetchSupportLatestDalvik(
+        http,
+        source,
+        androidProxyServer,
+        preferences: existingPreferences,
+      );
+      filterList = await fetchFilterListDalvik(
+        http,
+        source,
+        androidProxyServer,
+        preferences: existingPreferences,
+      );
+      final freshPreferences = await fetchPreferencesDalvik(
+        http,
+        source,
+        androidProxyServer,
+        preferences: existingPreferences,
+      );
+      preferenceList = freshPreferences == null
+          ? existingPreferences
+          : mergeMihonPreferenceValues(freshPreferences, existingPreferences);
+    } else {
+      headers = await getIsolateService.get<Map<String, String>>(
+        source: source,
+        serviceType: 'getHeaders',
+      );
+    }
+
+    updatedSources.add(
+      Source()
+        ..headers = jsonEncode(headers)
+        ..supportLatest = supportLatest
+        ..filterList = filterList != null
+            ? jsonEncode(filterList.toJson())
+            : null
+        ..preferenceList = preferenceList != null
+            ? jsonEncode(preferenceList.map((e) => e.toJson()).toList())
+            : null
+        ..isAdded = true
+        ..isActive = existingSource?.isActive ?? true
+        ..isPinned = existingSource?.isPinned ?? false
+        ..lastUsed = existingSource?.lastUsed ?? false
+        ..sourceCode = sourceCode
+        ..sourceCodeUrl = source.sourceCodeUrl
+        ..id = source.id
+        ..apiUrl = source.apiUrl
+        ..baseUrl = source.baseUrl
+        ..dateFormat = source.dateFormat
+        ..dateFormatLocale = source.dateFormatLocale
+        ..hasCloudflare = source.hasCloudflare
+        ..iconUrl = source.iconUrl
+        ..typeSource = source.typeSource
+        ..lang = source.lang
+        ..isNsfw = source.isNsfw
+        ..name = source.name
+        ..version = source.version
+        ..versionLast = source.version
+        ..itemType = itemType
+        ..isFullData = source.isFullData ?? false
+        ..appMinVerReq = source.appMinVerReq
+        ..sourceCodeLanguage = source.sourceCodeLanguage
+        ..additionalParams = additionalParams
+        ..isObsolete = false
+        ..notes = source.notes
+        ..repo = repo
+        ..updatedAt = DateTime.now().millisecondsSinceEpoch,
     );
   }
 
-  final updatedSource = Source()
-    ..headers = jsonEncode(headers)
-    ..supportLatest = supportLatest
-    ..filterList = filterList != null ? jsonEncode(filterList.toJson()) : null
-    ..preferenceList = preferenceList != null
-        ? jsonEncode(preferenceList.map((e) => e.toJson()).toList())
-        : null
-    ..isAdded = true
-    ..sourceCode = sourceCode
-    ..sourceCodeUrl = source.sourceCodeUrl
-    ..id = source.id
-    ..apiUrl = source.apiUrl
-    ..baseUrl = source.baseUrl
-    ..dateFormat = source.dateFormat
-    ..dateFormatLocale = source.dateFormatLocale
-    ..hasCloudflare = source.hasCloudflare
-    ..iconUrl = source.iconUrl
-    ..typeSource = source.typeSource
-    ..lang = source.lang
-    ..isNsfw = source.isNsfw
-    ..name = source.name
-    ..version = source.version
-    ..versionLast = source.version
-    ..itemType = itemType
-    ..isFullData = source.isFullData ?? false
-    ..appMinVerReq = source.appMinVerReq
-    ..sourceCodeLanguage = source.sourceCodeLanguage
-    ..additionalParams = source.additionalParams ?? ""
-    ..isObsolete = false
-    ..notes = source.notes
-    ..repo = repo
-    ..updatedAt = DateTime.now().millisecondsSinceEpoch;
+  await isar.writeTxn(() async => isar.sources.putAll(updatedSources));
+}
 
-  await isar.writeTxn(() async => isar.sources.put(updatedSource));
+List<SourcePreference> _decodePreferences(String? preferenceList) {
+  if (preferenceList == null || preferenceList.isEmpty) return [];
+  try {
+    return (jsonDecode(preferenceList) as List)
+        .map((preference) => SourcePreference.fromJson(preference))
+        .toList();
+  } catch (_) {
+    return [];
+  }
 }
 
 Future<void> _addNewSource(Source source, Repo? repo, ItemType itemType) async {
@@ -247,6 +399,7 @@ Future<void> _addNewSource(Source source, Repo? repo, ItemType itemType) async {
     ..sourceCodeLanguage = source.sourceCodeLanguage
     ..isFullData = source.isFullData ?? false
     ..appMinVerReq = source.appMinVerReq
+    ..additionalParams = source.additionalParams
     ..isObsolete = false
     ..notes = source.notes
     ..repo = repo
@@ -278,10 +431,20 @@ Future<void> checkIfSourceIsObsolete(
 
   if (sourceIds.isEmpty) return;
 
+  final mihonExtensionGroups = sourceList
+      .where((source) => source.sourceCodeLanguage == SourceCodeLanguage.mihon)
+      .map(mihonExtensionGroupKey)
+      .toSet();
+
   final toUpdate = <Source>[];
   for (var source in sources) {
+    final belongsToKnownMihonPackage =
+        source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
+        mihonExtensionGroups.contains(mihonExtensionGroupKey(source));
     final isNowObsolete =
-        !sourceIds.contains(source.id) && source.repo?.jsonUrl == repo.jsonUrl;
+        !sourceIds.contains(source.id) &&
+        !belongsToKnownMihonPackage &&
+        source.repo?.jsonUrl == repo.jsonUrl;
 
     if (source.isObsolete != isNowObsolete) {
       source.isObsolete = isNowObsolete;
@@ -315,13 +478,18 @@ int compareVersions(String version1, String version2) {
 Future<Map<String, String>> fetchHeadersDalvik(
   InterceptedClient client,
   Source source,
-  String androidProxyServer,
-) async {
+  String androidProxyServer, {
+  List<SourcePreference> preferences = const [],
+}) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await client.post(
       Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({"method": "headers$name", "data": source.sourceCode}),
+      body: jsonEncode({
+        "method": "headers$name",
+        "data": source.sourceCode,
+        "preferences": mihonPreferencePayload(source, preferences),
+      }),
     );
     final data = jsonDecode(res.body) as List;
     final Map<String, String> headers = {};
@@ -337,8 +505,9 @@ Future<Map<String, String>> fetchHeadersDalvik(
 Future<bool> fetchSupportLatestDalvik(
   InterceptedClient client,
   Source source,
-  String androidProxyServer,
-) async {
+  String androidProxyServer, {
+  List<SourcePreference> preferences = const [],
+}) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await client.post(
@@ -346,6 +515,7 @@ Future<bool> fetchSupportLatestDalvik(
       body: jsonEncode({
         "method": "supportLatest$name",
         "data": source.sourceCode,
+        "preferences": mihonPreferencePayload(source, preferences),
       }),
     );
     return res.body.trim() == "true";
@@ -357,13 +527,18 @@ Future<bool> fetchSupportLatestDalvik(
 Future<FilterList?> fetchFilterListDalvik(
   InterceptedClient client,
   Source source,
-  String androidProxyServer,
-) async {
+  String androidProxyServer, {
+  List<SourcePreference> preferences = const [],
+}) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await client.post(
       Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({"method": "filters$name", "data": source.sourceCode}),
+      body: jsonEncode({
+        "method": "filters$name",
+        "data": source.sourceCode,
+        "preferences": mihonPreferencePayload(source, preferences),
+      }),
     );
     final data = jsonDecode(res.body) as List;
 
@@ -450,15 +625,24 @@ List<dynamic> filtersFromJson(List<dynamic> json) {
 Future<List<SourcePreference>?> fetchPreferencesDalvik(
   InterceptedClient client,
   Source source,
-  String androidProxyServer,
-) async {
+  String androidProxyServer, {
+  List<SourcePreference> preferences = const [],
+  String? changedPreferenceKey,
+}) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await client.post(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
-        "method": "preferences$name",
+        "method": changedPreferenceKey == null
+            ? "preferences$name"
+            : "setPreference$name",
         "data": source.sourceCode,
+        "preferences": mihonPreferencePayload(
+          source,
+          preferences,
+          changedPreferenceKey: changedPreferenceKey,
+        ),
       }),
     );
     final data = jsonDecode(res.body) as List;
@@ -467,6 +651,35 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
           (e) => SourcePreference.fromJson(e)
             ..id = null
             ..sourceId = source.id,
+        )
+        .toList();
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<List<MihonSourceDescriptor>?> fetchMihonSourceDescriptors(
+  InterceptedClient client,
+  Source source,
+  String androidProxyServer, {
+  List<SourcePreference> preferences = const [],
+}) async {
+  try {
+    final name = source.itemType == ItemType.anime ? 'Anime' : 'Manga';
+    final res = await client.post(
+      Uri.parse('$androidProxyServer/dalvik'),
+      body: jsonEncode({
+        'method': 'sources$name',
+        'data': source.sourceCode,
+        'preferences': mihonPreferencePayload(source, preferences),
+      }),
+    );
+    final data = jsonDecode(res.body) as List;
+    return data
+        .map(
+          (descriptor) => MihonSourceDescriptor.fromJson(
+            descriptor as Map<String, dynamic>,
+          ),
         )
         .toList();
   } catch (_) {

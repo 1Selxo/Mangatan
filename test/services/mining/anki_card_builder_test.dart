@@ -181,6 +181,65 @@ void main() {
     expect(draft.mediaFiles, [audio]);
   });
 
+  test('fills sentence audio only when an Anki field requests it', () async {
+    final result = HoshiLookupResult(
+      matched: '食べる',
+      deinflected: '食べる',
+      trace: const [],
+      preprocessorSteps: 0,
+      term: const HoshiTermResult(
+        expression: '食べる',
+        reading: 'たべる',
+        rules: 'v1',
+        score: 1,
+        glossaries: [],
+        frequencies: [],
+        pitches: [],
+      ),
+    );
+    final sentenceAudio = AnkiMediaFile(
+      filename: 'sentence.opus',
+      bytes: Uint8List.fromList([0x4f, 0x67, 0x67, 0x53]),
+    );
+    var loads = 0;
+    final context = MiningContext(
+      sentence: 'パンを食べる。',
+      sentenceAudioLoader: (format) {
+        loads++;
+        expect(format, AnkiSentenceAudioFormat.opus);
+        return sentenceAudio;
+      },
+    );
+
+    final draft = await const AnkiCardBuilder().build(
+      result: result,
+      context: context,
+      profile: const AnkiMiningProfile(
+        sentenceAudioFormat: AnkiSentenceAudioFormat.opus,
+        fieldMap: {'SentenceAudio': AnkiMarker.sentenceAudio},
+      ),
+    );
+
+    expect(loads, 1);
+    expect(draft.fields['SentenceAudio'], '[sound:sentence.opus]');
+    expect(draft.mediaFiles, [sentenceAudio]);
+    expect(
+      AnkiMiningProfile.fromJson({
+        'sentenceAudioFormat': 'opus',
+      }).sentenceAudioFormat,
+      AnkiSentenceAudioFormat.opus,
+    );
+
+    await const AnkiCardBuilder().build(
+      result: result,
+      context: context,
+      profile: const AnkiMiningProfile(
+        fieldMap: {'Sentence': AnkiMarker.sentence},
+      ),
+    );
+    expect(loads, 1);
+  });
+
   test(
     'fills Chimahon/Yomitan-style dictionary single glossary markers',
     () async {

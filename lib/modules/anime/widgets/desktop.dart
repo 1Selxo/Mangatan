@@ -18,34 +18,31 @@ import 'package:window_manager/window_manager.dart';
 class DesktopControllerWidget extends ConsumerStatefulWidget {
   final Function(Duration?) tempDuration;
   final Function(bool?) doubleSpeed;
-  final AnimeStreamController streamController;
   final VideoController videoController;
   final Widget topButtonBarWidget;
-  final GlobalKey<VideoState> videoStatekey;
+  final Widget primaryButtonBarWidget;
   final Widget bottomButtonBarWidget;
-  final Widget seekToWidget;
   final int defaultSkipIntroLength;
   final void Function(bool) desktopFullScreenPlayer;
   final ValueNotifier<List<(String, int)>> chapterMarks;
-  // Bumped by the player on each d-pad key so the desktop controls can reveal on
-  // a TV remote — they otherwise only appear on mouse hover. Null off-TV.
-  final ValueNotifier<int>? revealControls;
-  final MiningContext Function(String text)? subtitleMiningContextBuilder;
+  final Future<MiningContext> Function(String text)?
+  subtitleMiningContextBuilder;
+  final bool videoOcrActive;
+  final Future<void> Function()? onVideoOcrShortcut;
   const DesktopControllerWidget({
     super.key,
     required this.videoController,
     required this.topButtonBarWidget,
+    required this.primaryButtonBarWidget,
     required this.bottomButtonBarWidget,
-    required this.streamController,
-    required this.videoStatekey,
-    required this.seekToWidget,
     required this.tempDuration,
     required this.doubleSpeed,
     required this.defaultSkipIntroLength,
     required this.desktopFullScreenPlayer,
     required this.chapterMarks,
-    this.revealControls,
     this.subtitleMiningContextBuilder,
+    this.videoOcrActive = false,
+    this.onVideoOcrShortcut,
   });
 
   @override
@@ -78,18 +75,7 @@ class _DesktopControllerWidgetState
   final List<StreamSubscription> subscriptions = [];
   DateTime last = DateTime.now();
   Timer? _tapTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Reveal on a d-pad key (TV remote) — the desktop controls otherwise only
-    // appear on mouse hover, which a remote can't trigger.
-    widget.revealControls?.addListener(_onRevealRequest);
-  }
-
-  void _onRevealRequest() {
-    if (mounted) onEnter();
-  }
+  DateTime? _lastSpaceShortcutAt;
 
   @override
   void setState(VoidCallback fn) {
@@ -122,7 +108,6 @@ class _DesktopControllerWidgetState
 
   @override
   void dispose() {
-    widget.revealControls?.removeListener(_onRevealRequest);
     for (final subscription in subscriptions) {
       subscription.cancel();
     }
@@ -203,6 +188,29 @@ class _DesktopControllerWidgetState
 
   final bool modifyVolumeOnScroll = true; // TODO. The variable is never changed
   final bool toggleFullscreenOnDoublePress = true; // TODO. variable not changed
+  static const _spaceDoublePressWindow = Duration(milliseconds: 360);
+
+  void _handleSpaceShortcut() {
+    final onVideoOcrShortcut = widget.onVideoOcrShortcut;
+    if (widget.videoOcrActive && onVideoOcrShortcut != null) {
+      _lastSpaceShortcutAt = null;
+      unawaited(onVideoOcrShortcut());
+      return;
+    }
+    final now = DateTime.now();
+    final lastSpaceShortcutAt = _lastSpaceShortcutAt;
+    if (lastSpaceShortcutAt != null &&
+        now.difference(lastSpaceShortcutAt) <= _spaceDoublePressWindow) {
+      _lastSpaceShortcutAt = null;
+      if (onVideoOcrShortcut != null) {
+        unawaited(onVideoOcrShortcut());
+        return;
+      }
+    }
+    _lastSpaceShortcutAt = now;
+    widget.videoController.player.playOrPause();
+  }
+
   @override
   Widget build(BuildContext context) {
     _scheduleSubtitleAnchorUpdate();
@@ -220,8 +228,7 @@ class _DesktopControllerWidgetState
             widget.videoController.player.next(),
         const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious): () =>
             widget.videoController.player.previous(),
-        const SingleActivator(LogicalKeyboardKey.space): () =>
-            widget.videoController.player.playOrPause(),
+        const SingleActivator(LogicalKeyboardKey.space): _handleSpaceShortcut,
         const SingleActivator(LogicalKeyboardKey.keyJ): () {
           final rate =
               widget.videoController.player.state.position -
@@ -268,10 +275,6 @@ class _DesktopControllerWidgetState
         },
         const SingleActivator(LogicalKeyboardKey.keyF): () async {
           await _changeFullScreen(ref, widget.desktopFullScreenPlayer);
-        },
-        const SingleActivator(LogicalKeyboardKey.escape): () async {
-          final desktopFullScreenPlayer = widget.desktopFullScreenPlayer;
-          await _changeFullScreen(ref, desktopFullScreenPlayer, value: false);
         },
         const SingleActivator(LogicalKeyboardKey.digit0, control: true): () {
           (widget.videoController.player.platform as NativePlayer).command([
@@ -423,31 +426,17 @@ class _DesktopControllerWidgetState
                           clipBehavior: Clip.none,
                           alignment: Alignment.bottomCenter,
                           children: [
-                            // Top gradient.
                             Container(
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
-                                  stops: [0.0, 0.2],
+                                  stops: [0.0, 0.2, 0.7, 1.0],
                                   colors: [
-                                    Color(0x61000000),
+                                    Color(0xCC000000),
                                     Color(0x00000000),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Bottom gradient.
-                            Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  stops: [0.5, 1.0],
-                                  colors: [
                                     Color(0x00000000),
-                                    Color(0x61000000),
+                                    Color(0xCC000000),
                                   ],
                                 ),
                               ),
@@ -463,32 +452,48 @@ class _DesktopControllerWidgetState
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  // Expanded only controls the main axis of a
+                                  // Column. Stretch the cross axis as well so
+                                  // the centered control Stack gets the full
+                                  // player width instead of being pinned right.
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     widget.topButtonBarWidget,
-                                    // Only display [primaryButtonBar] if [buffering] is false.
                                     Expanded(
-                                      child: AnimatedOpacity(
-                                        curve: Curves.easeInOut,
-                                        opacity: buffering
-                                            ? 0.0
-                                            : !showSwipeDuration
-                                            ? 0.0
-                                            : 1.0,
-                                        duration: controlsTransitionDuration,
-                                        child: Center(
-                                          child: seekIndicatorTextWidget(
-                                            Duration(seconds: swipeDuration),
-                                            widget
-                                                .videoController
-                                                .player
-                                                .state
-                                                .position,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          AnimatedOpacity(
+                                            curve: Curves.easeInOut,
+                                            opacity:
+                                                !buffering && !showSwipeDuration
+                                                ? 1.0
+                                                : 0.0,
+                                            duration:
+                                                controlsTransitionDuration,
+                                            child:
+                                                widget.primaryButtonBarWidget,
                                           ),
-                                        ),
+                                          AnimatedOpacity(
+                                            curve: Curves.easeInOut,
+                                            opacity: showSwipeDuration
+                                                ? 1.0
+                                                : 0.0,
+                                            duration:
+                                                controlsTransitionDuration,
+                                            child: seekIndicatorTextWidget(
+                                              Duration(seconds: swipeDuration),
+                                              widget
+                                                  .videoController
+                                                  .player
+                                                  .state
+                                                  .position,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    widget.seekToWidget,
                                     Transform.translate(
                                       offset: Offset.zero,
                                       child: Padding(

@@ -9,6 +9,7 @@ import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 
 class DictionaryScreen extends StatefulWidget {
@@ -826,6 +827,32 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   value: _ankiAudioPreferences.enabled,
                   onChanged: (value) => _saveAnkiAudio(
                     _ankiAudioPreferences.copyWith(enabled: value),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<AnkiSentenceAudioFormat>(
+                    initialValue: _ankiProfile.sentenceAudioFormat,
+                    decoration: const InputDecoration(
+                      labelText: 'Sentence audio format',
+                      prefixIcon: Icon(Icons.record_voice_over_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: AnkiSentenceAudioFormat.mp3,
+                        child: Text('MP3'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiSentenceAudioFormat.opus,
+                        child: Text('Opus'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _saveAnki(
+                        _ankiProfile.copyWith(sentenceAudioFormat: value),
+                      );
+                    },
                   ),
                 ),
                 Padding(

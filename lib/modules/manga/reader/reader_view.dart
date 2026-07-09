@@ -810,6 +810,7 @@ class _MangaChapterPageGalleryState
         animationMaxScale: 8,
         cacheGesture: true,
         hitTestBehavior: HitTestBehavior.translucent,
+        reverseMousePointerScrollDirection: true,
       ),
       onDoubleTap: (state) {
         final Offset? pointerDownPosition = state.pointerDownPosition;

@@ -1,8 +1,10 @@
 import 'package:extended_image/extended_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_paged.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_paged.dart';
@@ -200,23 +202,44 @@ class _DoublePageViewState extends State<DoublePageView>
   }
 
   Widget _buildPagedMode() {
-    return PhotoViewGallery.builder(
-      backgroundDecoration: const BoxDecoration(color: Colors.transparent),
-      itemCount: 1,
-      builder: (context, _) {
-        return PhotoViewGalleryPageOptions.customChild(
-          controller: _photoViewController,
-          scaleStateController: _photoViewScaleStateController,
-          basePosition: _scalePosition,
-          onScaleEnd: _onScaleEnd,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onDoubleTapDown: (details) => _toggleScale(details.globalPosition),
-            onDoubleTap: () {},
-            child: _buildPageRow(),
-          ),
-        );
-      },
+    return LayoutBuilder(
+      builder: (zoomContext, _) => PhotoViewGallery.builder(
+        backgroundDecoration: const BoxDecoration(color: Colors.transparent),
+        itemCount: 1,
+        builder: (context, _) {
+          return PhotoViewGalleryPageOptions.customChild(
+            controller: _photoViewController,
+            scaleStateController: _photoViewScaleStateController,
+            basePosition: _scalePosition,
+            onScaleEnd: _onScaleEnd,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerSignal: (event) =>
+                  _handlePointerSignal(event, zoomContext: zoomContext),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onDoubleTapDown: (details) =>
+                    _toggleScale(details.globalPosition),
+                onDoubleTap: () {},
+                child: _buildPageRow(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _handlePointerSignal(
+    PointerSignalEvent event, {
+    required BuildContext zoomContext,
+  }) {
+    registerReaderModifierWheelZoom(
+      event,
+      zoomContext: zoomContext,
+      photoViewController: _photoViewController,
+      scaleStateController: _photoViewScaleStateController,
+      basePosition: _scalePosition,
     );
   }
 
@@ -250,6 +273,7 @@ class _DoublePageViewState extends State<DoublePageView>
 
     return ImageViewPaged(
       data: pageData,
+      enableGestures: false,
       normalizeOcrPaintCoordinates: true,
       loadStateChanged: (state) {
         switch (state.extendedImageLoadState) {

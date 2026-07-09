@@ -1,5 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
@@ -69,33 +71,41 @@ class ImageViewWebtoon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PhotoViewGallery.builder(
-      itemCount: 1,
-      builder: (_, _) => PhotoViewGalleryPageOptions.customChild(
-        controller: photoViewController,
-        scaleStateController: photoViewScaleStateController,
-        basePosition: scalePosition,
-        onScaleEnd: (context, details, controllerValue) => onScaleEnd(details),
-        child: ScrollablePositionedList.separated(
-          scrollDirection: scrollDirection,
-          reverse: reverse,
-          minCacheExtent: minCacheExtent,
-          initialScrollIndex: initialScrollIndex,
-          itemCount: isDoublePageMode && !isHorizontalContinuous
-              ? doublePageViewCount(pages.length, pageMode)
-              : pages.length,
-          physics: physics,
-          itemScrollController: itemScrollController,
-          scrollOffsetController: scrollOffsetController,
-          itemPositionsListener: itemPositionsListener,
-          itemBuilder: (context, index) => _buildItem(context, index),
-          separatorBuilder: _buildSeparator,
+    return LayoutBuilder(
+      builder: (zoomContext, _) => PhotoViewGallery.builder(
+        itemCount: 1,
+        builder: (_, _) => PhotoViewGalleryPageOptions.customChild(
+          controller: photoViewController,
+          scaleStateController: photoViewScaleStateController,
+          basePosition: scalePosition,
+          onScaleEnd: (context, details, controllerValue) =>
+              onScaleEnd(details),
+          child: _wrapPointerSignalHandler(
+            zoomContext: zoomContext,
+            child: ScrollablePositionedList.separated(
+              scrollDirection: scrollDirection,
+              reverse: reverse,
+              minCacheExtent: minCacheExtent,
+              initialScrollIndex: initialScrollIndex,
+              itemCount: isDoublePageMode && !isHorizontalContinuous
+                  ? doublePageViewCount(pages.length, pageMode)
+                  : pages.length,
+              physics: physics,
+              itemScrollController: itemScrollController,
+              scrollOffsetController: scrollOffsetController,
+              itemPositionsListener: itemPositionsListener,
+              itemBuilder: (context, index) =>
+                  _buildItem(context, index, zoomContext),
+              separatorBuilder: (context, index) =>
+                  _buildSeparator(context, index, zoomContext),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildItem(BuildContext context, int index) {
+  Widget _buildItem(BuildContext context, int index, BuildContext zoomContext) {
     final currentActualIndex = isDoublePageMode && !isHorizontalContinuous
         ? doublePageViewToActualIndex(index, pages.length, pageMode)
         : index;
@@ -104,11 +114,14 @@ class ImageViewWebtoon extends StatelessWidget {
       '${currentPage.chapter?.id ?? "trans"}-${currentPage.index ?? currentActualIndex}',
     );
 
-    return KeyedSubtree(
-      key: uniqueKey,
-      child: (isDoublePageMode && !isHorizontalContinuous)
-          ? _buildDoublePageItem(context, index)
-          : _buildSinglePageItem(context, index),
+    return _wrapPointerSignalHandler(
+      zoomContext: zoomContext,
+      child: KeyedSubtree(
+        key: uniqueKey,
+        child: (isDoublePageMode && !isHorizontalContinuous)
+            ? _buildDoublePageItem(context, index)
+            : _buildSinglePageItem(context, index),
+      ),
     );
   }
 
@@ -167,18 +180,68 @@ class ImageViewWebtoon extends StatelessWidget {
     );
   }
 
-  Widget _buildSeparator(BuildContext context, int index) {
+  Widget _buildSeparator(
+    BuildContext context,
+    int index,
+    BuildContext zoomContext,
+  ) {
     if (!showPageGaps || readerMode == ReaderMode.webtoon) {
       return const SizedBox.shrink();
     }
 
     if (isHorizontalContinuous) {
-      return VerticalDivider(
-        color: getBackgroundColor(backgroundColor),
-        width: 6,
+      return _wrapPointerSignalHandler(
+        zoomContext: zoomContext,
+        child: VerticalDivider(
+          color: getBackgroundColor(backgroundColor),
+          width: 6,
+        ),
       );
     } else {
-      return Divider(color: getBackgroundColor(backgroundColor), height: 6);
+      return _wrapPointerSignalHandler(
+        zoomContext: zoomContext,
+        child: Divider(color: getBackgroundColor(backgroundColor), height: 6),
+      );
     }
+  }
+
+  Widget _wrapPointerSignalHandler({
+    required BuildContext zoomContext,
+    required Widget child,
+  }) {
+    return Builder(
+      builder: (scrollContext) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerSignal: (event) => _handlePointerSignal(
+          event,
+          zoomContext: zoomContext,
+          scrollContext: scrollContext,
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  void _handlePointerSignal(
+    PointerSignalEvent event, {
+    required BuildContext zoomContext,
+    required BuildContext scrollContext,
+  }) {
+    if (registerReaderModifierWheelZoom(
+      event,
+      zoomContext: zoomContext,
+      photoViewController: photoViewController,
+      scaleStateController: photoViewScaleStateController,
+      basePosition: scalePosition,
+    )) {
+      return;
+    }
+
+    registerHorizontalContinuousWheelScroll(
+      event,
+      isHorizontalContinuous: isHorizontalContinuous,
+      scrollContext: scrollContext,
+      scrollOffsetController: scrollOffsetController,
+    );
   }
 }

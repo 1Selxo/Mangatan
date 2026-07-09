@@ -17,6 +17,7 @@ class ImageViewPaged extends ConsumerStatefulWidget {
   final GestureConfig Function(ExtendedImageState state)?
   initGestureConfigHandler;
   final bool normalizeOcrPaintCoordinates;
+  final bool enableGestures;
   const ImageViewPaged({
     super.key,
     required this.data,
@@ -25,6 +26,7 @@ class ImageViewPaged extends ConsumerStatefulWidget {
     this.onDoubleTap,
     this.initGestureConfigHandler,
     this.normalizeOcrPaintCoordinates = false,
+    this.enableGestures = true,
   });
 
   @override
@@ -74,13 +76,16 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
     final image = widget.data.getImageProvider(ref, true);
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);
     final needsScaleOverride =
-        scaleType == ScaleType.fitWidth || scaleType == ScaleType.fitHeight;
+        widget.enableGestures &&
+        (scaleType == ScaleType.fitWidth || scaleType == ScaleType.fitHeight);
     final effectiveFit = needsScaleOverride
         ? BoxFit.contain
         : getBoxFit(scaleType);
 
     GestureConfig Function(ExtendedImageState)? effectiveGestureHandler;
-    if (needsScaleOverride) {
+    if (!widget.enableGestures) {
+      effectiveGestureHandler = null;
+    } else if (needsScaleOverride) {
       effectiveGestureHandler = (ExtendedImageState state) {
         final base = widget.initGestureConfigHandler?.call(state);
         double initScale = base?.initialScale ?? 1.0;
@@ -103,14 +108,19 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
           }
         }
         return GestureConfig(
+          minScale: base?.minScale ?? 0.8,
+          speed: base?.speed ?? 1,
           initialScale: initScale,
           initialAlignment: alignment,
           inertialSpeed: base?.inertialSpeed ?? 200,
           inPageView: base?.inPageView ?? true,
           maxScale: base?.maxScale ?? 8,
+          animationMinScale: base?.animationMinScale,
           animationMaxScale: base?.animationMaxScale ?? 8,
           cacheGesture: base?.cacheGesture ?? true,
           hitTestBehavior: base?.hitTestBehavior ?? HitTestBehavior.translucent,
+          reverseMousePointerScrollDirection:
+              base?.reverseMousePointerScrollDirection ?? true,
         );
       };
     } else {
@@ -138,7 +148,9 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
           color: color,
           fit: effectiveFit,
           filterQuality: FilterQuality.medium,
-          mode: ExtendedImageMode.gesture,
+          mode: widget.enableGestures
+              ? ExtendedImageMode.gesture
+              : ExtendedImageMode.none,
           handleLoadingProgress: true,
           loadStateChanged: (state) {
             if (state.extendedImageLoadState == LoadState.completed) {
@@ -147,7 +159,7 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
             return widget.loadStateChanged(state);
           },
           initGestureConfigHandler: effectiveGestureHandler,
-          onDoubleTap: widget.onDoubleTap,
+          onDoubleTap: widget.enableGestures ? widget.onDoubleTap : null,
           afterPaintImage: (canvas, rect, image, paint) {
             _ocr.paint(
               canvas,

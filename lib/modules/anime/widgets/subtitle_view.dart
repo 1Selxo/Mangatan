@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -188,6 +189,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     Offset globalPosition,
     String subtitleText, {
     bool hoverTriggered = false,
+    Future<List<HoshiLookupResult>>? initialResults,
   }) async {
     final builder = widget.miningContextBuilder;
     if (builder == null || subtitleText.trim().isEmpty) return null;
@@ -207,13 +209,12 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     final anchor = paragraph == null
         ? Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1)
         : _lookupAnchorRect(paragraph: paragraph, selection: selection);
-    final miningContext = await builder(subtitleText);
-    if (!context.mounted) return null;
     return DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
       text: selection.text,
-      miningContext: miningContext,
+      miningContext: builder(subtitleText),
+      initialResults: initialResults,
       dismissOnOutsideTap: !hoverTriggered,
       onMatchChanged: (count) {
         if (!mounted || count <= 0) return;
@@ -244,19 +245,20 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       _scheduleHoverDismiss();
       return;
     }
-    if (_sameSelection(_hoverSelection, selection) && _hoverPopup != null) {
-      return;
-    }
+    if (_sameSelection(_hoverSelection, selection)) return;
     _clearHighlightIfNeeded();
     _hoverSelection = selection;
+    final initialResults = DictionaryLookupPopup.lookup(selection.text);
+    unawaited(initialResults.then<void>((_) {}, onError: (_) {}));
     _hoverLookupTimer?.cancel();
-    _hoverLookupTimer = Timer(const Duration(milliseconds: 140), () {
+    _hoverLookupTimer = Timer(const Duration(milliseconds: 60), () {
       unawaited(
         _openHoverLookup(
           context: context,
           selection: selection,
           subtitleText: subtitleText,
           globalPosition: globalPosition,
+          initialResults: initialResults,
         ),
       );
     });
@@ -267,6 +269,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     required _SubtitleLookupSelection selection,
     required String subtitleText,
     required Offset globalPosition,
+    required Future<List<HoshiLookupResult>> initialResults,
   }) async {
     if (!mounted ||
         !_subtitleHovered ||
@@ -289,6 +292,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       globalPosition,
       subtitleText,
       hoverTriggered: true,
+      initialResults: initialResults,
     );
     if (!mounted ||
         !_sameSelection(_hoverSelection, selection) ||

@@ -18,17 +18,28 @@ import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// Each result already contains every matching dictionary glossary. Keeping the
+// headword count bounded avoids copying a very large nested payload through
+// C++, Rust, Dart, and the WebView for every hover.
+const hoshiPopupMaxResults = 3;
+
+// Hoshidicts checks every prefix up to this length. Japanese words fit well
+// within 24 characters, while an 80-character subtitle run multiplies queries.
+const hoshiPopupScanLength = 24;
+
 class HoshiDictionaryPopup extends StatefulWidget {
   const HoshiDictionaryPopup({
     super.key,
     required this.text,
     this.miningContext,
+    this.initialResults,
     required this.preferences,
     required this.onMatchChanged,
   });
 
   final String text;
-  final MiningContext? miningContext;
+  final FutureOr<MiningContext?> miningContext;
+  final Future<List<HoshiLookupResult>>? initialResults;
   final DictionaryPopupPreferences preferences;
   final ValueChanged<int> onMatchChanged;
 
@@ -37,7 +48,8 @@ class HoshiDictionaryPopup extends StatefulWidget {
 }
 
 class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
-  late final Future<_HoshiPopupData> _shellFuture = _loadShell();
+  Future<_HoshiPopupData>? _shellFuture;
+  late final Future<Map<String, String>> _stylesFuture;
   InAppWebViewController? _controller;
   List<HoshiLookupResult> _results = const [];
   List<Map<String, dynamic>> _entries = const [];
@@ -46,28 +58,62 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   int _lookupGeneration = 0;
   Future<void> _javascriptQueue = Future<void>.value();
   Player? _audioPlayer;
+  String? _requestedQuery;
+  String? _resultQuery;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.text.trim().isNotEmpty) {
+      unawaited(
+        _lookupAndRender(
+          widget.text,
+          notifyMatch: true,
+          initialResults: widget.initialResults,
+        ),
+      );
+    }
+    _stylesFuture = _loadStyles();
+  }
 
   @override
   void didUpdateWidget(covariant HoshiDictionaryPopup oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text && _webReady) {
-      unawaited(_lookupAndRender(widget.text, notifyMatch: true));
+    if (oldWidget.text != widget.text) {
+      unawaited(
+        _lookupAndRender(
+          widget.text,
+          notifyMatch: true,
+          initialResults: widget.initialResults,
+        ),
+      );
+    } else if (oldWidget.initialResults != widget.initialResults) {
+      if (_resultQuery == widget.text.trim()) {
+        if (_results.isNotEmpty) {
+          widget.onMatchChanged(_results.first.matched.length);
+        }
+      } else {
+        unawaited(
+          _lookupAndRender(
+            widget.text,
+            notifyMatch: true,
+            initialResults: widget.initialResults,
+          ),
+        );
+      }
     }
   }
 
-  Future<_HoshiPopupData> _loadShell() async {
-    final theme = Theme.of(context);
-    final dark = _isDarkPopup(context, widget.preferences.theme);
+  Future<_HoshiPopupData> _loadShell({
+    required ThemeData theme,
+    required bool dark,
+  }) async {
     final values = await Future.wait<dynamic>([
       rootBundle.loadString('assets/hoshi_popup/popup.css'),
       rootBundle.loadString('assets/hoshi_popup/popup.js'),
       rootBundle.loadString('assets/hoshi_popup/selection.js'),
       MiningPreferences.getAnkiAudioPreferences(),
-      HoshidictsLookupBackend.instance.getStyles().catchError(
-        (_) => <HoshiDictionaryStyle>[],
-      ),
     ]);
-    final styles = values[4] as List<HoshiDictionaryStyle>;
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
         popupCss: values[0] as String,
@@ -78,8 +124,14 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         theme: theme,
         dark: dark,
       ),
-      styles: {for (final style in styles) style.dictName: style.styles},
     );
+  }
+
+  Future<Map<String, String>> _loadStyles() async {
+    final styles = await HoshidictsLookupBackend.instance
+        .getStyles()
+        .catchError((_) => <HoshiDictionaryStyle>[]);
+    return {for (final style in styles) style.dictName: style.styles};
   }
 
   void _setResults(List<HoshiLookupResult> results) {
@@ -90,31 +142,37 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   Future<void> _lookupAndRender(
     String text, {
     required bool notifyMatch,
+    Future<List<HoshiLookupResult>>? initialResults,
   }) async {
     final generation = ++_lookupGeneration;
     final query = text.trim();
+    _requestedQuery = query;
     final results = query.isEmpty
         ? <HoshiLookupResult>[]
-        : await HoshidictsLookupBackend.instance.lookup(
-            query,
-            maxResults: 20,
-            scanLength: 80,
-          );
+        : await (initialResults ??
+              HoshidictsLookupBackend.instance.lookup(
+                query,
+                maxResults: hoshiPopupMaxResults,
+                scanLength: hoshiPopupScanLength,
+              ));
     if (!mounted || generation != _lookupGeneration) return;
+    final unchanged = query == _resultQuery && identical(results, _results);
     _setResults(results);
+    _resultQuery = query;
     if (notifyMatch && results.isNotEmpty) {
       widget.onMatchChanged(results.first.matched.length);
     }
-    await _replaceRender();
+    if (!unchanged) await _replaceRender();
   }
 
   Future<int> _lookupRedirect(String query) async {
     final results = await HoshidictsLookupBackend.instance.lookup(
       query,
-      maxResults: 20,
-      scanLength: 80,
+      maxResults: hoshiPopupMaxResults,
+      scanLength: hoshiPopupScanLength,
     );
     _setResults(results);
+    _resultQuery = query.trim();
     return _entries.length;
   }
 
@@ -147,10 +205,10 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
     }
     if (result == null || _exporting) return false;
-    final miningContext = widget.miningContext;
-    if (miningContext == null) return false;
     setState(() => _exporting = true);
     try {
+      final miningContext = await widget.miningContext;
+      if (miningContext == null) return false;
       final profile = await MiningPreferences.getAnkiProfile();
       if (!profile.ankiEnabled) {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
@@ -332,9 +390,9 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     );
   }
 
-  Future<void> _render(_HoshiPopupData data) async {
+  Future<void> _render(Map<String, String> styles) async {
     await _evaluateJavascript(
-      'window.dictionaryStyles = ${jsonEncode(data.styles)};'
+      'window.dictionaryStyles = ${jsonEncode(styles)};'
       '${hoshiReplaceRenderScriptForEntries(_entries)}',
     );
   }
@@ -372,15 +430,33 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   @override
+  void reassemble() {
+    super.reassemble();
+    if (!_webReady) _shellFuture = null;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final shellFuture = _shellFuture ??= _loadShell(
+      theme: theme,
+      dark: _isDarkPopup(theme.brightness, widget.preferences.theme),
+    );
     return FutureBuilder<_HoshiPopupData>(
-      future: _shellFuture,
+      future: shellFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Lookup failed: ${snapshot.error}'));
+          return Center(
+            child: TextButton(
+              onPressed: () => setState(() => _shellFuture = null),
+              child: const Text(
+                'Dictionary popup failed to load. Tap to retry.',
+              ),
+            ),
+          );
         }
         final data = snapshot.data!;
         return Listener(
@@ -413,8 +489,14 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             },
             onLoadStop: (_, _) async {
               _webReady = true;
-              await _render(data);
-              await _lookupAndRender(widget.text, notifyMatch: true);
+              await _render(await _stylesFuture);
+              if (_requestedQuery != widget.text.trim()) {
+                await _lookupAndRender(
+                  widget.text,
+                  notifyMatch: true,
+                  initialResults: widget.initialResults,
+                );
+              }
             },
             onLoadResourceWithCustomScheme: _usesStableCustomSchemes
                 ? (_, request) => _loadDictionaryMedia(request)
@@ -647,7 +729,7 @@ String buildHoshiPopupHtml({
     window.compactGlossariesAnki = false;
     window.customCSS = $customCss;
     window.scanNonJapaneseText = true;
-    window.scanLength = 80;
+    window.scanLength = $hoshiPopupScanLength;
     window.swipeThreshold = 0;
     window.webkit = {messageHandlers: new Proxy({}, {get: (_, name) => ({
       postMessage: (payload) => ${jsonEncode(nativeHandlers)}.includes(String(name))
@@ -692,13 +774,14 @@ String buildHoshiPopupHtml({
       );
 }
 
-bool _isDarkPopup(BuildContext context, DictionaryThemePreference preference) =>
-    switch (preference) {
-      DictionaryThemePreference.light => false,
-      DictionaryThemePreference.dark || DictionaryThemePreference.black => true,
-      DictionaryThemePreference.system =>
-        Theme.of(context).brightness == Brightness.dark,
-    };
+bool _isDarkPopup(
+  Brightness brightness,
+  DictionaryThemePreference preference,
+) => switch (preference) {
+  DictionaryThemePreference.light => false,
+  DictionaryThemePreference.dark || DictionaryThemePreference.black => true,
+  DictionaryThemePreference.system => brightness == Brightness.dark,
+};
 
 String _cssColor(Color color) {
   final rgb = color.toARGB32() & 0x00ffffff;
@@ -720,8 +803,7 @@ bool get _usesStableCustomSchemes =>
     kIsWeb || defaultTargetPlatform != TargetPlatform.windows;
 
 class _HoshiPopupData {
-  const _HoshiPopupData({required this.html, required this.styles});
+  const _HoshiPopupData({required this.html});
 
   final String html;
-  final Map<String, String> styles;
 }

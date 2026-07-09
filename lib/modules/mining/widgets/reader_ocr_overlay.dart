@@ -639,8 +639,6 @@ class ReaderOcrController extends ChangeNotifier {
     final anchor = hit.blockRectIsGlobal
         ? hit.blockRect
         : _localAnchorFor(context, hit.blockRect);
-    final bytes = data.cropImage ?? await data.getImageBytes;
-    if (!context.mounted) return true;
     if (triggeredByHover &&
         !ReaderOcrState._isCurrentHoverLookup(hoverGeneration!, hoverKey!)) {
       return true;
@@ -656,7 +654,8 @@ class ReaderOcrController extends ChangeNotifier {
         sentence: ordered,
         pageIndex: data.pageIndex,
         sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
-        imageBytesLoader: () async => bytes,
+        imageBytesLoader: () async =>
+            data.cropImage ?? await data.getImageBytes,
       ),
       onMatchChanged: (length) {
         _matchLength = math.max(0, length);

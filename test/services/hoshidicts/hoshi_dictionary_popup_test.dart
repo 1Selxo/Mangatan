@@ -94,6 +94,9 @@ void main() {
     expect(html, contains('window.hoshiSelection = {};'));
     expect(html, contains("window.collapseMode = 'Expand All'"));
     expect(html, contains('window.harmonicFrequency = true'));
+    expect(hoshiPopupMaxResults, 3);
+    expect(hoshiPopupScanLength, 24);
+    expect(html, contains('window.scanLength = 24;'));
     expect(html, contains('window.audioSources = [];'));
     expect(html, contains('flutter_inappwebview.callHandler'));
     expect(html, contains('getTermAudioSources'));

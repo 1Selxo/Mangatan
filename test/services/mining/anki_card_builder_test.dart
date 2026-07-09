@@ -38,6 +38,7 @@ void main() {
       'DefinitionPicture',
       'Picture',
       'Glossary',
+      'SelectionText',
       'IsWordAndSentenceCard',
       'Frequency',
       'FreqSort',
@@ -58,6 +59,7 @@ void main() {
         'furiganaPlain': 'term[reading]',
         'glossary': '<div class="yomitan-glossary">all</div>',
         'glossaryFirst': '<div class="yomitan-glossary">first</div>',
+        'popupSelectionText': 'chosen definition',
         'frequenciesHtml': '<ul><li>Test: 10</li></ul>',
         'freqHarmonicRank': '10',
       },
@@ -67,11 +69,71 @@ void main() {
     expect(draft.fields['ExpressionFurigana'], 'term[reading]');
     expect(draft.fields['MainDefinition'], contains('first'));
     expect(draft.fields['Glossary'], contains('all'));
+    expect(draft.fields['SelectionText'], 'chosen definition');
     expect(draft.fields['DefinitionPicture'], isEmpty);
     expect(draft.fields['IsWordAndSentenceCard'], 'x');
     expect(draft.fields['Frequency'], contains('Test: 10'));
     expect(draft.fields['FreqSort'], '10');
     expect(draft.mediaFiles, [media]);
+  });
+
+  test('fills selection markers from highlighted popup text only', () async {
+    expect(AnkiMarker.standardTemplates['Selection text'], '{selection-text}');
+
+    final result = HoshiLookupResult(
+      matched: 'term',
+      deinflected: 'term',
+      trace: const [],
+      preprocessorSteps: 0,
+      term: const HoshiTermResult(
+        expression: 'term',
+        reading: 'term',
+        rules: '',
+        score: 1,
+        glossaries: [
+          HoshiGlossaryEntry(
+            dictName: 'JMdict',
+            glossary: 'long definition',
+            definitionTags: '',
+            termTags: '',
+          ),
+        ],
+        frequencies: [],
+        pitches: [],
+      ),
+    );
+
+    final selectedDraft = await const AnkiCardBuilder().build(
+      result: result,
+      context: const MiningContext(sentence: 'a term in context'),
+      profile: const AnkiMiningProfile(
+        fieldMap: {
+          'SelectionText': AnkiMarker.selectionText,
+          'LegacyPopupSelectionText': '{popup-selection-text}',
+        },
+      ),
+      renderedContent: const {'popupSelectionText': 'chosen <definition>'},
+    );
+
+    expect(selectedDraft.fields['SelectionText'], 'chosen &lt;definition&gt;');
+    expect(
+      selectedDraft.fields['LegacyPopupSelectionText'],
+      'chosen &lt;definition&gt;',
+    );
+
+    final emptyDraft = await const AnkiCardBuilder().build(
+      result: result,
+      context: const MiningContext(sentence: 'a term in context'),
+      profile: const AnkiMiningProfile(
+        fieldMap: {
+          'SelectionText': AnkiMarker.selectionText,
+          'LegacyPopupSelectionText': '{popup-selection-text}',
+        },
+      ),
+    );
+
+    expect(emptyDraft.fields['SelectionText'], isEmpty);
+    expect(emptyDraft.fields['LegacyPopupSelectionText'], isEmpty);
   });
 
   test('fills audio markers and attaches audio media', () async {

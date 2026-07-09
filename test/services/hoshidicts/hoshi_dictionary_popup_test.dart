@@ -207,6 +207,21 @@ void main() {
     expect(popup, contains('audio-speaker-body'));
     expect(popup, contains('M3 9v6h4l5 4V5L7 9H3z'));
     expect(popup, contains('window.resetHoshiAudioCaches = resetAudioCaches'));
+    expect(popup, contains('function hasPopupTextSelection()'));
+    expect(popup, contains('function rememberPopupTextSelection()'));
+    expect(
+      popup,
+      contains(
+        "document.addEventListener('selectionchange', rememberPopupTextSelection);",
+      ),
+    );
+    expect(
+      popup,
+      contains(
+        'const selectedText = rememberPopupTextSelection() || lastSelection;',
+      ),
+    );
+    expect(popup, contains('if (hasPopupTextSelection())'));
     expect(popup, contains('const audioKey = audioCacheKey(entry);'));
     expect(popup, contains('audioUrls[audioKey]'));
     expect(popup, isNot(contains('audioUrls[idx]')));

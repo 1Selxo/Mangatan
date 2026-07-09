@@ -39,6 +39,9 @@ class AnkiCardBuilder {
     final renderedSingleGlossaries = _renderedSingleGlossaries(
       renderedContent['singleGlossaries'],
     );
+    final selectedText = _escape(
+      renderedContent['popupSelectionText']?.toString() ?? '',
+    );
     final glossary = rendered('glossary', _glossary(result.term.glossaries));
     final glossaryPlain = _glossaryPlain(result.term.glossaries);
     final selectedDictionary =
@@ -145,11 +148,8 @@ class AnkiCardBuilder {
       AnkiMarker.media: _escape(context.locationLabel),
       AnkiMarker.source: _escape(context.locationLabel),
       AnkiMarker.documentTitle: _escape(context.sourceTitle),
-      AnkiMarker.selectionText: _escape(result.matched),
-      AnkiMarker.popupSelectionText: rendered(
-        'popupSelectionText',
-        _escape(result.matched),
-      ),
+      AnkiMarker.selectionText: selectedText,
+      _legacyPopupSelectionTextMarker: selectedText,
     };
 
     final fields = profile.fieldMap.map((field, template) {
@@ -462,6 +462,7 @@ class AnkiCardBuilder {
 
   static final _markerPattern = RegExp(r'\{([^{}]+)\}');
 
+  static const _legacyPopupSelectionTextMarker = '{popup-selection-text}';
   static const _maxScreenshotUploadBytes = 4 * 1024 * 1024;
   static const _absoluteScreenshotUploadBytes = 8 * 1024 * 1024;
   static const _maxScreenshotDimension = 1280;

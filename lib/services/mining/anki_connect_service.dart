@@ -174,7 +174,7 @@ class AnkiConnectService {
         );
       }
     }
-    final noteId = await addNote(normalized);
+    final noteId = await addNote(normalized, allowDuplicate: !duplicateCheck);
     if (syncOnCreate) await sync();
     return noteId;
   }

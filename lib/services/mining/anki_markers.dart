@@ -41,7 +41,6 @@ class AnkiMarker {
   static const source = '{source}';
   static const documentTitle = '{document-title}';
   static const selectionText = '{selection-text}';
-  static const popupSelectionText = '{popup-selection-text}';
 
   static const standardTemplates = <String, String>{
     'Expression': expression,
@@ -73,7 +72,7 @@ class AnkiMarker {
     'Media': media,
     'URL': url,
     'Document title': documentTitle,
-    'Selection text': popupSelectionText,
+    'Selection text': selectionText,
   };
 
   static Map<String, String> singleGlossaryTemplatesForDictionaries(
@@ -161,7 +160,7 @@ class AnkiMarker {
     chapter: ['chapter', 'episode'],
     media: ['media', 'source', 'context'],
     documentTitle: ['miscinfo', 'document-title', 'documenttitle'],
-    popupSelectionText: ['selection', 'selection-text', 'popup-selection-text'],
+    selectionText: ['selection', 'selection-text', 'popup-selection-text'],
   };
 
   static const _lapisFieldMap = <String, String>{
@@ -169,7 +168,7 @@ class AnkiMarker {
     'expressionfurigana': furiganaPlain,
     'expressionreading': reading,
     'expressionaudio': audio,
-    'selectiontext': popupSelectionText,
+    'selectiontext': selectionText,
     'maindefinition': selectedGlossary,
     'definitionpicture': '',
     'sentence': sentence,

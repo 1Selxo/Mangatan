@@ -23,6 +23,21 @@ let lastSelection = '';
 let currentDictionaryMedia = null;
 let selectedDictionaries = {};
 
+function hasPopupTextSelection() {
+    const selection = window.getSelection?.();
+    return !!selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+}
+
+function rememberPopupTextSelection() {
+    const selection = window.getSelection?.();
+    const selectedText = !selection || selection.isCollapsed ? '' : selection.toString();
+    if (selectedText.trim().length === 0) {
+        return '';
+    }
+    lastSelection = selectedText;
+    return selectedText;
+}
+
 function el(tag, props = {}, children = []) {
     const element = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
@@ -951,6 +966,10 @@ function renderStructuredContent(parent, node, language = null, dictName = null,
         element.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (hasPopupTextSelection()) {
+                return;
+            }
+            lastSelection = '';
             if (isExternal) {
                 openExternalLink(node.href);
             } else {
@@ -1402,10 +1421,11 @@ async function mineEntryAtIndex(entryIndex) {
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
     const mineSlot = getButtonSlot('mine', entryIndex);
     
-    lastSelection = window.getSelection()?.toString() || '';
+    const selectedText = rememberPopupTextSelection() || lastSelection;
     updateButtonSlot(mineSlot, { enabled: false });
     
-    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
+    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, selectedText);
+    lastSelection = '';
     const checkDuplicate = async () => {
         const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
         updateButtonSlot(mineSlot, {
@@ -1834,6 +1854,10 @@ window.renderPopup = function() {
     container.clickAttached = true;
     container.addEventListener('click', (e) => {
         const target = e.target?.nodeType === Node.TEXT_NODE ? e.target.parentElement : e.target;
+        if (hasPopupTextSelection()) {
+            return;
+        }
+        lastSelection = '';
         if (target?.closest('summary')) {
             return;
         }
@@ -1848,3 +1872,5 @@ window.renderPopup = function() {
         }
     });
 };
+
+document.addEventListener('selectionchange', rememberPopupTextSelection);

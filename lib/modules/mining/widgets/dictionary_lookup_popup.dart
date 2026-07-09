@@ -49,18 +49,21 @@ class _DictionaryPopupHostController {
     required BuildContext context,
     required Rect anchor,
     required String text,
-    required MiningContext miningContext,
+    required FutureOr<MiningContext> miningContext,
+    required Future<List<HoshiLookupResult>> initialResults,
     bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) async {
+    final resolvedMiningContext = Future<MiningContext>.value(miningContext);
     await _ensure(context);
     if (!context.mounted) return null;
     return key.currentState?.present(
       screen: MediaQuery.sizeOf(context),
       anchor: anchor,
       text: text,
-      miningContext: miningContext,
+      miningContext: resolvedMiningContext,
+      initialResults: initialResults,
       dismissOnOutsideTap: dismissOnOutsideTap,
       onMatchChanged: onMatchChanged,
       onHoverChanged: onHoverChanged,
@@ -72,12 +75,14 @@ class _DictionaryPopupRequest {
   const _DictionaryPopupRequest({
     required this.text,
     required this.miningContext,
+    required this.initialResults,
     required this.onMatchChanged,
     required this.onHoverChanged,
   });
 
   final String text;
-  final MiningContext miningContext;
+  final Future<MiningContext> miningContext;
+  final Future<List<HoshiLookupResult>> initialResults;
   final ValueChanged<int>? onMatchChanged;
   final ValueChanged<bool>? onHoverChanged;
 }
@@ -115,7 +120,8 @@ class _DictionaryPopupOverlayHostState
     required Size screen,
     required Rect anchor,
     required String text,
-    required MiningContext miningContext,
+    required Future<MiningContext> miningContext,
+    required Future<List<HoshiLookupResult>> initialResults,
     required bool dismissOnOutsideTap,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
@@ -135,6 +141,7 @@ class _DictionaryPopupOverlayHostState
       _request = _DictionaryPopupRequest(
         text: text,
         miningContext: miningContext,
+        initialResults: initialResults,
         onMatchChanged: onMatchChanged,
         onHoverChanged: onHoverChanged,
       );
@@ -209,6 +216,7 @@ class _DictionaryPopupOverlayHostState
                   child: HoshiDictionaryPopup(
                     text: request?.text ?? '',
                     miningContext: request?.miningContext,
+                    initialResults: request?.initialResults,
                     preferences: widget.preferences,
                     onMatchChanged: (count) =>
                         _request?.onMatchChanged?.call(count),
@@ -249,7 +257,8 @@ class DictionaryLookupPopup extends StatelessWidget {
     required BuildContext context,
     required Rect anchor,
     required String text,
-    required MiningContext miningContext,
+    required FutureOr<MiningContext> miningContext,
+    Future<List<HoshiLookupResult>>? initialResults,
     bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
@@ -261,6 +270,7 @@ class DictionaryLookupPopup extends StatelessWidget {
       anchor: anchor,
       text: lookupText,
       miningContext: miningContext,
+      initialResults: initialResults ?? lookup(lookupText),
       dismissOnOutsideTap: dismissOnOutsideTap,
       onMatchChanged: onMatchChanged,
       onHoverChanged: onHoverChanged,
@@ -269,6 +279,16 @@ class DictionaryLookupPopup extends StatelessWidget {
 
   static Future<void> prewarm(BuildContext context) =>
       _dictionaryPopupHost.prewarm(context);
+
+  static Future<List<HoshiLookupResult>> lookup(String text) {
+    final query = text.trim();
+    if (query.isEmpty) return Future.value(const []);
+    return HoshidictsLookupBackend.instance.lookup(
+      query,
+      maxResults: hoshiPopupMaxResults,
+      scanLength: hoshiPopupScanLength,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -308,8 +328,8 @@ class DictionaryLookupResultsView extends StatefulWidget {
     this.compact = false,
     this.showAnkiButton = true,
     this.shrinkWrap = false,
-    this.maxResults = 20,
-    this.scanLength = 80,
+    this.maxResults = 10,
+    this.scanLength = hoshiPopupScanLength,
   });
 
   final String text;

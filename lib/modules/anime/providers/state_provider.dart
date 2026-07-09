@@ -33,6 +33,7 @@ class SubtitleSettingsState extends _$SubtitleSettingsState {
     final settings = isar.settings.getSync(227);
     state = PlayerSubtitleSettings(
       fontSize: state.fontSize,
+      position: state.position ?? 0,
       useBold: state.useBold,
       useItalic: state.useItalic,
     );
@@ -41,6 +42,7 @@ class SubtitleSettingsState extends _$SubtitleSettingsState {
         settings!
           ..playerSubtitleSettings = PlayerSubtitleSettings(
             fontSize: state.fontSize,
+            position: state.position ?? 0,
             useBold: state.useBold,
             useItalic: state.useItalic,
           )

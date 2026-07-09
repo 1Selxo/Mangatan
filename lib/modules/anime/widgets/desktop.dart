@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -69,6 +70,10 @@ class _DesktopControllerWidgetState
   final controlsHoverDuration = const Duration(seconds: 3);
   double buttonBarHeight = 100;
   final bottomButtonBarMargin = const EdgeInsets.only(left: 16.0, right: 8.0);
+  final GlobalKey _subtitleOverlayKey = GlobalKey();
+  final GlobalKey _seekBarKey = GlobalKey();
+  double _subtitleBottomInset = 24;
+  bool _subtitleAnchorUpdateScheduled = false;
 
   final List<StreamSubscription> subscriptions = [];
   DateTime last = DateTime.now();
@@ -172,10 +177,35 @@ class _DesktopControllerWidgetState
     _timer?.cancel();
   }
 
+  void _scheduleSubtitleAnchorUpdate() {
+    if (_subtitleAnchorUpdateScheduled) return;
+    _subtitleAnchorUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _subtitleAnchorUpdateScheduled = false;
+      if (!mounted) return;
+      final overlay =
+          _subtitleOverlayKey.currentContext?.findRenderObject() as RenderBox?;
+      final seekBar =
+          _seekBarKey.currentContext?.findRenderObject() as RenderBox?;
+      if (overlay == null || seekBar == null) return;
+      final seekBarTop = overlay
+          .globalToLocal(seekBar.localToGlobal(Offset.zero))
+          .dy;
+      final inset = subtitleBottomInsetForSeekBar(
+        playerHeight: overlay.size.height,
+        seekBarTop: seekBarTop,
+      );
+      if ((inset - _subtitleBottomInset).abs() > 0.5) {
+        setState(() => _subtitleBottomInset = inset);
+      }
+    });
+  }
+
   final bool modifyVolumeOnScroll = true; // TODO. The variable is never changed
   final bool toggleFullscreenOnDoublePress = true; // TODO. variable not changed
   @override
   Widget build(BuildContext context) {
+    _scheduleSubtitleAnchorUpdate();
     return CallbackShortcuts(
       bindings: {
         // Default key-board shortcuts.
@@ -287,6 +317,7 @@ class _DesktopControllerWidgetState
         },
       },
       child: Stack(
+        key: _subtitleOverlayKey,
         children: [
           Focus(
             autofocus: true,
@@ -465,6 +496,7 @@ class _DesktopControllerWidgetState
                                           horizontal: 5,
                                         ),
                                         child: CustomSeekBar(
+                                          key: _seekBarKey,
                                           onSeekStart: (value) {
                                             setState(() {
                                               swipeDuration = value.inSeconds;
@@ -565,16 +597,26 @@ class _DesktopControllerWidgetState
             ),
           ),
           Consumer(
-            builder: (context, ref, _) => Positioned(
-              child: CustomSubtitleView(
-                controller: widget.videoController,
-                configuration: SubtitleViewConfiguration(
-                  style: subtileTextStyle(ref),
+            builder: (context, ref, _) {
+              final subtitleSettings = ref.watch(subtitleSettingsStateProvider);
+              return Positioned(
+                child: CustomSubtitleView(
+                  controller: widget.videoController,
+                  configuration: SubtitleViewConfiguration(
+                    style: subtileTextStyle(ref),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      _subtitleBottomInset,
+                    ),
+                  ),
+                  paintSubtitle: true,
+                  verticalOffset: (subtitleSettings.position ?? 0).toDouble(),
+                  miningContextBuilder: widget.subtitleMiningContextBuilder,
                 ),
-                paintSubtitle: true,
-                miningContextBuilder: widget.subtitleMiningContextBuilder,
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),

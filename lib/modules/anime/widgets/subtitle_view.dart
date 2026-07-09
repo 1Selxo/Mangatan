@@ -22,7 +22,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 class CustomSubtitleView extends ConsumerStatefulWidget {
   final VideoController controller;
   final SubtitleViewConfiguration configuration;
-  final MiningContext Function(String text)? miningContextBuilder;
+  final Future<MiningContext> Function(String text)? miningContextBuilder;
   final bool paintSubtitle;
   final double verticalOffset;
 
@@ -207,11 +207,13 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     final anchor = paragraph == null
         ? Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1)
         : _lookupAnchorRect(paragraph: paragraph, selection: selection);
+    final miningContext = await builder(subtitleText);
+    if (!context.mounted) return null;
     return DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
       text: selection.text,
-      miningContext: builder(subtitleText),
+      miningContext: miningContext,
       dismissOnOutsideTap: !hoverTriggered,
       onMatchChanged: (count) {
         if (!mounted || count <= 0) return;

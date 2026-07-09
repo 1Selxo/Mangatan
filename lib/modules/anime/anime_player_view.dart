@@ -40,6 +40,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/aniskip.dart';
 import 'package:mangayomi/services/fetch_subtitles.dart';
+import 'package:mangayomi/services/mining/anime_sentence_audio_service.dart';
 import 'package:mangayomi/services/get_video_list.dart';
 import 'package:mangayomi/services/mining/jimaku_service.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -784,7 +785,20 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (_skipPhase.value != newPhase) _skipPhase.value = newPhase;
   }
 
-  MiningContext _subtitleMiningContext(String subtitleText) {
+  Future<MiningContext> _subtitleMiningContext(String subtitleText) async {
+    final video = _video.value;
+    final snapshot = await AnimeSentenceAudioService.snapshot(
+      player: _player,
+      fallbackSource: video?.videoTrack?.id ?? _firstVid.url,
+      fallbackPosition: _currentPosition.value,
+    );
+    final activeAudio = _player.state.track.audio;
+    final audioSource = activeAudio.uri && activeAudio.id != 'no'
+        ? activeAudio.id
+        : snapshot.source;
+    final headers = video?.headers == null
+        ? null
+        : Map<String, String>.unmodifiable(video!.headers!);
     return MiningContext(
       mediaType: MiningMediaType.anime,
       sourceTitle: widget.episode.manga.value?.name ?? '',
@@ -796,6 +810,16 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         format: 'image/png',
         includeLibassSubtitles: _includeSubtitles,
       ),
+      sentenceAudioLoader: audioSource.trim().isEmpty
+          ? null
+          : (format) => AnimeSentenceAudioService().capture(
+              source: audioSource,
+              headers: headers,
+              timing: snapshot.timing,
+              format: format,
+              sourceTitle: widget.episode.manga.value?.name ?? '',
+              chapterTitle: widget.episode.name ?? '',
+            ),
     );
   }
 

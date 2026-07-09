@@ -27,7 +27,8 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
   final GlobalKey<VideoState> videoStatekey;
   final Widget bottomButtonBarWidget;
   final ValueNotifier<List<(String, int)>> chapterMarks;
-  final MiningContext Function(String text)? subtitleMiningContextBuilder;
+  final Future<MiningContext> Function(String text)?
+  subtitleMiningContextBuilder;
   const MobileControllerWidget({
     super.key,
     required this.videoController,

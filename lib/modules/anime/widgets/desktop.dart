@@ -27,7 +27,8 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
   final int defaultSkipIntroLength;
   final void Function(bool) desktopFullScreenPlayer;
   final ValueNotifier<List<(String, int)>> chapterMarks;
-  final MiningContext Function(String text)? subtitleMiningContextBuilder;
+  final Future<MiningContext> Function(String text)?
+  subtitleMiningContextBuilder;
   const DesktopControllerWidget({
     super.key,
     required this.videoController,

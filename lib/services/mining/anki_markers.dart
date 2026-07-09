@@ -1,3 +1,5 @@
+import 'package:mangayomi/services/mining/mining_models.dart';
+
 class AnkiMarker {
   static const expression = '{expression}';
   static const reading = '{reading}';
@@ -202,6 +204,7 @@ class AnkiMiningProfile {
   final bool duplicateCheck;
   final String duplicateScope;
   final bool syncOnCreate;
+  final AnkiSentenceAudioFormat sentenceAudioFormat;
   final Map<String, String> fieldMap;
 
   const AnkiMiningProfile({
@@ -212,6 +215,7 @@ class AnkiMiningProfile {
     this.duplicateCheck = true,
     this.duplicateScope = 'deck',
     this.syncOnCreate = false,
+    this.sentenceAudioFormat = AnkiSentenceAudioFormat.mp3,
     this.fieldMap = defaultFieldMap,
   });
 
@@ -228,6 +232,10 @@ class AnkiMiningProfile {
       duplicateCheck: json['duplicateCheck'] as bool? ?? true,
       duplicateScope: json['duplicateScope'] as String? ?? 'deck',
       syncOnCreate: json['syncOnCreate'] as bool? ?? false,
+      sentenceAudioFormat: AnkiSentenceAudioFormat.values.firstWhere(
+        (format) => format.name == json['sentenceAudioFormat'],
+        orElse: () => AnkiSentenceAudioFormat.mp3,
+      ),
       fieldMap: rawFieldMap is Map
           ? rawFieldMap.map(
               (key, value) => MapEntry(key.toString(), value.toString()),
@@ -244,6 +252,7 @@ class AnkiMiningProfile {
     bool? duplicateCheck,
     String? duplicateScope,
     bool? syncOnCreate,
+    AnkiSentenceAudioFormat? sentenceAudioFormat,
     Map<String, String>? fieldMap,
   }) {
     return AnkiMiningProfile(
@@ -254,6 +263,7 @@ class AnkiMiningProfile {
       duplicateCheck: duplicateCheck ?? this.duplicateCheck,
       duplicateScope: duplicateScope ?? this.duplicateScope,
       syncOnCreate: syncOnCreate ?? this.syncOnCreate,
+      sentenceAudioFormat: sentenceAudioFormat ?? this.sentenceAudioFormat,
       fieldMap: fieldMap ?? this.fieldMap,
     );
   }
@@ -267,6 +277,7 @@ class AnkiMiningProfile {
       'duplicateCheck': duplicateCheck,
       'duplicateScope': duplicateScope,
       'syncOnCreate': syncOnCreate,
+      'sentenceAudioFormat': sentenceAudioFormat.name,
       'fieldMap': fieldMap,
     };
   }

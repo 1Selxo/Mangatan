@@ -17,6 +17,10 @@ class AnkiCardBuilder {
     List<AnkiMediaFile> dictionaryMedia = const [],
     AnkiMediaFile? wordAudio,
   }) async {
+    final sentenceAudio =
+        _usesMarker(profile.fieldMap, AnkiMarker.sentenceAudio)
+        ? await context.sentenceAudioLoader?.call(profile.sentenceAudioFormat)
+        : null;
     final screenshot = await _loadScreenshot(context);
     final screenshotName = screenshot == null
         ? null
@@ -68,6 +72,9 @@ class AnkiCardBuilder {
     final wordAudioTag = wordAudio == null
         ? ''
         : '[sound:${_soundFilename(wordAudio.filename)}]';
+    final sentenceAudioTag = sentenceAudio == null
+        ? ''
+        : '[sound:${_soundFilename(sentenceAudio.filename)}]';
     final replacements = <String, String>{
       AnkiMarker.expression: _escape(result.term.expression),
       AnkiMarker.reading: _escape(result.term.reading),
@@ -141,7 +148,7 @@ class AnkiCardBuilder {
           ? ''
           : '<img src="$screenshotName">',
       AnkiMarker.wordAudio: wordAudioTag,
-      AnkiMarker.sentenceAudio: '',
+      AnkiMarker.sentenceAudio: sentenceAudioTag,
       AnkiMarker.url: _escape(context.sourceUri?.toString() ?? ''),
       AnkiMarker.book: _escape(context.sourceTitle),
       AnkiMarker.chapter: _escape(context.chapterTitle),
@@ -176,11 +183,12 @@ class AnkiCardBuilder {
       tags: profile.tags,
       screenshotBytes: screenshot?.bytes,
       screenshotFileName: screenshotName,
-      mediaFiles: wordAudio == null
-          ? dictionaryMedia
-          : [...dictionaryMedia, wordAudio],
+      mediaFiles: [...dictionaryMedia, ?wordAudio, ?sentenceAudio],
     );
   }
+
+  bool _usesMarker(Map<String, String> fieldMap, String marker) =>
+      fieldMap.values.any((template) => template.contains(marker));
 
   Future<_ScreenshotPayload?> _loadScreenshot(MiningContext context) async {
     final loader = context.imageBytesLoader;

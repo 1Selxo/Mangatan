@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 enum MiningMediaType { manga, anime, novel, unknown }
 
+enum AnkiSentenceAudioFormat { mp3, opus }
+
 class MiningContext {
   final MiningMediaType mediaType;
   final String sourceTitle;
@@ -12,6 +14,8 @@ class MiningContext {
   final Duration? position;
   final Uri? sourceUri;
   final FutureOr<Uint8List?> Function()? imageBytesLoader;
+  final FutureOr<AnkiMediaFile?> Function(AnkiSentenceAudioFormat format)?
+  sentenceAudioLoader;
 
   const MiningContext({
     this.mediaType = MiningMediaType.unknown,
@@ -22,6 +26,7 @@ class MiningContext {
     this.position,
     this.sourceUri,
     this.imageBytesLoader,
+    this.sentenceAudioLoader,
   });
 
   MiningContext copyWith({
@@ -33,6 +38,8 @@ class MiningContext {
     Duration? position,
     Uri? sourceUri,
     FutureOr<Uint8List?> Function()? imageBytesLoader,
+    FutureOr<AnkiMediaFile?> Function(AnkiSentenceAudioFormat format)?
+    sentenceAudioLoader,
   }) {
     return MiningContext(
       mediaType: mediaType ?? this.mediaType,
@@ -43,6 +50,7 @@ class MiningContext {
       position: position ?? this.position,
       sourceUri: sourceUri ?? this.sourceUri,
       imageBytesLoader: imageBytesLoader ?? this.imageBytesLoader,
+      sentenceAudioLoader: sentenceAudioLoader ?? this.sentenceAudioLoader,
     );
   }
 

@@ -25,4 +25,14 @@ void main() {
 
     expect(normalized, Rect.fromLTWH(10, 40, 480, 720));
   });
+
+  test('normalizes parent-offset single-page OCR paint rect', () {
+    final normalized = readerOcrHitTestImageRect(
+      paintedImageRect: Rect.fromLTWH(120, 0, 320, 600),
+      renderBoxSize: const Size(400, 600),
+      normalizePaintCoordinates: true,
+    );
+
+    expect(normalized, Rect.fromLTWH(40, 0, 320, 600));
+  });
 }

@@ -97,7 +97,11 @@ void main() {
     expect(hoshiPopupMaxResults, 3);
     expect(hoshiPopupScanLength, 24);
     expect(html, contains('window.scanLength = 24;'));
-    expect(html, contains('window.audioSources = [];'));
+    expect(
+      html,
+      contains('window.audioSources = ["${AnkiAudioPreferences.defaultUrl}"];'),
+    );
+    expect(html, contains('window.needsAudio = true;'));
     expect(html, contains('flutter_inappwebview.callHandler'));
     expect(html, contains('getTermAudioSources'));
     expect(html, contains('playWordAudio'));

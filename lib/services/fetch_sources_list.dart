@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 import 'package:http_interceptor/http_interceptor.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/filter.dart';
@@ -11,6 +12,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/utils/extension_language_defaults.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 Future<void> fetchSourcesList({
@@ -145,11 +147,18 @@ Future<void> fetchSourcesList({
       await _updateSources(installGroup, androidProxyServer, repo, itemType);
     }
   } else {
+    final languageStates = await _savedExtensionLanguageStates(itemType);
+    final deviceLocales = PlatformDispatcher.instance.locales;
     final updateGroups = <String, List<Source>>{};
     for (var source in sourceList) {
       final existingSource = await isar.sources.get(source.id!);
       if (existingSource == null) {
-        await _addNewSource(source, repo, itemType);
+        final isActive = extensionLanguageEnabledForNewSource(
+          source.lang,
+          savedLanguageStates: languageStates,
+          deviceLocales: deviceLocales,
+        );
+        await _addNewSource(source, repo, itemType, isActive: isActive);
         continue;
       }
       final existingMihonMetadata = mihonSourceMetadata(existingSource);
@@ -334,7 +343,12 @@ Future<void> _updateSources(
             ? jsonEncode(preferenceList.map((e) => e.toJson()).toList())
             : null
         ..isAdded = true
-        ..isActive = existingSource?.isActive ?? true
+        ..isActive =
+            existingSource?.isActive ??
+            shouldEnableExtensionLanguageByDefault(
+              source.lang,
+              PlatformDispatcher.instance.locales,
+            )
         ..isPinned = existingSource?.isPinned ?? false
         ..lastUsed = existingSource?.lastUsed ?? false
         ..sourceCode = sourceCode
@@ -378,7 +392,12 @@ List<SourcePreference> _decodePreferences(String? preferenceList) {
   }
 }
 
-Future<void> _addNewSource(Source source, Repo? repo, ItemType itemType) async {
+Future<void> _addNewSource(
+  Source source,
+  Repo? repo,
+  ItemType itemType, {
+  required bool isActive,
+}) async {
   final newSource = Source()
     ..sourceCodeUrl = source.sourceCodeUrl
     ..id = source.id
@@ -392,6 +411,7 @@ Future<void> _addNewSource(Source source, Repo? repo, ItemType itemType) async {
     ..typeSource = source.typeSource
     ..lang = source.lang
     ..isNsfw = source.isNsfw
+    ..isActive = isActive
     ..name = source.name
     ..version = source.version
     ..versionLast = source.version
@@ -405,6 +425,25 @@ Future<void> _addNewSource(Source source, Repo? repo, ItemType itemType) async {
     ..repo = repo
     ..updatedAt = DateTime.now().millisecondsSinceEpoch;
   await isar.writeTxn(() async => isar.sources.put(newSource));
+}
+
+Future<Map<String, bool>> _savedExtensionLanguageStates(
+  ItemType itemType,
+) async {
+  final sources = await isar.sources
+      .filter()
+      .itemTypeEqualTo(itemType)
+      .findAll();
+  final states = <String, bool>{};
+  for (final source in sources) {
+    final language = normalizeExtensionLanguageTag(source.lang);
+    states.update(
+      language,
+      (isActive) => isActive || (source.isActive ?? false),
+      ifAbsent: () => source.isActive ?? false,
+    );
+  }
+  return states;
 }
 
 Future<void> checkIfSourceIsObsolete(

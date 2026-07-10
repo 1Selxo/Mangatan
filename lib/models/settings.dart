@@ -1,6 +1,7 @@
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/utils/constant.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 part 'settings.g.dart';
 
 @collection
@@ -430,7 +431,7 @@ class Settings {
     this.backupListOptions,
     this.autoBackupLocation,
     this.startDatebackup,
-    this.usePageTapZones = true,
+    this.usePageTapZones,
     this.autoScrollPages,
     this.markEpisodeAsSeenType = 85,
     this.defaultSkipIntroLength = 85,
@@ -531,7 +532,9 @@ class Settings {
     this.ttsPitch = 1.0,
     this.ttsLanguage,
     this.ttsVoice,
-  });
+  }) {
+    usePageTapZones ??= !isDesktop;
+  }
 
   Settings.fromJson(Map<String, dynamic> json) {
     updatedAt = json["updatedAt"];

@@ -148,7 +148,7 @@ class BackgroundColorState extends _$BackgroundColorState {
 class UsePageTapZonesState extends _$UsePageTapZonesState {
   @override
   bool build() {
-    return isar.settings.getSync(227)!.usePageTapZones ?? true;
+    return isar.settings.getSync(227)!.usePageTapZones ?? !isDesktop;
   }
 
   void set(bool value) {

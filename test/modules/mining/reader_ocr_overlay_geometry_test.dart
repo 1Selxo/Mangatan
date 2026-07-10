@@ -35,4 +35,28 @@ void main() {
 
     expect(normalized, Rect.fromLTWH(40, 0, 320, 600));
   });
+
+  test('popup dismissal consumes the reader tap', () {
+    expect(
+      readerOcrShouldConsumeMissedTap(
+        popupWasVisibleOnPointerDown: true,
+        dismissedPopup: false,
+      ),
+      isTrue,
+    );
+    expect(
+      readerOcrShouldConsumeMissedTap(
+        popupWasVisibleOnPointerDown: false,
+        dismissedPopup: true,
+      ),
+      isTrue,
+    );
+    expect(
+      readerOcrShouldConsumeMissedTap(
+        popupWasVisibleOnPointerDown: false,
+        dismissedPopup: false,
+      ),
+      isFalse,
+    );
+  });
 }

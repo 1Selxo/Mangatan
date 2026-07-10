@@ -52,5 +52,89 @@ void main() {
         isFalse,
       );
     });
+
+    test('outside click dismisses if no replacement popup is presented', () {
+      expect(
+        dictionaryPopupShouldCommitOutsideDismissal(
+          visible: true,
+          startedGeneration: 4,
+          currentGeneration: 4,
+        ),
+        isTrue,
+      );
+    });
+
+    test('replacement popup cancels the pending outside dismissal', () {
+      expect(
+        dictionaryPopupShouldCommitOutsideDismissal(
+          visible: true,
+          startedGeneration: 4,
+          currentGeneration: 5,
+        ),
+        isFalse,
+      );
+    });
+
+    test('stale popup handles cannot dismiss a replacement popup', () {
+      expect(
+        dictionaryPopupCanDismissGeneration(
+          expectedGeneration: 4,
+          currentGeneration: 5,
+        ),
+        isFalse,
+      );
+      expect(
+        dictionaryPopupCanDismissGeneration(
+          expectedGeneration: 5,
+          currentGeneration: 5,
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  group('dictionary popup placement', () {
+    test('keeps the default popup below horizontal text', () {
+      final rect = dictionaryPopupRect(
+        screen: const Size(1000, 800),
+        anchor: const Rect.fromLTWH(400, 300, 100, 80),
+        preferredSize: const Size(320, 240),
+      );
+
+      expect(rect, const Rect.fromLTWH(290, 388, 320, 240));
+    });
+
+    test('places vertical text popup on the preferred right side', () {
+      final rect = dictionaryPopupRect(
+        screen: const Size(1000, 800),
+        anchor: const Rect.fromLTWH(400, 200, 40, 300),
+        preferredSize: const Size(320, 240),
+        placement: DictionaryPopupPlacement.leftOrRight,
+      );
+
+      expect(rect, const Rect.fromLTWH(448, 200, 320, 240));
+    });
+
+    test('falls back to the left when the right side would overflow', () {
+      final rect = dictionaryPopupRect(
+        screen: const Size(1000, 800),
+        anchor: const Rect.fromLTWH(850, 500, 40, 180),
+        preferredSize: const Size(320, 240),
+        placement: DictionaryPopupPlacement.leftOrRight,
+      );
+
+      expect(rect, const Rect.fromLTWH(522, 500, 320, 240));
+    });
+
+    test('shrinks on the larger side instead of moving above or below', () {
+      final rect = dictionaryPopupRect(
+        screen: const Size(600, 800),
+        anchor: const Rect.fromLTWH(250, 700, 100, 80),
+        preferredSize: const Size(500, 240),
+        placement: DictionaryPopupPlacement.leftOrRight,
+      );
+
+      expect(rect, const Rect.fromLTWH(12, 548, 230, 240));
+    });
   });
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
@@ -89,13 +90,17 @@ class ReaderGestureHandler extends StatelessWidget {
       5 => _buildDisabled(context),
       _ => _buildDefault(context),
     };
-    return MouseRegion(
-      opaque: false,
-      onHover: (event) {
-        unawaited(ReaderOcrState.handleHover(event.position));
-      },
-      onExit: (_) => ReaderOcrState.handleHoverExit(),
-      child: zones,
+    return Listener(
+      onPointerDown: (_) => ReaderOcrState.handlePointerDown(),
+      onPointerCancel: (_) => ReaderOcrState.handlePointerCancel(),
+      child: MouseRegion(
+        opaque: false,
+        onHover: (event) {
+          unawaited(ReaderOcrState.handleHover(event.position));
+        },
+        onExit: (_) => ReaderOcrState.handleHoverExit(),
+        child: zones,
+      ),
     );
   }
 
@@ -263,7 +268,7 @@ class ReaderGestureHandler extends StatelessWidget {
 }
 
 /// Individual gesture detector for a zone.
-class _ZoneGestureDetector extends StatelessWidget {
+class _ZoneGestureDetector extends StatefulWidget {
   final VoidCallback onTap;
   final void Function(Offset position)? onDoubleTapDown;
   final VoidCallback? onDoubleTap;
@@ -279,21 +284,47 @@ class _ZoneGestureDetector extends StatelessWidget {
   });
 
   @override
+  State<_ZoneGestureDetector> createState() => _ZoneGestureDetectorState();
+}
+
+class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
+  bool _pointerHandledByOcr = false;
+  bool _primaryPointer = false;
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onTapUp: (details) async {
-        final handled = await ReaderOcrState.handleTap(details.globalPosition);
-        if (!handled) onTap();
+      onTapUp: (_) {
+        final handled = _pointerHandledByOcr;
+        _pointerHandledByOcr = false;
+        if (!handled) widget.onTap();
       },
-      onDoubleTapDown: onDoubleTapDown != null
-          ? (details) => onDoubleTapDown!(details.globalPosition)
+      onTapCancel: () => _pointerHandledByOcr = false,
+      onDoubleTapDown: widget.onDoubleTapDown != null
+          ? (details) => widget.onDoubleTapDown!(details.globalPosition)
           : null,
-      onDoubleTap: onDoubleTap,
-      onSecondaryTapDown: onSecondaryTapDown != null
-          ? (details) => onSecondaryTapDown!(details.globalPosition)
+      onDoubleTap: widget.onDoubleTap,
+      onSecondaryTapDown: widget.onSecondaryTapDown != null
+          ? (details) => widget.onSecondaryTapDown!(details.globalPosition)
           : null,
-      onSecondaryTap: onSecondaryTap,
+      onSecondaryTap: widget.onSecondaryTap,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (event) {
+          _primaryPointer = event.buttons == kPrimaryButton;
+        },
+        onPointerUp: (event) {
+          if (_primaryPointer) {
+            _pointerHandledByOcr = ReaderOcrState.handlePointerUp(
+              event.position,
+            );
+          }
+          _primaryPointer = false;
+        },
+        onPointerCancel: (_) => _primaryPointer = false,
+        child: const SizedBox.expand(),
+      ),
     );
   }
 }

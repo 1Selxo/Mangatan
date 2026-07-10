@@ -21,6 +21,8 @@ class DictionaryPopupHandle {
   final Future<void> dismissed;
 }
 
+enum DictionaryPopupPlacement { aboveOrBelow, leftOrRight }
+
 final _dictionaryPopupHost = _DictionaryPopupHostController();
 
 class _DictionaryPopupHostController {
@@ -36,6 +38,8 @@ class _DictionaryPopupHostController {
     state.dismiss();
     return true;
   }
+
+  bool get isActive => key.currentState?.isVisible ?? false;
 
   Future<void> _ensure(BuildContext context) {
     if (_entry != null) return Future.value();
@@ -60,23 +64,34 @@ class _DictionaryPopupHostController {
     required String text,
     required FutureOr<MiningContext> miningContext,
     required Future<List<HoshiLookupResult>> initialResults,
+    required DictionaryPopupPlacement placement,
     bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) async {
     final resolvedMiningContext = Future<MiningContext>.value(miningContext);
+    DictionaryPopupHandle? present() {
+      if (!context.mounted) return null;
+      return key.currentState?.present(
+        screen: MediaQuery.sizeOf(context),
+        anchor: anchor,
+        text: text,
+        miningContext: resolvedMiningContext,
+        initialResults: initialResults,
+        placement: placement,
+        dismissOnOutsideTap: dismissOnOutsideTap,
+        onMatchChanged: onMatchChanged,
+        onHoverChanged: onHoverChanged,
+      );
+    }
+
+    // Once initialized, replace the request synchronously during the reader's
+    // pointer-up callback. This also invalidates any deferred outside-click
+    // dismissal before Flutter advances to another frame.
+    final currentHandle = present();
+    if (currentHandle != null) return currentHandle;
     await _ensure(context);
-    if (!context.mounted) return null;
-    return key.currentState?.present(
-      screen: MediaQuery.sizeOf(context),
-      anchor: anchor,
-      text: text,
-      miningContext: resolvedMiningContext,
-      initialResults: initialResults,
-      dismissOnOutsideTap: dismissOnOutsideTap,
-      onMatchChanged: onMatchChanged,
-      onHoverChanged: onHoverChanged,
-    );
+    return present();
   }
 }
 
@@ -90,7 +105,7 @@ class _DictionaryPopupRequest {
   });
 
   final String text;
-  final Future<MiningContext> miningContext;
+  final Future<MiningContext?> miningContext;
   final Future<List<HoshiLookupResult>> initialResults;
   final ValueChanged<int>? onMatchChanged;
   final ValueChanged<bool>? onHoverChanged;
@@ -108,7 +123,15 @@ class _DictionaryPopupOverlayHost extends StatefulWidget {
 
 class _DictionaryPopupOverlayHostState
     extends State<_DictionaryPopupOverlayHost> {
-  _DictionaryPopupRequest? _request;
+  static final _warmRequest = _DictionaryPopupRequest(
+    text: '',
+    miningContext: Future<MiningContext?>.value(null),
+    initialResults: Future<List<HoshiLookupResult>>.value(const []),
+    onMatchChanged: null,
+    onHoverChanged: null,
+  );
+
+  _DictionaryPopupRequest _request = _warmRequest;
   Completer<void>? _dismissed;
   bool _visible = false;
   late double _left;
@@ -116,6 +139,9 @@ class _DictionaryPopupOverlayHostState
   late double _width;
   late double _height;
   bool _dismissOnOutsideTap = true;
+  int _presentationGeneration = 0;
+  int? _pendingOutsidePointer;
+  int? _pendingOutsideGeneration;
 
   bool get isVisible => _visible;
 
@@ -132,20 +158,49 @@ class _DictionaryPopupOverlayHostState
   Rect get _popupBounds => Rect.fromLTWH(_left, _top, _width, _height);
 
   void _handleGlobalPointer(PointerEvent event) {
-    if (event is! PointerDownEvent) return;
-    if (!dictionaryPopupShouldDismissForPointer(
-      visible: _visible,
-      dismissOnOutsideTap: _dismissOnOutsideTap,
-      popupBounds: _popupBounds,
-      position: event.position,
-      buttons: event.buttons,
-    )) {
+    if (event is PointerDownEvent) {
+      if (!dictionaryPopupShouldDismissForPointer(
+        visible: _visible,
+        dismissOnOutsideTap: _dismissOnOutsideTap,
+        popupBounds: _popupBounds,
+        position: event.position,
+        buttons: event.buttons,
+      )) {
+        return;
+      }
+      _pendingOutsidePointer = event.pointer;
+      _pendingOutsideGeneration = _presentationGeneration;
       return;
     }
-    // This global route observes without joining the hit-test path, so the
-    // same click continues to the reader and can immediately replace the
-    // lookup instead of being consumed by a modal barrier.
-    dismiss();
+    if (event.pointer != _pendingOutsidePointer) return;
+    if (event is PointerCancelEvent) {
+      _clearPendingOutsideDismissal();
+      return;
+    }
+    if (event is! PointerUpEvent) return;
+    final generation = _pendingOutsideGeneration;
+    _clearPendingOutsideDismissal();
+    if (generation == null) return;
+
+    // Reader lookups are recognized on pointer-up. Give that callback a
+    // chance to replace the request before dismissing so successive clicks
+    // update the warm popup in place instead of closing and reopening it.
+    scheduleMicrotask(() {
+      if (!mounted ||
+          !dictionaryPopupShouldCommitOutsideDismissal(
+            visible: _visible,
+            startedGeneration: generation,
+            currentGeneration: _presentationGeneration,
+          )) {
+        return;
+      }
+      dismiss();
+    });
+  }
+
+  void _clearPendingOutsideDismissal() {
+    _pendingOutsidePointer = null;
+    _pendingOutsideGeneration = null;
   }
 
   bool _handleHardwareKey(KeyEvent event) {
@@ -161,20 +216,20 @@ class _DictionaryPopupOverlayHostState
     required String text,
     required Future<MiningContext> miningContext,
     required Future<List<HoshiLookupResult>> initialResults,
+    required DictionaryPopupPlacement placement,
     required bool dismissOnOutsideTap,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) {
+    _clearPendingOutsideDismissal();
+    final generation = ++_presentationGeneration;
     _completeDismissal();
-    final width = math.min(widget.preferences.width, screen.width - 24);
-    final height = math.min(widget.preferences.height, screen.height - 24);
-    final left = (anchor.center.dx - width / 2)
-        .clamp(12.0, math.max(12.0, screen.width - width - 12))
-        .toDouble();
-    final below = anchor.bottom + 8;
-    final top = below + height <= screen.height - 12
-        ? below
-        : math.max(12.0, anchor.top - height - 8);
+    final popupRect = dictionaryPopupRect(
+      screen: screen,
+      anchor: anchor,
+      preferredSize: Size(widget.preferences.width, widget.preferences.height),
+      placement: placement,
+    );
     final completer = Completer<void>();
     setState(() {
       _request = _DictionaryPopupRequest(
@@ -187,22 +242,34 @@ class _DictionaryPopupOverlayHostState
       _dismissed = completer;
       _visible = true;
       _dismissOnOutsideTap = dismissOnOutsideTap;
-      _left = left;
-      _top = top;
-      _width = width;
-      _height = height;
+      _left = popupRect.left;
+      _top = popupRect.top;
+      _width = popupRect.width;
+      _height = popupRect.height;
     });
-    return DictionaryPopupHandle(dismiss: dismiss, dismissed: completer.future);
+    return DictionaryPopupHandle(
+      dismiss: () => dismiss(expectedGeneration: generation),
+      dismissed: completer.future,
+    );
   }
 
-  void dismiss() {
+  void dismiss({int? expectedGeneration}) {
+    if (!dictionaryPopupCanDismissGeneration(
+      expectedGeneration: expectedGeneration,
+      currentGeneration: _presentationGeneration,
+    )) {
+      return;
+    }
+    _clearPendingOutsideDismissal();
+    _presentationGeneration++;
     if (!_visible) {
       _completeDismissal();
       return;
     }
+    // Keep the last request mounted so the WebView, rendered definitions, and
+    // lookup state survive dismissal and can be reused across reader bubbles.
     setState(() {
       _visible = false;
-      _request = null;
       _dismissOnOutsideTap = true;
       _left = -_width - 100;
       _top = 0;
@@ -222,12 +289,13 @@ class _DictionaryPopupOverlayHostState
     final popupTheme = _popupTheme(Theme.of(context), widget.preferences.theme);
     return Stack(
       children: [
-        if (_visible && request != null)
-          Positioned(
-            left: _left,
-            top: _top,
-            width: _width,
-            height: _height,
+        Positioned(
+          left: _left,
+          top: _top,
+          width: _width,
+          height: _height,
+          child: Offstage(
+            offstage: !_visible,
             child: IgnorePointer(
               ignoring: !_visible,
               child: MouseRegion(
@@ -253,15 +321,19 @@ class _DictionaryPopupOverlayHostState
                       miningContext: request.miningContext,
                       initialResults: request.initialResults,
                       preferences: widget.preferences,
-                      onMatchChanged: (count) =>
-                          _request?.onMatchChanged?.call(count),
-                      onDismiss: dismiss,
+                      onMatchChanged: (count) {
+                        if (_visible) {
+                          _request.onMatchChanged?.call(count);
+                        }
+                      },
+                      onDismiss: () => dismiss(),
                     ),
                   ),
                 ),
               ),
             ),
           ),
+        ),
       ],
     );
   }
@@ -299,6 +371,7 @@ class DictionaryLookupPopup extends StatelessWidget {
     required String text,
     required FutureOr<MiningContext> miningContext,
     Future<List<HoshiLookupResult>>? initialResults,
+    DictionaryPopupPlacement placement = DictionaryPopupPlacement.aboveOrBelow,
     bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
@@ -311,6 +384,7 @@ class DictionaryLookupPopup extends StatelessWidget {
       text: lookupText,
       miningContext: miningContext,
       initialResults: initialResults ?? lookup(lookupText),
+      placement: placement,
       dismissOnOutsideTap: dismissOnOutsideTap,
       onMatchChanged: onMatchChanged,
       onHoverChanged: onHoverChanged,
@@ -323,6 +397,8 @@ class DictionaryLookupPopup extends StatelessWidget {
   /// Dismisses the active popup without affecting the current app route.
   /// Returns whether a popup consumed the back action.
   static bool dismissActive() => _dictionaryPopupHost.dismissActive();
+
+  static bool get isActive => _dictionaryPopupHost.isActive;
 
   static Future<List<HoshiLookupResult>> lookup(String text) {
     final query = text.trim();
@@ -380,6 +456,64 @@ bool dictionaryPopupShouldDismissForPointer({
   // it can consume the route pop when a dictionary popup is active.
   if (buttons & (kBackMouseButton | kForwardMouseButton) != 0) return false;
   return !popupBounds.contains(position);
+}
+
+@visibleForTesting
+bool dictionaryPopupShouldCommitOutsideDismissal({
+  required bool visible,
+  required int startedGeneration,
+  required int currentGeneration,
+}) => visible && startedGeneration == currentGeneration;
+
+@visibleForTesting
+bool dictionaryPopupCanDismissGeneration({
+  required int? expectedGeneration,
+  required int currentGeneration,
+}) => expectedGeneration == null || expectedGeneration == currentGeneration;
+
+@visibleForTesting
+Rect dictionaryPopupRect({
+  required Size screen,
+  required Rect anchor,
+  required Size preferredSize,
+  DictionaryPopupPlacement placement = DictionaryPopupPlacement.aboveOrBelow,
+}) {
+  const margin = 12.0;
+  const gap = 8.0;
+  final availableWidth = math.max(0.0, screen.width - margin * 2);
+  final availableHeight = math.max(0.0, screen.height - margin * 2);
+  var width = math.min(preferredSize.width, availableWidth);
+  final height = math.min(preferredSize.height, availableHeight);
+
+  if (placement == DictionaryPopupPlacement.aboveOrBelow) {
+    final left = (anchor.center.dx - width / 2)
+        .clamp(margin, math.max(margin, screen.width - width - margin))
+        .toDouble();
+    final below = anchor.bottom + gap;
+    final top = below + height <= screen.height - margin
+        ? below
+        : math.max(margin, anchor.top - height - gap);
+    return Rect.fromLTWH(left, top, width, height);
+  }
+
+  // Match Yomitan's vertical-text policy: Japanese vertical text prefers the
+  // right, falls back to the side with less overflow, and shrinks only when
+  // neither side can contain the preferred width.
+  final before = math.min(screen.width - margin, anchor.left - gap);
+  final after = math.max(margin, anchor.right + gap);
+  final spaceBefore = math.max(0.0, before - margin);
+  final spaceAfter = math.max(0.0, screen.width - margin - after);
+  final placeRight = spaceAfter >= width
+      ? true
+      : spaceBefore >= width
+      ? false
+      : spaceAfter > spaceBefore;
+  width = math.min(width, placeRight ? spaceAfter : spaceBefore);
+  final left = placeRight ? after : before - width;
+  final top = anchor.top
+      .clamp(margin, math.max(margin, screen.height - height - margin))
+      .toDouble();
+  return Rect.fromLTWH(left, top, width, height);
 }
 
 class DictionaryLookupResultsView extends StatefulWidget {

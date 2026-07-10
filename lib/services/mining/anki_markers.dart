@@ -108,9 +108,15 @@ class AnkiMarker {
         .toLowerCase();
   }
 
-  static String? autoDetectTemplate(String fieldName, int fieldIndex) {
-    final lapis = _lapisFieldMap[fieldName.toLowerCase()];
-    if (lapis != null) return lapis;
+  static String? autoDetectTemplate(
+    String fieldName,
+    int fieldIndex, {
+    bool isLapis = false,
+  }) {
+    if (isLapis) {
+      final lapis = _lapisFieldMap[fieldName.toLowerCase()];
+      if (lapis != null) return lapis;
+    }
     if (fieldIndex == 0) return expression;
     final normalized = _normalizeFieldName(fieldName);
     for (final entry in _autoDetectAliases.entries) {
@@ -173,7 +179,7 @@ class AnkiMarker {
     'selectiontext': selectionText,
     'maindefinition': selectedGlossary,
     'definitionpicture': '',
-    'sentence': sentence,
+    'sentence': sentenceBold,
     'sentencefurigana': '',
     'sentenceaudio': sentenceAudio,
     'picture': screenshot,
@@ -190,9 +196,13 @@ class AnkiMarker {
     'miscinfo': documentTitle,
   };
 
-  static Map<String, String> defaultsForFields(List<String> fields) => {
+  static Map<String, String> defaultsForFields(
+    List<String> fields, {
+    bool isLapis = false,
+  }) => {
     for (final indexed in fields.indexed)
-      indexed.$2: autoDetectTemplate(indexed.$2, indexed.$1) ?? '',
+      indexed.$2:
+          autoDetectTemplate(indexed.$2, indexed.$1, isLapis: isLapis) ?? '',
   };
 }
 

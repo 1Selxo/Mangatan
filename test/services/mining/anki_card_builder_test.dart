@@ -8,6 +8,40 @@ import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
 void main() {
+  test('Lapis autofill bolds the full conjugated lookup match', () async {
+    final result = HoshiLookupResult(
+      matched: '食べさせられました',
+      deinflected: '食べる',
+      trace: const [],
+      preprocessorSteps: 0,
+      term: const HoshiTermResult(
+        expression: '食べる',
+        reading: 'たべる',
+        rules: 'v1',
+        score: 1,
+        glossaries: [],
+        frequencies: [],
+        pitches: [],
+      ),
+    );
+    const fields = ['Expression', 'Sentence'];
+    final fieldMap = AnkiMarker.defaultsForFields(fields, isLapis: true);
+
+    expect(
+      AnkiMarker.defaultsForFields(fields)['Sentence'],
+      AnkiMarker.sentence,
+    );
+    expect(fieldMap['Sentence'], AnkiMarker.sentenceBold);
+
+    final draft = await const AnkiCardBuilder().build(
+      result: result,
+      context: const MiningContext(sentence: 'パンを食べさせられました。'),
+      profile: AnkiMiningProfile(modelName: 'Lapis', fieldMap: fieldMap),
+    );
+
+    expect(draft.fields['Sentence'], 'パンを<b>食べさせられました</b>。');
+  });
+
   test('uses the Yomitan-rendered payload for Lapis fields', () async {
     final result = HoshiLookupResult(
       matched: 'term',
@@ -53,7 +87,7 @@ void main() {
       context: const MiningContext(sentence: 'a term in context'),
       profile: AnkiMiningProfile(
         modelName: 'Lapis',
-        fieldMap: AnkiMarker.defaultsForFields(fields),
+        fieldMap: AnkiMarker.defaultsForFields(fields, isLapis: true),
       ),
       renderedContent: const {
         'furiganaPlain': 'term[reading]',

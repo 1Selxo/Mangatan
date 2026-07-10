@@ -1,0 +1,82 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_preferences.dart';
+
+void main() {
+  const codec = ChimahonPreferenceCodec();
+
+  test('preserves exact primitive preference values', () {
+    final values = <String, Object>{
+      'integer': 42,
+      'floating': 1.25,
+      'string': 'filled field',
+      'boolean': true,
+      'set': <String>{'one', 'two'},
+    };
+
+    for (final entry in values.entries) {
+      final decoded = codec.decode(codec.encode(entry.key, entry.value));
+      expect(decoded.value, entry.value);
+    }
+  });
+
+  test('decodes a fixture emitted by Chimahon kotlinx serialization', () {
+    const fixture =
+        'wgZXCgtwcmVmX3N0cmluZxJICjxldS5rYW5hZGUudGFjaGl5b21pLmRhdGEuYmFja3VwLm1vZGVscy5TdHJpbmdQcmVmZXJlbmNlVmFsdWUSCAoGZmlsbGVkwgZLCghwcmVmX2ludBI/CjlldS5rYW5hZGUudGFjaGl5b21pLmRhdGEuYmFja3VwLm1vZGVscy5JbnRQcmVmZXJlbmNlVmFsdWUSAggqwgZQCglwcmVmX2Jvb2wSQwo9ZXUua2FuYWRlLnRhY2hpeW9taS5kYXRhLmJhY2t1cC5tb2RlbHMuQm9vbGVhblByZWZlcmVuY2VWYWx1ZRICCAE=';
+    final backup = BackupMihon.fromBuffer(base64Decode(fixture));
+    final values = {
+      for (final preference in backup.backupPreferences)
+        preference.key: codec.decode(preference).value,
+    };
+
+    expect(values, {
+      'pref_string': 'filled',
+      'pref_int': 42,
+      'pref_bool': true,
+    });
+  });
+
+  test('parses Chimahon profiles, field mappings, and dictionary order', () {
+    final profile = {
+      'id': 'japanese',
+      'name': 'Japanese',
+      'ankiEnabled': true,
+      'ankiDeck': 'Mining',
+      'ankiModel': 'Lapis',
+      'ankiFieldMap': jsonEncode({
+        'Expression': '{expression}',
+        'Sentence': '{sentence}',
+      }),
+      'ankiTags': 'chimahon mining',
+      'ankiDupCheck': true,
+      'ankiDupScope': 'deck',
+      'ankiDupAction': 'prevent',
+      'ankiCropMode': 'selection',
+      'ankiSyncOnCreate': true,
+      'dictionaryOrder': ['JMdict', 'JPDB'],
+      'enabledDictionaries': ['JMdict'],
+      'dictionaryCollapseMode': 'custom',
+      'dictionaryDisplayModes': {'JMdict': 'always_expanded'},
+      'languageCode': 'ja',
+    };
+    final payload = ChimahonSettingsPayload.fromBackup([
+      codec.encode('pref_anki_profiles', jsonEncode([profile])),
+      codec.encode('pref_active_profile_id', 'japanese'),
+      codec.encode('pref_dictionary_popup_mode', 'floating'),
+      codec.encode('pref_dict_show_frequency_average', true),
+    ]);
+
+    final active = payload.activeLanguageProfile!;
+    expect(active.languageCode, 'ja');
+    expect(active.ankiFieldMap['Sentence'], '{sentence}');
+    expect(active.dictionaryOrder, ['JMdict', 'JPDB']);
+    expect(active.enabledDictionaries, {'JMdict'});
+    expect(
+      payload.dictionaryPreferences,
+      contains('pref_dictionary_popup_mode'),
+    );
+    expect(payload.ankiPreferences, contains('pref_anki_profiles'));
+  });
+}

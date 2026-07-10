@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+message BackupExtensionRepos {
+    string baseUrl = 1;
+    string name = 2;
+    optional string shortName = 3;
+    string website = 4;
+    string signingKeyFingerprint = 5;
+}

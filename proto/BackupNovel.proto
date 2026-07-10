@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+message BackupNovel {
+    string id = 1;
+    string title = 2;
+    optional string author = 3;
+    optional string cover = 4;
+    int32 chapterIndex = 5;
+    double progress = 6;
+    int32 characterCount = 7;
+    int64 lastModified = 8;
+    repeated BackupNovelStat stats = 9;
+    repeated string categoryIds = 10;
+    optional string lang = 11;
+}
+
+message BackupNovelCategory {
+    string id = 1;
+    string name = 2;
+    int64 order = 3;
+    int64 flags = 4;
+}
+
+message BackupNovelStat {
+    string dateKey = 1;
+    int32 charactersRead = 2;
+    double readingTime = 3;
+    int32 minReadingSpeed = 4;
+    int32 altMinReadingSpeed = 5;
+    int32 lastReadingSpeed = 6;
+    int32 maxReadingSpeed = 7;
+    int64 lastStatisticModified = 8;
+}

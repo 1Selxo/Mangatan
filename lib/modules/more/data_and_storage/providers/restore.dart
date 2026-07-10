@@ -1,9 +1,7 @@
 import 'dart:convert';
-
 import 'package:archive/archive_io.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
@@ -12,39 +10,78 @@ import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/custom_button.dart';
 import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_app_settings_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
+import 'package:mangayomi/services/sync/chimahon_manual_restore_category_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_manual_restore_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_mining_settings_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_local_sync_projection_service.dart';
+import 'package:mangayomi/services/sync/chimahon_media_sync_selection.dart';
+import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
+import 'package:mangayomi/services/statistics/immersion_stats_models.dart';
+import 'package:mangayomi/services/statistics/immersion_stats_storage.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/reconcile_mihon_sources.dart';
+import 'package:mangayomi/services/sync/chimahon_stats_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_sync_importer.dart';
+import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
+import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
+import 'package:mangayomi/services/sync/chimahon_source_preferences_adapter.dart';
+import 'package:mangayomi/services/sync/mihon_backup_source_resolver.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
+import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
-import 'package:protobuf/protobuf.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'restore.g.dart';
 
 @riverpod
-void doRestore(Ref ref, {required String path, required BuildContext context}) {
+Future<void> doRestore(
+  Ref ref, {
+  required String path,
+  required BuildContext context,
+}) async {
+  final tachiType = _tachiBackupTypeFromPath(path);
+  if (tachiType != null) {
+    try {
+      await ref.read(restoreTachiBkBackupProvider(path, tachiType).future);
+      showBotToast("Backup restored!");
+    } catch (e, s) {
+      botToast('$e\n$s');
+    }
+    return;
+  }
+
   final inputStream = InputFileStream(path);
   try {
     final archive = ZipDecoder().decodeStream(inputStream);
     final backupType = checkBackupType(path, archive);
     switch (backupType) {
       case BackupType.mangayomi:
-        final backup = jsonDecode(
-          utf8.decode(archive.files.first.content),
-        ) as Map<String, dynamic>;
+        final backup =
+            jsonDecode(utf8.decode(archive.files.first.content))
+                as Map<String, dynamic>;
         ref.read(restoreBackupProvider(backup));
         break;
       case BackupType.kotatsu:
@@ -53,7 +90,6 @@ void doRestore(Ref ref, {required String path, required BuildContext context}) {
       case BackupType.mihon:
       case BackupType.aniyomi:
       case BackupType.neko:
-        ref.read(restoreTachiBkBackupProvider(path, backupType));
         break;
       default:
     }
@@ -86,7 +122,9 @@ void showBotToast(String text) {
 enum BackupType { unknown, mangayomi, mihon, aniyomi, kotatsu, neko }
 
 BackupType checkBackupType(String path, Archive archive) {
-  if (path.toLowerCase().contains("mangayomi") &&
+  final normalizedPath = path.toLowerCase();
+  if ((normalizedPath.contains("mangatan") ||
+          normalizedPath.contains("mangayomi")) &&
       (archive.files.firstOrNull?.name ?? "").endsWith(".backup.db")) {
     return BackupType.mangayomi;
   } else if (path.toLowerCase().contains("kotatsu") &&
@@ -101,17 +139,23 @@ BackupType checkBackupType(String path, Archive archive) {
           }).length ==
           2) {
     return BackupType.kotatsu;
-  } else if (path.toLowerCase().endsWith(".tachibk") ||
-      path.toLowerCase().endsWith(".proto.gz")) {
-    return path.contains("xyz.jmir.tachiyomi.mi") || path.contains("aniyomi.mi")
-        ? BackupType.aniyomi
-        : path.contains("tachiyomi") || path.contains("mihon")
-        ? BackupType.mihon
-        : path.contains("neko")
-        ? BackupType.neko
-        : BackupType.unknown;
   }
   return BackupType.unknown;
+}
+
+BackupType? _tachiBackupTypeFromPath(String path) {
+  final lower = path.toLowerCase();
+  if (!lower.endsWith('.tachibk') && !lower.endsWith('.proto.gz')) {
+    return null;
+  }
+  if (lower.contains('xyz.jmir.tachiyomi.mi') ||
+      lower.contains('aniyomi.mi') ||
+      lower.contains('anikku')) {
+    return BackupType.aniyomi;
+  }
+  if (lower.contains('neko')) return BackupType.neko;
+  // Mihon, Komikku, Chimahon, and their forks share the same current envelope.
+  return BackupType.mihon;
 }
 
 @riverpod
@@ -160,84 +204,63 @@ void restoreBackup(Ref ref, Map<String, dynamic> backup, {bool full = true}) {
           ?.map((e) => CustomButton.fromJson(e))
           .toList();
 
-      final currentSettings = isar.settings.getSync(227);
       isar.writeTxnSync(() {
         isar.mangas.clearSync();
         if (manga != null) {
           isar.mangas.putAllSync(manga);
           if (chapters != null) {
             isar.chapters.clearSync();
-            final mangaMap = {
-              for (var m in isar.mangas.where().findAllSync()) m.id!: m,
-            };
-            final chaptersToPut = <Chapter>[];
             for (var chapter in chapters) {
-              final manga = mangaMap[chapter.mangaId];
+              final manga = isar.mangas.getSync(chapter.mangaId!);
               if (manga != null) {
-                chapter.manga.value = manga;
-                chaptersToPut.add(chapter);
+                isar.chapters.putSync(chapter..manga.value = manga);
+                chapter.manga.saveSync();
               }
             }
-            isar.chapters.putAllSync(chaptersToPut);
-            for (var chapter in chaptersToPut) {
-              chapter.manga.saveSync();
-            }
-
-            final chapterMap = {
-              for (var c in isar.chapters.where().findAllSync()) c.id!: c,
-            };
 
             if (full) {
               isar.downloads.clearSync();
               if (downloads != null) {
-                final downloadsToPut = <Download>[];
                 for (var download in downloads) {
-                  final chapter = chapterMap[download.id];
+                  final chapter = isar.chapters.getSync(download.id!);
                   if (chapter != null) {
-                    download.chapter.value = chapter;
-                    downloadsToPut.add(download);
+                    isar.downloads.putSync(download..chapter.value = chapter);
+                    download.chapter.saveSync();
                   }
-                }
-                isar.downloads.putAllSync(downloadsToPut);
-                for (var download in downloadsToPut) {
-                  download.chapter.saveSync();
                 }
               }
             }
 
             isar.historys.clearSync();
             if (history != null) {
-              final historyToPut = <History>[];
               for (var element in history) {
-                final chapter = chapterMap[element.chapterId];
+                final chapter = isar.chapters.getSync(element.chapterId!);
                 if (chapter != null) {
-                  element.chapter.value = chapter;
-                  historyToPut.add(element);
+                  isar.historys.putSync(element..chapter.value = chapter);
+                  element.chapter.saveSync();
                 }
-              }
-              isar.historys.putAllSync(historyToPut);
-              for (var element in historyToPut) {
-                element.chapter.saveSync();
               }
             }
 
             isar.updates.clearSync();
             if (updates != null) {
-              final chapterMapByKey = {
-                for (var c in chapterMap.values) "${c.mangaId}_${c.name}": c,
-              };
-              final updatesToPut = <Update>[];
+              final tempChapters = isar.chapters
+                  .filter()
+                  .idIsNotNull()
+                  .findAllSync()
+                  .toList();
               for (var update in updates) {
-                final matchingChapter =
-                    chapterMapByKey["${update.mangaId}_${update.chapterName}"];
+                final matchingChapter = tempChapters
+                    .where(
+                      (chapter) =>
+                          chapter.mangaId == update.mangaId &&
+                          chapter.name == update.chapterName,
+                    )
+                    .firstOrNull;
                 if (matchingChapter != null) {
-                  update.chapter.value = matchingChapter;
-                  updatesToPut.add(update);
+                  isar.updates.putSync(update..chapter.value = matchingChapter);
+                  update.chapter.saveSync();
                 }
-              }
-              isar.updates.putAllSync(updatesToPut);
-              for (var update in updatesToPut) {
-                update.chapter.saveSync();
               }
             }
           }
@@ -268,18 +291,7 @@ void restoreBackup(Ref ref, Map<String, dynamic> backup, {bool full = true}) {
           }
           isar.settings.clearSync();
           if (settings != null) {
-            isar.settings.putAllSync(
-              settings
-                  .map(
-                    (settings) => currentSettings == null
-                        ? settings
-                        : _preserveDeviceLocalSettings(
-                            settings,
-                            currentSettings,
-                          ),
-                  )
-                  .toList(),
-            );
+            isar.settings.putAllSync(settings);
           }
           isar.customButtons.clearSync();
           if (customButtons != null) {
@@ -388,192 +400,656 @@ void restoreKotatsuBackup(Ref ref, Archive archive) {
 }
 
 @riverpod
-void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
+Future<void> restoreTachiBkBackup(
+  Ref ref,
+  String path,
+  BackupType bkType,
+) async {
   final inputStream = InputFileStream(path);
-  final content = GZipDecoder().decodeBytes(inputStream.toUint8List());
-  inputStream.close();
-  final backup = BackupMihon.create();
-  backup.mergeFromCodedBufferReader(
-    CodedBufferReader(content, sizeLimit: 250 << 20),
+  late final DecodedChimahonSync decoded;
+  try {
+    decoded = const ChimahonSyncCodec().decode(inputStream.toUint8List());
+  } finally {
+    inputStream.close();
+  }
+  final content = decoded.protobufBytes;
+  final backup = decoded.backup;
+  await restoreTachiBkBackupData(ref, backup, content, bkType);
+}
+
+Future<void> restoreTachiBkBackupData(
+  Ref ref,
+  BackupMihon backup,
+  List<int> content,
+  BackupType bkType, {
+  ChimahonDeferredPayloadStore? pendingManualRestoreStore,
+}) => ChimahonRestoreSyncCoordinator.shared.duringManualRestore(
+  () => _restoreTachiBkBackupDataExclusive(
+    ref,
+    backup,
+    content,
+    bkType,
+    pendingManualRestoreStore: pendingManualRestoreStore,
+  ),
+);
+
+Future<void> _restoreTachiBkBackupDataExclusive(
+  Ref ref,
+  BackupMihon backup,
+  List<int> content,
+  BackupType bkType, {
+  ChimahonDeferredPayloadStore? pendingManualRestoreStore,
+}) async {
+  final localSources = isar.sources.filter().idIsNotNull().findAllSync();
+  final shouldRestoreAnime =
+      bkType == BackupType.aniyomi ||
+      backup.backupAnime.isNotEmpty ||
+      backup.backupAnimeCategories.isNotEmpty;
+  final legacyAnimeBackup = shouldRestoreAnime
+      ? BackupAniyomi.fromBuffer(content)
+      : null;
+  final List<BackupCategory> animeCategories =
+      backup.backupAnimeCategories.isNotEmpty
+      ? backup.backupAnimeCategories.toList()
+      : legacyAnimeBackup?.backupAnimeCategories.isNotEmpty == true
+      ? legacyAnimeBackup!.backupAnimeCategories.toList()
+      : legacyAnimeBackup?.legacyBackupAnimeCategories.toList() ?? const [];
+  final List<BackupAnime> animeEntries = backup.backupAnime.isNotEmpty
+      ? backup.backupAnime.toList()
+      : legacyAnimeBackup?.backupAnime.isNotEmpty == true
+      ? legacyAnimeBackup!.backupAnime.toList()
+      : legacyAnimeBackup?.legacyBackupAnime.toList() ?? const [];
+  final List<BackupSource> animeSources = backup.backupAnimeSources.isNotEmpty
+      ? backup.backupAnimeSources.toList()
+      : legacyAnimeBackup?.backupAnimeSources.isNotEmpty == true
+      ? legacyAnimeBackup!.backupAnimeSources.toList()
+      : legacyAnimeBackup?.legacyBackupAnimeSources.toList() ?? const [];
+  final pendingBackup = backup.deepCopy();
+  if (pendingBackup.backupAnime.isEmpty) {
+    pendingBackup.backupAnime.addAll(animeEntries);
+  }
+  if (pendingBackup.backupAnimeCategories.isEmpty) {
+    pendingBackup.backupAnimeCategories.addAll(animeCategories);
+  }
+  if (pendingBackup.backupAnimeSources.isEmpty) {
+    pendingBackup.backupAnimeSources.addAll(animeSources);
+  }
+  // Preserve the exact restore payload (including fields this Mangatan build
+  // cannot project) until a conditional Chimahon upload succeeds. Persist it
+  // before destructive database work so a partial restore cannot lose data.
+  final pendingStore =
+      pendingManualRestoreStore ??
+      await defaultChimahonPendingManualRestoreStore();
+  if (pendingStore case ChimahonPendingManualRestoreLifecycleStore lifecycle) {
+    await lifecycle.beginPreparing(pendingBackup);
+  } else {
+    // Custom stores predating the lifecycle keep their legacy ready behavior.
+    await pendingStore.save(pendingBackup);
+  }
+  const manualRestoreAdapter = ChimahonManualRestoreAdapter();
+  const novelMaterializer = ChimahonNovelMaterializer();
+  final localNovelProgress = isar.epubBookProgress.where().findAllSync();
+  final allLocalChapters = isar.chapters.where().findAllSync();
+  final allLocalArchiveMangas = isar.mangas
+      .filter()
+      .isLocalArchiveEqualTo(true)
+      .findAllSync();
+  final obsoleteCloudNovelParentIds = novelMaterializer
+      .staleCloudNovelParentIds(
+        localMangas: allLocalArchiveMangas,
+        localProgress: localNovelProgress,
+        localChapters: allLocalChapters,
+        remote: backup.backupNovels,
+      );
+  final localArchiveMangas = allLocalArchiveMangas
+      .where((manga) => !obsoleteCloudNovelParentIds.contains(manga.id))
+      .toList(growable: false);
+  final localArchiveIds = localArchiveMangas
+      .map((manga) => manga.id)
+      .whereType<int>()
+      .toSet();
+  final manualOverlayChapters = allLocalChapters
+      .where(
+        (chapter) =>
+            !localArchiveIds.contains(chapter.mangaId) &&
+            manualRestoreAdapter.isDeviceLocalChapter(chapter),
+      )
+      .toList(growable: false);
+  final manualOverlayParentIds = manualOverlayChapters
+      .map((chapter) => chapter.mangaId)
+      .whereType<int>()
+      .toSet();
+  final retainedLocalMangas = [
+    ...localArchiveMangas,
+    ...isar.mangas.where().findAllSync().where(
+      (manga) => manualOverlayParentIds.contains(manga.id),
+    ),
+  ];
+  final retainedLocalMangaIds = retainedLocalMangas
+      .map((manga) => manga.id)
+      .whereType<int>()
+      .toSet();
+  final retainedLocalChapters = [
+    ...allLocalChapters.where(
+      (chapter) => localArchiveIds.contains(chapter.mangaId),
+    ),
+    ...manualOverlayChapters,
+  ];
+  final retainedLocalChapterIds = retainedLocalChapters
+      .map((chapter) => chapter.id)
+      .whereType<int>()
+      .toSet();
+  final retainedLocalHistories = isar.historys
+      .where()
+      .findAllSync()
+      .where((history) => retainedLocalChapterIds.contains(history.chapterId))
+      .toList(growable: false);
+  final retainedLastReadByMangaId = <int, int>{};
+  for (final manga in retainedLocalMangas) {
+    final mangaId = manga.id;
+    if (mangaId == null) continue;
+    retainedLastReadByMangaId[mangaId] = manualRestoreAdapter.retainedLastRead(
+      parentLastRead: manga.lastRead,
+      histories: retainedLocalHistories.where(
+        (history) => history.mangaId == mangaId,
+      ),
+    );
+  }
+  final retainedLocalTracks = manualRestoreAdapter
+      .trackingRowsForRetainedParents(
+        tracks: isar.tracks.where().findAllSync(),
+        retainedParentIds: retainedLocalMangaIds,
+      );
+  final retainedTracksByMangaId = <int, List<Track>>{};
+  for (final track in retainedLocalTracks) {
+    final mangaId = track.mangaId;
+    if (mangaId != null) {
+      retainedTracksByMangaId.putIfAbsent(mangaId, () => []).add(track);
+    }
+  }
+  final localCategories = isar.categorys.where().findAllSync();
+  final retainedLocalCategoryIds = retainedLocalMangas
+      .expand((manga) => manga.categories ?? const <int>[])
+      .toSet();
+  final categoryPlan = const ChimahonManualRestoreCategoryAdapter().build(
+    localCategories: localCategories,
+    retainedLocalCategoryIds: retainedLocalCategoryIds,
+    mangaCategories: backup.backupCategories,
+    animeCategories: animeCategories,
+    novelCategories: backup.backupNovelCategories,
   );
-  List<Category> cats = [];
+  final retainedNovelProgress = localNovelProgress
+      .where((progress) => retainedLocalMangaIds.contains(progress.mangaId))
+      .toList(growable: false);
+  final novelPlan = novelMaterializer.plan(
+    localMangas: retainedLocalMangas,
+    localProgress: retainedNovelProgress,
+    localChapters: retainedLocalChapters,
+    remote: backup.backupNovels,
+  );
   isar.writeTxnSync(() {
     isar.categorys.clearSync();
     isar.mangas.clearSync();
     isar.chapters.clearSync();
     isar.historys.clearSync();
-    for (var category in backup.backupCategories) {
-      final cat = Category(
-        name: category.name,
-        forItemType: ItemType.manga,
-        pos: _protoInt(category.order),
+    isar.tracks.clearSync();
+    // Progress belongs to retained local EPUB parents or to remote ghosts
+    // materialized below. Clearing first prevents an orphan from suppressing
+    // a remote book and then attaching to a reused auto-increment parent ID.
+    isar.epubBookProgress.clearSync();
+    for (final category in categoryPlan.categoriesForInsertion) {
+      isar.categorys.putSync(category);
+    }
+    for (final manga in retainedLocalMangas) {
+      manga.hasLocalChapterOverlay = manualOverlayParentIds.contains(manga.id);
+      final remoteNovelCategoryIds =
+          novelPlan.remoteCategoryIdsByMangaId[manga.id] ?? const <String>[];
+      manga.categories = manga.itemType != ItemType.novel
+          ? categoryPlan.remapLocalIds(manga.categories)
+          : novelPlan.authoritativeCloudParentIds.contains(manga.id)
+          ? categoryPlan.idsForNovelBackupIds(remoteNovelCategoryIds)
+          : categoryPlan.idsForRetainedNovelTitle(
+              localIds: manga.categories,
+              backupIds: remoteNovelCategoryIds,
+            );
+      isar.mangas.putSync(manga);
+    }
+    if (retainedNovelProgress.isNotEmpty) {
+      isar.epubBookProgress.putAllSync(retainedNovelProgress);
+    }
+    for (final cloudNovel in novelPlan.cloudNovels) {
+      cloudNovel.parent.categories = categoryPlan.idsForNovelBackupIds(
+        cloudNovel.remote.categoryIds,
       );
-      isar.categorys.putSync(cat);
-      cats.add(cat);
+      isar.mangas.putSync(cloudNovel.parent);
+      cloudNovel.progress.mangaId = cloudNovel.parent.id!;
+      isar.epubBookProgress.putSync(cloudNovel.progress);
+    }
+    for (final chapter in retainedLocalChapters) {
+      final manga = isar.mangas.getSync(chapter.mangaId!);
+      if (manga == null) continue;
+      isar.chapters.putSync(chapter..manga.value = manga);
+      chapter.manga.saveSync();
+    }
+    for (final history in retainedLocalHistories) {
+      final chapter = isar.chapters.getSync(history.chapterId!);
+      if (chapter == null) continue;
+      isar.historys.putSync(history..chapter.value = chapter);
+      history.chapter.saveSync();
+    }
+    if (retainedLocalTracks.isNotEmpty) {
+      isar.tracks.putAllSync(retainedLocalTracks);
     }
     for (var tempManga in backup.backupManga) {
-      final sourceId = _protoInt(tempManga.source);
+      final nativeSourceId = _protoInt(tempManga.source);
+      final resolvedSource = resolveMihonBackupSource(
+        nativeId: nativeSourceId,
+        backupSources: backup.backupSources,
+        localSources: localSources,
+      );
       final categoryOrders = tempManga.categories.map(_protoInt).toSet();
+      final titles = const ChimahonMangaTitleAdapter().fromBackup(tempManga);
+      final retained = _findRetainedRestoreTitle(
+        retained: retainedLocalMangas,
+        itemType: ItemType.manga,
+        source: resolvedSource,
+        url: tempManga.url,
+        sourceTitle: titles.sourceTitle,
+      );
       final manga = Manga(
-        source:
-            backup.backupSources
-                .firstWhereOrNull((src) => _protoInt(src.sourceId) == sourceId)
-                ?.name ??
-            "Unknown",
+        id: retained?.id,
+        source: resolvedSource.name,
         author: tempManga.author,
         artist: tempManga.artist,
         genre: tempManga.genre,
         imageUrl: tempManga.thumbnailUrl,
-        lang: 'en',
+        lang: resolvedSource.language,
         link: tempManga.url,
-        name: tempManga.title,
+        name: titles.displayTitle,
+        sourceTitle: titles.sourceTitle,
         status: _convertStatusFromTachiBk(tempManga.status),
         description: tempManga.description,
-        categories: cats
-            .where((cat) => categoryOrders.contains(cat.pos))
-            .map((cat) => cat.id!)
-            .toList(),
+        categories: categoryPlan.idsForRetainedTitle(
+          localIds: retained?.categories,
+          itemType: ItemType.manga,
+          backupOrders: categoryOrders,
+        ),
         itemType: ItemType.manga,
-        favorite: true,
-        dateAdded: _protoMillis(tempManga.dateAdded),
-        lastUpdate: _protoMillis(tempManga.lastModifiedAt),
-        sourceId: null,
+        favorite: tempManga.hasFavorite() ? tempManga.favorite : true,
+        favoriteModifiedAt: manualRestoreAdapter.mangaFavoriteModifiedAt(
+          tempManga,
+        ),
+        dateAdded: normalizeMihonTimestamp(_protoInt(tempManga.dateAdded)),
+        lastRead: retained?.id == null
+            ? 0
+            : retainedLastReadByMangaId[retained!.id!] ?? retained.lastRead,
+        lastUpdate: normalizeMihonTimestamp(
+          _protoInt(tempManga.lastModifiedAt),
+        ),
+        sourceId: resolvedSource.localId,
+        isManga: retained?.isManga,
+        isLocalArchive: retained?.isLocalArchive ?? false,
+        hasLocalChapterOverlay:
+            retained != null && manualOverlayParentIds.contains(retained.id),
+        customCoverImage: retained?.customCoverImage,
+        customCoverFromTracker: retained?.customCoverFromTracker,
+        smartUpdateDays: retained?.smartUpdateDays,
+        updatedAt: manualRestoreAdapter.updatedAtFromLastModified(
+          _protoInt(tempManga.lastModifiedAt),
+        ),
       );
       if (bkType == BackupType.neko) {
         manga.source = "MangaDex";
       }
       isar.mangas.putSync(manga);
-      History? history;
+      final chaptersByUrl = <String, Chapter>{};
       for (var tempChapter in tempManga.chapters) {
-        final chapter = Chapter(
+        final chapter = manualRestoreAdapter.mangaChapterRow(
+          remote: tempChapter,
           mangaId: manga.id!,
-          name: tempChapter.name,
           dateUpload: bkType != BackupType.neko
-              ? "${_protoMillis(tempChapter.dateUpload)}"
-              : "${DateTime.now().millisecondsSinceEpoch - _protoInt(tempChapter.dateUpload).abs()}",
-          isBookmarked: tempChapter.bookmark,
-          isRead: tempChapter.read,
-          lastPageRead: _protoInt(tempChapter.lastPageRead) != 0
-              ? "${_protoInt(tempChapter.lastPageRead)}"
-              : "1",
-          scanlator: tempChapter.scanlator,
-          url: tempChapter.url,
+              ? normalizeMihonTimestamp(_protoInt(tempChapter.dateUpload))
+              : DateTime.now().millisecondsSinceEpoch -
+                    _protoInt(tempChapter.dateUpload).abs(),
         );
         isar.chapters.putSync(chapter..manga.value = manga);
         chapter.manga.saveSync();
-        if ((history == null ||
-            int.parse(history.date ?? "0") <
-                _protoMillis(tempChapter.lastModifiedAt))) {
-          history = History(
-            mangaId: manga.id,
-            date: bkType != BackupType.neko
-                ? "${_protoMillis(tempChapter.lastModifiedAt)}"
-                : "${DateTime.now().millisecondsSinceEpoch - _protoInt(tempChapter.dateUpload).abs()}",
-            itemType: ItemType.manga,
-            chapterId: chapter.id,
-          )..chapter.value = chapter;
-        }
+        chaptersByUrl[tempChapter.url] = chapter;
       }
-      if (history != null) {
+      var lastRead = manga.lastRead ?? 0;
+      for (final tempHistory in tempManga.history) {
+        final chapter = chaptersByUrl[tempHistory.url];
+        if (chapter == null) continue;
+        final readAt = normalizeMihonTimestamp(_protoInt(tempHistory.lastRead));
+        lastRead = readAt > lastRead ? readAt : lastRead;
+        final history = History(
+          mangaId: manga.id,
+          date: '$readAt',
+          itemType: ItemType.manga,
+          chapterId: chapter.id,
+          readingTimeSeconds: Duration(
+            milliseconds: _protoInt(tempHistory.readDuration),
+          ).inSeconds,
+        )..chapter.value = chapter;
         isar.historys.putSync(history);
         history.chapter.saveSync();
       }
+      if (lastRead > 0) isar.mangas.putSync(manga..lastRead = lastRead);
+      final restoredTracks = manualRestoreAdapter.trackingRows(
+        remote: tempManga.tracking,
+        mangaId: manga.id!,
+        itemType: ItemType.manga,
+        parentModifiedAt: _protoInt(tempManga.lastModifiedAt),
+        existing: retainedTracksByMangaId[manga.id] ?? const <Track>[],
+      );
+      if (restoredTracks.isNotEmpty) {
+        isar.tracks.putAllSync(restoredTracks);
+      }
     }
   });
-  if (bkType == BackupType.aniyomi) {
-    final backupAnime = BackupAniyomi.fromBuffer(content);
-    final animeCategories = backupAnime.backupAnimeCategories.isNotEmpty
-        ? backupAnime.backupAnimeCategories
-        : backupAnime.legacyBackupAnimeCategories;
-    final animeEntries = backupAnime.backupAnime.isNotEmpty
-        ? backupAnime.backupAnime
-        : backupAnime.legacyBackupAnime;
-    final animeSources = backupAnime.backupAnimeSources.isNotEmpty
-        ? backupAnime.backupAnimeSources
-        : backupAnime.legacyBackupAnimeSources;
-    List<Category> cats = [];
+  if (shouldRestoreAnime) {
     isar.writeTxnSync(() {
-      for (var category in animeCategories) {
-        final cat = Category(
-          name: category.name,
-          forItemType: ItemType.anime,
-          pos: _protoInt(category.order),
-        );
-        isar.categorys.putSync(cat);
-        cats.add(cat);
-      }
       for (var tempAnime in animeEntries) {
-        final sourceId = _protoInt(tempAnime.source);
+        final nativeSourceId = _protoInt(tempAnime.source);
+        final resolvedSource = resolveMihonBackupSource(
+          nativeId: nativeSourceId,
+          backupSources: animeSources,
+          localSources: localSources,
+        );
         final categoryOrders = tempAnime.categories.map(_protoInt).toSet();
+        final retained = _findRetainedRestoreTitle(
+          retained: retainedLocalMangas,
+          itemType: ItemType.anime,
+          source: resolvedSource,
+          url: tempAnime.url,
+          sourceTitle: tempAnime.title,
+        );
         final anime = Manga(
-          source:
-              animeSources
-                  .firstWhereOrNull(
-                    (src) => _protoInt(src.sourceId) == sourceId,
-                  )
-                  ?.name ??
-              "Unknown",
+          id: retained?.id,
+          source: resolvedSource.name,
           author: tempAnime.author,
           artist: tempAnime.artist,
           genre: tempAnime.genre,
           imageUrl: tempAnime.thumbnailUrl,
-          lang: 'en',
+          lang: resolvedSource.language,
           link: tempAnime.url,
           name: tempAnime.title,
           status: _convertStatusFromTachiBk(tempAnime.status),
           description: tempAnime.description,
-          categories: cats
-              .where((cat) => categoryOrders.contains(cat.pos))
-              .map((cat) => cat.id!)
-              .toList(),
+          categories: categoryPlan.idsForRetainedTitle(
+            localIds: retained?.categories,
+            itemType: ItemType.anime,
+            backupOrders: categoryOrders,
+          ),
           itemType: ItemType.anime,
-          favorite: true,
-          dateAdded: _protoMillis(tempAnime.dateAdded),
-          lastUpdate: _protoMillis(tempAnime.lastModifiedAt),
-          sourceId: null,
+          favorite: tempAnime.hasFavorite() ? tempAnime.favorite : true,
+          favoriteModifiedAt: manualRestoreAdapter.animeFavoriteModifiedAt(
+            tempAnime,
+          ),
+          dateAdded: normalizeMihonTimestamp(_protoInt(tempAnime.dateAdded)),
+          lastRead: retained?.id == null
+              ? 0
+              : retainedLastReadByMangaId[retained!.id!] ?? retained.lastRead,
+          lastUpdate: normalizeMihonTimestamp(
+            _protoInt(tempAnime.lastModifiedAt),
+          ),
+          sourceId: resolvedSource.localId,
+          isManga: retained?.isManga,
+          isLocalArchive: retained?.isLocalArchive ?? false,
+          hasLocalChapterOverlay:
+              retained != null && manualOverlayParentIds.contains(retained.id),
+          customCoverImage: retained?.customCoverImage,
+          customCoverFromTracker: retained?.customCoverFromTracker,
+          smartUpdateDays: retained?.smartUpdateDays,
+          updatedAt: manualRestoreAdapter.updatedAtFromLastModified(
+            _protoInt(tempAnime.lastModifiedAt),
+          ),
         );
         isar.mangas.putSync(anime);
-        History? history;
+        final episodesByUrl = <String, Chapter>{};
         for (var tempEpisode in tempAnime.episodes) {
-          final episode = Chapter(
+          final episode = manualRestoreAdapter.animeEpisodeRow(
+            remote: tempEpisode,
             mangaId: anime.id!,
-            name: tempEpisode.name,
-            dateUpload: "${_protoMillis(tempEpisode.dateUpload)}",
-            isBookmarked: tempEpisode.bookmark,
-            isRead: tempEpisode.seen,
-            lastPageRead: _protoInt(tempEpisode.lastSecondSeen) != 0
-                ? "${_protoMillis(tempEpisode.lastSecondSeen)}"
-                : "1",
-            scanlator: tempEpisode.scanlator,
-            url: tempEpisode.url,
+            dateUpload: normalizeMihonTimestamp(
+              _protoInt(tempEpisode.dateUpload),
+            ),
           );
           isar.chapters.putSync(episode..manga.value = anime);
           episode.manga.saveSync();
-          if ((history == null ||
-              int.parse(history.date ?? "0") <
-                  _protoMillis(tempEpisode.lastModifiedAt))) {
-            history = History(
-              mangaId: anime.id,
-              date: "${_protoMillis(tempEpisode.lastModifiedAt)}",
-              itemType: ItemType.anime,
-              chapterId: episode.id,
-            )..chapter.value = episode;
-          }
+          episodesByUrl[tempEpisode.url] = episode;
         }
-        if (history != null) {
+        var lastRead = anime.lastRead ?? 0;
+        for (final tempHistory in tempAnime.history) {
+          final episode = episodesByUrl[tempHistory.url];
+          if (episode == null) continue;
+          final readAt = normalizeMihonTimestamp(
+            _protoInt(tempHistory.lastRead),
+          );
+          lastRead = readAt > lastRead ? readAt : lastRead;
+          final history = History(
+            mangaId: anime.id,
+            date: '$readAt',
+            itemType: ItemType.anime,
+            chapterId: episode.id,
+            readingTimeSeconds: Duration(
+              milliseconds: _protoInt(tempHistory.readDuration),
+            ).inSeconds,
+          )..chapter.value = episode;
           isar.historys.putSync(history);
           history.chapter.saveSync();
+        }
+        if (lastRead > 0) isar.mangas.putSync(anime..lastRead = lastRead);
+        final restoredTracks = manualRestoreAdapter.trackingRows(
+          remote: tempAnime.tracking,
+          mangaId: anime.id!,
+          itemType: ItemType.anime,
+          parentModifiedAt: _protoInt(tempAnime.lastModifiedAt),
+          existing: retainedTracksByMangaId[anime.id] ?? const <Track>[],
+        );
+        if (restoredTracks.isNotEmpty) {
+          isar.tracks.putAllSync(restoredTracks);
         }
       }
     });
   }
   isar.writeTxnSync(() {
+    // Chimahon has no representation for Mangatan's tracker account
+    // preferences, so an explicit restore must leave that local table intact.
     isar.downloads.clearSync();
     isar.updates.clearSync();
-    isar.tracks.clearSync();
-    isar.trackPreferences.clearSync();
-    _invalidateCommonState(ref);
   });
+  await _importChimahonSettings(ref, backup);
+  await _importImmersionStats(backup, replace: true);
+  _importChimahonMediaSelection(backup);
+  ref.invalidate(synchingProvider(syncId: 1));
+  if (pendingStore case ChimahonLocalPreferenceBaselineStore preferenceStore) {
+    final syncPreference =
+        isar.syncPreferences.getSync(1) ?? SyncPreference(syncId: 1);
+    final projection = await ChimahonLocalSyncProjectionService(
+      database: isar,
+      mediaSelection: ChimahonMediaSyncSelection(
+        manga: syncPreference.chimahonSyncManga,
+        anime: syncPreference.chimahonSyncAnime,
+        novels: syncPreference.chimahonSyncNovels,
+      ),
+      mediaSelectionInitialized:
+          syncPreference.chimahonMediaSelectionInitialized,
+    ).createSnapshot();
+    await preferenceStore.saveLocalPreferenceBaseline(
+      projection.backup.backupPreferences,
+    );
+    if (pendingStore
+        case ChimahonLocalSourcePreferenceBaselineStore sourceStore) {
+      await sourceStore.saveLocalSourcePreferenceBaseline(
+        projection.backup.backupSourcePreferences,
+      );
+    }
+  }
+  if (pendingStore case ChimahonPendingManualRestoreLifecycleStore lifecycle) {
+    await lifecycle.markReady();
+  }
+  _invalidateCommonState(ref);
+}
+
+/// Restores immersion statistics from a Chimahon-compatible backup.
+///
+/// A manual restore is an explicit "make this device look like the backup", so
+/// it replaces the local rows. Sync merges instead, because both sides may hold
+/// reading the other has not seen.
+Future<void> _importImmersionStats(
+  BackupMihon backup, {
+  required bool replace,
+}) async {
+  const adapter = ChimahonStatsAdapter();
+  final mangaStats = adapter.importAllMangaStats(backup.backupMangaStats);
+  final ankiStats = adapter.importAllAnkiStats(backup.backupAnkiStats);
+  final novelStats = <String, List<NovelStatsEntry>>{};
+  for (final novel in backup.backupNovels) {
+    if (novel.stats.isEmpty || novel.id.isEmpty) continue;
+    novelStats
+        .putIfAbsent(novel.id, () => [])
+        .addAll(adapter.importAllNovelStats(novel.stats));
+  }
+
+  if (replace) {
+    await ImmersionStatsStorage.clear();
+    await ImmersionStatsStorage.saveMangaStats(mangaStats);
+    await ImmersionStatsStorage.saveAnkiStats(ankiStats);
+    for (final entry in novelStats.entries) {
+      await ImmersionStatsStorage.saveNovelStats(entry.key, entry.value);
+    }
+    return;
+  }
+  await ImmersionStatsStorage.mergeMangaStats(mangaStats);
+  await ImmersionStatsStorage.mergeAnkiStats(ankiStats);
+  for (final entry in novelStats.entries) {
+    await ImmersionStatsStorage.mergeNovelStats(entry.key, entry.value);
+  }
+}
+
+void _importChimahonMediaSelection(BackupMihon backup) {
+  final preferences = backup.backupPreferences;
+  if (!ChimahonMediaSyncSelection.hasAnyPreference(preferences)) {
+    return;
+  }
+  isar.writeTxnSync(() {
+    final preference =
+        isar.syncPreferences.getSync(1) ?? SyncPreference(syncId: 1);
+    final selection = chimahonMediaSelectionForExplicitRestore(
+      preferences: preferences,
+      current: ChimahonMediaSyncSelection(
+        manga: preference.chimahonSyncManga,
+        anime: preference.chimahonSyncAnime,
+        novels: preference.chimahonSyncNovels,
+      ),
+    );
+    final malformed = ChimahonMediaSyncSelection.hasMalformedPreference(
+      preferences,
+    );
+    final nextGeneration = preference.chimahonMediaSelectionGeneration + 1;
+    preference
+      ..chimahonSyncManga = selection.manga
+      ..chimahonSyncAnime = selection.anime
+      ..chimahonSyncNovels = selection.novels
+      ..chimahonMediaSelectionInitialized = !malformed
+      ..chimahonMediaSelectionUserSelected = !malformed
+      ..chimahonMediaSelectionScopeToken = null
+      ..chimahonMediaSelectionGeneration = nextGeneration;
+    isar.syncPreferences.putSync(preference);
+  });
+}
+
+/// Applies a Chimahon sync payload while preserving device-only artifacts.
+///
+/// Routine merge sync is incremental. Passing [authoritativeSelection] makes
+/// the enabled media scopes remote-authoritative while retaining downloads,
+/// manual chapters, archives, EPUB files, and disabled scopes. Matching title
+/// and chapter IDs remain stable in both modes.
+Future<ChimahonSyncImportResult> restoreChimahonSyncData(
+  Ref ref,
+  BackupMihon backup, {
+  ChimahonMediaSyncSelection? authoritativeSelection,
+}) async {
+  var result = const ChimahonSyncImporter().apply(
+    database: isar,
+    backup: backup,
+    authoritativeSelection: authoritativeSelection,
+  );
+  final factoryRefresh = await _importChimahonSettings(
+    ref,
+    backup,
+    preserveUnrepresentableLocalSettings: true,
+  );
+  result = result.withSourceReconciliation(
+    rebound: factoryRefresh.reconciliation.rebound,
+    unavailable: factoryRefresh.reconciliation.unavailable,
+    unresolved: factoryRefresh.unresolvedGroups,
+  );
+  await _importImmersionStats(backup, replace: false);
+  _invalidateCommonState(ref);
+  return result;
+}
+
+Future<MihonFactoryRefreshResult> _importChimahonSettings(
+  Ref ref,
+  BackupMihon backup, {
+  bool preserveUnrepresentableLocalSettings = false,
+}) async {
+  final miningSnapshot = await MiningPreferences.writableSnapshot();
+  try {
+    isar.writeTxnSync(() {
+      final settings = isar.settings.getSync(227);
+      if (settings != null) {
+        const adapter = ChimahonAppSettingsAdapter();
+        final preserveLocalKeys = preserveUnrepresentableLocalSettings
+            ? adapter.project(settings).unrepresentableKeys
+            : const <String>{};
+        adapter.importInto(
+          settings,
+          backup.backupPreferences,
+          preserveLocalKeys: preserveLocalKeys,
+        );
+        isar.settings.putSync(settings);
+      }
+    });
+    const sourcePreferencesAdapter = ChimahonSourcePreferencesAdapter();
+    sourcePreferencesAdapter.importInto(
+      database: isar,
+      sourcePreferences: backup.backupSourcePreferences,
+    );
+    final sources = isar.sources.filter().idIsNotNull().findAllSync();
+    const miningAdapter = ChimahonMiningSettingsAdapter();
+    final portableSourceIds = chimahonPortableSourceOverrideIds(sources);
+    final preserveLocalMiningKeys = preserveUnrepresentableLocalSettings
+        ? (await miningAdapter.project(
+            portableSourceIds: portableSourceIds,
+          )).unrepresentableKeys
+        : const <String>{};
+    await miningAdapter.import(
+      backup.backupPreferences,
+      portableSourceIds: portableSourceIds,
+      preserveLocalKeys: preserveLocalMiningKeys,
+    );
+  } catch (_) {
+    await MiningPreferences.restoreSnapshot(miningSnapshot);
+    rethrow;
+  }
+  // JVM discovery is deliberately outside the settings rollback boundary.
+  // A missing bridge leaves native IDs unresolved and retryable; it must not
+  // revert an otherwise successful authoritative settings import.
+  final factoryRefresh = await refreshInstalledMihonFactorySources(
+    ref,
+    remoteSourcePreferences: backup.backupSourcePreferences,
+    replacePresentPreferences: true,
+  );
+  if (factoryRefresh.groupsReconciled > 0) {
+    const ChimahonSourcePreferencesAdapter().importInto(
+      database: isar,
+      sourcePreferences: backup.backupSourcePreferences,
+    );
+  }
+  return factoryRefresh;
 }
 
 int _protoInt(Object value) {
@@ -583,23 +1059,13 @@ int _protoInt(Object value) {
   return (value as dynamic).toInt() as int;
 }
 
-int _protoMillis(Object seconds) => _protoInt(seconds) * 1000;
-
-Settings _preserveDeviceLocalSettings(Settings incoming, Settings current) {
-  return incoming
-    ..id = current.id
-    ..localFolders = current.localFolders
-    ..namedLocalFolders = current.namedLocalFolders
-    ..downloadLocalFolderName = current.downloadLocalFolderName
-    ..askDownloadDestination = current.askDownloadDestination
-    ..androidProxyServer = current.androidProxyServer
-    ..jrePath = current.jrePath
-    ..extensionServerPath = current.extensionServerPath;
-}
 void _invalidateCommonState(Ref ref) {
-  ref.read(synchingProvider(syncId: 1).notifier).clearAllChangedParts(false);
+  // Sync markers are durable local intent. In particular, tracker deletion
+  // tombstones are cleared by SyncServer only after a successful upload.
+  // A restore/import must not clear unrelated or concurrently-created rows.
   ref.invalidate(followSystemThemeStateProvider);
   ref.invalidate(themeModeStateProvider);
+  ref.invalidate(animationDurationScaleProvider);
   ref.invalidate(blendLevelStateProvider);
   ref.invalidate(flexSchemeColorStateProvider);
   ref.invalidate(pureBlackDarkModeStateProvider);
@@ -611,6 +1077,20 @@ void _invalidateCommonState(Ref ref) {
   ref.invalidate(extensionsRepoStateProvider(ItemType.novel));
   ref.read(routerCurrentLocationStateProvider.notifier).refresh();
 }
+
+Manga? _findRetainedRestoreTitle({
+  required Iterable<Manga> retained,
+  required ItemType itemType,
+  required ResolvedMihonBackupSource source,
+  required String url,
+  required String sourceTitle,
+}) => const ChimahonManualRestoreAdapter().retainedTitle(
+  retained: retained,
+  itemType: itemType,
+  source: source,
+  url: url,
+  sourceTitle: sourceTitle,
+);
 
 Status _convertStatusFromTachiBk(int idx) {
   switch (idx) {

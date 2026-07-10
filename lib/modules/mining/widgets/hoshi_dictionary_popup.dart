@@ -9,6 +9,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
@@ -35,6 +36,7 @@ class HoshiDictionaryPopup extends StatefulWidget {
     this.initialResults,
     required this.preferences,
     required this.onMatchChanged,
+    required this.onDismiss,
   });
 
   final String text;
@@ -42,6 +44,7 @@ class HoshiDictionaryPopup extends StatefulWidget {
   final Future<List<HoshiLookupResult>>? initialResults;
   final DictionaryPopupPreferences preferences;
   final ValueChanged<int> onMatchChanged;
+  final VoidCallback onDismiss;
 
   @override
   State<HoshiDictionaryPopup> createState() => _HoshiDictionaryPopupState();
@@ -53,6 +56,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   InAppWebViewController? _controller;
   List<HoshiLookupResult> _results = const [];
   List<Map<String, dynamic>> _entries = const [];
+  Map<String, Map<String, String>> _dictionaryMediaData = const {};
   bool _exporting = false;
   bool _webReady = false;
   int _lookupGeneration = 0;
@@ -134,9 +138,27 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return {for (final style in styles) style.dictName: style.styles};
   }
 
-  void _setResults(List<HoshiLookupResult> results) {
+  void _setResults(
+    List<HoshiLookupResult> results, {
+    required Map<String, Map<String, String>> dictionaryMediaData,
+  }) {
     _results = results;
     _entries = hoshiPopupEntries(results);
+    _dictionaryMediaData = dictionaryMediaData;
+  }
+
+  Future<Map<String, Map<String, String>>> _loadPopupMedia(
+    List<HoshiLookupResult> results,
+  ) {
+    if (_usesStableCustomSchemes) return Future.value(const {});
+    return hoshiPopupMediaDataUris(
+      results,
+      (dictionary, path) => HoshidictsLookupBackend.instance.getMediaFile(
+        dictName: dictionary,
+        mediaPath: path,
+      ),
+      existing: _dictionaryMediaData,
+    );
   }
 
   Future<void> _lookupAndRender(
@@ -156,8 +178,10 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
                 scanLength: hoshiPopupScanLength,
               ));
     if (!mounted || generation != _lookupGeneration) return;
+    final dictionaryMediaData = await _loadPopupMedia(results);
+    if (!mounted || generation != _lookupGeneration) return;
     final unchanged = query == _resultQuery && identical(results, _results);
-    _setResults(results);
+    _setResults(results, dictionaryMediaData: dictionaryMediaData);
     _resultQuery = query;
     if (notifyMatch && results.isNotEmpty) {
       widget.onMatchChanged(results.first.matched.length);
@@ -171,7 +195,9 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       maxResults: hoshiPopupMaxResults,
       scanLength: hoshiPopupScanLength,
     );
-    _setResults(results);
+    final dictionaryMediaData = await _loadPopupMedia(results);
+    if (!mounted) return 0;
+    _setResults(results, dictionaryMediaData: dictionaryMediaData);
     _resultQuery = query.trim();
     return _entries.length;
   }
@@ -312,6 +338,13 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       },
     );
     controller.addJavaScriptHandler(
+      handlerName: 'dismissPopup',
+      callback: (_) {
+        widget.onDismiss();
+        return true;
+      },
+    );
+    controller.addJavaScriptHandler(
       handlerName: 'duplicateCheck',
       callback: (arguments) =>
           _isDuplicate(arguments.isEmpty ? '' : arguments.first.toString()),
@@ -393,13 +426,18 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   Future<void> _render(Map<String, String> styles) async {
     await _evaluateJavascript(
       'window.dictionaryStyles = ${jsonEncode(styles)};'
-      '${hoshiReplaceRenderScriptForEntries(_entries)}',
+      '${hoshiReplaceRenderScriptForEntries(_entries, mediaDataUris: _dictionaryMediaData)}',
     );
   }
 
   Future<void> _replaceRender() async {
     if (!_webReady) return;
-    await _evaluateJavascript(hoshiReplaceRenderScriptForEntries(_entries));
+    await _evaluateJavascript(
+      hoshiReplaceRenderScriptForEntries(
+        _entries,
+        mediaDataUris: _dictionaryMediaData,
+      ),
+    );
   }
 
   Future<void> _evaluateJavascript(String source) {
@@ -522,11 +560,15 @@ String hoshiReplaceRenderScript(int entryCount) =>
     'window.renderPopup();';
 
 @visibleForTesting
-String hoshiReplaceRenderScriptForEntries(List<Map<String, dynamic>> entries) =>
+String hoshiReplaceRenderScriptForEntries(
+  List<Map<String, dynamic>> entries, {
+  Map<String, Map<String, String>> mediaDataUris = const {},
+}) =>
     '(function(){'
     'window.__mangayomiHoshiRenderToken = '
     '(window.__mangayomiHoshiRenderToken || 0) + 1;'
     'window.resetHoshiAudioCaches?.();'
+    'window.hoshiDictionaryMedia = ${jsonEncode(mediaDataUris)};'
     'window.lookupEntries = ${jsonEncode(entries)};'
     'window.entryCount = window.lookupEntries.length;'
     'const container = document.getElementById("entries-container");'
@@ -541,6 +583,40 @@ String hoshiReplaceRenderScriptForEntries(List<Map<String, dynamic>> entries) =>
 
 List<Map<String, dynamic>> hoshiPopupEntries(List<HoshiLookupResult> results) =>
     [for (final result in results) hoshiPopupEntry(result)];
+
+typedef HoshiPopupMediaLoader =
+    Future<Uint8List?> Function(String dictionary, String path);
+
+@visibleForTesting
+Future<Map<String, Map<String, String>>> hoshiPopupMediaDataUris(
+  List<HoshiLookupResult> results,
+  HoshiPopupMediaLoader load, {
+  Map<String, Map<String, String>> existing = const {},
+}) async {
+  final requested = <(String, String)>{};
+  for (final result in results) {
+    for (final glossary in result.term.glossaries) {
+      for (final path in yomitanGlossaryMediaPaths(glossary.glossary)) {
+        requested.add((glossary.dictName, path));
+      }
+    }
+  }
+
+  final media = <String, Map<String, String>>{};
+  for (final (dictionary, path) in requested) {
+    final cached = existing[dictionary]?[path];
+    if (cached != null) {
+      (media[dictionary] ??= {})[path] = cached;
+      continue;
+    }
+    final bytes = await load(dictionary, path);
+    if (bytes == null || bytes.isEmpty) continue;
+    final dataUri =
+        'data:${_mediaMimeType(path)};base64,${base64Encode(bytes)}';
+    (media[dictionary] ??= {})[path] = dataUri;
+  }
+  return media;
+}
 
 Map<String, dynamic> hoshiPopupEntry(HoshiLookupResult result) {
   final term = result.term;
@@ -628,6 +704,7 @@ String buildHoshiPopupHtml({
     'getEntries',
     'lookupRedirect',
     'textSelected',
+    'dismissPopup',
     'mineEntry',
     'openLink',
     'getTermAudioSources',

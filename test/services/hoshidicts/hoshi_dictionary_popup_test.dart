@@ -163,6 +163,55 @@ void main() {
     );
   });
 
+  test(
+    'embeds dictionary images when WebView custom schemes are unavailable',
+    () async {
+      final result = HoshiLookupResult(
+        matched: 'コンビニ',
+        deinflected: 'コンビニ',
+        trace: const [],
+        preprocessorSteps: 0,
+        term: const HoshiTermResult(
+          expression: 'コンビニ',
+          reading: '',
+          rules: '',
+          score: 1,
+          glossaries: [
+            HoshiGlossaryEntry(
+              dictName: '深辞海',
+              glossary:
+                  '{"type":"structured-content","content":{"tag":"img","path":"yomitan_images/3494.jpg"}}',
+              definitionTags: '',
+              termTags: '',
+            ),
+          ],
+          frequencies: [],
+          pitches: [],
+        ),
+      );
+
+      final media = await hoshiPopupMediaDataUris([result], (
+        dictionary,
+        path,
+      ) async {
+        expect(dictionary, '深辞海');
+        expect(path, 'yomitan_images/3494.jpg');
+        return Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]);
+      });
+
+      expect(
+        media['深辞海']?['yomitan_images/3494.jpg'],
+        'data:image/jpeg;base64,/9j/2Q==',
+      );
+      final script = hoshiReplaceRenderScriptForEntries(
+        hoshiPopupEntries([result]),
+        mediaDataUris: media,
+      );
+      expect(script, contains('window.hoshiDictionaryMedia'));
+      expect(script, contains('data:image/jpeg;base64,/9j/2Q=='));
+    },
+  );
+
   test('keeps frequency and pitch labels white on accent tags', () {
     const preferences = DictionaryPopupPreferences(
       width: 540,
@@ -210,6 +259,11 @@ void main() {
     expect(popup, contains('audio-speaker-body'));
     expect(popup, contains('M3 9v6h4l5 4V5L7 9H3z'));
     expect(popup, contains('window.resetHoshiAudioCaches = resetAudioCaches'));
+    expect(
+      popup,
+      contains('window.hoshiDictionaryMedia?.[dictionary]?.[path]'),
+    );
+    expect(popup, contains("node.type === 'image' || node.tag === 'img'"));
     expect(popup, contains('function hasPopupTextSelection()'));
     expect(popup, contains('function rememberPopupTextSelection()'));
     expect(

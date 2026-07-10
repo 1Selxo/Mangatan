@@ -693,7 +693,10 @@ function createDefinitionImage(data, dictionary, exporting = false) {
     }
     
     if (!exporting) {
-        const imageUrl = `image://?dictionary=${encodeURIComponent(dictionary)}&path=${encodeURIComponent(path)}`;
+        const embeddedImage = window.hoshiDictionaryMedia?.[dictionary]?.[path];
+        const imageUrl = typeof embeddedImage === 'string' && embeddedImage.length > 0
+            ? embeddedImage
+            : `image://?dictionary=${encodeURIComponent(dictionary)}&path=${encodeURIComponent(path)}`;
         if (shouldRenderDefinitionImageToCanvas(path, appearance, usedWidth, invAspectRatio)) {
             imageContainer.appendChild(createDefinitionImageCanvas(imageUrl, nodeData?.alt || title || '', (canvas, sourceImage) => {
                 renderDefinitionImageToCanvas(canvas, sourceImage, usedWidth, invAspectRatio, appearance);
@@ -950,7 +953,7 @@ function renderStructuredContent(parent, node, language = null, dictName = null,
         return;
     }
     
-    if (node.tag === 'img') {
+    if (node.type === 'image' || node.tag === 'img') {
         parent.appendChild(createDefinitionImage(node, dictName, exporting));
         return;
     }
@@ -1874,3 +1877,15 @@ window.renderPopup = function() {
 };
 
 document.addEventListener('selectionchange', rememberPopupTextSelection);
+
+// The embedded WebView owns keyboard focus while the popup is open, so these
+// keys need to cross the JavaScript bridge instead of relying solely on the
+// Flutter focus tree.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' && event.key !== 'Backspace' && event.key !== 'BrowserBack') {
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    webkit.messageHandlers.dismissPopup.postMessage(null);
+}, true);

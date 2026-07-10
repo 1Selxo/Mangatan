@@ -97,6 +97,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   bool _exporting = false;
   bool _webReady = false;
   int _lookupGeneration = 0;
+  int _cachedMatchNotificationGeneration = 0;
   Future<void> _javascriptQueue = Future<void>.value();
   Player? _audioPlayer;
   String? _requestedQuery;
@@ -137,7 +138,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     } else if (oldWidget.initialResults != widget.initialResults) {
       if (_resultQuery == widget.text.trim()) {
         if (_results.isNotEmpty) {
-          widget.onMatchChanged(_results.first.matched.length);
+          _notifyCachedMatchAfterBuild();
         }
       } else {
         unawaited(
@@ -149,6 +150,21 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         );
       }
     }
+  }
+
+  void _notifyCachedMatchAfterBuild() {
+    // didUpdateWidget runs while the popup subtree is building. Its listener
+    // may belong to another overlay tree, so only notify once the frame ends.
+    final generation = ++_cachedMatchNotificationGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _cachedMatchNotificationGeneration ||
+          _resultQuery != widget.text.trim() ||
+          _results.isEmpty) {
+        return;
+      }
+      widget.onMatchChanged(_results.first.matched.length);
+    });
   }
 
   Future<_HoshiPopupData> _loadShell({
@@ -210,6 +226,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     Future<List<HoshiLookupResult>>? initialResults,
   }) async {
     final generation = ++_lookupGeneration;
+    _cachedMatchNotificationGeneration++;
     final query = text.trim();
     _requestedQuery = query;
     _notifyLoadingChanged(query.isNotEmpty);

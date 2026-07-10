@@ -128,7 +128,7 @@ jobs:
           if (Test-Path -LiteralPath 'C:\m') {
             Remove-Item -LiteralPath 'C:\m' -Recurse -Force
           }
-          robocopy "$env:GITHUB_WORKSPACE" 'C:\m' /MIR /XD .git build .dart_tool | Out-Host
+          robocopy "$env:GITHUB_WORKSPACE" 'C:\m' /MIR /XD .git .dart_tool | Out-Host
           if ($LASTEXITCODE -le 7) {
             exit 0
           }
@@ -141,7 +141,7 @@ jobs:
       - name: build windows exe
         working-directory: C:\m
         run: |
-          dart run inno_bundle:build --release --build-args=--verbose
+          dart run inno_bundle:build --release
 
       - name: build windows zip
         working-directory: C:\m

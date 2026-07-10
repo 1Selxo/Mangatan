@@ -16,6 +16,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/get_source_preference.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/reconcile_mihon_sources.dart';
 import 'package:mangayomi/services/uninstall_extension.dart';
 import 'package:mangayomi/utils/cached_network.dart';
@@ -72,8 +73,10 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
     setState(() => _isRefreshingPreferences = true);
     final previous = sourcePreference ?? const <SourcePreference>[];
     final client = MClient.init(reqcopyWith: {'useDartHttpClient': true});
-    final proxyServer = ref.read(androidProxyServerStateProvider);
     try {
+      await MExtensionServerPlatform(ref).startServer();
+      if (!mounted) return;
+      final proxyServer = ref.read(androidProxyServerStateProvider);
       var fresh = await fetchPreferencesDalvik(
         client,
         source,

@@ -5,7 +5,7 @@ import 'package:mangayomi/eval/model/m_pages.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'get_latest_updates.g.dart';
@@ -41,10 +41,11 @@ Future<MPages?> getLatestUpdates(
             .toList();
     return MPages(list: result, hasNextPage: true);
   }
+  final proxyServer = await prepareMihonBridge(ref, source);
   return getIsolateService.get<MPages?>(
     page: page,
     source: source,
     serviceType: 'getLatestUpdates',
-    proxyServer: ref.read(androidProxyServerStateProvider),
+    proxyServer: proxyServer,
   );
 }

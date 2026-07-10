@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:path/path.dart' as p;
 import 'package:mangayomi/eval/javascript/http.dart';
 import 'package:mangayomi/main.dart';
@@ -76,11 +76,12 @@ Future<GetChapterPagesModel> getChapterPages(
           pageUrls.add(PageUrl(isarPageUrls.urls![i], headers: headers));
         }
       } else {
+        final proxyServer = await prepareMihonBridge(ref, source);
         pageUrls = await getIsolateService.get<List<PageUrl>>(
           url: chapter.url!,
           source: source,
           serviceType: 'getPageList',
-          proxyServer: ref.read(androidProxyServerStateProvider),
+          proxyServer: proxyServer,
         );
       }
     }

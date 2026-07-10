@@ -1,12 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
-import 'package:http_interceptor/http_interceptor.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:mangayomi/eval/javascript/http.dart';
 import 'package:mangayomi/eval/model/filter.dart';
 import 'package:mangayomi/eval/model/m_chapter.dart';
 import 'package:mangayomi/eval/model/m_manga.dart';
 import 'package:mangayomi/eval/model/m_pages.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
+import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/page.dart';
@@ -23,12 +26,38 @@ class MihonExtensionService implements ExtensionService {
   late String androidProxyServer;
   @override
   late Source source;
-  late final InterceptedClient client = MClient.init();
+  late final http.Client client = _createClient();
 
   MihonExtensionService(this.source, this.androidProxyServer);
 
   @override
-  void dispose() {}
+  void dispose() {
+    if (_usesLoopbackBridge) client.close();
+  }
+
+  bool get _usesLoopbackBridge => isLoopbackMihonBridge(androidProxyServer);
+
+  http.Client _createClient() {
+    if (!_usesLoopbackBridge) return MClient.init();
+
+    final httpClient = HttpClient();
+    httpClient.findProxy = (_) => 'DIRECT';
+    httpClient.connectionTimeout = const Duration(seconds: 10);
+    httpClient.idleTimeout = const Duration(seconds: 15);
+    return IOClient(httpClient);
+  }
+
+  Future<http.Response> _postDalvik(
+    Uri uri, {
+    Object? body,
+    Map<String, String>? headers,
+  }) => postMihonBridge(
+    client,
+    uri,
+    body: body,
+    headers: headers,
+    retryTransientFailures: _usesLoopbackBridge,
+  );
 
   @override
   Map<String, String> getHeaders() {
@@ -50,7 +79,7 @@ class MihonExtensionService implements ExtensionService {
   @override
   Future<MPages> getPopular(int page) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
+    final res = await _postDalvik(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getPopular$name",
@@ -87,7 +116,7 @@ class MihonExtensionService implements ExtensionService {
   @override
   Future<MPages> getLatestUpdates(int page) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
+    final res = await _postDalvik(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getLatest$name",
@@ -124,7 +153,7 @@ class MihonExtensionService implements ExtensionService {
   @override
   Future<MPages> search(String query, int page, List<dynamic> filters) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
+    final res = await _postDalvik(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getSearch$name",
@@ -162,7 +191,7 @@ class MihonExtensionService implements ExtensionService {
   @override
   Future<MManga> getDetail(String url) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
+    final res = await _postDalvik(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getDetails$name",
@@ -197,7 +226,7 @@ class MihonExtensionService implements ExtensionService {
   }
 
   Future<List<MChapter>> getChapterList(String url) async {
-    final res = await client.post(
+    final res = await _postDalvik(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": source.itemType == ItemType.anime
@@ -228,7 +257,7 @@ class MihonExtensionService implements ExtensionService {
 
   @override
   Future<List<PageUrl>> getPageList(String url) async {
-    final res = await client.post(
+    final res = await _postDalvik(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getPageList",
@@ -245,7 +274,7 @@ class MihonExtensionService implements ExtensionService {
 
   @override
   Future<List<Video>> getVideoList(String url) async {
-    final res = await client.post(
+    final res = await _postDalvik(
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getVideoList",
@@ -364,7 +393,7 @@ class MihonExtensionService implements ExtensionService {
   }
 }
 
-void hasError(Response response) {
+void hasError(http.Response response) {
   try {
     final errorMessage = jsonDecode(response.body)['error'];
     final code = jsonDecode(response.body)['code'];

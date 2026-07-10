@@ -223,7 +223,7 @@ class _MyAppState extends ConsumerState<MyApp>
     unawaited(ref.read(scanLocalLibraryProvider.future));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      MExtensionServerPlatform(ref).startServer();
+      MExtensionServerPlatform(ref, persistent: true).startServer();
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
         ref.watch(totalChapterCacheSizeStateProvider);

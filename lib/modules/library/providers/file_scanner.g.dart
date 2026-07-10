@@ -61,15 +61,15 @@ abstract class _$LocalFoldersState extends $Notifier<List<String>> {
   }
 }
 
-/// Scans `Mangayomi/local` folder (if exists) for Mangas/Animes and imports in library.
+/// Scans `Mangatan/local` folder (if exists) for Mangas/Animes and imports in library.
 ///
 /// **Folder structure:**
 /// ```
-/// Mangayomi/local/MangaName/CustomCover.jpg (optional)
-/// Mangayomi/local/MangaName/Chapter1/Page1.jpg
-/// Mangayomi/local/MangaName/Chapter2.cbz
-/// Mangayomi/local/AnimeName/Episode1.mp4
-/// Mangayomi/local/NovelName/NovelName.epub
+/// Mangatan/local/MangaName/CustomCover.jpg (optional)
+/// Mangatan/local/MangaName/Chapter1/Page1.jpg
+/// Mangatan/local/MangaName/Chapter2.cbz
+/// Mangatan/local/AnimeName/Episode1.mp4
+/// Mangatan/local/NovelName/NovelName.epub
 /// ```
 /// **Supported filetypes:** (taken from lib/modules/library/providers/local_archive.dart, line 98)
 /// ```
@@ -82,15 +82,15 @@ abstract class _$LocalFoldersState extends $Notifier<List<String>> {
 @ProviderFor(scanLocalLibrary)
 final scanLocalLibraryProvider = ScanLocalLibraryProvider._();
 
-/// Scans `Mangayomi/local` folder (if exists) for Mangas/Animes and imports in library.
+/// Scans `Mangatan/local` folder (if exists) for Mangas/Animes and imports in library.
 ///
 /// **Folder structure:**
 /// ```
-/// Mangayomi/local/MangaName/CustomCover.jpg (optional)
-/// Mangayomi/local/MangaName/Chapter1/Page1.jpg
-/// Mangayomi/local/MangaName/Chapter2.cbz
-/// Mangayomi/local/AnimeName/Episode1.mp4
-/// Mangayomi/local/NovelName/NovelName.epub
+/// Mangatan/local/MangaName/CustomCover.jpg (optional)
+/// Mangatan/local/MangaName/Chapter1/Page1.jpg
+/// Mangatan/local/MangaName/Chapter2.cbz
+/// Mangatan/local/AnimeName/Episode1.mp4
+/// Mangatan/local/NovelName/NovelName.epub
 /// ```
 /// **Supported filetypes:** (taken from lib/modules/library/providers/local_archive.dart, line 98)
 /// ```
@@ -103,15 +103,15 @@ final scanLocalLibraryProvider = ScanLocalLibraryProvider._();
 final class ScanLocalLibraryProvider
     extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
     with $FutureModifier<void>, $FutureProvider<void> {
-  /// Scans `Mangayomi/local` folder (if exists) for Mangas/Animes and imports in library.
+  /// Scans `Mangatan/local` folder (if exists) for Mangas/Animes and imports in library.
   ///
   /// **Folder structure:**
   /// ```
-  /// Mangayomi/local/MangaName/CustomCover.jpg (optional)
-  /// Mangayomi/local/MangaName/Chapter1/Page1.jpg
-  /// Mangayomi/local/MangaName/Chapter2.cbz
-  /// Mangayomi/local/AnimeName/Episode1.mp4
-  /// Mangayomi/local/NovelName/NovelName.epub
+  /// Mangatan/local/MangaName/CustomCover.jpg (optional)
+  /// Mangatan/local/MangaName/Chapter1/Page1.jpg
+  /// Mangatan/local/MangaName/Chapter2.cbz
+  /// Mangatan/local/AnimeName/Episode1.mp4
+  /// Mangatan/local/NovelName/NovelName.epub
   /// ```
   /// **Supported filetypes:** (taken from lib/modules/library/providers/local_archive.dart, line 98)
   /// ```

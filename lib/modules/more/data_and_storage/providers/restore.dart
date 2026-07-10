@@ -94,7 +94,9 @@ void showBotToast(String text) {
 enum BackupType { unknown, mangayomi, mihon, aniyomi, kotatsu, neko }
 
 BackupType checkBackupType(String path, Archive archive) {
-  if (path.toLowerCase().contains("mangayomi") &&
+  final normalizedPath = path.toLowerCase();
+  if ((normalizedPath.contains("mangatan") ||
+          normalizedPath.contains("mangayomi")) &&
       (archive.files.firstOrNull?.name ?? "").endsWith(".backup.db")) {
     return BackupType.mangayomi;
   } else if (path.toLowerCase().contains("kotatsu") &&

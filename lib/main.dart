@@ -175,8 +175,12 @@ class _StartupErrorApp extends StatelessWidget {
 Future<void> _postLaunchInit(StorageProvider storage) async {
   await AppLogger.init();
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
-  final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
-  await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
+  if (isApple || Platform.isAndroid) {
+    await Hive.initFlutter(isApple ? "databases" : "");
+  } else {
+    final databaseDirectory = await storage.getDatabaseDirectory();
+    Hive.init(databaseDirectory!.path);
+  }
   Hive.registerAdapter(TrackSearchAdapter());
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");

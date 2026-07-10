@@ -146,7 +146,7 @@ Future<void> doBackUp(
     }
     final regExp = RegExp(r'[^a-zA-Z0-9 .()\-\s]');
     final name =
-        'mangayomi_${DateTime.now().toString().replaceAll(regExp, '_').replaceAll(' ', '_')}';
+        'mangatan_${DateTime.now().toString().replaceAll(regExp, '_').replaceAll(' ', '_')}';
     final backupFilePath = p.join(path, "$name.backup.db");
     final file = File(backupFilePath);
 
@@ -186,7 +186,7 @@ Future<void> doBackUp(
                       ShareParams(
                         files: [XFile(p.join(path, "$name.backup"))],
                         subject: "$name.backup",
-                        title: "Share Mangayomi backup file",
+                        title: "Share Mangatan backup file",
                         sharePositionOrigin: box == null
                             ? null
                             : box.localToGlobal(Offset.zero) & box.size,

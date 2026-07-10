@@ -19,10 +19,10 @@ depencencies:
 essential: false
 
 postinstall_scripts:
-  - echo "Installed Mangayomi successfully"
+  - echo "Installed Mangatan successfully"
   
 postuninstall_scripts:
-  - echo "Uninstalled Mangayomi successfully"
+  - echo "Uninstalled Mangatan successfully"
 icon: assets/app_icons/icon-red.png
 
 keywords:

@@ -230,7 +230,7 @@ class AnkiAudioService {
         .replaceAll(RegExp(r'[\\/:*?"<>|\[\]]'), '_')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    final prefix = base.isEmpty ? 'mangayomi-audio' : base;
+    final prefix = base.isEmpty ? 'mangatan-audio' : base;
     return '$prefix-${DateTime.now().millisecondsSinceEpoch}.$extension';
   }
 

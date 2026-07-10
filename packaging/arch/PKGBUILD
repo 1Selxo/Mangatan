@@ -6,7 +6,7 @@ pkgver=0.6.25
 pkgrel=1
 pkgdesc="A free and open source manga, manhwa and manhua reader for Android, Windows, Linux, and macOS."
 arch=('x86_64')
-url="https://github.com/kodjodevf/mangayomi"
+url="https://github.com/1Selxo/Mangatan"
 license=('GPL3')
 
 depends=('unzip')
@@ -36,7 +36,7 @@ package() {
   # 5. Install the desktop entry
   install -Dm644 /dev/stdin "${pkgdir}/usr/share/applications/${_pkgname}.desktop" <<EOF
 [Desktop Entry]
-Name=Mangayomi
+Name=Mangatan
 Comment=Manga, Manhwa, and Manhua Reader
 Exec=${_pkgname}
 Icon=${_pkgname}

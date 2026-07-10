@@ -31,7 +31,7 @@ class DiscordRPC {
       ),
       const RPCButton(
         label: "Join us",
-        url: "https://discord.com/invite/EjfBuYahsP",
+        url: "https://discord.com/invite/Ak2sW9Nvr9",
       ),
     ],
     details: "Idle",

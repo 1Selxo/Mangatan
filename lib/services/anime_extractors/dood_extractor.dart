@@ -38,7 +38,7 @@ class DoodExtractor {
           newUrl,
           newQuality,
           videoUrl,
-          headers: {'User-Agent': 'Mangayomi', 'Referer': 'https://$doodHost/'},
+          headers: {'User-Agent': 'Mangatan', 'Referer': 'https://$doodHost/'},
         ),
       ];
     } catch (_) {

@@ -303,6 +303,10 @@ void main() {
     expect(css, contains('.glossary-content .gloss-sc-summary::marker'));
     expect(css, contains('.pronunciation-mora'));
     expect(css, contains('--danger-color-lightest: #4a2020;'));
+    expect(
+      css,
+      contains('.gloss-image-link[data-path^="gaiji/bs"] .gloss-image'),
+    );
     expect(license, contains('GNU GENERAL PUBLIC LICENSE'));
   });
 }

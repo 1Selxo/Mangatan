@@ -48,3 +48,4 @@ app.*.map.json
 
 /android/app/.cxx
 untranslated_messages.txt
+AGENTS.override.md

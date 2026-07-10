@@ -49,3 +49,6 @@ app.*.map.json
 /android/app/.cxx
 untranslated_messages.txt
 AGENTS.override.md
+
+# Runtime mpv configuration extracted from assets/mangayomi_mpv.zip
+/mpv/

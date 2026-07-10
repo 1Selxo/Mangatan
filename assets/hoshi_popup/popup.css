@@ -506,4 +506,8 @@ a {
     .overlay {
         background: #222;
     }
+
+    .gloss-image-link[data-path^="gaiji/bs"] .gloss-image {
+        filter: invert(1);
+    }
 }

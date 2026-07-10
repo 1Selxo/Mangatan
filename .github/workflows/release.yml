@@ -167,12 +167,216 @@ jobs:
             release-windows/Mangatan-*.zip
           if-no-files-found: error
 
+  build-and-release-linux:
+    needs: validate-release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+
+      - name: install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            libblkid-dev \
+            libfuse2 \
+            libgtk-3-dev \
+            liblzma-dev \
+            libmpv-dev \
+            libwebkit2gtk-4.1-dev \
+            ninja-build \
+            pkg-config \
+            rpm \
+            wget \
+            zip
+          sudo wget -q -O /usr/local/bin/linuxdeploy \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          sudo chmod +x /usr/local/bin/linuxdeploy
+
+      - name: setup flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: build linux
+        run: flutter build linux --release --verbose
+
+      - name: build Linux ZIP and AppImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="build/linux/x64/release/bundle"
+          release_dir="$GITHUB_WORKSPACE/release-linux"
+          mkdir -p "$release_dir"
+
+          (
+            cd "$bundle_dir"
+            zip -r "$release_dir/Mangatan-$RELEASE_TAG-linux.zip" .
+          )
+
+          rm -rf AppDir
+          mkdir -p AppDir/usr/bin AppDir/usr/share/icons
+          cp -a "$bundle_dir"/. AppDir/usr/bin/
+          cp -aL linux/packaging/icons/. AppDir/usr/share/icons/
+          cp linux/mangayomi.desktop AppDir/mangayomi.desktop
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="$HERE/usr/bin:$PATH"
+          export LD_LIBRARY_PATH="$HERE/usr/bin/lib:$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
+          exec "$HERE/usr/bin/mangayomi" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          EXCLUDE_ARGS=()
+          while IFS= read -r library; do
+            EXCLUDE_ARGS+=(--exclude-library "$library")
+          done < <(find AppDir/usr/bin/lib -type f -name '*.so*' -exec basename {} \; | sort -u)
+
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /usr/local/bin/linuxdeploy \
+            --appdir AppDir \
+            --desktop-file AppDir/mangayomi.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/512x512/apps/mangayomi.png \
+            --executable AppDir/usr/bin/mangayomi \
+            "${EXCLUDE_ARGS[@]}" \
+            --output appimage
+
+          appimage=$(find . -maxdepth 1 -type f -name '*.AppImage' -print -quit)
+          test -n "$appimage"
+          mv "$appimage" "$release_dir/Mangatan-$RELEASE_TAG-linux.AppImage"
+
+      - name: build Linux DEB
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(awk '/^version:/ { print $2; exit }' pubspec.yaml)
+          version=${version%%+*}
+          deb_version=${version/-/~}
+          bundle_dir="build/linux/x64/release/bundle"
+          package_root="$RUNNER_TEMP/mangatan-deb"
+          release_dir="$GITHUB_WORKSPACE/release-linux"
+          installed_size=$(du -sk "$bundle_dir" | cut -f1)
+
+          rm -rf "$package_root"
+          mkdir -p \
+            "$package_root/DEBIAN" \
+            "$package_root/opt/mangayomi" \
+            "$package_root/usr/bin" \
+            "$package_root/usr/share/applications" \
+            "$package_root/usr/share/icons"
+          cp -a "$bundle_dir"/. "$package_root/opt/mangayomi/"
+          cp linux/mangayomi.desktop "$package_root/usr/share/applications/mangayomi.desktop"
+          cp -aL linux/packaging/icons/. "$package_root/usr/share/icons/"
+          ln -s /opt/mangayomi/mangayomi "$package_root/usr/bin/mangayomi"
+          cat > "$package_root/DEBIAN/control" <<EOF
+          Package: mangayomi
+          Version: $deb_version
+          Section: x11
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Mangatan contributors
+          Installed-Size: $installed_size
+          Depends: libgtk-3-0, libwebkit2gtk-4.1-0, libmpv2
+          Description: Read manga and light novels, and watch anime
+           Mangatan is a free and open source media reader built with Flutter.
+          EOF
+
+          dpkg-deb --build --root-owner-group \
+            "$package_root" \
+            "$release_dir/Mangatan-$RELEASE_TAG-linux.deb"
+
+      - name: build Linux RPM
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(awk '/^version:/ { print $2; exit }' pubspec.yaml)
+          version=${version%%+*}
+          rpm_version=${version%%-*}
+          if [[ "$version" == *-* ]]; then
+            rpm_release="0.${version#*-}.1"
+          else
+            rpm_release="1"
+          fi
+          rpm_release=${rpm_release//[^a-zA-Z0-9._]/.}
+          bundle_dir="build/linux/x64/release/bundle"
+          rpm_root="$RUNNER_TEMP/rpmbuild"
+          release_dir="$GITHUB_WORKSPACE/release-linux"
+
+          rm -rf "$rpm_root"
+          mkdir -p "$rpm_root"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          cp -a "$bundle_dir" "$rpm_root/SOURCES/mangayomi-$rpm_version"
+          tar -czf "$rpm_root/SOURCES/mangayomi-$rpm_version.tar.gz" \
+            -C "$rpm_root/SOURCES" "mangayomi-$rpm_version"
+          mkdir -p "$rpm_root/SOURCES/icons"
+          cp -aL linux/packaging/icons/. "$rpm_root/SOURCES/icons/"
+          cp linux/mangayomi.desktop "$rpm_root/SOURCES/mangayomi.desktop"
+          cat > "$rpm_root/SPECS/mangayomi.spec" <<EOF
+          Name: mangayomi
+          Version: $rpm_version
+          Release: $rpm_release%{?dist}
+          Summary: Read manga and light novels, and watch anime
+          License: GPL-3.0-or-later
+          Source0: %{name}-%{version}.tar.gz
+          BuildArch: x86_64
+
+          %description
+          Mangatan is a free and open source media reader built with Flutter.
+
+          %prep
+          %setup -q
+
+          %install
+          mkdir -p %{buildroot}/opt/mangayomi
+          mkdir -p %{buildroot}/usr/bin
+          mkdir -p %{buildroot}/usr/share/applications
+          mkdir -p %{buildroot}/usr/share/icons
+          cp -a . %{buildroot}/opt/mangayomi/
+          ln -s /opt/mangayomi/mangayomi %{buildroot}/usr/bin/mangayomi
+          cp %{_sourcedir}/mangayomi.desktop %{buildroot}/usr/share/applications/mangayomi.desktop
+          cp -a %{_sourcedir}/icons/. %{buildroot}/usr/share/icons/
+
+          %files
+          /opt/mangayomi
+          /usr/bin/mangayomi
+          /usr/share/applications/mangayomi.desktop
+          /usr/share/icons/hicolor/*/apps/mangayomi.png
+          EOF
+
+          rpmbuild --define "_topdir $rpm_root" -ba "$rpm_root/SPECS/mangayomi.spec"
+          rpm_file=$(find "$rpm_root/RPMS" -type f -name '*.rpm' -print -quit)
+          test -n "$rpm_file"
+          mv "$rpm_file" "$release_dir/Mangatan-$RELEASE_TAG-linux.rpm"
+
+      - name: upload Linux release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: Mangatan-${{ env.RELEASE_TAG }}-linux
+          path: |
+            release-linux/Mangatan-*.AppImage
+            release-linux/Mangatan-*.deb
+            release-linux/Mangatan-*.rpm
+            release-linux/Mangatan-*.zip
+          if-no-files-found: error
+
   release:
     permissions:
       contents: write
     needs:
       - build-and-release-macos-dmg
       - build-and-release-windows-exe_zip
+      - build-and-release-linux
     runs-on: ubuntu-latest
     steps:
       - name: download release packages

@@ -16,7 +16,8 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'BackupEpisode.pb.dart' as $0;
-import 'BackupHistory.pb.dart' as $1;
+import 'BackupHistory.pb.dart' as $2;
+import 'BackupTracking.pb.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -34,13 +35,15 @@ class BackupAnime extends $pb.GeneratedMessage {
     $fixnum.Int64? dateAdded,
     $core.Iterable<$0.BackupEpisode>? episodes,
     $core.Iterable<$fixnum.Int64>? categories,
+    $core.Iterable<$1.BackupTracking>? tracking,
     $core.bool? favorite,
     $core.int? episodeFlags,
     $core.int? viewerFlags,
-    $core.Iterable<$1.BackupHistory>? history,
+    $core.Iterable<$2.BackupHistory>? history,
     $core.int? updateStrategy,
     $fixnum.Int64? lastModifiedAt,
     $fixnum.Int64? favoriteModifiedAt,
+    $core.Iterable<$core.String>? excludedScanlators,
     $fixnum.Int64? version,
     $core.String? backgroundUrl,
     $fixnum.Int64? parentId,
@@ -63,6 +66,7 @@ class BackupAnime extends $pb.GeneratedMessage {
     if (dateAdded != null) result.dateAdded = dateAdded;
     if (episodes != null) result.episodes.addAll(episodes);
     if (categories != null) result.categories.addAll(categories);
+    if (tracking != null) result.tracking.addAll(tracking);
     if (favorite != null) result.favorite = favorite;
     if (episodeFlags != null) result.episodeFlags = episodeFlags;
     if (viewerFlags != null) result.viewerFlags = viewerFlags;
@@ -71,6 +75,8 @@ class BackupAnime extends $pb.GeneratedMessage {
     if (lastModifiedAt != null) result.lastModifiedAt = lastModifiedAt;
     if (favoriteModifiedAt != null)
       result.favoriteModifiedAt = favoriteModifiedAt;
+    if (excludedScanlators != null)
+      result.excludedScanlators.addAll(excludedScanlators);
     if (version != null) result.version = version;
     if (backgroundUrl != null) result.backgroundUrl = backgroundUrl;
     if (parentId != null) result.parentId = parentId;
@@ -108,17 +114,21 @@ class BackupAnime extends $pb.GeneratedMessage {
         subBuilder: $0.BackupEpisode.create)
     ..p<$fixnum.Int64>(
         17, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.K6)
+    ..pPM<$1.BackupTracking>(18, _omitFieldNames ? '' : 'tracking',
+        subBuilder: $1.BackupTracking.create)
     ..aOB(100, _omitFieldNames ? '' : 'favorite')
     ..aI(101, _omitFieldNames ? '' : 'episodeFlags', protoName: 'episodeFlags')
     ..aI(103, _omitFieldNames ? '' : 'viewerFlags')
-    ..pPM<$1.BackupHistory>(104, _omitFieldNames ? '' : 'history',
-        subBuilder: $1.BackupHistory.create)
+    ..pPM<$2.BackupHistory>(104, _omitFieldNames ? '' : 'history',
+        subBuilder: $2.BackupHistory.create)
     ..aI(105, _omitFieldNames ? '' : 'updateStrategy',
         protoName: 'updateStrategy')
     ..aInt64(106, _omitFieldNames ? '' : 'lastModifiedAt',
         protoName: 'lastModifiedAt')
     ..aInt64(107, _omitFieldNames ? '' : 'favoriteModifiedAt',
         protoName: 'favoriteModifiedAt')
+    ..pPS(108, _omitFieldNames ? '' : 'excludedScanlators',
+        protoName: 'excludedScanlators')
     ..aInt64(109, _omitFieldNames ? '' : 'version')
     ..aOS(500, _omitFieldNames ? '' : 'backgroundUrl',
         protoName: 'backgroundUrl')
@@ -242,132 +252,138 @@ class BackupAnime extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   $pb.PbList<$fixnum.Int64> get categories => $_getList(11);
 
+  @$pb.TagNumber(18)
+  $pb.PbList<$1.BackupTracking> get tracking => $_getList(12);
+
   @$pb.TagNumber(100)
-  $core.bool get favorite => $_getBF(12);
+  $core.bool get favorite => $_getBF(13);
   @$pb.TagNumber(100)
-  set favorite($core.bool value) => $_setBool(12, value);
+  set favorite($core.bool value) => $_setBool(13, value);
   @$pb.TagNumber(100)
-  $core.bool hasFavorite() => $_has(12);
+  $core.bool hasFavorite() => $_has(13);
   @$pb.TagNumber(100)
   void clearFavorite() => $_clearField(100);
 
   @$pb.TagNumber(101)
-  $core.int get episodeFlags => $_getIZ(13);
+  $core.int get episodeFlags => $_getIZ(14);
   @$pb.TagNumber(101)
-  set episodeFlags($core.int value) => $_setSignedInt32(13, value);
+  set episodeFlags($core.int value) => $_setSignedInt32(14, value);
   @$pb.TagNumber(101)
-  $core.bool hasEpisodeFlags() => $_has(13);
+  $core.bool hasEpisodeFlags() => $_has(14);
   @$pb.TagNumber(101)
   void clearEpisodeFlags() => $_clearField(101);
 
   @$pb.TagNumber(103)
-  $core.int get viewerFlags => $_getIZ(14);
+  $core.int get viewerFlags => $_getIZ(15);
   @$pb.TagNumber(103)
-  set viewerFlags($core.int value) => $_setSignedInt32(14, value);
+  set viewerFlags($core.int value) => $_setSignedInt32(15, value);
   @$pb.TagNumber(103)
-  $core.bool hasViewerFlags() => $_has(14);
+  $core.bool hasViewerFlags() => $_has(15);
   @$pb.TagNumber(103)
   void clearViewerFlags() => $_clearField(103);
 
   @$pb.TagNumber(104)
-  $pb.PbList<$1.BackupHistory> get history => $_getList(15);
+  $pb.PbList<$2.BackupHistory> get history => $_getList(16);
 
   @$pb.TagNumber(105)
-  $core.int get updateStrategy => $_getIZ(16);
+  $core.int get updateStrategy => $_getIZ(17);
   @$pb.TagNumber(105)
-  set updateStrategy($core.int value) => $_setSignedInt32(16, value);
+  set updateStrategy($core.int value) => $_setSignedInt32(17, value);
   @$pb.TagNumber(105)
-  $core.bool hasUpdateStrategy() => $_has(16);
+  $core.bool hasUpdateStrategy() => $_has(17);
   @$pb.TagNumber(105)
   void clearUpdateStrategy() => $_clearField(105);
 
   @$pb.TagNumber(106)
-  $fixnum.Int64 get lastModifiedAt => $_getI64(17);
+  $fixnum.Int64 get lastModifiedAt => $_getI64(18);
   @$pb.TagNumber(106)
-  set lastModifiedAt($fixnum.Int64 value) => $_setInt64(17, value);
+  set lastModifiedAt($fixnum.Int64 value) => $_setInt64(18, value);
   @$pb.TagNumber(106)
-  $core.bool hasLastModifiedAt() => $_has(17);
+  $core.bool hasLastModifiedAt() => $_has(18);
   @$pb.TagNumber(106)
   void clearLastModifiedAt() => $_clearField(106);
 
   @$pb.TagNumber(107)
-  $fixnum.Int64 get favoriteModifiedAt => $_getI64(18);
+  $fixnum.Int64 get favoriteModifiedAt => $_getI64(19);
   @$pb.TagNumber(107)
-  set favoriteModifiedAt($fixnum.Int64 value) => $_setInt64(18, value);
+  set favoriteModifiedAt($fixnum.Int64 value) => $_setInt64(19, value);
   @$pb.TagNumber(107)
-  $core.bool hasFavoriteModifiedAt() => $_has(18);
+  $core.bool hasFavoriteModifiedAt() => $_has(19);
   @$pb.TagNumber(107)
   void clearFavoriteModifiedAt() => $_clearField(107);
 
+  @$pb.TagNumber(108)
+  $pb.PbList<$core.String> get excludedScanlators => $_getList(20);
+
   @$pb.TagNumber(109)
-  $fixnum.Int64 get version => $_getI64(19);
+  $fixnum.Int64 get version => $_getI64(21);
   @$pb.TagNumber(109)
-  set version($fixnum.Int64 value) => $_setInt64(19, value);
+  set version($fixnum.Int64 value) => $_setInt64(21, value);
   @$pb.TagNumber(109)
-  $core.bool hasVersion() => $_has(19);
+  $core.bool hasVersion() => $_has(21);
   @$pb.TagNumber(109)
   void clearVersion() => $_clearField(109);
 
   @$pb.TagNumber(500)
-  $core.String get backgroundUrl => $_getSZ(20);
+  $core.String get backgroundUrl => $_getSZ(22);
   @$pb.TagNumber(500)
-  set backgroundUrl($core.String value) => $_setString(20, value);
+  set backgroundUrl($core.String value) => $_setString(22, value);
   @$pb.TagNumber(500)
-  $core.bool hasBackgroundUrl() => $_has(20);
+  $core.bool hasBackgroundUrl() => $_has(22);
   @$pb.TagNumber(500)
   void clearBackgroundUrl() => $_clearField(500);
 
   @$pb.TagNumber(502)
-  $fixnum.Int64 get parentId => $_getI64(21);
+  $fixnum.Int64 get parentId => $_getI64(23);
   @$pb.TagNumber(502)
-  set parentId($fixnum.Int64 value) => $_setInt64(21, value);
+  set parentId($fixnum.Int64 value) => $_setInt64(23, value);
   @$pb.TagNumber(502)
-  $core.bool hasParentId() => $_has(21);
+  $core.bool hasParentId() => $_has(23);
   @$pb.TagNumber(502)
   void clearParentId() => $_clearField(502);
 
   @$pb.TagNumber(503)
-  $fixnum.Int64 get id => $_getI64(22);
+  $fixnum.Int64 get id => $_getI64(24);
   @$pb.TagNumber(503)
-  set id($fixnum.Int64 value) => $_setInt64(22, value);
+  set id($fixnum.Int64 value) => $_setInt64(24, value);
   @$pb.TagNumber(503)
-  $core.bool hasId() => $_has(22);
+  $core.bool hasId() => $_has(24);
   @$pb.TagNumber(503)
   void clearId() => $_clearField(503);
 
   @$pb.TagNumber(504)
-  $fixnum.Int64 get seasonFlags => $_getI64(23);
+  $fixnum.Int64 get seasonFlags => $_getI64(25);
   @$pb.TagNumber(504)
-  set seasonFlags($fixnum.Int64 value) => $_setInt64(23, value);
+  set seasonFlags($fixnum.Int64 value) => $_setInt64(25, value);
   @$pb.TagNumber(504)
-  $core.bool hasSeasonFlags() => $_has(23);
+  $core.bool hasSeasonFlags() => $_has(25);
   @$pb.TagNumber(504)
   void clearSeasonFlags() => $_clearField(504);
 
   @$pb.TagNumber(505)
-  $core.double get seasonNumber => $_getN(24);
+  $core.double get seasonNumber => $_getN(26);
   @$pb.TagNumber(505)
-  set seasonNumber($core.double value) => $_setDouble(24, value);
+  set seasonNumber($core.double value) => $_setDouble(26, value);
   @$pb.TagNumber(505)
-  $core.bool hasSeasonNumber() => $_has(24);
+  $core.bool hasSeasonNumber() => $_has(26);
   @$pb.TagNumber(505)
   void clearSeasonNumber() => $_clearField(505);
 
   @$pb.TagNumber(506)
-  $fixnum.Int64 get seasonSourceOrder => $_getI64(25);
+  $fixnum.Int64 get seasonSourceOrder => $_getI64(27);
   @$pb.TagNumber(506)
-  set seasonSourceOrder($fixnum.Int64 value) => $_setInt64(25, value);
+  set seasonSourceOrder($fixnum.Int64 value) => $_setInt64(27, value);
   @$pb.TagNumber(506)
-  $core.bool hasSeasonSourceOrder() => $_has(25);
+  $core.bool hasSeasonSourceOrder() => $_has(27);
   @$pb.TagNumber(506)
   void clearSeasonSourceOrder() => $_clearField(506);
 
   @$pb.TagNumber(507)
-  $core.int get fetchType => $_getIZ(26);
+  $core.int get fetchType => $_getIZ(28);
   @$pb.TagNumber(507)
-  set fetchType($core.int value) => $_setSignedInt32(26, value);
+  set fetchType($core.int value) => $_setSignedInt32(28, value);
   @$pb.TagNumber(507)
-  $core.bool hasFetchType() => $_has(26);
+  $core.bool hasFetchType() => $_has(28);
   @$pb.TagNumber(507)
   void clearFetchType() => $_clearField(507);
 }

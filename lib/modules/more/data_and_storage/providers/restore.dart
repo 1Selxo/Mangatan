@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
@@ -19,7 +18,8 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
-import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
+import 'package:mangayomi/services/sync/mihon_backup_source_resolver.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
@@ -29,12 +29,22 @@ import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_pr
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
-import 'package:protobuf/protobuf.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'restore.g.dart';
 
 @riverpod
 void doRestore(Ref ref, {required String path, required BuildContext context}) {
+  final tachiType = _tachiBackupTypeFromPath(path);
+  if (tachiType != null) {
+    try {
+      ref.read(restoreTachiBkBackupProvider(path, tachiType));
+      showBotToast("Backup restored!");
+    } catch (e, s) {
+      botToast('$e\n$s');
+    }
+    return;
+  }
+
   final inputStream = InputFileStream(path);
   try {
     final archive = ZipDecoder().decodeStream(inputStream);
@@ -52,7 +62,6 @@ void doRestore(Ref ref, {required String path, required BuildContext context}) {
       case BackupType.mihon:
       case BackupType.aniyomi:
       case BackupType.neko:
-        ref.read(restoreTachiBkBackupProvider(path, backupType));
         break;
       default:
     }
@@ -100,17 +109,23 @@ BackupType checkBackupType(String path, Archive archive) {
           }).length ==
           2) {
     return BackupType.kotatsu;
-  } else if (path.toLowerCase().endsWith(".tachibk") ||
-      path.toLowerCase().endsWith(".proto.gz")) {
-    return path.contains("xyz.jmir.tachiyomi.mi") || path.contains("aniyomi.mi")
-        ? BackupType.aniyomi
-        : path.contains("tachiyomi") || path.contains("mihon")
-        ? BackupType.mihon
-        : path.contains("neko")
-        ? BackupType.neko
-        : BackupType.unknown;
   }
   return BackupType.unknown;
+}
+
+BackupType? _tachiBackupTypeFromPath(String path) {
+  final lower = path.toLowerCase();
+  if (!lower.endsWith('.tachibk') && !lower.endsWith('.proto.gz')) {
+    return null;
+  }
+  if (lower.contains('xyz.jmir.tachiyomi.mi') ||
+      lower.contains('aniyomi.mi') ||
+      lower.contains('anikku')) {
+    return BackupType.aniyomi;
+  }
+  if (lower.contains('neko')) return BackupType.neko;
+  // Mihon, Komikku, Chimahon, and their forks share the same current envelope.
+  return BackupType.mihon;
 }
 
 @riverpod
@@ -357,12 +372,15 @@ void restoreKotatsuBackup(Ref ref, Archive archive) {
 @riverpod
 void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
   final inputStream = InputFileStream(path);
-  final content = GZipDecoder().decodeBytes(inputStream.toUint8List());
-  inputStream.close();
-  final backup = BackupMihon.create();
-  backup.mergeFromCodedBufferReader(
-    CodedBufferReader(content, sizeLimit: 250 << 20),
-  );
+  late final DecodedChimahonSync decoded;
+  try {
+    decoded = const ChimahonSyncCodec().decode(inputStream.toUint8List());
+  } finally {
+    inputStream.close();
+  }
+  final content = decoded.protobufBytes;
+  final backup = decoded.backup;
+  final localSources = isar.sources.filter().idIsNotNull().findAllSync();
   List<Category> cats = [];
   isar.writeTxnSync(() {
     isar.categorys.clearSync();
@@ -379,19 +397,20 @@ void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
       cats.add(cat);
     }
     for (var tempManga in backup.backupManga) {
-      final sourceId = _protoInt(tempManga.source);
+      final nativeSourceId = _protoInt(tempManga.source);
+      final resolvedSource = resolveMihonBackupSource(
+        nativeId: nativeSourceId,
+        backupSources: backup.backupSources,
+        localSources: localSources,
+      );
       final categoryOrders = tempManga.categories.map(_protoInt).toSet();
       final manga = Manga(
-        source:
-            backup.backupSources
-                .firstWhereOrNull((src) => _protoInt(src.sourceId) == sourceId)
-                ?.name ??
-            "Unknown",
+        source: resolvedSource.name,
         author: tempManga.author,
         artist: tempManga.artist,
         genre: tempManga.genre,
         imageUrl: tempManga.thumbnailUrl,
-        lang: 'en',
+        lang: resolvedSource.language,
         link: tempManga.url,
         name: tempManga.title,
         status: _convertStatusFromTachiBk(tempManga.status),
@@ -401,22 +420,25 @@ void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
             .map((cat) => cat.id!)
             .toList(),
         itemType: ItemType.manga,
-        favorite: true,
-        dateAdded: _protoMillis(tempManga.dateAdded),
-        lastUpdate: _protoMillis(tempManga.lastModifiedAt),
-        sourceId: null,
+        favorite: tempManga.hasFavorite() ? tempManga.favorite : true,
+        dateAdded: normalizeMihonTimestamp(_protoInt(tempManga.dateAdded)),
+        lastUpdate: normalizeMihonTimestamp(
+          _protoInt(tempManga.lastModifiedAt),
+        ),
+        sourceId: resolvedSource.localId,
+        updatedAt: _protoInt(tempManga.version),
       );
       if (bkType == BackupType.neko) {
         manga.source = "MangaDex";
       }
       isar.mangas.putSync(manga);
-      History? history;
+      final chaptersByUrl = <String, Chapter>{};
       for (var tempChapter in tempManga.chapters) {
         final chapter = Chapter(
           mangaId: manga.id!,
           name: tempChapter.name,
           dateUpload: bkType != BackupType.neko
-              ? "${_protoMillis(tempChapter.dateUpload)}"
+              ? "${normalizeMihonTimestamp(_protoInt(tempChapter.dateUpload))}"
               : "${DateTime.now().millisecondsSinceEpoch - _protoInt(tempChapter.dateUpload).abs()}",
           isBookmarked: tempChapter.bookmark,
           isRead: tempChapter.read,
@@ -425,37 +447,48 @@ void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
               : "1",
           scanlator: tempChapter.scanlator,
           url: tempChapter.url,
+          updatedAt: _protoInt(tempChapter.version),
         );
         isar.chapters.putSync(chapter..manga.value = manga);
         chapter.manga.saveSync();
-        if ((history == null ||
-            int.parse(history.date ?? "0") <
-                _protoMillis(tempChapter.lastModifiedAt))) {
-          history = History(
-            mangaId: manga.id,
-            date: bkType != BackupType.neko
-                ? "${_protoMillis(tempChapter.lastModifiedAt)}"
-                : "${DateTime.now().millisecondsSinceEpoch - _protoInt(tempChapter.dateUpload).abs()}",
-            itemType: ItemType.manga,
-            chapterId: chapter.id,
-          )..chapter.value = chapter;
-        }
+        chaptersByUrl[tempChapter.url] = chapter;
       }
-      if (history != null) {
+      var lastRead = 0;
+      for (final tempHistory in tempManga.history) {
+        final chapter = chaptersByUrl[tempHistory.url];
+        if (chapter == null) continue;
+        final readAt = normalizeMihonTimestamp(_protoInt(tempHistory.lastRead));
+        lastRead = readAt > lastRead ? readAt : lastRead;
+        final history = History(
+          mangaId: manga.id,
+          date: '$readAt',
+          itemType: ItemType.manga,
+          chapterId: chapter.id,
+          readingTimeSeconds: Duration(
+            milliseconds: _protoInt(tempHistory.readDuration),
+          ).inSeconds,
+        )..chapter.value = chapter;
         isar.historys.putSync(history);
         history.chapter.saveSync();
       }
+      if (lastRead > 0) isar.mangas.putSync(manga..lastRead = lastRead);
     }
   });
-  if (bkType == BackupType.aniyomi) {
+  if (bkType == BackupType.aniyomi || backup.backupAnime.isNotEmpty) {
     final backupAnime = BackupAniyomi.fromBuffer(content);
-    final animeCategories = backupAnime.backupAnimeCategories.isNotEmpty
+    final animeCategories = backup.backupAnimeCategories.isNotEmpty
+        ? backup.backupAnimeCategories
+        : backupAnime.backupAnimeCategories.isNotEmpty
         ? backupAnime.backupAnimeCategories
         : backupAnime.legacyBackupAnimeCategories;
-    final animeEntries = backupAnime.backupAnime.isNotEmpty
+    final animeEntries = backup.backupAnime.isNotEmpty
+        ? backup.backupAnime
+        : backupAnime.backupAnime.isNotEmpty
         ? backupAnime.backupAnime
         : backupAnime.legacyBackupAnime;
-    final animeSources = backupAnime.backupAnimeSources.isNotEmpty
+    final animeSources = backup.backupAnimeSources.isNotEmpty
+        ? backup.backupAnimeSources
+        : backupAnime.backupAnimeSources.isNotEmpty
         ? backupAnime.backupAnimeSources
         : backupAnime.legacyBackupAnimeSources;
     List<Category> cats = [];
@@ -470,21 +503,20 @@ void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
         cats.add(cat);
       }
       for (var tempAnime in animeEntries) {
-        final sourceId = _protoInt(tempAnime.source);
+        final nativeSourceId = _protoInt(tempAnime.source);
+        final resolvedSource = resolveMihonBackupSource(
+          nativeId: nativeSourceId,
+          backupSources: animeSources,
+          localSources: localSources,
+        );
         final categoryOrders = tempAnime.categories.map(_protoInt).toSet();
         final anime = Manga(
-          source:
-              animeSources
-                  .firstWhereOrNull(
-                    (src) => _protoInt(src.sourceId) == sourceId,
-                  )
-                  ?.name ??
-              "Unknown",
+          source: resolvedSource.name,
           author: tempAnime.author,
           artist: tempAnime.artist,
           genre: tempAnime.genre,
           imageUrl: tempAnime.thumbnailUrl,
-          lang: 'en',
+          lang: resolvedSource.language,
           link: tempAnime.url,
           name: tempAnime.title,
           status: _convertStatusFromTachiBk(tempAnime.status),
@@ -494,43 +526,56 @@ void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
               .map((cat) => cat.id!)
               .toList(),
           itemType: ItemType.anime,
-          favorite: true,
-          dateAdded: _protoMillis(tempAnime.dateAdded),
-          lastUpdate: _protoMillis(tempAnime.lastModifiedAt),
-          sourceId: null,
+          favorite: tempAnime.hasFavorite() ? tempAnime.favorite : true,
+          dateAdded: normalizeMihonTimestamp(_protoInt(tempAnime.dateAdded)),
+          lastUpdate: normalizeMihonTimestamp(
+            _protoInt(tempAnime.lastModifiedAt),
+          ),
+          sourceId: resolvedSource.localId,
+          updatedAt: _protoInt(tempAnime.version),
         );
         isar.mangas.putSync(anime);
-        History? history;
+        final episodesByUrl = <String, Chapter>{};
         for (var tempEpisode in tempAnime.episodes) {
           final episode = Chapter(
             mangaId: anime.id!,
             name: tempEpisode.name,
-            dateUpload: "${_protoMillis(tempEpisode.dateUpload)}",
+            dateUpload:
+                "${normalizeMihonTimestamp(_protoInt(tempEpisode.dateUpload))}",
             isBookmarked: tempEpisode.bookmark,
             isRead: tempEpisode.seen,
             lastPageRead: _protoInt(tempEpisode.lastSecondSeen) != 0
-                ? "${_protoMillis(tempEpisode.lastSecondSeen)}"
+                ? "${_protoInt(tempEpisode.lastSecondSeen)}"
                 : "1",
             scanlator: tempEpisode.scanlator,
             url: tempEpisode.url,
+            updatedAt: _protoInt(tempEpisode.version),
           );
           isar.chapters.putSync(episode..manga.value = anime);
           episode.manga.saveSync();
-          if ((history == null ||
-              int.parse(history.date ?? "0") <
-                  _protoMillis(tempEpisode.lastModifiedAt))) {
-            history = History(
-              mangaId: anime.id,
-              date: "${_protoMillis(tempEpisode.lastModifiedAt)}",
-              itemType: ItemType.anime,
-              chapterId: episode.id,
-            )..chapter.value = episode;
-          }
+          episodesByUrl[tempEpisode.url] = episode;
         }
-        if (history != null) {
+        var lastRead = 0;
+        for (final tempHistory in tempAnime.history) {
+          final episode = episodesByUrl[tempHistory.url];
+          if (episode == null) continue;
+          final readAt = normalizeMihonTimestamp(
+            _protoInt(tempHistory.lastRead),
+          );
+          lastRead = readAt > lastRead ? readAt : lastRead;
+          final history = History(
+            mangaId: anime.id,
+            date: '$readAt',
+            itemType: ItemType.anime,
+            chapterId: episode.id,
+            readingTimeSeconds: Duration(
+              milliseconds: _protoInt(tempHistory.readDuration),
+            ).inSeconds,
+          )..chapter.value = episode;
           isar.historys.putSync(history);
           history.chapter.saveSync();
         }
+        if (lastRead > 0) isar.mangas.putSync(anime..lastRead = lastRead);
       }
     });
   }
@@ -549,8 +594,6 @@ int _protoInt(Object value) {
   }
   return (value as dynamic).toInt() as int;
 }
-
-int _protoMillis(Object seconds) => _protoInt(seconds) * 1000;
 
 void _invalidateCommonState(Ref ref) {
   ref.read(synchingProvider(syncId: 1).notifier).clearAllChangedParts(false);

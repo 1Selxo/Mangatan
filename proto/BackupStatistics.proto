@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+message BackupMangaStats {
+    string dateKey = 1;
+    int32 charactersRead = 2;
+    int64 readingTime = 3;
+    int64 mangaId = 4;
+}
+
+message BackupAnkiStats {
+    string dateKey = 1;
+    int32 mangaCards = 2;
+    int32 novelCards = 3;
+    string profileId = 4;
+    optional string titleId = 5;
+}

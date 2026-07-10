@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+message BackupSavedSearch {
+    string name = 1;
+    string query = 2;
+    string filterList = 3;
+    int64 source = 4;
+}

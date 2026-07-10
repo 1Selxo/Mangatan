@@ -256,6 +256,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               fieldMap: _autoMapFields(
                 fields,
                 needsLapisMigration ? const {} : _ankiProfile.fieldMap,
+                isLapis: isLapis,
               ),
             )
           : _ankiProfile;
@@ -295,11 +296,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     } catch (error) {
       botToast('Could not fetch fields: $error', second: 5);
     }
+    final isLapis = _isLapisLike(modelName, fields);
     final profile = _ankiProfile.copyWith(
       modelName: modelName,
       fieldMap: _autoMapFields(
         fields,
-        _isLapisLike(modelName, fields) ? const {} : _ankiProfile.fieldMap,
+        isLapis ? const {} : _ankiProfile.fieldMap,
+        isLapis: isLapis,
       ),
     );
     if (!mounted) return;
@@ -309,14 +312,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   Map<String, String> _autoMapFields(
     List<String> fields,
-    Map<String, String> current,
-  ) {
+    Map<String, String> current, {
+    bool isLapis = false,
+  }) {
     if (fields.isEmpty) return current;
     return {
       for (final indexed in fields.indexed)
         indexed.$2:
             current[indexed.$2] ??
-            AnkiMarker.autoDetectTemplate(indexed.$2, indexed.$1) ??
+            AnkiMarker.autoDetectTemplate(
+              indexed.$2,
+              indexed.$1,
+              isLapis: isLapis,
+            ) ??
             '',
     };
   }
@@ -353,7 +361,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               .where((dictionary) => dictionary.hasTerms)
               .map((dictionary) => dictionary.name),
         );
-    var map = _autoMapFields(fields, _ankiProfile.fieldMap);
+    final isLapis = _isLapisLike(_ankiProfile.modelName, fields);
+    var map = _autoMapFields(fields, _ankiProfile.fieldMap, isLapis: isLapis);
     final saved = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) {
@@ -399,7 +408,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 TextButton(
                   onPressed: () {
                     setDialogState(
-                      () => map = _autoMapFields(fields, const {}),
+                      () => map = _autoMapFields(
+                        fields,
+                        const {},
+                        isLapis: isLapis,
+                      ),
                     );
                   },
                   child: const Text('Auto map'),

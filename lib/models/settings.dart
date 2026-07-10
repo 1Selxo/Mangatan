@@ -45,6 +45,8 @@ class Settings {
 
   double? flexColorSchemeBlendLevel;
 
+  double? animationDurationScale;
+
   String? dateFormat;
 
   int? relativeTimesTamps;
@@ -379,6 +381,7 @@ class Settings {
     this.sortChapterList,
     this.chapterFilterDownloadedList,
     this.flexColorSchemeBlendLevel = 10.0,
+    this.animationDurationScale = 1.0,
     this.dateFormat = "M/d/y",
     this.relativeTimesTamps = 2,
     this.flexSchemeColorIndex = 2,
@@ -533,6 +536,7 @@ class Settings {
   Settings.fromJson(Map<String, dynamic> json) {
     updatedAt = json["updatedAt"];
     animatePageTransitions = json['animatePageTransitions'];
+    animationDurationScale = json['animationDurationScale']?.toDouble() ?? 1.0;
     animeDisplayType = DisplayType
         .values[json['animeDisplayType'] ?? DisplayType.compactGrid.index];
     animeLibraryDownloadedChapters = json['animeLibraryDownloadedChapters'];
@@ -817,6 +821,7 @@ class Settings {
   Map<String, dynamic> toJson() => {
     'updatedAt': updatedAt,
     'animatePageTransitions': animatePageTransitions,
+    'animationDurationScale': animationDurationScale,
     'animeDisplayType': animeDisplayType.index,
     'animeLibraryDownloadedChapters': animeLibraryDownloadedChapters,
     'animeLibraryLocalSource': animeLibraryLocalSource,

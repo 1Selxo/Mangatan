@@ -228,14 +228,20 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                   source.notes != null && source.notes!.isNotEmpty
                       ? SizedBox(
                           height: 20,
-                          child: Marquee(
-                            text: l10n.extension_notes(source.notes!),
-                            style: const TextStyle(fontSize: 12),
-                            blankSpace: 40.0,
-                            velocity: 30.0,
-                            pauseAfterRound: const Duration(seconds: 1),
-                            startPadding: 10.0,
-                          ),
+                          child: MediaQuery.disableAnimationsOf(context)
+                              ? Text(
+                                  l10n.extension_notes(source.notes!),
+                                  style: const TextStyle(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : Marquee(
+                                  text: l10n.extension_notes(source.notes!),
+                                  style: const TextStyle(fontSize: 12),
+                                  blankSpace: 40.0,
+                                  velocity: 30.0,
+                                  pauseAfterRound: const Duration(seconds: 1),
+                                  startPadding: 10.0,
+                                ),
                         )
                       : Container(),
                 ],

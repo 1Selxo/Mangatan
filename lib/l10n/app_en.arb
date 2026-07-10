@@ -286,6 +286,16 @@
   "default_subtitle_language": "Default subtitle language",
   "appearance": "Appearance",
   "appearance_subtitle": "Theme, date & time format",
+  "animation_speed": "Animation speed",
+  "animation_speed_description": "Lower values play animations faster.",
+  "animation_duration_percentage": "{percentage}% duration",
+  "@animation_duration_percentage": {
+    "placeholders": {
+      "percentage": {
+        "type": "int"
+      }
+    }
+  },
   "theme": "Theme",
   "dark_mode": "Dark mode",
   "follow_system_theme": "Follow system theme",

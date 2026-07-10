@@ -554,6 +554,18 @@ class AppLocalizationsFr extends AppLocalizations {
   String get appearance_subtitle => 'Thème, format de la date et de l\'heure';
 
   @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
   String get theme => 'Thème';
 
   @override

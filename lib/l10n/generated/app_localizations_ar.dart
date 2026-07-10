@@ -562,6 +562,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get appearance_subtitle => 'الثيم، تنسيق التاريخ والوقت';
 
   @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
   String get theme => 'الثيم';
 
   @override

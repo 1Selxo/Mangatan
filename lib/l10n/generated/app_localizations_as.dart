@@ -551,6 +551,18 @@ class AppLocalizationsAs extends AppLocalizations {
   String get appearance_subtitle => 'থীম, তাৰিখ আৰু সময়ৰ ফৰ্মেট';
 
   @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
   String get theme => 'থীম';
 
   @override

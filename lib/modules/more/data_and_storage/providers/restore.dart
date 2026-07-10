@@ -21,6 +21,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAn
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/mihon_backup_source_resolver.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
@@ -601,6 +602,7 @@ void _invalidateCommonState(Ref ref) {
   ref.read(synchingProvider(syncId: 1).notifier).clearAllChangedParts(false);
   ref.invalidate(followSystemThemeStateProvider);
   ref.invalidate(themeModeStateProvider);
+  ref.invalidate(animationDurationScaleProvider);
   ref.invalidate(blendLevelStateProvider);
   ref.invalidate(flexSchemeColorStateProvider);
   ref.invalidate(pureBlackDarkModeStateProvider);

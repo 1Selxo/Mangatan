@@ -8,6 +8,7 @@ import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:go_router/go_router.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,6 +32,7 @@ import 'package:mangayomi/modules/more/settings/general/providers/general_state_
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/services/http/m_client.dart';
@@ -198,14 +200,19 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp>
-    with WidgetsBindingObserver, WindowListener {
+    with
+        WidgetsBindingObserver,
+        WindowListener,
+        SingleTickerProviderStateMixin {
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
   Uri? lastUri;
+  late final AnimationController _disabledProgressController;
 
   @override
   void initState() {
     super.initState();
+    _disabledProgressController = AnimationController(vsync: this, value: 0.5);
     WidgetsBinding.instance.addObserver(this);
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
@@ -245,6 +252,14 @@ class _MyAppState extends ConsumerState<MyApp>
 
   @override
   Widget build(BuildContext context) {
+    final animationDurationScale = isMobile
+        ? defaultAnimationDurationScale
+        : ref.watch(animationDurationScaleProvider);
+    if (!isMobile) {
+      final dilation = animationTimeDilation(animationDurationScale);
+      if (timeDilation != dilation) timeDilation = dilation;
+    }
+
     final followSystem = ref.watch(followSystemThemeStateProvider);
     final forcedDark = ref.watch(themeModeStateProvider);
     final themeMode = followSystem
@@ -263,7 +278,7 @@ class _MyAppState extends ConsumerState<MyApp>
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) {
         final base = BotToastInit()(context, child);
-        final withBackHandler = !isMobile
+        Widget content = !isMobile
             ? _MouseBackButtonHandler(router: router, child: base)
             : base;
 
@@ -271,14 +286,28 @@ class _MyAppState extends ConsumerState<MyApp>
           final isUnlocked = ref.watch(appUnlockedStateProvider);
           final lockEnabled = ref.watch(appLockEnabledStateProvider);
           if (lockEnabled && !isUnlocked) {
-            return Stack(
+            content = Stack(
               fit: StackFit.expand,
-              children: [withBackHandler, const AppLockScreen()],
+              children: [content, const AppLockScreen()],
             );
           }
         }
 
-        return withBackHandler;
+        if (!isMobile &&
+            animationDurationScale == minimumAnimationDurationScale) {
+          content = ProgressIndicatorTheme(
+            data: Theme.of(context).progressIndicatorTheme.copyWith(
+              controller: _disabledProgressController,
+            ),
+            child: content,
+          );
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: content,
+          );
+        }
+
+        return content;
       },
       routeInformationParser: router.routeInformationParser,
       routerDelegate: router.routerDelegate,
@@ -290,6 +319,8 @@ class _MyAppState extends ConsumerState<MyApp>
 
   @override
   void dispose() {
+    if (!isMobile) timeDilation = defaultAnimationDurationScale;
+    _disabledProgressController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     if (!isMobile) {
       windowManager.removeListener(this);

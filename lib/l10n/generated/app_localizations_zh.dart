@@ -534,6 +534,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearance_subtitle => '主题，日期和时间格式';
 
   @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
   String get theme => '主题';
 
   @override

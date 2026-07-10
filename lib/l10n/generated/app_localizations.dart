@@ -1007,6 +1007,24 @@ abstract class AppLocalizations {
   /// **'Theme, date & time format'**
   String get appearance_subtitle;
 
+  /// No description provided for @animation_speed.
+  ///
+  /// In en, this message translates to:
+  /// **'Animation speed'**
+  String get animation_speed;
+
+  /// No description provided for @animation_speed_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower values play animations faster.'**
+  String get animation_speed_description;
+
+  /// No description provided for @animation_duration_percentage.
+  ///
+  /// In en, this message translates to:
+  /// **'{percentage}% duration'**
+  String animation_duration_percentage(int percentage);
+
   /// No description provided for @theme.
   ///
   /// In en, this message translates to:

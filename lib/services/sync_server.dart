@@ -11,6 +11,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
@@ -475,6 +476,7 @@ class SyncServer extends _$SyncServer {
       await isar.settings.put(settings..cookiesList = oldSettings.cookiesList);
       ref.invalidate(followSystemThemeStateProvider);
       ref.invalidate(themeModeStateProvider);
+      ref.invalidate(animationDurationScaleProvider);
       ref.invalidate(blendLevelStateProvider);
       ref.invalidate(flexSchemeColorStateProvider);
       ref.invalidate(pureBlackDarkModeStateProvider);

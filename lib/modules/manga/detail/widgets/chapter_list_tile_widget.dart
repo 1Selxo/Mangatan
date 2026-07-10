@@ -283,14 +283,20 @@ class ChapterListTileWidget extends ConsumerWidget {
         if (isOverflowing) {
           return SizedBox(
             height: 20,
-            child: Marquee(
-              text: text,
-              style: const TextStyle(fontSize: 13),
-              blankSpace: 40.0,
-              velocity: 30.0,
-              pauseAfterRound: const Duration(seconds: 1),
-              startPadding: 10.0,
-            ),
+            child: MediaQuery.disableAnimationsOf(context)
+                ? Text(
+                    text,
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Marquee(
+                    text: text,
+                    style: const TextStyle(fontSize: 13),
+                    blankSpace: 40.0,
+                    velocity: 30.0,
+                    pauseAfterRound: const Duration(seconds: 1),
+                    startPadding: 10.0,
+                  ),
           );
         } else {
           return Text(

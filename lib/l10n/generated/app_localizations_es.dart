@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -491,6 +490,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get statistics => 'Estadísticas';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'Configuraciones';
 
   @override
@@ -517,14 +519,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get name => 'Nombre';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label: $value';
-  }
-
-  @override
-  String get url => 'URL';
 
   @override
   String get category_name_required => '*Requerido';
@@ -688,11 +682,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get version => 'Versión';
 
   @override
-  String beta_version(Object version) {
-    return 'Beta ($version)';
-  }
-
-  @override
   String get check_for_update => 'Buscar actualizaciones';
 
   @override
@@ -746,20 +735,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get unknown => 'Desconocido';
 
   @override
-  String get empty_placeholder => 'EMPTY\nMPTY\nMTY\nMT\n\n';
-
-  @override
-  String get error => 'Error';
-
-  @override
-  String error_with_message(Object error) {
-    return 'Error: $error';
-  }
-
-  @override
-  String get no_pages_available => 'Error: no pages available';
-
-  @override
   String get set_categories => 'Establecer categorías';
 
   @override
@@ -788,84 +763,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get source_title => 'Título de fuente';
-
-  @override
-  String get create_extension => 'Create Extension';
-
-  @override
-  String get choose_extension_language => 'Choose extension language';
-
-  @override
-  String get lang => 'Lang';
-
-  @override
-  String get base_url => 'BaseUrl';
-
-  @override
-  String get api_url_optional => 'ApiUrl (optional)';
-
-  @override
-  String get icon_url => 'iconUrl';
-
-  @override
-  String get source_icon_url => 'Source icon url';
-
-  @override
-  String get notes => 'notes';
-
-  @override
-  String get extension_name_example => 'ex: myAnime';
-
-  @override
-  String get language_code_example => 'ex: en';
-
-  @override
-  String get base_url_example => 'ex: https://example.com';
-
-  @override
-  String get api_url_example => 'ex: https://api.example.com';
-
-  @override
-  String get extension_notes_example => 'ex: this extension requires login';
-
-  @override
-  String get type => 'Type';
-
-  @override
-  String get target => 'Target';
-
-  @override
-  String get source_type_single => 'single';
-
-  @override
-  String get source_type_multi => 'multi';
-
-  @override
-  String get source_type_torrent => 'torrent';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'LNReader compiled JS';
-
-  @override
-  String get source_created_successfully => 'Source created successfully';
-
-  @override
-  String get source_already_exists => 'Source already exists';
-
-  @override
-  String get error_when_creating_source => 'Error when creating source';
-
-  @override
-  String get cookies_deleted => 'Cookies deleted!';
-
-  @override
-  String get delete_all_cookies => 'Delete all cookies';
 
   @override
   String get chapter_number => 'Número de capítulo';
@@ -1090,7 +987,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      '¡Esta operación reemplazará completamente los datos locales con los datos remotos!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => 'Habilitar sincronización';
@@ -1465,7 +1362,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mark_duplicate_chapters_read =>
-      'Marcar números de capítulos duplicados como leídos';
+      'Mark duplicate chapter numbers as read';
 
   @override
   String get default_skip_intro_length =>
@@ -1629,9 +1526,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get font_size => 'Tamaño de fuente';
-
-  @override
-  String get subtitle_position => 'Subtitle position';
 
   @override
   String get text => 'Texto';
@@ -1842,8 +1736,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get url_cannot_be_empty => 'La URL no puede estar vacía';
 
   @override
-  String get url_must_end_with_dot_json_or_dot_pb =>
-      'La URL debe terminar con .json / .pb';
+  String get url_must_end_with_dot_json => 'La URL debe terminar con .json';
 
   @override
   String get repo_url => 'URL del repositorio';
@@ -2144,103 +2037,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Reescanear todas las carpetas locales ahora';
 
   @override
-  String get default_download_destination => 'Default download destination';
-
-  @override
-  String get ask_download_destination => 'Ask for download destination';
-
-  @override
-  String get ask_download_destination_desc =>
-      'Choose a local folder each time a download starts.';
-
-  @override
-  String get select_download_destination => 'Select download destination';
-
-  @override
-  String get clear_local_library => 'Clear local library';
-
-  @override
-  String get clear_local_library_desc =>
-      'Remove local folder and archive entries from the library.';
-
-  @override
-  String get clear_local_library_msg =>
-      'This will remove local folder and archive entries from your library. It will not delete files from disk.';
-
-  @override
-  String get custom => 'Custom';
-
-  @override
-  String get no_local_folder_available_for_downloads =>
-      'No local folder is available for downloads';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return 'Failed to create CBZ: $error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return 'Error reading cover image: $error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return 'Error reading metadata: $error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return 'Error saving chapter/episode to library: $error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return 'Error reading chapter cover image: $error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return 'Error reading archive cover image: $error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return 'Error getting local library: $error';
-  }
-
-  @override
   String get export_metadata => 'Exportar metadatos';
 
   @override
   String get exported => 'Exportado';
-
-  @override
-  String failed_to_export_metadata(Object error) {
-    return 'Failed to export metadata: $error';
-  }
-
-  @override
-  String get cloudflare_resolution_webview_server_start_failed =>
-      'Couldn\'t start Cloudflare Resolution Webview Server.';
-
-  @override
-  String tracker_token_expired(Object tracker) {
-    return '$tracker Token expired';
-  }
-
-  @override
-  String get video_list_empty => 'Video list is empty';
-
-  @override
-  String playback_speed_multiplier(Object value) {
-    return 'x$value';
-  }
-
-  @override
-  String could_not_launch_url(Object url) {
-    return 'Could not launch $url';
-  }
 
   @override
   String get text_size => 'Tamaño del texto:';
@@ -2510,6 +2310,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Archivos del servidor vinculados.';
 
   @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
   String get select_extension_server_jar =>
       'Seleccionar JAR del servidor de extensiones';
 
@@ -2533,70 +2340,48 @@ class AppLocalizationsEs extends AppLocalizations {
   String get not_configured => 'No configurado';
 
   @override
-  String get zero_interpreter => 'Zero interpreter';
-
-  @override
-  String get zero_interpreter_description =>
-      'The server starts automatically on launch. You can also control it manually.';
-
-  @override
-  String get runtime_status => 'Runtime status';
-
-  @override
-  String get running => 'Running';
-
-  @override
-  String get stopped => 'Stopped';
-
-  @override
-  String get start => 'Start';
-
-  @override
-  String get stop => 'Stop';
-
-  @override
   String get webview => 'Webview';
 
   @override
-  String get tts => 'Texto a voz';
+  String get tts => 'Text-to-Speech';
 
   @override
-  String get tts_speed => 'Velocidad';
+  String get tts_speed => 'Speed';
 
   @override
-  String get tts_pitch => 'Tono';
+  String get tts_pitch => 'Pitch';
 
   @override
-  String get tts_language => 'Idioma';
+  String get tts_language => 'Language';
 
   @override
-  String get tts_voice => 'Voz';
+  String get tts_voice => 'Voice';
 
   @override
-  String get tts_stop => 'Detener';
+  String get tts_stop => 'Stop';
 
   @override
-  String get tts_play => 'Reproducir';
+  String get tts_play => 'Play';
 
   @override
-  String get tts_pause => 'Pausa';
+  String get tts_pause => 'Pause';
 
   @override
-  String get tts_previous => 'Párrafo anterior';
+  String get tts_previous => 'Previous paragraph';
 
   @override
-  String get tts_next => 'Siguiente párrafo';
+  String get tts_next => 'Next paragraph';
 
   @override
   String tts_paragraph_progress(Object current, Object total) {
-    return 'Párrafo $current de $total';
+    return 'Paragraph $current of $total';
   }
 
   @override
-  String get tts_settings => 'Configuración de TTS';
+  String get tts_settings => 'TTS Settings';
 
   @override
-  String get tts_default => 'Predeterminado';
+  String get tts_default => 'Default';
 
   @override
   String get webtoon_disable_zoom_out => 'Desactivar zoom out de Webtoon';
@@ -2708,59 +2493,131 @@ class AppLocalizationsEs extends AppLocalizations {
   String get error_no_pages_available => 'Error: no hay páginas disponibles';
 
   @override
-  String get app_ui_scale => 'Escala de interfaz';
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
+  String get dictionary_lookup => 'Dictionary';
+
+  @override
+  String get dictionary_settings => 'Dictionary settings';
+
+  @override
+  String get dictionary_search_label => 'Search';
+
+  @override
+  String get dictionary_search_hint => 'Word, reading, or phrase';
+
+  @override
+  String get clear_search => 'Clear search';
+
+  @override
+  String dictionary_count(int count) {
+    return '$count dictionaries';
+  }
+
+  @override
+  String dictionary_anki_deck(String name) {
+    return 'Anki deck: $name';
+  }
+
+  @override
+  String get dictionary_load_failed => 'Dictionary data could not be loaded';
+
+  @override
+  String get no_dictionaries_title => 'No dictionaries installed';
+
+  @override
+  String get no_dictionaries_description =>
+      'Import a Yomitan dictionary to start looking up words.';
+
+  @override
+  String get manage_dictionaries => 'Set up dictionaries';
+
+  @override
+  String get dictionary_empty_title => 'Look up a word or phrase';
+
+  @override
+  String get dictionary_empty_description =>
+      'Search a term, expression, sentence, or block of text.';
+
+  @override
+  String get previous_lookup => 'Previous lookup';
+
+  @override
+  String get next_lookup => 'Next lookup';
+
+  @override
+  String get app_ui_scale => 'Interface scale';
 
   @override
   String get app_ui_scale_subtitle =>
-      'Haga que la interfaz sea más grande o más pequeña para adaptarse a su pantalla y distancia de visualización.';
+      'Make the interface larger or smaller to suit your screen and viewing distance.';
 
   @override
-  String get allow_concurrent_downloads => 'Permitir descargas concurrentes';
+  String get allow_concurrent_downloads => 'Allow concurrent downloads';
 
   @override
   String get allow_concurrent_downloads_subtitle =>
-      'Descargar de diferentes fuentes al mismo tiempo. Una sola fuente aún descarga un capítulo a la vez para que no se sobrecargue. Apague para descargar uno a la vez en todas partes.';
+      'Download from different sources at the same time. A single source still downloads one chapter at a time so it isn\'t overloaded. Turn off to download one at a time everywhere.';
 
   @override
-  String get download_delay => 'Retraso de descarga';
+  String get download_delay => 'Download delay';
 
   @override
   String get download_delay_subtitle =>
-      'Desactivado. Agregue una espera con variación aleatoria entre capítulos para ser más suave con las fuentes.';
+      'Off. Add a wait with random jitter between chapters to be gentler on sources.';
 
   @override
-  String get save_search => 'Guardar búsqueda';
+  String get save_search => 'Save search';
 
   @override
-  String get saved_searches => 'Búsquedas guardadas';
+  String get saved_searches => 'Saved searches';
 
   @override
-  String get enter_search_to_save_first =>
-      'Ingrese una búsqueda para guardar primero';
+  String get enter_search_to_save_first => 'Enter a search to save first';
 
   @override
   String get no_saved_searches =>
-      'Aún no hay búsquedas guardadas para esta fuente.\nEjecute una búsqueda y luego elija \"Guardar búsqueda\".';
+      'No saved searches for this source yet.\nRun a search, then pick \"Save search\".';
 
   @override
-  String get source => 'Fuente';
-
-  @override
-  String get something_went_wrong => 'Something went wrong';
-
-  @override
-  String get startup_failed => 'Mangayomi could not finish starting up';
-
-  @override
-  String sources_with_no_results(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count sources with no results',
-      one: '1 source with no results',
-    );
-    return '$_temp0';
-  }
+  String get source => 'Source';
 }
 
 /// The translations for Spanish Castilian, as used in Latin America and the Caribbean (`es_419`).
@@ -3743,10 +3600,6 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get sync_button_download => 'Solo descargar';
 
   @override
-  String get sync_button_download_info =>
-      '¡Esta operación reemplazará completamente los datos locales con los datos remotos!';
-
-  @override
   String get sync_on => 'Habilitar sincronización';
 
   @override
@@ -4116,10 +3969,6 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   @override
   String get markEpisodeAsSeenSetting =>
       'En qué momento marcar el episodio como visto';
-
-  @override
-  String get mark_duplicate_chapters_read =>
-      'Marcar números de capítulos duplicados como leídos';
 
   @override
   String get default_skip_intro_length =>
@@ -4493,8 +4342,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get url_cannot_be_empty => 'La URL no puede estar vacía';
 
   @override
-  String get url_must_end_with_dot_json_or_dot_pb =>
-      'La URL debe terminar con .json / .pb';
+  String get url_must_end_with_dot_json => 'La URL debe terminar con .json';
 
   @override
   String get repo_url => 'URL del repositorio';
@@ -5093,47 +4941,6 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get webview => 'Webview';
 
   @override
-  String get tts => 'Texto a voz';
-
-  @override
-  String get tts_speed => 'Velocidad';
-
-  @override
-  String get tts_pitch => 'Tono';
-
-  @override
-  String get tts_language => 'Idioma';
-
-  @override
-  String get tts_voice => 'Voz';
-
-  @override
-  String get tts_stop => 'Detener';
-
-  @override
-  String get tts_play => 'Reproducir';
-
-  @override
-  String get tts_pause => 'Pausa';
-
-  @override
-  String get tts_previous => 'Párrafo anterior';
-
-  @override
-  String get tts_next => 'Siguiente párrafo';
-
-  @override
-  String tts_paragraph_progress(Object current, Object total) {
-    return 'Párrafo $current de $total';
-  }
-
-  @override
-  String get tts_settings => 'Configuración de TTS';
-
-  @override
-  String get tts_default => 'Predeterminado';
-
-  @override
   String get webtoon_disable_zoom_out => 'Desactivar zoom out de Webtoon';
 
   @override
@@ -5241,42 +5048,4 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
 
   @override
   String get error_no_pages_available => 'Error: no hay páginas disponibles';
-
-  @override
-  String get app_ui_scale => 'Escala de interfaz';
-
-  @override
-  String get app_ui_scale_subtitle =>
-      'Haga que la interfaz sea más grande o más pequeña para adaptarse a su pantalla y distancia de visualización.';
-
-  @override
-  String get allow_concurrent_downloads => 'Permitir descargas concurrentes';
-
-  @override
-  String get allow_concurrent_downloads_subtitle =>
-      'Descargar de diferentes fuentes al mismo tiempo. Una sola fuente aún descarga un capítulo a la vez para que no se sobrecargue. Apague para descargar uno a la vez en todas partes.';
-
-  @override
-  String get download_delay => 'Retraso de descarga';
-
-  @override
-  String get download_delay_subtitle =>
-      'Desactivado. Agregue una espera con variación aleatoria entre capítulos para ser más suave con las fuentes.';
-
-  @override
-  String get save_search => 'Guardar búsqueda';
-
-  @override
-  String get saved_searches => 'Búsquedas guardadas';
-
-  @override
-  String get enter_search_to_save_first =>
-      'Ingrese una búsqueda para guardar primero';
-
-  @override
-  String get no_saved_searches =>
-      'Aún no hay búsquedas guardadas para esta fuente.\nEjecute una búsqueda y luego elija \"Guardar búsqueda\".';
-
-  @override
-  String get source => 'Fuente';
 }

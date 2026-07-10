@@ -28,6 +28,7 @@ final navigationItems = {
   "/updates": "Updates",
   "/history": "History",
   "/browse": "Browse",
+  "/dictionaryLookup": "Dictionary",
   "/more": "More",
   "/trackerLibrary": "Tracking",
 };

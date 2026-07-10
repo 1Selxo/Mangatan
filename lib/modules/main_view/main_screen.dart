@@ -460,6 +460,18 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ),
       );
     }
+    if (dest.contains("/dictionaryLookup")) {
+      destinations[dest.indexOf(
+        "/dictionaryLookup",
+      )] = NavigationRailDestination(
+        selectedIcon: const Icon(Icons.translate),
+        icon: const Icon(Icons.translate_outlined),
+        label: Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Text(l10n.dictionary_lookup),
+        ),
+      );
+    }
     if (dest.contains("/more")) {
       destinations[dest.indexOf("/more")] = NavigationRailDestination(
         // Even breathing room between tabs on TV; null off-TV.
@@ -572,6 +584,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ref: ref,
         ),
         label: l10n.browse,
+      );
+    }
+    if (dest.contains("/dictionaryLookup")) {
+      destinations[dest.indexOf("/dictionaryLookup")] = NavigationDestination(
+        selectedIcon: const Icon(Icons.translate),
+        icon: const Icon(Icons.translate_outlined),
+        label: l10n.dictionary_lookup,
       );
     }
     if (dest.contains("/more")) {
@@ -886,6 +905,7 @@ class _TabletLayoutState extends State<_TabletLayout> {
       '/history',
       '/updates',
       '/browse',
+      '/dictionaryLookup',
       '/more',
       '/trackerLibrary',
     };
@@ -956,6 +976,7 @@ class _MobileBottomNavigation extends StatelessWidget {
       '/history',
       '/updates',
       '/browse',
+      '/dictionaryLookup',
       '/more',
       '/trackerLibrary',
     };

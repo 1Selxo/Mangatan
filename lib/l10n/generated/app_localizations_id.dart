@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -490,6 +489,9 @@ class AppLocalizationsId extends AppLocalizations {
   String get statistics => 'Statistik';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'Pengaturan';
 
   @override
@@ -516,14 +518,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get name => 'Nama';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label: $value';
-  }
-
-  @override
-  String get url => 'URL';
 
   @override
   String get category_name_required => '*Diperlukan';
@@ -687,11 +681,6 @@ class AppLocalizationsId extends AppLocalizations {
   String get version => 'Versi';
 
   @override
-  String beta_version(Object version) {
-    return 'Beta ($version)';
-  }
-
-  @override
   String get check_for_update => 'Periksa Pembaruan';
 
   @override
@@ -745,20 +734,6 @@ class AppLocalizationsId extends AppLocalizations {
   String get unknown => 'Tidak diketahui';
 
   @override
-  String get empty_placeholder => 'EMPTY\nMPTY\nMTY\nMT\n\n';
-
-  @override
-  String get error => 'Error';
-
-  @override
-  String error_with_message(Object error) {
-    return 'Error: $error';
-  }
-
-  @override
-  String get no_pages_available => 'Error: no pages available';
-
-  @override
   String get set_categories => 'Tetapkan kategori';
 
   @override
@@ -787,84 +762,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get source_title => 'Judul sumber';
-
-  @override
-  String get create_extension => 'Create Extension';
-
-  @override
-  String get choose_extension_language => 'Choose extension language';
-
-  @override
-  String get lang => 'Lang';
-
-  @override
-  String get base_url => 'BaseUrl';
-
-  @override
-  String get api_url_optional => 'ApiUrl (optional)';
-
-  @override
-  String get icon_url => 'iconUrl';
-
-  @override
-  String get source_icon_url => 'Source icon url';
-
-  @override
-  String get notes => 'notes';
-
-  @override
-  String get extension_name_example => 'ex: myAnime';
-
-  @override
-  String get language_code_example => 'ex: en';
-
-  @override
-  String get base_url_example => 'ex: https://example.com';
-
-  @override
-  String get api_url_example => 'ex: https://api.example.com';
-
-  @override
-  String get extension_notes_example => 'ex: this extension requires login';
-
-  @override
-  String get type => 'Type';
-
-  @override
-  String get target => 'Target';
-
-  @override
-  String get source_type_single => 'single';
-
-  @override
-  String get source_type_multi => 'multi';
-
-  @override
-  String get source_type_torrent => 'torrent';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'LNReader compiled JS';
-
-  @override
-  String get source_created_successfully => 'Source created successfully';
-
-  @override
-  String get source_already_exists => 'Source already exists';
-
-  @override
-  String get error_when_creating_source => 'Error when creating source';
-
-  @override
-  String get cookies_deleted => 'Cookies deleted!';
-
-  @override
-  String get delete_all_cookies => 'Delete all cookies';
 
   @override
   String get chapter_number => 'Nomor bab';
@@ -1089,7 +986,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      'Operasi ini akan sepenuhnya menggantikan data lokal dengan data jarak jauh!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => 'Aktifkan sinkronisasi';
@@ -1459,7 +1356,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get mark_duplicate_chapters_read =>
-      'Tandai nomor bab duplikat sebagai dibaca';
+      'Mark duplicate chapter numbers as read';
 
   @override
   String get default_skip_intro_length => 'Panjang lewati intro default';
@@ -1621,9 +1518,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get font_size => 'Ukuran Huruf';
-
-  @override
-  String get subtitle_position => 'Subtitle position';
 
   @override
   String get text => 'Teks';
@@ -1829,8 +1723,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get url_cannot_be_empty => 'URL tidak boleh kosong';
 
   @override
-  String get url_must_end_with_dot_json_or_dot_pb =>
-      'URL harus diakhiri dengan .json / .pb';
+  String get url_must_end_with_dot_json => 'URL harus diakhiri dengan .json';
 
   @override
   String get repo_url => 'URL repositori';
@@ -2127,103 +2020,10 @@ class AppLocalizationsId extends AppLocalizations {
   String get rescan_local_folder => 'Pindai ulang semua folder lokal sekarang';
 
   @override
-  String get default_download_destination => 'Default download destination';
-
-  @override
-  String get ask_download_destination => 'Ask for download destination';
-
-  @override
-  String get ask_download_destination_desc =>
-      'Choose a local folder each time a download starts.';
-
-  @override
-  String get select_download_destination => 'Select download destination';
-
-  @override
-  String get clear_local_library => 'Clear local library';
-
-  @override
-  String get clear_local_library_desc =>
-      'Remove local folder and archive entries from the library.';
-
-  @override
-  String get clear_local_library_msg =>
-      'This will remove local folder and archive entries from your library. It will not delete files from disk.';
-
-  @override
-  String get custom => 'Custom';
-
-  @override
-  String get no_local_folder_available_for_downloads =>
-      'No local folder is available for downloads';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return 'Failed to create CBZ: $error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return 'Error reading cover image: $error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return 'Error reading metadata: $error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return 'Error saving chapter/episode to library: $error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return 'Error reading chapter cover image: $error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return 'Error reading archive cover image: $error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return 'Error getting local library: $error';
-  }
-
-  @override
   String get export_metadata => 'Ekspor metadata';
 
   @override
   String get exported => 'Diekspor';
-
-  @override
-  String failed_to_export_metadata(Object error) {
-    return 'Failed to export metadata: $error';
-  }
-
-  @override
-  String get cloudflare_resolution_webview_server_start_failed =>
-      'Couldn\'t start Cloudflare Resolution Webview Server.';
-
-  @override
-  String tracker_token_expired(Object tracker) {
-    return '$tracker Token expired';
-  }
-
-  @override
-  String get video_list_empty => 'Video list is empty';
-
-  @override
-  String playback_speed_multiplier(Object value) {
-    return 'x$value';
-  }
-
-  @override
-  String could_not_launch_url(Object url) {
-    return 'Could not launch $url';
-  }
 
   @override
   String get text_size => 'Ukuran Teks:';
@@ -2489,6 +2289,13 @@ class AppLocalizationsId extends AppLocalizations {
       'File server ekstensi telah ditautkan.';
 
   @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
   String get select_extension_server_jar => 'Pilih JAR server ekstensi';
 
   @override
@@ -2511,70 +2318,48 @@ class AppLocalizationsId extends AppLocalizations {
   String get not_configured => 'Belum dikonfigurasi';
 
   @override
-  String get zero_interpreter => 'Zero interpreter';
-
-  @override
-  String get zero_interpreter_description =>
-      'The server starts automatically on launch. You can also control it manually.';
-
-  @override
-  String get runtime_status => 'Runtime status';
-
-  @override
-  String get running => 'Running';
-
-  @override
-  String get stopped => 'Stopped';
-
-  @override
-  String get start => 'Start';
-
-  @override
-  String get stop => 'Stop';
-
-  @override
   String get webview => 'Tampilan Web';
 
   @override
-  String get tts => 'Teks ke Suara';
+  String get tts => 'Text-to-Speech';
 
   @override
-  String get tts_speed => 'Kecepatan';
+  String get tts_speed => 'Speed';
 
   @override
-  String get tts_pitch => 'Nada';
+  String get tts_pitch => 'Pitch';
 
   @override
-  String get tts_language => 'Bahasa';
+  String get tts_language => 'Language';
 
   @override
-  String get tts_voice => 'Suara';
+  String get tts_voice => 'Voice';
 
   @override
-  String get tts_stop => 'Hentikan';
+  String get tts_stop => 'Stop';
 
   @override
-  String get tts_play => 'Mainkan';
+  String get tts_play => 'Play';
 
   @override
-  String get tts_pause => 'Jeda';
+  String get tts_pause => 'Pause';
 
   @override
-  String get tts_previous => 'Paragraf sebelumnya';
+  String get tts_previous => 'Previous paragraph';
 
   @override
-  String get tts_next => 'Paragraf berikutnya';
+  String get tts_next => 'Next paragraph';
 
   @override
   String tts_paragraph_progress(Object current, Object total) {
-    return 'Paragraf $current dari $total';
+    return 'Paragraph $current of $total';
   }
 
   @override
-  String get tts_settings => 'Pengaturan TTS';
+  String get tts_settings => 'TTS Settings';
 
   @override
-  String get tts_default => 'Bawaan';
+  String get tts_default => 'Default';
 
   @override
   String get webtoon_disable_zoom_out => 'Nonaktifkan perkecil Webtoon';
@@ -2687,57 +2472,129 @@ class AppLocalizationsId extends AppLocalizations {
       'Kesalahan: tidak ada halaman tersedia';
 
   @override
-  String get app_ui_scale => 'Skala antarmuka';
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
+  String get dictionary_lookup => 'Dictionary';
+
+  @override
+  String get dictionary_settings => 'Dictionary settings';
+
+  @override
+  String get dictionary_search_label => 'Search';
+
+  @override
+  String get dictionary_search_hint => 'Word, reading, or phrase';
+
+  @override
+  String get clear_search => 'Clear search';
+
+  @override
+  String dictionary_count(int count) {
+    return '$count dictionaries';
+  }
+
+  @override
+  String dictionary_anki_deck(String name) {
+    return 'Anki deck: $name';
+  }
+
+  @override
+  String get dictionary_load_failed => 'Dictionary data could not be loaded';
+
+  @override
+  String get no_dictionaries_title => 'No dictionaries installed';
+
+  @override
+  String get no_dictionaries_description =>
+      'Import a Yomitan dictionary to start looking up words.';
+
+  @override
+  String get manage_dictionaries => 'Set up dictionaries';
+
+  @override
+  String get dictionary_empty_title => 'Look up a word or phrase';
+
+  @override
+  String get dictionary_empty_description =>
+      'Search a term, expression, sentence, or block of text.';
+
+  @override
+  String get previous_lookup => 'Previous lookup';
+
+  @override
+  String get next_lookup => 'Next lookup';
+
+  @override
+  String get app_ui_scale => 'Interface scale';
 
   @override
   String get app_ui_scale_subtitle =>
-      'Buat antarmuka lebih besar atau lebih kecil agar sesuai dengan layar dan jarak pandang Anda.';
+      'Make the interface larger or smaller to suit your screen and viewing distance.';
 
   @override
-  String get allow_concurrent_downloads => 'Izinkan pengunduhan bersamaan';
+  String get allow_concurrent_downloads => 'Allow concurrent downloads';
 
   @override
   String get allow_concurrent_downloads_subtitle =>
-      'Unduh dari berbagai sumber pada waktu yang sama. Satu sumber masih mengunduh satu bab pada satu waktu sehingga tidak kelebihan beban. Matikan untuk mengunduh satu per satu di mana-mana.';
+      'Download from different sources at the same time. A single source still downloads one chapter at a time so it isn\'t overloaded. Turn off to download one at a time everywhere.';
 
   @override
-  String get download_delay => 'Penundaan pengunduhan';
+  String get download_delay => 'Download delay';
 
   @override
   String get download_delay_subtitle =>
-      'Mati. Tambahkan penundaan dengan jitter acak antar bab agar lebih lembut di sumber.';
+      'Off. Add a wait with random jitter between chapters to be gentler on sources.';
 
   @override
-  String get save_search => 'Simpan pencarian';
+  String get save_search => 'Save search';
 
   @override
-  String get saved_searches => 'Pencarian tersimpan';
+  String get saved_searches => 'Saved searches';
 
   @override
-  String get enter_search_to_save_first =>
-      'Masukkan pencarian untuk disimpan terlebih dahulu';
+  String get enter_search_to_save_first => 'Enter a search to save first';
 
   @override
   String get no_saved_searches =>
-      'Belum ada pencarian tersimpan untuk sumber ini.\nJalankan pencarian, lalu pilih \"Simpan pencarian\".';
+      'No saved searches for this source yet.\nRun a search, then pick \"Save search\".';
 
   @override
-  String get source => 'Sumber';
-
-  @override
-  String get something_went_wrong => 'Something went wrong';
-
-  @override
-  String get startup_failed => 'Mangayomi could not finish starting up';
-
-  @override
-  String sources_with_no_results(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count sources with no results',
-      one: '1 source with no results',
-    );
-    return '$_temp0';
-  }
+  String get source => 'Source';
 }

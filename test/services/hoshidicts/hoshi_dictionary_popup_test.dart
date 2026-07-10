@@ -158,8 +158,16 @@ void main() {
       startsWith('window.resetHoshiAudioCaches?.();'),
     );
     expect(
+      hoshiReplaceRenderScript(2),
+      contains('window.resetHoshiNavigation?.();'),
+    );
+    expect(
       hoshiReplaceRenderScriptForEntries(const []),
       contains('window.resetHoshiAudioCaches?.();'),
+    );
+    expect(
+      hoshiReplaceRenderScriptForEntries(const []),
+      contains('window.resetHoshiNavigation?.();'),
     );
   });
 
@@ -259,6 +267,10 @@ void main() {
     expect(popup, contains('audio-speaker-body'));
     expect(popup, contains('M3 9v6h4l5 4V5L7 9H3z'));
     expect(popup, contains('window.resetHoshiAudioCaches = resetAudioCaches'));
+    expect(popup, contains('window.resetHoshiNavigation = () =>'));
+    expect(popup, contains('window.navigateBack = () =>'));
+    expect(popup, contains('window.navigateForward = () =>'));
+    expect(popup, contains('navigationChanged.postMessage'));
     expect(
       popup,
       contains('window.hoshiDictionaryMedia?.[dictionary]?.[path]'),

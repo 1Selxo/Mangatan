@@ -28,23 +28,60 @@ const hoshiPopupMaxResults = 3;
 // within 24 characters, while an 80-character subtitle run multiplies queries.
 const hoshiPopupScanLength = 24;
 
+class HoshiDictionaryNavigationState {
+  const HoshiDictionaryNavigationState({
+    required this.canGoBack,
+    required this.canGoForward,
+  });
+
+  static const empty = HoshiDictionaryNavigationState(
+    canGoBack: false,
+    canGoForward: false,
+  );
+
+  final bool canGoBack;
+  final bool canGoForward;
+}
+
+class HoshiDictionaryPopupController {
+  _HoshiDictionaryPopupState? _state;
+
+  Future<void> goBack() => _state?._navigateBack() ?? Future.value();
+
+  Future<void> goForward() => _state?._navigateForward() ?? Future.value();
+
+  void _attach(_HoshiDictionaryPopupState state) => _state = state;
+
+  void _detach(_HoshiDictionaryPopupState state) {
+    if (identical(_state, state)) _state = null;
+  }
+}
+
 class HoshiDictionaryPopup extends StatefulWidget {
   const HoshiDictionaryPopup({
     super.key,
     required this.text,
     this.miningContext,
     this.initialResults,
+    this.controller,
     required this.preferences,
     required this.onMatchChanged,
     required this.onDismiss,
+    this.onLoadingChanged,
+    this.onLookupError,
+    this.onNavigationChanged,
   });
 
   final String text;
   final FutureOr<MiningContext?> miningContext;
   final Future<List<HoshiLookupResult>>? initialResults;
+  final HoshiDictionaryPopupController? controller;
   final DictionaryPopupPreferences preferences;
   final ValueChanged<int> onMatchChanged;
   final VoidCallback onDismiss;
+  final ValueChanged<bool>? onLoadingChanged;
+  final ValueChanged<Object>? onLookupError;
+  final ValueChanged<HoshiDictionaryNavigationState>? onNavigationChanged;
 
   @override
   State<HoshiDictionaryPopup> createState() => _HoshiDictionaryPopupState();
@@ -64,10 +101,12 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   Player? _audioPlayer;
   String? _requestedQuery;
   String? _resultQuery;
+  String _emptyMessage = 'No dictionary results found.';
 
   @override
   void initState() {
     super.initState();
+    widget.controller?._attach(this);
     if (widget.text.trim().isNotEmpty) {
       unawaited(
         _lookupAndRender(
@@ -83,6 +122,10 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   @override
   void didUpdateWidget(covariant HoshiDictionaryPopup oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     if (oldWidget.text != widget.text) {
       unawaited(
         _lookupAndRender(
@@ -169,24 +212,46 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     final generation = ++_lookupGeneration;
     final query = text.trim();
     _requestedQuery = query;
-    final results = query.isEmpty
-        ? <HoshiLookupResult>[]
-        : await (initialResults ??
-              HoshidictsLookupBackend.instance.lookup(
-                query,
-                maxResults: hoshiPopupMaxResults,
-                scanLength: hoshiPopupScanLength,
-              ));
-    if (!mounted || generation != _lookupGeneration) return;
-    final dictionaryMediaData = await _loadPopupMedia(results);
-    if (!mounted || generation != _lookupGeneration) return;
-    final unchanged = query == _resultQuery && identical(results, _results);
-    _setResults(results, dictionaryMediaData: dictionaryMediaData);
-    _resultQuery = query;
-    if (notifyMatch && results.isNotEmpty) {
-      widget.onMatchChanged(results.first.matched.length);
+    _notifyLoadingChanged(query.isNotEmpty);
+    try {
+      final results = query.isEmpty
+          ? <HoshiLookupResult>[]
+          : await (initialResults ??
+                HoshidictsLookupBackend.instance.lookup(
+                  query,
+                  maxResults: hoshiPopupMaxResults,
+                  scanLength: hoshiPopupScanLength,
+                ));
+      if (!mounted || generation != _lookupGeneration) return;
+      final dictionaryMediaData = await _loadPopupMedia(results);
+      if (!mounted || generation != _lookupGeneration) return;
+      final unchanged = query == _resultQuery && identical(results, _results);
+      _setResults(results, dictionaryMediaData: dictionaryMediaData);
+      _resultQuery = query;
+      _emptyMessage = 'No dictionary results found.';
+      if (notifyMatch && results.isNotEmpty) {
+        widget.onMatchChanged(results.first.matched.length);
+      }
+      if (!unchanged) await _replaceRender();
+    } catch (error) {
+      if (!mounted || generation != _lookupGeneration) return;
+      _setResults(const [], dictionaryMediaData: const {});
+      _resultQuery = query;
+      _emptyMessage = 'Dictionary lookup failed. Search again to retry.';
+      widget.onLookupError?.call(error);
+      await _replaceRender();
+    } finally {
+      if (mounted && generation == _lookupGeneration) {
+        _notifyLoadingChanged(false);
+      }
     }
-    if (!unchanged) await _replaceRender();
+  }
+
+  void _notifyLoadingChanged(bool loading) {
+    if (widget.onLoadingChanged == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onLoadingChanged?.call(loading);
+    });
   }
 
   Future<int> _lookupRedirect(String query) async {
@@ -369,6 +434,19 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         return uri != null && await launchUrl(uri);
       },
     );
+    controller.addJavaScriptHandler(
+      handlerName: 'navigationChanged',
+      callback: (arguments) {
+        final state = _argumentMap(arguments);
+        widget.onNavigationChanged?.call(
+          HoshiDictionaryNavigationState(
+            canGoBack: state['canGoBack'] == true,
+            canGoForward: state['canGoForward'] == true,
+          ),
+        );
+        return true;
+      },
+    );
     for (final name in const ['tapOutside', 'swipeDismiss', 'buttonRects']) {
       controller.addJavaScriptHandler(handlerName: name, callback: (_) => null);
     }
@@ -426,7 +504,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   Future<void> _render(Map<String, String> styles) async {
     await _evaluateJavascript(
       'window.dictionaryStyles = ${jsonEncode(styles)};'
-      '${hoshiReplaceRenderScriptForEntries(_entries, mediaDataUris: _dictionaryMediaData)}',
+      '${hoshiReplaceRenderScriptForEntries(_entries, mediaDataUris: _dictionaryMediaData, emptyMessage: _emptyMessage)}',
     );
   }
 
@@ -436,6 +514,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       hoshiReplaceRenderScriptForEntries(
         _entries,
         mediaDataUris: _dictionaryMediaData,
+        emptyMessage: _emptyMessage,
       ),
     );
   }
@@ -451,6 +530,12 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return current;
   }
 
+  Future<void> _navigateBack() =>
+      _evaluateJavascript('window.navigateBack?.();');
+
+  Future<void> _navigateForward() =>
+      _evaluateJavascript('window.navigateForward?.();');
+
   void _scrollPopupBy(Offset delta) {
     if (!_webReady || delta == Offset.zero) return;
     unawaited(
@@ -463,6 +548,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _audioPlayer?.dispose();
     super.dispose();
   }
@@ -554,6 +640,7 @@ Map<String, dynamic> _argumentMap(List<dynamic> arguments) {
 @visibleForTesting
 String hoshiReplaceRenderScript(int entryCount) =>
     'window.resetHoshiAudioCaches?.();'
+    'window.resetHoshiNavigation?.();'
     'window.lookupEntries = undefined;'
     'window.entryCount = $entryCount;'
     'document.getElementById("entries-container").innerHTML = "";'
@@ -563,19 +650,25 @@ String hoshiReplaceRenderScript(int entryCount) =>
 String hoshiReplaceRenderScriptForEntries(
   List<Map<String, dynamic>> entries, {
   Map<String, Map<String, String>> mediaDataUris = const {},
+  String emptyMessage = 'No dictionary results found.',
 }) =>
     '(function(){'
     'window.__mangayomiHoshiRenderToken = '
     '(window.__mangayomiHoshiRenderToken || 0) + 1;'
     'window.resetHoshiAudioCaches?.();'
+    'window.resetHoshiNavigation?.();'
     'window.hoshiDictionaryMedia = ${jsonEncode(mediaDataUris)};'
     'window.lookupEntries = ${jsonEncode(entries)};'
     'window.entryCount = window.lookupEntries.length;'
     'const container = document.getElementById("entries-container");'
     'if (container) container.textContent = "";'
     'if (window.entryCount === 0) {'
-    'if (container) container.innerHTML = '
-    '"<div class=\\"popup-empty\\">No dictionary results found.</div>";'
+    'if (container) {'
+    'const empty = document.createElement("div");'
+    'empty.className = "popup-empty";'
+    'empty.textContent = ${jsonEncode(emptyMessage)};'
+    'container.replaceChildren(empty);'
+    '}'
     'return;'
     '}'
     'window.renderPopup();'
@@ -709,6 +802,7 @@ String buildHoshiPopupHtml({
     'openLink',
     'getTermAudioSources',
     'playWordAudio',
+    'navigationChanged',
   ];
   final html =
       '''<!DOCTYPE html>

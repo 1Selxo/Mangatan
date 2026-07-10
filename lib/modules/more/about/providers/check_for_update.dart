@@ -5,7 +5,6 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/http/m_client.dart';
-import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'check_for_update.g.dart';
@@ -32,7 +31,9 @@ Future<UpdateInfo?> _getUpdateIfAvailable() async {
     log(info.data.toString());
   }
   final latest = await _fetchLatestRelease();
-  return compareVersions(info.version, latest.$1) < 0 ? latest : null;
+  return compareVersions(_numericVersion(info.version), latest.$1) < 0
+      ? latest
+      : null;
 }
 
 @riverpod
@@ -47,16 +48,29 @@ Future<UpdateInfo> _fetchLatestRelease() async {
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
   final res = await http.get(
     Uri.parse(
-      'https://api.github.com/repos/kodjodevf/Mangayomi/releases/latest',
+      'https://api.github.com/repos/1Selxo/Mangatan/releases?per_page=10',
     ),
   );
-  final release = jsonDecode(res.body) as Map<String, dynamic>;
+  final releases = (jsonDecode(res.body) as List<dynamic>)
+      .cast<Map<String, dynamic>>();
+  final release = releases.firstWhere(
+    (release) => release['draft'] != true,
+    orElse: () => throw StateError('Mangatan has no published releases'),
+  );
   return (
-    release['name'].toString().substringAfter('v').substringBefore('-'),
+    _numericVersion(release['tag_name'].toString()),
     release['body'].toString(),
     release['html_url'].toString(),
     (release['assets'] as List)
         .map((asset) => asset['browser_download_url'])
         .toList(),
   );
+}
+
+String _numericVersion(String value) {
+  final match = RegExp(r'\d+(?:\.\d+)*').firstMatch(value);
+  if (match == null) {
+    throw FormatException('Release does not contain a numeric version', value);
+  }
+  return match.group(0)!;
 }

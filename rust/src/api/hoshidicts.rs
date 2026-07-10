@@ -339,6 +339,97 @@ pub use native::{
     rebuild_query as hoshidicts_rebuild_query, HoshiLookupSession,
 };
 
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::{
+        hoshidicts_create_lookup_session, hoshidicts_import_dictionary, hoshidicts_lookup,
+        hoshidicts_rebuild_query,
+    };
+    use std::{env, fs, path::PathBuf, process};
+
+    /// Imports large, locally supplied dictionaries without checking them into
+    /// the repository. Separate paths with `|` in HOSHIDICTS_TEST_ZIPS.
+    #[test]
+    #[ignore = "requires dictionaries supplied through HOSHIDICTS_TEST_ZIPS"]
+    fn imports_external_yomitan_dictionaries() {
+        let zip_paths = env::var("HOSHIDICTS_TEST_ZIPS")
+            .expect("HOSHIDICTS_TEST_ZIPS must contain one or more ZIP paths");
+        let output_dir: PathBuf =
+            env::temp_dir().join(format!("mangatan-hoshidicts-test-{}", process::id()));
+        fs::create_dir_all(&output_dir).expect("failed to create test output directory");
+        let mut term_paths = Vec::new();
+        let mut frequency_paths = Vec::new();
+        let mut pitch_paths = Vec::new();
+
+        for zip_path in zip_paths.split('|').filter(|path| !path.is_empty()) {
+            let result = hoshidicts_import_dictionary(
+                zip_path.to_owned(),
+                output_dir.to_string_lossy().into_owned(),
+                true,
+            )
+            .unwrap_or_else(|error| panic!("failed to call importer for {zip_path}: {error}"));
+
+            assert!(
+                result.success,
+                "failed to import {zip_path}: {}",
+                result.errors.join("; ")
+            );
+            assert!(
+                result.term_count + result.meta_count > 0,
+                "imported {zip_path} without any dictionary entries"
+            );
+            println!(
+                "imported {zip_path} as {} (terms: {}, metadata: {}, frequencies: {}, pitches: {}, media: {})",
+                result.title,
+                result.term_count,
+                result.meta_count,
+                result.freq_count,
+                result.pitch_count,
+                result.media_count
+            );
+
+            let dictionary_path = output_dir
+                .join(&result.title)
+                .to_string_lossy()
+                .into_owned();
+            if result.term_count > 0 {
+                term_paths.push(dictionary_path.clone());
+            }
+            if result.freq_count > 0 {
+                frequency_paths.push(dictionary_path.clone());
+            }
+            if result.pitch_count > 0 {
+                pitch_paths.push(dictionary_path);
+            }
+        }
+
+        let session = hoshidicts_create_lookup_session().expect("failed to create lookup session");
+        hoshidicts_rebuild_query(&session, term_paths, frequency_paths, pitch_paths)
+            .expect("failed to load imported dictionaries");
+        let results = hoshidicts_lookup(&session, "日本".to_owned(), 16, 16)
+            .expect("lookup failed after importing dictionaries");
+        assert!(!results.is_empty(), "term dictionary was not loaded");
+        let frequency_results = hoshidicts_lookup(&session, "の".to_owned(), 16, 16)
+            .expect("frequency lookup failed after importing dictionaries");
+        assert!(
+            frequency_results
+                .iter()
+                .any(|result| !result.term.frequencies.is_empty()),
+            "frequency dictionary was not loaded"
+        );
+        let pitch_results = hoshidicts_lookup(&session, "ああ".to_owned(), 16, 16)
+            .expect("pitch lookup failed after importing dictionaries");
+        assert!(
+            pitch_results
+                .iter()
+                .any(|result| !result.term.pitches.is_empty()),
+            "pitch dictionary was not loaded"
+        );
+
+        fs::remove_dir_all(output_dir).expect("failed to remove test output directory");
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
 pub(crate) mod native {
     use super::*;

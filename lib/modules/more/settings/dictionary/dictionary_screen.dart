@@ -835,7 +835,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   secondary: const Icon(Icons.volume_up_outlined),
                   title: const Text('Add word audio'),
                   subtitle: const Text(
-                    'Fills {audio} and {word-audio} with the first audio source match',
+                    'Fills {word-audio} with the first audio source match',
                   ),
                   value: _ankiAudioPreferences.enabled,
                   onChanged: (value) => _saveAnkiAudio(

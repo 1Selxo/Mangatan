@@ -20,7 +20,7 @@ class AnkiAudioPreferences {
       'http://127.0.0.1:5050/?term={term}&reading={reading}';
 
   static const defaults = AnkiAudioPreferences(
-    enabled: false,
+    enabled: true,
     sourceType: AnkiAudioSourceType.customJson,
     url: defaultUrl,
     timeout: Duration(milliseconds: 5000),
@@ -218,8 +218,7 @@ class MiningPreferences {
             as String? ??
         AnkiAudioSourceType.customJson.name;
     return AnkiAudioPreferences(
-      enabled:
-          box?.get(_ankiAudioEnabled, defaultValue: false) as bool? ?? false,
+      enabled: box?.get(_ankiAudioEnabled, defaultValue: true) as bool? ?? true,
       sourceType: AnkiAudioSourceType.values.firstWhere(
         (value) => value.name == sourceTypeName,
         orElse: () => AnkiAudioSourceType.customJson,

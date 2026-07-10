@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/library/widgets/continue_reader_button.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/widgets/listview_widget.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 
 class LibraryListViewWidget extends StatelessWidget {
   final List<Manga> entriesManga;
@@ -15,7 +16,6 @@ class LibraryListViewWidget extends StatelessWidget {
   final Set<int> mangaIdsList;
   final bool continueReaderBtn;
   final bool localSource;
-  final Settings settings;
   const LibraryListViewWidget({
     super.key,
     required this.entriesManga,
@@ -24,15 +24,23 @@ class LibraryListViewWidget extends StatelessWidget {
     required this.continueReaderBtn,
     required this.mangaIdsList,
     required this.localSource,
-    required this.settings,
   });
 
   @override
   Widget build(BuildContext context) {
+    final missingEpubParentIds =
+        entriesManga.firstOrNull?.itemType == ItemType.novel
+        ? missingCloudNovelParentIds()
+        : const <int>{};
     return SuperListViewWidget(
       itemCount: entriesManga.length,
       itemBuilder: (context, index) {
         final entry = entriesManga[index];
+        final isLocalArchive = entry.isLocalArchive ?? false;
+        final isMissingEpub = isMissingCloudNovelEntry(
+          entry,
+          missingParentIds: missingEpubParentIds,
+        );
         return Consumer(
           builder: (context, ref, child) {
             final isLongPressed = ref.watch(isLongPressedStateProvider);
@@ -102,24 +110,48 @@ class LibraryListViewWidget extends StatelessWidget {
                           ),
 
                           // ── Right-side badge row ──
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              LibraryBadgeWidget(
-                                entry: entry,
-                                showLocal: localSource,
-                                showDownloaded: downloadedChapter,
-                                settings: settings,
+                          Padding(
+                            padding: const EdgeInsets.all(5),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(3),
+                                color: context.primaryColor,
                               ),
-                              if (language && (entry.lang?.isNotEmpty ?? false))
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 3),
-                                  child: EntryBadgeChip(
-                                    label: entry.lang!.toUpperCase(),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
+                              child: SizedBox(
+                                height: 22,
+                                child: Row(
+                                  children: [
+                                    if (isMissingEpub)
+                                      const EntryBadgeChip(
+                                        label: chimahonMissingEpubBadge,
+                                      ),
+                                    if (localSource && isLocalArchive)
+                                      const EntryBadgeChip(label: 'Local'),
+                                    if (downloadedChapter)
+                                      DownloadCountBadge(entry: entry),
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        left: 3,
+                                        right: 3,
+                                      ),
+                                      child: Text(
+                                        userFacingChapters(entry)
+                                            .where((e) => !e.isRead!)
+                                            .length
+                                            .toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    if (language && entry.lang!.isNotEmpty)
+                                      EntryBadgeChip(
+                                        label: entry.lang!.toUpperCase(),
+                                      ),
+                                  ],
                                 ),
-                            ],
+                              ),
+                            ),
                           ),
                           if (continueReaderBtn)
                             ContinueReaderButton(entry: entry),

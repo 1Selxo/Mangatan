@@ -189,5 +189,5 @@ jobs:
           artifactErrorsFailBuild: true
           allowUpdates: true
           immutableCreate: true
-          prerelease: ${{ inputs.private_release || false }}
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           tag: ${{ env.RELEASE_TAG }}

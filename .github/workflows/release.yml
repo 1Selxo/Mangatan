@@ -173,6 +173,8 @@ jobs:
     env:
       CC: clang-18
       CXX: clang++-18
+      CC_x86_64_unknown_linux_gnu: gcc-13
+      CXX_x86_64_unknown_linux_gnu: g++-13
     steps:
       - name: checkout branch
         uses: actions/checkout@v7
@@ -187,6 +189,8 @@ jobs:
             clang \
             clang-18 \
             cmake \
+            g++-13 \
+            gcc-13 \
             libasound2-dev \
             libblkid-dev \
             libepoxy-dev \

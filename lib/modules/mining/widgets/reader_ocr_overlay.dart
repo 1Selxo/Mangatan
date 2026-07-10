@@ -32,6 +32,7 @@ class ReaderOcrState {
   static int _hoverGeneration = 0;
   static int _scanGeneration = 0;
   static int _paintGeneration = 0;
+  static bool _popupWasVisibleOnPointerDown = false;
   static List<UChapDataPreload> _lastScanPages = const [];
   static int _lastStartIndex = 0;
   static Future<void> Function(UChapDataPreload)? _lastPreparePage;
@@ -91,26 +92,56 @@ class ReaderOcrState {
     if (!value) _dismissHoverPopup();
   }
 
-  static Future<bool> handleTap(Offset globalPosition) async {
-    if (!enabled.value || lookupOnHover.value) return false;
+  static bool handlePointerUp(Offset globalPosition) {
+    final popupWasVisible = _popupWasVisibleOnPointerDown;
+    _popupWasVisibleOnPointerDown = false;
+    if (!enabled.value) return false;
+    if (lookupOnHover.value) {
+      if (!popupWasVisible) return false;
+      _dismissHoverPopup();
+      clearActive();
+      return true;
+    }
     final hit = _bestGlobalHit(globalPosition);
     if (hit == null) {
       clearActive();
-      return false;
+      final dismissedPopup = DictionaryLookupPopup.dismissActive();
+      return readerOcrShouldConsumeMissedTap(
+        popupWasVisibleOnPointerDown: popupWasVisible,
+        dismissedPopup: dismissedPopup,
+      );
     }
     _activateGlobalHit(hit);
-    return hit.controller._activateHit(hit.context, hit.tapHit);
+    unawaited(hit.controller._activateHit(hit.context, hit.tapHit));
+    return true;
+  }
+
+  static void handlePointerDown() {
+    _popupWasVisibleOnPointerDown = DictionaryLookupPopup.isActive;
+  }
+
+  static void handlePointerCancel() {
+    _popupWasVisibleOnPointerDown = false;
   }
 
   static Future<bool> handleHover(Offset globalPosition) async {
-    if (!enabled.value || !lookupOnHover.value) return false;
+    if (!enabled.value) return false;
     final hit = _bestGlobalHit(globalPosition);
     if (hit == null) {
-      _scheduleHoverDismiss();
+      if (lookupOnHover.value) {
+        _scheduleHoverDismiss();
+      } else {
+        clearActive();
+      }
       return false;
     }
-    _hoverDismissTimer?.cancel();
     _activateGlobalHit(hit);
+    if (!lookupOnHover.value) {
+      hit.controller._revealHit(hit.tapHit);
+      hit.controller._prefetchHit(hit.tapHit);
+      return true;
+    }
+    _hoverDismissTimer?.cancel();
     return hit.controller._activateHit(
       hit.context,
       hit.tapHit,
@@ -119,7 +150,11 @@ class ReaderOcrState {
   }
 
   static void handleHoverExit() {
-    if (lookupOnHover.value) _scheduleHoverDismiss();
+    if (lookupOnHover.value) {
+      _scheduleHoverDismiss();
+    } else {
+      clearActive();
+    }
   }
 
   static _GlobalOcrHit? _bestGlobalHit(Offset globalPosition) {
@@ -326,6 +361,7 @@ class ReaderOcrController extends ChangeNotifier {
   Color _outlineColor = const Color(0xff8ab4f8);
   bool _loading = false;
   bool _disposed = false;
+  String? _prefetchedLookupKey;
 
   bool get enabled => ReaderOcrState.enabled.value;
 
@@ -562,6 +598,7 @@ class ReaderOcrController extends ChangeNotifier {
           rawOffset: rawOffset,
           blockRect: blockRect,
           blockRectIsGlobal: blockRectIsGlobal,
+          vertical: lineBox.vertical,
         );
       }
       lineStart += lineBox.text.length;
@@ -577,6 +614,38 @@ class ReaderOcrController extends ChangeNotifier {
       ),
       blockRect: blockRect,
       blockRectIsGlobal: blockRectIsGlobal,
+      vertical: painted.block.vertical,
+    );
+  }
+
+  void _revealHit(_OcrTapHit hit) {
+    if (identical(_activeBlock, hit.block)) return;
+    _activeBlock = hit.block;
+    _activeOffset = -1;
+    _matchLength = 0;
+    notifyListeners();
+  }
+
+  void _prefetchHit(_OcrTapHit hit) {
+    final ordered = _orderedBlock(hit.block);
+    if (ordered.isEmpty) return;
+    final orderedOffset = _toOrderedOffset(
+      hit.block,
+      hit.rawOffset,
+    ).clamp(0, ordered.length - 1);
+    if (!_isLookupStartChar(ordered[orderedOffset])) return;
+    final lookup = _extractOcrLookupString(ordered, orderedOffset);
+    if (lookup.isEmpty) return;
+    final key = '${identityHashCode(hit.block)}:$orderedOffset:$lookup';
+    if (_prefetchedLookupKey == key) return;
+    _prefetchedLookupKey = key;
+    unawaited(
+      DictionaryLookupPopup.lookup(lookup).then<void>(
+        (_) {},
+        onError: (_) {
+          if (_prefetchedLookupKey == key) _prefetchedLookupKey = null;
+        },
+      ),
     );
   }
 
@@ -657,6 +726,9 @@ class ReaderOcrController extends ChangeNotifier {
         imageBytesLoader: () async =>
             data.cropImage ?? await data.getImageBytes,
       ),
+      placement: hit.vertical
+          ? DictionaryPopupPlacement.leftOrRight
+          : DictionaryPopupPlacement.aboveOrBelow,
       onMatchChanged: (length) {
         _matchLength = math.max(0, length);
         if (!_disposed) notifyListeners();
@@ -1187,6 +1259,12 @@ Rect readerOcrHitTestImageRect({
   );
 }
 
+@visibleForTesting
+bool readerOcrShouldConsumeMissedTap({
+  required bool popupWasVisibleOnPointerDown,
+  required bool dismissedPopup,
+}) => popupWasVisibleOnPointerDown || dismissedPopup;
+
 class _OcrLineBox {
   const _OcrLineBox({
     required this.text,
@@ -1218,12 +1296,14 @@ class _OcrTapHit {
     required this.block,
     required this.rawOffset,
     required this.blockRect,
+    required this.vertical,
     this.blockRectIsGlobal = false,
   });
 
   final OcrTextBlock block;
   final int rawOffset;
   final Rect blockRect;
+  final bool vertical;
   final bool blockRectIsGlobal;
 }
 

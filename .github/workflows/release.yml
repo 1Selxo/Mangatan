@@ -4,228 +4,123 @@ on:
   push:
     tags:
       - v*
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to build and publish (for example v0.7.85)
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Existing release tag to build and publish
+        required: true
+        type: string
+      private_release:
+        description: Publish the release as a private-channel prerelease
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
-  cancel-in-progress: true
+  group: release-${{ inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
 
 env:
-  ZSIGN_VERSION: "0.7"
+  PRIVATE_RELEASE: ${{ inputs.private_release || false }}
+  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
 jobs:
-  build-and-release-android-apks:
-    permissions:
-      contents: write
+  validate-release:
     runs-on: ubuntu-latest
     steps:
       - name: checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
-          submodules: recursive
+          ref: ${{ env.RELEASE_TAG }}
 
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Java toolchain (Only Android target)
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-        env:
-          JAVA_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=512m"
-
-      - name: Setup Gradle properties for CI
+      - name: validate release tag
+        shell: bash
         run: |
-          echo "org.gradle.jvmargs=-Xmx4096M -XX:MaxMetaspaceSize=512m -XX:+UseG1GC" >> android/gradle.properties
-          echo "org.gradle.parallel=true" >> android/gradle.properties
-          echo "org.gradle.daemon=false" >> android/gradle.properties
+          version="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
+          expected_tag="v${version%%+*}"
+          version_tag="${RELEASE_TAG#private-}"
 
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "3.22.1"
+          if [[ "$PRIVATE_RELEASE" == "true" && "$RELEASE_TAG" != private-v* ]]; then
+            echo "Private releases must use a private-v* tag." >&2
+            exit 1
+          fi
+          if [[ "$PRIVATE_RELEASE" != "true" && "$RELEASE_TAG" != v* ]]; then
+            echo "Public releases must use a v* tag." >&2
+            exit 1
+          fi
 
-      - name: Setup ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: Setup Android keystore
-        run: |
-          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 -di > android/app/upload-keystore.jks
-          echo "${{ secrets.SIGNING_KEY_PROPERTIES }}" > android/key.properties
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: build android apks (split per ABI)
-        run: |
-          export GRADLE_OPTS="-Xmx4096m -XX:MaxMetaspaceSize=512m -XX:+UseG1GC"
-          flutter build apk --release --split-per-abi --verbose
-          cd build/app/outputs/flutter-apk
-          mv app-arm64-v8a-release.apk Mangatan-${{ github.ref_name }}-android-arm64-v8a.apk
-          mv app-armeabi-v7a-release.apk Mangatan-${{ github.ref_name }}-android-armeabi-v7a.apk
-          mv app-x86_64-release.apk Mangatan-${{ github.ref_name }}-android-x86_64.apk
-
-      - name: upload artifact android apks
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mangatan-${{ github.ref_name }}-android
-          path: "build/app/outputs/flutter-apk/Mangatan-*.apk"
-
-      - name: release packages android apks
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "build/app/outputs/flutter-apk/Mangatan-*.apk"
-          allowUpdates: true
-
-  build-and-release-ios-ipa:
-    permissions:
-      contents: write
-    runs-on: macos-15
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          architecture: x64
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios,x86_64-apple-ios
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
-          cache-on-failure: true
-
-      - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen
-
-      - name: Select latest Xcode
-        run: |
-          latest_xcode="$(find /Applications -maxdepth 1 -name 'Xcode*.app' | sort | tail -n 1)"
-          sudo xcode-select --switch "$latest_xcode"
-          echo "Selected $latest_xcode"
-
-      - name: Print Xcode version
-        run: xcodebuild -version
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      - name: Setup signing environment
-        env:
-          P12_BASE64: ${{ secrets.P12_CERTIFICATE }}
-          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE }}
-        run: |
-          echo "$P12_BASE64" | base64 -d > certificate.p12
-          echo "$PROVISIONING_PROFILE_BASE64" | base64 -d > profile.mobileprovision
-          curl -L -o zsign.zip "https://github.com/zhlynn/zsign/releases/download/v${{ env.ZSIGN_VERSION }}/zsign-v${{ env.ZSIGN_VERSION }}-macos-x64.zip"
-          unzip zsign.zip
-          chmod +x zsign || chmod +x zsign-*
-
-      - name: Build iOS
-        env:
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-        run: |
-          flutter build ios --release --no-codesign
-          mkdir -p build/ios/iphoneos/Payload
-          mv build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
-          ./zsign -f -k ./certificate.p12 -p "$P12_PASSWORD" -m ./profile.mobileprovision ./build/ios/iphoneos/Payload/Runner.app
-          cd build/ios/iphoneos
-          zip -r Mangatan-${{ github.ref_name }}-ios.ipa Payload
-
-      - name: Upload artifact iOS IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mangatan-${{ github.ref_name }}-ios
-          path: "build/ios/iphoneos/Mangatan-*.ipa"
-
-      - name: Release package iOS IPA
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "build/ios/iphoneos/Mangatan-*.ipa"
-          allowUpdates: true
+          if [[ "$version_tag" != "$expected_tag" ]]; then
+            echo "Release tag $RELEASE_TAG does not match pubspec version $version." >&2
+            echo "Expected $expected_tag (or private-$expected_tag)." >&2
+            exit 1
+          fi
 
   build-and-release-macos-dmg:
-    permissions:
-      contents: write
-    runs-on: macos-latest
+    needs: validate-release
+    runs-on: macos-15
+    env:
+      FLUTTER_XCODE_ARCHS: arm64
     steps:
       - name: checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_TAG }}
           submodules: recursive
 
       - name: setup flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "stable"
+          flutter-version: "3.44.4"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
+        with:
+          targets: aarch64-apple-darwin
 
       - name: flutter pub get
         run: flutter pub get
 
       - name: build macos
         run: |
-          cd macos
-          pod update
-          cd ..
           flutter build macos --release --verbose
           brew install create-dmg
-          create-dmg --volname Mangatan-${{ github.ref_name }}-macos --window-pos 200 120 --window-size 800 450 --icon-size 100 --app-drop-link 600 185 Mangatan-${{ github.ref_name }}-macos.dmg build/macos/Build/Products/Release/Mangatan.app
+          create-dmg --volname Mangatan-${{ env.RELEASE_TAG }}-macos-arm64 --window-pos 200 120 --window-size 800 450 --icon-size 100 --app-drop-link 600 185 Mangatan-${{ env.RELEASE_TAG }}-macos-arm64.dmg build/macos/Build/Products/Release/Mangatan.app
 
       - name: upload artifact macos dmg
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: Mangatan-${{ github.ref_name }}-macos
+          name: Mangatan-${{ env.RELEASE_TAG }}-macos-arm64
           path: "Mangatan-*.dmg"
-
-      - name: release package macos dmg
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "Mangatan-*.dmg"
-          allowUpdates: true
+          if-no-files-found: error
 
   build-and-release-windows-exe_zip:
-    permissions:
-      contents: write
-    runs-on: windows-latest
+    needs: validate-release
+    runs-on: windows-2022
+    env:
+      PUB_CACHE: 'C:\pub-cache'
     steps:
       - name: checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_TAG }}
           submodules: recursive
 
       - name: setup flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "stable"
+          flutter-version: "3.44.4"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
 
       - name: Copy workspace to short path
         shell: pwsh
@@ -243,10 +138,6 @@ jobs:
         working-directory: C:\m
         run: flutter pub get
 
-      - name: Enable inno_bundle
-        working-directory: C:\m
-        run: dart pub global activate inno_bundle
-
       - name: build windows exe
         working-directory: C:\m
         run: |
@@ -254,252 +145,49 @@ jobs:
 
       - name: build windows zip
         working-directory: C:\m
+        shell: pwsh
         run: |
-          # Rename the installer .exe
-          $installer = Get-ChildItem "build/windows/x64/installer/Release/*-Installer.exe"
-          Rename-Item -Path $installer.FullName -NewName "Mangatan-${{ github.ref_name }}-windows.exe"
+          $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'release-windows'
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
-          # Go to runner output dir
-          Set-Location -Path "build/windows/x64/runner/Release"
+          $installers = @(Get-ChildItem 'build/windows/x64/installer/Release/*-Installer.exe')
+          if ($installers.Count -ne 1) {
+            throw "Expected one Windows installer, found $($installers.Count)."
+          }
+          Copy-Item -LiteralPath $installers[0].FullName -Destination (Join-Path $releaseDir "Mangatan-$env:RELEASE_TAG-windows.exe")
 
-          # Create zip
-          Compress-Archive -Path * -DestinationPath "Mangatan-Windows.zip"
-
-          # Rename zip
-          Rename-Item -Path "Mangatan-Windows.zip" -NewName "Mangatan-${{ github.ref_name }}-windows.zip"
-
-          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\release-windows" | Out-Null
-          Copy-Item "C:\m\build\windows\x64\installer\Release\Mangatan-*.exe" "$env:GITHUB_WORKSPACE\release-windows\"
-          Copy-Item "C:\m\build\windows\x64\runner\Release\Mangatan-*.zip" "$env:GITHUB_WORKSPACE\release-windows\"
+          Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath (Join-Path $releaseDir "Mangatan-$env:RELEASE_TAG-windows.zip")
 
       - name: upload artifact windows exe_zip
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: Mangatan-${{ github.ref_name }}-windows-zip
+          name: Mangatan-${{ env.RELEASE_TAG }}-windows-zip
           path: |
             release-windows/Mangatan-*.exe
             release-windows/Mangatan-*.zip
+          if-no-files-found: error
 
-      - name: release package windows exe_zip
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: |
-            release-windows/Mangatan-*.exe
-            release-windows/Mangatan-*.zip
-          allowUpdates: true
-
-  build-and-release-linux-zip_AppImage_RPM:
+  release:
     permissions:
       contents: write
+    needs:
+      - build-and-release-macos-dmg
+      - build-and-release-windows-exe_zip
     runs-on: ubuntu-latest
     steps:
-      - name: checkout branch
-        uses: actions/checkout@v4
+      - name: download release packages
+        uses: actions/download-artifact@v8
         with:
-          submodules: recursive
+          pattern: Mangatan-${{ env.RELEASE_TAG }}-*
+          path: release-packages
+          merge-multiple: true
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install webkit2gtk-4.1 clang cmake ninja-build pkg-config libgtk-3-dev mpv libmpv-dev dpkg-dev libblkid-dev liblzma-dev fuse rpm
-          wget -O /usr/local/bin/linuxdeploy "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
-          chmod +x /usr/local/bin/linuxdeploy
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: build linux
-        run: flutter build linux --release --verbose
-
-      - name: Zip
-        uses: thedoctor0/zip-release@main
-        with:
-          type: "zip"
-          filename: Mangatan-${{ github.ref_name }}-linux.zip
-          directory: build/linux/x64/release/bundle
-
-      - name: Create AppImage
-        run: |
-          # Move Zip-file outside the bundle dir to avoid including it in the AppImage
-          mv build/linux/x64/release/bundle/Mangatan-*.zip build/linux/x64/release/
-          # Create fresh AppDir structure
-          rm -rf AppDir
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/icons
-          # Copy built files
-          cp -r build/linux/x64/release/bundle/* AppDir/usr/bin/
-          cp -rL linux/packaging/icons/* AppDir/usr/share/icons
-          # AppImage fix: Create Symlink AppDir/usr/bin/lib/libmpv.so to AppDir/usr/lib/libmpv.so.2
-          if [ ! -e AppDir/usr/bin/lib/libmpv.so ]; then
-            mkdir -p AppDir/usr/lib
-            ln -s libmpv.so.2 AppDir/usr/lib/libmpv.so
-          fi
-          # Scan AppDir/usr/bin/lib for existing libraries to exclude them from linuxdeploy packaging
-          EXCLUDE_LIBS=$(find AppDir/usr/bin/lib -type f -name "*.so*" -exec basename {} \; | sort -u)
-          # Add --exclude-library flag to each found library
-          for lib in $EXCLUDE_LIBS; do
-            EXCLUDE_ARGS+=" --exclude-library $lib"
-          done
-          # Copy desktop file to AppDir root
-          cp linux/mangayomi.desktop AppDir/mangayomi.desktop
-          # Create AppRun file
-          cat <<EOF > AppDir/AppRun
-          #!/bin/sh
-          SELF=\$(readlink -f "\$0")
-          HERE=\${SELF%/*}
-          export PATH="\${HERE}/usr/bin/:\${PATH}"
-          export LD_LIBRARY_PATH="\${HERE}/usr/bin/lib/:\${HERE}/usr/lib/:\${LD_LIBRARY_PATH}"
-          exec "\${HERE}/usr/bin/mangayomi" "\$@"
-          EOF
-          chmod +x AppDir/AppRun
-          # Make AppImage
-          /usr/local/bin/linuxdeploy \
-            --appdir AppDir \
-            --desktop-file AppDir/mangayomi.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/512x512/apps/mangayomi.png \
-            --executable AppDir/usr/bin/mangayomi \
-            $EXCLUDE_ARGS \
-            --output appimage
-          mv $(find . -type f -name "*.AppImage") build/linux/x64/release/Mangatan-${{ github.ref_name }}-linux.AppImage
-
-      - name: Create RPM Package
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
-          mkdir -p rpm_build/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          cp -r build/linux/x64/release/bundle rpm_build/SOURCES/mangayomi-${VERSION}
-          tar czf rpm_build/SOURCES/mangayomi-${VERSION}.tar.gz -C rpm_build/SOURCES mangayomi-${VERSION}
-          mkdir -p rpm_build/SOURCES/usr/share/icons
-          cp -rL linux/packaging/icons/* rpm_build/SOURCES/usr/share/icons
-          cp linux/mangayomi.desktop rpm_build/SOURCES/
-          # RPM Spec File
-          cat <<EOF > rpm_build/SPECS/mangayomi.spec
-          Name: mangayomi
-          Version: ${VERSION}
-          Release: 1%{?dist}
-          Summary: Mangayomi is an open-source Flutter app for reading manga, novels, and watching animes across multiple platforms
-          License: MIT
-          Source0: %{name}-%{version}.tar.gz
-          BuildArch: x86_64
-
-          %description
-          Mangayomi is an open-source Flutter app for reading manga, novels, and watching animes across multiple platforms.
-
-          %prep
-          %setup -q
-
-          %install
-          mkdir -p %{buildroot}/usr/bin
-          mkdir -p %{buildroot}/usr/share/applications
-          mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
-          cp -r * %{buildroot}/usr/bin/
-          cp -r %{_sourcedir}/usr/share/* %{buildroot}/usr/share/
-          cp %{_sourcedir}/mangayomi.desktop %{buildroot}/usr/share/applications/mangayomi.desktop
-
-          %files
-          /usr/bin/*
-          /usr/share/applications/mangayomi.desktop
-          /usr/share/icons/hicolor/16x16/apps/mangayomi.png
-          /usr/share/icons/hicolor/32x32/apps/mangayomi.png
-          /usr/share/icons/hicolor/64x64/apps/mangayomi.png
-          /usr/share/icons/hicolor/128x128/apps/mangayomi.png
-          /usr/share/icons/hicolor/256x256/apps/mangayomi.png
-          /usr/share/icons/hicolor/512x512/apps/mangayomi.png
-          EOF
-
-          rpmbuild --define "_topdir $(pwd)/rpm_build" -ba rpm_build/SPECS/mangayomi.spec
-          mv rpm_build/RPMS/x86_64/*.rpm build/linux/x64/release/Mangatan-${{ github.ref_name }}-linux.rpm
-
-      - name: upload artifact linux zip
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mangatan-${{ github.ref_name }}-linux-zip
-          path: |
-            build/linux/x64/release/Mangatan-*.zip
-            build/linux/x64/release/Mangatan-*.AppImage
-            build/linux/x64/release/Mangatan-*.rpm
-      - name: release packages linux zip
+      - name: release packages
         uses: ncipollo/release-action@v1
         with:
-          artifacts: |
-            build/linux/x64/release/Mangatan-*.zip
-            build/linux/x64/release/Mangatan-*.AppImage
-            build/linux/x64/release/Mangatan-*.rpm
+          artifacts: "release-packages/*"
+          artifactErrorsFailBuild: true
           allowUpdates: true
-
-  build-and-release-linux-deb:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout branch
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install webkit2gtk-4.1 clang cmake ninja-build pkg-config libgtk-3-dev mpv libmpv-dev dpkg-dev libfuse2
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: Enable fastforge
-        run: dart pub global activate fastforge
-
-      - name: Update PATH
-        run: echo "PATH=${HOME}/.pub-cache/bin:${PATH}" >> $GITHUB_ENV
-
-      - name: Build deb package
-        run: fastforge package --platform linux --targets deb
-
-      - name: Inject custom .desktop file into .deb
-        run: |
-          mkdir extracted_deb
-          dpkg-deb -R "$(find dist -name '*.deb' | head -n 1)" extracted_deb
-          # Replace desktop file
-          cp -f linux/mangayomi.desktop extracted_deb/usr/share/applications/mangayomi.desktop
-          # copy all icon sizes
-          cp -rLf linux/packaging/icons/* extracted_deb/usr/share/icons
-          # Set correct permissions
-          chmod 644 extracted_deb/usr/share/applications/mangayomi.desktop
-          # Repack the .deb
-          fakeroot dpkg-deb -b extracted_deb dist/Mangatan-${{ github.ref_name }}-linux.deb
-
-      - name: upload artifact linux deb
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mangatan-${{ github.ref_name }}-linux-deb
-          path: dist/Mangatan-*.deb
-
-      - name: Release package deb
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: dist/Mangatan-*.deb
-          allowUpdates: true
-
-  ios-source-build:
-    needs: build-and-release-ios-ipa
-    uses: ./.github/workflows/update_sideloading_source.yml
+          immutableCreate: true
+          prerelease: ${{ inputs.private_release || false }}
+          tag: ${{ env.RELEASE_TAG }}

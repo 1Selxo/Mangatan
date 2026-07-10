@@ -5,144 +5,18 @@ on:
     tags:
       - "private-v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing private release tag to build and publish
+        required: true
+        type: string
 
 permissions:
   contents: write
 
-concurrency:
-  group: private-release-${{ github.ref_name }}
-  cancel-in-progress: true
-
-env:
-  FLUTTER_RUST_BRIDGE_VERSION: "2.12.0"
-
 jobs:
-  android:
-    name: Android APKs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source and submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up CMake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "3.31.6"
-
-      - name: Set up Ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
-
-      - name: Install Flutter Rust Bridge codegen
-        run: cargo install flutter_rust_bridge_codegen --version "$FLUTTER_RUST_BRIDGE_VERSION" --locked
-
-      - name: Restore Android signing key
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEY_PROPERTIES: ${{ secrets.ANDROID_KEY_PROPERTIES }}
-        run: |
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          printf '%s' "$ANDROID_KEY_PROPERTIES" > android/key.properties
-
-      - name: Resolve Flutter dependencies
-        run: flutter pub get
-
-      - name: Build release APKs
-        run: flutter build apk --release --split-per-abi
-
-      - name: Name Android packages
-        shell: bash
-        run: |
-          cd build/app/outputs/flutter-apk
-          mv app-arm64-v8a-release.apk "Mangayomi-${GITHUB_REF_NAME}-android-arm64-v8a.apk"
-          mv app-armeabi-v7a-release.apk "Mangayomi-${GITHUB_REF_NAME}-android-armeabi-v7a.apk"
-          mv app-x86_64-release.apk "Mangayomi-${GITHUB_REF_NAME}-android-x86_64.apk"
-
-      - name: Upload Android packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: android
-          path: build/app/outputs/flutter-apk/Mangayomi-*.apk
-          retention-days: 14
-
-  windows:
-    name: Windows installer and ZIP
-    runs-on: windows-latest
-    steps:
-      - name: Check out source and submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Flutter Rust Bridge codegen
-        run: cargo install flutter_rust_bridge_codegen --version $env:FLUTTER_RUST_BRIDGE_VERSION --locked
-
-      - name: Resolve Flutter dependencies
-        run: flutter pub get
-
-      - name: Install Inno Bundle
-        run: dart pub global activate inno_bundle
-
-      - name: Build Windows installer
-        run: dart run inno_bundle:build --release
-
-      - name: Package Windows build
-        shell: pwsh
-        run: |
-          $installer = Get-ChildItem "build/windows/x64/installer/Release/*-Installer.exe" | Select-Object -First 1
-          Rename-Item -LiteralPath $installer.FullName -NewName "Mangayomi-$env:GITHUB_REF_NAME-windows.exe"
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "build/windows/x64/runner/Release/Mangayomi-$env:GITHUB_REF_NAME-windows.zip"
-
-      - name: Upload Windows packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: |
-            build/windows/x64/installer/Release/Mangayomi-*.exe
-            build/windows/x64/runner/Release/Mangayomi-*.zip
-          retention-days: 14
-
-  release:
-    name: Publish private release
-    if: startsWith(github.ref, 'refs/tags/private-v')
-    needs: [android, windows]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download packages
-        uses: actions/download-artifact@v4
-        with:
-          path: packages
-          merge-multiple: true
-
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "Mangayomi MineLab ${{ github.ref_name }}"
-          prerelease: true
-          generate_release_notes: true
-          files: packages/*
+  build-and-release:
+    uses: ./.github/workflows/release.yml
+    with:
+      private_release: true
+      release_tag: ${{ inputs.release_tag || github.ref_name }}

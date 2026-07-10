@@ -454,7 +454,7 @@ class AnkiCardBuilder {
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    return '${safe.isEmpty ? 'mangayomi-mining' : safe}.$extension';
+    return '${safe.isEmpty ? 'mangatan-mining' : safe}.$extension';
   }
 
   static String _soundFilename(String value) {

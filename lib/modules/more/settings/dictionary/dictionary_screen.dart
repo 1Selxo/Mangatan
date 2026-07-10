@@ -1083,7 +1083,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     final value = await _editText(
                       title: 'Default tags',
                       value: _ankiProfile.tags.join(' '),
-                      hint: 'mangayomi manga',
+                      hint: 'mangatan manga',
                     );
                     if (value == null) return;
                     await _saveAnki(

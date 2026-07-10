@@ -26,6 +26,10 @@ Future<MPages?> getPopular(
                   (q) => q
                       .sourceEqualTo("local")
                       .or()
+                      .linkContains("Mangatan/local")
+                      .or()
+                      .linkContains("Mangatan\\local")
+                      .or()
                       .linkContains("Mangayomi/local")
                       .or()
                       .linkContains("Mangayomi\\local"),

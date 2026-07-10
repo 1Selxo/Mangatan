@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT DEFINED MANGAYOMI_PROJECT_ROOT)
-    message(FATAL_ERROR "MANGAYOMI_PROJECT_ROOT must point to the Mangayomi workspace root")
+    message(FATAL_ERROR "MANGAYOMI_PROJECT_ROOT must point to the Mangatan workspace root")
 endif()
 
 set(HOSHIDICTS_ROOT "${MANGAYOMI_PROJECT_ROOT}/third_party/hoshidicts")

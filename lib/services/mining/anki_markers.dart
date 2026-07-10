@@ -211,7 +211,7 @@ class AnkiMiningProfile {
     this.ankiEnabled = true,
     this.deckName = 'Mining',
     this.modelName = 'Basic',
-    this.tags = const ['mangayomi'],
+    this.tags = const ['mangatan'],
     this.duplicateCheck = true,
     this.duplicateScope = 'deck',
     this.syncOnCreate = false,
@@ -228,7 +228,7 @@ class AnkiMiningProfile {
       modelName: json['modelName'] as String? ?? 'Basic',
       tags:
           (json['tags'] as List?)?.map((tag) => tag.toString()).toList() ??
-          const ['mangayomi'],
+          const ['mangatan'],
       duplicateCheck: json['duplicateCheck'] as bool? ?? true,
       duplicateScope: json['duplicateScope'] as String? ?? 'deck',
       syncOnCreate: json['syncOnCreate'] as bool? ?? false,

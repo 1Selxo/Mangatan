@@ -193,6 +193,7 @@ class NavigationOrderState extends _$NavigationOrderState {
     '/updates',
     '/history',
     '/browse',
+    '/dictionaryLookup',
     '/more',
     '/trackerLibrary',
   ];

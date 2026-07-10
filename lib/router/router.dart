@@ -15,6 +15,7 @@ import 'package:mangayomi/modules/browse/extension/extension_detail.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/create_extension.dart';
 import 'package:mangayomi/modules/browse/sources/sources_filter_screen.dart';
 import 'package:mangayomi/modules/calendar/calendar_screen.dart';
+import 'package:mangayomi/modules/dictionary/dictionary_lookup_screen.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/migrate_screen.dart';
 import 'package:mangayomi/modules/mass_migration/mass_migration_source_selection_screen.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/recommendation_screen.dart';
@@ -151,6 +152,10 @@ class RouterNotifier extends ChangeNotifier {
         _genericRoute(name: "history", child: const HistoryScreen()),
         _genericRoute(name: "updates", child: const UpdatesScreen()),
         _genericRoute(name: "browse", child: const BrowseScreen()),
+        _genericRoute(
+          name: "dictionaryLookup",
+          child: const DictionaryLookupScreen(),
+        ),
         _genericRoute(name: "more", child: const MoreScreen()),
       ],
     ),

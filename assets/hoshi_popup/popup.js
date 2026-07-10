@@ -1582,9 +1582,17 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
 const backStack = [];
 const forwardStack = [];
 
+function reportNavigationState() {
+    webkit.messageHandlers.navigationChanged.postMessage({
+        canGoBack: backStack.length > 0,
+        canGoForward: forwardStack.length > 0,
+    });
+}
+
 function redirect(count) {
     backStack.push(snapshot());
     forwardStack.length = 0;
+    reportNavigationState();
     window.lookupEntries = undefined;
     window.entryCount = count;
     resetAudioCaches();
@@ -1629,9 +1637,15 @@ function navigate(org, to) {
     }
     to.push(snapshot());
     restore(org.pop());
+    reportNavigationState();
 }
 window.navigateBack = () => navigate(backStack, forwardStack);
 window.navigateForward = () => navigate(forwardStack, backStack);
+window.resetHoshiNavigation = () => {
+    backStack.length = 0;
+    forwardStack.length = 0;
+    reportNavigationState();
+};
 
 const MASONRY_GAP = 5;
 const HAS_NATIVE_MASONRY = CSS.supports('display', 'grid-lanes');

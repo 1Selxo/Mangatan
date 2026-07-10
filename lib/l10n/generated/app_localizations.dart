@@ -4348,6 +4348,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Default'**
   String get tts_default;
+
+  /// No description provided for @dictionary_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary'**
+  String get dictionary_lookup;
+
+  /// No description provided for @dictionary_settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary settings'**
+  String get dictionary_settings;
+
+  /// No description provided for @dictionary_search_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get dictionary_search_label;
+
+  /// No description provided for @dictionary_search_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Word, reading, or phrase'**
+  String get dictionary_search_hint;
+
+  /// No description provided for @clear_search.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clear_search;
+
+  /// No description provided for @dictionary_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} dictionaries'**
+  String dictionary_count(int count);
+
+  /// No description provided for @dictionary_anki_deck.
+  ///
+  /// In en, this message translates to:
+  /// **'Anki deck: {name}'**
+  String dictionary_anki_deck(String name);
+
+  /// No description provided for @dictionary_load_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary data could not be loaded'**
+  String get dictionary_load_failed;
+
+  /// No description provided for @no_dictionaries_title.
+  ///
+  /// In en, this message translates to:
+  /// **'No dictionaries installed'**
+  String get no_dictionaries_title;
+
+  /// No description provided for @no_dictionaries_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a Yomitan dictionary to start looking up words.'**
+  String get no_dictionaries_description;
+
+  /// No description provided for @manage_dictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up dictionaries'**
+  String get manage_dictionaries;
+
+  /// No description provided for @dictionary_empty_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Look up a word or phrase'**
+  String get dictionary_empty_title;
+
+  /// No description provided for @dictionary_empty_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Search a term, expression, sentence, or block of text.'**
+  String get dictionary_empty_description;
+
+  /// No description provided for @previous_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous lookup'**
+  String get previous_lookup;
+
+  /// No description provided for @next_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Next lookup'**
+  String get next_lookup;
 }
 
 class _AppLocalizationsDelegate

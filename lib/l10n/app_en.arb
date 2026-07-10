@@ -854,5 +854,34 @@
     }
   },
   "tts_settings": "TTS Settings",
-  "tts_default": "Default"
+  "tts_default": "Default",
+  "dictionary_lookup": "Dictionary",
+  "dictionary_settings": "Dictionary settings",
+  "dictionary_search_label": "Search",
+  "dictionary_search_hint": "Word, reading, or phrase",
+  "clear_search": "Clear search",
+  "dictionary_count": "{count} dictionaries",
+  "@dictionary_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dictionary_anki_deck": "Anki deck: {name}",
+  "@dictionary_anki_deck": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dictionary_load_failed": "Dictionary data could not be loaded",
+  "no_dictionaries_title": "No dictionaries installed",
+  "no_dictionaries_description": "Import a Yomitan dictionary to start looking up words.",
+  "manage_dictionaries": "Set up dictionaries",
+  "dictionary_empty_title": "Look up a word or phrase",
+  "dictionary_empty_description": "Search a term, expression, sentence, or block of text.",
+  "previous_lookup": "Previous lookup",
+  "next_lookup": "Next lookup"
 }

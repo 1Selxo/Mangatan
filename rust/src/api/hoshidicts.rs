@@ -342,8 +342,8 @@ pub use native::{
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::{
-        hoshidicts_create_lookup_session, hoshidicts_import_dictionary, hoshidicts_lookup,
-        hoshidicts_rebuild_query,
+        hoshidicts_create_lookup_session, hoshidicts_get_media_file, hoshidicts_import_dictionary,
+        hoshidicts_lookup, hoshidicts_rebuild_query,
     };
     use std::{env, fs, path::PathBuf, process};
 
@@ -427,6 +427,26 @@ mod tests {
         );
 
         fs::remove_dir_all(output_dir).expect("failed to remove test output directory");
+    }
+
+    #[test]
+    #[ignore = "requires an installed dictionary supplied through HOSHIDICTS_TEST_DICT_* "]
+    fn loads_external_dictionary_media() {
+        let dictionary_path = env::var("HOSHIDICTS_TEST_DICT_DIR")
+            .expect("HOSHIDICTS_TEST_DICT_DIR must point to an imported dictionary");
+        let dictionary_name = env::var("HOSHIDICTS_TEST_DICT_NAME")
+            .expect("HOSHIDICTS_TEST_DICT_NAME must contain the dictionary title");
+        let media_path = env::var("HOSHIDICTS_TEST_MEDIA_PATH")
+            .expect("HOSHIDICTS_TEST_MEDIA_PATH must contain a glossary media path");
+        let session = hoshidicts_create_lookup_session().expect("failed to create lookup session");
+        hoshidicts_rebuild_query(&session, vec![dictionary_path], vec![], vec![])
+            .expect("failed to load dictionary");
+
+        let media = hoshidicts_get_media_file(&session, dictionary_name, media_path)
+            .expect("media lookup failed")
+            .expect("dictionary media was not found");
+
+        assert!(!media.is_empty(), "dictionary media file was empty");
     }
 }
 

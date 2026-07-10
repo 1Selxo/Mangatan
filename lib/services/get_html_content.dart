@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:path/path.dart' as p;
@@ -27,29 +28,33 @@ Future<(String, EpubNovel?)> getHtmlContent(
           epubPath: chapter.archivePath!,
           fullData: true,
         );
-        String htmlContent = "";
+        String htmlContent = selectEpubChapterContent(book, chapter.url);
         if (chapter.url != null && chapter.url!.isNotEmpty) {
-          // Load specific chapter by its spine idref
-          final matches = book.chapters.where((c) => c.path == chapter.url);
-          if (matches.isNotEmpty) {
-            htmlContent = matches.first.content;
-          } else {
-            // Fallback: try via Rust direct access
+          // Older imports can contain a stale spine id. Ask Rust directly if
+          // the current manifest did not resolve it.
+          if (!readerHtmlHasRenderableContent(htmlContent)) {
             htmlContent = await getChapterContent(
               epubPath: chapter.archivePath!,
               chapterPath: chapter.url!,
             );
           }
-        } else {
-          // Legacy: no chapter url, concatenate all (old single-chapter imports)
-          for (var subChapter in book.chapters) {
-            htmlContent += "\n<hr/>\n${subChapter.content}";
-          }
         }
-        result = (_buildHtml(htmlContent), book);
-      } catch (_) {}
-
-      result ??= (_buildHtml("Local epub file not found!"), null);
+        if (!readerHtmlHasRenderableContent(htmlContent)) {
+          throw const FormatException(
+            'The EPUB contains no readable chapter content.',
+          );
+        }
+        result = (buildReaderHtml(htmlContent), book);
+      } catch (error) {
+        final message = const HtmlEscape().convert(error.toString());
+        result = (
+          buildReaderHtml(
+            '<p><strong>Unable to open this EPUB chapter.</strong></p>'
+            '<p>$message</p>',
+          ),
+          null,
+        );
+      }
     }
     if (result == null) {
       final storageProvider = StorageProvider();
@@ -86,7 +91,7 @@ Future<(String, EpubNovel?)> getHtmlContent(
           );
         }
       });
-      result = (_buildHtml(html.substring(1, html.length - 1)), null);
+      result = (buildReaderHtml(html.substring(1, html.length - 1)), null);
     }
 
     keepAlive.close();
@@ -97,7 +102,30 @@ Future<(String, EpubNovel?)> getHtmlContent(
   }
 }
 
-String _buildHtml(String input) {
+String selectEpubChapterContent(EpubNovel book, String? chapterPath) {
+  if (chapterPath != null && chapterPath.isNotEmpty) {
+    for (final subChapter in book.chapters) {
+      if (subChapter.path == chapterPath) return subChapter.content;
+    }
+    return '';
+  }
+
+  // Legacy single-entry imports represent the whole book as one chapter.
+  return book.chapters
+      .map((chapter) => chapter.content)
+      .where(readerHtmlHasRenderableContent)
+      .join('\n<hr/>\n');
+}
+
+bool readerHtmlHasRenderableContent(String input) {
+  if (input.trim().isEmpty) return false;
+  final document = parse(input);
+  final text = document.body?.text.trim() ?? '';
+  return text.isNotEmpty ||
+      document.querySelector('img, svg, image, video, audio') != null;
+}
+
+String buildReaderHtml(String input) {
   // Decode basic escapes
   String cleaned = input
       .replaceAll("\\n", "")
@@ -132,48 +160,10 @@ String _buildHtml(String input) {
         '${quote.attributes['style'] ?? ''} border-left: 4px solid #ccc; padding-left: 15px; margin: 10px 0; font-style: italic;';
   });
 
-  // Get cleaned HTML
-  String htmlContent = document.body?.innerHtml ?? cleaned;
-
-  // Decode HTML entities while keeping HTML tags
-  htmlContent = _decodeHtmlEntities(htmlContent);
+  // Keep entities encoded here. flutter_html parses this fragment again and
+  // performs the correct entity decode; decoding `<` at this point would turn
+  // literal book text into markup and make it disappear.
+  final htmlContent = document.body?.innerHtml ?? cleaned;
 
   return '''<div id="readerViewContent">$htmlContent</div>''';
-}
-
-String _decodeHtmlEntities(String html) {
-  // Decode numeric HTML entities (&#8220;, &#8217;, etc.)
-  String decoded = html.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
-    final charCode = int.tryParse(match.group(1)!);
-    return charCode != null ? String.fromCharCode(charCode) : match.group(0)!;
-  });
-
-  // Decode hexadecimal HTML entities (&#x2019;, etc.)
-  decoded = decoded.replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (match) {
-    final charCode = int.tryParse(match.group(1)!, radix: 16);
-    return charCode != null ? String.fromCharCode(charCode) : match.group(0)!;
-  });
-
-  // Decode common named HTML entities
-  final entities = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&nbsp;': ' ',
-    '&quot;': '"',
-    '&apos;': "'",
-    '&ldquo;': '"',
-    '&rdquo;': '"',
-    '&lsquo;': ''',
-    '&rsquo;': ''',
-    '&mdash;': '—',
-    '&ndash;': '–',
-    '&hellip;': '…',
-  };
-
-  entities.forEach((entity, replacement) {
-    decoded = decoded.replaceAll(entity, replacement);
-  });
-
-  return decoded;
 }

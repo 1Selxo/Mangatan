@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
 import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
@@ -27,6 +29,13 @@ class _DictionaryPopupHostController {
   Future<void>? _initializing;
 
   Future<void> prewarm(BuildContext context) => _ensure(context);
+
+  bool dismissActive() {
+    final state = key.currentState;
+    if (state == null || !state.isVisible) return false;
+    state.dismiss();
+    return true;
+  }
 
   Future<void> _ensure(BuildContext context) {
     if (_entry != null) return Future.value();
@@ -108,12 +117,42 @@ class _DictionaryPopupOverlayHostState
   late double _height;
   bool _dismissOnOutsideTap = true;
 
+  bool get isVisible => _visible;
+
   @override
   void initState() {
     super.initState();
     _width = widget.preferences.width;
     _height = widget.preferences.height;
     _left = -_width - 100;
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_handleGlobalPointer);
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
+  }
+
+  Rect get _popupBounds => Rect.fromLTWH(_left, _top, _width, _height);
+
+  void _handleGlobalPointer(PointerEvent event) {
+    if (event is! PointerDownEvent) return;
+    if (!dictionaryPopupShouldDismissForPointer(
+      visible: _visible,
+      dismissOnOutsideTap: _dismissOnOutsideTap,
+      popupBounds: _popupBounds,
+      position: event.position,
+      buttons: event.buttons,
+    )) {
+      return;
+    }
+    // This global route observes without joining the hit-test path, so the
+    // same click continues to the reader and can immediately replace the
+    // lookup instead of being consumed by a modal barrier.
+    dismiss();
+  }
+
+  bool _handleHardwareKey(KeyEvent event) {
+    if (!_visible || event is! KeyDownEvent) return false;
+    if (!dictionaryPopupIsDismissKey(event.logicalKey)) return false;
+    dismiss();
+    return true;
   }
 
   DictionaryPopupHandle present({
@@ -163,6 +202,7 @@ class _DictionaryPopupOverlayHostState
     }
     setState(() {
       _visible = false;
+      _request = null;
       _dismissOnOutsideTap = true;
       _left = -_width - 100;
       _top = 0;
@@ -182,56 +222,56 @@ class _DictionaryPopupOverlayHostState
     final popupTheme = _popupTheme(Theme.of(context), widget.preferences.theme);
     return Stack(
       children: [
-        if (_visible && _dismissOnOutsideTap)
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: dismiss,
-              child: const ColoredBox(color: Colors.transparent),
-            ),
-          ),
-        Positioned(
-          left: _left,
-          top: _top,
-          width: _width,
-          height: _height,
-          child: IgnorePointer(
-            ignoring: !_visible,
-            child: MouseRegion(
-              onEnter: (_) => request?.onHoverChanged?.call(true),
-              onExit: (_) => request?.onHoverChanged?.call(false),
-              child: Theme(
-                data: popupTheme.copyWith(
-                  textTheme: popupTheme.textTheme.apply(
-                    fontSizeFactor: widget.preferences.fontSize / 14,
+        if (_visible && request != null)
+          Positioned(
+            left: _left,
+            top: _top,
+            width: _width,
+            height: _height,
+            child: IgnorePointer(
+              ignoring: !_visible,
+              child: MouseRegion(
+                onEnter: (_) => request.onHoverChanged?.call(true),
+                onExit: (_) => request.onHoverChanged?.call(false),
+                child: Theme(
+                  data: popupTheme.copyWith(
+                    textTheme: popupTheme.textTheme.apply(
+                      fontSizeFactor: widget.preferences.fontSize / 14,
+                    ),
                   ),
-                ),
-                child: Material(
-                  elevation: _visible && !widget.preferences.eInkMode ? 12 : 0,
-                  clipBehavior: Clip.antiAlias,
-                  borderRadius: BorderRadius.circular(
-                    widget.preferences.eInkMode ? 0 : 8,
-                  ),
-                  color: popupTheme.colorScheme.surface,
-                  child: HoshiDictionaryPopup(
-                    text: request?.text ?? '',
-                    miningContext: request?.miningContext,
-                    initialResults: request?.initialResults,
-                    preferences: widget.preferences,
-                    onMatchChanged: (count) =>
-                        _request?.onMatchChanged?.call(count),
+                  child: Material(
+                    elevation: _visible && !widget.preferences.eInkMode
+                        ? 12
+                        : 0,
+                    clipBehavior: Clip.antiAlias,
+                    borderRadius: BorderRadius.circular(
+                      widget.preferences.eInkMode ? 0 : 8,
+                    ),
+                    color: popupTheme.colorScheme.surface,
+                    child: HoshiDictionaryPopup(
+                      text: request.text,
+                      miningContext: request.miningContext,
+                      initialResults: request.initialResults,
+                      preferences: widget.preferences,
+                      onMatchChanged: (count) =>
+                          _request?.onMatchChanged?.call(count),
+                      onDismiss: dismiss,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
       ],
     );
   }
 
   @override
   void dispose() {
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(
+      _handleGlobalPointer,
+    );
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     _completeDismissal();
     super.dispose();
   }
@@ -280,6 +320,10 @@ class DictionaryLookupPopup extends StatelessWidget {
   static Future<void> prewarm(BuildContext context) =>
       _dictionaryPopupHost.prewarm(context);
 
+  /// Dismisses the active popup without affecting the current app route.
+  /// Returns whether a popup consumed the back action.
+  static bool dismissActive() => _dictionaryPopupHost.dismissActive();
+
   static Future<List<HoshiLookupResult>> lookup(String text) {
     final query = text.trim();
     if (query.isEmpty) return Future.value(const []);
@@ -310,10 +354,32 @@ class DictionaryLookupPopup extends StatelessWidget {
           miningContext: miningContext,
           preferences: preferences,
           onMatchChanged: onMatchChanged,
+          onDismiss: onClose,
         ),
       ),
     );
   }
+}
+
+@visibleForTesting
+bool dictionaryPopupIsDismissKey(LogicalKeyboardKey key) =>
+    key == LogicalKeyboardKey.escape ||
+    key == LogicalKeyboardKey.backspace ||
+    key == LogicalKeyboardKey.browserBack;
+
+@visibleForTesting
+bool dictionaryPopupShouldDismissForPointer({
+  required bool visible,
+  required bool dismissOnOutsideTap,
+  required Rect popupBounds,
+  required Offset position,
+  required int buttons,
+}) {
+  if (!visible || !dismissOnOutsideTap) return false;
+  // Mouse navigation buttons are handled by the app-level back listener so
+  // it can consume the route pop when a dictionary popup is active.
+  if (buttons & (kBackMouseButton | kForwardMouseButton) != 0) return false;
+  return !popupBounds.contains(position);
 }
 
 class DictionaryLookupResultsView extends StatefulWidget {

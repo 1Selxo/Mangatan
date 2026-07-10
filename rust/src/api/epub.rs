@@ -1,3 +1,4 @@
+use encoding_rs::Encoding;
 use epub::doc::EpubDoc;
 use std::fs;
 use std::io::{Cursor, Read, Seek};
@@ -83,8 +84,8 @@ fn parse_epub_with_doc<R: Read + Seek>(
             .enumerate()
             .map(|(idx, item)| {
                 let content = doc
-                    .get_resource_str(&item.idref)
-                    .map(|(c, _)| c)
+                    .get_resource(&item.idref)
+                    .map(|(bytes, _)| decode_text_resource(&bytes))
                     .unwrap_or_default();
 
                 // Try to find chapter name from TOC
@@ -206,8 +207,157 @@ pub fn get_chapter_content(epub_path: String, chapter_path: String) -> Result<St
 
     // Find and get the chapter content
     let (content, _mime) = doc
-        .get_resource_str(&chapter_path)
+        .get_resource(&chapter_path)
         .ok_or_else(|| format!("Failed to read chapter: {}", chapter_path))?;
 
-    Ok(content)
+    Ok(decode_text_resource(&content))
+}
+
+/// EPUB XHTML is normally UTF-8, but real-world books also contain UTF-16 or
+/// legacy Japanese encodings. The upstream `get_resource_str` helper rejects
+/// those bytes and returns `None`, which used to turn the whole chapter into a
+/// blank page. Decode the BOM/XML declaration when present and fall back to a
+/// lossless-enough UTF-8 replacement decode so readable content is never
+/// silently discarded.
+fn decode_text_resource(bytes: &[u8]) -> String {
+    if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return String::from_utf8_lossy(&bytes[3..]).into_owned();
+    }
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        return decode_utf16(&bytes[2..], true);
+    }
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        return decode_utf16(&bytes[2..], false);
+    }
+
+    let declaration = String::from_utf8_lossy(&bytes[..bytes.len().min(512)]);
+    if let Some(label) = declared_encoding(&declaration) {
+        let normalized = label.trim().to_ascii_lowercase();
+        if normalized == "utf-16" || normalized == "utf-16le" {
+            return decode_utf16(bytes, true);
+        }
+        if normalized == "utf-16be" {
+            return decode_utf16(bytes, false);
+        }
+        if let Some(encoding) = Encoding::for_label(normalized.as_bytes()) {
+            let (decoded, _, _) = encoding.decode(bytes);
+            return decoded.into_owned();
+        }
+    }
+
+    String::from_utf8(bytes.to_vec())
+        .unwrap_or_else(|_| String::from_utf8_lossy(bytes).into_owned())
+}
+
+fn decode_utf16(bytes: &[u8], little_endian: bool) -> String {
+    let units = bytes.chunks_exact(2).map(|pair| {
+        if little_endian {
+            u16::from_le_bytes([pair[0], pair[1]])
+        } else {
+            u16::from_be_bytes([pair[0], pair[1]])
+        }
+    });
+    char::decode_utf16(units)
+        .map(|value| value.unwrap_or(char::REPLACEMENT_CHARACTER))
+        .collect()
+}
+
+fn declared_encoding(declaration: &str) -> Option<&str> {
+    let lower = declaration.to_ascii_lowercase();
+    for marker in ["encoding=\"", "encoding='", "charset=\"", "charset='"] {
+        let Some(marker_start) = lower.find(marker) else {
+            continue;
+        };
+        let start = marker_start + marker.len();
+        let quote = marker.as_bytes().last().copied().unwrap_or(b'\"') as char;
+        let rest = &declaration[start..];
+        if let Some(end) = rest.find(quote) {
+            return Some(&rest[..end]);
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{declared_encoding, decode_text_resource, parse_epub_from_bytes};
+    use std::io::{Cursor, Write};
+    use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+    fn epub_with_chapter(chapter: &[u8]) -> Vec<u8> {
+        let cursor = Cursor::new(Vec::new());
+        let mut writer = ZipWriter::new(cursor);
+        let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+
+        writer.start_file("mimetype", stored).unwrap();
+        writer.write_all(b"application/epub+zip").unwrap();
+        writer
+            .start_file("META-INF/container.xml", SimpleFileOptions::default())
+            .unwrap();
+        writer
+            .write_all(
+                br#"<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("OEBPS/content.opf", SimpleFileOptions::default())
+            .unwrap();
+        writer
+            .write_all(
+                br#"<?xml version="1.0" encoding="UTF-8"?>
+<package version="2.0" unique-identifier="book-id" xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="book-id">fixture</dc:identifier><dc:title>Japanese fixture</dc:title>
+  </metadata>
+  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <spine><itemref idref="chapter"/></spine>
+</package>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("OEBPS/chapter.xhtml", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(chapter).unwrap();
+
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn decodes_utf16le_japanese_xhtml() {
+        let source = "<?xml version=\"1.0\" encoding=\"UTF-16\"?><p>探偵はもう、死んでいる。</p>";
+        let mut bytes = vec![0xFF, 0xFE];
+        bytes.extend(source.encode_utf16().flat_map(u16::to_le_bytes));
+
+        assert_eq!(decode_text_resource(&bytes), source);
+    }
+
+    #[test]
+    fn decodes_shift_jis_from_xml_declaration() {
+        let source = "<?xml version=\"1.0\" encoding=\"Shift_JIS\"?><p>辞書検索</p>";
+        let (bytes, _, _) = encoding_rs::SHIFT_JIS.encode(source);
+
+        assert_eq!(decode_text_resource(&bytes), source);
+    }
+
+    #[test]
+    fn reads_encoding_declaration_case_insensitively() {
+        assert_eq!(
+            declared_encoding("<?xml version='1.0' ENCODING='Shift_JIS'?>"),
+            Some("Shift_JIS")
+        );
+    }
+
+    #[test]
+    fn parses_non_utf8_japanese_chapter_through_epub_spine() {
+        let source = "<?xml version=\"1.0\" encoding=\"Shift_JIS\"?><html><body><p>本文を辞書検索</p></body></html>";
+        let (chapter, _, _) = encoding_rs::SHIFT_JIS.encode(source);
+
+        let book = parse_epub_from_bytes(epub_with_chapter(&chapter), true).unwrap();
+
+        assert_eq!(book.chapters.len(), 1);
+        assert!(book.chapters[0].content.contains("本文を辞書検索"));
+    }
 }

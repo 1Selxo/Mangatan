@@ -18,12 +18,10 @@ import 'package:window_manager/window_manager.dart';
 class DesktopControllerWidget extends ConsumerStatefulWidget {
   final Function(Duration?) tempDuration;
   final Function(bool?) doubleSpeed;
-  final AnimeStreamController streamController;
   final VideoController videoController;
   final Widget topButtonBarWidget;
-  final GlobalKey<VideoState> videoStatekey;
+  final Widget primaryButtonBarWidget;
   final Widget bottomButtonBarWidget;
-  final Widget seekToWidget;
   final int defaultSkipIntroLength;
   final void Function(bool) desktopFullScreenPlayer;
   final ValueNotifier<List<(String, int)>> chapterMarks;
@@ -33,10 +31,8 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
     super.key,
     required this.videoController,
     required this.topButtonBarWidget,
+    required this.primaryButtonBarWidget,
     required this.bottomButtonBarWidget,
-    required this.streamController,
-    required this.videoStatekey,
-    required this.seekToWidget,
     required this.tempDuration,
     required this.doubleSpeed,
     required this.defaultSkipIntroLength,
@@ -407,31 +403,17 @@ class _DesktopControllerWidgetState
                           clipBehavior: Clip.none,
                           alignment: Alignment.bottomCenter,
                           children: [
-                            // Top gradient.
                             Container(
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
-                                  stops: [0.0, 0.2],
+                                  stops: [0.0, 0.2, 0.7, 1.0],
                                   colors: [
-                                    Color(0x61000000),
+                                    Color(0xCC000000),
                                     Color(0x00000000),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Bottom gradient.
-                            Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  stops: [0.5, 1.0],
-                                  colors: [
                                     Color(0x00000000),
-                                    Color(0x61000000),
+                                    Color(0xCC000000),
                                   ],
                                 ),
                               ),
@@ -447,32 +429,48 @@ class _DesktopControllerWidgetState
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  // Expanded only controls the main axis of a
+                                  // Column. Stretch the cross axis as well so
+                                  // the centered control Stack gets the full
+                                  // player width instead of being pinned right.
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     widget.topButtonBarWidget,
-                                    // Only display [primaryButtonBar] if [buffering] is false.
                                     Expanded(
-                                      child: AnimatedOpacity(
-                                        curve: Curves.easeInOut,
-                                        opacity: buffering
-                                            ? 0.0
-                                            : !showSwipeDuration
-                                            ? 0.0
-                                            : 1.0,
-                                        duration: controlsTransitionDuration,
-                                        child: Center(
-                                          child: seekIndicatorTextWidget(
-                                            Duration(seconds: swipeDuration),
-                                            widget
-                                                .videoController
-                                                .player
-                                                .state
-                                                .position,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          AnimatedOpacity(
+                                            curve: Curves.easeInOut,
+                                            opacity:
+                                                !buffering && !showSwipeDuration
+                                                ? 1.0
+                                                : 0.0,
+                                            duration:
+                                                controlsTransitionDuration,
+                                            child:
+                                                widget.primaryButtonBarWidget,
                                           ),
-                                        ),
+                                          AnimatedOpacity(
+                                            curve: Curves.easeInOut,
+                                            opacity: showSwipeDuration
+                                                ? 1.0
+                                                : 0.0,
+                                            duration:
+                                                controlsTransitionDuration,
+                                            child: seekIndicatorTextWidget(
+                                              Duration(seconds: swipeDuration),
+                                              widget
+                                                  .videoController
+                                                  .player
+                                                  .state
+                                                  .position,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    widget.seekToWidget,
                                     Transform.translate(
                                       offset: Offset.zero,
                                       child: Padding(

@@ -24,6 +24,7 @@ import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/storage_usage.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/general_state_provider.dart';
@@ -537,6 +538,7 @@ class _MouseBackButtonHandler extends StatelessWidget {
     return Listener(
       onPointerDown: (event) {
         if (event.buttons & kBackMouseButton != 0) {
+          if (DictionaryLookupPopup.dismissActive()) return;
           if (router.canPop()) router.pop();
         }
       },

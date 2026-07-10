@@ -23,8 +23,8 @@ import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
+import 'package:mangayomi/modules/anime/widgets/chimahon_primary_controls.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
-import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.dart';
 import 'package:mangayomi/modules/anime/widgets/mobile.dart';
@@ -1312,7 +1312,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
   }
 
-  void _videoSettingDraggableMenu(BuildContext context) async {
+  void _videoSettingDraggableMenu(
+    BuildContext context, {
+    int initialIndex = 0,
+  }) async {
     final l10n = l10nLocalizations(context)!;
     bool hasSubtitleTrack = false;
     _player.pause();
@@ -1330,6 +1333,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       context: context,
       vsync: this,
       fullWidth: true,
+      initialIndex: initialIndex,
       moreWidget: IconButton(
         onPressed: () async {
           if (useLibass) {
@@ -1782,138 +1786,93 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   Widget _mobileBottomButtonBar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 30),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _seekToWidget(),
-                _chapterMarkWidget(),
-                _buildSettingsButtons(context),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return _playerBottomButtonBar(context);
   }
 
   Widget _desktopBottomButtonBar(BuildContext context) {
-    final skipDuration = ref.watch(defaultDoubleTapToSkipLengthStateProvider);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                if (_streamController.hasPreviousEpisode)
-                  IconButton(
-                    onPressed: () {
-                      pushToNewEpisode(
-                        context,
-                        _streamController.getPrevEpisode(),
-                      );
-                    },
-                    icon: const Icon(Icons.skip_previous, color: Colors.white),
-                  ),
-                CustomPlayOrPauseButton(controller: _controller),
-                if (hasNextEpisode)
-                  IconButton(
-                    onPressed: () async {
-                      pushToNewEpisode(
-                        context,
-                        _streamController.getNextEpisode(),
-                      );
-                    },
-                    icon: const Icon(Icons.skip_next, color: Colors.white),
-                  ),
-                SizedBox(
-                  height: 50,
-                  width: 50,
-                  child: IconButton(
-                    onPressed: () async => await _seekBy(-skipDuration),
-                    icon: Stack(
-                      children: [
-                        const Positioned.fill(
-                          child: Icon(
-                            Icons.rotate_left_outlined,
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                skipDuration.toString(),
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.white,
-                                ),
-                              ),
+    return _playerBottomButtonBar(context);
+  }
+
+  Widget _playerBottomButtonBar(BuildContext context) {
+    final isFullScreen = ref.watch(fullscreenProvider);
+    const speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 0, 8, isDesktop ? 4 : 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  if (isDesktop)
+                    CustomMaterialDesktopVolumeButton(controller: _controller),
+                  ValueListenableBuilder<double>(
+                    valueListenable: _playbackSpeed,
+                    builder: (context, speed, _) => PopupMenuButton<double>(
+                      tooltip: 'Playback speed',
+                      onSelected: _setPlaybackSpeed,
+                      itemBuilder: (context) => speeds
+                          .map(
+                            (value) => PopupMenuItem<double>(
+                              value: value,
+                              child: Text('${value}x'),
                             ),
-                          ),
+                          )
+                          .toList(),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 50,
-                  width: 50,
-                  child: IconButton(
-                    onPressed: () async => await _seekBy(skipDuration),
-                    icon: Stack(
-                      children: [
-                        const Positioned.fill(
-                          child: Icon(
-                            Icons.rotate_right_outlined,
-                            color: Colors.white,
-                            size: 30,
-                          ),
+                        child: Text(
+                          '${speed}x',
+                          style: const TextStyle(color: Colors.white),
                         ),
-                        Positioned.fill(
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                skipDuration.toString(),
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                CustomMaterialDesktopVolumeButton(controller: _controller),
-                ValueListenableBuilder(
-                  valueListenable: _tempPosition,
-                  builder: (context, value, child) =>
-                      CustomMaterialDesktopPositionIndicator(
-                        delta: value,
-                        controller: _controller,
                       ),
-                ),
-                _chapterMarkWidget(),
-              ],
+                    ),
+                  ),
+                  _chapterMarkWidget(),
+                ],
+              ),
             ),
-            _buildSettingsButtons(context),
-          ],
-        ),
-      ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _seekToWidget(),
+              if (isDesktop && useMpvConfig)
+                ..._buildMpvSettingsButton(context),
+              IconButton(
+                tooltip: 'Aspect ratio',
+                icon: const Icon(Icons.aspect_ratio_rounded),
+                color: Colors.white,
+                onPressed: () => _changeFitLabel(ref),
+              ),
+              if (isDesktop)
+                CustomMaterialDesktopFullscreenButton(
+                  controller: _controller,
+                  desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
+                )
+              else
+                IconButton(
+                  tooltip: isFullScreen ? 'Exit fullscreen' : 'Fullscreen',
+                  icon: Icon(
+                    isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  ),
+                  color: Colors.white,
+                  onPressed: () {
+                    _setLandscapeMode(!isFullScreen);
+                    ref.read(fullscreenProvider.notifier).state = !isFullScreen;
+                    widget.desktopFullScreenPlayer(!isFullScreen);
+                  },
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -2022,59 +1981,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     ];
   }
 
-  /// helper method for _mobileBottomButtonBar() and _desktopBottomButtonBar()
-  Widget _buildSettingsButtons(BuildContext context) {
-    final isFullscreen = ref.watch(fullscreenProvider);
-    return Row(
-      children: [
-        IconButton(
-          padding: isDesktop ? EdgeInsets.zero : const EdgeInsets.all(5),
-          onPressed: () => _videoSettingDraggableMenu(context),
-          icon: const Icon(Icons.video_settings, color: Colors.white),
-        ),
-        if (useMpvConfig) ..._buildMpvSettingsButton(context),
-        PopupMenuButton<double>(
-          tooltip: '', // Remove default tooltip "Show menu" for consistency
-          icon: const Icon(Icons.speed, color: Colors.white),
-          itemBuilder: (context) =>
-              [0.25, 0.5, 0.75, 1.0, 1.25, 1.50, 1.75, 2.0]
-                  .map(
-                    (speed) => PopupMenuItem<double>(
-                      value: speed,
-                      child: Text("${speed}x"),
-                      onTap: () {
-                        _setPlaybackSpeed(speed);
-                      },
-                    ),
-                  )
-                  .toList(),
-        ),
-        IconButton(
-          icon: const Icon(Icons.fit_screen_outlined, color: Colors.white),
-          onPressed: () async {
-            _changeFitLabel(ref);
-          },
-        ),
-        if (isDesktop)
-          CustomMaterialDesktopFullscreenButton(
-            controller: _controller,
-            desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-          )
-        else
-          IconButton(
-            icon: Icon(isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
-            iconSize: 25,
-            color: Colors.white,
-            onPressed: () {
-              _setLandscapeMode(!isFullscreen);
-              ref.read(fullscreenProvider.notifier).state = !isFullscreen;
-              widget.desktopFullScreenPlayer.call(!isFullscreen);
-            },
-          ),
-      ],
-    );
-  }
-
   Widget _topButtonBar(BuildContext context) {
     final fullScreen = ref.watch(fullscreenProvider);
     return Padding(
@@ -2120,9 +2026,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 child: Text(
                   widget.episode.name!,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: Colors.white.withValues(alpha: 0.7),
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white.withValues(alpha: 0.5),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -2142,6 +2049,26 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                     windowManager.setAlwaysOnTop(_alwaysOnTop);
                   },
                 ),
+              IconButton(
+                tooltip: context.l10n.video_subtitle,
+                icon: const Icon(Icons.subtitles_rounded),
+                color: Colors.white,
+                onPressed: () =>
+                    _videoSettingDraggableMenu(context, initialIndex: 1),
+              ),
+              IconButton(
+                tooltip: context.l10n.video_audio,
+                icon: const Icon(Icons.audiotrack_rounded),
+                color: Colors.white,
+                onPressed: () =>
+                    _videoSettingDraggableMenu(context, initialIndex: 2),
+              ),
+              IconButton(
+                tooltip: context.l10n.video_quality,
+                icon: const Icon(Icons.high_quality_rounded),
+                color: Colors.white,
+                onPressed: () => _videoSettingDraggableMenu(context),
+              ),
               btnToShowChapterListDialog(
                 context,
                 context.l10n.episodes,
@@ -2187,6 +2114,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
   }
 
+  Widget _primaryButtonBar(BuildContext context) {
+    return ChimahonPrimaryControls(
+      controller: _controller,
+      hasPrevious: _streamController.hasPreviousEpisode,
+      hasNext: _streamController.hasNextEpisode,
+      onPrevious: () =>
+          pushToNewEpisode(context, _streamController.getPrevEpisode()),
+      onNext: () =>
+          pushToNewEpisode(context, _streamController.getNextEpisode()),
+    );
+  }
+
   Widget _videoPlayer(BuildContext context) {
     final fit = _fit.value;
     _resize(fit);
@@ -2207,13 +2146,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               ? DesktopControllerWidget(
                   videoController: _controller,
                   topButtonBarWidget: _topButtonBar(context),
-                  videoStatekey: _key,
+                  primaryButtonBarWidget: _primaryButtonBar(context),
                   bottomButtonBarWidget: _desktopBottomButtonBar(context),
-                  streamController: _streamController,
-                  seekToWidget: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    child: Row(children: [_seekToWidget()]),
-                  ),
                   tempDuration: (value) {
                     _tempPosition.value = value;
                   },
@@ -2228,9 +2162,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               : MobileControllerWidget(
                   videoController: _controller,
                   topButtonBarWidget: _topButtonBar(context),
-                  videoStatekey: _key,
+                  primaryButtonBarWidget: _primaryButtonBar(context),
                   bottomButtonBarWidget: _mobileBottomButtonBar(context),
-                  streamController: _streamController,
                   doubleSpeed: (value) {
                     _isDoubleSpeed.value = value ?? false;
                   },

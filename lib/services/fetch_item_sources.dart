@@ -1,5 +1,7 @@
+import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -14,6 +16,7 @@ Future<void> fetchItemSourcesList(
 }) async {
   if (ref.watch(checkForExtensionsUpdateStateProvider) || reFresh) {
     final repos = ref.watch(extensionsRepoStateProvider(itemType));
+    Object? lastInstallError;
     for (Repo repo in repos) {
       try {
         await fetchSourcesList(
@@ -24,7 +27,33 @@ Future<void> fetchItemSourcesList(
           autoUpdateExtensions: ref.watch(autoUpdateExtensionsStateProvider),
           itemType: itemType,
         );
-      } catch (_) {}
+      } catch (error) {
+        if (id != null) lastInstallError = error;
+      }
+    }
+
+    if (id != null) {
+      final installed = await isar.sources.get(id);
+      if (!extensionInstallIsComplete(installed)) {
+        throw ExtensionInstallException(
+          lastInstallError?.toString() ??
+              'The extension repository did not install this source.',
+        );
+      }
     }
   }
+}
+
+bool extensionInstallIsComplete(Source? source) =>
+    source != null &&
+    (source.isAdded ?? false) &&
+    (source.sourceCode?.isNotEmpty ?? false);
+
+class ExtensionInstallException implements Exception {
+  const ExtensionInstallException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

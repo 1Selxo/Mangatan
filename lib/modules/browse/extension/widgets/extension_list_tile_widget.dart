@@ -61,8 +61,22 @@ class _ExtensionListTileWidgetState
         itemType: widget.source.itemType,
       );
 
-      if (!widget.source.isAdded!) ref.invalidate(provider);
-      await ref.watch(provider.future);
+      // A keep-alive family can otherwise return a completed prior attempt.
+      // Invalidate it, then read it from this callback (`watch` belongs in
+      // build methods and silently aborted installs in debug builds).
+      ref.invalidate(provider);
+      await ref.read(provider.future);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to install ${widget.source.name ?? 'extension'}: $error',
+            ),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

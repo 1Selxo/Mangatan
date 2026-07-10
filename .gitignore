@@ -50,5 +50,16 @@ app.*.map.json
 untranslated_messages.txt
 AGENTS.override.md
 
+# Platform caches and generated files created by Flutter run/build
+/android/.gradle/
+/android/local.properties
+/ios/.symlinks/
+/ios/Flutter/ephemeral/
+/ios/Pods/
+/macos/Flutter/ephemeral/
+/macos/Pods/
+/linux/flutter/ephemeral/
+/windows/flutter/ephemeral/
+
 # Runtime mpv configuration extracted from assets/mangayomi_mpv.zip
 /mpv/

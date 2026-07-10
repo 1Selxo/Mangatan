@@ -1,6 +1,7 @@
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/utils/constant.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 part 'settings.g.dart';
 
 @collection
@@ -52,6 +53,8 @@ class Settings {
   double? flexColorSchemeBlendLevel;
   double? appUiScale;
 
+  double? animationDurationScale;
+
   String? dateFormat;
 
   int? relativeTimesTamps;
@@ -82,6 +85,12 @@ class Settings {
 
   @enumerated
   late ReaderMode defaultReaderMode;
+
+  /// Persisted enum index. Nullable so legacy combined RTL modes can migrate.
+  int? defaultReadingDirectionIndex;
+
+  @enumerated
+  late PageMode defaultPageMode;
 
   List<PersonalReaderMode>? personalReaderModeList;
 
@@ -286,11 +295,17 @@ class Settings {
 
   double? novelReaderLineHeight;
 
+  double? novelReaderParagraphSpacing;
+
   bool? novelShowScrollPercentage;
 
   bool? novelRemoveExtraParagraphSpacing;
 
   bool? novelTapToScroll;
+
+  int? novelEpubReadingLayout;
+
+  bool? novelShowReturnToSavedPositionButton;
 
   List<String>? navigationOrder;
 
@@ -334,14 +349,7 @@ class Settings {
 
   late AlgorithmWeights? algorithmWeights;
 
-  /// Legacy custom local folders stored before folders had user-facing names.
   List<String>? localFolders;
-
-  List<LocalFolder>? namedLocalFolders;
-
-  String? downloadLocalFolderName;
-
-  bool? askDownloadDestination;
 
   bool? appLockEnabled;
 
@@ -429,7 +437,7 @@ class Settings {
     this.libraryFilterMangasSourceIds,
     this.libraryFilterAnimeSourceIds,
     this.libraryFilterNovelSourceIds,
-    this.libraryShowCategoryTabs = false,
+    this.libraryShowCategoryTabs = true,
     this.libraryDownloadedChapters = false,
     this.libraryShowLanguage = false,
     this.libraryShowNumbersOfItems = false,
@@ -438,6 +446,7 @@ class Settings {
     this.sortChapterList,
     this.chapterFilterDownloadedList,
     this.flexColorSchemeBlendLevel = 10.0,
+    this.animationDurationScale = 1.0,
     this.appUiScale = 1.0,
     this.dateFormat = "M/d/y",
     this.relativeTimesTamps = 2,
@@ -450,9 +459,11 @@ class Settings {
     this.chapterPageIndexList,
     this.userAgent = defaultUserAgent,
     this.cookiesList,
+    this.defaultReaderMode = ReaderMode.verticalPaged,
+    this.defaultReadingDirectionIndex = 0,
+    this.defaultPageMode = PageMode.onePage,
     this.updateErrorsList,
     this.savedSearchesList,
-    this.defaultReaderMode = ReaderMode.vertical,
     this.personalReaderModeList,
     this.animatePageTransitions = true,
     this.doubleTapAnimationSpeed = 1,
@@ -474,7 +485,7 @@ class Settings {
     this.libraryFilterAnimeUnreadType = 0,
     this.libraryFilterAnimeStartedType = 0,
     this.libraryFilterAnimeBookMarkedType = 0,
-    this.animeLibraryShowCategoryTabs = false,
+    this.animeLibraryShowCategoryTabs = true,
     this.animeLibraryDownloadedChapters = false,
     this.animeLibraryShowLanguage = false,
     this.animeLibraryShowNumbersOfItems = false,
@@ -492,7 +503,7 @@ class Settings {
     this.backupListOptions,
     this.autoBackupLocation,
     this.startDatebackup,
-    this.usePageTapZones = true,
+    this.usePageTapZones,
     this.autoScrollPages,
     this.markEpisodeAsSeenType = 85,
     this.defaultSkipIntroLength = 85,
@@ -528,7 +539,7 @@ class Settings {
     this.libraryFilterNovelUnreadType = 0,
     this.libraryFilterNovelStartedType = 0,
     this.libraryFilterNovelBookMarkedType = 0,
-    this.novelLibraryShowCategoryTabs = false,
+    this.novelLibraryShowCategoryTabs = true,
     this.novelLibraryDownloadedChapters = false,
     this.novelLibraryShowLanguage = false,
     this.novelLibraryShowNumbersOfItems = false,
@@ -540,11 +551,14 @@ class Settings {
     this.novelTextAlign = NovelTextAlign.left,
     this.novelReaderTheme = '#292832',
     this.novelReaderTextColor = '#CCCCCC',
-    this.novelReaderPadding = 16,
+    this.novelReaderPadding = 12,
     this.novelReaderLineHeight = 1.5,
+    this.novelReaderParagraphSpacing = 0.0,
     this.novelShowScrollPercentage = true,
     this.novelRemoveExtraParagraphSpacing = false,
     this.novelTapToScroll = false,
+    this.novelEpubReadingLayout = 0,
+    this.novelShowReturnToSavedPositionButton = true,
     this.navigationOrder,
     this.hideItems,
     this.clearChapterCacheOnAppLaunch = false,
@@ -572,9 +586,6 @@ class Settings {
     this.downloadedOnlyMode = false,
     this.algorithmWeights,
     this.localFolders,
-    this.namedLocalFolders,
-    this.downloadLocalFolderName,
-    this.askDownloadDestination = true,
     this.appLockEnabled = false,
     this.libraryFilterMangasCompletedType = 0,
     this.libraryFilterAnimeCompletedType = 0,
@@ -621,11 +632,14 @@ class Settings {
     this.tvPlayerStyle,
     this.tvHomeStyle,
     this.tvHomeGenreRows,
-  });
+  }) {
+    usePageTapZones ??= !isDesktop;
+  }
 
   Settings.fromJson(Map<String, dynamic> json) {
     updatedAt = json["updatedAt"];
     animatePageTransitions = json['animatePageTransitions'];
+    animationDurationScale = json['animationDurationScale']?.toDouble() ?? 1.0;
     animeDisplayType = DisplayType
         .values[json['animeDisplayType'] ?? DisplayType.compactGrid.index];
     animeLibraryDownloadedChapters = json['animeLibraryDownloadedChapters'];
@@ -685,8 +699,21 @@ class Settings {
     }
     cropBorders = json['cropBorders'];
     dateFormat = json['dateFormat'];
-    defaultReaderMode = ReaderMode
-        .values[json['defaultReaderMode'] ?? ReaderMode.vertical.index];
+    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
+      json['defaultReaderMode'],
+    );
+    defaultReaderMode = restoredReaderMode.normalized;
+    defaultReadingDirectionIndex =
+        (json['defaultReadingDirection'] == null
+                ? restoredReaderMode.legacyReadingDirection ??
+                      ReadingDirection.leftToRight
+                : ReadingDirectionExtension.fromPersistedIndex(
+                    json['defaultReadingDirection'],
+                  ))
+            .index;
+    defaultPageMode = PageModeExtension.fromPersistedIndex(
+      json['defaultPageMode'],
+    );
     displayType = DisplayType.values[json['displayType']];
     doubleTapAnimationSpeed = json['doubleTapAnimationSpeed'];
     downloadLocation = json['downloadLocation'];
@@ -845,9 +872,15 @@ class Settings {
     if (json['novelReaderLineHeight'] != null) {
       novelReaderLineHeight = json['novelReaderLineHeight'];
     }
+    novelReaderParagraphSpacing =
+        json['novelReaderParagraphSpacing']?.toDouble() ??
+        (json['novelRemoveExtraParagraphSpacing'] == true ? 0.25 : 0.0);
     novelShowScrollPercentage = json['novelShowScrollPercentage'];
     novelRemoveExtraParagraphSpacing = json['novelRemoveExtraParagraphSpacing'];
     novelTapToScroll = json['novelTapToScroll'];
+    novelEpubReadingLayout = json['novelEpubReadingLayout'];
+    novelShowReturnToSavedPositionButton =
+        json['novelShowReturnToSavedPositionButton'];
     if (json['navigationOrder'] != null) {
       navigationOrder = (json['navigationOrder'] as List).cast<String>();
     }
@@ -900,17 +933,7 @@ class Settings {
     algorithmWeights = json['algorithmWeights'] != null
         ? AlgorithmWeights.fromJson(json['algorithmWeights'])
         : null;
-    localFolders = (json['localFolders'] as List?)
-        ?.whereType<String>()
-        .toList();
-    namedLocalFolders = (json['namedLocalFolders'] as List?)
-        ?.map((e) => LocalFolder.fromJson(e))
-        .toList();
-    namedLocalFolders ??= localFolders
-        ?.map((e) => LocalFolder.fromPath(path: e))
-        .toList();
-    downloadLocalFolderName = json['downloadLocalFolderName'];
-    askDownloadDestination = json['askDownloadDestination'];
+    localFolders = (json['localFolders'] as List?)?.cast<String>();
     appLockEnabled = json['appLockEnabled'];
     libraryFilterMangasCompletedType = json['libraryFilterMangasCompletedType'];
     libraryFilterAnimeCompletedType = json['libraryFilterAnimeCompletedType'];
@@ -962,6 +985,7 @@ class Settings {
   Map<String, dynamic> toJson() => {
     'updatedAt': updatedAt,
     'animatePageTransitions': animatePageTransitions,
+    'animationDurationScale': animationDurationScale,
     'animeDisplayType': animeDisplayType.index,
     'animeLibraryDownloadedChapters': animeLibraryDownloadedChapters,
     'animeLibraryLocalSource': animeLibraryLocalSource,
@@ -993,7 +1017,9 @@ class Settings {
     'savedSearchesList': savedSearchesList,
     'cropBorders': cropBorders,
     'dateFormat': dateFormat,
-    'defaultReaderMode': defaultReaderMode.index,
+    'defaultReaderMode': effectiveDefaultReaderMode.index,
+    'defaultReadingDirection': effectiveDefaultReadingDirection.index,
+    'defaultPageMode': defaultPageMode.index,
     'displayType': displayType.index,
     'doubleTapAnimationSpeed': doubleTapAnimationSpeed,
     'downloadLocation': downloadLocation,
@@ -1104,9 +1130,13 @@ class Settings {
     'novelReaderTextColor': novelReaderTextColor,
     'novelReaderPadding': novelReaderPadding,
     'novelReaderLineHeight': novelReaderLineHeight,
+    'novelReaderParagraphSpacing': novelReaderParagraphSpacing,
     'novelShowScrollPercentage': novelShowScrollPercentage,
     'novelRemoveExtraParagraphSpacing': novelRemoveExtraParagraphSpacing,
     'novelTapToScroll': novelTapToScroll,
+    'novelEpubReadingLayout': novelEpubReadingLayout,
+    'novelShowReturnToSavedPositionButton':
+        novelShowReturnToSavedPositionButton,
     'navigationOrder': navigationOrder,
     'hideItems': hideItems,
     'clearChapterCacheOnAppLaunch': clearChapterCacheOnAppLaunch,
@@ -1135,9 +1165,6 @@ class Settings {
     if (algorithmWeights != null)
       'algorithmWeights': algorithmWeights!.toJson(),
     'localFolders': localFolders,
-    'namedLocalFolders': namedLocalFolders?.map((e) => e.toJson()).toList(),
-    'downloadLocalFolderName': downloadLocalFolderName,
-    'askDownloadDestination': askDownloadDestination,
     'appLockEnabled': appLockEnabled,
     'libraryFilterMangasCompletedType': libraryFilterMangasCompletedType,
     'libraryFilterAnimeCompletedType': libraryFilterAnimeCompletedType,
@@ -1279,20 +1306,31 @@ class SortLibraryManga {
 
 @embedded
 class SortChapter {
+  static const sourceTitleDisplay = 0;
+  static const chapterNumberDisplay = 1;
+
   int? mangaId;
   bool? reverse;
   int? index;
-  SortChapter({this.mangaId, this.reverse = false, this.index = 1});
+  int? displayMode;
+  SortChapter({
+    this.mangaId,
+    this.reverse = false,
+    this.index = 1,
+    this.displayMode = sourceTitleDisplay,
+  });
   SortChapter.fromJson(Map<String, dynamic> json) {
     index = json['index'];
     mangaId = json['mangaId'];
     reverse = json['reverse'];
+    displayMode = json['displayMode'] ?? sourceTitleDisplay;
   }
 
   Map<String, dynamic> toJson() => {
     'index': index,
     'mangaId': mangaId,
     'reverse': reverse,
+    'displayMode': displayMode,
   };
 }
 
@@ -1375,17 +1413,37 @@ class PersonalReaderMode {
   int? mangaId;
 
   @enumerated
-  ReaderMode readerMode = ReaderMode.vertical;
-  PersonalReaderMode({this.mangaId, this.readerMode = ReaderMode.vertical});
+  ReaderMode readerMode = ReaderMode.verticalPaged;
+
+  /// Persisted enum index. Nullable for reader preferences saved before the
+  /// reading-direction setting was split from [readerMode].
+  int? readingDirectionIndex;
+
+  PersonalReaderMode({
+    this.mangaId,
+    this.readerMode = ReaderMode.verticalPaged,
+    this.readingDirectionIndex,
+  });
 
   PersonalReaderMode.fromJson(Map<String, dynamic> json) {
     mangaId = json['mangaId'];
-    readerMode = ReaderMode.values[json['readerMode']];
+    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
+      json['readerMode'],
+    );
+    readerMode = restoredReaderMode.normalized;
+    readingDirectionIndex =
+        (json['readingDirection'] == null
+                ? restoredReaderMode.legacyReadingDirection
+                : ReadingDirectionExtension.fromPersistedIndex(
+                    json['readingDirection'],
+                  ))
+            ?.index;
   }
 
   Map<String, dynamic> toJson() => {
     'mangaId': mangaId,
-    'readerMode': readerMode.index,
+    'readerMode': readerMode.normalized.index,
+    'readingDirection': readingDirectionIndex,
   };
 }
 
@@ -1468,38 +1526,88 @@ class PersonalPageMode {
 }
 
 enum ReaderMode {
-  vertical,
-  ltr,
-  rtl,
+  // Keep these persisted positions stable. The legacy entries are hidden from
+  // selectors and normalized when settings are read.
+  verticalPaged,
+  horizontalPaged,
+  legacyHorizontalPagedRtl,
   verticalContinuous,
   webtoon,
   horizontalContinuous,
-  horizontalContinuousRTL,
+  legacyHorizontalContinuousRtl,
 }
 
 extension ReaderModeExtension on ReaderMode {
-  /// Vertical continuous || Webtoon || Horizontal continuous || Horizontal continuous (RTL)
+  static const selectableValues = [
+    ReaderMode.horizontalPaged,
+    ReaderMode.verticalPaged,
+    ReaderMode.horizontalContinuous,
+    ReaderMode.verticalContinuous,
+    ReaderMode.webtoon,
+  ];
+
+  static ReaderMode fromPersistedIndex(Object? value) {
+    final index = value is int ? value : null;
+    if (index == null || index < 0 || index >= ReaderMode.values.length) {
+      return ReaderMode.verticalPaged;
+    }
+    return ReaderMode.values[index];
+  }
+
+  ReaderMode get normalized => switch (this) {
+    ReaderMode.legacyHorizontalPagedRtl => ReaderMode.horizontalPaged,
+    ReaderMode.legacyHorizontalContinuousRtl => ReaderMode.horizontalContinuous,
+    _ => this,
+  };
+
+  ReadingDirection? get legacyReadingDirection => switch (this) {
+    ReaderMode.horizontalPaged => ReadingDirection.leftToRight,
+    ReaderMode.legacyHorizontalPagedRtl => ReadingDirection.rightToLeft,
+    ReaderMode.horizontalContinuous => ReadingDirection.leftToRight,
+    ReaderMode.legacyHorizontalContinuousRtl => ReadingDirection.rightToLeft,
+    _ => null,
+  };
+
+  /// Vertical continuous || Webtoon || Horizontal continuous
   bool get isContinuous => isVerticalContinuous || isHorizontalContinuous;
 
-  /// Vertical || Vertical continuous || Webtoon
-  bool get isVertical => this == ReaderMode.vertical || isVerticalContinuous;
+  /// Vertical paged || Vertical continuous || Webtoon
+  bool get isVertical =>
+      this == ReaderMode.verticalPaged || isVerticalContinuous;
 
   /// Vertical continuous || Webtoon
   bool get isVerticalContinuous =>
       this == ReaderMode.verticalContinuous || this == ReaderMode.webtoon;
 
-  /// Horizontal continuous || Horizontal continuous (RTL)
+  /// Horizontal continuous
   bool get isHorizontalContinuous =>
-      this == ReaderMode.horizontalContinuous ||
-      this == ReaderMode.horizontalContinuousRTL;
+      normalized == ReaderMode.horizontalContinuous;
 
-  /// Right to Left || Horizontal continuous (RTL)
-  bool get isRTL =>
-      this == ReaderMode.rtl || this == ReaderMode.horizontalContinuousRTL;
+  /// Horizontal paged
+  bool get isHorizontalPaged => normalized == ReaderMode.horizontalPaged;
+}
 
-  /// Left to Right || Right to Left
-  bool get isHorizontalPaged =>
-      this == ReaderMode.ltr || this == ReaderMode.rtl;
+enum ReadingDirection { leftToRight, rightToLeft }
+
+extension ReadingDirectionExtension on ReadingDirection {
+  static ReadingDirection fromPersistedIndex(Object? value) {
+    return value == ReadingDirection.rightToLeft.index
+        ? ReadingDirection.rightToLeft
+        : ReadingDirection.leftToRight;
+  }
+
+  bool get isRtl => this == ReadingDirection.rightToLeft;
+}
+
+extension ReaderSettingsDirectionExtension on Settings {
+  ReaderMode get effectiveDefaultReaderMode => defaultReaderMode.normalized;
+
+  ReadingDirection get effectiveDefaultReadingDirection =>
+      defaultReadingDirectionIndex == null
+      ? defaultReaderMode.legacyReadingDirection ?? ReadingDirection.leftToRight
+      : ReadingDirectionExtension.fromPersistedIndex(
+          defaultReadingDirectionIndex,
+        );
 }
 
 enum NovelTextAlign { left, center, right, block }
@@ -1507,6 +1615,14 @@ enum NovelTextAlign { left, center, right, block }
 enum PageMode { onePage, doublePage, doublePageCover }
 
 extension PageModeExtension on PageMode {
+  static PageMode fromPersistedIndex(Object? value) {
+    final index = value is int ? value : null;
+    if (index == null || index < 0 || index >= PageMode.values.length) {
+      return PageMode.onePage;
+    }
+    return PageMode.values[index];
+  }
+
   bool get isDoublePage =>
       this == PageMode.doublePage || this == PageMode.doublePageCover;
 
@@ -1666,40 +1782,6 @@ class AlgorithmWeights {
     'synopsis': synopsis,
     'theme': theme,
   };
-}
-
-@embedded
-class LocalFolder {
-  String? name;
-  String? path;
-
-  LocalFolder({this.name, this.path});
-
-  LocalFolder.fromPath({required String path, String? name})
-    : this(name: name ?? _nameFromPath(path), path: path);
-
-  LocalFolder.fromJson(dynamic json) {
-    if (json is String) {
-      path = json;
-      name = _nameFromPath(json);
-      return;
-    }
-    if (json is Map) {
-      name = json['name'];
-      path = json['path'];
-    }
-  }
-
-  Map<String, dynamic> toJson() => {'name': name, 'path': path};
-
-  static String _nameFromPath(String path) {
-    final normalized = path.replaceAll('\\', '/');
-    final parts = normalized
-        .split('/')
-        .where((part) => part.trim().isNotEmpty)
-        .toList();
-    return parts.isEmpty ? 'Local' : parts.last;
-  }
 }
 
 enum ColorFilterBlendMode {

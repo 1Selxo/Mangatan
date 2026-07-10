@@ -65,7 +65,7 @@ final class DoRestoreProvider extends $FunctionalProvider<void, void, void>
   }
 }
 
-String _$doRestoreHash() => r'4e556ae822d1f48ef3519fd65393c178de14b73d';
+String _$doRestoreHash() => r'3c13834bf33ad158dddf246f32b4b75e649af0db';
 
 final class DoRestoreFamily extends $Family
     with
@@ -301,7 +301,7 @@ final class RestoreTachiBkBackupProvider
 }
 
 String _$restoreTachiBkBackupHash() =>
-    r'0f121d94021eb9a56d0689240dbcefd49f5a2a79';
+    r'470f5b8238ce181c98e39c9d486e41b8b88dc7cf';
 
 final class RestoreTachiBkBackupFamily extends $Family
     with $FunctionalFamilyOverride<void, (String, BackupType)> {

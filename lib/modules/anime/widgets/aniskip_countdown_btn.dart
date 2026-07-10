@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/services/aniskip.dart';
@@ -28,30 +30,37 @@ class AniSkipCountDownButton extends ConsumerStatefulWidget {
 class _AniSkipCountDownButtonState extends ConsumerState<AniSkipCountDownButton>
     with TickerProviderStateMixin {
   late AnimationController _controller;
+  Timer? _completionTimer;
+
   @override
   void initState() {
+    super.initState();
     _controller = AnimationController(
       vsync: this,
       duration: Duration(seconds: widget.timeoutLength),
     )..forward();
-    super.initState();
     if (widget.active) {
       if (widget.autoSkip) {
         _seekTo();
       } else {
-        _controller.addListener(() {
-          if (_controller.isCompleted) {
-            setState(() {
-              _isCompleted = true;
-            });
-            _controller.reset();
-          }
-        });
+        // The timeout is functional behavior, so it must not change with the
+        // user's visual animation-duration preference.
+        _completionTimer = Timer(
+          Duration(seconds: widget.timeoutLength),
+          _complete,
+        );
       }
     }
   }
 
+  void _complete() {
+    if (!mounted) return;
+    setState(() => _isCompleted = true);
+    _controller.reset();
+  }
+
   void _seekTo() {
+    _completionTimer?.cancel();
     setState(() {
       _isCompleted = true;
     });
@@ -64,6 +73,7 @@ class _AniSkipCountDownButtonState extends ConsumerState<AniSkipCountDownButton>
   bool _isCompleted = false;
   @override
   void dispose() {
+    _completionTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

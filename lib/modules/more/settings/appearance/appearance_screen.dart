@@ -10,6 +10,7 @@ import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/date.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/date_format_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/widgets/animation_speed_slider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/blend_level_slider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/dark_mode_button.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/theme_selector.dart';
@@ -17,6 +18,7 @@ import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
 import 'package:mangayomi/modules/widgets/tv_escapable_slider.dart';
@@ -164,6 +166,7 @@ class AppearanceScreen extends ConsumerWidget {
                 ),
                 _buildLanguageTile(context, ref, l10n),
                 _buildFontTile(context, ref, l10n),
+                if (!isMobile) const AnimationSpeedSlider(),
                 ListTile(
                   title: Text(l10n.reorder_navigation),
                   subtitle: Text(

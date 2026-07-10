@@ -500,6 +500,7 @@ a {
         --text-color-light3: #888888;
         --text-color-light4: #777777;
         --background-color-dark1: #333333;
+        --danger-color-lightest: #4a2020;
     }
     
     .overlay {

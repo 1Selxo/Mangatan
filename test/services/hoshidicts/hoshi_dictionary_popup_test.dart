@@ -302,6 +302,7 @@ void main() {
     expect(css, contains('.glossary-group'));
     expect(css, contains('.glossary-content .gloss-sc-summary::marker'));
     expect(css, contains('.pronunciation-mora'));
+    expect(css, contains('--danger-color-lightest: #4a2020;'));
     expect(license, contains('GNU GENERAL PUBLIC LICENSE'));
   });
 }

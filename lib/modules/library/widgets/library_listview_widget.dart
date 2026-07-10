@@ -125,8 +125,8 @@ class LibraryListViewWidget extends StatelessWidget {
                                             .where((e) => !e.isRead!)
                                             .length
                                             .toString(),
-                                        style: TextStyle(
-                                          color: context.dynamicBlackWhiteColor,
+                                        style: const TextStyle(
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ),

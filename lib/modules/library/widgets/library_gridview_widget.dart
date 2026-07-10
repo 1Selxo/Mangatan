@@ -106,9 +106,8 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
                                               .where((e) => !e.isRead!)
                                               .length
                                               .toString(),
-                                          style: TextStyle(
-                                            color:
-                                                context.dynamicBlackWhiteColor,
+                                          style: const TextStyle(
+                                            color: Colors.white,
                                           ),
                                         ),
                                       ),

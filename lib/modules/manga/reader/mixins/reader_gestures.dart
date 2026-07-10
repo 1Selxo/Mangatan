@@ -71,17 +71,19 @@ class ReaderKeyboardHandler {
     }
   }
 
-  /// Creates a KeyboardListener widget with this handler.
+  /// Creates a focusable widget with this handler.
   Widget wrapWithKeyboardListener({
     required Widget child,
     bool isReverseHorizontal = false,
     FocusNode? focusNode,
   }) {
-    return KeyboardListener(
+    return Focus(
       autofocus: true,
-      focusNode: focusNode ?? FocusNode(),
-      onKeyEvent: (event) =>
-          handleKeyEvent(event, isReverseHorizontal: isReverseHorizontal),
+      focusNode: focusNode,
+      onKeyEvent: (_, event) =>
+          handleKeyEvent(event, isReverseHorizontal: isReverseHorizontal)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored,
       child: child,
     );
   }

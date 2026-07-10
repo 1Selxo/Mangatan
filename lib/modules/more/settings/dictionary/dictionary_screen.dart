@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dialog.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -189,35 +190,14 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     required String value,
     String? hint,
     int maxLines = 1,
-  }) async {
-    final controller = TextEditingController(text: value);
-    final result = await showDialog<String>(
+  }) {
+    return showEditTextDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          maxLines: maxLines,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: hint,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      title: title,
+      initialValue: value,
+      hint: hint,
+      maxLines: maxLines,
     );
-    controller.dispose();
-    return result;
   }
 
   Future<void> _saveAnki(AnkiMiningProfile profile) async {

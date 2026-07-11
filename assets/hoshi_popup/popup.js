@@ -22,6 +22,8 @@ let audioSourceResults = {};
 let lastSelection = '';
 let currentDictionaryMedia = null;
 let selectedDictionaries = {};
+let nextDictionaryStyleScope = 0;
+const dictionaryStyleElements = new Set();
 
 function hasPopupTextSelection() {
     const selection = window.getSelection?.();
@@ -36,6 +38,108 @@ function rememberPopupTextSelection() {
     }
     lastSelection = selectedText;
     return selectedText;
+}
+
+// Hoshi scopes dictionary styles with CSS nesting. Some Windows installations
+// still use a WebView2 runtime old enough to reject the entire nested block,
+// leaving gaiji at their 100em fallback size and native details markers visible.
+// Scope selectors through the long-established CSSOM instead, which keeps broad
+// dictionary rules isolated without requiring CSS nesting support.
+function splitCssSelectorList(selectorText) {
+    const selectors = [];
+    let start = 0;
+    let quote = '';
+    let escaped = false;
+    let parentheses = 0;
+    let brackets = 0;
+
+    for (let index = 0; index < selectorText.length; index++) {
+        const character = selectorText[index];
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (character === '\\') {
+            escaped = true;
+            continue;
+        }
+        if (quote) {
+            if (character === quote) quote = '';
+            continue;
+        }
+        if (character === '"' || character === "'") {
+            quote = character;
+            continue;
+        }
+        if (character === '(') parentheses++;
+        else if (character === ')') parentheses--;
+        else if (character === '[') brackets++;
+        else if (character === ']') brackets--;
+        else if (character === ',' && parentheses === 0 && brackets === 0) {
+            selectors.push(selectorText.slice(start, index).trim());
+            start = index + 1;
+        }
+    }
+    selectors.push(selectorText.slice(start).trim());
+    return selectors.filter(Boolean);
+}
+
+function scopedCssSelector(selector, scopeSelector) {
+    if (selector === ':root' || selector === 'html' || selector === 'body') {
+        return scopeSelector;
+    }
+    if (selector.startsWith('&')) {
+        return `${scopeSelector}${selector.slice(1)}`;
+    }
+    return `${scopeSelector} ${selector}`;
+}
+
+function scopeDictionaryStyleRules(rules, scopeSelector) {
+    for (const rule of [...rules]) {
+        if (rule.type === 1 && typeof rule.selectorText === 'string') { // CSSRule.STYLE_RULE
+            const selectors = splitCssSelectorList(rule.selectorText);
+            try {
+                rule.selectorText = selectors
+                    .map(selector => scopedCssSelector(selector, scopeSelector))
+                    .join(', ');
+            } catch {
+                // A selector the current engine can parse but not rewrite must
+                // not affect definitions from other dictionaries.
+                rule.style.cssText = '';
+            }
+        } else if (rule.cssRules) {
+            // Recurse through grouping rules such as @media and @supports, but
+            // not through style rules containing native CSS nesting.
+            scopeDictionaryStyleRules(rule.cssRules, scopeSelector);
+        }
+    }
+}
+
+function installScopedDictionaryStyle(dictWrapper, css) {
+    if (!css.trim()) return;
+
+    const scope = String(++nextDictionaryStyleScope);
+    const scopeSelector = `[data-hoshi-dictionary-scope="${scope}"]`;
+    dictWrapper.setAttribute('data-hoshi-dictionary-scope', scope);
+
+    const style = el('style', {
+        'data-hoshi-dictionary-style': '',
+        textContent: css,
+    });
+    // A style element must be connected before older WebViews expose its
+    // CSSStyleSheet. Keep it in <head>; resetDictionaryStyles removes it when
+    // Flutter replaces the popup results.
+    document.head.appendChild(style);
+    dictionaryStyleElements.add(style);
+    if (style.sheet) {
+        scopeDictionaryStyleRules(style.sheet.cssRules, scopeSelector);
+    }
+}
+
+function resetDictionaryStyles() {
+    dictionaryStyleElements.forEach(style => style.remove());
+    dictionaryStyleElements.clear();
+    nextDictionaryStyleScope = 0;
 }
 
 function el(tag, props = {}, children = []) {
@@ -1264,6 +1368,7 @@ function resetAudioCaches() {
     hideAudioSourceMenu();
 }
 window.resetHoshiAudioCaches = resetAudioCaches;
+window.resetHoshiDictionaryStyles = resetDictionaryStyles;
 
 function audioCacheKey(entry) {
     const expression = entry?.expression || '';
@@ -1515,17 +1620,10 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     
     const dictWrapper = document.createElement('div');
     dictWrapper.setAttribute('data-dictionary', dictName);
+    dictWrapper.style.color = 'var(--text-color)';
     
     const dictStyle = window.dictionaryStyles?.[dictName] ?? '';
-    dictWrapper.appendChild(el('style', {
-        textContent: `
-            [data-dictionary="${dictName}"] {
-                @media (prefers-color-scheme: light) { color: #000; }
-                @media (prefers-color-scheme: dark) { color: #fff; }
-                ${dictStyle}
-            }
-        `.trim()
-    }));
+    installScopedDictionaryStyle(dictWrapper, dictStyle);
     
     const termTags = [...new Set(parseTags(contents[0]?.termTags))];
     const renderContent = (parent, content) => {

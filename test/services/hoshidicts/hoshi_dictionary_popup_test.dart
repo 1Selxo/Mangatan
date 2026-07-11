@@ -156,7 +156,7 @@ void main() {
     );
   });
 
-  test('resets popup audio caches when replacing lookup results', () {
+  test('resets popup state when replacing lookup results', () {
     expect(
       hoshiReplaceRenderScript(2),
       startsWith('window.resetHoshiAudioCaches?.();'),
@@ -166,12 +166,20 @@ void main() {
       contains('window.resetHoshiNavigation?.();'),
     );
     expect(
+      hoshiReplaceRenderScript(2),
+      contains('window.resetHoshiDictionaryStyles?.();'),
+    );
+    expect(
       hoshiReplaceRenderScriptForEntries(const []),
       contains('window.resetHoshiAudioCaches?.();'),
     );
     expect(
       hoshiReplaceRenderScriptForEntries(const []),
       contains('window.resetHoshiNavigation?.();'),
+    );
+    expect(
+      hoshiReplaceRenderScriptForEntries(const []),
+      contains('window.resetHoshiDictionaryStyles?.();'),
     );
     expect(
       hoshiReplaceRenderScriptForEntries(const []),
@@ -279,6 +287,13 @@ void main() {
     expect(popup, contains('audio-speaker-body'));
     expect(popup, contains('M3 9v6h4l5 4V5L7 9H3z'));
     expect(popup, contains('window.resetHoshiAudioCaches = resetAudioCaches'));
+    expect(
+      popup,
+      contains('window.resetHoshiDictionaryStyles = resetDictionaryStyles'),
+    );
+    expect(popup, contains('function installScopedDictionaryStyle'));
+    expect(popup, contains('scopeDictionaryStyleRules(style.sheet.cssRules'));
+    expect(popup, isNot(contains('[data-dictionary="\${dictName}"] {')));
     expect(popup, contains('window.resetHoshiNavigation = () =>'));
     expect(popup, contains('window.navigateBack = () =>'));
     expect(popup, contains('window.navigateForward = () =>'));

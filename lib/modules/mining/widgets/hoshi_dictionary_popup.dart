@@ -704,6 +704,7 @@ Map<String, dynamic> _argumentMap(List<dynamic> arguments) {
 String hoshiReplaceRenderScript(int entryCount) =>
     'window.resetHoshiAudioCaches?.();'
     'window.resetHoshiNavigation?.();'
+    'window.resetHoshiDictionaryStyles?.();'
     'window.getSelection?.()?.removeAllRanges?.();'
     'window.scrollTo(0, 0);'
     'window.lookupEntries = undefined;'
@@ -722,6 +723,7 @@ String hoshiReplaceRenderScriptForEntries(
     '(window.__mangayomiHoshiRenderToken || 0) + 1;'
     'window.resetHoshiAudioCaches?.();'
     'window.resetHoshiNavigation?.();'
+    'window.resetHoshiDictionaryStyles?.();'
     'window.getSelection?.()?.removeAllRanges?.();'
     'window.scrollTo(0, 0);'
     'window.hoshiDictionaryMedia = ${jsonEncode(mediaDataUris)};'

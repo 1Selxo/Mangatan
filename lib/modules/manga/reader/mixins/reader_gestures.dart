@@ -9,6 +9,7 @@ class ReaderKeyboardHandler {
   final VoidCallback? onNextPage;
   final VoidCallback? onNextChapter;
   final VoidCallback? onPreviousChapter;
+  final bool Function(KeyEvent event)? onLookupTrigger;
   final bool pageKeysNavigatePages;
   final bool delegateHorizontalPageKeysToChild;
 
@@ -19,12 +20,14 @@ class ReaderKeyboardHandler {
     this.onNextPage,
     this.onNextChapter,
     this.onPreviousChapter,
+    this.onLookupTrigger,
     this.pageKeysNavigatePages = false,
     this.delegateHorizontalPageKeysToChild = false,
   });
 
   /// Handles a key event and returns true if it was handled.
   bool handleKeyEvent(KeyEvent event, {bool isReverseHorizontal = false}) {
+    if (onLookupTrigger?.call(event) ?? false) return true;
     if (event is! KeyDownEvent) return false;
     switch (event.logicalKey) {
       case LogicalKeyboardKey.f11:

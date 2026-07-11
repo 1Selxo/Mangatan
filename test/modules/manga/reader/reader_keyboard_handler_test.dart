@@ -33,6 +33,30 @@ void main() {
     expect(nextChapterCalls, 0);
   });
 
+  test('lookup trigger receives both Shift press and release', () {
+    final events = <KeyEvent>[];
+    final handler = ReaderKeyboardHandler(
+      onLookupTrigger: (event) {
+        events.add(event);
+        return true;
+      },
+    );
+    const down = KeyDownEvent(
+      physicalKey: PhysicalKeyboardKey.shiftLeft,
+      logicalKey: LogicalKeyboardKey.shiftLeft,
+      timeStamp: Duration.zero,
+    );
+    const up = KeyUpEvent(
+      physicalKey: PhysicalKeyboardKey.shiftLeft,
+      logicalKey: LogicalKeyboardKey.shiftLeft,
+      timeStamp: Duration.zero,
+    );
+
+    expect(handler.handleKeyEvent(down), isTrue);
+    expect(handler.handleKeyEvent(up), isTrue);
+    expect(events, [down, up]);
+  });
+
   test('explicit chapter shortcuts still navigate chapters', () {
     var previousChapterCalls = 0;
     var nextChapterCalls = 0;

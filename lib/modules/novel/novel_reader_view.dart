@@ -16,6 +16,7 @@ import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/auto_scroll_button.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_app_bar.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
@@ -293,6 +294,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   @override
   void initState() {
     super.initState();
+    unawaited(ReaderLookupTriggerState.initialize());
     _epubLayout.addListener(_onEpubLayoutChanged);
     WidgetsBinding.instance.addObserver(this);
     _readingStopwatch.start();
@@ -630,6 +632,19 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
       onNextPage: () => _onBtnTapped(100),
       onNextChapter: () => _goToChapter(true),
       onPreviousChapter: () => _goToChapter(false),
+      onLookupTrigger: (event) {
+        if (!_usingTtsuReader ||
+            !readerLookupTriggerMatchesKey(
+              ReaderLookupTriggerState.trigger.value,
+              event,
+            )) {
+          return false;
+        }
+        unawaited(
+          _epubReaderController.setShiftLookupActive(event is KeyDownEvent),
+        );
+        return true;
+      },
       pageKeysNavigatePages: true,
       delegateHorizontalPageKeysToChild: delegateHorizontalPageKeysToChild,
     ).wrapWithKeyboardListener(

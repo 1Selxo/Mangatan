@@ -93,29 +93,34 @@ class ImageViewWebtoon extends StatelessWidget {
             minScale: readerMinimumZoomScale,
             child: _wrapPointerSignalHandler(
               zoomContext: zoomContext,
-              child: ScrollablePositionedList.separated(
-                scrollDirection: scrollDirection,
-                reverse: reverse,
-                minCacheExtent: minCacheExtent,
-                initialScrollIndex: initialScrollIndex,
-                itemCount: isDoublePageMode && !isHorizontalContinuous
-                    ? _doublePageSpreadIndices.length
-                    : pages.length,
-                physics: ContinuousReaderZoomScrollPhysics(
-                  controller: photoViewController,
-                  alignment: scalePosition,
-                  baseViewportDimension: scrollDirection == Axis.vertical
-                      ? constraints.maxHeight
-                      : constraints.maxWidth,
-                  parent: physics,
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(
+                  context,
+                ).copyWith(scrollbars: false),
+                child: ScrollablePositionedList.separated(
+                  scrollDirection: scrollDirection,
+                  reverse: reverse,
+                  minCacheExtent: minCacheExtent,
+                  initialScrollIndex: initialScrollIndex,
+                  itemCount: isDoublePageMode && !isHorizontalContinuous
+                      ? _doublePageSpreadIndices.length
+                      : pages.length,
+                  physics: ContinuousReaderZoomScrollPhysics(
+                    controller: photoViewController,
+                    alignment: scalePosition,
+                    baseViewportDimension: scrollDirection == Axis.vertical
+                        ? constraints.maxHeight
+                        : constraints.maxWidth,
+                    parent: physics,
+                  ),
+                  itemScrollController: itemScrollController,
+                  scrollOffsetController: scrollOffsetController,
+                  itemPositionsListener: itemPositionsListener,
+                  itemBuilder: (context, index) =>
+                      _buildItem(context, index, zoomContext),
+                  separatorBuilder: (context, index) =>
+                      _buildSeparator(context, index, zoomContext),
                 ),
-                itemScrollController: itemScrollController,
-                scrollOffsetController: scrollOffsetController,
-                itemPositionsListener: itemPositionsListener,
-                itemBuilder: (context, index) =>
-                    _buildItem(context, index, zoomContext),
-                separatorBuilder: (context, index) =>
-                    _buildSeparator(context, index, zoomContext),
               ),
             ),
           ),

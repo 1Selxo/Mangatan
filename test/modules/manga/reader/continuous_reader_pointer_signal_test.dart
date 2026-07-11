@@ -396,6 +396,19 @@ void main() {
     expect(photoViewController.position.dx, greaterThan(0));
   });
 
+  testWidgets('continuous readers suppress automatic desktop scrollbars', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _reader(
+        mode: ReaderMode.verticalContinuous,
+        platform: TargetPlatform.macOS,
+      ),
+    );
+
+    expect(find.byType(Scrollbar), findsNothing);
+  });
+
   testWidgets('cmd+scroll also zooms continuous readers', (tester) async {
     final photoViewController = PhotoViewController(initialScale: 1);
 
@@ -457,6 +470,7 @@ Widget _reader({
   int initialScrollIndex = 0,
   bool isDoublePageMode = false,
   PageMode pageMode = PageMode.onePage,
+  TargetPlatform? platform,
   PhotoViewController? photoViewController,
   ScrollOffsetController? scrollOffsetController,
   ItemPositionsListener? itemPositionsListener,
@@ -479,6 +493,7 @@ Widget _reader({
       readerSaturationStateProvider.overrideWithValue(1),
     ],
     child: MaterialApp(
+      theme: platform == null ? null : ThemeData(platform: platform),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(

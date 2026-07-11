@@ -7,8 +7,9 @@ import 'package:flutter/widgets.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
-const double _minWheelScale = 1.0;
-const double _maxWheelScale = 8.0;
+const double readerMinimumZoomScale = 0.5;
+const double readerDefaultZoomScale = 1.0;
+const double readerMaximumZoomScale = 8.0;
 const double _wheelZoomSensitivity = 0.0015;
 
 /// Dispatches pointer signals before descendants so the reader can win the
@@ -75,7 +76,6 @@ bool registerReaderModifierWheelZoom(
   PointerSignalEvent event, {
   required BuildContext zoomContext,
   required PhotoViewController photoViewController,
-  required PhotoViewScaleStateController scaleStateController,
   required Alignment basePosition,
 }) {
   if (event is! PointerScrollEvent || !_isModifierZoomPressed) {
@@ -88,7 +88,6 @@ bool registerReaderModifierWheelZoom(
       event,
       zoomContext: zoomContext,
       photoViewController: photoViewController,
-      scaleStateController: scaleStateController,
       basePosition: basePosition,
     ),
   );
@@ -127,16 +126,15 @@ void _handleModifierScrollZoom(
   PointerSignalEvent event, {
   required BuildContext zoomContext,
   required PhotoViewController photoViewController,
-  required PhotoViewScaleStateController scaleStateController,
   required Alignment basePosition,
 }) {
   final scrollEvent = event as PointerScrollEvent;
   final delta = _primaryScrollDelta(scrollEvent);
   if (delta == 0) return;
 
-  final currentScale = photoViewController.scale ?? _minWheelScale;
+  final currentScale = photoViewController.scale ?? readerDefaultZoomScale;
   final targetScale = (currentScale * math.exp(-delta * _wheelZoomSensitivity))
-      .clamp(_minWheelScale, _maxWheelScale)
+      .clamp(readerMinimumZoomScale, readerMaximumZoomScale)
       .toDouble();
   final scaleRatio = targetScale / currentScale;
   final focalPoint = _focalPointFromBasePosition(
@@ -151,11 +149,10 @@ void _handleModifierScrollZoom(
 
   photoViewController.updateMultiple(
     scale: targetScale,
-    position: targetScale <= _minWheelScale ? Offset.zero : targetPosition,
+    position: targetScale <= readerMinimumZoomScale
+        ? Offset.zero
+        : targetPosition,
   );
-  if (targetScale <= _minWheelScale) {
-    scaleStateController.reset();
-  }
   scrollEvent.respond(allowPlatformDefault: false);
 }
 

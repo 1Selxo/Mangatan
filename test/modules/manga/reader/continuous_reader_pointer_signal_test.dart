@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/manga/reader/image_view_paged.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_webtoon.dart';
+import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
@@ -208,7 +210,165 @@ void main() {
       expect(photoViewController.scale, greaterThan(1));
       expect(_leadingEdge(itemPositionsListener), initialLeadingEdge);
     });
+
+    testWidgets('$mode can zoom out to half the default scale', (tester) async {
+      final photoViewController = PhotoViewController(initialScale: 1);
+
+      await tester.pumpWidget(
+        _reader(mode: mode, photoViewController: photoViewController),
+      );
+      expect(photoViewController.scale, readerDefaultZoomScale);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      addTearDown(
+        () async => tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft),
+      );
+
+      await _sendScroll(tester, const Offset(0, 1000));
+      await tester.pump();
+      await tester.pump();
+
+      expect(photoViewController.scale, readerMinimumZoomScale);
+    });
+
+    for (final readingDirection
+        in mode.isHorizontalContinuous
+            ? ReadingDirection.values
+            : [ReadingDirection.leftToRight]) {
+      testWidgets(
+        '$mode $readingDirection reveals adjacent pages when zoomed out',
+        (tester) async {
+          final photoViewController = PhotoViewController(initialScale: 1);
+          final longPressedPages = <int>[];
+          final itemPositionsListener = ItemPositionsListener.create();
+
+          await tester.pumpWidget(
+            _reader(
+              mode: mode,
+              readingDirection: readingDirection,
+              pages: List.generate(5, _page),
+              initialScrollIndex: 2,
+              photoViewController: photoViewController,
+              itemPositionsListener: itemPositionsListener,
+              onLongPressData: (page) => longPressedPages.add(page.index!),
+            ),
+          );
+          final readerRect = tester.getRect(find.byType(ImageViewWebtoon));
+          final currentPage = _verticalPage(2);
+          final currentPageRectAtDefaultScale = tester.getRect(currentPage);
+
+          photoViewController.scale = readerMinimumZoomScale;
+          await tester.pump();
+          await tester.pump();
+
+          final listSize = tester.getSize(
+            find.byType(ScrollablePositionedList),
+          );
+          if (mode.isHorizontalContinuous) {
+            expect(
+              listSize.width,
+              closeTo(readerRect.width / readerMinimumZoomScale, 0.01),
+            );
+            expect(listSize.height, closeTo(readerRect.height, 0.01));
+          } else {
+            expect(listSize.width, closeTo(readerRect.width, 0.01));
+            expect(
+              listSize.height,
+              closeTo(readerRect.height / readerMinimumZoomScale, 0.01),
+            );
+          }
+          expect(
+            tester.getRect(currentPage),
+            _scaleRectAroundCenter(
+              currentPageRectAtDefaultScale,
+              readerRect.center,
+              readerMinimumZoomScale,
+            ),
+          );
+
+          for (final pageIndex in [1, 3]) {
+            final page = _verticalPage(pageIndex);
+            expect(page, findsOneWidget);
+
+            final visibleRect = tester.getRect(page).intersect(readerRect);
+            expect(visibleRect.isEmpty, isFalse);
+
+            if (!readingDirection.isRtl) {
+              await tester.longPressAt(visibleRect.center);
+              expect(
+                longPressedPages,
+                contains(pageIndex),
+                reason:
+                    'pageRect=${tester.getRect(page)}, '
+                    'visibleRect=$visibleRect, '
+                    'positions=${itemPositionsListener.itemPositions.value}',
+              );
+            }
+          }
+
+          photoViewController.scale = readerDefaultZoomScale;
+          await tester.pump();
+          await tester.pump();
+          expect(tester.getRect(currentPage), currentPageRectAtDefaultScale);
+        },
+      );
+    }
   }
+
+  testWidgets('continuous double-page spreads stay unified when zoomed out', (
+    tester,
+  ) async {
+    final photoViewController = PhotoViewController(initialScale: 1);
+
+    await tester.pumpWidget(
+      _reader(
+        mode: ReaderMode.verticalContinuous,
+        pages: List.generate(10, _page),
+        initialScrollIndex: 2,
+        isDoublePageMode: true,
+        pageMode: PageMode.doublePage,
+        photoViewController: photoViewController,
+      ),
+    );
+    final readerRect = tester.getRect(find.byType(ImageViewWebtoon));
+    final currentLeftPage = _pagedImage(4);
+    final currentRightPage = _pagedImage(5);
+    final currentSpreadAtDefaultScale = tester
+        .getRect(currentLeftPage)
+        .expandToInclude(tester.getRect(currentRightPage));
+
+    photoViewController.scale = readerMinimumZoomScale;
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(PhotoView), findsOneWidget);
+    final imageViews = tester.widgetList<ImageViewPaged>(
+      find.byType(ImageViewPaged, skipOffstage: false),
+    );
+    expect(imageViews, isNotEmpty);
+    expect(imageViews.every((view) => !view.enableGestures), isTrue);
+
+    final currentLeftRect = tester.getRect(currentLeftPage);
+    final currentRightRect = tester.getRect(currentRightPage);
+    expect(currentLeftRect.top, closeTo(currentRightRect.top, 0.01));
+    expect(currentLeftRect.bottom, closeTo(currentRightRect.bottom, 0.01));
+    expect(currentLeftRect.right, closeTo(currentRightRect.left, 0.01));
+    expect(
+      currentLeftRect.expandToInclude(currentRightRect),
+      _scaleRectAroundCenter(
+        currentSpreadAtDefaultScale,
+        readerRect.center,
+        readerMinimumZoomScale,
+      ),
+    );
+
+    for (final pageIndex in [2, 3, 6, 7]) {
+      expect(
+        tester.getRect(_pagedImage(pageIndex)).overlaps(readerRect),
+        isTrue,
+      );
+    }
+  });
 
   testWidgets('modifier wheel zoom anchors around the pointer', (tester) async {
     final photoViewController = PhotoViewController(initialScale: 1);
@@ -293,9 +453,14 @@ void main() {
 Widget _reader({
   required ReaderMode mode,
   ReadingDirection readingDirection = ReadingDirection.leftToRight,
+  List<UChapDataPreload>? pages,
+  int initialScrollIndex = 0,
+  bool isDoublePageMode = false,
+  PageMode pageMode = PageMode.onePage,
   PhotoViewController? photoViewController,
   ScrollOffsetController? scrollOffsetController,
   ItemPositionsListener? itemPositionsListener,
+  ValueChanged<UChapDataPreload>? onLongPressData,
 }) {
   final isHorizontal = mode.isHorizontalContinuous;
 
@@ -318,7 +483,7 @@ Widget _reader({
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: ImageViewWebtoon(
-          pages: List.generate(3, _page),
+          pages: pages ?? List.generate(3, _page),
           itemScrollController: ItemScrollController(),
           scrollOffsetController:
               scrollOffsetController ?? ScrollOffsetController(),
@@ -326,13 +491,13 @@ Widget _reader({
               itemPositionsListener ?? ItemPositionsListener.create(),
           scrollDirection: isHorizontal ? Axis.horizontal : Axis.vertical,
           minCacheExtent: 0,
-          initialScrollIndex: 0,
+          initialScrollIndex: initialScrollIndex,
           physics: const ClampingScrollPhysics(),
-          onLongPressData: (_) {},
+          onLongPressData: onLongPressData ?? (_) {},
           onFailedToLoadImage: (_) {},
           backgroundColor: BackgroundColor.black,
-          isDoublePageMode: false,
-          pageMode: PageMode.onePage,
+          isDoublePageMode: isDoublePageMode,
+          pageMode: pageMode,
           isHorizontalContinuous: isHorizontal,
           readerMode: mode,
           readingDirection: readingDirection,
@@ -340,7 +505,6 @@ Widget _reader({
               photoViewController ?? PhotoViewController(initialScale: 1),
           photoViewScaleStateController: PhotoViewScaleStateController(),
           scalePosition: Alignment.center,
-          onScaleEnd: (_) {},
           onDoubleTapDown: (_) {},
           onDoubleTap: () {},
           isScrolling: ValueNotifier(false),
@@ -348,6 +512,24 @@ Widget _reader({
         ),
       ),
     ),
+  );
+}
+
+Finder _verticalPage(int index) => find.byWidgetPredicate(
+  (widget) => widget is ImageViewVertical && widget.data.index == index,
+  skipOffstage: false,
+);
+
+Finder _pagedImage(int index) => find.byWidgetPredicate(
+  (widget) => widget is ImageViewPaged && widget.data.index == index,
+  skipOffstage: false,
+);
+
+Rect _scaleRectAroundCenter(Rect rect, Offset center, double scale) {
+  Offset scalePoint(Offset point) => center + (point - center) * scale;
+  return Rect.fromPoints(
+    scalePoint(rect.topLeft),
+    scalePoint(rect.bottomRight),
   );
 }
 

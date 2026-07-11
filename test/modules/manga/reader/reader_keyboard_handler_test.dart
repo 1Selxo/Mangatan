@@ -75,6 +75,84 @@ void main() {
     expect(previousChapterCalls, 2);
   });
 
+  test('novel mode maps page keys to pages while keeping N and P explicit', () {
+    var previousPageCalls = 0;
+    var nextPageCalls = 0;
+    var previousChapterCalls = 0;
+    var nextChapterCalls = 0;
+    final handler = ReaderKeyboardHandler(
+      onPreviousPage: () => previousPageCalls++,
+      onNextPage: () => nextPageCalls++,
+      onPreviousChapter: () => previousChapterCalls++,
+      onNextChapter: () => nextChapterCalls++,
+      pageKeysNavigatePages: true,
+    );
+
+    handler
+      ..handleKeyEvent(
+        const KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.pageDown,
+          logicalKey: LogicalKeyboardKey.pageDown,
+          timeStamp: Duration.zero,
+        ),
+      )
+      ..handleKeyEvent(
+        const KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.pageUp,
+          logicalKey: LogicalKeyboardKey.pageUp,
+          timeStamp: Duration.zero,
+        ),
+      )
+      ..handleKeyEvent(
+        const KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.keyN,
+          logicalKey: LogicalKeyboardKey.keyN,
+          timeStamp: Duration.zero,
+        ),
+      )
+      ..handleKeyEvent(
+        const KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.keyP,
+          logicalKey: LogicalKeyboardKey.keyP,
+          timeStamp: Duration.zero,
+        ),
+      );
+
+    expect(nextPageCalls, 1);
+    expect(previousPageCalls, 1);
+    expect(nextChapterCalls, 1);
+    expect(previousChapterCalls, 1);
+  });
+
+  test('embedded reader can own horizontal and page navigation keys', () {
+    var pageCalls = 0;
+    final handler = ReaderKeyboardHandler(
+      onPreviousPage: () => pageCalls++,
+      onNextPage: () => pageCalls++,
+      pageKeysNavigatePages: true,
+      delegateHorizontalPageKeysToChild: true,
+    );
+
+    for (final keys in [
+      (PhysicalKeyboardKey.arrowLeft, LogicalKeyboardKey.arrowLeft),
+      (PhysicalKeyboardKey.arrowRight, LogicalKeyboardKey.arrowRight),
+      (PhysicalKeyboardKey.pageUp, LogicalKeyboardKey.pageUp),
+      (PhysicalKeyboardKey.pageDown, LogicalKeyboardKey.pageDown),
+    ]) {
+      expect(
+        handler.handleKeyEvent(
+          KeyDownEvent(
+            physicalKey: keys.$1,
+            logicalKey: keys.$2,
+            timeStamp: Duration.zero,
+          ),
+        ),
+        isFalse,
+      );
+    }
+    expect(pageCalls, 0);
+  });
+
   testWidgets('handled reader shortcuts do not propagate to ancestors', (
     tester,
   ) async {

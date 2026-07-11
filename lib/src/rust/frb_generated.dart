@@ -1393,12 +1393,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EpubChapter dco_decode_epub_chapter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return EpubChapter(
       name: dco_decode_String(arr[0]),
       content: dco_decode_String(arr[1]),
       path: dco_decode_String(arr[2]),
+      href: dco_decode_String(arr[3]),
+      spineIndex: dco_decode_u_32(arr[4]),
+      isNavigationEntry: dco_decode_bool(arr[5]),
     );
   }
 
@@ -1983,6 +1986,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   BigInt dco_decode_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dcoDecodeU64(raw);
@@ -2363,7 +2372,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_name = sse_decode_String(deserializer);
     var var_content = sse_decode_String(deserializer);
     var var_path = sse_decode_String(deserializer);
-    return EpubChapter(name: var_name, content: var_content, path: var_path);
+    var var_href = sse_decode_String(deserializer);
+    var var_spineIndex = sse_decode_u_32(deserializer);
+    var var_isNavigationEntry = sse_decode_bool(deserializer);
+    return EpubChapter(
+      name: var_name,
+      content: var_content,
+      path: var_path,
+      href: var_href,
+      spineIndex: var_spineIndex,
+      isNavigationEntry: var_isNavigationEntry,
+    );
   }
 
   @protected
@@ -3179,6 +3198,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
+  }
+
+  @protected
   BigInt sse_decode_u_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getBigUint64();
@@ -3649,6 +3674,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.content, serializer);
     sse_encode_String(self.path, serializer);
+    sse_encode_String(self.href, serializer);
+    sse_encode_u_32(self.spineIndex, serializer);
+    sse_encode_bool(self.isNavigationEntry, serializer);
   }
 
   @protected
@@ -4371,6 +4399,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_u_16(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint16(self);
+  }
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
   }
 
   @protected

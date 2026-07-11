@@ -448,6 +448,28 @@ class NovelTapToScrollState extends _$NovelTapToScrollState {
 }
 
 @riverpod
+class NovelEpubReadingLayoutState extends _$NovelEpubReadingLayoutState {
+  @override
+  int build() {
+    final value = isar.settings.getSync(227)!.novelEpubReadingLayout ?? 0;
+    return value.clamp(0, 2);
+  }
+
+  void set(int value) {
+    final safeValue = value.clamp(0, 2);
+    final settings = isar.settings.getSync(227);
+    state = safeValue;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..novelEpubReadingLayout = safeValue
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
+@riverpod
 class ShowPagesNumberState extends _$ShowPagesNumberState {
   @override
   build() {

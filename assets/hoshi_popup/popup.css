@@ -31,9 +31,13 @@ body {
     --background-color-dark1: #eeeeee;
     color: var(--text-color);
     background-color: transparent;
-    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif !important;
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", Arial, "Noto Sans JP", "Noto Sans CJK JP", "Meiryo", sans-serif !important;
     overscroll-behavior-y: contain;
     touch-action: pan-y;
+}
+
+body * {
+    font-family: inherit !important;
 }
 
 body {

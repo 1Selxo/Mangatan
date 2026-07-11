@@ -11,4 +11,12 @@ void main() {
   test('page tap zones are disabled by default on desktop', () {
     expect(Settings().usePageTapZones, !isDesktop);
   });
+
+  test('EPUB reading layout is persisted in settings JSON', () {
+    final settings = Settings()..novelEpubReadingLayout = 2;
+    final json = settings.toJson();
+
+    expect(json['novelEpubReadingLayout'], 2);
+    expect(Settings.fromJson(json).novelEpubReadingLayout, 2);
+  });
 }

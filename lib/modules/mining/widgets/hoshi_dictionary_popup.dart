@@ -102,6 +102,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   Player? _audioPlayer;
   String? _requestedQuery;
   String? _resultQuery;
+  String? _renderedQuery;
   String _emptyMessage = 'No dictionary results found.';
 
   @override
@@ -136,11 +137,11 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         ),
       );
     } else if (oldWidget.initialResults != widget.initialResults) {
-      if (_resultQuery == widget.text.trim()) {
-        if (_results.isNotEmpty) {
-          _notifyCachedMatchAfterBuild();
-        }
+      if (_resultQuery == widget.text.trim() && _results.isNotEmpty) {
+        _notifyCachedMatchAfterBuild();
       } else {
+        // Retry an empty or stale result even when the spelling is unchanged
+        // (for example after a failed lookup or dictionary reload).
         unawaited(
           _lookupAndRender(
             widget.text,
@@ -149,6 +150,13 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           ),
         );
       }
+    } else if (oldWidget.onMatchChanged != widget.onMatchChanged &&
+        _resultQuery == widget.text.trim() &&
+        _renderedQuery == widget.text.trim() &&
+        _results.isNotEmpty) {
+      // A warm popup can be presented for the same spelling at a different
+      // reader position. Replay the match only after the new frame is built.
+      _notifyCachedMatchAfterBuild();
     }
   }
 
@@ -240,16 +248,27 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
                   scanLength: hoshiPopupScanLength,
                 ));
       if (!mounted || generation != _lookupGeneration) return;
-      final dictionaryMediaData = await _loadPopupMedia(results);
-      if (!mounted || generation != _lookupGeneration) return;
       final unchanged = query == _resultQuery && identical(results, _results);
-      _setResults(results, dictionaryMediaData: dictionaryMediaData);
+      _setResults(
+        results,
+        dictionaryMediaData: unchanged
+            ? _dictionaryMediaData
+            : const <String, Map<String, String>>{},
+      );
       _resultQuery = query;
       _emptyMessage = 'No dictionary results found.';
-      if (notifyMatch && results.isNotEmpty) {
+      if (!unchanged) await _replaceRender();
+      if (!mounted || generation != _lookupGeneration) return;
+      if (_webReady) _renderedQuery = query;
+      if (notifyMatch && _webReady && results.isNotEmpty) {
+        // Notify the reader only after the warm WebView has accepted the new
+        // render request. A prefetched hidden render can therefore complete
+        // before presentation without moving the reader highlight early.
         widget.onMatchChanged(results.first.matched.length);
       }
-      if (!unchanged) await _replaceRender();
+      if (!unchanged && !_usesStableCustomSchemes && results.isNotEmpty) {
+        unawaited(_hydratePopupMedia(generation, results));
+      }
     } catch (error) {
       if (!mounted || generation != _lookupGeneration) return;
       _setResults(const [], dictionaryMediaData: const {});
@@ -257,10 +276,28 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       _emptyMessage = 'Dictionary lookup failed. Search again to retry.';
       widget.onLookupError?.call(error);
       await _replaceRender();
+      if (mounted && generation == _lookupGeneration && _webReady) {
+        _renderedQuery = query;
+      }
     } finally {
       if (mounted && generation == _lookupGeneration) {
         _notifyLoadingChanged(false);
       }
+    }
+  }
+
+  Future<void> _hydratePopupMedia(
+    int generation,
+    List<HoshiLookupResult> results,
+  ) async {
+    try {
+      final dictionaryMediaData = await _loadPopupMedia(results);
+      if (!mounted || generation != _lookupGeneration) return;
+      _dictionaryMediaData = dictionaryMediaData;
+      await _replaceRender();
+    } catch (_) {
+      // The text definitions are already rendered. Missing optional media
+      // must not delay or invalidate the lookup/highlight interaction.
     }
   }
 
@@ -272,15 +309,20 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<int> _lookupRedirect(String query) async {
+    final generation = ++_lookupGeneration;
+    final normalized = query.trim();
+    _requestedQuery = normalized;
     final results = await HoshidictsLookupBackend.instance.lookup(
-      query,
+      normalized,
       maxResults: hoshiPopupMaxResults,
       scanLength: hoshiPopupScanLength,
     );
+    if (!mounted || generation != _lookupGeneration) return 0;
     final dictionaryMediaData = await _loadPopupMedia(results);
-    if (!mounted) return 0;
+    if (!mounted || generation != _lookupGeneration) return 0;
     _setResults(results, dictionaryMediaData: dictionaryMediaData);
-    _resultQuery = query.trim();
+    _resultQuery = normalized;
+    _renderedQuery = normalized;
     return _entries.length;
   }
 
@@ -414,7 +456,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         if (text.trim().isEmpty) return 0;
         final count = await _lookupRedirect(text);
         if (count > 0) {
-          await controller.evaluateJavascript(source: 'redirect($count);');
+          await _evaluateJavascript('redirect($count);');
         }
         return count;
       },
@@ -631,6 +673,10 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             onLoadStop: (_, _) async {
               _webReady = true;
               await _render(await _stylesFuture);
+              _renderedQuery = _resultQuery;
+              if (_resultQuery == widget.text.trim() && _results.isNotEmpty) {
+                widget.onMatchChanged(_results.first.matched.length);
+              }
               if (_requestedQuery != widget.text.trim()) {
                 await _lookupAndRender(
                   widget.text,
@@ -658,6 +704,8 @@ Map<String, dynamic> _argumentMap(List<dynamic> arguments) {
 String hoshiReplaceRenderScript(int entryCount) =>
     'window.resetHoshiAudioCaches?.();'
     'window.resetHoshiNavigation?.();'
+    'window.getSelection?.()?.removeAllRanges?.();'
+    'window.scrollTo(0, 0);'
     'window.lookupEntries = undefined;'
     'window.entryCount = $entryCount;'
     'document.getElementById("entries-container").innerHTML = "";'
@@ -674,6 +722,8 @@ String hoshiReplaceRenderScriptForEntries(
     '(window.__mangayomiHoshiRenderToken || 0) + 1;'
     'window.resetHoshiAudioCaches?.();'
     'window.resetHoshiNavigation?.();'
+    'window.getSelection?.()?.removeAllRanges?.();'
+    'window.scrollTo(0, 0);'
     'window.hoshiDictionaryMedia = ${jsonEncode(mediaDataUris)};'
     'window.lookupEntries = ${jsonEncode(entries)};'
     'window.entryCount = window.lookupEntries.length;'

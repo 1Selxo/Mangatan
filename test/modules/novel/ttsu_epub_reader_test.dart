@@ -61,4 +61,129 @@ void main() {
     expect(document, contains('text-align: left'));
     expect(document, contains('const initialProgress = 1.0'));
   });
+
+  test(
+    'keeps EPUB-relative resources and stylesheet links in a file session',
+    () {
+      final document = buildTtsuEpubDocument(
+        html: '''
+        <html><head><link rel="stylesheet" href="../css/book.css"></head>
+        <body><p style="display:none">日本語</p><img src="../images/cover.png"></body></html>
+      ''',
+        book: EpubNovel(
+          name: 'Reader fixture',
+          chapters: const [],
+          images: book.images,
+          stylesheets: [
+            EpubResource(
+              name: 'OEBPS/css/book.css',
+              content: Uint8List.fromList([]),
+            ),
+          ],
+        ),
+        title: 'fixture',
+        backgroundColor: '#101010',
+        textColor: '#f0f0f0',
+        fontSize: 18,
+        lineHeight: 1.8,
+        padding: 24,
+        textAlign: 'justify',
+        initialProgress: 0,
+        tapToScroll: true,
+        chapterHref: 'OEBPS/text/chapter.xhtml',
+        resourceUrlFor: (resource) => resource.name.endsWith('.css')
+            ? '../css/book.css'
+            : '../images/cover.png',
+      );
+
+      expect(document, contains('href="../css/book.css"'));
+      expect(document, contains('src="../images/cover.png"'));
+      expect(document, isNot(contains('data:image/png;base64,')));
+      expect(document, isNot(contains('display:none')));
+      expect(document, contains("const lookupAt = (x, y)"));
+      expect(document, contains("call('readerLink', href)"));
+      expect(document, contains('sentenceFor'));
+    },
+  );
+
+  test('uses one selectable DOM for paged and vertical Japanese layouts', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>EPUB reader fixture</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'justify',
+      initialProgress: 0.5,
+      tapToScroll: true,
+      layout: EpubReadingLayout.vertical,
+    );
+
+    expect(document, contains('data-mangatan-reader-layout="vertical"'));
+    expect(document, contains('writing-mode: vertical-rl'));
+    expect(document, contains('const pageMode = true'));
+    expect(document, contains('const verticalWriting = true'));
+    expect(document, contains('const scanLookup ='));
+    expect(document, contains('fragment.querySelectorAll'));
+    expect(document, contains("const axis = verticalWriting\n          ? 'y'"));
+    expect(
+      document,
+      contains(
+        'const yMax = Math.max(0, root.scrollHeight - root.clientHeight)',
+      ),
+    );
+    expect(
+      document,
+      contains(
+        "const pageSize = axis === 'x' ? root.clientWidth : root.clientHeight",
+      ),
+    );
+    expect(document, contains('const calculateProgress = () =>'));
+    expect(document, contains('const restoreProgress = async (value)'));
+    expect(document, contains('range.getClientRects()'));
+    expect(document, isNot(contains('const estimatedPages =')));
+    expect(document, isNot(contains('--mangatan-page-shift')));
+    expect(document, contains("document.addEventListener('wheel'"));
+    expect(document, contains("event.key === 'ArrowLeft'"));
+    expect(document, contains('const highlightMatch = (count, expectedToken)'));
+    expect(
+      document,
+      contains(
+        "CSS.highlights.set('hoshi-selection', new Highlight(...ranges))",
+      ),
+    );
+    expect(document, isNot(contains('selection.addRange(range)')));
+    expect(document, contains('lookupToken'));
+    expect(document, contains('const clearLookup = (expectedToken)'));
+    expect(document, contains("call('readerPrefetch', { text })"));
+    expect(document, isNot(contains('highlightMatch(1)')));
+    expect(document, contains("content.querySelectorAll('ruby')"));
+    expect(document, contains('column-count: auto !important'));
+    expect(document, contains('column-gap: 48.0px !important'));
+    expect(document, contains('alignToPage(context, progress * context.max)'));
+    expect(document, contains('const measureLastContentPage = () =>'));
+    expect(document, contains('measuredPageMax = measureLastContentPage()'));
+    expect(document, contains("'img, svg, video, canvas, table, hr'"));
+    expect(document, contains("content.addEventListener('scroll'"));
+    expect(document, contains('if (pageMode && !verticalWriting)'));
+    expect(document, isNot(contains('maxAligned')));
+    expect(document, contains('background: rgba(138, 180, 248, .62)'));
+    expect(
+      document,
+      contains('background: rgba(160, 160, 160, .4) !important'),
+    );
+  });
+
+  test('writes generated reader shells as HTML beside the source XHTML', () {
+    const document =
+        '<html data-mangatan-reader-href="OEBPS/text/chapter.xhtml"></html>';
+
+    expect(
+      renderedEpubDocumentHref(document, 7),
+      'OEBPS/text/.mangatan-reader-7.html',
+    );
+  });
 }

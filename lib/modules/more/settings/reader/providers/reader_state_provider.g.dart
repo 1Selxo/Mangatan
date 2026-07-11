@@ -413,7 +413,7 @@ final class UsePageTapZonesStateProvider
 }
 
 String _$usePageTapZonesStateHash() =>
-    r'8bdfc5d257eeba63bb4f4ff3ceda766bcc58dc37';
+    r'aa9b5fd9c8959ee014f318d62ff0b29b3f3242df';
 
 abstract class _$UsePageTapZonesState extends $Notifier<bool> {
   bool build();
@@ -466,7 +466,7 @@ final class FullScreenReaderStateProvider
 }
 
 String _$fullScreenReaderStateHash() =>
-    r'6685d29e04c71975c3442a5299299e761ff72997';
+    r'fb8f87677f17c42a53a1e21b9bd6dcb4060162e5';
 
 abstract class _$FullScreenReaderState extends $Notifier<bool> {
   bool build();
@@ -519,7 +519,7 @@ final class NavigationOrderStateProvider
 }
 
 String _$navigationOrderStateHash() =>
-    r'7b40ce1b52f02ebac46ed6d0d5ab9ff9590b6885';
+    r'e4d1293b30e1b3a21280542dd2fb01389ab9921f';
 
 abstract class _$NavigationOrderState extends $Notifier<List<String>> {
   List<String> build();
@@ -1120,6 +1120,60 @@ abstract class _$NovelTapToScrollState extends $Notifier<bool> {
             as $ClassProviderElement<
               AnyNotifier<bool, bool>,
               bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(NovelEpubReadingLayoutState)
+final novelEpubReadingLayoutStateProvider =
+    NovelEpubReadingLayoutStateProvider._();
+
+final class NovelEpubReadingLayoutStateProvider
+    extends $NotifierProvider<NovelEpubReadingLayoutState, int> {
+  NovelEpubReadingLayoutStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'novelEpubReadingLayoutStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$novelEpubReadingLayoutStateHash();
+
+  @$internal
+  @override
+  NovelEpubReadingLayoutState create() => NovelEpubReadingLayoutState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$novelEpubReadingLayoutStateHash() =>
+    r'ac010a295f79828fde3cdc9ace92c6a168c58cf2';
+
+abstract class _$NovelEpubReadingLayoutState extends $Notifier<int> {
+  int build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<int, int>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<int, int>,
+              int,
               Object?,
               Object?
             >;

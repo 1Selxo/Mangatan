@@ -42,7 +42,7 @@ final class DefaultReadingModeStateProvider
 }
 
 String _$defaultReadingModeStateHash() =>
-    r'6125feb2aff79c017dc55ea2faa2591916af051a';
+    r'fa4a07dd8132c847fbe93e72f21f37c338fe6923';
 
 abstract class _$DefaultReadingModeState extends $Notifier<ReaderMode> {
   ReaderMode build();
@@ -55,6 +55,61 @@ abstract class _$DefaultReadingModeState extends $Notifier<ReaderMode> {
             as $ClassProviderElement<
               AnyNotifier<ReaderMode, ReaderMode>,
               ReaderMode,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(DefaultReadingDirectionState)
+final defaultReadingDirectionStateProvider =
+    DefaultReadingDirectionStateProvider._();
+
+final class DefaultReadingDirectionStateProvider
+    extends $NotifierProvider<DefaultReadingDirectionState, ReadingDirection> {
+  DefaultReadingDirectionStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'defaultReadingDirectionStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$defaultReadingDirectionStateHash();
+
+  @$internal
+  @override
+  DefaultReadingDirectionState create() => DefaultReadingDirectionState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ReadingDirection value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ReadingDirection>(value),
+    );
+  }
+}
+
+String _$defaultReadingDirectionStateHash() =>
+    r'f80a55640b6cd19987a7247d193be621e61ef6ec';
+
+abstract class _$DefaultReadingDirectionState
+    extends $Notifier<ReadingDirection> {
+  ReadingDirection build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ReadingDirection, ReadingDirection>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ReadingDirection, ReadingDirection>,
+              ReadingDirection,
               Object?,
               Object?
             >;

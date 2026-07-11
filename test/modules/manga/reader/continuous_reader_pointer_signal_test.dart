@@ -182,7 +182,6 @@ void main() {
     ReaderMode.verticalContinuous,
     ReaderMode.webtoon,
     ReaderMode.horizontalContinuous,
-    ReaderMode.horizontalContinuousRTL,
   ]) {
     testWidgets('ctrl+scroll zooms $mode without scrolling the list', (
       tester,
@@ -255,17 +254,18 @@ void main() {
     expect(photoViewController.scale, greaterThan(1));
   });
 
-  for (final mode in [
-    ReaderMode.horizontalContinuous,
-    ReaderMode.horizontalContinuousRTL,
-  ]) {
-    testWidgets('vertical wheel scrolls $mode by the wheel delta', (
+  for (final direction in ReadingDirection.values) {
+    testWidgets('vertical wheel scrolls horizontal continuous $direction', (
       tester,
     ) async {
       final itemPositionsListener = ItemPositionsListener.create();
 
       await tester.pumpWidget(
-        _reader(mode: mode, itemPositionsListener: itemPositionsListener),
+        _reader(
+          mode: ReaderMode.horizontalContinuous,
+          readingDirection: direction,
+          itemPositionsListener: itemPositionsListener,
+        ),
       );
       final viewportWidth = tester.getSize(find.byType(ImageViewWebtoon)).width;
       final initialLeadingEdge = _leadingEdge(itemPositionsListener);
@@ -292,6 +292,7 @@ void main() {
 
 Widget _reader({
   required ReaderMode mode,
+  ReadingDirection readingDirection = ReadingDirection.leftToRight,
   PhotoViewController? photoViewController,
   ScrollOffsetController? scrollOffsetController,
   ItemPositionsListener? itemPositionsListener,
@@ -334,6 +335,7 @@ Widget _reader({
           pageMode: PageMode.onePage,
           isHorizontalContinuous: isHorizontal,
           readerMode: mode,
+          readingDirection: readingDirection,
           photoViewController:
               photoViewController ?? PhotoViewController(initialScale: 1),
           photoViewScaleStateController: PhotoViewScaleStateController(),
@@ -342,7 +344,7 @@ Widget _reader({
           onDoubleTapDown: (_) {},
           onDoubleTap: () {},
           isScrolling: ValueNotifier(false),
-          reverse: mode.isRTL,
+          reverse: isHorizontal && readingDirection.isRtl,
         ),
       ),
     ),

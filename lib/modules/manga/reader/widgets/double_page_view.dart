@@ -102,16 +102,6 @@ class DoublePageViewState extends State<DoublePageView>
     };
   }
 
-  void _onScaleEnd(
-    BuildContext context,
-    ScaleEndDetails details,
-    PhotoViewControllerValue controllerValue,
-  ) {
-    if (controllerValue.scale! < 1) {
-      _photoViewScaleStateController.reset();
-    }
-  }
-
   double get pixelRatio => View.of(context).devicePixelRatio;
   Size get size => View.of(context).physicalSize / pixelRatio;
 
@@ -126,10 +116,7 @@ class DoublePageViewState extends State<DoublePageView>
   void initState() {
     super.initState();
     if (widget.isPagedMode) {
-      _scaleAnimationController = AnimationController(
-        duration: _doubleTapAnimationDuration(),
-        vsync: this,
-      );
+      _scaleAnimationController = AnimationController(vsync: this);
       _animation = Tween(begin: 1.0, end: 2.0).animate(
         CurvedAnimation(curve: Curves.ease, parent: _scaleAnimationController),
       );
@@ -156,6 +143,7 @@ class DoublePageViewState extends State<DoublePageView>
 
     setState(() {
       if (_scaleAnimationController.isAnimating) return;
+      _scaleAnimationController.duration = _doubleTapAnimationDuration();
 
       if (_photoViewController.scale == 1.0) {
         _scalePosition = _computeAlignmentByTapOffset(tapPosition);
@@ -217,7 +205,7 @@ class DoublePageViewState extends State<DoublePageView>
             controller: _photoViewController,
             scaleStateController: _photoViewScaleStateController,
             basePosition: _scalePosition,
-            onScaleEnd: _onScaleEnd,
+            minScale: readerMinimumZoomScale,
             child: Listener(
               behavior: HitTestBehavior.translucent,
               onPointerSignal: (event) =>
@@ -244,7 +232,6 @@ class DoublePageViewState extends State<DoublePageView>
       event,
       zoomContext: zoomContext ?? context,
       photoViewController: _photoViewController,
-      scaleStateController: _photoViewScaleStateController,
       basePosition: _scalePosition,
     );
   }

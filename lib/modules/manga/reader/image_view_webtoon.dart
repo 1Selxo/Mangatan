@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/continuous_reader_zoom_viewport.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_vertical.dart';
@@ -33,7 +34,6 @@ class ImageViewWebtoon extends StatelessWidget {
   final PhotoViewController photoViewController;
   final PhotoViewScaleStateController photoViewScaleStateController;
   final Alignment scalePosition;
-  final Function(ScaleEndDetails) onScaleEnd;
   final Function(Offset) onDoubleTapDown;
   final VoidCallback onDoubleTap;
   final int webtoonSidePadding;
@@ -62,7 +62,6 @@ class ImageViewWebtoon extends StatelessWidget {
     required this.photoViewController,
     required this.photoViewScaleStateController,
     required this.scalePosition,
-    required this.onScaleEnd,
     required this.onDoubleTapDown,
     required this.onDoubleTap,
     required this.isScrolling,
@@ -81,32 +80,43 @@ class ImageViewWebtoon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder: (zoomContext, _) => PhotoViewGallery.builder(
-        itemCount: 1,
-        builder: (_, _) => PhotoViewGalleryPageOptions.customChild(
-          controller: photoViewController,
-          scaleStateController: photoViewScaleStateController,
-          basePosition: scalePosition,
-          onScaleEnd: (context, details, controllerValue) =>
-              onScaleEnd(details),
-          child: _wrapPointerSignalHandler(
-            zoomContext: zoomContext,
-            child: ScrollablePositionedList.separated(
-              scrollDirection: scrollDirection,
-              reverse: reverse,
-              minCacheExtent: minCacheExtent,
-              initialScrollIndex: initialScrollIndex,
-              itemCount: isDoublePageMode && !isHorizontalContinuous
-                  ? _doublePageSpreadIndices.length
-                  : pages.length,
-              physics: physics,
-              itemScrollController: itemScrollController,
-              scrollOffsetController: scrollOffsetController,
-              itemPositionsListener: itemPositionsListener,
-              itemBuilder: (context, index) =>
-                  _buildItem(context, index, zoomContext),
-              separatorBuilder: (context, index) =>
-                  _buildSeparator(context, index, zoomContext),
+      builder: (zoomContext, constraints) => ContinuousReaderZoomViewport(
+        controller: photoViewController,
+        scrollDirection: scrollDirection,
+        alignment: scalePosition,
+        child: PhotoViewGallery.builder(
+          itemCount: 1,
+          builder: (_, _) => PhotoViewGalleryPageOptions.customChild(
+            controller: photoViewController,
+            scaleStateController: photoViewScaleStateController,
+            basePosition: scalePosition,
+            minScale: readerMinimumZoomScale,
+            child: _wrapPointerSignalHandler(
+              zoomContext: zoomContext,
+              child: ScrollablePositionedList.separated(
+                scrollDirection: scrollDirection,
+                reverse: reverse,
+                minCacheExtent: minCacheExtent,
+                initialScrollIndex: initialScrollIndex,
+                itemCount: isDoublePageMode && !isHorizontalContinuous
+                    ? _doublePageSpreadIndices.length
+                    : pages.length,
+                physics: ContinuousReaderZoomScrollPhysics(
+                  controller: photoViewController,
+                  alignment: scalePosition,
+                  baseViewportDimension: scrollDirection == Axis.vertical
+                      ? constraints.maxHeight
+                      : constraints.maxWidth,
+                  parent: physics,
+                ),
+                itemScrollController: itemScrollController,
+                scrollOffsetController: scrollOffsetController,
+                itemPositionsListener: itemPositionsListener,
+                itemBuilder: (context, index) =>
+                    _buildItem(context, index, zoomContext),
+                separatorBuilder: (context, index) =>
+                    _buildSeparator(context, index, zoomContext),
+              ),
             ),
           ),
         ),
@@ -243,7 +253,6 @@ class ImageViewWebtoon extends StatelessWidget {
       event,
       zoomContext: zoomContext,
       photoViewController: photoViewController,
-      scaleStateController: photoViewScaleStateController,
       basePosition: scalePosition,
     )) {
       return;

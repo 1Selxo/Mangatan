@@ -325,16 +325,6 @@ class _MangaChapterPageGalleryState
       PhotoViewScaleStateController();
   final List<int> _cropBorderCheckList = [];
 
-  void _onScaleEnd(
-    BuildContext context,
-    ScaleEndDetails details,
-    PhotoViewControllerValue controllerValue,
-  ) {
-    if (controllerValue.scale! < 1) {
-      _photoViewScaleStateController.reset();
-    }
-  }
-
   late final _extendedController = PageController(initialPage: _currentIndex!);
   final Map<int, GlobalKey<DoublePageViewState>> _pagedViewKeys = {};
 
@@ -469,11 +459,6 @@ class _MangaChapterPageGalleryState
                             photoViewScaleStateController:
                                 _photoViewScaleStateController,
                             scalePosition: _scalePosition,
-                            onScaleEnd: (details) => _onScaleEnd(
-                              context,
-                              details,
-                              _photoViewController.value,
-                            ),
                             onDoubleTapDown: (offset) => _toggleScale(offset),
                             onDoubleTap: () {},
                             webtoonSidePadding: ref.watch(

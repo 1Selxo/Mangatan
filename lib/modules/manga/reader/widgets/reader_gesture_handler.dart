@@ -93,7 +93,7 @@ class ReaderGestureHandler extends StatelessWidget {
     };
     return Listener(
       onPointerMove: (event) {
-        ReaderOcrState.handleMiddleLookupMove(event.position, event.buttons);
+        ReaderOcrState.handleMiddleLookupMove(event.position);
       },
       child: MouseRegion(
         opaque: false,

@@ -145,12 +145,8 @@ class ReaderOcrState {
     return true;
   }
 
-  static void handleMiddleLookupMove(Offset globalPosition, int buttons) {
+  static void handleMiddleLookupMove(Offset globalPosition) {
     if (!_middleLookupActive) return;
-    if (buttons != kMiddleMouseButton) {
-      _middleLookupActive = false;
-      return;
-    }
     unawaited(handleHover(globalPosition));
   }
 

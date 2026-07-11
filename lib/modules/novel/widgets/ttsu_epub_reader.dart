@@ -1078,6 +1078,7 @@ String buildTtsuEpubDocument({
       let lastPointerX = null;
       let lastPointerY = null;
       let shiftLookupActive = false;
+      let middleLookupActive = false;
       let lastHeldLookupKey = null;
       let nextTextNodeId = 0;
       const textNodeIds = new WeakMap();
@@ -1543,8 +1544,7 @@ String buildTtsuEpubDocument({
         prefetchTimer = setTimeout(() => prefetchAt(x, y), 70);
         const shiftScan = lookupTrigger === 'shift' &&
           (event.shiftKey || shiftLookupActive);
-        const middleScan = lookupTrigger === 'middleClick' &&
-          event.buttons === 4;
+        const middleScan = lookupTrigger === 'middleClick' && middleLookupActive;
         if (shiftScan || middleScan) {
           triggerHeldLookupAt(x, y);
         }
@@ -1552,6 +1552,7 @@ String buildTtsuEpubDocument({
       document.addEventListener('pointerdown', (event) => {
         if (lookupTrigger === 'middleClick' && event.button === 1) {
           event.preventDefault();
+          middleLookupActive = true;
           lastHeldLookupKey = null;
           if (event.target !== action && !selectionText(window.getSelection())) {
             triggerHeldLookupAt(event.clientX, event.clientY);
@@ -1563,15 +1564,21 @@ String buildTtsuEpubDocument({
         prefetchAt(event.clientX, event.clientY);
       }, { passive: false });
       document.addEventListener('pointerup', (event) => {
-        if (lookupTrigger !== 'middleClick' || event.button !== 1) return;
+        if (lookupTrigger !== 'middleClick' || !middleLookupActive) return;
         event.preventDefault();
         event.stopPropagation();
+        middleLookupActive = false;
+        lastHeldLookupKey = null;
+      });
+      document.addEventListener('pointercancel', () => {
+        middleLookupActive = false;
         lastHeldLookupKey = null;
       });
       document.addEventListener('auxclick', (event) => {
         if (lookupTrigger !== 'middleClick' || event.button !== 1) return;
         event.preventDefault();
         event.stopPropagation();
+        middleLookupActive = false;
       }, true);
       document.addEventListener('click', (event) => {
         if (event.target === action) return;
@@ -1662,6 +1669,11 @@ String buildTtsuEpubDocument({
       document.addEventListener('keyup', (event) => {
         if (lookupTrigger !== 'shift' || event.key !== 'Shift') return;
         setShiftLookupActive(false);
+      });
+      window.addEventListener('blur', () => {
+        shiftLookupActive = false;
+        middleLookupActive = false;
+        lastHeldLookupKey = null;
       });
 
       // Hoshi normalizes ruby base text before retaining DOM ranges. This

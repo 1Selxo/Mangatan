@@ -63,7 +63,9 @@ void main() {
     expect(document, contains("document.addEventListener('pointerup'"));
     expect(document, contains("document.addEventListener('auxclick'"));
     expect(document, contains("event.button !== 1"));
-    expect(document, contains("event.buttons === 4"));
+    expect(document, contains('middleLookupActive = true'));
+    expect(document, contains("document.addEventListener('pointercancel'"));
+    expect(document, contains("middleLookupActive"));
     expect(document, contains('triggerHeldLookupAt(x, y)'));
     expect(document, contains("event.preventDefault()"));
   });

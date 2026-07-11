@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 
 void main() {
@@ -39,6 +40,59 @@ void main() {
     expect(document, contains("call('readerDictionary'"));
     expect(document, contains('const initialProgress = 0.25'));
     expect(document, contains('user-select: text'));
+    expect(document, contains("const lookupTrigger = \"leftClick\""));
+  });
+
+  test('generates middle-click dictionary lookup handling', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>辞書</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      lookupTrigger: DictionaryLookupTrigger.middleClick,
+    );
+
+    expect(document, contains("const lookupTrigger = \"middleClick\""));
+    expect(document, contains("document.addEventListener('pointerup'"));
+    expect(document, contains("document.addEventListener('auxclick'"));
+    expect(document, contains("event.button !== 1"));
+    expect(document, contains("event.buttons === 4"));
+    expect(document, contains('triggerHeldLookupAt(x, y)'));
+    expect(document, contains("event.preventDefault()"));
+  });
+
+  test('generates left/right-agnostic Shift dictionary lookup handling', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>辞書</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      lookupTrigger: DictionaryLookupTrigger.shift,
+    );
+
+    expect(document, contains("const lookupTrigger = \"shift\""));
+    expect(document, contains("event.key === 'Shift'"));
+    expect(document, contains('!event.repeat'));
+    expect(document, contains('const setShiftLookupActive = (active) =>'));
+    expect(document, contains('setShiftLookupActive(true);'));
+    expect(document, contains("document.addEventListener('keyup'"));
+    expect(document, contains('setShiftLookupActive(false);'));
+    expect(document, contains("event.shiftKey || shiftLookupActive"));
+    expect(document, contains('triggerHeldLookupAt(x, y)'));
   });
 
   test('does not allow EPUB markup to inject executable elements', () {
@@ -100,7 +154,7 @@ void main() {
       expect(document, contains('src="../images/cover.png"'));
       expect(document, isNot(contains('data:image/png;base64,')));
       expect(document, isNot(contains('display:none')));
-      expect(document, contains("const lookupAt = (x, y)"));
+      expect(document, contains("const lookupAt = (x, y, existingHit = null)"));
       expect(document, contains("call('readerLink', href)"));
       expect(document, contains('sentenceFor'));
     },

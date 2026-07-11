@@ -398,6 +398,7 @@ class _MangaChapterPageGalleryState
       onFullScreen: () => _setFullScreen(),
       onNextChapter: () => _goToChapter(true),
       onPreviousChapter: () => _goToChapter(false),
+      onLookupTrigger: ReaderOcrState.handleLookupTriggerKey,
     ).wrapWithKeyboardListener(
       isReverseHorizontal: _isReverseHorizontal,
       focusNode: _keyboardFocusNode,

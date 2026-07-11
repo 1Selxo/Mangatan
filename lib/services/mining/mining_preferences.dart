@@ -5,6 +5,15 @@ enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }
 
 enum DictionaryThemePreference { system, light, dark, black }
 
+enum DictionaryLookupTrigger { leftClick, shift, middleClick }
+
+DictionaryLookupTrigger dictionaryLookupTriggerFromName(String? name) {
+  return DictionaryLookupTrigger.values.firstWhere(
+    (value) => value.name == name,
+    orElse: () => DictionaryLookupTrigger.leftClick,
+  );
+}
+
 enum AnkiAudioSourceType { customUrl, customJson }
 
 class AnkiAudioPreferences {
@@ -128,6 +137,7 @@ class MiningPreferences {
   static const _ocrBoxScaleX = 'ocr_box_scale_x';
   static const _ocrBoxScaleY = 'ocr_box_scale_y';
   static const _dictionaryPopupWidth = 'dictionary_popup_width';
+  static const _dictionaryLookupTrigger = 'dictionary_lookup_trigger';
   static const _dictionaryPopupHeight = 'dictionary_popup_height';
   static const _dictionaryFontSize = 'dictionary_font_size';
   static const _dictionaryTheme = 'dictionary_theme';
@@ -351,6 +361,22 @@ class MiningPreferences {
 
   static Future<void> setOcrLookupOnHover(bool value) async {
     await (await _boxOrNull())?.put(_ocrLookupOnHover, value);
+  }
+
+  static Future<DictionaryLookupTrigger> getDictionaryLookupTrigger() async {
+    final name =
+        (await _boxOrNull())?.get(
+              _dictionaryLookupTrigger,
+              defaultValue: DictionaryLookupTrigger.leftClick.name,
+            )
+            as String?;
+    return dictionaryLookupTriggerFromName(name);
+  }
+
+  static Future<void> setDictionaryLookupTrigger(
+    DictionaryLookupTrigger value,
+  ) async {
+    await (await _boxOrNull())?.put(_dictionaryLookupTrigger, value.name);
   }
 
   static Future<DictionaryPopupPreferences>

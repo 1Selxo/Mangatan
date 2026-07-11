@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dialog.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -29,6 +30,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   double _boxScaleY = 1;
   bool _outlineVisible = true;
   bool _lookupOnHover = false;
+  DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
   bool _overlayEnabled = true;
   bool _screenAiAvailable = false;
   bool _loading = true;
@@ -66,6 +68,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getAnkiAudioPreferences(),
       MiningPreferences.getAnkiEndpoint(),
       ScreenAiOcrClient.isAvailable(),
+      MiningPreferences.getDictionaryLookupTrigger(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -83,6 +86,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _ankiAudioPreferences = values[11] as AnkiAudioPreferences;
       _ankiEndpoint = values[12] as Uri;
       _screenAiAvailable = values[13] as bool;
+      _lookupTrigger = values[14] as DictionaryLookupTrigger;
       _loading = false;
     });
     unawaited(_refreshAnki(silent: true));
@@ -651,6 +655,39 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     });
                     MiningPreferences.setShowPitchText(value);
                   },
+                ),
+                const Divider(height: 24),
+                const _SectionHeader('Lookup behavior'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<DictionaryLookupTrigger>(
+                    initialValue: _lookupTrigger,
+                    decoration: const InputDecoration(
+                      labelText: 'Lookup trigger',
+                      helperText:
+                          'Used in manga and EPUB readers when hover lookup is off',
+                      prefixIcon: Icon(Icons.mouse_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: DictionaryLookupTrigger.leftClick,
+                        child: Text('Left click'),
+                      ),
+                      DropdownMenuItem(
+                        value: DictionaryLookupTrigger.shift,
+                        child: Text('Hold Shift'),
+                      ),
+                      DropdownMenuItem(
+                        value: DictionaryLookupTrigger.middleClick,
+                        child: Text('Hold middle click'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _lookupTrigger = value);
+                      unawaited(ReaderLookupTriggerState.setTrigger(value));
+                    },
+                  ),
                 ),
                 const Divider(height: 24),
                 const _SectionHeader('OCR overlay'),

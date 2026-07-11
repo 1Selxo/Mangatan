@@ -10,10 +10,12 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
 import 'package:mangayomi/services/get_html_content.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:path/path.dart' as p;
@@ -99,6 +101,16 @@ class TtsuEpubReaderController {
     );
     return _javascriptNumber(value);
   }
+
+  Future<bool?> setShiftLookupActive(bool active) async {
+    final webView = _webView;
+    if (webView == null) return null;
+    final value = await webView.evaluateJavascript(
+      source:
+          'Boolean(window.mangatanReader?.setShiftLookupActive?.($active));',
+    );
+    return _javascriptNullableBool(value);
+  }
 }
 
 /// Hoshi-style EPUB reader.
@@ -168,6 +180,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   int _dictionaryGeneration = 0;
   String? _prefetchedLookupText;
   Future<List<HoshiLookupResult>>? _prefetchedLookupResults;
+  DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
 
   String? get _chapterHref {
     final chapterId = widget.chapter.url;
@@ -185,7 +198,17 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   @override
   void initState() {
     super.initState();
+    ReaderLookupTriggerState.trigger.addListener(_handleLookupTriggerChanged);
     unawaited(_prepareBundle());
+  }
+
+  void _handleLookupTriggerChanged() {
+    final trigger = ReaderLookupTriggerState.trigger.value;
+    if (trigger == _lookupTrigger) return;
+    _lookupTrigger = trigger;
+    if (_bundle != null && !_isPreparing) {
+      unawaited(_reloadAtCurrentPosition());
+    }
   }
 
   @override
@@ -227,6 +250,8 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     }
 
     try {
+      await ReaderLookupTriggerState.initialize();
+      _lookupTrigger = ReaderLookupTriggerState.trigger.value;
       final bundle = await _EpubRenderBundle.create(
         book: widget.book,
         chapterHref: _chapterHref,
@@ -299,12 +324,16 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     tapToScroll: widget.tapToScroll,
     removeExtraParagraphSpacing: widget.removeExtraParagraphSpacing,
     layout: widget.layout,
+    lookupTrigger: _lookupTrigger,
     chapterHref: _chapterHref,
     resourceUrlFor: resourceUrlFor ?? _bundle?.relativeUrlFor,
   );
 
   @override
   void dispose() {
+    ReaderLookupTriggerState.trigger.removeListener(
+      _handleLookupTriggerChanged,
+    );
     final controller = _webView;
     if (controller != null) widget.controller.detach(controller);
     final bundle = _bundle;
@@ -851,6 +880,7 @@ String buildTtsuEpubDocument({
   required bool tapToScroll,
   bool removeExtraParagraphSpacing = false,
   EpubReadingLayout layout = EpubReadingLayout.scroll,
+  DictionaryLookupTrigger lookupTrigger = DictionaryLookupTrigger.leftClick,
   String? chapterHref,
   String? Function(EpubResource resource)? resourceUrlFor,
 }) {
@@ -883,6 +913,7 @@ String buildTtsuEpubDocument({
   final layoutValue = layout.documentValue;
   final pageMode = layout.isPaged;
   final verticalWriting = layout == EpubReadingLayout.vertical;
+  final lookupTriggerValue = jsonEncode(lookupTrigger.name);
   final pageGap = (padding * 2).toStringAsFixed(1);
 
   return '''<!doctype html>
@@ -1033,6 +1064,7 @@ String buildTtsuEpubDocument({
       const tapZones = $tapZones;
       const pageMode = $pageMode;
       const verticalWriting = $verticalWriting;
+      const lookupTrigger = $lookupTriggerValue;
       const content = document.getElementById('reader-content');
       const action = document.getElementById('dictionary-action');
       let progressFrame = 0;
@@ -1043,6 +1075,12 @@ String buildTtsuEpubDocument({
       let prefetchTimer = 0;
       let lastPrefetchedText = '';
       let lookupHighlight = false;
+      let lastPointerX = null;
+      let lastPointerY = null;
+      let shiftLookupActive = false;
+      let lastHeldLookupKey = null;
+      let nextTextNodeId = 0;
+      const textNodeIds = new WeakMap();
       let measuredPageMax = null;
 
       const call = (name, payload) => {
@@ -1383,8 +1421,8 @@ String buildTtsuEpubDocument({
         CSS.highlights.set('hoshi-selection', new Highlight(...ranges));
         return true;
       };
-      const lookupAt = (x, y) => {
-        const hit = characterAt(x, y);
+      const lookupAt = (x, y, existingHit = null) => {
+        const hit = existingHit || characterAt(x, y);
         if (!hit) return null;
         const scan = scanLookup(hit.node, hit.offset);
         const query = scan.text;
@@ -1439,6 +1477,37 @@ String buildTtsuEpubDocument({
         return true;
       };
       const clearSelection = () => clearLookup();
+      const triggerLookupAt = (x, y, hit = null) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+        hideAction();
+        const lookup = lookupAt(x, y, hit);
+        if (!lookup) { clearLookup(); return false; }
+        call('readerDictionary', lookup);
+        return true;
+      };
+      const triggerHeldLookupAt = (x, y) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+        const hit = characterAt(x, y);
+        if (!hit) { lastHeldLookupKey = null; clearLookup(); return false; }
+        let nodeId = textNodeIds.get(hit.node);
+        if (nodeId == null) {
+          nodeId = ++nextTextNodeId;
+          textNodeIds.set(hit.node, nodeId);
+        }
+        const key = nodeId + ':' + hit.offset;
+        if (key === lastHeldLookupKey) return true;
+        lastHeldLookupKey = key;
+        return triggerLookupAt(x, y, hit);
+      };
+      const setShiftLookupActive = (active) => {
+        if (lookupTrigger !== 'shift') return false;
+        const wasActive = shiftLookupActive;
+        shiftLookupActive = Boolean(active);
+        if (!shiftLookupActive) { lastHeldLookupKey = null; return true; }
+        if (wasActive) return true;
+        lastHeldLookupKey = null;
+        return triggerHeldLookupAt(lastPointerX, lastPointerY);
+      };
       window.mangatanReader = {
         fraction,
         calculateProgress,
@@ -1450,6 +1519,7 @@ String buildTtsuEpubDocument({
         highlightMatch,
         clearLookup,
         clearSelection,
+        setShiftLookupActive,
         isReady: () => ready,
       };
 
@@ -1468,20 +1538,47 @@ String buildTtsuEpubDocument({
       document.addEventListener('pointermove', (event) => {
         if (event.pointerType && event.pointerType !== 'mouse') return;
         const x = event.clientX; const y = event.clientY;
+        lastPointerX = x; lastPointerY = y;
         clearTimeout(prefetchTimer);
         prefetchTimer = setTimeout(() => prefetchAt(x, y), 70);
+        const shiftScan = lookupTrigger === 'shift' &&
+          (event.shiftKey || shiftLookupActive);
+        const middleScan = lookupTrigger === 'middleClick' &&
+          event.buttons === 4;
+        if (shiftScan || middleScan) {
+          triggerHeldLookupAt(x, y);
+        }
       }, { passive: true });
       document.addEventListener('pointerdown', (event) => {
+        if (lookupTrigger === 'middleClick' && event.button === 1) {
+          event.preventDefault();
+          lastHeldLookupKey = null;
+          if (event.target !== action && !selectionText(window.getSelection())) {
+            triggerHeldLookupAt(event.clientX, event.clientY);
+          }
+        }
+        if (!event.pointerType || event.pointerType === 'mouse') {
+          lastPointerX = event.clientX; lastPointerY = event.clientY;
+        }
         prefetchAt(event.clientX, event.clientY);
-      }, { passive: true });
+      }, { passive: false });
+      document.addEventListener('pointerup', (event) => {
+        if (lookupTrigger !== 'middleClick' || event.button !== 1) return;
+        event.preventDefault();
+        event.stopPropagation();
+        lastHeldLookupKey = null;
+      });
+      document.addEventListener('auxclick', (event) => {
+        if (lookupTrigger !== 'middleClick' || event.button !== 1) return;
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
       document.addEventListener('click', (event) => {
         if (event.target === action) return;
         const selection = window.getSelection(); if (selectionText(selection)) return;
         const link = event.target.closest?.('a[href]');
         if (link) { event.preventDefault(); clearLookup(); const href = link.getAttribute('href') || ''; if (href.startsWith('#')) jumpToFragment(href); else call('readerLink', href); return; }
-        hideAction();
-        const lookup = lookupAt(event.clientX, event.clientY);
-        if (lookup) { call('readerDictionary', lookup); return; }
+        if (lookupTrigger === 'leftClick' && triggerLookupAt(event.clientX, event.clientY)) return;
         clearLookup();
         call('readerTap', { x: event.clientX, y: event.clientY, width: window.innerWidth, height: window.innerHeight, tapZones });
       });
@@ -1537,6 +1634,12 @@ String buildTtsuEpubDocument({
         }, 120);
       }, { passive: true });
       document.addEventListener('keydown', (event) => {
+        if (lookupTrigger === 'shift' && event.key === 'Shift' && !event.repeat) {
+          event.preventDefault();
+          event.stopPropagation();
+          setShiftLookupActive(true);
+          return;
+        }
         if (event.key === 'PageDown') {
           event.preventDefault();
           if (!scrollPage(1)) call('readerChapter', 1);
@@ -1555,6 +1658,10 @@ String buildTtsuEpubDocument({
         }
         if (event.key.toLowerCase() === 'n') call('readerChapter', 1);
         if (event.key.toLowerCase() === 'm') call('readerChapter', -1);
+      });
+      document.addEventListener('keyup', (event) => {
+        if (lookupTrigger !== 'shift' || event.key !== 'Shift') return;
+        setShiftLookupActive(false);
       });
 
       // Hoshi normalizes ruby base text before retaining DOM ranges. This

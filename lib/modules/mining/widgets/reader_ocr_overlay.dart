@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/chrome_lens_ocr.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -33,6 +35,8 @@ class ReaderOcrState {
   static int _scanGeneration = 0;
   static int _paintGeneration = 0;
   static bool _popupWasVisibleOnPointerDown = false;
+  static Offset? _lastPointerPosition;
+  static bool _middleLookupActive = false;
   static List<UChapDataPreload> _lastScanPages = const [];
   static int _lastStartIndex = 0;
   static Future<void> Function(UChapDataPreload)? _lastPreparePage;
@@ -50,6 +54,7 @@ class ReaderOcrState {
         MiningPreferences.getOcrOverlayEnabled(),
         MiningPreferences.getOcrOutlineVisible(),
         MiningPreferences.getOcrLookupOnHover(),
+        ReaderLookupTriggerState.initialize(),
       ]);
       enabled.value = values[0] as bool;
       outlineVisible.value = values[1] as bool;
@@ -116,19 +121,50 @@ class ReaderOcrState {
     return true;
   }
 
-  static void handlePointerDown() {
+  static void handlePointerDown(Offset globalPosition) {
+    _lastPointerPosition = globalPosition;
     _popupWasVisibleOnPointerDown = DictionaryLookupPopup.isActive;
   }
 
   static void handlePointerCancel() {
     _popupWasVisibleOnPointerDown = false;
+    _middleLookupActive = false;
+  }
+
+  static bool handleMiddleLookupStart(Offset globalPosition, int buttons) {
+    if (!enabled.value ||
+        buttons != kMiddleMouseButton ||
+        lookupOnHover.value ||
+        ReaderLookupTriggerState.trigger.value !=
+            DictionaryLookupTrigger.middleClick) {
+      return false;
+    }
+    _middleLookupActive = true;
+    _lastPointerPosition = globalPosition;
+    unawaited(handleHover(globalPosition));
+    return true;
+  }
+
+  static void handleMiddleLookupMove(Offset globalPosition, int buttons) {
+    if (!_middleLookupActive) return;
+    if (buttons != kMiddleMouseButton) {
+      _middleLookupActive = false;
+      return;
+    }
+    unawaited(handleHover(globalPosition));
+  }
+
+  static void handleMiddleLookupEnd() {
+    _middleLookupActive = false;
   }
 
   static Future<bool> handleHover(Offset globalPosition) async {
+    _lastPointerPosition = globalPosition;
     if (!enabled.value) return false;
+    final hoverLookupActive = _hoverLookupActive;
     final hit = _bestGlobalHit(globalPosition);
     if (hit == null) {
-      if (lookupOnHover.value) {
+      if (hoverLookupActive) {
         _scheduleHoverDismiss();
       } else {
         clearActive();
@@ -136,7 +172,7 @@ class ReaderOcrState {
       return false;
     }
     _activateGlobalHit(hit);
-    if (!lookupOnHover.value) {
+    if (!hoverLookupActive) {
       hit.controller._revealHit(hit.tapHit);
       hit.controller._prefetchHit(hit.tapHit);
       return true;
@@ -150,11 +186,36 @@ class ReaderOcrState {
   }
 
   static void handleHoverExit() {
-    if (lookupOnHover.value) {
+    _lastPointerPosition = null;
+    if (_hoverLookupActive) {
       _scheduleHoverDismiss();
     } else {
       clearActive();
     }
+  }
+
+  static bool handleLookupTriggerKey(KeyEvent event) {
+    if (!readerLookupTriggerMatchesKey(
+      ReaderLookupTriggerState.trigger.value,
+      event,
+    )) {
+      return false;
+    }
+    if (event is KeyUpEvent) {
+      return true;
+    }
+    if (!enabled.value || lookupOnHover.value) return false;
+    final position = _lastPointerPosition;
+    if (position != null) unawaited(handleHover(position));
+    return true;
+  }
+
+  static bool get _hoverLookupActive {
+    return lookupOnHover.value ||
+        _middleLookupActive ||
+        (ReaderLookupTriggerState.trigger.value ==
+                DictionaryLookupTrigger.shift &&
+            HardwareKeyboard.instance.isShiftPressed);
   }
 
   static _GlobalOcrHit? _bestGlobalHit(Offset globalPosition) {
@@ -190,9 +251,7 @@ class ReaderOcrState {
   }
 
   static bool _isCurrentHoverLookup(int generation, String key) {
-    return lookupOnHover.value &&
-        _hoverGeneration == generation &&
-        _hoverLookupKey == key;
+    return _hoverGeneration == generation && _hoverLookupKey == key;
   }
 
   static void _setHoverPopup(

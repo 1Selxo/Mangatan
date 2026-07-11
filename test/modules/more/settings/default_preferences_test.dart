@@ -8,6 +8,21 @@ void main() {
     expect(AnkiAudioPreferences.defaults.enabled, isTrue);
   });
 
+  test('dictionary lookup trigger falls back to left click', () {
+    expect(
+      dictionaryLookupTriggerFromName(null),
+      DictionaryLookupTrigger.leftClick,
+    );
+    expect(
+      dictionaryLookupTriggerFromName('invalid'),
+      DictionaryLookupTrigger.leftClick,
+    );
+    expect(
+      dictionaryLookupTriggerFromName('middleClick'),
+      DictionaryLookupTrigger.middleClick,
+    );
+  });
+
   test('page tap zones are disabled by default on desktop', () {
     expect(Settings().usePageTapZones, !isDesktop);
   });

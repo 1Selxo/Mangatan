@@ -1,6 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 
 void main() {
   test('keeps single-page OCR paint rect unchanged', () {
@@ -55,6 +58,91 @@ void main() {
       readerOcrShouldConsumeMissedTap(
         popupWasVisibleOnPointerDown: false,
         dismissedPopup: false,
+      ),
+      isFalse,
+    );
+  });
+
+  test('matches only the configured lookup pointer button', () {
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.leftClick,
+        kPrimaryButton,
+      ),
+      isTrue,
+    );
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.leftClick,
+        kMiddleMouseButton,
+      ),
+      isFalse,
+    );
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.middleClick,
+        kMiddleMouseButton,
+      ),
+      isTrue,
+    );
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.middleClick,
+        kPrimaryButton | kMiddleMouseButton,
+      ),
+      isFalse,
+    );
+  });
+
+  test('matches either Shift key on key down and key up', () {
+    for (final keys in [
+      (PhysicalKeyboardKey.shiftLeft, LogicalKeyboardKey.shiftLeft),
+      (PhysicalKeyboardKey.shiftRight, LogicalKeyboardKey.shiftRight),
+    ]) {
+      expect(
+        readerLookupTriggerMatchesKey(
+          DictionaryLookupTrigger.shift,
+          KeyDownEvent(
+            physicalKey: keys.$1,
+            logicalKey: keys.$2,
+            timeStamp: Duration.zero,
+          ),
+        ),
+        isTrue,
+      );
+    }
+
+    expect(
+      readerLookupTriggerMatchesKey(
+        DictionaryLookupTrigger.shift,
+        const KeyUpEvent(
+          physicalKey: PhysicalKeyboardKey.shiftRight,
+          logicalKey: LogicalKeyboardKey.shiftRight,
+          timeStamp: Duration.zero,
+        ),
+      ),
+      isTrue,
+    );
+
+    expect(
+      readerLookupTriggerMatchesKey(
+        DictionaryLookupTrigger.shift,
+        const KeyRepeatEvent(
+          physicalKey: PhysicalKeyboardKey.shiftLeft,
+          logicalKey: LogicalKeyboardKey.shiftLeft,
+          timeStamp: Duration.zero,
+        ),
+      ),
+      isFalse,
+    );
+    expect(
+      readerLookupTriggerMatchesKey(
+        DictionaryLookupTrigger.leftClick,
+        const KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.shiftLeft,
+          logicalKey: LogicalKeyboardKey.shiftLeft,
+          timeStamp: Duration.zero,
+        ),
       ),
       isFalse,
     );

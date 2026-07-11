@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 
@@ -91,8 +92,9 @@ class ReaderGestureHandler extends StatelessWidget {
       _ => _buildDefault(context),
     };
     return Listener(
-      onPointerDown: (_) => ReaderOcrState.handlePointerDown(),
-      onPointerCancel: (_) => ReaderOcrState.handlePointerCancel(),
+      onPointerMove: (event) {
+        ReaderOcrState.handleMiddleLookupMove(event.position, event.buttons);
+      },
       child: MouseRegion(
         opaque: false,
         onHover: (event) {
@@ -289,7 +291,9 @@ class _ZoneGestureDetector extends StatefulWidget {
 
 class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
   bool _pointerHandledByOcr = false;
-  bool _primaryPointer = false;
+  bool _lookupPointer = false;
+  bool _lookupPointerUsesPrimaryButton = false;
+  bool _middleHoverPointer = false;
 
   @override
   Widget build(BuildContext context) {
@@ -312,17 +316,40 @@ class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: (event) {
-          _primaryPointer = event.buttons == kPrimaryButton;
+          _lookupPointerUsesPrimaryButton = event.buttons == kPrimaryButton;
+          _middleHoverPointer = ReaderOcrState.handleMiddleLookupStart(
+            event.position,
+            event.buttons,
+          );
+          _lookupPointer = ReaderOcrState.lookupOnHover.value
+              ? _lookupPointerUsesPrimaryButton
+              : _middleHoverPointer ||
+                    readerLookupTriggerMatchesPointer(
+                      ReaderLookupTriggerState.trigger.value,
+                      event.buttons,
+                    );
+          if (_lookupPointer && !_middleHoverPointer) {
+            ReaderOcrState.handlePointerDown(event.position);
+          }
         },
         onPointerUp: (event) {
-          if (_primaryPointer) {
-            _pointerHandledByOcr = ReaderOcrState.handlePointerUp(
-              event.position,
-            );
+          if (_middleHoverPointer) {
+            ReaderOcrState.handleMiddleLookupEnd();
+          } else if (_lookupPointer) {
+            final handled = ReaderOcrState.handlePointerUp(event.position);
+            _pointerHandledByOcr = _lookupPointerUsesPrimaryButton && handled;
           }
-          _primaryPointer = false;
+          _lookupPointer = false;
+          _lookupPointerUsesPrimaryButton = false;
+          _middleHoverPointer = false;
         },
-        onPointerCancel: (_) => _primaryPointer = false,
+        onPointerCancel: (_) {
+          if (_lookupPointer) ReaderOcrState.handlePointerCancel();
+          if (_middleHoverPointer) ReaderOcrState.handleMiddleLookupEnd();
+          _lookupPointer = false;
+          _lookupPointerUsesPrimaryButton = false;
+          _middleHoverPointer = false;
+        },
         child: const SizedBox.expand(),
       ),
     );

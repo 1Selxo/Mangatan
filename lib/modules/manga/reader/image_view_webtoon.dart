@@ -69,6 +69,13 @@ class ImageViewWebtoon extends StatelessWidget {
     this.reverse = false,
   });
 
+  List<List<int?>> get _doublePageSpreadIndices =>
+      transitionAwareDoublePageSpreadIndices(
+        pages.length,
+        pageMode,
+        isTransitionPage: (index) => pages[index].isTransitionPage,
+      );
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -88,7 +95,7 @@ class ImageViewWebtoon extends StatelessWidget {
               minCacheExtent: minCacheExtent,
               initialScrollIndex: initialScrollIndex,
               itemCount: isDoublePageMode && !isHorizontalContinuous
-                  ? doublePageViewCount(pages.length, pageMode)
+                  ? _doublePageSpreadIndices.length
                   : pages.length,
               physics: physics,
               itemScrollController: itemScrollController,
@@ -107,7 +114,7 @@ class ImageViewWebtoon extends StatelessWidget {
 
   Widget _buildItem(BuildContext context, int index, BuildContext zoomContext) {
     final currentActualIndex = isDoublePageMode && !isHorizontalContinuous
-        ? doublePageViewToActualIndex(index, pages.length, pageMode)
+        ? _doublePageSpreadIndices[index].first!
         : index;
     final currentPage = pages[currentActualIndex];
     final uniqueKey = ValueKey(
@@ -165,7 +172,9 @@ class ImageViewWebtoon extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final datas = doublePageSpreadItems(pages, index, pageMode);
+    final datas = _doublePageSpreadIndices[index]
+        .map((actualIndex) => actualIndex == null ? null : pages[actualIndex])
+        .toList();
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,

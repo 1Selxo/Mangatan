@@ -72,10 +72,10 @@ class DoublePageView extends StatefulWidget {
   }) : isPagedMode = false;
 
   @override
-  State<DoublePageView> createState() => _DoublePageViewState();
+  State<DoublePageView> createState() => DoublePageViewState();
 }
 
-class _DoublePageViewState extends State<DoublePageView>
+class DoublePageViewState extends State<DoublePageView>
     with TickerProviderStateMixin {
   // Controllers for paged mode zoom
   late AnimationController _scaleAnimationController;
@@ -215,7 +215,7 @@ class _DoublePageViewState extends State<DoublePageView>
             child: Listener(
               behavior: HitTestBehavior.translucent,
               onPointerSignal: (event) =>
-                  _handlePointerSignal(event, zoomContext: zoomContext),
+                  registerModifierWheelZoom(event, zoomContext: zoomContext),
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onDoubleTapDown: (details) =>
@@ -230,13 +230,13 @@ class _DoublePageViewState extends State<DoublePageView>
     );
   }
 
-  void _handlePointerSignal(
+  bool registerModifierWheelZoom(
     PointerSignalEvent event, {
-    required BuildContext zoomContext,
+    BuildContext? zoomContext,
   }) {
-    registerReaderModifierWheelZoom(
+    return registerReaderModifierWheelZoom(
       event,
-      zoomContext: zoomContext,
+      zoomContext: zoomContext ?? context,
       photoViewController: _photoViewController,
       scaleStateController: _photoViewScaleStateController,
       basePosition: _scalePosition,

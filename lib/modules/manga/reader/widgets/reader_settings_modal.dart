@@ -49,10 +49,14 @@ class ReaderSettingsModal {
     required BuildContext context,
     required TickerProvider vsync,
     required ProviderListenable<ReaderMode?> currentReaderModeProvider,
+    required ProviderListenable<ReadingDirection?>
+    currentReadingDirectionProvider,
     required ValueNotifier<bool> autoScrollPage,
     required ValueNotifier<bool> autoScroll,
     required ValueNotifier<double> pageOffset,
     required void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged,
+    required void Function(ReadingDirection direction, WidgetRef ref)
+    onReadingDirectionChanged,
     required void Function(bool enabled, double offset) onAutoScrollSave,
     required VoidCallback onFullScreenToggle,
     required VoidCallback onAutoPageScroll,
@@ -76,9 +80,11 @@ class ReaderSettingsModal {
         // Reading Mode Tab
         _ReadingModeTab(
           currentReaderModeProvider: currentReaderModeProvider,
+          currentReadingDirectionProvider: currentReadingDirectionProvider,
           autoScrollPage: autoScrollPage,
           pageOffset: pageOffset,
           onReaderModeChanged: onReaderModeChanged,
+          onReadingDirectionChanged: onReadingDirectionChanged,
           onAutoScrollSave: onAutoScrollSave,
           onAutoScroll: (val) {
             autoScroll.value = val;
@@ -109,17 +115,22 @@ class ReaderSettingsModal {
 /// Reading Mode Tab with Consumer for reactive updates.
 class _ReadingModeTab extends ConsumerWidget {
   final ProviderListenable<ReaderMode?> currentReaderModeProvider;
+  final ProviderListenable<ReadingDirection?> currentReadingDirectionProvider;
   final ValueNotifier<bool> autoScrollPage;
   final ValueNotifier<double> pageOffset;
   final void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged;
+  final void Function(ReadingDirection direction, WidgetRef ref)
+  onReadingDirectionChanged;
   final void Function(bool enabled, double offset) onAutoScrollSave;
   final void Function(bool val) onAutoScroll;
 
   const _ReadingModeTab({
     required this.currentReaderModeProvider,
+    required this.currentReadingDirectionProvider,
     required this.autoScrollPage,
     required this.pageOffset,
     required this.onReaderModeChanged,
+    required this.onReadingDirectionChanged,
     required this.onAutoScrollSave,
     required this.onAutoScroll,
   });
@@ -128,6 +139,7 @@ class _ReadingModeTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = l10nLocalizations(context)!;
     final readerMode = ref.watch(currentReaderModeProvider);
+    final readingDirection = ref.watch(currentReadingDirectionProvider);
     final usePageTapZones = ref.watch(usePageTapZonesStateProvider);
     final cropBorders = ref.watch(cropBordersStateProvider);
     final keepScreenOn = ref.watch(keepScreenOnReaderStateProvider);
@@ -147,8 +159,20 @@ class _ReadingModeTab extends ConsumerWidget {
                 onReaderModeChanged(value, ref);
               },
               value: readerMode,
-              list: ReaderMode.values,
+              list: ReaderModeExtension.selectableValues,
               itemText: (mode) => getReaderModeName(mode, context),
+            ),
+
+            CustomPopupMenuButton<ReadingDirection>(
+              label: l10n.reading_direction,
+              title: getReadingDirectionName(readingDirection!, context),
+              onSelected: (value) {
+                onReadingDirectionChanged(value, ref);
+              },
+              value: readingDirection,
+              list: ReadingDirection.values,
+              itemText: (direction) =>
+                  getReadingDirectionName(direction, context),
             ),
 
             // Crop Borders

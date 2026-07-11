@@ -41,6 +41,9 @@ class DoublePageView extends StatefulWidget {
   /// Whether to add top padding for the first page (vertical mode only).
   final bool addTopPadding;
 
+  /// Controls the left-to-right order of pages within a spread.
+  final ReadingDirection readingDirection;
+
   const DoublePageView({
     super.key,
     required this.pages,
@@ -49,6 +52,7 @@ class DoublePageView extends StatefulWidget {
     this.onFailedToLoadImage,
     this.isPagedMode = true,
     this.addTopPadding = true,
+    this.readingDirection = ReadingDirection.leftToRight,
   });
 
   /// Creates a paged mode double page view.
@@ -58,6 +62,7 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
+    this.readingDirection = ReadingDirection.leftToRight,
   }) : isPagedMode = true,
        addTopPadding = false;
 
@@ -69,6 +74,7 @@ class DoublePageView extends StatefulWidget {
     this.onLongPressData,
     this.onFailedToLoadImage,
     this.addTopPadding = true,
+    this.readingDirection = ReadingDirection.leftToRight,
   }) : isPagedMode = false;
 
   @override
@@ -256,13 +262,14 @@ class DoublePageViewState extends State<DoublePageView>
   }
 
   Widget _buildPageRow() {
+    final pages = widget.readingDirection.isRtl
+        ? widget.pages.reversed
+        : widget.pages;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (widget.pages.isNotEmpty && widget.pages[0] != null)
-          Flexible(child: _buildPageImage(widget.pages[0]!)),
-        if (widget.pages.length > 1 && widget.pages[1] != null)
-          Flexible(child: _buildPageImage(widget.pages[1]!)),
+        for (final page in pages)
+          if (page != null) Flexible(child: _buildPageImage(page)),
       ],
     );
   }

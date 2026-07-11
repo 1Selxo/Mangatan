@@ -70,9 +70,21 @@ class ReaderController extends _$ReaderController
       (element) => element.mangaId == getManga().id,
     );
     if (personalReaderMode.isNotEmpty) {
-      return personalReaderMode.first.readerMode;
+      return personalReaderMode.first.readerMode.normalized;
     }
-    return getIsarSetting().defaultReaderMode;
+    return getIsarSetting().effectiveDefaultReaderMode;
+  }
+
+  ReadingDirection getReadingDirection() {
+    final settings = getIsarSetting();
+    final personalReaderMode = (settings.personalReaderModeList ?? [])
+        .where((element) => element.mangaId == getManga().id)
+        .firstOrNull;
+    final personalDirection = personalReaderMode?.readingDirectionIndex;
+    return personalDirection == null
+        ? personalReaderMode?.readerMode.legacyReadingDirection ??
+              settings.effectiveDefaultReadingDirection
+        : ReadingDirectionExtension.fromPersistedIndex(personalDirection);
   }
 
   PageMode getPageMode() {
@@ -87,22 +99,38 @@ class ReaderController extends _$ReaderController
   }
 
   void setReaderMode(ReaderMode newReaderMode) {
-    List<PersonalReaderMode>? personalReaderModeLists = [];
-    for (var personalReaderMode
-        in getIsarSetting().personalReaderModeList ?? []) {
-      if (personalReaderMode.mangaId != getManga().id) {
-        personalReaderModeLists.add(personalReaderMode);
-      }
-    }
-    personalReaderModeLists.add(
-      PersonalReaderMode()
-        ..mangaId = getManga().id
-        ..readerMode = newReaderMode,
+    _setPersonalReaderPreference(
+      readerMode: newReaderMode.normalized,
+      readingDirection: getReadingDirection(),
     );
+  }
+
+  void setReadingDirection(ReadingDirection newReadingDirection) {
+    _setPersonalReaderPreference(
+      readerMode: getReaderMode(),
+      readingDirection: newReadingDirection,
+    );
+  }
+
+  void _setPersonalReaderPreference({
+    required ReaderMode readerMode,
+    required ReadingDirection readingDirection,
+  }) {
+    final personalReaderModes =
+        (getIsarSetting().personalReaderModeList ?? [])
+            .where((preference) => preference.mangaId != getManga().id)
+            .toList()
+          ..add(
+            PersonalReaderMode(
+              mangaId: getManga().id,
+              readerMode: readerMode,
+              readingDirectionIndex: readingDirection.index,
+            ),
+          );
     isar.writeTxnSync(
       () => isar.settings.putSync(
         getIsarSetting()
-          ..personalReaderModeList = personalReaderModeLists
+          ..personalReaderModeList = personalReaderModes
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );

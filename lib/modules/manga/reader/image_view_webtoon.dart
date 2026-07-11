@@ -29,6 +29,7 @@ class ImageViewWebtoon extends StatelessWidget {
   final PageMode pageMode;
   final bool isHorizontalContinuous;
   final ReaderMode readerMode;
+  final ReadingDirection readingDirection;
   final PhotoViewController photoViewController;
   final PhotoViewScaleStateController photoViewScaleStateController;
   final Alignment scalePosition;
@@ -57,6 +58,7 @@ class ImageViewWebtoon extends StatelessWidget {
     required this.pageMode,
     required this.isHorizontalContinuous,
     required this.readerMode,
+    required this.readingDirection,
     required this.photoViewController,
     required this.photoViewScaleStateController,
     required this.scalePosition,
@@ -182,6 +184,7 @@ class ImageViewWebtoon extends StatelessWidget {
       onDoubleTap: onDoubleTap,
       child: DoublePageView.vertical(
         pages: datas,
+        readingDirection: readingDirection,
         backgroundColor: backgroundColor,
         onFailedToLoadImage: onFailedToLoadImage,
         onLongPressData: onLongPressData,

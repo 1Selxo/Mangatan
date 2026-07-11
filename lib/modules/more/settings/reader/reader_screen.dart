@@ -13,6 +13,9 @@ class ReaderScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final defaultReadingMode = ref.watch(defaultReadingModeStateProvider);
+    final defaultReadingDirection = ref.watch(
+      defaultReadingDirectionStateProvider,
+    );
     final animatePageTransitions = ref.watch(
       animatePageTransitionsStateProvider,
     );
@@ -55,20 +58,18 @@ class ReaderScreen extends ConsumerWidget {
                           },
                           child: SuperListView.builder(
                             shrinkWrap: true,
-                            itemCount: ReaderMode.values.length,
+                            itemCount:
+                                ReaderModeExtension.selectableValues.length,
                             itemBuilder: (context, index) {
+                              final mode =
+                                  ReaderModeExtension.selectableValues[index];
                               return RadioListTile(
                                 dense: true,
                                 contentPadding: const EdgeInsets.all(0),
-                                value: ReaderMode.values[index],
+                                value: mode,
                                 title: Row(
                                   children: [
-                                    Text(
-                                      getReaderModeName(
-                                        ReaderMode.values[index],
-                                        context,
-                                      ),
-                                    ),
+                                    Text(getReaderModeName(mode, context)),
                                   ],
                                 ),
                               );
@@ -99,6 +100,44 @@ class ReaderScreen extends ConsumerWidget {
               title: Text(context.l10n.default_reading_mode),
               subtitle: Text(
                 getReaderModeName(defaultReadingMode, context),
+                style: TextStyle(fontSize: 11, color: context.secondaryColor),
+              ),
+            ),
+            ListTile(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(context.l10n.reading_direction),
+                    content: RadioGroup(
+                      groupValue: defaultReadingDirection,
+                      onChanged: (value) {
+                        ref
+                            .read(defaultReadingDirectionStateProvider.notifier)
+                            .set(value!);
+                        Navigator.pop(context);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final direction in ReadingDirection.values)
+                            RadioListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: direction,
+                              title: Text(
+                                getReadingDirectionName(direction, context),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              title: Text(context.l10n.reading_direction),
+              subtitle: Text(
+                getReadingDirectionName(defaultReadingDirection, context),
                 style: TextStyle(fontSize: 11, color: context.secondaryColor),
               ),
             ),
@@ -482,16 +521,24 @@ class ReaderScreen extends ConsumerWidget {
 }
 
 String getReaderModeName(ReaderMode readerMode, BuildContext context) {
-  return switch (readerMode) {
-    ReaderMode.vertical => context.l10n.reading_mode_vertical,
+  return switch (readerMode.normalized) {
+    ReaderMode.verticalPaged => context.l10n.reading_mode_vertical_paged,
+    ReaderMode.horizontalPaged => context.l10n.reading_mode_horizontal_paged,
     ReaderMode.verticalContinuous =>
       context.l10n.reading_mode_vertical_continuous,
-    ReaderMode.ltr => context.l10n.reading_mode_left_to_right,
-    ReaderMode.rtl => context.l10n.reading_mode_right_to_left,
-    ReaderMode.horizontalContinuous => context.l10n.horizontal_continious,
-    ReaderMode.horizontalContinuousRTL =>
-      "${context.l10n.horizontal_continious} (RTL)",
+    ReaderMode.horizontalContinuous =>
+      context.l10n.reading_mode_horizontal_continuous,
     _ => context.l10n.reading_mode_webtoon,
+  };
+}
+
+String getReadingDirectionName(
+  ReadingDirection readingDirection,
+  BuildContext context,
+) {
+  return switch (readingDirection) {
+    ReadingDirection.leftToRight => context.l10n.reading_mode_left_to_right,
+    ReadingDirection.rightToLeft => context.l10n.reading_mode_right_to_left,
   };
 }
 

@@ -32,6 +32,31 @@ void main() {
     expect(imageViews, hasLength(2));
     expect(imageViews.every((widget) => !widget.enableGestures), isTrue);
   });
+
+  testWidgets('double page spreads follow the selected reading direction', (
+    tester,
+  ) async {
+    for (final (direction, expectedOrder) in [
+      (ReadingDirection.leftToRight, [0, 1]),
+      (ReadingDirection.rightToLeft, [1, 0]),
+    ]) {
+      await tester.pumpWidget(
+        _reader(
+          DoublePageView.vertical(
+            pages: [_page(0), _page(1)],
+            backgroundColor: BackgroundColor.black,
+            readingDirection: direction,
+          ),
+        ),
+      );
+
+      final actualOrder = tester
+          .widgetList<ImageViewPaged>(find.byType(ImageViewPaged))
+          .map((widget) => widget.data.index)
+          .toList();
+      expect(actualOrder, expectedOrder);
+    }
+  });
 }
 
 Widget _reader(Widget child) {

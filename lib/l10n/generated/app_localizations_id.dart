@@ -622,6 +622,18 @@ class AppLocalizationsId extends AppLocalizations {
   String get reading_mode_right_to_left => 'Dari Kanan ke Kiri';
 
   @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
   String get reading_mode_vertical_continuous => 'Vertikal Berkelanjutan';
 
   @override

@@ -1139,6 +1139,30 @@ abstract class AppLocalizations {
   /// **'Right to Left'**
   String get reading_mode_right_to_left;
 
+  /// No description provided for @reading_direction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading direction'**
+  String get reading_direction;
+
+  /// No description provided for @reading_mode_horizontal_paged.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal paged'**
+  String get reading_mode_horizontal_paged;
+
+  /// No description provided for @reading_mode_vertical_paged.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical paged'**
+  String get reading_mode_vertical_paged;
+
+  /// No description provided for @reading_mode_horizontal_continuous.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal continuous'**
+  String get reading_mode_horizontal_continuous;
+
   /// No description provided for @reading_mode_vertical_continuous.
   ///
   /// In en, this message translates to:

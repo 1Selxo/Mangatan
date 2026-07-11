@@ -247,6 +247,8 @@ class _MangaChapterPageGalleryState
   late final int _initialActualIndex = _readerController.getPageIndex();
   late final PageMode _initialPageMode = _readerController.getPageMode();
   late final ReaderMode _initialReaderMode = _readerController.getReaderMode();
+  late final ReadingDirection _initialReadingDirection = _readerController
+      .getReadingDirection();
   late int? _currentIndex =
       _initialPageMode.isDoublePage &&
           !_initialReaderMode.isHorizontalContinuous
@@ -310,6 +312,7 @@ class _MangaChapterPageGalleryState
 
   bool _isLastPageTransition = false;
   final _currentReaderMode = StateProvider<ReaderMode?>(() => null);
+  final _currentReadingDirection = StateProvider<ReadingDirection?>(() => null);
   PageMode? _pageMode;
   bool _isView = false;
   final _keyboardFocusNode = FocusNode();
@@ -392,7 +395,10 @@ class _MangaChapterPageGalleryState
     final backgroundColor = ref.watch(backgroundColorStateProvider);
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
     final readerMode = ref.watch(_currentReaderMode);
-    if (readerMode == null) return const SizedBox.shrink();
+    final readingDirection = ref.watch(_currentReadingDirection);
+    if (readerMode == null || readingDirection == null) {
+      return const SizedBox.shrink();
+    }
     final bool isHorizontalContinuous = readerMode.isHorizontalContinuous;
 
     return ReaderKeyboardHandler(
@@ -458,6 +464,7 @@ class _MangaChapterPageGalleryState
                             pageMode: _pageMode ?? PageMode.onePage,
                             isHorizontalContinuous: isHorizontalContinuous,
                             readerMode: ref.watch(_currentReaderMode)!,
+                            readingDirection: readingDirection,
                             photoViewController: _photoViewController,
                             photoViewScaleStateController:
                                 _photoViewScaleStateController,
@@ -473,7 +480,9 @@ class _MangaChapterPageGalleryState
                               webtoonSidePaddingStateProvider,
                             ),
                             showPageGaps: ref.watch(showPageGapsStateProvider),
-                            reverse: _isReverseHorizontal,
+                            reverse:
+                                isHorizontalContinuous &&
+                                readingDirection.isRtl,
                             isScrolling: _isScrolling,
                           )
                         : Material(
@@ -482,7 +491,9 @@ class _MangaChapterPageGalleryState
                             child: PageView.builder(
                               controller: _extendedController,
                               scrollDirection: _scrollDirection,
-                              reverse: _isReverseHorizontal,
+                              reverse:
+                                  readerMode.isHorizontalPaged &&
+                                  readingDirection.isRtl,
                               physics: const ClampingScrollPhysics(),
                               itemBuilder: (context, index) =>
                                   _buildPagedPhotoView(index, backgroundColor),
@@ -579,6 +590,11 @@ class _MangaChapterPageGalleryState
                         ref.read(_currentReaderMode.notifier).state = mode;
                         _setReaderMode(mode, ref);
                       },
+                      onReadingDirectionChanged: (direction, ref) {
+                        ref.read(_currentReadingDirection.notifier).state =
+                            direction;
+                        _setReadingDirection(direction, ref);
+                      },
                       onPageModeToggle: () async {
                         final readerMode = ref.read(_currentReaderMode);
                         if (!(readerMode?.isHorizontalContinuous ?? false)) {
@@ -610,6 +626,8 @@ class _MangaChapterPageGalleryState
                         context: context,
                         vsync: this,
                         currentReaderModeProvider: _currentReaderMode,
+                        currentReadingDirectionProvider:
+                            _currentReadingDirection,
                         autoScroll: _autoScroll,
                         autoScrollPage: _autoScrollPage,
                         pageOffset: _pageOffset,
@@ -618,6 +636,13 @@ class _MangaChapterPageGalleryState
                           widgetRef.read(_currentReaderMode.notifier).state =
                               mode;
                           _setReaderMode(mode, widgetRef);
+                        },
+                        onReadingDirectionChanged: (direction, widgetRef) {
+                          widgetRef
+                                  .read(_currentReadingDirection.notifier)
+                                  .state =
+                              direction;
+                          _setReadingDirection(direction, widgetRef);
                         },
                         onAutoScrollSave: (enabled, offset) {
                           _readerController.setAutoScroll(enabled, offset);
@@ -630,6 +655,7 @@ class _MangaChapterPageGalleryState
                         },
                       ),
                       currentReaderModeProvider: _currentReaderMode,
+                      currentReadingDirectionProvider: _currentReadingDirection,
                       currentPageListenable: _currentPageDisplayIndex,
                       currentPageMode: _pageMode,
                       isReverseHorizontal: _isReverseHorizontal,
@@ -688,7 +714,9 @@ class _MangaChapterPageGalleryState
         index,
         () => GlobalKey<DoublePageViewState>(),
       ),
-      pages: _isReverseHorizontal ? pageList.reversed.toList() : pageList,
+      pages: pageList,
+      readingDirection:
+          ref.read(_currentReadingDirection) ?? ReadingDirection.leftToRight,
       backgroundColor: backgroundColor,
       onFailedToLoadImage: (val) {
         if (_failedToLoadImage.value != val && mounted) {
@@ -1034,6 +1062,9 @@ class _MangaChapterPageGalleryState
       }
     }
     ref.read(_currentReaderMode.notifier).state = readerMode;
+    ref.read(_currentReadingDirection.notifier).state =
+        _initialReadingDirection;
+    _isReverseHorizontal = _initialReadingDirection.isRtl;
     if (mounted) {
       setState(() {
         _pageMode = _readerController.getPageMode();
@@ -1046,7 +1077,8 @@ class _MangaChapterPageGalleryState
     }
     _autoPagescroll();
     if (_readerController.getPageLength(_chapterUrlModel.pageUrls) == 1 &&
-        (readerMode.isHorizontalPaged || readerMode == ReaderMode.vertical)) {
+        (readerMode.isHorizontalPaged ||
+            readerMode == ReaderMode.verticalPaged)) {
       _onPageChanged(0);
     }
   }
@@ -1320,9 +1352,7 @@ class _MangaChapterPageGalleryState
     ref.read(_currentReaderMode.notifier).state = value;
     if (!mounted) return;
     setState(() {
-      _isReverseHorizontal = value.isRTL;
-
-      if (value == ReaderMode.vertical) {
+      if (value == ReaderMode.verticalPaged) {
         _scrollDirection = Axis.vertical;
       } else if (value.isHorizontalPaged) {
         _scrollDirection = Axis.horizontal;
@@ -1337,7 +1367,7 @@ class _MangaChapterPageGalleryState
     );
     _currentIndex = viewIndex;
 
-    if (value == ReaderMode.vertical || value.isHorizontalPaged) {
+    if (value == ReaderMode.verticalPaged || value.isHorizontalPaged) {
       _extendedController.jumpToPage(viewIndex);
     } else {
       _itemScrollController.scrollTo(
@@ -1345,6 +1375,34 @@ class _MangaChapterPageGalleryState
         duration: const Duration(milliseconds: 1),
         curve: Curves.ease,
       );
+    }
+    _scanCurrentChapterOcr(actualIndex: actualIndex);
+  }
+
+  void _setReadingDirection(ReadingDirection value, WidgetRef ref) async {
+    final readerMode = ref.read(_currentReaderMode);
+    if (readerMode == null) return;
+
+    final actualIndex = _pageViewToActualIndex(_currentIndex!);
+    _readerController.setReadingDirection(value);
+    ref.read(_currentReadingDirection.notifier).state = value;
+    if (!mounted) return;
+    setState(() {
+      _isReverseHorizontal = value.isRtl;
+    });
+
+    await WidgetsBinding.instance.endOfFrame;
+    final viewIndex = _actualToViewIndexForMode(
+      actualIndex,
+      readerMode: readerMode,
+      pageMode: _pageMode,
+    );
+    _currentIndex = viewIndex;
+    if (readerMode == ReaderMode.verticalPaged ||
+        readerMode.isHorizontalPaged) {
+      _extendedController.jumpToPage(viewIndex);
+    } else {
+      _itemScrollController.jumpTo(index: viewIndex);
     }
     _scanCurrentChapterOcr(actualIndex: actualIndex);
   }

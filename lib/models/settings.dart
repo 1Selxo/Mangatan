@@ -73,6 +73,9 @@ class Settings {
   @enumerated
   late ReaderMode defaultReaderMode;
 
+  /// Persisted enum index. Nullable so legacy combined RTL modes can migrate.
+  int? defaultReadingDirectionIndex;
+
   List<PersonalReaderMode>? personalReaderModeList;
 
   bool? animatePageTransitions;
@@ -396,7 +399,8 @@ class Settings {
     this.chapterPageIndexList,
     this.userAgent = defaultUserAgent,
     this.cookiesList,
-    this.defaultReaderMode = ReaderMode.vertical,
+    this.defaultReaderMode = ReaderMode.verticalPaged,
+    this.defaultReadingDirectionIndex = 0,
     this.personalReaderModeList,
     this.animatePageTransitions = true,
     this.doubleTapAnimationSpeed = 1,
@@ -592,8 +596,18 @@ class Settings {
     }
     cropBorders = json['cropBorders'];
     dateFormat = json['dateFormat'];
-    defaultReaderMode = ReaderMode
-        .values[json['defaultReaderMode'] ?? ReaderMode.vertical.index];
+    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
+      json['defaultReaderMode'],
+    );
+    defaultReaderMode = restoredReaderMode.normalized;
+    defaultReadingDirectionIndex =
+        (json['defaultReadingDirection'] == null
+                ? restoredReaderMode.legacyReadingDirection ??
+                      ReadingDirection.leftToRight
+                : ReadingDirectionExtension.fromPersistedIndex(
+                    json['defaultReadingDirection'],
+                  ))
+            .index;
     displayType = DisplayType.values[json['displayType']];
     doubleTapAnimationSpeed = json['doubleTapAnimationSpeed'];
     downloadLocation = json['downloadLocation'];
@@ -858,7 +872,8 @@ class Settings {
     'cookiesList': cookiesList,
     'cropBorders': cropBorders,
     'dateFormat': dateFormat,
-    'defaultReaderMode': defaultReaderMode.index,
+    'defaultReaderMode': effectiveDefaultReaderMode.index,
+    'defaultReadingDirection': effectiveDefaultReadingDirection.index,
     'displayType': displayType.index,
     'doubleTapAnimationSpeed': doubleTapAnimationSpeed,
     'downloadLocation': downloadLocation,
@@ -1172,17 +1187,37 @@ class PersonalReaderMode {
   int? mangaId;
 
   @enumerated
-  ReaderMode readerMode = ReaderMode.vertical;
-  PersonalReaderMode({this.mangaId, this.readerMode = ReaderMode.vertical});
+  ReaderMode readerMode = ReaderMode.verticalPaged;
+
+  /// Persisted enum index. Nullable for reader preferences saved before the
+  /// reading-direction setting was split from [readerMode].
+  int? readingDirectionIndex;
+
+  PersonalReaderMode({
+    this.mangaId,
+    this.readerMode = ReaderMode.verticalPaged,
+    this.readingDirectionIndex,
+  });
 
   PersonalReaderMode.fromJson(Map<String, dynamic> json) {
     mangaId = json['mangaId'];
-    readerMode = ReaderMode.values[json['readerMode']];
+    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
+      json['readerMode'],
+    );
+    readerMode = restoredReaderMode.normalized;
+    readingDirectionIndex =
+        (json['readingDirection'] == null
+                ? restoredReaderMode.legacyReadingDirection
+                : ReadingDirectionExtension.fromPersistedIndex(
+                    json['readingDirection'],
+                  ))
+            ?.index;
   }
 
   Map<String, dynamic> toJson() => {
     'mangaId': mangaId,
-    'readerMode': readerMode.index,
+    'readerMode': readerMode.normalized.index,
+    'readingDirection': readingDirectionIndex,
   };
 }
 
@@ -1265,38 +1300,88 @@ class PersonalPageMode {
 }
 
 enum ReaderMode {
-  vertical,
-  ltr,
-  rtl,
+  // Keep these persisted positions stable. The legacy entries are hidden from
+  // selectors and normalized when settings are read.
+  verticalPaged,
+  horizontalPaged,
+  legacyHorizontalPagedRtl,
   verticalContinuous,
   webtoon,
   horizontalContinuous,
-  horizontalContinuousRTL,
+  legacyHorizontalContinuousRtl,
 }
 
 extension ReaderModeExtension on ReaderMode {
-  /// Vertical continuous || Webtoon || Horizontal continuous || Horizontal continuous (RTL)
+  static const selectableValues = [
+    ReaderMode.horizontalPaged,
+    ReaderMode.verticalPaged,
+    ReaderMode.horizontalContinuous,
+    ReaderMode.verticalContinuous,
+    ReaderMode.webtoon,
+  ];
+
+  static ReaderMode fromPersistedIndex(Object? value) {
+    final index = value is int ? value : null;
+    if (index == null || index < 0 || index >= ReaderMode.values.length) {
+      return ReaderMode.verticalPaged;
+    }
+    return ReaderMode.values[index];
+  }
+
+  ReaderMode get normalized => switch (this) {
+    ReaderMode.legacyHorizontalPagedRtl => ReaderMode.horizontalPaged,
+    ReaderMode.legacyHorizontalContinuousRtl => ReaderMode.horizontalContinuous,
+    _ => this,
+  };
+
+  ReadingDirection? get legacyReadingDirection => switch (this) {
+    ReaderMode.horizontalPaged => ReadingDirection.leftToRight,
+    ReaderMode.legacyHorizontalPagedRtl => ReadingDirection.rightToLeft,
+    ReaderMode.horizontalContinuous => ReadingDirection.leftToRight,
+    ReaderMode.legacyHorizontalContinuousRtl => ReadingDirection.rightToLeft,
+    _ => null,
+  };
+
+  /// Vertical continuous || Webtoon || Horizontal continuous
   bool get isContinuous => isVerticalContinuous || isHorizontalContinuous;
 
-  /// Vertical || Vertical continuous || Webtoon
-  bool get isVertical => this == ReaderMode.vertical || isVerticalContinuous;
+  /// Vertical paged || Vertical continuous || Webtoon
+  bool get isVertical =>
+      this == ReaderMode.verticalPaged || isVerticalContinuous;
 
   /// Vertical continuous || Webtoon
   bool get isVerticalContinuous =>
       this == ReaderMode.verticalContinuous || this == ReaderMode.webtoon;
 
-  /// Horizontal continuous || Horizontal continuous (RTL)
+  /// Horizontal continuous
   bool get isHorizontalContinuous =>
-      this == ReaderMode.horizontalContinuous ||
-      this == ReaderMode.horizontalContinuousRTL;
+      normalized == ReaderMode.horizontalContinuous;
 
-  /// Right to Left || Horizontal continuous (RTL)
-  bool get isRTL =>
-      this == ReaderMode.rtl || this == ReaderMode.horizontalContinuousRTL;
+  /// Horizontal paged
+  bool get isHorizontalPaged => normalized == ReaderMode.horizontalPaged;
+}
 
-  /// Left to Right || Right to Left
-  bool get isHorizontalPaged =>
-      this == ReaderMode.ltr || this == ReaderMode.rtl;
+enum ReadingDirection { leftToRight, rightToLeft }
+
+extension ReadingDirectionExtension on ReadingDirection {
+  static ReadingDirection fromPersistedIndex(Object? value) {
+    return value == ReadingDirection.rightToLeft.index
+        ? ReadingDirection.rightToLeft
+        : ReadingDirection.leftToRight;
+  }
+
+  bool get isRtl => this == ReadingDirection.rightToLeft;
+}
+
+extension ReaderSettingsDirectionExtension on Settings {
+  ReaderMode get effectiveDefaultReaderMode => defaultReaderMode.normalized;
+
+  ReadingDirection get effectiveDefaultReadingDirection =>
+      defaultReadingDirectionIndex == null
+      ? defaultReaderMode.legacyReadingDirection ?? ReadingDirection.leftToRight
+      : ReadingDirectionExtension.fromPersistedIndex(
+          defaultReadingDirectionIndex,
+        );
 }
 
 enum NovelTextAlign { left, center, right, block }

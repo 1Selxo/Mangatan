@@ -32,6 +32,16 @@ class _DictionaryPopupHostController {
 
   Future<void> prewarm(BuildContext context) => _ensure(context);
 
+  Future<void> prepare({
+    required BuildContext context,
+    required String text,
+    required Future<List<HoshiLookupResult>> initialResults,
+  }) async {
+    await _ensure(context);
+    if (!context.mounted) return;
+    key.currentState?.prepare(text: text, initialResults: initialResults);
+  }
+
   bool dismissActive() {
     final state = key.currentState;
     if (state == null || !state.isVisible) return false;
@@ -42,20 +52,31 @@ class _DictionaryPopupHostController {
   bool get isActive => key.currentState?.isVisible ?? false;
 
   Future<void> _ensure(BuildContext context) {
-    if (_entry != null) return Future.value();
-    return _initializing ??= _initialize(context);
+    if (_entry != null && key.currentState != null) return Future.value();
+    final initializing = _initializing;
+    if (initializing != null) return initializing;
+    if (_entry != null) return WidgetsBinding.instance.endOfFrame;
+    return _initializing = _initialize(context);
   }
 
   Future<void> _initialize(BuildContext context) async {
-    final preferences = await MiningPreferences.getDictionaryPopupPreferences();
-    if (!context.mounted || _entry != null) return;
-    final overlay = Overlay.of(context, rootOverlay: true);
-    _entry = OverlayEntry(
-      builder: (_) =>
-          _DictionaryPopupOverlayHost(key: key, preferences: preferences),
-    );
-    overlay.insert(_entry!);
-    await WidgetsBinding.instance.endOfFrame;
+    try {
+      final preferences =
+          await MiningPreferences.getDictionaryPopupPreferences();
+      if (!context.mounted || _entry != null) return;
+      final overlay = Overlay.of(context, rootOverlay: true);
+      _entry = OverlayEntry(
+        builder: (_) =>
+            _DictionaryPopupOverlayHost(key: key, preferences: preferences),
+      );
+      overlay.insert(_entry!);
+      await WidgetsBinding.instance.endOfFrame;
+    } finally {
+      // A reader can close while preferences are loading. Do not leave a
+      // completed initialization future cached forever with no overlay entry;
+      // the next reader must be able to retry the warm-up.
+      _initializing = null;
+    }
   }
 
   Future<DictionaryPopupHandle?> show({
@@ -253,6 +274,27 @@ class _DictionaryPopupOverlayHostState
     );
   }
 
+  void prepare({
+    required String text,
+    required Future<List<HoshiLookupResult>> initialResults,
+  }) {
+    final query = text.trim();
+    if (_visible || query.isEmpty) return;
+    if (_request.text == query &&
+        identical(_request.initialResults, initialResults)) {
+      return;
+    }
+    setState(() {
+      _request = _DictionaryPopupRequest(
+        text: query,
+        miningContext: Future<MiningContext?>.value(null),
+        initialResults: initialResults,
+        onMatchChanged: null,
+        onHoverChanged: null,
+      );
+    });
+  }
+
   void dismiss({int? expectedGeneration}) {
     if (!dictionaryPopupCanDismissGeneration(
       expectedGeneration: expectedGeneration,
@@ -286,6 +328,7 @@ class _DictionaryPopupOverlayHostState
   @override
   Widget build(BuildContext context) {
     final request = _request;
+    final presentationGeneration = _presentationGeneration;
     final popupTheme = _popupTheme(Theme.of(context), widget.preferences.theme);
     return Stack(
       children: [
@@ -322,11 +365,14 @@ class _DictionaryPopupOverlayHostState
                       initialResults: request.initialResults,
                       preferences: widget.preferences,
                       onMatchChanged: (count) {
-                        if (_visible) {
-                          _request.onMatchChanged?.call(count);
+                        if (_visible &&
+                            presentationGeneration == _presentationGeneration &&
+                            identical(request, _request)) {
+                          request.onMatchChanged?.call(count);
                         }
                       },
-                      onDismiss: () => dismiss(),
+                      onDismiss: () =>
+                          dismiss(expectedGeneration: presentationGeneration),
                     ),
                   ),
                 ),
@@ -393,6 +439,19 @@ class DictionaryLookupPopup extends StatelessWidget {
 
   static Future<void> prewarm(BuildContext context) =>
       _dictionaryPopupHost.prewarm(context);
+
+  /// Resolves and renders the latest hovered word while the persistent popup
+  /// remains off-screen. Showing the same request can then reuse both the
+  /// lookup Future and the already-warm WebView document.
+  static Future<void> prepare({
+    required BuildContext context,
+    required String text,
+    required Future<List<HoshiLookupResult>> initialResults,
+  }) => _dictionaryPopupHost.prepare(
+    context: context,
+    text: text,
+    initialResults: initialResults,
+  );
 
   /// Dismisses the active popup without affecting the current app route.
   /// Returns whether a popup consumed the back action.
@@ -483,14 +542,23 @@ Rect dictionaryPopupRect({
   final availableWidth = math.max(0.0, screen.width - margin * 2);
   final availableHeight = math.max(0.0, screen.height - margin * 2);
   var width = math.min(preferredSize.width, availableWidth);
-  final height = math.min(preferredSize.height, availableHeight);
+  var height = math.min(preferredSize.height, availableHeight);
 
   if (placement == DictionaryPopupPlacement.aboveOrBelow) {
+    final spaceAbove = math.max(0.0, anchor.top - gap - margin);
+    final spaceBelow = math.max(
+      0.0,
+      screen.height - margin - anchor.bottom - gap,
+    );
+    // Hoshi shrinks to the larger free side before choosing it. Clamping a
+    // full-height popup after placement can otherwise cover the looked-up
+    // word when neither side has enough room.
+    height = math.min(height, math.max(spaceAbove, spaceBelow));
     final left = (anchor.center.dx - width / 2)
         .clamp(margin, math.max(margin, screen.width - width - margin))
         .toDouble();
     final below = anchor.bottom + gap;
-    final top = below + height <= screen.height - margin
+    final top = spaceBelow >= height
         ? below
         : math.max(margin, anchor.top - height - gap);
     return Rect.fromLTWH(left, top, width, height);

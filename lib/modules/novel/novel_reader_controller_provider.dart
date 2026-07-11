@@ -23,18 +23,19 @@ class NovelReaderController extends _$NovelReaderController
   // Scroll-position tracking
   // ---------------------------------------------------------------------------
 
-  void setChapterOffset(double newOffset, double maxOffset, bool save) {
+  void setChapterOffset(double newOffset, double maxOffset) {
     if (incognitoMode) return;
     final isRead = (newOffset / (maxOffset != 0 ? maxOffset : 1)) >= 0.9;
-    if (isRead || save) {
-      final ch = chapter;
-      isar.writeTxnSync(() {
-        ch.isRead = isRead;
-        ch.lastPageRead = (maxOffset != 0 ? newOffset / maxOffset : 0)
-            .toString();
-        ch.updatedAt = DateTime.now().millisecondsSinceEpoch;
-        isar.chapters.putSync(ch);
-      });
-    }
+    // A reader process can be closed without dispose running (crash, OS
+    // shutdown, force-close). Persist the debounced position even before the
+    // 90% "read" threshold so a local EPUB resumes where the reader left it.
+    final ch = chapter;
+    isar.writeTxnSync(() {
+      ch.isRead = isRead;
+      ch.lastPageRead = (maxOffset != 0 ? newOffset / maxOffset : 0)
+          .toString();
+      ch.updatedAt = DateTime.now().millisecondsSinceEpoch;
+      isar.chapters.putSync(ch);
+    });
   }
 }

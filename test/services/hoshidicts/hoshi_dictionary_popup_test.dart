@@ -173,6 +173,14 @@ void main() {
       hoshiReplaceRenderScriptForEntries(const []),
       contains('window.resetHoshiNavigation?.();'),
     );
+    expect(
+      hoshiReplaceRenderScriptForEntries(const []),
+      contains('window.getSelection?.()?.removeAllRanges?.();'),
+    );
+    expect(
+      hoshiReplaceRenderScriptForEntries(const []),
+      contains('window.scrollTo(0, 0);'),
+    );
   });
 
   test(
@@ -282,6 +290,12 @@ void main() {
     expect(popup, contains("node.type === 'image' || node.tag === 'img'"));
     expect(popup, contains('function hasPopupTextSelection()'));
     expect(popup, contains('function rememberPopupTextSelection()'));
+    expect(
+      css,
+      contains(
+        'Arial, "Noto Sans JP", "Noto Sans CJK JP", "Meiryo", sans-serif',
+      ),
+    );
     expect(
       popup,
       contains(

@@ -138,8 +138,10 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
           return true;
         },
         child: chapters.when(
-          data: (_) {
-            List<Chapter> chapters = widget.manga!.getSortedFilteredChapters();
+          data: (chapterRows) {
+            final chapters = widget.manga!.getSortedFilteredChapters(
+              sourceChapters: chapterRows,
+            );
             ref.read(chaptersListttStateProvider.notifier).set(chapters);
             return _buildWidget(chapters: chapters);
           },
@@ -147,7 +149,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
             return ErrorText(error);
           },
           loading: () {
-            return _buildWidget(chapters: widget.manga!.chapters.toList());
+            return _buildWidget(chapters: const <Chapter>[]);
           },
         ),
       ),
@@ -760,24 +762,13 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                                           manga: manga,
                                                         );
                                                       } else {
-                                                        final splitChapters =
-                                                            manga.itemType ==
-                                                                ItemType.novel
-                                                            ? await _showSplitChaptersDialog(
-                                                                context,
-                                                              )
-                                                            : true;
-                                                        if (!context.mounted) {
-                                                          return;
-                                                        }
                                                         await ref.watch(
                                                           importArchivesFromFileProvider(
                                                             itemType:
                                                                 manga.itemType,
                                                             manga,
                                                             init: false,
-                                                            splitChapters:
-                                                                splitChapters,
+                                                            splitChapters: false,
                                                           ).future,
                                                         );
                                                       }
@@ -1756,19 +1747,12 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                     if (manga!.source == "torrent") {
                                       addTorrent(context, manga: manga);
                                     } else {
-                                      final splitChapters =
-                                          manga.itemType == ItemType.novel
-                                          ? await _showSplitChaptersDialog(
-                                              context,
-                                            )
-                                          : true;
-                                      if (!context.mounted) return;
                                       await ref.watch(
                                         importArchivesFromFileProvider(
                                           itemType: manga.itemType,
                                           manga,
                                           init: false,
-                                          splitChapters: splitChapters,
+                                          splitChapters: false,
                                         ).future,
                                       );
                                     }
@@ -2468,26 +2452,4 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
       ),
     );
   }
-}
-
-Future<bool> _showSplitChaptersDialog(BuildContext context) async {
-  final l10n = l10nLocalizations(context)!;
-  return await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(l10n.split_epub_chapters),
-          content: Text(l10n.split_epub_chapters_description),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(l10n.split_epub_chapters),
-            ),
-          ],
-        ),
-      ) ??
-      true;
 }

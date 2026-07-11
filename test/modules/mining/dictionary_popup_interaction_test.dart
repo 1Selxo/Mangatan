@@ -104,6 +104,17 @@ void main() {
       expect(rect, const Rect.fromLTWH(290, 388, 320, 240));
     });
 
+    test('shrinks horizontal popup instead of covering the selected word', () {
+      final rect = dictionaryPopupRect(
+        screen: const Size(600, 400),
+        anchor: const Rect.fromLTWH(250, 170, 100, 60),
+        preferredSize: const Size(320, 300),
+      );
+
+      expect(rect, const Rect.fromLTWH(140, 238, 320, 150));
+      expect(rect.overlaps(const Rect.fromLTWH(250, 170, 100, 60)), isFalse);
+    });
+
     test('places vertical text popup on the preferred right side', () {
       final rect = dictionaryPopupRect(
         screen: const Size(1000, 800),

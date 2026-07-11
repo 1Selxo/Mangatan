@@ -8,6 +8,7 @@ import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -15,6 +16,7 @@ import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/auto_scroll_button.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_app_bar.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
 import 'package:mangayomi/modules/novel/tts/novel_tts_service.dart';
@@ -25,6 +27,7 @@ import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart'
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/services/get_html_content.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:mangayomi/utils/extensions/dom_extensions.dart';
@@ -43,10 +46,91 @@ typedef DoubleClickAnimationListener = void Function();
 
 enum NovelReaderTapAction { previousPage, toggleUi, nextPage }
 
+class NovelReaderRouteArgs {
+  const NovelReaderRouteArgs({required this.chapterId, this.initialProgress});
+
+  final int chapterId;
+  final double? initialProgress;
+}
+
+String normalizeEpubReaderReference(String? value) {
+  if (value == null || value.isEmpty) return '';
+  final withoutSuffix = value.split('#').first.split('?').first;
+  String decoded;
+  try {
+    decoded = Uri.decodeComponent(withoutSuffix);
+  } catch (_) {
+    decoded = withoutSuffix;
+  }
+  final parts = <String>[];
+  for (final part in decoded.replaceAll('\\', '/').split('/')) {
+    if (part.isEmpty || part == '.') continue;
+    if (part == '..') {
+      if (parts.isNotEmpty) parts.removeLast();
+    } else {
+      parts.add(part);
+    }
+  }
+  return parts.join('/');
+}
+
+({bool belongsToSpine, String? target, int? targetSpineIndex})
+adjacentEpubSpineTarget({
+  required EpubNovel book,
+  required String? currentReference,
+  int? currentSpineIndex,
+  required bool next,
+}) {
+  final current = normalizeEpubReaderReference(currentReference);
+  if (current.isEmpty && currentSpineIndex == null) {
+    return (belongsToSpine: false, target: null, targetSpineIndex: null);
+  }
+  // The canonical href is authoritative. Imported rows can carry stale v2/v3
+  // metadata after an EPUB is re-imported, so use the stored spine index only
+  // when the current href cannot be resolved.
+  final referenceMatches = current.isEmpty
+      ? const <int>[]
+      : <int>[
+          for (var i = 0; i < book.chapters.length; i++)
+            if (normalizeEpubReaderReference(book.chapters[i].path) ==
+                    current ||
+                normalizeEpubReaderReference(book.chapters[i].href) == current)
+              i,
+        ];
+  var index = referenceMatches.length == 1
+      ? referenceMatches.single
+      : currentSpineIndex == null
+      ? (referenceMatches.isEmpty ? -1 : referenceMatches.first)
+      : referenceMatches.firstWhere(
+          (candidate) =>
+              book.chapters[candidate].spineIndex == currentSpineIndex,
+          orElse: () => referenceMatches.isEmpty ? -1 : referenceMatches.first,
+        );
+  if (index < 0 && currentSpineIndex != null) {
+    index = book.chapters.indexWhere(
+      (entry) => entry.spineIndex == currentSpineIndex,
+    );
+  }
+  if (index < 0) {
+    return (belongsToSpine: false, target: null, targetSpineIndex: null);
+  }
+  final targetIndex = index + (next ? 1 : -1);
+  if (targetIndex < 0 || targetIndex >= book.chapters.length) {
+    return (belongsToSpine: true, target: null, targetSpineIndex: null);
+  }
+  final target = book.chapters[targetIndex];
+  return (
+    belongsToSpine: true,
+    target: target.path,
+    targetSpineIndex: target.spineIndex,
+  );
+}
+
 NovelReaderTapAction novelReaderTapActionForPosition({
   required Offset position,
   required Size viewport,
   required bool usePageTapZones,
+  bool reverseHorizontal = false,
 }) {
   if (!usePageTapZones || viewport.width <= 0 || viewport.height <= 0) {
     return NovelReaderTapAction.toggleUi;
@@ -57,28 +141,47 @@ NovelReaderTapAction novelReaderTapActionForPosition({
   if (verticalRatio > 7 / 9) return NovelReaderTapAction.nextPage;
 
   final horizontalRatio = position.dx / viewport.width;
-  if (horizontalRatio < 1 / 3) return NovelReaderTapAction.previousPage;
-  if (horizontalRatio > 2 / 3) return NovelReaderTapAction.nextPage;
+  if (horizontalRatio < 1 / 3) {
+    return reverseHorizontal
+        ? NovelReaderTapAction.nextPage
+        : NovelReaderTapAction.previousPage;
+  }
+  if (horizontalRatio > 2 / 3) {
+    return reverseHorizontal
+        ? NovelReaderTapAction.previousPage
+        : NovelReaderTapAction.nextPage;
+  }
   return NovelReaderTapAction.toggleUi;
 }
 
 class NovelReaderView extends ConsumerWidget {
   final int chapterId;
-  NovelReaderView({super.key, required this.chapterId});
+  final double? initialProgress;
+  NovelReaderView({super.key, required this.chapterId, this.initialProgress});
   late final Chapter chapter = isar.chapters.getSync(chapterId)!;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final result = ref.watch(getHtmlContentProvider(chapter: chapter));
 
-    return NovelWebView(chapter: chapter, result: result);
+    return NovelWebView(
+      chapter: chapter,
+      result: result,
+      initialProgress: initialProgress,
+    );
   }
 }
 
 class NovelWebView extends ConsumerStatefulWidget {
-  const NovelWebView({super.key, required this.chapter, required this.result});
+  const NovelWebView({
+    super.key,
+    required this.chapter,
+    required this.result,
+    this.initialProgress,
+  });
 
   final Chapter chapter;
   final AsyncValue<(String, EpubNovel?)> result;
+  final double? initialProgress;
 
   @override
   ConsumerState createState() {
@@ -96,10 +199,18 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     keepScrollOffset: true,
   );
   final _epubReaderController = TtsuEpubReaderController();
+  late final _epubLayout = ValueNotifier(
+    EpubReadingLayout.values[ref.read(novelEpubReadingLayoutStateProvider)],
+  );
+  Timer? _progressPersistDebounce;
+  bool _isDisposed = false;
+  bool _chapterTransitionInProgress = false;
+  bool _dictionaryPopupPrewarmed = false;
   bool _usingTtsuReader = false;
   bool scrolled = false;
   double offset = 0;
   double maxOffset = 0;
+  double? _pendingSeekFraction;
   int fontSize = 14;
   bool get _ttsSupported => !Platform.isLinux;
 
@@ -109,24 +220,44 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     if (_scrollController.hasClients) {
       offset = _scrollController.offset;
       maxOffset = _scrollController.position.maxScrollExtent;
-      _rebuildDetail.add(offset);
+      _reportProgress(offset, maxOffset);
     }
+  }
+
+  void _reportProgress(double newOffset, double newMaxOffset) {
+    offset = newOffset;
+    maxOffset = newMaxOffset;
+    _pendingSeekFraction = null;
+    if (!_isDisposed && !_rebuildDetail.isClosed) {
+      _rebuildDetail.add(newOffset);
+    }
+    _progressPersistDebounce?.cancel();
+    _progressPersistDebounce = Timer(const Duration(seconds: 2), () {
+      if (!_isDisposed) {
+        _readerController.setChapterOffset(offset, maxOffset);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
+    DictionaryLookupPopup.dismissActive();
     _readingStopwatch.stop();
     WidgetsBinding.instance.removeObserver(this);
-    _readerController.setChapterOffset(offset, maxOffset, true);
+    _readerController.setChapterOffset(offset, maxOffset);
     _readerController.setHistoryUpdate(
       elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
     );
     _scrollController.removeListener(onScroll);
     _scrollController.dispose();
+    _progressPersistDebounce?.cancel();
     _rebuildDetail.close();
     _autoScroll.value = false;
     _autoScroll.dispose();
     _autoScrollPage.dispose();
+    _epubLayout.removeListener(_onEpubLayoutChanged);
+    _epubLayout.dispose();
     _keyboardFocusNode.dispose();
     _ttsIndexSub?.cancel();
     _ttsStateSub?.cancel();
@@ -148,6 +279,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _readingStopwatch.stop();
+      _readerController.setChapterOffset(offset, maxOffset);
     } else if (state == AppLifecycleState.resumed) {
       _readingStopwatch.start();
     }
@@ -161,6 +293,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   @override
   void initState() {
     super.initState();
+    _epubLayout.addListener(_onEpubLayoutChanged);
     WidgetsBinding.instance.addObserver(this);
     _readingStopwatch.start();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -189,6 +322,18 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         wordEnd: wp.endOffset,
       );
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_dictionaryPopupPrewarmed) return;
+    _dictionaryPopupPrewarmed = true;
+    unawaited(DictionaryLookupPopup.prewarm(context));
+  }
+
+  void _onEpubLayoutChanged() {
+    if (mounted) setState(() {});
   }
 
   late bool _isBookmarked = _readerController.getChapterBookmarked();
@@ -233,7 +378,11 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         return;
       }
       if (_usingTtsuReader) {
-        await _epubReaderController.scrollBy(_pageOffset.value);
+        final moved = await _epubReaderController.scrollBy(_pageOffset.value);
+        if (moved == false && mounted) {
+          _goToChapter(true);
+          return;
+        }
       } else if (_scrollController.hasClients) {
         final currentOffset = _scrollController.offset;
         final maxScroll = _scrollController.position.maxScrollExtent;
@@ -276,8 +425,11 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   /// If the reader is already at the first or last chapter (depending on
   /// the direction), the method returns without navigating.
   void _goToChapter(bool next) {
+    if (_chapterTransitionInProgress || !mounted) return;
+    if (_goToAdjacentEpubSpine(next)) return;
     if (next && !_readerController.hasNextChapter) return;
     if (!next && !_readerController.hasPreviousChapter) return;
+    _chapterTransitionInProgress = true;
     pushReplacementMangaReaderView(
       context: context,
       chapter: next
@@ -286,16 +438,202 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     );
   }
 
+  bool _goToAdjacentEpubSpine(bool next) {
+    final book = epubBook;
+    if (book == null) return false;
+    final navigation = adjacentEpubSpineTarget(
+      book: book,
+      currentReference: chapter.url,
+      currentSpineIndex: epubChapterSpineIndex(chapter),
+      next: next,
+    );
+    if (!navigation.belongsToSpine) return false;
+    // The EPUB spine is authoritative. At its limits, do not fall through to
+    // manga-style numeric sorting and accidentally leave/reorder the book.
+    final targetReference = navigation.target;
+    if (targetReference == null) return true;
+    final target = _findOrCreateImportedEpubChapter(
+      targetReference,
+      spineIndex: navigation.targetSpineIndex,
+    );
+    if (target == null || target.id == chapter.id) return true;
+
+    _openEpubChapter(target, initialProgress: next ? 0 : 1);
+    return true;
+  }
+
+  void _goToEpubChapter(String chapterId) {
+    if (_chapterTransitionInProgress || !mounted) return;
+    final target = _findOrCreateImportedEpubChapter(chapterId);
+    if (target == null || target.id == chapter.id) return;
+    _openEpubChapter(target, initialProgress: 0);
+  }
+
+  void _openEpubChapter(Chapter target, {required double initialProgress}) {
+    final targetId = target.id;
+    if (_chapterTransitionInProgress || targetId == null || !mounted) return;
+    _chapterTransitionInProgress = true;
+    _readerController.setChapterOffset(offset, maxOffset);
+    context.pushReplacement(
+      '/novelReaderView',
+      extra: NovelReaderRouteArgs(
+        chapterId: targetId,
+        initialProgress: initialProgress,
+      ),
+    );
+  }
+
+  Chapter? _findOrCreateImportedEpubChapter(
+    String reference, {
+    int? spineIndex,
+  }) {
+    final wanted = normalizeEpubReaderReference(reference);
+    if (wanted.isEmpty) return null;
+    EpubChapter? runtimeTarget;
+    final book = epubBook;
+    if (book != null) {
+      for (final entry in book.chapters) {
+        final matchesReference =
+            normalizeEpubReaderReference(entry.path) == wanted ||
+            normalizeEpubReaderReference(entry.href) == wanted;
+        if (matchesReference &&
+            (spineIndex == null || entry.spineIndex == spineIndex)) {
+          runtimeTarget = entry;
+          break;
+        }
+      }
+    }
+    final chapters = isar.chapters
+        .filter()
+        .idIsNotNull()
+        .mangaIdEqualTo(chapter.mangaId)
+        .findAllSync();
+    final exactCandidates = chapters
+        .where(
+          (candidate) =>
+              candidate.archivePath == chapter.archivePath &&
+              candidate.id != chapter.id &&
+              normalizeEpubReaderReference(candidate.url) == wanted,
+        )
+        .toList(growable: false);
+    Chapter? exactCandidate;
+    if (spineIndex == null) {
+      exactCandidate = exactCandidates.firstOrNull;
+    } else {
+      exactCandidate = exactCandidates
+          .where((entry) => epubChapterSpineIndex(entry) == spineIndex)
+          .firstOrNull;
+      exactCandidate ??= exactCandidates
+          .where((entry) => epubChapterSpineIndex(entry) == null)
+          .firstOrNull;
+      if (exactCandidate == null && exactCandidates.length == 1) {
+        exactCandidate = exactCandidates.single;
+      }
+    }
+    if (exactCandidate != null) {
+      // Matching the canonical href within the same archive is stronger than
+      // legacy metadata. For repeated idrefs, the spine index disambiguates
+      // each occurrence before we repair the row.
+      if (runtimeTarget != null) {
+        _updateImportedEpubMetadata(exactCandidate, runtimeTarget);
+      }
+      return exactCandidate;
+    }
+    if (spineIndex != null && runtimeTarget != null) {
+      for (final candidate in chapters) {
+        if (candidate.archivePath == chapter.archivePath &&
+            candidate.id != chapter.id &&
+            epubChapterSpineIndex(candidate) == spineIndex) {
+          _updateImportedEpubMetadata(candidate, runtimeTarget);
+          return candidate;
+        }
+      }
+    }
+    if (runtimeTarget == null) return null;
+
+    chapter.manga.loadSync();
+    final manga = chapter.manga.value;
+    if (manga == null) return null;
+    final created = Chapter(
+      mangaId: chapter.mangaId,
+      name: runtimeTarget.name,
+      archivePath: chapter.archivePath,
+      url: runtimeTarget.path,
+      dateUpload: runtimeTarget.spineIndex.toString(),
+      description: epubChapterMetadata(
+        spineIndex: runtimeTarget.spineIndex,
+        navigationEntry: runtimeTarget.isNavigationEntry,
+      ),
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    )..manga.value = manga;
+    isar.writeTxnSync(() {
+      isar.chapters.putSync(created);
+      created.manga.saveSync();
+    });
+    return created;
+  }
+
+  void _updateImportedEpubMetadata(
+    Chapter candidate,
+    EpubChapter runtimeTarget,
+  ) {
+    final metadata = epubChapterMetadata(
+      spineIndex: runtimeTarget.spineIndex,
+      navigationEntry: runtimeTarget.isNavigationEntry,
+    );
+    if (candidate.archivePath == chapter.archivePath &&
+        normalizeEpubReaderReference(candidate.url) ==
+            normalizeEpubReaderReference(runtimeTarget.path) &&
+        candidate.dateUpload == runtimeTarget.spineIndex.toString() &&
+        candidate.description == metadata &&
+        candidate.name == runtimeTarget.name) {
+      return;
+    }
+    candidate
+      ..archivePath = chapter.archivePath
+      ..url = runtimeTarget.path
+      ..name = runtimeTarget.name
+      ..dateUpload = runtimeTarget.spineIndex.toString()
+      ..description = metadata
+      ..updatedAt = DateTime.now().millisecondsSinceEpoch;
+    isar.writeTxnSync(() => isar.chapters.putSync(candidate));
+  }
+
+  bool _hasAdjacentChapter(bool next) {
+    final book = epubBook;
+    if (book != null) {
+      final navigation = adjacentEpubSpineTarget(
+        book: book,
+        currentReference: chapter.url,
+        currentSpineIndex: epubChapterSpineIndex(chapter),
+        next: next,
+      );
+      if (navigation.belongsToSpine) {
+        return navigation.targetSpineIndex != null;
+      }
+    }
+    return next
+        ? _readerController.hasNextChapter
+        : _readerController.hasPreviousChapter;
+  }
+
   @override
   Widget build(BuildContext context) {
     final backgroundColor = ref.watch(backgroundColorStateProvider);
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
+    final delegateHorizontalPageKeysToChild =
+        widget.result.asData?.value.$2 != null && !Platform.isLinux;
     return ReaderKeyboardHandler(
       onEscape: () => _goBack(context),
       onFullScreen: () => _setFullScreen(),
+      onPreviousPage: () => _onBtnTapped(-100),
+      onNextPage: () => _onBtnTapped(100),
       onNextChapter: () => _goToChapter(true),
       onPreviousChapter: () => _goToChapter(false),
+      pageKeysNavigatePages: true,
+      delegateHorizontalPageKeysToChild: delegateHorizontalPageKeysToChild,
     ).wrapWithKeyboardListener(
+      isReverseHorizontal: _epubLayout.value == EpubReadingLayout.vertical,
       child: NotificationListener<UserScrollNotification>(
         onNotification: (notification) {
           if (notification.direction == ScrollDirection.idle) {
@@ -386,8 +724,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                           _scrollController
                                                   .position
                                                   .maxScrollExtent *
-                                              (double.tryParse(
-                                                    chapter.lastPageRead!,
+                                              (widget.initialProgress ??
+                                                  double.tryParse(
+                                                    chapter.lastPageRead ?? '',
                                                   ) ??
                                                   0),
                                           duration: Duration(seconds: 1),
@@ -402,7 +741,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                               );
                               return Consumer(
                                 builder: (context, ref, _) {
-                                  final fontSize = ref.read(
+                                  final fontSize = ref.watch(
                                     novelFontSizeStateProvider,
                                   );
                                   final usePageTapZones = ref.watch(
@@ -414,41 +753,60 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                     _ttsTotalBlocks = NovelTtsService.instance
                                         .extractParagraphs(data.$1)
                                         .length;
-                                    return TtsuEpubReader(
-                                      controller: _epubReaderController,
-                                      chapter: chapter,
-                                      html: data.$1,
-                                      book: data.$2!,
-                                      backgroundColor: customBackgroundColor,
-                                      textColor: customTextColor,
-                                      fontSize: fontSize.toDouble(),
-                                      lineHeight: lineHeight,
-                                      padding: padding.toDouble(),
-                                      textAlign: switch (textAlign) {
-                                        NovelTextAlign.left => 'left',
-                                        NovelTextAlign.center => 'center',
-                                        NovelTextAlign.right => 'right',
-                                        NovelTextAlign.block => 'justify',
+                                    return ValueListenableBuilder<
+                                      EpubReadingLayout
+                                    >(
+                                      valueListenable: _epubLayout,
+                                      builder: (context, layout, _) {
+                                        return TtsuEpubReader(
+                                          controller: _epubReaderController,
+                                          chapter: chapter,
+                                          html: data.$1,
+                                          book: data.$2!,
+                                          backgroundColor:
+                                              customBackgroundColor,
+                                          textColor: customTextColor,
+                                          fontSize: fontSize.toDouble(),
+                                          lineHeight: lineHeight,
+                                          padding: padding.toDouble(),
+                                          textAlign: switch (textAlign) {
+                                            NovelTextAlign.left => 'left',
+                                            NovelTextAlign.center => 'center',
+                                            NovelTextAlign.right => 'right',
+                                            NovelTextAlign.block => 'justify',
+                                          },
+                                          initialProgress:
+                                              widget.initialProgress ??
+                                              double.tryParse(
+                                                chapter.lastPageRead ?? '0',
+                                              ) ??
+                                              0,
+                                          tapToScroll: usePageTapZones,
+                                          removeExtraParagraphSpacing:
+                                              removeExtraSpacing,
+                                          layout: layout,
+                                          onProgress:
+                                              (newOffset, newMaxOffset) {
+                                                _reportProgress(
+                                                  newOffset,
+                                                  newMaxOffset,
+                                                );
+                                              },
+                                          onReaderTap: (position, viewport) =>
+                                              _handleReaderTap(
+                                                position,
+                                                viewport,
+                                                usePageTapZones,
+                                                reverseHorizontal:
+                                                    layout ==
+                                                    EpubReadingLayout.vertical,
+                                              ),
+                                          onChapterRequested: (direction) =>
+                                              _goToChapter(direction > 0),
+                                          onChapterLinkRequested:
+                                              _goToEpubChapter,
+                                        );
                                       },
-                                      initialProgress:
-                                          double.tryParse(
-                                            chapter.lastPageRead ?? '0',
-                                          ) ??
-                                          0,
-                                      tapToScroll: usePageTapZones,
-                                      onProgress: (newOffset, newMaxOffset) {
-                                        offset = newOffset;
-                                        maxOffset = newMaxOffset;
-                                        _rebuildDetail.add(newOffset);
-                                      },
-                                      onReaderTap: (position, viewport) =>
-                                          _handleReaderTap(
-                                            position,
-                                            viewport,
-                                            usePageTapZones,
-                                          ),
-                                      onChapterRequested: (direction) =>
-                                          _goToChapter(direction > 0),
                                     );
                                   }
                                   return Scrollbar(
@@ -922,7 +1280,12 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
 
   void _onBtnTapped(double value) {
     if (_usingTtsuReader) {
-      unawaited(_epubReaderController.scrollPage(value.sign.toInt()));
+      unawaited(() async {
+        final moved = await _epubReaderController.scrollPage(
+          value.sign.toInt(),
+        );
+        if (moved == false && mounted) _goToChapter(value > 0);
+      }());
       return;
     }
     if (!_scrollController.hasClients) return;
@@ -937,11 +1300,17 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     );
   }
 
-  void _handleReaderTap(Offset position, Size viewport, bool usePageTapZones) {
+  void _handleReaderTap(
+    Offset position,
+    Size viewport,
+    bool usePageTapZones, {
+    bool reverseHorizontal = false,
+  }) {
     switch (novelReaderTapActionForPosition(
       position: position,
       viewport: viewport,
       usePageTapZones: usePageTapZones,
+      reverseHorizontal: reverseHorizontal,
     )) {
       case NovelReaderTapAction.previousPage:
         _onBtnTapped(-100);
@@ -1003,8 +1372,8 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     if (!_isView && Platform.isIOS) {
       return const SizedBox.shrink();
     }
-    bool hasPrevChapter = _readerController.hasPreviousChapter;
-    bool hasNextChapter = _readerController.hasNextChapter;
+    final hasPrevChapter = _hasAdjacentChapter(false);
+    final hasNextChapter = _hasAdjacentChapter(true);
     final bodyLargeColor = Theme.of(context).textTheme.bodyLarge!.color;
     return Positioned(
       bottom: 0,
@@ -1025,12 +1394,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                       backgroundColor: _backgroundColor(context),
                       child: IconButton(
                         onPressed: hasPrevChapter
-                            ? () {
-                                pushReplacementMangaReaderView(
-                                  context: context,
-                                  chapter: _readerController.getPrevChapter(),
-                                );
-                              }
+                            ? () => _goToChapter(false)
                             : null,
                         icon: Icon(
                           Icons.skip_previous_rounded,
@@ -1053,11 +1417,15 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                         builder: (context, asyncSnapshot) {
                           return Consumer(
                             builder: (context, ref, child) {
-                              final scrollPercentage = maxOffset > 0
-                                  ? ((offset / maxOffset) * 100)
-                                        .clamp(0, 100)
-                                        .toInt()
-                                  : 0;
+                              final double progressFraction =
+                                  _pendingSeekFraction ??
+                                  (maxOffset > 0
+                                      ? (offset / maxOffset)
+                                            .clamp(0.0, 1.0)
+                                            .toDouble()
+                                      : 0.0);
+                              final scrollPercentage = (progressFraction * 100)
+                                  .round();
                               return Row(
                                 children: [
                                   SizedBox(width: 10),
@@ -1090,10 +1458,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                         child: Slider(
                                           onChanged: (value) {
                                             if (_usingTtsuReader) {
-                                              unawaited(
-                                                _epubReaderController
-                                                    .jumpToFraction(value),
-                                              );
+                                              setState(() {
+                                                _pendingSeekFraction = value;
+                                              });
                                             } else if (_scrollController
                                                 .hasClients) {
                                               _scrollController.jumpTo(
@@ -1104,7 +1471,14 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                               );
                                             }
                                           },
-                                          value: scrollPercentage / 100,
+                                          onChangeEnd: (value) {
+                                            if (!_usingTtsuReader) return;
+                                            unawaited(
+                                              _epubReaderController
+                                                  .jumpToFraction(value),
+                                            );
+                                          },
+                                          value: progressFraction,
                                           min: 0,
                                           max: 1,
                                         ),
@@ -1137,12 +1511,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                       backgroundColor: _backgroundColor(context),
                       child: IconButton(
                         onPressed: hasNextChapter
-                            ? () {
-                                pushReplacementMangaReaderView(
-                                  context: context,
-                                  chapter: _readerController.getNextChapter(),
-                                );
-                              }
+                            ? () => _goToChapter(true)
                             : null,
                         icon: Transform.scale(
                           scaleX: 1,
@@ -1314,7 +1683,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                         Tab(text: context.l10n.tts),
                                     ],
                                     children: [
-                                      ReaderSettingsTab(),
+                                      ReaderSettingsTab(
+                                        epubLayout: _epubLayout,
+                                      ),
                                       GeneralSettingsTab(
                                         autoScrollPage: _autoScrollPage,
                                         autoScroll: _autoScroll,

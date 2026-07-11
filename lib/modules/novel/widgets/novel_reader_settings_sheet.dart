@@ -4,10 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
+import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 
 class ReaderSettingsTab extends ConsumerWidget {
-  const ReaderSettingsTab({super.key});
+  const ReaderSettingsTab({super.key, this.epubLayout});
+
+  /// Only supplied by the browser EPUB reader; web novels retain their normal
+  /// scroll view. The selected EPUB layout is persisted globally.
+  final ValueNotifier<EpubReadingLayout>? epubLayout;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -117,6 +122,48 @@ class ReaderSettingsTab extends ConsumerWidget {
               ],
             ),
           ),
+
+          if (epubLayout != null) ...[
+            const SizedBox(height: 16),
+            _SettingSection(
+              title: 'EPUB layout',
+              child: ValueListenableBuilder<EpubReadingLayout>(
+                valueListenable: epubLayout!,
+                builder: (context, layout, _) {
+                  return SegmentedButton<EpubReadingLayout>(
+                    segments: const [
+                      ButtonSegment(
+                        value: EpubReadingLayout.scroll,
+                        icon: Icon(Icons.vertical_align_center_rounded),
+                        label: Text('Scroll'),
+                      ),
+                      ButtonSegment(
+                        value: EpubReadingLayout.paginated,
+                        icon: Icon(Icons.menu_book_rounded),
+                        label: Text('Pages'),
+                      ),
+                      ButtonSegment(
+                        value: EpubReadingLayout.vertical,
+                        icon: Icon(Icons.format_textdirection_r_to_l_rounded),
+                        label: Text('Vertical'),
+                      ),
+                    ],
+                    selected: {layout},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) {
+                      if (selection.isNotEmpty) {
+                        final layout = selection.first;
+                        epubLayout!.value = layout;
+                        ref
+                            .read(novelEpubReadingLayoutStateProvider.notifier)
+                            .set(layout.index);
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
 
           const SizedBox(height: 16),
           _SettingSection(

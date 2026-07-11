@@ -69,7 +69,7 @@ final class ImportArchivesFromFileProvider
 }
 
 String _$importArchivesFromFileHash() =>
-    r'871480402500a77765e2581062042a2ea5161bf9';
+    r'9bafc602d6672a2b0d9d1c64d6e3ced3f3fb3461';
 
 final class ImportArchivesFromFileFamily extends $Family
     with
@@ -90,7 +90,7 @@ final class ImportArchivesFromFileFamily extends $Family
     Manga? mManga, {
     required ItemType itemType,
     required bool init,
-    bool splitChapters = true,
+    bool splitChapters = false,
   }) => ImportArchivesFromFileProvider._(
     argument: (
       mManga,

@@ -6,6 +6,7 @@ import 'package:mangayomi/main.dart'; // Exposes the global `isar` instance
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:path/path.dart' as p; // For manipulating file system paths
 import 'package:bot_toast/bot_toast.dart'; // For Exceptions
@@ -320,6 +321,11 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
                 name: epubChapter.name,
                 archivePath: chapterPath,
                 url: epubChapter.path,
+                dateUpload: epubChapter.spineIndex.toString(),
+                description: epubChapterMetadata(
+                  spineIndex: epubChapter.spineIndex,
+                  navigationEntry: epubChapter.isNavigationEntry,
+                ),
                 downloadSize: null,
               )..manga.value = manga,
             );

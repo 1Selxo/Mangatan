@@ -175,9 +175,16 @@ class RouterNotifier extends ChangeNotifier {
       name: "animePlayerView",
       builder: (id) => AnimePlayerView(episodeId: id),
     ),
-    _genericRoute<int>(
+    _genericRoute<Object>(
       name: "novelReaderView",
-      builder: (id) => NovelReaderView(chapterId: id),
+      builder: (extra) => switch (extra) {
+        NovelReaderRouteArgs args => NovelReaderView(
+          chapterId: args.chapterId,
+          initialProgress: args.initialProgress,
+        ),
+        int id => NovelReaderView(chapterId: id),
+        _ => throw ArgumentError.value(extra, 'extra', 'Invalid novel route'),
+      },
     ),
     _genericRoute<ItemType>(
       name: "ExtensionLang",

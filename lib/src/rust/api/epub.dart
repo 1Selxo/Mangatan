@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `extract_resources_from_archive`, `extract_resources_with_content_from_bytes`, `extract_resources_with_content`, `find_chapter_name_from_toc`, `parse_epub_with_doc`
+// These functions are ignored because they are not marked as `pub`: `declared_encoding`, `decode_text_resource`, `decode_utf16`, `epub_content_is_renderable`, `epub_paths_match`, `extract_resources_from_archive`, `extract_resources_with_content_from_bytes`, `extract_resources_with_content`, `find_chapter_name_from_toc`, `is_epub_reader_auxiliary_asset`, `normalize_epub_path`, `parse_epub_with_doc`, `percent_decode_path`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 Future<EpubNovel> parseEpubFromPath({
@@ -35,18 +35,41 @@ Future<String> getChapterContent({
 );
 
 class EpubChapter {
+  /// Logical section name inherited from the nearest preceding EPUB TOC
+  /// entry. Raw spine fragments remain separate for reliable rendering.
   final String name;
   final String content;
   final String path;
+
+  /// Canonical path inside the EPUB archive. This is intentionally kept
+  /// alongside [path] so existing records remain readable while the reader
+  /// can resolve images, footnotes, and cross-chapter links correctly.
+  final String href;
+
+  /// Stable position in the filtered, renderable spine.
+  final int spineIndex;
+
+  /// Whether this spine item should appear in the user-facing chapter list.
+  /// Non-navigation fragments are still kept for seamless reader paging.
+  final bool isNavigationEntry;
 
   const EpubChapter({
     required this.name,
     required this.content,
     required this.path,
+    required this.href,
+    required this.spineIndex,
+    required this.isNavigationEntry,
   });
 
   @override
-  int get hashCode => name.hashCode ^ content.hashCode ^ path.hashCode;
+  int get hashCode =>
+      name.hashCode ^
+      content.hashCode ^
+      path.hashCode ^
+      href.hashCode ^
+      spineIndex.hashCode ^
+      isNavigationEntry.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -55,7 +78,10 @@ class EpubChapter {
           runtimeType == other.runtimeType &&
           name == other.name &&
           content == other.content &&
-          path == other.path;
+          path == other.path &&
+          href == other.href &&
+          spineIndex == other.spineIndex &&
+          isNavigationEntry == other.isNavigationEntry;
 }
 
 class EpubNovel {

@@ -4,13 +4,14 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 
 extension MangaExtensions on Manga {
   /// Filtered chapters respecting the user's active filters (unread,
   /// bookmarked, downloaded, scanlator). Sorted by chapter number ascending.
   /// Base list — no user-chosen sort, no deduplication.
-  List<Chapter> getFilteredChapters() {
+  List<Chapter> getFilteredChapters({Iterable<Chapter>? sourceChapters}) {
     final settings = isar.settings.getSync(227)!;
 
     final filterUnread =
@@ -48,8 +49,15 @@ extension MangaExtensions on Manga {
     );
 
     // Sort by chapter number — DB insertion order is NOT guaranteed to be ascending
-    final data = chapters.toList()
+    final chapterSource = sourceChapters ?? chapters;
+    final data = chapterSource.toList()
       ..sort((a, b) => chapNum(a).compareTo(chapNum(b)));
+
+    if (isLocalEpubManga(this)) {
+      data
+        ..clear()
+        ..addAll(epubNavigationChaptersInSpineOrder(chapterSource));
+    }
 
     final chapterIds = data.map((c) => c.id).whereType<int>().toList();
     final downloadedIds = (filterDownloaded == 0 || chapterIds.isEmpty)
@@ -88,7 +96,10 @@ extension MangaExtensions on Manga {
 
   /// Filtered chapters for display in the chapter list UI: same filters as
   /// [getFilteredChapters] with the user's chosen sort order and direction applied.
-  List<Chapter> getSortedFilteredChapters() {
+  List<Chapter> getSortedFilteredChapters({Iterable<Chapter>? sourceChapters}) {
+    if (isLocalEpubManga(this)) {
+      return getFilteredChapters(sourceChapters: sourceChapters);
+    }
     final settings = isar.settings.getSync(227)!;
 
     final sortChapterEntry =
@@ -98,7 +109,7 @@ extension MangaExtensions on Manga {
     final reverse = sortChapterEntry.reverse!;
 
     // Build on getFilteredChapters so filter logic lives in one place.
-    List<Chapter> list = getFilteredChapters();
+    List<Chapter> list = getFilteredChapters(sourceChapters: sourceChapters);
 
     switch (sortIndex) {
       case 0: // by scanlator, then chapter number
@@ -145,8 +156,9 @@ extension MangaExtensions on Manga {
   /// [getFilteredChapters] but with duplicate chapter numbers collapsed to a
   /// single entry so the reader advances to the next story chapter rather than
   /// another scanlator's copy of the same one.
-  List<Chapter> getChapterListForReading() {
-    final list = getFilteredChapters();
+  List<Chapter> getChapterListForReading({Iterable<Chapter>? sourceChapters}) {
+    final list = getFilteredChapters(sourceChapters: sourceChapters);
+    if (isLocalEpubManga(this)) return list;
     final mangaTitle = name ?? '';
     final recognition = ChapterRecognition();
     final seen = <int>{};

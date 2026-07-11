@@ -44,7 +44,12 @@ Future<(String, EpubNovel?)> getHtmlContent(
             'The EPUB contains no readable chapter content.',
           );
         }
-        result = (buildReaderHtml(htmlContent), book);
+        // Keep the original EPUB XHTML for the browser reader. It needs the
+        // document head and relative URLs to resolve publisher CSS, images,
+        // footnotes, and SVG resources from the materialized EPUB session.
+        // The compatibility Flutter renderer still sanitizes this through
+        // buildReaderHtml when it is used as a fallback.
+        result = (htmlContent, book);
       } catch (error) {
         final message = const HtmlEscape().convert(error.toString());
         result = (
@@ -105,7 +110,11 @@ Future<(String, EpubNovel?)> getHtmlContent(
 String selectEpubChapterContent(EpubNovel book, String? chapterPath) {
   if (chapterPath != null && chapterPath.isNotEmpty) {
     for (final subChapter in book.chapters) {
-      if (subChapter.path == chapterPath) return subChapter.content;
+      if (subChapter.path == chapterPath ||
+          _normalizedEpubReference(subChapter.href) ==
+              _normalizedEpubReference(chapterPath)) {
+        return subChapter.content;
+      }
     }
     return '';
   }
@@ -115,6 +124,19 @@ String selectEpubChapterContent(EpubNovel book, String? chapterPath) {
       .map((chapter) => chapter.content)
       .where(readerHtmlHasRenderableContent)
       .join('\n<hr/>\n');
+}
+
+String _normalizedEpubReference(String value) {
+  final withoutFragment = value.split('#').first.split('?').first;
+  try {
+    return p.posix
+        .normalize(Uri.decodeComponent(withoutFragment).replaceAll('\\', '/'))
+        .replaceFirst(RegExp(r'^\./'), '');
+  } catch (_) {
+    return p.posix
+        .normalize(withoutFragment.replaceAll('\\', '/'))
+        .replaceFirst(RegExp(r'^\./'), '');
+  }
 }
 
 bool readerHtmlHasRenderableContent(String input) {

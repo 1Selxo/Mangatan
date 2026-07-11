@@ -6,6 +6,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/manga/archive_reader/models/models.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'local_archive.g.dart';
@@ -16,7 +17,7 @@ Future importArchivesFromFile(
   Manga? mManga, {
   required ItemType itemType,
   required bool init,
-  bool splitChapters = true,
+  bool splitChapters = false,
 }) async {
   final keepAlile = ref.keepAlive();
   try {
@@ -92,6 +93,11 @@ Future importArchivesFromFile(
                     name: epubChapter.name,
                     archivePath: file.path,
                     url: epubChapter.path,
+                    dateUpload: epubChapter.spineIndex.toString(),
+                    description: epubChapterMetadata(
+                      spineIndex: epubChapter.spineIndex,
+                      navigationEntry: epubChapter.isNavigationEntry,
+                    ),
                     updatedAt: DateTime.now().millisecondsSinceEpoch,
                   )..manga.value = manga,
                 );
@@ -103,6 +109,10 @@ Future importArchivesFromFile(
                   mangaId: mangaId,
                   name: book.name,
                   archivePath: file.path,
+                  dateUpload: splitChapters ? '' : '0',
+                  description: splitChapters
+                      ? null
+                      : epubUnsplitChapterMetadata(),
                   updatedAt: DateTime.now().millisecondsSinceEpoch,
                 )..manga.value = manga,
               );

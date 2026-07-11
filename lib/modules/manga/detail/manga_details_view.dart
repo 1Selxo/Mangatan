@@ -105,9 +105,7 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                       isExtended: !isExtended,
                       label: buttonLabel,
                       onPressed: () {
-                        widget.manga.chapters.toList().first.pushToReaderView(
-                          context,
-                        );
+                        chaptersList.first.pushToReaderView(context);
                       },
                     );
                   },

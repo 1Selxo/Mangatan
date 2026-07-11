@@ -9,6 +9,8 @@ class ReaderKeyboardHandler {
   final VoidCallback? onNextPage;
   final VoidCallback? onNextChapter;
   final VoidCallback? onPreviousChapter;
+  final bool pageKeysNavigatePages;
+  final bool delegateHorizontalPageKeysToChild;
 
   const ReaderKeyboardHandler({
     this.onEscape,
@@ -17,6 +19,8 @@ class ReaderKeyboardHandler {
     this.onNextPage,
     this.onNextChapter,
     this.onPreviousChapter,
+    this.pageKeysNavigatePages = false,
+    this.delegateHorizontalPageKeysToChild = false,
   });
 
   /// Handles a key event and returns true if it was handled.
@@ -41,6 +45,7 @@ class ReaderKeyboardHandler {
         return true;
 
       case LogicalKeyboardKey.arrowLeft:
+        if (delegateHorizontalPageKeysToChild) return false;
         if (isReverseHorizontal) {
           onNextPage?.call();
         } else {
@@ -49,6 +54,7 @@ class ReaderKeyboardHandler {
         return true;
 
       case LogicalKeyboardKey.arrowRight:
+        if (delegateHorizontalPageKeysToChild) return false;
         if (isReverseHorizontal) {
           onPreviousPage?.call();
         } else {
@@ -56,13 +62,29 @@ class ReaderKeyboardHandler {
         }
         return true;
 
-      case LogicalKeyboardKey.keyN:
       case LogicalKeyboardKey.pageDown:
+        if (delegateHorizontalPageKeysToChild) return false;
+        if (pageKeysNavigatePages && onNextPage != null) {
+          onNextPage?.call();
+        } else {
+          onNextChapter?.call();
+        }
+        return true;
+
+      case LogicalKeyboardKey.pageUp:
+        if (delegateHorizontalPageKeysToChild) return false;
+        if (pageKeysNavigatePages && onPreviousPage != null) {
+          onPreviousPage?.call();
+        } else {
+          onPreviousChapter?.call();
+        }
+        return true;
+
+      case LogicalKeyboardKey.keyN:
         onNextChapter?.call();
         return true;
 
       case LogicalKeyboardKey.keyP:
-      case LogicalKeyboardKey.pageUp:
         onPreviousChapter?.call();
         return true;
 

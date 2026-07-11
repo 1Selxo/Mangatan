@@ -7,9 +7,20 @@ use zip::ZipArchive;
 
 #[derive(Debug, Clone)]
 pub struct EpubChapter {
+    /// Logical section name inherited from the nearest preceding EPUB TOC
+    /// entry. Raw spine fragments remain separate for reliable rendering.
     pub name: String,
     pub content: String,
     pub path: String,
+    /// Canonical path inside the EPUB archive. This is intentionally kept
+    /// alongside [path] so existing records remain readable while the reader
+    /// can resolve images, footnotes, and cross-chapter links correctly.
+    pub href: String,
+    /// Stable position in the original OPF spine.
+    pub spine_index: u32,
+    /// Whether this spine item should appear in the user-facing chapter list.
+    /// Non-navigation fragments are still kept for seamless reader paging.
+    pub is_navigation_entry: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +39,12 @@ pub struct EpubNovel {
     pub chapters: Vec<EpubChapter>,
     pub images: Vec<EpubResource>,
     pub stylesheets: Vec<EpubResource>,
+}
+
+#[derive(Debug, Clone)]
+struct NavigationEntry {
+    label: String,
+    href: String,
 }
 
 pub fn parse_epub_from_path(epub_path: String, full_data: bool) -> Result<EpubNovel, String> {
@@ -78,25 +95,52 @@ fn parse_epub_with_doc<R: Read + Seek>(
     let (chapters, images, stylesheets) = if full_data {
         // Extract chapters from spine with real names from TOC
         let spine = doc.spine.clone();
-        let toc = doc.toc.clone();
+        let navigation = collect_navigation_entries(doc);
+        let mut current_section_name: Option<String> = None;
+        let mut has_renderable_spine_item = false;
         let chapters: Vec<EpubChapter> = spine
             .iter()
             .enumerate()
-            .map(|(idx, item)| {
+            .filter_map(|(source_spine_index, item)| {
+                let resource_path = doc.resources.get(&item.idref)?.path.clone();
                 let content = doc
                     .get_resource(&item.idref)
                     .map(|(bytes, _)| decode_text_resource(&bytes))
                     .unwrap_or_default();
 
-                // Try to find chapter name from TOC
-                let chapter_name = find_chapter_name_from_toc(&toc, &item.idref)
-                    .unwrap_or_else(|| format!("Chapter {}", idx + 1));
+                // `linear="no"` is only a reading-order hint. Real-world
+                // Japanese EPUBs use it for valid cover/title pages which
+                // must remain addressable by the reader. Drop only resources
+                // that cannot render any text or image content.
+                if !epub_content_is_renderable(&content) {
+                    return None;
+                }
 
-                EpubChapter {
+                let href = normalize_epub_path(&resource_path.to_string_lossy());
+                let toc_name = find_chapter_name_from_navigation(&navigation, &href);
+                let is_first_spine_item = !has_renderable_spine_item;
+                let is_navigation_entry = toc_name.is_some() || is_first_spine_item;
+
+                if let Some(toc_name) = toc_name {
+                    current_section_name = Some(toc_name);
+                } else if is_first_spine_item {
+                    // A surprising number of EPUB2 files have a stale NCX
+                    // cover target which is not in the OPF spine. Keep a
+                    // deterministic beginning row so the book remains
+                    // enterable without inventing a row for every fragment.
+                    current_section_name = Some("Beginning".to_owned());
+                }
+                let chapter_name = current_section_name.clone().unwrap_or_else(|| name.clone());
+                has_renderable_spine_item = true;
+
+                Some(EpubChapter {
                     name: chapter_name,
                     content,
                     path: item.idref.clone(),
-                }
+                    href,
+                    spine_index: source_spine_index as u32,
+                    is_navigation_entry,
+                })
             })
             .collect();
 
@@ -126,7 +170,11 @@ fn parse_epub_with_doc<R: Read + Seek>(
     })
 }
 
-/// Extract CSS and image files with their binary content from EPUB (file path version)
+/// Extract reader assets and images with their binary content from EPUB (file path version).
+///
+/// `stylesheets` also carries local font files. Keeping them in the existing
+/// resource bucket avoids an FFI schema migration while allowing CSS
+/// `@font-face` URLs to resolve after the EPUB package is materialized.
 fn extract_resources_with_content(
     epub_path: &str,
 ) -> Result<(Vec<EpubResource>, Vec<EpubResource>), String> {
@@ -158,18 +206,19 @@ fn extract_resources_from_archive<R: Read + Seek>(
 
         let name = file.name().to_string();
 
-        if name.ends_with(".css") {
+        let lower_name = name.to_ascii_lowercase();
+        if lower_name.ends_with(".css") || is_epub_reader_auxiliary_asset(&lower_name) {
             let mut content = Vec::new();
             file.read_to_end(&mut content)
-                .map_err(|e| format!("Cannot read CSS file: {}", e))?;
+                .map_err(|e| format!("Cannot read EPUB reader asset: {}", e))?;
 
             stylesheets.push(EpubResource { name, content });
-        } else if name.ends_with(".jpg")
-            || name.ends_with(".jpeg")
-            || name.ends_with(".png")
-            || name.ends_with(".gif")
-            || name.ends_with(".svg")
-            || name.ends_with(".webp")
+        } else if lower_name.ends_with(".jpg")
+            || lower_name.ends_with(".jpeg")
+            || lower_name.ends_with(".png")
+            || lower_name.ends_with(".gif")
+            || lower_name.ends_with(".svg")
+            || lower_name.ends_with(".webp")
         {
             let mut content = Vec::new();
             file.read_to_end(&mut content)
@@ -182,23 +231,348 @@ fn extract_resources_from_archive<R: Read + Seek>(
     Ok((stylesheets, images))
 }
 
-/// Helper function to find chapter name from TOC by resource ID
-/// Recursively searches through navigation points to match the chapter ID
-fn find_chapter_name_from_toc(toc: &[epub::doc::NavPoint], resource_id: &str) -> Option<String> {
-    for nav_point in toc {
-        let path_str = nav_point.content.to_string_lossy();
+fn is_epub_reader_auxiliary_asset(lower_name: &str) -> bool {
+    let lower_name = lower_name.to_ascii_lowercase();
+    lower_name.ends_with(".woff")
+        || lower_name.ends_with(".woff2")
+        || lower_name.ends_with(".ttf")
+        || lower_name.ends_with(".otf")
+        || lower_name.ends_with(".eot")
+}
 
-        // Check if this TOC entry matches the resource ID
-        if path_str.contains(resource_id) || path_str.ends_with(&format!("{}.xhtml", resource_id)) {
-            return Some(nav_point.label.clone());
-        }
+/// Collect logical navigation independently from the raw OPF spine.
+///
+/// The `epub` crate reads valid EPUB2 NCX files, but it intentionally ignores
+/// malformed NCX and does not populate `toc` from EPUB3 navigation XHTML.
+/// Many converted Japanese books contain a malformed title while their
+/// `navMap` is still perfectly usable, so both fallbacks are parsed here.
+fn collect_navigation_entries<R: Read + Seek>(doc: &mut EpubDoc<R>) -> Vec<NavigationEntry> {
+    let mut entries = Vec::new();
+    flatten_nav_points(&doc.toc, &mut entries);
+    if !entries.is_empty() {
+        return entries;
+    }
 
-        // Recursively search in children
-        if let Some(found_name) = find_chapter_name_from_toc(&nav_point.children, resource_id) {
-            return Some(found_name);
+    if let Some(nav_id) = doc.get_nav_id() {
+        let nav_path = doc
+            .resources
+            .get(&nav_id)
+            .map(|resource| resource.path.to_string_lossy().into_owned());
+        if let (Some(nav_path), Some((bytes, _))) = (nav_path, doc.get_resource(&nav_id)) {
+            entries = parse_epub3_navigation(&decode_text_resource(&bytes), &nav_path);
         }
     }
+    if !entries.is_empty() {
+        return entries;
+    }
+
+    let ncx = doc.resources.iter().find_map(|(id, resource)| {
+        let path = resource.path.to_string_lossy();
+        (resource
+            .mime
+            .eq_ignore_ascii_case("application/x-dtbncx+xml")
+            || path.to_ascii_lowercase().ends_with(".ncx"))
+        .then(|| (id.clone(), path.into_owned()))
+    });
+    if let Some((ncx_id, ncx_path)) = ncx {
+        if let Some((bytes, _)) = doc.get_resource(&ncx_id) {
+            entries = parse_ncx_navigation(&decode_text_resource(&bytes), &ncx_path);
+        }
+    }
+    entries
+}
+
+fn flatten_nav_points(points: &[epub::doc::NavPoint], output: &mut Vec<NavigationEntry>) {
+    for point in points {
+        output.push(NavigationEntry {
+            label: point.label.clone(),
+            href: normalize_epub_path(&point.content.to_string_lossy()),
+        });
+        flatten_nav_points(&point.children, output);
+    }
+}
+
+fn parse_ncx_navigation(markup: &str, ncx_path: &str) -> Vec<NavigationEntry> {
+    let Some(nav_map) = element_content(markup, "navMap") else {
+        return Vec::new();
+    };
+    let lower = nav_map.to_ascii_lowercase();
+    let mut entries = Vec::new();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find("<navpoint") {
+        let start = cursor + relative_start;
+        let Some(relative_end) = lower[start..].find("</navpoint>") else {
+            break;
+        };
+        let end = start + relative_end + "</navpoint>".len();
+        let block = &nav_map[start..end];
+        let label = element_content(block, "navLabel")
+            .and_then(|value| element_content(value, "text").or(Some(value)))
+            .map(strip_markup)
+            .unwrap_or_default();
+        let href = opening_tag(block, "content")
+            .and_then(|tag| attribute_value(tag, "src"))
+            .unwrap_or_default();
+        if !label.is_empty() && !href.is_empty() {
+            entries.push(NavigationEntry {
+                label,
+                href: resolve_epub_reference(ncx_path, &href),
+            });
+        }
+        // Advance past only this opening token so nested navPoints are also
+        // flattened in their authored order.
+        cursor = start + "<navpoint".len();
+    }
+    entries
+}
+
+fn parse_epub3_navigation(markup: &str, nav_path: &str) -> Vec<NavigationEntry> {
+    let lower = markup.to_ascii_lowercase();
+    let mut nav_cursor = 0;
+    while let Some(relative_start) = lower[nav_cursor..].find("<nav") {
+        let start = nav_cursor + relative_start;
+        let Some(open_end_relative) = lower[start..].find('>') else {
+            break;
+        };
+        let open_end = start + open_end_relative + 1;
+        let tag = &markup[start..open_end];
+        let is_toc = attribute_value(tag, "epub:type")
+            .or_else(|| attribute_value(tag, "type"))
+            .is_some_and(|value| value.split_whitespace().any(|part| part == "toc"))
+            || attribute_value(tag, "role").is_some_and(|value| value == "doc-toc");
+        if !is_toc {
+            nav_cursor = open_end;
+            continue;
+        }
+        let close = lower[open_end..]
+            .find("</nav>")
+            .map(|relative| open_end + relative)
+            .unwrap_or(markup.len());
+        return parse_navigation_links(&markup[open_end..close], nav_path);
+    }
+    Vec::new()
+}
+
+fn parse_navigation_links(markup: &str, base_path: &str) -> Vec<NavigationEntry> {
+    let lower = markup.to_ascii_lowercase();
+    let mut entries = Vec::new();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find("<a") {
+        let start = cursor + relative_start;
+        let Some(open_end_relative) = lower[start..].find('>') else {
+            break;
+        };
+        let open_end = start + open_end_relative + 1;
+        let Some(close_relative) = lower[open_end..].find("</a>") else {
+            break;
+        };
+        let close = open_end + close_relative;
+        let href = attribute_value(&markup[start..open_end], "href").unwrap_or_default();
+        let label = strip_markup(&markup[open_end..close]);
+        if !label.is_empty() && !href.is_empty() {
+            entries.push(NavigationEntry {
+                label,
+                href: resolve_epub_reference(base_path, &href),
+            });
+        }
+        cursor = close + "</a>".len();
+    }
+    entries
+}
+
+fn find_chapter_name_from_navigation(
+    navigation: &[NavigationEntry],
+    resource_path: &str,
+) -> Option<String> {
+    navigation
+        .iter()
+        .find(|entry| epub_paths_match(&entry.href, resource_path))
+        .map(|entry| entry.label.clone())
+}
+
+fn resolve_epub_reference(base_path: &str, reference: &str) -> String {
+    if reference.starts_with('/') {
+        return normalize_epub_path(reference);
+    }
+    let normalized_base = normalize_epub_path(base_path);
+    let directory = normalized_base
+        .rsplit_once('/')
+        .map(|(directory, _)| directory)
+        .unwrap_or_default();
+    normalize_epub_path(&format!("{directory}/{reference}"))
+}
+
+fn opening_tag<'a>(markup: &'a str, tag_name: &str) -> Option<&'a str> {
+    let lower = markup.to_ascii_lowercase();
+    let start = lower.find(&format!("<{}", tag_name.to_ascii_lowercase()))?;
+    let end = lower[start..].find('>')? + start + 1;
+    Some(&markup[start..end])
+}
+
+fn element_content<'a>(markup: &'a str, tag_name: &str) -> Option<&'a str> {
+    let lower = markup.to_ascii_lowercase();
+    let start = lower.find(&format!("<{}", tag_name.to_ascii_lowercase()))?;
+    let content_start = lower[start..].find('>')? + start + 1;
+    let content_end = lower[content_start..]
+        .find(&format!("</{}>", tag_name.to_ascii_lowercase()))?
+        + content_start;
+    Some(&markup[content_start..content_end])
+}
+
+fn attribute_value(tag: &str, attribute: &str) -> Option<String> {
+    let lower = tag.to_ascii_lowercase();
+    let attribute = attribute.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(relative) = lower[cursor..].find(&attribute) {
+        let start = cursor + relative;
+        let before_is_boundary = start == 0
+            || lower.as_bytes()[start - 1].is_ascii_whitespace()
+            || lower.as_bytes()[start - 1] == b'<';
+        let mut equals = start + attribute.len();
+        while equals < lower.len() && lower.as_bytes()[equals].is_ascii_whitespace() {
+            equals += 1;
+        }
+        if before_is_boundary && lower.as_bytes().get(equals) == Some(&b'=') {
+            let mut value_start = equals + 1;
+            while value_start < tag.len() && tag.as_bytes()[value_start].is_ascii_whitespace() {
+                value_start += 1;
+            }
+            let quote = *tag.as_bytes().get(value_start)?;
+            if quote == b'\'' || quote == b'"' {
+                let value_end = tag[value_start + 1..].find(quote as char)? + value_start + 1;
+                return Some(decode_markup_entities(&tag[value_start + 1..value_end]));
+            }
+        }
+        cursor = start + attribute.len();
+    }
     None
+}
+
+fn strip_markup(markup: &str) -> String {
+    let mut text = String::new();
+    let mut in_tag = false;
+    for character in markup.chars() {
+        match character {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => text.push(character),
+            _ => {}
+        }
+    }
+    decode_markup_entities(&text)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn decode_markup_entities(value: &str) -> String {
+    let named = value
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ");
+    let mut decoded = String::with_capacity(named.len());
+    let mut remaining = named.as_str();
+    while let Some(start) = remaining.find("&#") {
+        decoded.push_str(&remaining[..start]);
+        let entity_start = start + 2;
+        let Some(relative_end) = remaining[entity_start..].find(';') else {
+            decoded.push_str(&remaining[start..]);
+            return decoded;
+        };
+        let end = entity_start + relative_end;
+        let entity = &remaining[entity_start..end];
+        let value = entity
+            .strip_prefix('x')
+            .or_else(|| entity.strip_prefix('X'))
+            .and_then(|hex| u32::from_str_radix(hex, 16).ok())
+            .or_else(|| entity.parse::<u32>().ok());
+        if let Some(character) = value.and_then(char::from_u32) {
+            decoded.push(character);
+        } else {
+            decoded.push_str(&remaining[start..=end]);
+        }
+        remaining = &remaining[end + 1..];
+    }
+    decoded.push_str(remaining);
+    decoded
+}
+
+fn normalize_epub_path(path: &str) -> String {
+    let without_suffix = path
+        .split('#')
+        .next()
+        .unwrap_or(path)
+        .split('?')
+        .next()
+        .unwrap_or(path)
+        .replace('\\', "/");
+    let decoded = percent_decode_path(&without_suffix);
+    let mut segments = Vec::new();
+    for segment in decoded.split('/') {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                segments.pop();
+            }
+            value => segments.push(value),
+        }
+    }
+    segments.join("/")
+}
+
+fn epub_paths_match(left: &str, right: &str) -> bool {
+    left == right
+        || left
+            .strip_suffix(right)
+            .is_some_and(|prefix| prefix.ends_with('/'))
+        || right
+            .strip_suffix(left)
+            .is_some_and(|prefix| prefix.ends_with('/'))
+}
+
+fn percent_decode_path(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let high = (bytes[index + 1] as char).to_digit(16);
+            let low = (bytes[index + 2] as char).to_digit(16);
+            if let (Some(high), Some(low)) = (high, low) {
+                decoded.push((high * 16 + low) as u8);
+                index += 3;
+                continue;
+            }
+        }
+        decoded.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&decoded).into_owned()
+}
+
+fn epub_content_is_renderable(markup: &str) -> bool {
+    let lower = markup.to_ascii_lowercase();
+    if lower.contains("<img") || lower.contains("<svg") || lower.contains("<image") {
+        return true;
+    }
+
+    let mut in_tag = false;
+    let mut in_entity = false;
+    for character in markup.chars() {
+        match character {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            '&' if !in_tag => in_entity = true,
+            ';' if in_entity => in_entity = false,
+            _ if !in_tag && !in_entity && !character.is_whitespace() => return true,
+            _ => {}
+        }
+    }
+    false
 }
 
 /// Get chapter content from EPUB by path
@@ -280,9 +654,87 @@ fn declared_encoding(declaration: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{declared_encoding, decode_text_resource, parse_epub_from_bytes};
+    use super::{
+        declared_encoding, decode_text_resource, epub_content_is_renderable, epub_paths_match,
+        is_epub_reader_auxiliary_asset, normalize_epub_path, parse_epub3_navigation,
+        parse_epub_from_bytes, parse_ncx_navigation,
+    };
     use std::io::{Cursor, Write};
     use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+    #[test]
+    fn canonicalizes_epub_paths_without_matching_partial_names() {
+        assert_eq!(
+            normalize_epub_path("./OEBPS/text/chapter-10.xhtml#note"),
+            "OEBPS/text/chapter-10.xhtml"
+        );
+        assert_ne!(
+            normalize_epub_path("OEBPS/text/chapter-1.xhtml"),
+            normalize_epub_path("OEBPS/text/chapter-10.xhtml")
+        );
+        assert_eq!(
+            normalize_epub_path("./OPS/../OEBPS/%E7%9B%AE%E6%AC%A1.xhtml?x=1#top"),
+            "OEBPS/目次.xhtml"
+        );
+        assert!(epub_paths_match(
+            "OEBPS/text/chapter-1.xhtml",
+            "text/chapter-1.xhtml"
+        ));
+        assert!(!epub_paths_match(
+            "OEBPS/text/chapter-1.xhtml",
+            "OEBPS/text/chapter-10.xhtml"
+        ));
+    }
+
+    #[test]
+    fn recovers_navigation_from_ncx_with_malformed_title_markup() {
+        let ncx = r#"<ncx><docTitle><text>業物語 <物語></text></docTitle>
+<navMap>
+  <navPoint><navLabel><text>目次</text></navLabel><content src="Text/part0003.xhtml"/></navPoint>
+  <navPoint><navLabel><text>第一話</text></navLabel><content src="Text/part0004.xhtml#start"/></navPoint>
+</navMap></ncx>"#;
+        let entries = parse_ncx_navigation(ncx, "OEBPS/toc.ncx");
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].label, "目次");
+        assert_eq!(entries[0].href, "OEBPS/Text/part0003.xhtml");
+        assert_eq!(entries[1].label, "第一話");
+        assert_eq!(entries[1].href, "OEBPS/Text/part0004.xhtml");
+    }
+
+    #[test]
+    fn reads_epub3_navigation_xhtml_in_authored_order() {
+        let nav = r#"<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+<nav epub:type="toc"><ol>
+  <li><a href="Text/chapter-1.xhtml">第一章</a></li>
+  <li><a href="Text/chapter-2.xhtml#part">第二章</a></li>
+</ol></nav></body></html>"#;
+        let entries = parse_epub3_navigation(nav, "EPUB/nav.xhtml");
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].label, "第一章");
+        assert_eq!(entries[0].href, "EPUB/Text/chapter-1.xhtml");
+        assert_eq!(entries[1].label, "第二章");
+        assert_eq!(entries[1].href, "EPUB/Text/chapter-2.xhtml");
+    }
+
+    #[test]
+    fn ignores_empty_navigation_markup_but_keeps_image_pages() {
+        assert!(!epub_content_is_renderable(
+            "<html><body> \n </body></html>"
+        ));
+        assert!(epub_content_is_renderable(
+            "<html><body><img src=\"cover.JPG\"></body></html>"
+        ));
+        assert!(epub_content_is_renderable("<p>Japanese text</p>"));
+    }
+
+    #[test]
+    fn keeps_local_fonts_with_stylesheets_for_file_backed_reader_sessions() {
+        assert!(is_epub_reader_auxiliary_asset("oebps/fonts/book.woff2"));
+        assert!(is_epub_reader_auxiliary_asset("OEBPS/Fonts/BOOK.OTF"));
+        assert!(!is_epub_reader_auxiliary_asset("OEBPS/images/cover.webp"));
+    }
 
     fn epub_with_chapter(chapter: &[u8]) -> Vec<u8> {
         let cursor = Cursor::new(Vec::new());
@@ -358,6 +810,9 @@ mod tests {
         let book = parse_epub_from_bytes(epub_with_chapter(&chapter), true).unwrap();
 
         assert_eq!(book.chapters.len(), 1);
+        assert_eq!(book.chapters[0].spine_index, 0);
+        assert!(book.chapters[0].is_navigation_entry);
+        assert_eq!(book.chapters[0].name, "Beginning");
         assert!(book.chapters[0].content.contains("本文を辞書検索"));
     }
 }

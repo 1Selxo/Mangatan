@@ -13,6 +13,8 @@ void main() {
       3,
     ]);
     expect(doublePageIndexLabel(1, 5, PageMode.doublePage), '3-4');
+    expect(doublePageActualIndexLabel(0, 59, PageMode.doublePage), '1-2');
+    expect(doublePageActualIndexLabel(2, 59, PageMode.doublePage), '3-4');
   });
 
   test('cover offset keeps the first page solo and pairs from page two', () {
@@ -33,5 +35,42 @@ void main() {
     );
     expect(doublePageIndexLabel(0, 5, PageMode.doublePageCover), '1');
     expect(doublePageIndexLabel(1, 5, PageMode.doublePageCover), '2-3');
+    expect(doublePageActualIndexLabel(0, 59, PageMode.doublePageCover), '1');
+    expect(doublePageActualIndexLabel(1, 59, PageMode.doublePageCover), '2-3');
+  });
+
+  test('transition pages never consume an orphan chapter page', () {
+    final transitionIndices = {5};
+    expect(
+      transitionAwareDoublePageSpreadIndices(
+        6,
+        PageMode.doublePage,
+        isTransitionPage: transitionIndices.contains,
+      ),
+      [
+        [0, 1],
+        [2, 3],
+        [4, null],
+        [5, null],
+      ],
+    );
+  });
+
+  test('cover offset restarts after each chapter transition', () {
+    final transitionIndices = {3};
+    expect(
+      transitionAwareDoublePageSpreadIndices(
+        7,
+        PageMode.doublePageCover,
+        isTransitionPage: transitionIndices.contains,
+      ),
+      [
+        [0, null],
+        [1, 2],
+        [3, null],
+        [4, null],
+        [5, 6],
+      ],
+    );
   });
 }

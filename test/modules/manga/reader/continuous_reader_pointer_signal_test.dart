@@ -10,11 +10,174 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_webtoon.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 void main() {
+  testWidgets('unmodified wheel pages forward and backward', (tester) async {
+    var page = 1;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerSignal: (event) => registerPagedReaderWheelScroll(
+            event,
+            onPreviousPage: () => page--,
+            onNextPage: () => page++,
+          ),
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    await _sendScrollAt(tester, const Offset(100, 100), const Offset(0, 40));
+    expect(page, 2);
+    await _sendScrollAt(tester, const Offset(100, 100), const Offset(0, -40));
+    expect(page, 1);
+  });
+
+  testWidgets('modifier wheel does not turn paged-reader pages', (
+    tester,
+  ) async {
+    var page = 1;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerSignal: (event) => registerPagedReaderWheelScroll(
+            event,
+            onPreviousPage: () => page--,
+            onNextPage: () => page++,
+          ),
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    addTearDown(
+      () async => tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft),
+    );
+
+    await _sendScrollAt(tester, const Offset(100, 100), const Offset(0, 80));
+    expect(page, 1);
+  });
+
+  testWidgets('each rapid paged wheel notch turns exactly one page', (
+    tester,
+  ) async {
+    var page = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerSignal: (event) => registerPagedReaderWheelScroll(
+            event,
+            onPreviousPage: () => page--,
+            onNextPage: () => page++,
+          ),
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    for (var i = 0; i < 5; i++) {
+      await _sendScrollAt(tester, const Offset(100, 100), const Offset(0, 40));
+    }
+    expect(page, 5);
+  });
+
+  testWidgets('a large paged wheel delta still turns only one page', (
+    tester,
+  ) async {
+    var page = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerSignal: (event) => registerPagedReaderWheelScroll(
+            event,
+            onPreviousPage: () => page--,
+            onNextPage: () => page++,
+          ),
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    await _sendScrollAt(tester, const Offset(100, 100), const Offset(0, 400));
+    expect(page, 1);
+  });
+
+  testWidgets('paged reader wins wheel signals over descendant image zoom', (
+    tester,
+  ) async {
+    var pageTurns = 0;
+    var descendantZooms = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReaderPointerSignalInterceptor(
+          onPointerSignal: (event) => registerPagedReaderWheelScroll(
+            event,
+            onPreviousPage: () => pageTurns--,
+            onNextPage: () => pageTurns++,
+          ),
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerSignal: (event) {
+              GestureBinding.instance.pointerSignalResolver.register(
+                event,
+                (_) => descendantZooms++,
+              );
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+
+    await _sendScrollAt(tester, const Offset(100, 100), const Offset(0, 400));
+    expect(pageTurns, 1);
+    expect(descendantZooms, 0);
+  });
+
+  testWidgets('rapid paged wheel notches each jump exactly one page', (
+    tester,
+  ) async {
+    final controller = PageController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReaderPointerSignalInterceptor(
+          onPointerSignal: (event) => registerPagedReaderWheelScroll(
+            event,
+            onPreviousPage: () {
+              final page = controller.page!.round();
+              controller.jumpToPage((page - 1).clamp(0, 9));
+            },
+            onNextPage: () {
+              final page = controller.page!.round();
+              controller.jumpToPage((page + 1).clamp(0, 9));
+            },
+          ),
+          child: PageView.builder(
+            controller: controller,
+            itemCount: 10,
+            itemBuilder: (_, index) => Center(child: Text('$index')),
+          ),
+        ),
+      ),
+    );
+
+    for (var i = 0; i < 5; i++) {
+      await _sendScrollAt(tester, const Offset(100, 100), const Offset(0, 400));
+    }
+
+    expect(controller.page, 5);
+    expect(find.text('5'), findsOneWidget);
+  });
+
   for (final mode in [
     ReaderMode.verticalContinuous,
     ReaderMode.webtoon,

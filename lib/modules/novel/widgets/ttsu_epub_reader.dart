@@ -29,22 +29,45 @@ import 'package:url_launcher/url_launcher.dart';
 /// owns the page axis.  Keeping this separate from the Flutter chrome means
 /// dictionary selection keeps working in every layout.
 enum EpubReadingLayout {
-  scroll,
-  paginated,
-  vertical;
+  horizontalContinuous,
+  horizontalPaged,
+  verticalPaged,
+  verticalContinuous;
 
   String get documentValue => switch (this) {
-    EpubReadingLayout.scroll => 'scroll',
-    EpubReadingLayout.paginated => 'pages',
-    EpubReadingLayout.vertical => 'vertical',
+    EpubReadingLayout.horizontalContinuous => 'horizontal-scroll',
+    EpubReadingLayout.horizontalPaged => 'horizontal-pages',
+    EpubReadingLayout.verticalPaged => 'vertical-pages',
+    EpubReadingLayout.verticalContinuous => 'vertical-scroll',
   };
 
-  bool get isPaged => this != EpubReadingLayout.scroll;
+  bool get isPaged =>
+      this == EpubReadingLayout.horizontalPaged ||
+      this == EpubReadingLayout.verticalPaged;
+
+  bool get isVerticalWriting =>
+      this == EpubReadingLayout.verticalPaged ||
+      this == EpubReadingLayout.verticalContinuous;
+
+  bool get usesHorizontalScroll =>
+      this == EpubReadingLayout.horizontalPaged ||
+      this == EpubReadingLayout.verticalContinuous;
 
   String get label => switch (this) {
-    EpubReadingLayout.scroll => 'Scroll',
-    EpubReadingLayout.paginated => 'Pages',
-    EpubReadingLayout.vertical => 'Vertical Japanese',
+    EpubReadingLayout.horizontalContinuous => 'Horizontal continuous',
+    EpubReadingLayout.horizontalPaged => 'Horizontal paged',
+    EpubReadingLayout.verticalPaged => 'Vertical paged',
+    EpubReadingLayout.verticalContinuous => 'Vertical continuous',
+  };
+
+  static EpubReadingLayout fromAxes({
+    required bool vertical,
+    required bool paged,
+  }) => switch ((vertical, paged)) {
+    (false, false) => EpubReadingLayout.horizontalContinuous,
+    (false, true) => EpubReadingLayout.horizontalPaged,
+    (true, true) => EpubReadingLayout.verticalPaged,
+    (true, false) => EpubReadingLayout.verticalContinuous,
   };
 }
 
@@ -135,7 +158,7 @@ class TtsuEpubReader extends StatefulWidget {
     required this.initialProgress,
     required this.tapToScroll,
     required this.removeExtraParagraphSpacing,
-    this.layout = EpubReadingLayout.scroll,
+    this.layout = EpubReadingLayout.horizontalContinuous,
     required this.onProgress,
     required this.onReaderTap,
     required this.onChapterRequested,
@@ -467,7 +490,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       anchor: anchor,
       text: text,
       initialResults: prefetchedResults,
-      placement: widget.layout == EpubReadingLayout.vertical
+      placement: widget.layout.isVerticalWriting
           ? DictionaryPopupPlacement.leftOrRight
           : DictionaryPopupPlacement.aboveOrBelow,
       miningContext: MiningContext(
@@ -626,11 +649,9 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
                 transparentBackground: true,
                 supportZoom: false,
                 horizontalScrollBarEnabled: false,
-                verticalScrollBarEnabled: !widget.layout.isPaged,
-                disableHorizontalScroll:
-                    widget.layout != EpubReadingLayout.paginated,
-                disableVerticalScroll:
-                    widget.layout == EpubReadingLayout.paginated,
+                verticalScrollBarEnabled: !widget.layout.usesHorizontalScroll,
+                disableHorizontalScroll: !widget.layout.usesHorizontalScroll,
+                disableVerticalScroll: widget.layout.usesHorizontalScroll,
                 isInspectable: kDebugMode,
                 allowFileAccessFromFileURLs: true,
                 allowUniversalAccessFromFileURLs: false,
@@ -718,6 +739,7 @@ class _EpubFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final paddingPixels = MediaQuery.sizeOf(context).height * padding / 100;
     return ColoredBox(
       color: backgroundColor,
       child: Column(
@@ -739,7 +761,7 @@ class _EpubFallback extends StatelessWidget {
             child: NovelDictionarySelection(
               chapter: chapter,
               child: SingleChildScrollView(
-                padding: EdgeInsets.all(padding),
+                padding: EdgeInsets.all(paddingPixels),
                 child: Html(
                   data: buildReaderHtml(html),
                   style: {
@@ -879,7 +901,7 @@ String buildTtsuEpubDocument({
   required double initialProgress,
   required bool tapToScroll,
   bool removeExtraParagraphSpacing = false,
-  EpubReadingLayout layout = EpubReadingLayout.scroll,
+  EpubReadingLayout layout = EpubReadingLayout.horizontalContinuous,
   DictionaryLookupTrigger lookupTrigger = DictionaryLookupTrigger.leftClick,
   String? chapterHref,
   String? Function(EpubResource resource)? resourceUrlFor,
@@ -912,7 +934,7 @@ String buildTtsuEpubDocument({
   final documentHref = _safeArchivePath(chapterHref ?? '') ?? 'reader.xhtml';
   final layoutValue = layout.documentValue;
   final pageMode = layout.isPaged;
-  final verticalWriting = layout == EpubReadingLayout.vertical;
+  final verticalWriting = layout.isVerticalWriting;
   final lookupTriggerValue = jsonEncode(lookupTrigger.name);
   final pageGap = (padding * 2).toStringAsFixed(1);
 
@@ -928,8 +950,8 @@ String buildTtsuEpubDocument({
       color-scheme: light dark;
       --reader-bg: $background;
       --reader-fg: $foreground;
-      --reader-padding: ${padding}px;
-      --reader-page-gap: ${pageGap}px;
+      --reader-padding: ${padding}vh;
+      --reader-page-gap: ${pageGap}vh;
     }
     html, body {
       margin: 0;
@@ -951,7 +973,7 @@ String buildTtsuEpubDocument({
     }
     #reader-content {
       max-width: 72rem;
-      min-height: calc(100vh - ${padding * 2}px);
+      min-height: calc(100vh - ${padding * 2}vh);
       margin: 0 auto;
       color: inherit !important;
     }
@@ -985,22 +1007,26 @@ String buildTtsuEpubDocument({
     /* Use an explicit viewport instead of document.body. WebView2 and
        WKWebView disagree about which document node accepts programmatic
        page offsets, while an overflow container behaves consistently. */
-    html[data-mangatan-reader-layout="pages"],
-    html[data-mangatan-reader-layout="pages"] body,
-    html[data-mangatan-reader-layout="vertical"],
-    html[data-mangatan-reader-layout="vertical"] body {
+    html[data-mangatan-reader-layout="horizontal-pages"],
+    html[data-mangatan-reader-layout="horizontal-pages"] body,
+    html[data-mangatan-reader-layout="vertical-pages"],
+    html[data-mangatan-reader-layout="vertical-pages"] body,
+    html[data-mangatan-reader-layout="vertical-scroll"],
+    html[data-mangatan-reader-layout="vertical-scroll"] body {
       height: 100vh !important;
       width: 100vw !important;
       min-height: 0 !important;
       overflow: hidden !important;
     }
-    html[data-mangatan-reader-layout="pages"] body,
-    html[data-mangatan-reader-layout="vertical"] body {
+    html[data-mangatan-reader-layout="horizontal-pages"] body,
+    html[data-mangatan-reader-layout="vertical-pages"] body,
+    html[data-mangatan-reader-layout="vertical-scroll"] body {
       padding: 0 !important;
       box-sizing: border-box !important;
     }
-    html[data-mangatan-reader-layout="pages"] #reader-content,
-    html[data-mangatan-reader-layout="vertical"] #reader-content {
+    html[data-mangatan-reader-layout="horizontal-pages"] #reader-content,
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content,
+    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content {
       width: 100vw !important;
       height: 100vh !important;
       min-height: 0 !important;
@@ -1013,40 +1039,53 @@ String buildTtsuEpubDocument({
       overscroll-behavior: contain;
       scrollbar-width: none;
     }
-    html[data-mangatan-reader-layout="pages"] #reader-content::-webkit-scrollbar,
-    html[data-mangatan-reader-layout="vertical"] #reader-content::-webkit-scrollbar {
+    html[data-mangatan-reader-layout="horizontal-pages"] #reader-content::-webkit-scrollbar,
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content::-webkit-scrollbar,
+    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content::-webkit-scrollbar {
       display: none;
     }
-    html[data-mangatan-reader-layout="pages"] #reader-content *,
-    html[data-mangatan-reader-layout="vertical"] #reader-content * {
+    html[data-mangatan-reader-layout="horizontal-pages"] #reader-content *,
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content *,
+    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content * {
       column-count: auto !important;
       -webkit-column-count: auto !important;
     }
-    html[data-mangatan-reader-layout="pages"] #reader-content {
-      column-width: calc(100vw - ${padding * 2}px) !important;
-      column-gap: ${padding * 2}px !important;
+    html[data-mangatan-reader-layout="horizontal-pages"] #reader-content {
+      column-width: calc(100vw - ${padding * 2}vh) !important;
+      column-gap: ${padding * 2}vh !important;
     }
-    html[data-mangatan-reader-layout="pages"] #reader-content p,
-    html[data-mangatan-reader-layout="vertical"] #reader-content p {
+    html[data-mangatan-reader-layout="horizontal-pages"] #reader-content p,
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content p {
       break-inside: avoid;
       -webkit-column-break-inside: avoid;
     }
-    html[data-mangatan-reader-layout="vertical"] #reader-content {
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content {
       writing-mode: vertical-rl !important;
       text-orientation: mixed;
-      column-width: calc(100vh - ${padding * 2}px) !important;
+      column-width: calc(100vh - ${padding * 2}vh) !important;
       /* Column width + gap must equal one physical viewport. Any mismatch
          accumulates on every page and eventually seeks into blank columns. */
-      column-gap: ${padding * 2}px !important;
+      column-gap: ${padding * 2}vh !important;
     }
-    html[data-mangatan-reader-layout="vertical"] #reader-content p {
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content p,
+    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content p {
       margin: 0 0 0 $paragraphSpacing;
     }
-    html[data-mangatan-reader-layout="vertical"] #reader-content img,
-    html[data-mangatan-reader-layout="vertical"] #reader-content svg {
-      max-width: calc(100vw - ${padding * 2}px);
-      max-height: calc(100vh - ${padding * 2}px - ${fontSize}px);
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content img,
+    html[data-mangatan-reader-layout="vertical-pages"] #reader-content svg,
+    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content img,
+    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content svg {
+      max-width: calc(100vw - ${padding * 2}vh);
+      max-height: calc(100vh - ${padding * 2}vh - ${fontSize}px);
       margin: 0 auto !important;
+    }
+    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content {
+      writing-mode: vertical-rl !important;
+      text-orientation: mixed;
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      column-width: auto !important;
+      column-gap: normal !important;
     }
     #dictionary-action {
       position: fixed; z-index: 2147483647; display: none; transform: translate(-50%, -100%);
@@ -1064,6 +1103,7 @@ String buildTtsuEpubDocument({
       const tapZones = $tapZones;
       const pageMode = $pageMode;
       const verticalWriting = $verticalWriting;
+      const continuousVertical = verticalWriting && !pageMode;
       const lookupTrigger = $lookupTriggerValue;
       const content = document.getElementById('reader-content');
       const action = document.getElementById('dictionary-action');
@@ -1089,9 +1129,19 @@ String buildTtsuEpubDocument({
           window.flutter_inappwebview.callHandler(name, payload);
         }
       };
-      const scrollElement = () => pageMode
+      const scrollElement = () => (pageMode || continuousVertical)
         ? content
         : (document.scrollingElement || document.documentElement || document.body);
+      const continuousVerticalContext = () => {
+        const max = Math.max(0, content.scrollWidth - content.clientWidth);
+        return {
+          root: content,
+          axis: 'x',
+          pageSize: content.clientWidth,
+          max,
+          offset: Math.min(max, Math.abs(content.scrollLeft)),
+        };
+      };
       const rawPageContext = () => {
         const root = content;
         const xMax = Math.max(0, root.scrollWidth - root.clientWidth);
@@ -1181,6 +1231,10 @@ String buildTtsuEpubDocument({
         return Math.min(context.max, lastPage);
       };
       const calculateProgress = () => {
+        if (continuousVertical) {
+          const context = continuousVerticalContext();
+          return context.max > 0 ? context.offset / context.max : 0;
+        }
         if (!pageMode) {
           const root = scrollElement();
           const max = Math.max(0, root.scrollHeight - window.innerHeight);
@@ -1194,6 +1248,10 @@ String buildTtsuEpubDocument({
         if (pageMode) {
           return { offset: calculateProgress(), max: 1 };
         }
+        if (continuousVertical) {
+          const context = continuousVerticalContext();
+          return { offset: context.offset, max: context.max };
+        }
         const max = Math.max(0, root.scrollHeight - window.innerHeight);
         return { offset: root.scrollTop || window.scrollY || 0, max };
       };
@@ -1203,6 +1261,9 @@ String buildTtsuEpubDocument({
       const setOffset = (value, behavior = 'auto') => {
         const root = scrollElement();
         if (pageMode) return setPageOffset(pageContext(), value);
+        if (continuousVertical) {
+          return setPageOffset(continuousVerticalContext(), value);
+        }
         const max = Math.max(0, root.scrollHeight - window.innerHeight);
         const target = Math.max(0, Math.min(max, Number(value) || 0));
         root.scrollTo({ top: target, behavior });
@@ -1211,6 +1272,12 @@ String buildTtsuEpubDocument({
       const restoreProgress = async (value) => {
         const progress = Math.max(0, Math.min(1, Number(value) || 0));
         await (document.fonts?.ready || Promise.resolve());
+        if (continuousVertical) {
+          const context = continuousVerticalContext();
+          setPageOffset(context, progress * context.max);
+          queueReport();
+          return;
+        }
         if (!pageMode) {
           const root = scrollElement();
           setOffset(progress * Math.max(0, root.scrollHeight - window.innerHeight));
@@ -1242,7 +1309,14 @@ String buildTtsuEpubDocument({
         const target = id && (document.getElementById(id) || document.getElementsByName(id)[0]);
         if (!target) return false;
         await (document.fonts?.ready || Promise.resolve());
-        if (!pageMode) {
+        if (continuousVertical) {
+          const context = continuousVerticalContext();
+          const rect = target.getClientRects()[0] || target.getBoundingClientRect();
+          setPageOffset(
+            context,
+            window.innerWidth - rect.right + context.offset,
+          );
+        } else if (!pageMode) {
           target.scrollIntoView({ block: 'start', behavior: 'auto' });
         } else {
           const context = pageContext();
@@ -1268,7 +1342,10 @@ String buildTtsuEpubDocument({
         clearLookup();
         if (!pageMode) {
           const before = metrics().offset;
-          setOffset(before + (Number(direction) || 0) * window.innerHeight * .88);
+          const viewport = continuousVertical
+            ? window.innerWidth
+            : window.innerHeight;
+          setOffset(before + (Number(direction) || 0) * viewport * .88);
           const moved = Math.abs(metrics().offset - before) > 1;
           queueReport();
           return moved;
@@ -1599,6 +1676,18 @@ String buildTtsuEpubDocument({
         if (Math.abs(delta) < 1) return;
         if (!pageMode) {
           const direction = delta > 0 ? 1 : -1;
+          if (continuousVertical) {
+            event.preventDefault();
+            if (scrollByPixels(delta)) {
+              continuousBoundaryLocked = false;
+              return;
+            }
+            if (!continuousBoundaryLocked) {
+              continuousBoundaryLocked = true;
+              call('readerChapter', direction);
+            }
+            return;
+          }
           requestAnimationFrame(() => {
             const current = metrics();
             const atLimit = direction > 0
@@ -1655,7 +1744,8 @@ String buildTtsuEpubDocument({
           event.preventDefault();
           if (!scrollPage(-1)) call('readerChapter', -1);
         }
-        if (pageMode && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        if ((pageMode || continuousVertical) &&
+            (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
           event.preventDefault();
           const forward = verticalWriting
             ? event.key === 'ArrowLeft'
@@ -1696,13 +1786,8 @@ String buildTtsuEpubDocument({
         spacer.setAttribute('aria-hidden', 'true');
         spacer.style.display = 'block';
         spacer.style.breakInside = 'avoid';
-        if (verticalWriting) {
-          spacer.style.height = '100%';
-          spacer.style.width = 'calc(${padding}px + ${fontSize}px)';
-        } else {
-          spacer.style.height = '100%';
-          spacer.style.width = '${padding}px';
-        }
+        spacer.style.height = '100%';
+        spacer.style.width = '${padding}vh';
         content.appendChild(spacer);
       }
 

@@ -115,6 +115,34 @@ void main() {
     ]);
     expect(paths.termPaths.last, gamma.path);
   });
+
+  test(
+    'applies profile order and enabled dictionaries without rewriting disk order',
+    () async {
+      final root = await Directory.systemTemp.createTemp('dictionary-storage-');
+      addTearDown(() => root.delete(recursive: true));
+      final alpha = await _createDictionary(root, 'Alpha');
+      await _createDictionary(root, 'Beta');
+      final gamma = await _createDictionary(root, 'Gamma');
+
+      final installed = await DictionaryStorage.instance.installed(
+        root: root,
+        order: const ['Gamma', 'Alpha', 'Beta'],
+      );
+      final paths = await DictionaryStorage.instance.paths(
+        root: root,
+        order: const ['Gamma', 'Alpha', 'Beta'],
+        enabled: const {'Gamma', 'Alpha'},
+      );
+
+      expect(installed.map((dictionary) => dictionary.name), [
+        'Gamma',
+        'Alpha',
+        'Beta',
+      ]);
+      expect(paths.termPaths, [gamma.path, alpha.path]);
+    },
+  );
 }
 
 Future<Directory> _createDictionary(Directory root, String name) async {

@@ -175,10 +175,10 @@ void main() {
       textAlign: 'justify',
       initialProgress: 0.5,
       tapToScroll: true,
-      layout: EpubReadingLayout.vertical,
+      layout: EpubReadingLayout.verticalPaged,
     );
 
-    expect(document, contains('data-mangatan-reader-layout="vertical"'));
+    expect(document, contains('data-mangatan-reader-layout="vertical-pages"'));
     expect(document, contains('writing-mode: vertical-rl'));
     expect(document, contains('const pageMode = true'));
     expect(document, contains('const verticalWriting = true'));
@@ -218,7 +218,7 @@ void main() {
     expect(document, isNot(contains('highlightMatch(1)')));
     expect(document, contains("content.querySelectorAll('ruby')"));
     expect(document, contains('column-count: auto !important'));
-    expect(document, contains('column-gap: 48.0px !important'));
+    expect(document, contains('column-gap: 48.0vh !important'));
     expect(document, contains('alignToPage(context, progress * context.max)'));
     expect(document, contains('const measureLastContentPage = () =>'));
     expect(document, contains('measuredPageMax = measureLastContentPage()'));
@@ -230,6 +230,61 @@ void main() {
     expect(
       document,
       contains('background: rgba(160, 160, 160, .4) !important'),
+    );
+  });
+
+  test(
+    'supports continuous vertical writing on the horizontal scroll axis',
+    () {
+      final document = buildTtsuEpubDocument(
+        html: '<p>縦書きの連続表示</p>',
+        book: book,
+        title: 'fixture',
+        backgroundColor: '#292832',
+        textColor: '#cccccc',
+        fontSize: 18,
+        lineHeight: 1.8,
+        padding: 12,
+        textAlign: 'justify',
+        initialProgress: 0.25,
+        tapToScroll: true,
+        layout: EpubReadingLayout.verticalContinuous,
+      );
+
+      expect(
+        document,
+        contains('data-mangatan-reader-layout="vertical-scroll"'),
+      );
+      expect(document, contains('--reader-padding: 12.0vh'));
+      expect(document, contains('const pageMode = false'));
+      expect(document, contains('const verticalWriting = true'));
+      expect(
+        document,
+        contains('const continuousVertical = verticalWriting && !pageMode'),
+      );
+      expect(document, contains('const continuousVerticalContext = () =>'));
+      expect(document, contains('content.scrollWidth - content.clientWidth'));
+      expect(document, contains('overflow-x: auto !important'));
+      expect(document, contains('overflow-y: hidden !important'));
+    },
+  );
+
+  test('exposes every writing direction and flow combination', () {
+    expect(
+      EpubReadingLayout.fromAxes(vertical: false, paged: false),
+      EpubReadingLayout.horizontalContinuous,
+    );
+    expect(
+      EpubReadingLayout.fromAxes(vertical: false, paged: true),
+      EpubReadingLayout.horizontalPaged,
+    );
+    expect(
+      EpubReadingLayout.fromAxes(vertical: true, paged: true),
+      EpubReadingLayout.verticalPaged,
+    );
+    expect(
+      EpubReadingLayout.fromAxes(vertical: true, paged: false),
+      EpubReadingLayout.verticalContinuous,
     );
   });
 

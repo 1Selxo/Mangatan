@@ -648,7 +648,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
       pageKeysNavigatePages: true,
       delegateHorizontalPageKeysToChild: delegateHorizontalPageKeysToChild,
     ).wrapWithKeyboardListener(
-      isReverseHorizontal: _epubLayout.value == EpubReadingLayout.vertical,
+      isReverseHorizontal: _epubLayout.value.isVerticalWriting,
       child: NotificationListener<UserScrollNotification>(
         onNotification: (notification) {
           if (notification.direction == ScrollDirection.idle) {
@@ -813,8 +813,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                 viewport,
                                                 usePageTapZones,
                                                 reverseHorizontal:
-                                                    layout ==
-                                                    EpubReadingLayout.vertical,
+                                                    layout.isVerticalWriting,
                                               ),
                                           onChapterRequested: (direction) =>
                                               _goToChapter(direction > 0),

@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dialog.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
+import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 
@@ -23,8 +25,14 @@ class DictionaryScreen extends StatefulWidget {
 
 class _DictionaryScreenState extends State<DictionaryScreen> {
   List<InstalledDictionary> _dictionaries = const [];
+  List<DictionaryProfile> _profiles = const [];
+  DictionaryProfile _activeProfile = const DictionaryProfile(
+    id: 'mangatan-default',
+    name: 'Default',
+  );
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
   String _language = 'ja';
+  String _dictionaryLanguage = 'ja';
   double _opacity = 0.0;
   double _boxScale = 1;
   double _boxScaleY = 1;
@@ -69,10 +77,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getAnkiEndpoint(),
       ScreenAiOcrClient.isAvailable(),
       MiningPreferences.getDictionaryLookupTrigger(),
+      MiningPreferences.getDictionaryLanguage(),
+      MiningPreferences.getDictionaryProfiles(),
+      MiningPreferences.getActiveDictionaryProfile(),
     ]);
     if (!mounted) return;
     setState(() {
-      _dictionaries = values[0] as List<InstalledDictionary>;
+      _profiles = values[16] as List<DictionaryProfile>;
+      _activeProfile = values[17] as DictionaryProfile;
+      _dictionaries = _orderDictionaries(
+        values[0] as List<InstalledDictionary>,
+        _activeProfile.dictionaryOrder,
+      );
       _engine = values[1] as OcrEnginePreference;
       _language = values[2] as String;
       _opacity = values[3] as double;
@@ -87,6 +103,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _ankiEndpoint = values[12] as Uri;
       _screenAiAvailable = values[13] as bool;
       _lookupTrigger = values[14] as DictionaryLookupTrigger;
+      _dictionaryLanguage = values[15] as String;
       _loading = false;
     });
     unawaited(_refreshAnki(silent: true));
@@ -159,8 +176,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     final previous = _dictionaries;
     setState(() => _dictionaries = dictionaries);
     try {
-      await DictionaryStorage.instance.reorder(
-        dictionaries.map((dictionary) => dictionary.name).toList(),
+      await _updateActiveProfile(
+        _activeProfile.copyWith(
+          dictionaryOrder: dictionaries
+              .map((dictionary) => dictionary.name)
+              .toList(),
+        ),
       );
       await HoshidictsLookupBackend.instance.reloadFromStorage();
     } catch (error) {
@@ -205,8 +226,103 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   }
 
   Future<void> _saveAnki(AnkiMiningProfile profile) async {
-    setState(() => _ankiProfile = profile);
+    setState(() {
+      _ankiProfile = profile;
+      _activeProfile = _activeProfile.copyWith(anki: profile);
+    });
     await MiningPreferences.setAnkiProfile(profile);
+  }
+
+  List<InstalledDictionary> _orderDictionaries(
+    List<InstalledDictionary> dictionaries,
+    List<String> order,
+  ) {
+    if (order.isEmpty) return dictionaries;
+    final byName = {
+      for (final dictionary in dictionaries) dictionary.name: dictionary,
+    };
+    return [for (final name in order) ?byName.remove(name), ...byName.values];
+  }
+
+  Future<void> _updateActiveProfile(DictionaryProfile profile) async {
+    await MiningPreferences.updateDictionaryProfile(profile);
+    if (!mounted) return;
+    setState(() {
+      _activeProfile = profile;
+      _profiles = [
+        for (final item in _profiles) item.id == profile.id ? profile : item,
+      ];
+    });
+  }
+
+  Future<void> _activateProfile(DictionaryProfile profile) async {
+    if (profile.id == _activeProfile.id) return;
+    await MiningPreferences.setActiveDictionaryProfile(profile.id);
+    HoshidictsLookupBackend.instance.clearSession();
+    await _load();
+  }
+
+  Future<void> _createProfile() async {
+    final name = await _editText(
+      title: 'New profile',
+      value: '${_activeProfile.name} copy',
+      hint: 'Profile name',
+    );
+    if (name == null || name.trim().isEmpty) return;
+    final profile = _activeProfile.copyWith(
+      id: 'profile-${DateTime.now().microsecondsSinceEpoch}',
+      name: name.trim(),
+    );
+    await MiningPreferences.addDictionaryProfile(profile);
+    HoshidictsLookupBackend.instance.clearSession();
+    await _load();
+  }
+
+  Future<void> _renameActiveProfile() async {
+    final name = await _editText(
+      title: 'Rename profile',
+      value: _activeProfile.name,
+      hint: 'Profile name',
+    );
+    if (name == null || name.trim().isEmpty) return;
+    await _updateActiveProfile(_activeProfile.copyWith(name: name.trim()));
+  }
+
+  Future<void> _deleteActiveProfile() async {
+    if (_profiles.length <= 1) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete profile?'),
+        content: Text(_activeProfile.name),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await MiningPreferences.deleteDictionaryProfile(_activeProfile.id);
+    HoshidictsLookupBackend.instance.clearSession();
+    await _load();
+  }
+
+  Future<void> _toggleDictionary(String name, bool enabled) async {
+    var enabledNames = _activeProfile.enabledDictionaries.isEmpty
+        ? _dictionaries.map((dictionary) => dictionary.name).toSet()
+        : {..._activeProfile.enabledDictionaries};
+    enabled ? enabledNames.add(name) : enabledNames.remove(name);
+    if (enabledNames.length == _dictionaries.length) enabledNames = {};
+    await _updateActiveProfile(
+      _activeProfile.copyWith(enabledDictionaries: enabledNames),
+    );
+    await HoshidictsLookupBackend.instance.reloadFromStorage();
   }
 
   Future<void> _saveAnkiAudio(AnkiAudioPreferences preferences) async {
@@ -423,6 +539,68 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
+                const _SectionHeader('Profiles'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final profile in _profiles) ...[
+                                ChoiceChip(
+                                  label: Text(profile.name),
+                                  selected: profile.id == _activeProfile.id,
+                                  onSelected: (_) => _activateProfile(profile),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              ActionChip(
+                                avatar: const Icon(Icons.add, size: 18),
+                                label: const Text('Clone'),
+                                onPressed: _createProfile,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Profile actions',
+                        onSelected: (action) {
+                          if (action == 'rename') _renameActiveProfile();
+                          if (action == 'delete') _deleteActiveProfile();
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'rename',
+                            child: ListTile(
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Rename'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            enabled: _profiles.length > 1,
+                            child: const ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Delete'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text('Active: ${_activeProfile.name}'),
+                  subtitle: const Text(
+                    'Language, dictionary priority, enabled dictionaries, and Anki settings are saved per profile.',
+                  ),
+                ),
+                const Divider(height: 24),
                 const _SectionHeader('Dictionaries'),
                 ListTile(
                   leading: const Icon(Icons.archive_outlined),
@@ -459,6 +637,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         index: index,
                         canMoveUp: index > 0,
                         canMoveDown: index < _dictionaries.length - 1,
+                        enabled: _activeProfile.isDictionaryEnabled(
+                          dictionary.name,
+                        ),
+                        onEnabledChanged: (enabled) =>
+                            _toggleDictionary(dictionary.name, enabled),
                         onMoveUp: () => _moveDictionary(index, -1),
                         onMoveDown: () => _moveDictionary(index, 1),
                         onDelete: () => _deleteDictionary(dictionary),
@@ -658,6 +841,35 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 const Divider(height: 24),
                 const _SectionHeader('Lookup behavior'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _dictionaryLanguage,
+                    decoration: const InputDecoration(
+                      labelText: 'Dictionary language',
+                      helperText:
+                          'Controls word parsing and deinflection during lookup',
+                      prefixIcon: Icon(Icons.translate),
+                    ),
+                    items: [
+                      for (final language in dictionaryLanguages)
+                        DropdownMenuItem(
+                          value: language.code,
+                          child: Text(language.name),
+                        ),
+                    ],
+                    onChanged: (value) async {
+                      if (value == null) return;
+                      setState(() => _dictionaryLanguage = value);
+                      await MiningPreferences.setDictionaryLanguage(value);
+                      await _updateActiveProfile(
+                        _activeProfile.copyWith(languageCode: value),
+                      );
+                      HoshidictsLookupBackend.instance.invalidateLookups();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: DropdownButtonFormField<DictionaryLookupTrigger>(
@@ -1163,6 +1375,8 @@ class _DictionaryListTile extends StatelessWidget {
     required this.index,
     required this.canMoveUp,
     required this.canMoveDown,
+    required this.enabled,
+    required this.onEnabledChanged,
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onDelete,
@@ -1172,6 +1386,8 @@ class _DictionaryListTile extends StatelessWidget {
   final int index;
   final bool canMoveUp;
   final bool canMoveDown;
+  final bool enabled;
+  final ValueChanged<bool> onEnabledChanged;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
   final VoidCallback onDelete;
@@ -1209,6 +1425,7 @@ class _DictionaryListTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Switch(value: enabled, onChanged: onEnabledChanged),
           IconButton(
             tooltip: 'Move dictionary up',
             onPressed: canMoveUp ? onMoveUp : null,

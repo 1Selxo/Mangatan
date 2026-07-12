@@ -1,6 +1,10 @@
 import 'dart:typed_data';
 
+import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
+import 'package:mangayomi/services/hoshidicts/korean_language_parser.dart';
+import 'package:mangayomi/services/hoshidicts/yomitan_language_parser.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts/native.dart' as hoshidicts;
 
@@ -12,6 +16,8 @@ class HoshidictsLookupBackend {
   // Hovering commonly revisits nearby words, so retain a small LRU without
   // holding an entire subtitle or chapter's materialized glossary data.
   static const _maxCachedLookups = 32;
+
+  final YomitanLanguageParser _yomitanParser = YomitanLanguageParser();
 
   hoshidicts.HoshiLookupSession? _session;
   Future<hoshidicts.HoshiLookupSession>? _initializing;
@@ -70,13 +76,21 @@ class HoshidictsLookupBackend {
     String text, {
     int maxResults = 10,
     int scanLength = 20,
+    String? language,
   }) async {
     final query = text.trim();
     if (query.isEmpty || maxResults <= 0 || scanLength <= 0) {
       return const [];
     }
 
-    final request = _LookupRequest(query, maxResults, scanLength);
+    final lookupLanguage =
+        language ?? await MiningPreferences.getDictionaryLanguage();
+    final request = _LookupRequest(
+      query,
+      maxResults,
+      scanLength,
+      normalizeDictionaryLanguage(lookupLanguage),
+    );
     final cached = _lookupCache.remove(request);
     if (cached != null) {
       _lookupCache[request] = cached;
@@ -123,6 +137,8 @@ class HoshidictsLookupBackend {
     _invalidateQueryCaches();
   }
 
+  void invalidateLookups() => _invalidateQueryCaches();
+
   Future<hoshidicts.HoshiLookupSession> _ensureSession() async {
     final session = _session;
     if (session != null && _configured) return session;
@@ -141,7 +157,11 @@ class HoshidictsLookupBackend {
   }
 
   Future<hoshidicts.HoshiLookupSession> _initializeFromStorage() async {
-    final paths = await DictionaryStorage.instance.paths();
+    final profile = await MiningPreferences.getActiveDictionaryProfile();
+    final paths = await DictionaryStorage.instance.paths(
+      order: profile.dictionaryOrder,
+      enabled: profile.enabledDictionaries,
+    );
     return _rebuildQuery(
       termPaths: paths.termPaths,
       freqPaths: paths.frequencyPaths,
@@ -170,14 +190,48 @@ class HoshidictsLookupBackend {
     int generation,
   ) async {
     try {
-      final results = List<HoshiLookupResult>.unmodifiable(
-        await hoshidicts.lookup(
-          session: await _ensureSession(),
+      final session = await _ensureSession();
+      Future<List<HoshiLookupResult>> nativeLookup(
+        String text,
+        int maxResults,
+        int scanLength,
+      ) {
+        return hoshidicts.lookup(
+          session: session,
+          text: text,
+          maxResults: maxResults,
+          scanLength: BigInt.from(scanLength),
+        );
+      }
+
+      final rawResults = switch (request.language) {
+        'ja' => await nativeLookup(
+          request.text,
+          request.maxResults,
+          request.scanLength,
+        ),
+        'ko' => await lookupKoreanDictionary(
           text: request.text,
           maxResults: request.maxResults,
-          scanLength: BigInt.from(request.scanLength),
+          scanLength: request.scanLength,
+          lookup: nativeLookup,
         ),
-      );
+        _ => await lookupYomitanDictionary(
+          language: request.language,
+          text: request.text,
+          maxResults: request.maxResults,
+          scanLength: request.scanLength,
+          lookup: nativeLookup,
+          loadCandidates: (language, text, scanLength, maxCandidates) =>
+              _yomitanParser.candidates(
+                language,
+                text,
+                scanLength: scanLength,
+                maxCandidates: maxCandidates,
+              ),
+        ),
+      };
+      final results = List<HoshiLookupResult>.unmodifiable(rawResults);
       if (generation == _queryGeneration) {
         _lookupCache[request] = results;
         while (_lookupCache.length > _maxCachedLookups) {
@@ -212,19 +266,26 @@ class HoshidictsLookupBackend {
 }
 
 class _LookupRequest {
-  const _LookupRequest(this.text, this.maxResults, this.scanLength);
+  const _LookupRequest(
+    this.text,
+    this.maxResults,
+    this.scanLength,
+    this.language,
+  );
 
   final String text;
   final int maxResults;
   final int scanLength;
+  final String language;
 
   @override
   bool operator ==(Object other) =>
       other is _LookupRequest &&
       other.text == text &&
       other.maxResults == maxResults &&
-      other.scanLength == scanLength;
+      other.scanLength == scanLength &&
+      other.language == language;
 
   @override
-  int get hashCode => Object.hash(text, maxResults, scanLength);
+  int get hashCode => Object.hash(text, maxResults, scanLength, language);
 }

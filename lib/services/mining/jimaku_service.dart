@@ -166,6 +166,24 @@ class JimakuSubtitleService {
     return outputFile;
   }
 
+  Future<List<File>> downloadFiles({
+    required String apiKey,
+    required Iterable<JimakuFile> files,
+    required Directory outputDirectory,
+  }) async {
+    final downloaded = <File>[];
+    for (final file in files) {
+      downloaded.add(
+        await downloadFile(
+          apiKey: apiKey,
+          file: file,
+          outputDirectory: outputDirectory,
+        ),
+      );
+    }
+    return downloaded;
+  }
+
   Future<List<JimakuFile>> matchingFiles({
     required String apiKey,
     required JimakuEntry entry,

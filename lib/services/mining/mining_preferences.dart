@@ -1,5 +1,7 @@
 import 'package:hive_flutter/adapters.dart';
+import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 
 enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }
 
@@ -122,6 +124,8 @@ class MiningPreferences {
   static const _autoJimaku = 'auto_jimaku';
   static const _ankiEndpoint = 'anki_endpoint';
   static const _ankiProfile = 'anki_profile';
+  static const _dictionaryProfiles = 'dictionary_profiles';
+  static const _activeDictionaryProfileId = 'active_dictionary_profile_id';
   static const _ankiAudioEnabled = 'anki_audio_enabled';
   static const _ankiAudioSourceType = 'anki_audio_source_type';
   static const _ankiAudioUrl = 'anki_audio_url';
@@ -130,6 +134,7 @@ class MiningPreferences {
   static const _ocrEngine = 'ocr_engine';
   static const _ocrOverlayEnabled = 'ocr_overlay_enabled';
   static const _ocrLanguage = 'ocr_language';
+  static const _dictionaryLanguage = 'dictionary_language';
   static const _ocrOverlayOpacity = 'ocr_overlay_opacity';
   static const _ocrBoxScale = 'ocr_box_scale';
   static const _ocrOutlineVisible = 'ocr_outline_visible';
@@ -210,12 +215,95 @@ class MiningPreferences {
   }
 
   static Future<AnkiMiningProfile> getAnkiProfile() async {
-    final raw = (await _boxOrNull())?.get(_ankiProfile);
-    return AnkiMiningProfile.fromJson(raw is Map ? raw : null);
+    final active = await getActiveDictionaryProfile();
+    return active.anki;
   }
 
   static Future<void> setAnkiProfile(AnkiMiningProfile profile) async {
-    await (await _boxOrNull())?.put(_ankiProfile, profile.toJson());
+    final box = await _boxOrNull();
+    if (box == null) return;
+    await box.put(_ankiProfile, profile.toJson());
+    final profiles = await _profilesOrMigrate(box);
+    final activeId = _activeProfileId(box, profiles);
+    await _writeProfiles(box, [
+      for (final item in profiles)
+        item.id == activeId ? item.copyWith(anki: profile) : item,
+    ]);
+  }
+
+  static Future<List<DictionaryProfile>> getDictionaryProfiles() async {
+    final box = await _boxOrNull();
+    if (box == null) return const [_fallbackDictionaryProfile];
+    return _profilesOrMigrate(box);
+  }
+
+  static Future<DictionaryProfile> getActiveDictionaryProfile() async {
+    final box = await _boxOrNull();
+    if (box == null) return _fallbackDictionaryProfile;
+    final profiles = await _profilesOrMigrate(box);
+    final activeId = _activeProfileId(box, profiles);
+    return profiles.firstWhere(
+      (profile) => profile.id == activeId,
+      orElse: () => profiles.first,
+    );
+  }
+
+  static Future<void> setDictionaryProfiles(
+    List<DictionaryProfile> profiles, {
+    String? activeId,
+  }) async {
+    final box = await _boxOrNull();
+    if (box == null) return;
+    final safeProfiles = profiles
+        .where((profile) => profile.id.isNotEmpty)
+        .toList();
+    if (safeProfiles.isEmpty) safeProfiles.add(_fallbackDictionaryProfile);
+    await _writeProfiles(box, safeProfiles);
+    final selectedId = safeProfiles.any((profile) => profile.id == activeId)
+        ? activeId!
+        : _activeProfileId(box, safeProfiles);
+    await box.put(_activeDictionaryProfileId, selectedId);
+    await _mirrorActiveProfile(box, safeProfiles, selectedId);
+  }
+
+  static Future<void> updateDictionaryProfile(DictionaryProfile profile) async {
+    final box = await _boxOrNull();
+    if (box == null) return;
+    final profiles = await _profilesOrMigrate(box);
+    final updated = [
+      for (final item in profiles) item.id == profile.id ? profile : item,
+    ];
+    await _writeProfiles(box, updated);
+    final activeId = _activeProfileId(box, updated);
+    if (activeId == profile.id) {
+      await _mirrorActiveProfile(box, updated, activeId);
+    }
+  }
+
+  static Future<void> addDictionaryProfile(DictionaryProfile profile) async {
+    final profiles = await getDictionaryProfiles();
+    await setDictionaryProfiles([...profiles, profile], activeId: profile.id);
+  }
+
+  static Future<bool> deleteDictionaryProfile(String id) async {
+    final profiles = await getDictionaryProfiles();
+    if (profiles.length <= 1) return false;
+    final remaining = profiles.where((profile) => profile.id != id).toList();
+    final active = await getActiveDictionaryProfile();
+    await setDictionaryProfiles(
+      remaining,
+      activeId: active.id == id ? remaining.first.id : active.id,
+    );
+    return true;
+  }
+
+  static Future<void> setActiveDictionaryProfile(String id) async {
+    final box = await _boxOrNull();
+    if (box == null) return;
+    final profiles = await _profilesOrMigrate(box);
+    if (!profiles.any((profile) => profile.id == id)) return;
+    await box.put(_activeDictionaryProfileId, id);
+    await _mirrorActiveProfile(box, profiles, id);
   }
 
   static Future<AnkiAudioPreferences> getAnkiAudioPreferences() async {
@@ -293,6 +381,25 @@ class MiningPreferences {
 
   static Future<void> setOcrLanguage(String value) async {
     await (await _boxOrNull())?.put(_ocrLanguage, value);
+  }
+
+  static Future<String> getDictionaryLanguage() async {
+    return (await getActiveDictionaryProfile()).languageCode;
+  }
+
+  static Future<void> setDictionaryLanguage(String value) async {
+    final normalized = normalizeDictionaryLanguage(value);
+    final box = await _boxOrNull();
+    if (box == null) return;
+    await box.put(_dictionaryLanguage, normalized);
+    final profiles = await _profilesOrMigrate(box);
+    final activeId = _activeProfileId(box, profiles);
+    await _writeProfiles(box, [
+      for (final profile in profiles)
+        profile.id == activeId
+            ? profile.copyWith(languageCode: normalized)
+            : profile,
+    ]);
   }
 
   static Future<double> getOcrOverlayOpacity() async {
@@ -454,6 +561,70 @@ class MiningPreferences {
 
   static Future<void> setShowPitchText(bool value) async =>
       (await _boxOrNull())?.put(_showPitchText, value);
+
+  static const _fallbackDictionaryProfile = DictionaryProfile(
+    id: 'mangatan-default',
+    name: 'Default',
+  );
+
+  static List<DictionaryProfile> _readProfiles(Box<dynamic> box) {
+    final raw = box.get(_dictionaryProfiles);
+    if (raw is! Iterable) return const [];
+    return raw
+        .whereType<Map>()
+        .map(DictionaryProfile.fromJson)
+        .where((profile) => profile.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static Future<List<DictionaryProfile>> _profilesOrMigrate(
+    Box<dynamic> box,
+  ) async {
+    final profiles = _readProfiles(box);
+    if (profiles.isNotEmpty) return profiles;
+    final rawAnki = box.get(_ankiProfile);
+    final language = normalizeDictionaryLanguage(
+      box.get(_dictionaryLanguage, defaultValue: 'ja') as String?,
+    );
+    final migrated = _fallbackDictionaryProfile.copyWith(
+      languageCode: language,
+      anki: AnkiMiningProfile.fromJson(rawAnki is Map ? rawAnki : null),
+    );
+    await _writeProfiles(box, [migrated]);
+    await box.put(_activeDictionaryProfileId, migrated.id);
+    return [migrated];
+  }
+
+  static String _activeProfileId(
+    Box<dynamic> box,
+    List<DictionaryProfile> profiles,
+  ) {
+    final id = box.get(_activeDictionaryProfileId)?.toString() ?? '';
+    return profiles.any((profile) => profile.id == id) ? id : profiles.first.id;
+  }
+
+  static Future<void> _writeProfiles(
+    Box<dynamic> box,
+    List<DictionaryProfile> profiles,
+  ) {
+    return box.put(
+      _dictionaryProfiles,
+      profiles.map((profile) => profile.toJson()).toList(growable: false),
+    );
+  }
+
+  static Future<void> _mirrorActiveProfile(
+    Box<dynamic> box,
+    List<DictionaryProfile> profiles,
+    String activeId,
+  ) async {
+    final active = profiles.firstWhere(
+      (profile) => profile.id == activeId,
+      orElse: () => profiles.first,
+    );
+    await box.put(_ankiProfile, active.anki.toJson());
+    await box.put(_dictionaryLanguage, active.languageCode);
+  }
 
   static String _jimakuTitleKey(int? mediaId) {
     return 'jimaku_title_${mediaId ?? 'global'}';

@@ -43,6 +43,26 @@ void main() {
     expect(document, contains("const lookupTrigger = \"leftClick\""));
   });
 
+  test('rewrites SVG xlink image references used by fixed-layout EPUBs', () {
+    final document = buildTtsuEpubDocument(
+      html:
+          '<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="../images/cover.png"/></svg>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      chapterHref: 'OEBPS/text/chapter.xhtml',
+    );
+
+    expect(document, contains('xlink:href="data:image/png;base64,'));
+  });
+
   test('generates middle-click dictionary lookup handling', () {
     final document = buildTtsuEpubDocument(
       html: '<p>辞書</p>',
@@ -90,7 +110,9 @@ void main() {
     expect(document, contains('clearTimeout(wheelUnlockTimer)'));
     expect(
       document,
-      contains('wheelUnlockTimer = setTimeout(() => { wheelLocked = false; }, 180)'),
+      contains(
+        'wheelUnlockTimer = setTimeout(() => { wheelLocked = false; }, 180)',
+      ),
     );
     expect(document, contains('const touchCenter = (touches) =>'));
     expect(document, contains("document.addEventListener('touchstart'"));

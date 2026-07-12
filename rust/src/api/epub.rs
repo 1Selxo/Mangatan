@@ -146,10 +146,9 @@ fn parse_epub_with_doc<R: Read + Seek>(
 
         // Extract resources with content only if we have a file path
         let (stylesheets, images) = if let Some(path) = epub_path {
-            extract_resources_with_content(path).unwrap_or_else(|_| (vec![], vec![]))
+            extract_resources_with_content(path)?
         } else {
-            extract_resources_with_content_from_bytes(epub_bytes.unwrap_or_default())
-                .unwrap_or_else(|_| (vec![], vec![]))
+            extract_resources_with_content_from_bytes(epub_bytes.unwrap_or_default())?
         };
 
         (chapters, images, stylesheets)

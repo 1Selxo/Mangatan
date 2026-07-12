@@ -13,6 +13,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
+import 'package:mangayomi/services/epub_reader_asset_server.dart';
 import 'package:mangayomi/services/get_html_content.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -138,10 +139,11 @@ class TtsuEpubReaderController {
 
 /// Hoshi-style EPUB reader.
 ///
-/// EPUB documents are materialized into a short-lived private directory and
-/// loaded from a file URL. This avoids WebView2's small `NavigateToString`
-/// limit, preserves chapter-relative CSS/images, and prevents a large image
-/// from turning the reader into an empty surface.
+/// EPUB documents are materialized into a short-lived private directory. The
+/// reader uses a loopback HTTP origin on Windows and a file URL elsewhere.
+/// This avoids WebView2's small `NavigateToString` limit, preserves
+/// chapter-relative CSS/images, and prevents a large image from turning the
+/// reader into an empty surface.
 class TtsuEpubReader extends StatefulWidget {
   const TtsuEpubReader({
     super.key,
@@ -272,10 +274,11 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       });
     }
 
+    _EpubRenderBundle? bundle;
     try {
       await ReaderLookupTriggerState.initialize();
       _lookupTrigger = ReaderLookupTriggerState.trigger.value;
-      final bundle = await _EpubRenderBundle.create(
+      bundle = await _EpubRenderBundle.create(
         book: widget.book,
         chapterHref: _chapterHref,
       );
@@ -297,6 +300,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       });
       if (previous != null) unawaited(previous.dispose());
     } catch (error) {
+      await bundle?.dispose();
       if (!mounted || generation != _generation) return;
       setState(() {
         _isPreparing = false;
@@ -625,12 +629,11 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       );
     }
 
-    final documentPath = documentFile.path;
-    // A file URL can safely carry a query string on every supported WebView.
-    // It gives each settings reload a new platform-view identity while the
-    // physical chapter remains at its canonical EPUB-relative path.
-    final documentUri = Uri.file(documentPath).replace(
-      queryParameters: {'mangatan-reader-revision': '$_documentRevision'},
+    // A revision query gives each settings reload a new platform-view identity
+    // while the physical chapter remains at its canonical EPUB-relative path.
+    final documentUri = _bundle!.documentUri(
+      documentFile,
+      revision: _documentRevision,
     );
     final documentIdentity = _documentIdentity;
     return Stack(
@@ -653,7 +656,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
                 disableHorizontalScroll: !widget.layout.usesHorizontalScroll,
                 disableVerticalScroll: widget.layout.usesHorizontalScroll,
                 isInspectable: kDebugMode,
-                allowFileAccessFromFileURLs: true,
+                allowFileAccessFromFileURLs: !Platform.isWindows,
                 allowUniversalAccessFromFileURLs: false,
               ),
               onWebViewCreated: (controller) {
@@ -683,13 +686,10 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
                 final url = navigationAction.request.url;
                 if (url == null) return NavigationActionPolicy.CANCEL;
                 final uri = Uri.tryParse(url.toString());
-                if (uri != null &&
-                    uri.scheme == 'file' &&
-                    _sameLocalFile(uri, documentUri)) {
-                  // WebView2 reports a cancelled initial file navigation as
-                  // "the connection was stopped". Permit only this generated
-                  // chapter document; in-document EPUB links still use the JS
-                  // bridge below and cannot replace the controlled surface.
+                if (uri != null && _sameReaderDocument(uri, documentUri)) {
+                  // WebView2 describes a cancelled initial navigation as a
+                  // stopped connection. Permit only this generated chapter
+                  // document; EPUB links still use the JS bridge.
                   return NavigationActionPolicy.ALLOW;
                 }
                 if (uri != null &&
@@ -790,10 +790,8 @@ class _EpubFallback extends StatelessWidget {
   }
 
   Widget? _fallbackImage(dom.Element element) {
-    final source =
-        element.attributes['src'] ??
-        element.attributes['href'] ??
-        element.attributes['xlink:href'];
+    final attribute = _imageSourceAttribute(element);
+    final source = attribute == null ? null : element.attributes[attribute];
     if (source == null || _isExternalResource(source)) return null;
     final image = _findImage(book.images, source, chapterHref: chapterHref);
     if (image == null) return null;
@@ -809,10 +807,11 @@ class _EpubFallback extends StatelessWidget {
 }
 
 class _EpubRenderBundle {
-  _EpubRenderBundle._(this.root, this._resourceUrls);
+  _EpubRenderBundle._(this.root, this._resourceUrls, this._assetServer);
 
   final Directory root;
   final Map<String, String> _resourceUrls;
+  final EpubReaderAssetServer? _assetServer;
 
   static Future<_EpubRenderBundle> create({
     required EpubNovel book,
@@ -840,7 +839,10 @@ class _EpubRenderBundle {
         );
         urls[_resourceKey(resource)] = _relativeUrl(relative, chapterHref);
       }
-      return _EpubRenderBundle._(root, urls);
+      final assetServer = Platform.isWindows
+          ? await EpubReaderAssetServer.start(root)
+          : null;
+      return _EpubRenderBundle._(root, urls, assetServer);
     } catch (_) {
       try {
         await root.delete(recursive: true);
@@ -854,6 +856,12 @@ class _EpubRenderBundle {
   String? relativeUrlFor(EpubResource resource) =>
       _resourceUrls[_resourceKey(resource)];
 
+  Uri documentUri(File document, {required int revision}) {
+    final query = {'mangatan-reader-revision': '$revision'};
+    return _assetServer?.uriFor(document, queryParameters: query) ??
+        Uri.file(document.path).replace(queryParameters: query);
+  }
+
   Future<File> writeDocument(String document, {required int revision}) async {
     final href = renderedEpubDocumentHref(document, revision);
     final target = File(p.joinAll([root.path, ...href.split('/')]));
@@ -863,6 +871,7 @@ class _EpubRenderBundle {
   }
 
   Future<void> dispose() async {
+    await _assetServer?.close();
     if (await root.exists()) await root.delete(recursive: true);
   }
 }
@@ -1896,13 +1905,7 @@ void _rewriteEpubResourceUrls(
   required String? Function(EpubResource resource)? resourceUrlFor,
 }) {
   for (final element in document.querySelectorAll('img, image')) {
-    final attribute = element.attributes.containsKey('src')
-        ? 'src'
-        : element.attributes.containsKey('href')
-        ? 'href'
-        : element.attributes.containsKey('xlink:href')
-        ? 'xlink:href'
-        : null;
+    final attribute = _imageSourceAttribute(element);
     if (attribute == null) continue;
     final source = element.attributes[attribute];
     if (source == null || _isExternalResource(source)) continue;
@@ -1913,6 +1916,19 @@ void _rewriteEpubResourceUrls(
         url ??
         'data:${_mimeType(resource.name)};base64,${base64Encode(resource.content)}';
   }
+}
+
+Object? _imageSourceAttribute(dom.Element element) {
+  if (element.attributes.containsKey('src')) return 'src';
+  if (element.attributes.containsKey('href')) return 'href';
+  for (final attribute in element.attributes.keys) {
+    if (attribute is dom.AttributeName &&
+        attribute.prefix == 'xlink' &&
+        attribute.name == 'href') {
+      return attribute;
+    }
+  }
+  return null;
 }
 
 String _preservedStylesheetLinks(
@@ -2029,6 +2045,16 @@ bool _sameLocalFile(Uri first, Uri second) {
     return first.replace(query: '', fragment: '') ==
         second.replace(query: '', fragment: '');
   }
+}
+
+bool _sameReaderDocument(Uri first, Uri second) {
+  if (first.scheme == 'file' && second.scheme == 'file') {
+    return _sameLocalFile(first, second);
+  }
+  return first.scheme == second.scheme &&
+      first.host == second.host &&
+      first.port == second.port &&
+      first.path == second.path;
 }
 
 String _escapeHtmlAttribute(String value) => value

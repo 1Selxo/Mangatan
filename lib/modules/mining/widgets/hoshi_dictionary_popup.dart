@@ -14,6 +14,7 @@ import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
@@ -184,6 +185,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       rootBundle.loadString('assets/hoshi_popup/popup.js'),
       rootBundle.loadString('assets/hoshi_popup/selection.js'),
       MiningPreferences.getAnkiAudioPreferences(),
+      MiningPreferences.getActiveDictionaryProfile(),
     ]);
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
@@ -191,6 +193,8 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         popupJs: values[1] as String,
         selectionJs: values[2] as String,
         audioPreferences: values[3] as AnkiAudioPreferences,
+        allowDuplicates:
+            (values[4] as DictionaryProfile).duplicateAction == 'allow',
         preferences: widget.preferences,
         theme: theme,
         dark: dark,
@@ -328,16 +332,21 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
 
   Future<bool> _isDuplicate(String expression) async {
     try {
-      final profile = await MiningPreferences.getAnkiProfile();
+      final dictionaryProfile =
+          await MiningPreferences.getActiveDictionaryProfile();
+      final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled || !profile.duplicateCheck) return false;
       final service = AnkiConnectService(
         endpoint: await MiningPreferences.getAnkiEndpoint(),
       );
-      final notes = await service.findDuplicateExpressions(
+      final status = await service.checkDuplicateExpression(
         deckName: profile.deckName,
+        modelName: profile.modelName,
         expression: expression,
+        duplicateScope: profile.duplicateScope,
+        checkAllModels: profile.checkAllModels,
       );
-      return notes.isNotEmpty;
+      return status.isDuplicate;
     } catch (_) {
       return false;
     }
@@ -359,7 +368,9 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     try {
       final miningContext = await widget.miningContext;
       if (miningContext == null) return false;
-      final profile = await MiningPreferences.getAnkiProfile();
+      final dictionaryProfile =
+          await MiningPreferences.getActiveDictionaryProfile();
+      final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled) {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
         return false;
@@ -388,10 +399,16 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           ).exportDraft(
             draft,
             duplicateCheck: profile.duplicateCheck,
+            allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
+            duplicateScope: profile.duplicateScope,
+            checkAllModels: profile.checkAllModels,
             syncOnCreate: profile.syncOnCreate,
           );
       botToast('Added to Anki (#$noteId)', second: 3);
       return true;
+    } on AnkiDuplicateException {
+      botToast('Already in Anki', second: 3);
+      return false;
     } catch (error) {
       botToast('Anki export failed: $error', second: 5);
       return false;
@@ -826,6 +843,7 @@ String buildHoshiPopupHtml({
   required String popupJs,
   required String selectionJs,
   required AnkiAudioPreferences audioPreferences,
+  required bool allowDuplicates,
   required DictionaryPopupPreferences preferences,
   required ThemeData theme,
   required bool dark,
@@ -868,6 +886,7 @@ String buildHoshiPopupHtml({
     'textSelected',
     'dismissPopup',
     'mineEntry',
+    'duplicateCheck',
     'openLink',
     'getTermAudioSources',
     'playWordAudio',
@@ -962,7 +981,7 @@ String buildHoshiPopupHtml({
 	    window.audioEnableAutoplay = false;
 	    window.audioPlaybackMode = 'interrupt';
 	    window.needsAudio = ${audioSources.isNotEmpty};
-    window.allowDupes = false;
+    window.allowDupes = $allowDuplicates;
     window.useAnkiConnect = true;
     window.enableBackgroundDuplicateChecks = false;
     window.embedMedia = false;
@@ -1004,7 +1023,7 @@ String buildHoshiPopupHtml({
   return html
       .replaceFirst(
         RegExp(r'\.button-slot\[data-state="duplicate"\]::before \{[^}]*\}'),
-        '.button-slot[data-state="duplicate"]::before { content: "\\2713"; font-size: calc(19px * var(--popup-scale)); }',
+        '.button-slot[data-state="duplicate"]::before { content: "\\229E"; font-size: calc(19px * var(--popup-scale)); }',
       )
       .replaceFirst(
         RegExp(

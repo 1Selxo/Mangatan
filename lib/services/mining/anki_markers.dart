@@ -213,6 +213,7 @@ class AnkiMiningProfile {
   final List<String> tags;
   final bool duplicateCheck;
   final String duplicateScope;
+  final bool checkAllModels;
   final bool syncOnCreate;
   final AnkiSentenceAudioFormat sentenceAudioFormat;
   final Map<String, String> fieldMap;
@@ -224,6 +225,7 @@ class AnkiMiningProfile {
     this.tags = const ['mangatan'],
     this.duplicateCheck = true,
     this.duplicateScope = 'deck',
+    this.checkAllModels = false,
     this.syncOnCreate = false,
     this.sentenceAudioFormat = AnkiSentenceAudioFormat.mp3,
     this.fieldMap = defaultFieldMap,
@@ -241,6 +243,7 @@ class AnkiMiningProfile {
           const ['mangatan'],
       duplicateCheck: json['duplicateCheck'] as bool? ?? true,
       duplicateScope: json['duplicateScope'] as String? ?? 'deck',
+      checkAllModels: json['checkAllModels'] as bool? ?? false,
       syncOnCreate: json['syncOnCreate'] as bool? ?? false,
       sentenceAudioFormat: AnkiSentenceAudioFormat.values.firstWhere(
         (format) => format.name == json['sentenceAudioFormat'],
@@ -261,6 +264,7 @@ class AnkiMiningProfile {
     List<String>? tags,
     bool? duplicateCheck,
     String? duplicateScope,
+    bool? checkAllModels,
     bool? syncOnCreate,
     AnkiSentenceAudioFormat? sentenceAudioFormat,
     Map<String, String>? fieldMap,
@@ -272,6 +276,7 @@ class AnkiMiningProfile {
       tags: tags ?? this.tags,
       duplicateCheck: duplicateCheck ?? this.duplicateCheck,
       duplicateScope: duplicateScope ?? this.duplicateScope,
+      checkAllModels: checkAllModels ?? this.checkAllModels,
       syncOnCreate: syncOnCreate ?? this.syncOnCreate,
       sentenceAudioFormat: sentenceAudioFormat ?? this.sentenceAudioFormat,
       fieldMap: fieldMap ?? this.fieldMap,
@@ -286,6 +291,7 @@ class AnkiMiningProfile {
       'tags': tags,
       'duplicateCheck': duplicateCheck,
       'duplicateScope': duplicateScope,
+      'checkAllModels': checkAllModels,
       'syncOnCreate': syncOnCreate,
       'sentenceAudioFormat': sentenceAudioFormat.name,
       'fieldMap': fieldMap,

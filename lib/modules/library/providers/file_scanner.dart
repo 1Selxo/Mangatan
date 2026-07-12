@@ -304,42 +304,26 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       if (manga.itemType == ItemType.novel) {
         final book = await parseEpubFromPath(
           epubPath: chapterPath,
-          fullData: true,
+          fullData: false,
         );
 
         if (book.cover != null) {
           manga.customCoverImage = book.cover!.getCoverImage;
           saveManga++;
         }
-        final chaps = book.chapters;
-        if (chaps.isNotEmpty) {
-          for (int i = 0; i < chaps.length; i++) {
-            final epubChapter = chaps[i];
-            chaptersToSave.add(
-              Chapter(
-                mangaId: manga.id,
-                name: epubChapter.name,
-                archivePath: chapterPath,
-                url: epubChapter.path,
-                dateUpload: epubChapter.spineIndex.toString(),
-                description: epubChapterMetadata(
-                  spineIndex: epubChapter.spineIndex,
-                  navigationEntry: epubChapter.isNavigationEntry,
-                ),
-                downloadSize: null,
-              )..manga.value = manga,
-            );
-          }
-        } else {
-          chaptersToSave.add(
-            Chapter(
-              mangaId: manga.id,
-              name: book.name,
-              archivePath: chapterPath,
-              downloadSize: null,
-            )..manga.value = manga,
-          );
-        }
+        // Local novel imports use the legacy single-entry model. The reader
+        // parses the EPUB spine internally, so persisting every XHTML item as
+        // a library chapter only creates duplicate/garbled chapter lists.
+        chaptersToSave.add(
+          Chapter(
+            mangaId: manga.id,
+            name: book.name,
+            archivePath: chapterPath,
+            dateUpload: '0',
+            description: epubUnsplitChapterMetadata(),
+            downloadSize: null,
+          )..manga.value = manga,
+        );
       } else {
         final chapterFile = File(chapterPath);
         final chap = Chapter(

@@ -1667,51 +1667,68 @@ String buildTtsuEpubDocument({
         call('readerTap', { x: event.clientX, y: event.clientY, width: window.innerWidth, height: window.innerHeight, tapZones });
       });
       let wheelLocked = false;
-      let continuousBoundaryLocked = false;
       let pageSnapTimer = 0;
       document.addEventListener('wheel', (event) => {
-        const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+        const rawDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
           ? event.deltaY
           : event.deltaX;
+        const delta = rawDelta * (event.deltaMode === 1
+          ? 18
+          : event.deltaMode === 2
+            ? (continuousVertical ? window.innerWidth : window.innerHeight)
+            : 1);
         if (Math.abs(delta) < 1) return;
         if (!pageMode) {
-          const direction = delta > 0 ? 1 : -1;
-          if (continuousVertical) {
-            event.preventDefault();
-            if (scrollByPixels(delta)) {
-              continuousBoundaryLocked = false;
-              return;
-            }
-            if (!continuousBoundaryLocked) {
-              continuousBoundaryLocked = true;
-              call('readerChapter', direction);
-            }
+          // Explicitly bridge high-resolution trackpad wheels into the
+          // reader's logical axis. WebView2 otherwise drops vertical
+          // two-finger deltas when the EPUB itself scrolls horizontally.
+          event.preventDefault();
+          if (scrollByPixels(delta)) {
             return;
           }
-          requestAnimationFrame(() => {
-            const current = metrics();
-            const atLimit = direction > 0
-              ? current.offset >= current.max - 1
-              : current.offset <= 1;
-            if (!atLimit) {
-              continuousBoundaryLocked = false;
-              return;
-            }
-            if (continuousBoundaryLocked) return;
-            if (atLimit) {
-              continuousBoundaryLocked = true;
-              call('readerChapter', direction);
-            }
-          });
+          // A trackpad gesture must never turn into a chapter change merely
+          // because the current layout has not finished measuring its extent.
           return;
         }
         event.preventDefault();
         if (wheelLocked) return;
         wheelLocked = true;
-        const direction = delta > 0 ? 1 : -1;
-        if (!scrollPage(direction)) call('readerChapter', direction);
+        scrollPage(delta > 0 ? 1 : -1);
         setTimeout(() => { wheelLocked = false; }, 220);
       }, { passive: false });
+      const touchCenter = (touches) => {
+        if (!touches || touches.length < 2) return null;
+        return {
+          x: (touches[0].clientX + touches[1].clientX) / 2,
+          y: (touches[0].clientY + touches[1].clientY) / 2,
+        };
+      };
+      let twoFingerPan = null;
+      document.addEventListener('touchstart', (event) => {
+        const center = touchCenter(event.touches);
+        if (!center) return;
+        clearLookup();
+        twoFingerPan = { ...center };
+      }, { passive: true });
+      document.addEventListener('touchmove', (event) => {
+        if (!twoFingerPan) return;
+        const center = touchCenter(event.touches);
+        if (!center) return;
+        const dx = twoFingerPan.x - center.x;
+        const dy = twoFingerPan.y - center.y;
+        const delta = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
+        twoFingerPan.x = center.x;
+        twoFingerPan.y = center.y;
+        if (Math.abs(delta) < .25) return;
+        event.preventDefault();
+        scrollByPixels(delta);
+      }, { passive: false });
+      const finishTwoFingerPan = (event) => {
+        if (event.touches?.length >= 2) return;
+        twoFingerPan = null;
+      };
+      document.addEventListener('touchend', finishTwoFingerPan, { passive: true });
+      document.addEventListener('touchcancel', () => { twoFingerPan = null; }, { passive: true });
       content.addEventListener('scroll', () => {
         queueReport();
         if (!pageMode) return;

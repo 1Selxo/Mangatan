@@ -1351,10 +1351,73 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 SwitchListTile(
                   title: const Text('Check for duplicates'),
+                  subtitle: const Text(
+                    'Use Anki\'s note-model duplicate rules before adding',
+                  ),
                   value: _ankiProfile.duplicateCheck,
                   onChanged: (value) =>
                       _saveAnki(_ankiProfile.copyWith(duplicateCheck: value)),
                 ),
+                if (_ankiProfile.duplicateCheck) ...[
+                  SwitchListTile(
+                    title: const Text('Allow duplicates'),
+                    subtitle: const Text(
+                      'Show duplicate state but keep the add button enabled',
+                    ),
+                    value: _activeProfile.duplicateAction == 'allow',
+                    onChanged: (value) => _updateActiveProfile(
+                      _activeProfile.copyWith(
+                        duplicateAction: value ? 'allow' : 'prevent',
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.filter_alt_outlined),
+                    title: const Text('Duplicate scope'),
+                    subtitle: Text(switch (_ankiProfile.duplicateScope) {
+                      'collection' => 'Entire collection',
+                      'deckroot' => 'Deck root and child decks',
+                      _ => 'Selected deck',
+                    }),
+                    trailing: DropdownButton<String>(
+                      value:
+                          const {
+                            'collection',
+                            'deck',
+                            'deckroot',
+                          }.contains(_ankiProfile.duplicateScope)
+                          ? _ankiProfile.duplicateScope
+                          : 'deck',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'collection',
+                          child: Text('Collection'),
+                        ),
+                        DropdownMenuItem(value: 'deck', child: Text('Deck')),
+                        DropdownMenuItem(
+                          value: 'deckroot',
+                          child: Text('Deck root'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          _saveAnki(
+                            _ankiProfile.copyWith(duplicateScope: value),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  SwitchListTile(
+                    title: const Text('Check all note types'),
+                    subtitle: const Text(
+                      'Match the first field across every Anki model',
+                    ),
+                    value: _ankiProfile.checkAllModels,
+                    onChanged: (value) =>
+                        _saveAnki(_ankiProfile.copyWith(checkAllModels: value)),
+                  ),
+                ],
                 SwitchListTile(
                   title: const Text('Sync after adding a note'),
                   value: _ankiProfile.syncOnCreate,

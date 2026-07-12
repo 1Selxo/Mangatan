@@ -670,7 +670,9 @@ class _DictionaryLookupResultsViewState
   Future<void> _export(HoshiLookupResult result) async {
     setState(() => _exporting = true);
     try {
-      final profile = await MiningPreferences.getAnkiProfile();
+      final dictionaryProfile =
+          await MiningPreferences.getActiveDictionaryProfile();
+      final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled) {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
         return;
@@ -686,9 +688,14 @@ class _DictionaryLookupResultsViewState
           ).exportDraft(
             draft,
             duplicateCheck: profile.duplicateCheck,
+            allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
+            duplicateScope: profile.duplicateScope,
+            checkAllModels: profile.checkAllModels,
             syncOnCreate: profile.syncOnCreate,
           );
       botToast('Added to Anki (#$noteId)', second: 3);
+    } on AnkiDuplicateException {
+      botToast('Already in Anki', second: 3);
     } catch (error) {
       botToast('Anki export failed: $error', second: 5);
     } finally {

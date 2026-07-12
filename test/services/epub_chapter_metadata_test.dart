@@ -101,4 +101,25 @@ void main() {
 
     expect(epubNavigationChaptersInSpineOrder([unsplit]), [unsplit]);
   });
+
+  test('hides stale spine rows beside an unsplit legacy EPUB row', () {
+    final unsplit = Chapter(
+      id: 1,
+      mangaId: 1,
+      name: 'Whole book',
+      archivePath: 'book.epub',
+      description: epubUnsplitChapterMetadata(),
+    );
+    final staleNavigation = chapter(id: 2, spineIndex: 3, navigation: true);
+    final staleInternal = chapter(id: 3, spineIndex: 4, navigation: false);
+
+    expect(
+      epubNavigationChaptersInSpineOrder([
+        staleNavigation,
+        unsplit,
+        staleInternal,
+      ]),
+      [unsplit],
+    );
+  });
 }

@@ -146,13 +146,6 @@ void main() {
 
     expect(document, contains('event.deltaMode === 1'));
     expect(document, contains('scrollByPixels(delta)'));
-    expect(document, contains('clearTimeout(wheelUnlockTimer)'));
-    expect(
-      document,
-      contains(
-        'wheelUnlockTimer = setTimeout(() => { wheelLocked = false; }, 180)',
-      ),
-    );
     expect(document, contains('const touchCenter = (touches) =>'));
     expect(document, contains("document.addEventListener('touchstart'"));
     expect(document, contains("document.addEventListener('touchmove'"));
@@ -163,6 +156,41 @@ void main() {
       document.indexOf("content.addEventListener('scroll'"),
     );
     expect(wheelAndTouchHandlers, isNot(contains("call('readerChapter'")));
+  });
+
+  test('turns one page for every unmodified wheel event', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>paged scroll fixture</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 12,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      layout: EpubReadingLayout.horizontalPaged,
+    );
+
+    final wheelHandler = document.substring(
+      document.indexOf("document.addEventListener('wheel'"),
+      document.indexOf('const touchCenter = (touches) =>'),
+    );
+    expect(
+      wheelHandler,
+      contains('if (event.ctrlKey || event.metaKey) return'),
+    );
+    expect(
+      wheelHandler,
+      contains(
+        'const pageDelta = event.deltaY !== 0 ? event.deltaY : event.deltaX',
+      ),
+    );
+    expect(wheelHandler, contains('scrollPage(pageDelta > 0 ? 1 : -1)'));
+    expect(wheelHandler, isNot(contains('wheelLocked')));
+    expect(wheelHandler, isNot(contains('wheelUnlockTimer')));
   });
 
   test('bridges back inputs from the embedded reader to Flutter', () {

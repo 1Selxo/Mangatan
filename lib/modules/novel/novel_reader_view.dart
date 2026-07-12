@@ -21,6 +21,7 @@ import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
+import 'package:mangayomi/modules/novel/novel_reader_progress.dart';
 import 'package:mangayomi/modules/novel/tts/novel_tts_service.dart';
 import 'package:mangayomi/modules/novel/tts/tts_player_bar.dart';
 import 'package:mangayomi/modules/novel/tts/tts_settings_tab.dart';
@@ -240,7 +241,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   int? _epubCharacterCount;
   int? _currentEpubSpineIndex;
   int? _lastProjectedEpubSpineIndex;
-  int? _lastProjectedOverallPercent;
+  int? _lastProjectedOverallPermille;
   bool _epubExploring = false;
   bool _epubRestoring = false;
   bool _returnButtonHovered = false;
@@ -295,11 +296,11 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
       final overallProgress = newMaxOffset > 0
           ? (newOffset / newMaxOffset).clamp(0.0, 1.0).toDouble()
           : newOffset.clamp(0.0, 1.0).toDouble();
-      final overallPercent = (overallProgress * 100).round();
+      final overallPermille = (overallProgress * 1000).round();
       if (_lastProjectedEpubSpineIndex != epubSpineIndex ||
-          _lastProjectedOverallPercent != overallPercent) {
+          _lastProjectedOverallPermille != overallPermille) {
         _lastProjectedEpubSpineIndex = epubSpineIndex;
-        _lastProjectedOverallPercent = overallPercent;
+        _lastProjectedOverallPermille = overallPermille;
         _readerController.updateEpubShortcutPosition(
           spineIndex: epubSpineIndex,
           overallProgress: overallProgress,
@@ -811,6 +812,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                   _initializeSavedEpubSpine(epubBook!);
                 }
                 _currentHtmlContent = data.$1;
+                final chapterCharacterCount = _usingTtsuReader
+                    ? 0
+                    : chimahonChapterCharacterCount(data.$1);
                 return Stack(
                   children: [
                     Column(
@@ -1342,11 +1346,16 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                   final customTextColor = ref.watch(
                                     novelReaderTextColorStateProvider,
                                   );
-                                  final scrollPercentage = maxOffset > 0
-                                      ? ((offset / maxOffset) * 100)
-                                            .clamp(0, 100)
-                                            .toInt()
-                                      : 0;
+                                  final progress = maxOffset > 0
+                                      ? (offset / maxOffset)
+                                            .clamp(0.0, 1.0)
+                                            .toDouble()
+                                      : 0.0;
+                                  final exactCharacterCount = _usingTtsuReader
+                                      ? (_epubCharacterCount ??
+                                            widget.initialEpubCharacterCount ??
+                                            0)
+                                      : null;
                                   return Row(
                                     children: [
                                       Expanded(
@@ -1363,7 +1372,13 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                 4.0,
                                               ),
                                               child: Text(
-                                                '$scrollPercentage %',
+                                                formatNovelReaderProgress(
+                                                  progress: progress,
+                                                  totalCharacterCount:
+                                                      chapterCharacterCount,
+                                                  exactCharacterCount:
+                                                      exactCharacterCount,
+                                                ),
                                                 style: TextStyle(
                                                   color: Color(
                                                     int.parse(

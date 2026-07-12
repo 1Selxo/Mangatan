@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/modules/widgets/custom_extended_image_provider.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/modules/novel/novel_reader_progress.dart';
 import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/utils/constant.dart';
 import 'package:marquee/marquee.dart';
@@ -182,7 +183,9 @@ class ChapterListTileWidget extends ConsumerWidget {
                         const Text(' • '),
                         Text(
                           isEpubNavigationChapter(chapter)
-                              ? "${((double.tryParse(chapter.lastPageRead!) ?? 0) * 100).toStringAsFixed(0)} %"
+                              ? formatNovelProgressPercentage(
+                                  double.tryParse(chapter.lastPageRead!) ?? 0,
+                                )
                               : chapter.manga.value!.itemType == ItemType.anime
                               ? l10n.episode_progress(
                                   Duration(
@@ -195,7 +198,12 @@ class ChapterListTileWidget extends ConsumerWidget {
                                   chapter.manga.value!.itemType ==
                                           ItemType.manga
                                       ? chapter.lastPageRead!
-                                      : "${((double.tryParse(chapter.lastPageRead!) ?? 0) * 100).toStringAsFixed(0)} %",
+                                      : formatNovelProgressPercentage(
+                                          double.tryParse(
+                                                chapter.lastPageRead!,
+                                              ) ??
+                                              0,
+                                        ),
                                 ),
                           style: TextStyle(
                             fontSize: 11,

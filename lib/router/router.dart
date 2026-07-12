@@ -185,6 +185,7 @@ class RouterNotifier extends ChangeNotifier {
         NovelReaderRouteArgs args => NovelReaderView(
           chapterId: args.chapterId,
           initialProgress: args.initialProgress,
+          initialEpubSpineIndex: args.initialEpubSpineIndex,
         ),
         int id => NovelReaderView(chapterId: id),
         _ => throw ArgumentError.value(extra, 'extra', 'Invalid novel route'),

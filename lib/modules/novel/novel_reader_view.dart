@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
@@ -47,11 +48,38 @@ typedef DoubleClickAnimationListener = void Function();
 
 enum NovelReaderTapAction { previousPage, toggleUi, nextPage }
 
+enum EpubReturnButtonEdge { top, bottom, left, right }
+
+EpubReturnButtonEdge epubReturnButtonEdgeFor({
+  required EpubReadingLayout layout,
+  required bool targetAfterSavedPosition,
+}) {
+  return switch (layout) {
+    EpubReadingLayout.horizontalContinuous =>
+      targetAfterSavedPosition
+          ? EpubReturnButtonEdge.top
+          : EpubReturnButtonEdge.bottom,
+    EpubReadingLayout.horizontalPaged =>
+      targetAfterSavedPosition
+          ? EpubReturnButtonEdge.left
+          : EpubReturnButtonEdge.right,
+    EpubReadingLayout.verticalPaged || EpubReadingLayout.verticalContinuous =>
+      targetAfterSavedPosition
+          ? EpubReturnButtonEdge.right
+          : EpubReturnButtonEdge.left,
+  };
+}
+
 class NovelReaderRouteArgs {
-  const NovelReaderRouteArgs({required this.chapterId, this.initialProgress});
+  const NovelReaderRouteArgs({
+    required this.chapterId,
+    this.initialProgress,
+    this.initialEpubSpineIndex,
+  });
 
   final int chapterId;
   final double? initialProgress;
+  final int? initialEpubSpineIndex;
 }
 
 String normalizeEpubReaderReference(String? value) {
@@ -73,58 +101,6 @@ String normalizeEpubReaderReference(String? value) {
     }
   }
   return parts.join('/');
-}
-
-({bool belongsToSpine, String? target, int? targetSpineIndex})
-adjacentEpubSpineTarget({
-  required EpubNovel book,
-  required String? currentReference,
-  int? currentSpineIndex,
-  required bool next,
-}) {
-  final current = normalizeEpubReaderReference(currentReference);
-  if (current.isEmpty && currentSpineIndex == null) {
-    return (belongsToSpine: false, target: null, targetSpineIndex: null);
-  }
-  // The canonical href is authoritative. Imported rows can carry stale v2/v3
-  // metadata after an EPUB is re-imported, so use the stored spine index only
-  // when the current href cannot be resolved.
-  final referenceMatches = current.isEmpty
-      ? const <int>[]
-      : <int>[
-          for (var i = 0; i < book.chapters.length; i++)
-            if (normalizeEpubReaderReference(book.chapters[i].path) ==
-                    current ||
-                normalizeEpubReaderReference(book.chapters[i].href) == current)
-              i,
-        ];
-  var index = referenceMatches.length == 1
-      ? referenceMatches.single
-      : currentSpineIndex == null
-      ? (referenceMatches.isEmpty ? -1 : referenceMatches.first)
-      : referenceMatches.firstWhere(
-          (candidate) =>
-              book.chapters[candidate].spineIndex == currentSpineIndex,
-          orElse: () => referenceMatches.isEmpty ? -1 : referenceMatches.first,
-        );
-  if (index < 0 && currentSpineIndex != null) {
-    index = book.chapters.indexWhere(
-      (entry) => entry.spineIndex == currentSpineIndex,
-    );
-  }
-  if (index < 0) {
-    return (belongsToSpine: false, target: null, targetSpineIndex: null);
-  }
-  final targetIndex = index + (next ? 1 : -1);
-  if (targetIndex < 0 || targetIndex >= book.chapters.length) {
-    return (belongsToSpine: true, target: null, targetSpineIndex: null);
-  }
-  final target = book.chapters[targetIndex];
-  return (
-    belongsToSpine: true,
-    target: target.path,
-    targetSpineIndex: target.spineIndex,
-  );
 }
 
 NovelReaderTapAction novelReaderTapActionForPosition({
@@ -158,16 +134,52 @@ NovelReaderTapAction novelReaderTapActionForPosition({
 class NovelReaderView extends ConsumerWidget {
   final int chapterId;
   final double? initialProgress;
-  NovelReaderView({super.key, required this.chapterId, this.initialProgress});
-  late final Chapter chapter = isar.chapters.getSync(chapterId)!;
+  final int? initialEpubSpineIndex;
+  NovelReaderView({
+    super.key,
+    required this.chapterId,
+    this.initialProgress,
+    this.initialEpubSpineIndex,
+  });
+  late final Chapter _requestedChapter = isar.chapters.getSync(chapterId)!;
+
+  EpubBookProgress? _epubBookmark() {
+    final mangaId = _requestedChapter.mangaId;
+    final archivePath = _requestedChapter.archivePath;
+    if (!isEpubNavigationChapter(_requestedChapter) ||
+        mangaId == null ||
+        archivePath == null ||
+        archivePath.isEmpty) {
+      return null;
+    }
+    return isar.epubBookProgress
+        .filter()
+        .mangaIdEqualTo(mangaId)
+        .archivePathEqualTo(archivePath)
+        .findFirstSync();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final result = ref.watch(getHtmlContentProvider(chapter: chapter));
+    final bookmark = _epubBookmark();
+    final result = ref.watch(
+      getHtmlContentProvider(chapter: _requestedChapter),
+    );
 
     return NovelWebView(
-      chapter: chapter,
+      chapter: _requestedChapter,
       result: result,
       initialProgress: initialProgress,
+      initialEpubChapterIndex: bookmark?.chapterIndex,
+      initialEpubChapterProgress: bookmark?.progress,
+      initialEpubCharacterCount: bookmark?.characterCount,
+      initialEpubHasSavedPosition:
+          bookmark != null &&
+          (bookmark.lastModified != null ||
+              bookmark.chapterIndex > 0 ||
+              bookmark.progress > 0 ||
+              bookmark.characterCount > 0),
+      initialEpubSpineIndex: initialEpubSpineIndex,
     );
   }
 }
@@ -178,11 +190,21 @@ class NovelWebView extends ConsumerStatefulWidget {
     required this.chapter,
     required this.result,
     this.initialProgress,
+    this.initialEpubChapterIndex,
+    this.initialEpubChapterProgress,
+    this.initialEpubCharacterCount,
+    this.initialEpubHasSavedPosition = false,
+    this.initialEpubSpineIndex,
   });
 
   final Chapter chapter;
   final AsyncValue<(String, EpubNovel?)> result;
   final double? initialProgress;
+  final int? initialEpubChapterIndex;
+  final double? initialEpubChapterProgress;
+  final int? initialEpubCharacterCount;
+  final bool initialEpubHasSavedPosition;
+  final int? initialEpubSpineIndex;
 
   @override
   ConsumerState createState() {
@@ -208,14 +230,38 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   bool _chapterTransitionInProgress = false;
   bool _dictionaryPopupPrewarmed = false;
   bool _usingTtsuReader = false;
+  bool _appIsActive = true;
   bool scrolled = false;
   double offset = 0;
   double maxOffset = 0;
+  int? _epubChapterIndex;
+  double? _epubChapterProgress;
+  int? _epubCharacterCount;
+  int? _currentEpubSpineIndex;
+  int? _lastProjectedEpubSpineIndex;
+  int? _lastProjectedOverallPercent;
+  bool _epubExploring = false;
+  bool _epubRestoring = false;
+  bool _returnButtonHovered = false;
+  bool _savedEpubPositionExists = false;
+  int _savedEpubChapterIndex = 0;
+  double _savedEpubChapterProgress = 0;
+  int _savedEpubCharacterCount = 0;
+  int? _savedEpubSpineIndex;
+  int? _effectiveInitialEpubSpineIndex;
+  int? _explorationTargetSpineIndex;
   double? _pendingSeekFraction;
   int fontSize = 14;
   bool get _ttsSupported => !Platform.isLinux;
 
   final Stopwatch _readingStopwatch = Stopwatch();
+
+  bool get _epubPositionLocked => _epubExploring || _epubRestoring;
+
+  void _restartReadingStopwatch() {
+    _readingStopwatch.reset();
+    if (_appIsActive) _readingStopwatch.start();
+  }
 
   void onScroll() {
     if (_scrollController.hasClients) {
@@ -225,19 +271,57 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     }
   }
 
-  void _reportProgress(double newOffset, double newMaxOffset) {
+  void _reportProgress(
+    double newOffset,
+    double newMaxOffset, {
+    int? epubChapterIndex,
+    double? epubChapterProgress,
+    int? epubCharacterCount,
+    int? epubSpineIndex,
+  }) {
     offset = newOffset;
     maxOffset = newMaxOffset;
+    _epubChapterIndex = epubChapterIndex ?? _epubChapterIndex;
+    _epubChapterProgress = epubChapterProgress ?? _epubChapterProgress;
+    _epubCharacterCount = epubCharacterCount ?? _epubCharacterCount;
+    _currentEpubSpineIndex = epubSpineIndex ?? _currentEpubSpineIndex;
     _pendingSeekFraction = null;
     if (!_isDisposed && !_rebuildDetail.isClosed) {
       _rebuildDetail.add(newOffset);
     }
+    if (_epubPositionLocked) return;
+    if (epubSpineIndex != null) {
+      final overallProgress = newMaxOffset > 0
+          ? (newOffset / newMaxOffset).clamp(0.0, 1.0).toDouble()
+          : newOffset.clamp(0.0, 1.0).toDouble();
+      final overallPercent = (overallProgress * 100).round();
+      if (_lastProjectedEpubSpineIndex != epubSpineIndex ||
+          _lastProjectedOverallPercent != overallPercent) {
+        _lastProjectedEpubSpineIndex = epubSpineIndex;
+        _lastProjectedOverallPercent = overallPercent;
+        _readerController.updateEpubShortcutPosition(
+          spineIndex: epubSpineIndex,
+          overallProgress: overallProgress,
+        );
+      }
+    }
     _progressPersistDebounce?.cancel();
     _progressPersistDebounce = Timer(const Duration(seconds: 2), () {
       if (!_isDisposed) {
-        _readerController.setChapterOffset(offset, maxOffset);
+        _persistProgress();
       }
     });
+  }
+
+  void _persistProgress() {
+    if (_epubPositionLocked) return;
+    _readerController.setChapterOffset(
+      offset,
+      maxOffset,
+      epubChapterIndex: _epubChapterIndex,
+      epubChapterProgress: _epubChapterProgress,
+      epubCharacterCount: _epubCharacterCount,
+    );
   }
 
   @override
@@ -246,10 +330,12 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     DictionaryLookupPopup.dismissActive();
     _readingStopwatch.stop();
     WidgetsBinding.instance.removeObserver(this);
-    _readerController.setChapterOffset(offset, maxOffset);
-    _readerController.setHistoryUpdate(
-      elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
-    );
+    if (!_epubPositionLocked) {
+      _persistProgress();
+      _readerController.setHistoryUpdate(
+        elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
+      );
+    }
     _scrollController.removeListener(onScroll);
     _scrollController.dispose();
     _progressPersistDebounce?.cancel();
@@ -279,10 +365,12 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
+      _appIsActive = false;
       _readingStopwatch.stop();
-      _readerController.setChapterOffset(offset, maxOffset);
+      if (!_epubPositionLocked) _persistProgress();
     } else if (state == AppLifecycleState.resumed) {
-      _readingStopwatch.start();
+      _appIsActive = true;
+      if (!_epubPositionLocked) _readingStopwatch.start();
     }
   }
 
@@ -297,7 +385,17 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     unawaited(ReaderLookupTriggerState.initialize());
     _epubLayout.addListener(_onEpubLayoutChanged);
     WidgetsBinding.instance.addObserver(this);
-    _readingStopwatch.start();
+    _savedEpubPositionExists = widget.initialEpubHasSavedPosition;
+    _savedEpubChapterIndex = widget.initialEpubChapterIndex ?? 0;
+    _savedEpubChapterProgress = widget.initialEpubChapterProgress ?? 0;
+    _savedEpubCharacterCount = widget.initialEpubCharacterCount ?? 0;
+    _effectiveInitialEpubSpineIndex = widget.initialEpubSpineIndex;
+    _explorationTargetSpineIndex = widget.initialEpubSpineIndex;
+    _epubExploring =
+        widget.initialEpubSpineIndex != null &&
+        _savedEpubPositionExists &&
+        ref.read(novelShowReturnToSavedPositionButtonStateProvider);
+    if (!_epubPositionLocked) _readingStopwatch.start();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollController.addListener(onScroll);
       final initFontSize = ref.read(novelFontSizeStateProvider);
@@ -382,7 +480,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
       if (_usingTtsuReader) {
         final moved = await _epubReaderController.scrollBy(_pageOffset.value);
         if (moved == false && mounted) {
-          _goToChapter(true);
+          _autoScroll.value = false;
           return;
         }
       } else if (_scrollController.hasClients) {
@@ -428,7 +526,10 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   /// the direction), the method returns without navigating.
   void _goToChapter(bool next) {
     if (_chapterTransitionInProgress || !mounted) return;
-    if (_goToAdjacentEpubSpine(next)) return;
+    if (epubBook != null) {
+      unawaited(_epubReaderController.jumpToAdjacentChapter(next ? 1 : -1));
+      return;
+    }
     if (next && !_readerController.hasNextChapter) return;
     if (!next && !_readerController.hasPreviousChapter) return;
     _chapterTransitionInProgress = true;
@@ -440,179 +541,208 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     );
   }
 
-  bool _goToAdjacentEpubSpine(bool next) {
-    final book = epubBook;
-    if (book == null) return false;
-    final navigation = adjacentEpubSpineTarget(
-      book: book,
-      currentReference: chapter.url,
-      currentSpineIndex: epubChapterSpineIndex(chapter),
-      next: next,
-    );
-    if (!navigation.belongsToSpine) return false;
-    // The EPUB spine is authoritative. At its limits, do not fall through to
-    // manga-style numeric sorting and accidentally leave/reorder the book.
-    final targetReference = navigation.target;
-    if (targetReference == null) return true;
-    final target = _findOrCreateImportedEpubChapter(
-      targetReference,
-      spineIndex: navigation.targetSpineIndex,
-    );
-    if (target == null || target.id == chapter.id) return true;
-
-    _openEpubChapter(target, initialProgress: next ? 0 : 1);
-    return true;
-  }
-
   void _goToEpubChapter(String chapterId) {
-    if (_chapterTransitionInProgress || !mounted) return;
-    final target = _findOrCreateImportedEpubChapter(chapterId);
-    if (target == null || target.id == chapter.id) return;
-    _openEpubChapter(target, initialProgress: 0);
-  }
-
-  void _openEpubChapter(Chapter target, {required double initialProgress}) {
-    final targetId = target.id;
-    if (_chapterTransitionInProgress || targetId == null || !mounted) return;
-    _chapterTransitionInProgress = true;
-    _readerController.setChapterOffset(offset, maxOffset);
-    context.pushReplacement(
-      '/novelReaderView',
-      extra: NovelReaderRouteArgs(
-        chapterId: targetId,
-        initialProgress: initialProgress,
-      ),
-    );
-  }
-
-  Chapter? _findOrCreateImportedEpubChapter(
-    String reference, {
-    int? spineIndex,
-  }) {
-    final wanted = normalizeEpubReaderReference(reference);
-    if (wanted.isEmpty) return null;
-    EpubChapter? runtimeTarget;
-    final book = epubBook;
-    if (book != null) {
-      for (final entry in book.chapters) {
-        final matchesReference =
-            normalizeEpubReaderReference(entry.path) == wanted ||
-            normalizeEpubReaderReference(entry.href) == wanted;
-        if (matchesReference &&
-            (spineIndex == null || entry.spineIndex == spineIndex)) {
-          runtimeTarget = entry;
-          break;
-        }
-      }
-    }
-    final chapters = isar.chapters
-        .filter()
-        .idIsNotNull()
-        .mangaIdEqualTo(chapter.mangaId)
-        .findAllSync();
-    final exactCandidates = chapters
+    final wanted = normalizeEpubReaderReference(chapterId);
+    if (wanted.isEmpty) return;
+    final target = epubBook?.chapters
         .where(
-          (candidate) =>
-              candidate.archivePath == chapter.archivePath &&
-              candidate.id != chapter.id &&
-              normalizeEpubReaderReference(candidate.url) == wanted,
+          (entry) =>
+              normalizeEpubReaderReference(entry.path) == wanted ||
+              normalizeEpubReaderReference(entry.href) == wanted,
         )
-        .toList(growable: false);
-    Chapter? exactCandidate;
-    if (spineIndex == null) {
-      exactCandidate = exactCandidates.firstOrNull;
-    } else {
-      exactCandidate = exactCandidates
-          .where((entry) => epubChapterSpineIndex(entry) == spineIndex)
-          .firstOrNull;
-      exactCandidate ??= exactCandidates
-          .where((entry) => epubChapterSpineIndex(entry) == null)
-          .firstOrNull;
-      if (exactCandidate == null && exactCandidates.length == 1) {
-        exactCandidate = exactCandidates.single;
-      }
+        .firstOrNull;
+    if (target != null) {
+      unawaited(
+        _epubReaderController.jumpToEpubSpine(
+          target.spineIndex,
+          isolateChapter: false,
+        ),
+      );
     }
-    if (exactCandidate != null) {
-      // Matching the canonical href within the same archive is stronger than
-      // legacy metadata. For repeated idrefs, the spine index disambiguates
-      // each occurrence before we repair the row.
-      if (runtimeTarget != null) {
-        _updateImportedEpubMetadata(exactCandidate, runtimeTarget);
-      }
-      return exactCandidate;
-    }
-    if (spineIndex != null && runtimeTarget != null) {
-      for (final candidate in chapters) {
-        if (candidate.archivePath == chapter.archivePath &&
-            candidate.id != chapter.id &&
-            epubChapterSpineIndex(candidate) == spineIndex) {
-          _updateImportedEpubMetadata(candidate, runtimeTarget);
-          return candidate;
-        }
-      }
-    }
-    if (runtimeTarget == null) return null;
-
-    chapter.manga.loadSync();
-    final manga = chapter.manga.value;
-    if (manga == null) return null;
-    final created = Chapter(
-      mangaId: chapter.mangaId,
-      name: runtimeTarget.name,
-      archivePath: chapter.archivePath,
-      url: runtimeTarget.path,
-      dateUpload: runtimeTarget.spineIndex.toString(),
-      description: epubChapterMetadata(
-        spineIndex: runtimeTarget.spineIndex,
-        navigationEntry: runtimeTarget.isNavigationEntry,
-      ),
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
-    )..manga.value = manga;
-    isar.writeTxnSync(() {
-      isar.chapters.putSync(created);
-      created.manga.saveSync();
-    });
-    return created;
   }
 
-  void _updateImportedEpubMetadata(
-    Chapter candidate,
-    EpubChapter runtimeTarget,
-  ) {
-    final metadata = epubChapterMetadata(
-      spineIndex: runtimeTarget.spineIndex,
-      navigationEntry: runtimeTarget.isNavigationEntry,
+  void _initializeSavedEpubSpine(EpubNovel book) {
+    if (_savedEpubSpineIndex == null) {
+      final linearChapters = book.chapters
+          .where((entry) => entry.isLinear)
+          .toList();
+      if (linearChapters.isEmpty) return;
+      final index = _savedEpubChapterIndex.clamp(0, linearChapters.length - 1);
+      _savedEpubSpineIndex = linearChapters[index].spineIndex;
+    }
+    if (_epubExploring &&
+        _explorationTargetSpineIndex == _savedLogicalEpubSpineIndex()) {
+      // A stale imported row can temporarily lack the projected percentage.
+      // Treating the saved logical chapter as a preview would hide the return
+      // control while keeping persistence locked, so resume the bookmark.
+      _epubExploring = false;
+      _effectiveInitialEpubSpineIndex = null;
+      _explorationTargetSpineIndex = null;
+      _restartReadingStopwatch();
+    }
+  }
+
+  int? _savedLogicalEpubSpineIndex() {
+    final book = epubBook;
+    final saved = _savedEpubSpineIndex;
+    if (book == null || saved == null) return saved;
+    int? logical;
+    for (final entry in book.chapters) {
+      if (entry.spineIndex > saved) break;
+      if (entry.isNavigationEntry) logical = entry.spineIndex;
+    }
+    return logical ?? saved;
+  }
+
+  bool _snapshotHasProgress(EpubReaderProgressSnapshot snapshot) {
+    final overall = snapshot.maxOffset > 0
+        ? snapshot.offset / snapshot.maxOffset
+        : snapshot.offset;
+    return overall > 0.000001 ||
+        snapshot.chapterIndex > 0 ||
+        snapshot.chapterProgress > 0.000001 ||
+        snapshot.characterCount > 0;
+  }
+
+  void _writeEpubSnapshot(
+    EpubReaderProgressSnapshot snapshot, {
+    required bool updateSavedPosition,
+  }) {
+    final overall = snapshot.maxOffset > 0
+        ? (snapshot.offset / snapshot.maxOffset).clamp(0.0, 1.0).toDouble()
+        : snapshot.offset.clamp(0.0, 1.0).toDouble();
+    _readerController.setChapterOffset(
+      snapshot.offset,
+      snapshot.maxOffset,
+      epubChapterIndex: snapshot.chapterIndex,
+      epubChapterProgress: snapshot.chapterProgress,
+      epubCharacterCount: snapshot.characterCount,
     );
-    if (candidate.archivePath == chapter.archivePath &&
-        normalizeEpubReaderReference(candidate.url) ==
-            normalizeEpubReaderReference(runtimeTarget.path) &&
-        candidate.dateUpload == runtimeTarget.spineIndex.toString() &&
-        candidate.description == metadata &&
-        candidate.name == runtimeTarget.name) {
+    _readerController.updateEpubShortcutPosition(
+      spineIndex: snapshot.spineIndex,
+      overallProgress: overall,
+    );
+    if (updateSavedPosition) {
+      _savedEpubPositionExists = _snapshotHasProgress(snapshot);
+      _savedEpubChapterIndex = snapshot.chapterIndex;
+      _savedEpubChapterProgress = snapshot.chapterProgress;
+      _savedEpubCharacterCount = snapshot.characterCount;
+      _savedEpubSpineIndex = snapshot.spineIndex;
+    }
+  }
+
+  Future<void> _selectEpubChapter(Chapter selected) async {
+    if (!isEpubNavigationChapter(selected)) return;
+    if (selected.lastPageRead?.isNotEmpty == true) {
+      if (_epubExploring) await _returnToSavedEpubPosition();
       return;
     }
-    candidate
-      ..archivePath = chapter.archivePath
-      ..url = runtimeTarget.path
-      ..name = runtimeTarget.name
-      ..dateUpload = runtimeTarget.spineIndex.toString()
-      ..description = metadata
-      ..updatedAt = DateTime.now().millisecondsSinceEpoch;
-    isar.writeTxnSync(() => isar.chapters.putSync(candidate));
+    final targetSpine = epubChapterSpineIndex(selected);
+    if (targetSpine == null) return;
+    if (_savedEpubPositionExists &&
+        targetSpine == _savedLogicalEpubSpineIndex()) {
+      if (_epubExploring) {
+        await _returnToSavedEpubPosition();
+      } else {
+        await _epubReaderController.jumpToBookmark(
+          _savedEpubChapterIndex,
+          _savedEpubChapterProgress,
+        );
+      }
+      return;
+    }
+
+    if (!_epubExploring &&
+        ref.read(novelShowReturnToSavedPositionButtonStateProvider)) {
+      final snapshot = await _epubReaderController.currentProgressSnapshot();
+      if (!mounted || _isDisposed) return;
+      if (snapshot != null && _snapshotHasProgress(snapshot)) {
+        _progressPersistDebounce?.cancel();
+        _writeEpubSnapshot(snapshot, updateSavedPosition: true);
+        _readingStopwatch.stop();
+        final elapsed = _readingStopwatch.elapsed.inSeconds;
+        if (elapsed > 0) {
+          _readerController.setHistoryUpdate(elapsedSeconds: elapsed);
+        }
+        _readingStopwatch.reset();
+        _epubExploring = true;
+      }
+    }
+    _explorationTargetSpineIndex = targetSpine;
+    if (mounted) setState(() {});
+    await _epubReaderController.jumpToEpubSpine(targetSpine);
+  }
+
+  Future<void> _returnToSavedEpubPosition() async {
+    if (!_epubExploring || _epubRestoring || !_savedEpubPositionExists) return;
+    _progressPersistDebounce?.cancel();
+    _epubRestoring = true;
+    _epubChapterIndex = _savedEpubChapterIndex;
+    _epubChapterProgress = _savedEpubChapterProgress;
+    _epubCharacterCount = _savedEpubCharacterCount;
+    if (mounted) setState(() {});
+    EpubReaderProgressSnapshot? snapshot;
+    try {
+      await _epubReaderController.jumpToBookmark(
+        _savedEpubChapterIndex,
+        _savedEpubChapterProgress,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      snapshot = await _epubReaderController.currentProgressSnapshot();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _epubRestoring = false);
+      }
+      return;
+    }
+    if (!mounted || _isDisposed) return;
+    if (snapshot != null) {
+      offset = snapshot.offset;
+      maxOffset = snapshot.maxOffset;
+      _epubChapterIndex = snapshot.chapterIndex;
+      _epubChapterProgress = snapshot.chapterProgress;
+      _epubCharacterCount = snapshot.characterCount;
+      _currentEpubSpineIndex = snapshot.spineIndex;
+    }
+    _epubExploring = false;
+    _epubRestoring = false;
+    _returnButtonHovered = false;
+    _restartReadingStopwatch();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _continueReadingAtPreviewPosition() async {
+    if (!_epubExploring || _epubRestoring) return;
+    final snapshot = await _epubReaderController.currentProgressSnapshot();
+    if (snapshot == null || !mounted || _isDisposed) return;
+    _progressPersistDebounce?.cancel();
+    _writeEpubSnapshot(snapshot, updateSavedPosition: true);
+    try {
+      await _epubReaderController.clearLogicalChapterIsolation();
+    } catch (_) {
+      // The position tuple is already committed. The isolation class only
+      // affects the temporary viewport padding, so leaving it is safe.
+    }
+    if (!mounted || _isDisposed) return;
+    _epubExploring = false;
+    _returnButtonHovered = false;
+    _restartReadingStopwatch();
+    if (mounted) setState(() {});
   }
 
   bool _hasAdjacentChapter(bool next) {
     final book = epubBook;
     if (book != null) {
-      final navigation = adjacentEpubSpineTarget(
-        book: book,
-        currentReference: chapter.url,
-        currentSpineIndex: epubChapterSpineIndex(chapter),
-        next: next,
+      final current =
+          _currentEpubSpineIndex ??
+          widget.initialEpubSpineIndex ??
+          epubChapterSpineIndex(chapter) ??
+          0;
+      return book.chapters.any(
+        (entry) =>
+            entry.isNavigationEntry &&
+            (next ? entry.spineIndex > current : entry.spineIndex < current),
       );
-      if (navigation.belongsToSpine) {
-        return navigation.targetSpineIndex != null;
-      }
     }
     return next
         ? _readerController.hasNextChapter
@@ -623,6 +753,14 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   Widget build(BuildContext context) {
     final backgroundColor = ref.watch(backgroundColorStateProvider);
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
+    ref.listen<bool>(novelShowReturnToSavedPositionButtonStateProvider, (
+      previous,
+      next,
+    ) {
+      if (previous == true && !next && _epubExploring) {
+        unawaited(_continueReadingAtPreviewPosition());
+      }
+    });
     final delegateHorizontalPageKeysToChild =
         widget.result.asData?.value.$2 != null && !Platform.isLinux;
     return ReaderKeyboardHandler(
@@ -664,6 +802,12 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
             bottom: false,
             child: widget.result.when(
               data: (data) {
+                _usingTtsuReader = data.$2 != null && !Platform.isLinux;
+                epubBook = data.$2;
+                if (epubBook != null) {
+                  _initializeSavedEpubSpine(epubBook!);
+                }
+                _currentHtmlContent = data.$1;
                 return Stack(
                   children: [
                     Column(
@@ -671,9 +815,6 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                         Flexible(
                           child: Builder(
                             builder: (context) {
-                              epubBook = data.$2;
-                              _currentHtmlContent = data.$1;
-
                               final padding = ref.watch(
                                 novelReaderPaddingStateProvider,
                               );
@@ -762,8 +903,6 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                   final usePageTapZones = ref.watch(
                                     novelTapToScrollStateProvider,
                                   );
-                                  _usingTtsuReader =
-                                      data.$2 != null && !Platform.isLinux;
                                   if (_usingTtsuReader) {
                                     _ttsTotalBlocks = NovelTtsService.instance
                                         .extractParagraphs(data.$1)
@@ -796,15 +935,38 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                 chapter.lastPageRead ?? '0',
                                               ) ??
                                               0,
+                                          initialChapterIndex:
+                                              widget.initialEpubChapterIndex,
+                                          initialChapterProgress:
+                                              widget.initialEpubChapterProgress,
+                                          initialSpineIndex:
+                                              _effectiveInitialEpubSpineIndex,
+                                          previewSpineIndex: _epubExploring
+                                              ? _explorationTargetSpineIndex
+                                              : null,
                                           tapToScroll: usePageTapZones,
                                           removeExtraParagraphSpacing:
                                               removeExtraSpacing,
                                           layout: layout,
                                           onProgress:
-                                              (newOffset, newMaxOffset) {
+                                              (
+                                                newOffset,
+                                                newMaxOffset,
+                                                chapterIndex,
+                                                chapterProgress,
+                                                characterCount,
+                                                spineIndex,
+                                              ) {
                                                 _reportProgress(
                                                   newOffset,
                                                   newMaxOffset,
+                                                  epubChapterIndex:
+                                                      chapterIndex,
+                                                  epubChapterProgress:
+                                                      chapterProgress,
+                                                  epubCharacterCount:
+                                                      characterCount,
+                                                  epubSpineIndex: spineIndex,
                                                 );
                                               },
                                           onReaderTap: (position, viewport) =>
@@ -1234,6 +1396,10 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                         _autoScroll.value = !_autoScroll.value;
                       },
                     ),
+                    // Recovery must remain available while the reader chrome
+                    // is hidden; `_isView` only adjusts the safe padding.
+                    if (_usingTtsuReader && _epubExploring)
+                      _buildReturnToSavedPositionOverlay(),
                     if (_ttsSupported &&
                         _showTts &&
                         _currentHtmlContent != null)
@@ -1300,7 +1466,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         final moved = await _epubReaderController.scrollPage(
           value.sign.toInt(),
         );
-        if (moved == false && mounted) _goToChapter(value > 0);
+        // Page movement stops at the book boundary. Chapter controls are the
+        // only UI that jumps between TOC shortcuts.
+        if (moved == false) return;
       }());
       return;
     }
@@ -1337,6 +1505,107 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     }
   }
 
+  Widget _buildReturnToSavedPositionOverlay() {
+    final target = _explorationTargetSpineIndex;
+    final saved = _savedLogicalEpubSpineIndex();
+    if (target == null || saved == null || target == saved) {
+      return const SizedBox.shrink();
+    }
+    final layout = _epubLayout.value;
+    final edge = epubReturnButtonEdgeFor(
+      layout: layout,
+      targetAfterSavedPosition: target > saved,
+    );
+    final alignment = switch (edge) {
+      EpubReturnButtonEdge.top => Alignment.topCenter,
+      EpubReturnButtonEdge.bottom => Alignment.bottomCenter,
+      EpubReturnButtonEdge.left => Alignment.centerLeft,
+      EpubReturnButtonEdge.right => Alignment.centerRight,
+    };
+    final arrow = switch (edge) {
+      EpubReturnButtonEdge.top => Icons.arrow_upward_rounded,
+      EpubReturnButtonEdge.bottom => Icons.arrow_downward_rounded,
+      EpubReturnButtonEdge.left => Icons.arrow_back_rounded,
+      EpubReturnButtonEdge.right => Icons.arrow_forward_rounded,
+    };
+    final chromePadding = EdgeInsets.only(
+      top: edge == EpubReturnButtonEdge.top ? (_isView ? 88 : 16) : 16,
+      bottom: edge == EpubReturnButtonEdge.bottom
+          ? (_isView ? 156 : (_showTts ? 76 : 16))
+          : 16,
+      left: 16,
+      right: 16,
+    );
+    final theme = Theme.of(context);
+    final dismissButton = AnimatedOpacity(
+      opacity: _returnButtonHovered ? 1 : 0,
+      duration: const Duration(milliseconds: 140),
+      child: IgnorePointer(
+        ignoring: !_returnButtonHovered,
+        child: Material(
+          color: theme.colorScheme.surfaceContainerHighest,
+          elevation: 4,
+          shape: const CircleBorder(),
+          child: IconButton(
+            tooltip: 'Continue reading here',
+            onPressed: _continueReadingAtPreviewPosition,
+            icon: const Icon(Icons.close_rounded, size: 16),
+            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+            padding: EdgeInsets.zero,
+          ),
+        ),
+      ),
+    );
+    final returnButton = FloatingActionButton(
+      heroTag: null,
+      tooltip: 'Jump to current reading position',
+      onPressed: _epubRestoring ? null : _returnToSavedEpubPosition,
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: theme.colorScheme.onPrimary,
+      child: _epubRestoring
+          ? SizedBox.square(
+              dimension: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: theme.colorScheme.onPrimary,
+              ),
+            )
+          : Icon(arrow),
+    );
+    final controls = layout == EpubReadingLayout.horizontalContinuous
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [dismissButton, const SizedBox(width: 8), returnButton],
+          )
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [returnButton, const SizedBox(height: 6), dismissButton],
+          );
+
+    return Positioned.fill(
+      child: SafeArea(
+        child: Padding(
+          padding: chromePadding,
+          child: Align(
+            alignment: alignment,
+            child: MouseRegion(
+              onEnter: (_) {
+                if (mounted) setState(() => _returnButtonHovered = true);
+              },
+              onExit: (_) {
+                if (mounted) setState(() => _returnButtonHovered = false);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: controls,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _appBar() {
     return ReaderAppBar(
       chapter: chapter,
@@ -1350,6 +1619,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         _readerController.setChapterBookmarked();
         setState(() => _isBookmarked = !_isBookmarked);
       },
+      onChapterSelected: _usingTtsuReader ? _selectEpubChapter : null,
       onWebViewPressed: (chapter.manga.value!.isLocalArchive ?? false)
           ? null
           : () async {
@@ -1595,13 +1865,16 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                     ],
                                     children: [
                                       ReaderSettingsTab(
-                                        epubLayout: _epubLayout,
+                                        epubLayout: _usingTtsuReader
+                                            ? _epubLayout
+                                            : null,
                                       ),
                                       GeneralSettingsTab(
                                         autoScrollPage: _autoScrollPage,
                                         autoScroll: _autoScroll,
                                         readerController: _readerController,
                                         pageOffset: _pageOffset,
+                                        isEpubReader: _usingTtsuReader,
                                       ),
                                       if (_ttsSupported) const TtsSettingsTab(),
                                     ],

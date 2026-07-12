@@ -426,11 +426,13 @@ class GeneralSettingsTab extends ConsumerWidget {
   final ValueNotifier<bool> autoScroll;
   final NovelReaderController readerController;
   final ValueNotifier<double> pageOffset;
+  final bool isEpubReader;
   const GeneralSettingsTab({
     required this.autoScrollPage,
     required this.autoScroll,
     required this.readerController,
     required this.pageOffset,
+    this.isEpubReader = false,
     super.key,
   });
 
@@ -503,6 +505,21 @@ class GeneralSettingsTab extends ConsumerWidget {
               ref.read(novelTapToScrollStateProvider.notifier).set(value);
             },
           ),
+          if (isEpubReader)
+            _SwitchListTileSetting(
+              title: 'Show return-to-saved-position button',
+              value: ref.watch(
+                novelShowReturnToSavedPositionButtonStateProvider,
+              ),
+              onChanged: (value) {
+                ref
+                    .read(
+                      novelShowReturnToSavedPositionButtonStateProvider
+                          .notifier,
+                    )
+                    .set(value);
+              },
+            ),
         ],
       ),
     );

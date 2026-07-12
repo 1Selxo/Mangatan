@@ -1182,6 +1182,63 @@ abstract class _$NovelTapToScrollState extends $Notifier<bool> {
   }
 }
 
+@ProviderFor(NovelShowReturnToSavedPositionButtonState)
+final novelShowReturnToSavedPositionButtonStateProvider =
+    NovelShowReturnToSavedPositionButtonStateProvider._();
+
+final class NovelShowReturnToSavedPositionButtonStateProvider
+    extends $NotifierProvider<NovelShowReturnToSavedPositionButtonState, bool> {
+  NovelShowReturnToSavedPositionButtonStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'novelShowReturnToSavedPositionButtonStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() =>
+      _$novelShowReturnToSavedPositionButtonStateHash();
+
+  @$internal
+  @override
+  NovelShowReturnToSavedPositionButtonState create() =>
+      NovelShowReturnToSavedPositionButtonState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$novelShowReturnToSavedPositionButtonStateHash() =>
+    r'17c1f522066204e75bdf0a1233ad74763c729fd6';
+
+abstract class _$NovelShowReturnToSavedPositionButtonState
+    extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(NovelEpubReadingLayoutState)
 final novelEpubReadingLayoutStateProvider =
     NovelEpubReadingLayoutStateProvider._();

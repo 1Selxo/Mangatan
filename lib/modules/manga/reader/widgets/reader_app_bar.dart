@@ -51,6 +51,9 @@ class ReaderAppBar extends ConsumerWidget {
   /// Callback that opens the OCR overlay for the visible page.
   final VoidCallback? onOcrPressed;
 
+  /// Overrides route replacement when a reader can navigate chapters in place.
+  final ValueChanged<Chapter>? onChapterSelected;
+
   /// Background color getter
   final Color Function(BuildContext) backgroundColor;
 
@@ -65,6 +68,7 @@ class ReaderAppBar extends ConsumerWidget {
     required this.onBookmarkPressed,
     this.onWebViewPressed,
     this.onOcrPressed,
+    this.onChapterSelected,
     required this.backgroundColor,
   });
 
@@ -143,7 +147,12 @@ class ReaderAppBar extends ConsumerWidget {
         ),
 
       // Chapter list button
-      btnToShowChapterListDialog(context, context.l10n.chapters, chapter),
+      btnToShowChapterListDialog(
+        context,
+        context.l10n.chapters,
+        chapter,
+        onChapterSelected: onChapterSelected,
+      ),
 
       // Bookmark button
       IconButton(

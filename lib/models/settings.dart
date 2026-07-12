@@ -280,6 +280,8 @@ class Settings {
 
   int? novelEpubReadingLayout;
 
+  bool? novelShowReturnToSavedPositionButton;
+
   List<String>? navigationOrder;
 
   List<String>? hideItems;
@@ -489,6 +491,7 @@ class Settings {
     this.novelRemoveExtraParagraphSpacing = false,
     this.novelTapToScroll = false,
     this.novelEpubReadingLayout = 0,
+    this.novelShowReturnToSavedPositionButton = true,
     this.navigationOrder,
     this.hideItems,
     this.clearChapterCacheOnAppLaunch = false,
@@ -761,6 +764,8 @@ class Settings {
     novelRemoveExtraParagraphSpacing = json['novelRemoveExtraParagraphSpacing'];
     novelTapToScroll = json['novelTapToScroll'];
     novelEpubReadingLayout = json['novelEpubReadingLayout'];
+    novelShowReturnToSavedPositionButton =
+        json['novelShowReturnToSavedPositionButton'];
     if (json['navigationOrder'] != null) {
       navigationOrder = (json['navigationOrder'] as List).cast<String>();
     }
@@ -979,6 +984,8 @@ class Settings {
     'novelRemoveExtraParagraphSpacing': novelRemoveExtraParagraphSpacing,
     'novelTapToScroll': novelTapToScroll,
     'novelEpubReadingLayout': novelEpubReadingLayout,
+    'novelShowReturnToSavedPositionButton':
+        novelShowReturnToSavedPositionButton,
     'navigationOrder': navigationOrder,
     'hideItems': hideItems,
     'clearChapterCacheOnAppLaunch': clearChapterCacheOnAppLaunch,

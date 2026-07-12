@@ -471,6 +471,28 @@ class NovelTapToScrollState extends _$NovelTapToScrollState {
 }
 
 @riverpod
+class NovelShowReturnToSavedPositionButtonState
+    extends _$NovelShowReturnToSavedPositionButtonState {
+  @override
+  bool build() {
+    return isar.settings.getSync(227)!.novelShowReturnToSavedPositionButton ??
+        true;
+  }
+
+  void set(bool value) {
+    final settings = isar.settings.getSync(227);
+    state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..novelShowReturnToSavedPositionButton = value
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
+@riverpod
 class NovelEpubReadingLayoutState extends _$NovelEpubReadingLayoutState {
   @override
   int build() {

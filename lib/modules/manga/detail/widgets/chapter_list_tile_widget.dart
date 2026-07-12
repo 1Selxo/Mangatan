@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/modules/widgets/custom_extended_image_provider.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/utils/constant.dart';
 import 'package:marquee/marquee.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/utils/date.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
@@ -35,6 +38,8 @@ class ChapterListTileWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = l10nLocalizations(context)!;
     final isLongPressed = ref.watch(isLongPressedStateProvider);
+    final isEpubShortcut = isEpubNavigationChapter(chapter);
+    final epubCharacterStart = epubChapterCharacterStart(chapter);
     return Dismissible(
       key: ValueKey('chapter_swipe_${chapter.id}'),
       direction: isLongPressed
@@ -126,7 +131,7 @@ class ChapterListTileWidget extends ConsumerWidget {
                         color: context.primaryColor,
                       )
                     : SizedBox.shrink(),
-                chapter.description != null
+                chapter.description != null && !isManagedEpubChapter(chapter)
                     ? Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,7 +181,9 @@ class ChapterListTileWidget extends ConsumerWidget {
                       children: [
                         const Text(' • '),
                         Text(
-                          chapter.manga.value!.itemType == ItemType.anime
+                          isEpubNavigationChapter(chapter)
+                              ? "${((double.tryParse(chapter.lastPageRead!) ?? 0) * 100).toStringAsFixed(0)} %"
+                              : chapter.manga.value!.itemType == ItemType.anime
                               ? l10n.episode_progress(
                                   Duration(
                                     milliseconds: int.parse(
@@ -233,8 +240,15 @@ class ChapterListTileWidget extends ConsumerWidget {
                   ),
               ],
             ),
-            trailing:
-                !sourceExist || (chapter.manga.value!.isLocalArchive ?? false)
+            trailing: isEpubShortcut
+                ? Text(
+                    epubCharacterStart?.toString() ?? '...',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : !sourceExist || (chapter.manga.value!.isLocalArchive ?? false)
                 ? null
                 : ChapterPageDownload(chapter: chapter),
           ),
@@ -256,7 +270,21 @@ class ChapterListTileWidget extends ConsumerWidget {
       }
     } else {
       if (context != null) {
-        chapter.pushToReaderView(context, ignoreIsRead: true);
+        final chapterId = chapter.id;
+        if (chapterId != null && isEpubNavigationChapter(chapter)) {
+          final resumesSavedPosition = chapter.lastPageRead?.isNotEmpty == true;
+          context.push(
+            '/novelReaderView',
+            extra: NovelReaderRouteArgs(
+              chapterId: chapterId,
+              initialEpubSpineIndex: resumesSavedPosition
+                  ? null
+                  : epubChapterSpineIndex(chapter),
+            ),
+          );
+        } else {
+          chapter.pushToReaderView(context, ignoreIsRead: true);
+        }
       } else {
         ref.read(chaptersListStateProvider.notifier).update(chapter);
         ref.read(isLongPressedStateProvider.notifier).update(!isLongPressed);

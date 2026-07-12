@@ -48,6 +48,16 @@ void main() {
     expect(document, contains('activeLookup?.originNode === hit.node'));
     expect(document, contains('originOffset: hit.offset'));
     expect(document, contains('lookupToken, repeatedLookup'));
+    expect(document, contains(r'\p{Radical}'));
+    expect(document, contains('chimahonContinuousProgress'));
+    expect(document, contains('jumpToChimahonProgress'));
+    expect(document, contains('jumpToLogicalSpine'));
+    expect(document, contains('restorePreviewPosition'));
+    expect(document, contains('clearLogicalTarget'));
+    expect(document, contains("querySelector('.mangatan-logical-marker')"));
+    expect(document, contains('break-after: column'));
+    expect(document, contains('min-height: 100vh'));
+    expect(document, contains('metrics,'));
   });
 
   test('dismisses a repeated EPUB lookup only while its popup is visible', () {

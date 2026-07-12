@@ -815,6 +815,8 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                 reverseHorizontal:
                                                     layout.isVerticalWriting,
                                               ),
+                                          onBackRequested: () =>
+                                              _goBack(context),
                                           onChapterRequested: (direction) =>
                                               _goToChapter(direction > 0),
                                           onChapterLinkRequested:
@@ -1350,7 +1352,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
       isVisible: _isView,
       isBookmarked: _isBookmarked,
       backgroundColor: _backgroundColor,
-      onBackPressed: () => Navigator.pop(context),
+      onBackPressed: () => _goBack(context),
       onBookmarkPressed: () {
         _readerController.setChapterBookmarked();
         setState(() => _isBookmarked = !_isBookmarked);

@@ -163,6 +163,7 @@ class TtsuEpubReader extends StatefulWidget {
     this.layout = EpubReadingLayout.horizontalContinuous,
     required this.onProgress,
     required this.onReaderTap,
+    required this.onBackRequested,
     required this.onChapterRequested,
     required this.onChapterLinkRequested,
   });
@@ -183,6 +184,7 @@ class TtsuEpubReader extends StatefulWidget {
   final EpubReadingLayout layout;
   final void Function(double offset, double maxOffset) onProgress;
   final void Function(Offset position, Size viewport) onReaderTap;
+  final VoidCallback onBackRequested;
   final void Function(int direction) onChapterRequested;
   final void Function(String chapterId) onChapterLinkRequested;
 
@@ -403,6 +405,12 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
             _javascriptNumber(data['height']),
           ),
         );
+      },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'readerBack',
+      callback: (_) {
+        if (mounted) widget.onBackRequested();
       },
     );
     controller.addJavaScriptHandler(
@@ -1674,6 +1682,12 @@ String buildTtsuEpubDocument({
         }
       }, { passive: true });
       document.addEventListener('pointerdown', (event) => {
+        if (event.button === 3) {
+          event.preventDefault();
+          event.stopPropagation();
+          call('readerBack');
+          return;
+        }
         if (lookupTrigger === 'middleClick' && event.button === 1) {
           event.preventDefault();
           middleLookupActive = true;
@@ -1699,6 +1713,11 @@ String buildTtsuEpubDocument({
         lastHeldLookupKey = null;
       });
       document.addEventListener('auxclick', (event) => {
+        if (event.button === 3) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         if (lookupTrigger !== 'middleClick' || event.button !== 1) return;
         event.preventDefault();
         event.stopPropagation();
@@ -1796,6 +1815,14 @@ String buildTtsuEpubDocument({
         }, 120);
       }, { passive: true });
       document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' ||
+            event.key === 'Backspace' ||
+            event.key === 'BrowserBack') {
+          event.preventDefault();
+          event.stopPropagation();
+          call('readerBack');
+          return;
+        }
         if (lookupTrigger === 'shift' && event.key === 'Shift' && !event.repeat) {
           event.preventDefault();
           event.stopPropagation();

@@ -83,6 +83,7 @@ void main() {
       popupJs: 'window.renderPopup = function() {};',
       selectionJs: 'window.hoshiSelection = {};',
       audioPreferences: AnkiAudioPreferences.defaults,
+      allowDuplicates: false,
       preferences: preferences,
       theme: ThemeData.dark(),
       dark: true,
@@ -105,6 +106,9 @@ void main() {
     expect(html, contains('flutter_inappwebview.callHandler'));
     expect(html, contains('getTermAudioSources'));
     expect(html, contains('playWordAudio'));
+    expect(html, contains("'duplicateCheck'"));
+    expect(html, contains('window.allowDupes = false;'));
+    expect(html, contains('\\229E'));
     expect(html, contains('.plus-line'));
     expect(html, contains('.audio-icon'));
     expect(html, contains('.audio-speaker-body'));
@@ -137,6 +141,7 @@ void main() {
         timeout: Duration(seconds: 5),
         language: 'ja',
       ),
+      allowDuplicates: true,
       preferences: preferences,
       theme: ThemeData.light(),
       dark: false,
@@ -150,6 +155,7 @@ void main() {
     );
     expect(html, contains('window.audioSourceType = "customJson";'));
     expect(html, contains('window.needsAudio = true;'));
+    expect(html, contains('window.allowDupes = true;'));
     expect(
       html,
       contains("showAudioSourceMenu(Number(slot.dataset.entryIndex)"),
@@ -260,6 +266,7 @@ void main() {
       popupJs: 'window.renderPopup = function() {};',
       selectionJs: 'window.hoshiSelection = {};',
       audioPreferences: AnkiAudioPreferences.defaults,
+      allowDuplicates: false,
       preferences: preferences,
       theme: ThemeData.light(),
       dark: false,

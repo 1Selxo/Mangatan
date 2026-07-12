@@ -70,6 +70,35 @@ void main() {
     expect(document, contains("event.preventDefault()"));
   });
 
+  test('bridges trackpad wheels and two-finger touch panning', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>scroll fixture</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 12,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+    );
+
+    expect(document, contains('event.deltaMode === 1'));
+    expect(document, contains('scrollByPixels(delta)'));
+    expect(document, contains('const touchCenter = (touches) =>'));
+    expect(document, contains("document.addEventListener('touchstart'"));
+    expect(document, contains("document.addEventListener('touchmove'"));
+    expect(document, contains('if (!twoFingerPan) return'));
+    expect(document, contains('event.preventDefault()'));
+    final wheelAndTouchHandlers = document.substring(
+      document.indexOf("document.addEventListener('wheel'"),
+      document.indexOf("content.addEventListener('scroll'"),
+    );
+    expect(wheelAndTouchHandlers, isNot(contains("call('readerChapter'")));
+  });
+
   test('generates left/right-agnostic Shift dictionary lookup handling', () {
     final document = buildTtsuEpubDocument(
       html: '<p>辞書</p>',

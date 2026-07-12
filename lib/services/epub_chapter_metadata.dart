@@ -2,7 +2,6 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:path/path.dart' as p;
 
 const _epubChapterMetadataPrefix = 'mangatan:epub:v3:';
@@ -62,6 +61,14 @@ List<Chapter> epubNavigationChaptersInSpineOrder(Iterable<Chapter> chapters) {
 
   final result = <Chapter>[];
   for (final group in groups) {
+    final unsplitRows = group.value.where(isUnsplitEpubChapter).toList();
+    if (unsplitRows.isNotEmpty) {
+      // A legacy import is intentionally one reader entry per EPUB. If stale
+      // spine rows are present beside it, never surface them again.
+      unsplitRows.sort((a, b) => (a.id ?? 0).compareTo(b.id ?? 0));
+      result.add(unsplitRows.first);
+      continue;
+    }
     final hasManagedRows = group.value.any(isManagedEpubChapter);
     final visibleRows =
         group.value
@@ -93,11 +100,11 @@ List<Chapter> epubNavigationChaptersInSpineOrder(Iterable<Chapter> chapters) {
 bool isLocalEpubManga(Manga manga) =>
     manga.itemType == ItemType.novel && (manga.isLocalArchive ?? false);
 
-/// Reconciles old local imports with the parser's spine/TOC metadata.
+/// Restores the legacy one-entry-per-EPUB import contract.
 ///
-/// Existing rows are updated in place so bookmarks and reading progress are
-/// retained. Raw internal spine rows stay in Isar for seamless page turns,
-/// while only navigation rows are exposed by the chapter-list extension.
+/// The short-lived spine migration expanded old local EPUBs merely by opening
+/// their detail screen. Local import no longer offers that mode, so normalize
+/// both old rows and rows produced by that migration back to one chapter.
 Future<void> repairLocalEpubChapterMetadata(Manga manga) async {
   if (manga.itemType != ItemType.novel || !(manga.isLocalArchive ?? false)) {
     return;
@@ -125,115 +132,32 @@ Future<void> repairLocalEpubChapterMetadata(Manga manga) async {
   }
 
   for (final entry in byArchive.entries) {
-    if (entry.value.every(isManagedEpubChapter)) continue;
+    final rows = entry.value..sort((a, b) => (a.id ?? 0).compareTo(b.id ?? 0));
+    if (rows.length == 1 && isUnsplitEpubChapter(rows.single)) continue;
 
-    EpubNovel book;
-    try {
-      book = await parseEpubFromPath(epubPath: entry.key, fullData: true);
-    } catch (_) {
-      continue;
-    }
-
-    final oldRows = entry.value
-      ..sort((a, b) => (a.id ?? 0).compareTo(b.id ?? 0));
-    final updates = <Chapter>[];
-    final usedRows = <Chapter>{};
-    for (final epubChapter in book.chapters) {
-      Chapter? chapter;
-      for (final candidate in oldRows) {
-        if (usedRows.contains(candidate)) continue;
-        if (_epubReferencesMatch(candidate.url, epubChapter.path) ||
-            _epubReferencesMatch(candidate.url, epubChapter.href)) {
-          chapter = candidate;
-          break;
-        }
-      }
-      chapter ??= oldRows.cast<Chapter?>().firstWhere(
-        (candidate) =>
-            candidate != null &&
-            !usedRows.contains(candidate) &&
-            int.tryParse(candidate.dateUpload ?? '') == epubChapter.spineIndex,
-        orElse: () => null,
-      );
-      if (chapter == null && epubChapter.isNavigationEntry) {
-        chapter = oldRows.cast<Chapter?>().firstWhere(
-          (candidate) =>
-              candidate != null &&
-              !usedRows.contains(candidate) &&
-              (candidate.url?.isEmpty ?? true),
-          orElse: () => null,
-        );
-      }
-      chapter ??= Chapter(
-        mangaId: mangaId,
-        name: epubChapter.name,
-        archivePath: entry.key,
-        url: epubChapter.path,
-      )..manga.value = manga;
-      usedRows.add(chapter);
-
-      chapter
-        ..name = epubChapter.name
-        ..url = epubChapter.path
-        ..archivePath = entry.key
-        ..dateUpload = epubChapter.spineIndex.toString()
-        ..description = epubChapterMetadata(
-          spineIndex: epubChapter.spineIndex,
-          navigationEntry: epubChapter.isNavigationEntry,
-        )
-        ..updatedAt = DateTime.now().millisecondsSinceEpoch;
-      updates.add(chapter);
-    }
-
-    for (final stale in oldRows.where((row) => !usedRows.contains(row))) {
-      stale
-        ..description = epubChapterMetadata(
-          spineIndex: -1,
-          navigationEntry: false,
-        )
-        ..updatedAt = DateTime.now().millisecondsSinceEpoch;
-      updates.add(stale);
-    }
-
-    if (updates.isEmpty) continue;
+    // The earliest row is the original imported chapter when a legacy row was
+    // expanded. Retain its identity so history/bookmarks stay attached.
+    final canonical = rows.first;
+    canonical
+      ..mangaId = mangaId
+      ..manga.value = manga
+      ..name = manga.name?.trim().isNotEmpty == true
+          ? manga.name
+          : canonical.name
+      ..archivePath = entry.key
+      ..url = null
+      ..dateUpload = '0'
+      ..description = epubUnsplitChapterMetadata()
+      ..updatedAt = DateTime.now().millisecondsSinceEpoch;
+    final staleIds = rows
+        .skip(1)
+        .map((chapter) => chapter.id)
+        .whereType<int>()
+        .toList(growable: false);
     await isar.writeTxn(() async {
-      await isar.chapters.putAll(updates);
-      for (final chapter in updates) {
-        if (!chapter.manga.isLoaded || chapter.manga.value == null) {
-          chapter.manga.value = manga;
-        }
-        await chapter.manga.save();
-      }
+      await isar.chapters.put(canonical);
+      if (staleIds.isNotEmpty) await isar.chapters.deleteAll(staleIds);
+      await canonical.manga.save();
     });
   }
-}
-
-bool _epubReferencesMatch(String? left, String right) {
-  final normalizedLeft = _normalizeEpubReference(left);
-  final normalizedRight = _normalizeEpubReference(right);
-  if (normalizedLeft.isEmpty || normalizedRight.isEmpty) return false;
-  return normalizedLeft == normalizedRight ||
-      normalizedLeft.endsWith('/$normalizedRight') ||
-      normalizedRight.endsWith('/$normalizedLeft');
-}
-
-String _normalizeEpubReference(String? value) {
-  if (value == null || value.isEmpty) return '';
-  final withoutSuffix = value.split('#').first.split('?').first;
-  String decoded;
-  try {
-    decoded = Uri.decodeComponent(withoutSuffix);
-  } catch (_) {
-    decoded = withoutSuffix;
-  }
-  final parts = <String>[];
-  for (final part in decoded.replaceAll('\\', '/').split('/')) {
-    if (part.isEmpty || part == '.') continue;
-    if (part == '..') {
-      if (parts.isNotEmpty) parts.removeLast();
-    } else {
-      parts.add(part);
-    }
-  }
-  return parts.join('/');
 }

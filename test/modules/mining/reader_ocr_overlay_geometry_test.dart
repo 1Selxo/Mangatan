@@ -63,6 +63,49 @@ void main() {
     );
   });
 
+  test('repeated left-click lookup dismisses only the active OCR hit', () {
+    expect(
+      readerOcrShouldDismissRepeatedLookup(
+        popupVisible: true,
+        triggeredByHover: false,
+        sameBlock: true,
+        activeOffset: 4,
+        hitOffset: 4,
+      ),
+      isTrue,
+    );
+    expect(
+      readerOcrShouldDismissRepeatedLookup(
+        popupVisible: true,
+        triggeredByHover: false,
+        sameBlock: true,
+        activeOffset: 4,
+        hitOffset: 5,
+      ),
+      isFalse,
+    );
+    expect(
+      readerOcrShouldDismissRepeatedLookup(
+        popupVisible: false,
+        triggeredByHover: false,
+        sameBlock: true,
+        activeOffset: 4,
+        hitOffset: 4,
+      ),
+      isFalse,
+    );
+    expect(
+      readerOcrShouldDismissRepeatedLookup(
+        popupVisible: true,
+        triggeredByHover: true,
+        sameBlock: true,
+        activeOffset: 4,
+        hitOffset: 4,
+      ),
+      isFalse,
+    );
+  });
+
   test('matches only the configured lookup pointer button', () {
     expect(
       readerLookupTriggerMatchesPointer(

@@ -728,6 +728,17 @@ class ReaderOcrController extends ChangeNotifier {
   }) async {
     final block = hit.block;
     final rawOffset = hit.rawOffset;
+    if (readerOcrShouldDismissRepeatedLookup(
+      popupVisible: DictionaryLookupPopup.isActive,
+      triggeredByHover: triggeredByHover,
+      sameBlock: identical(_activeBlock, block),
+      activeOffset: _activeOffset,
+      hitOffset: rawOffset,
+    )) {
+      _clearActive();
+      DictionaryLookupPopup.dismissActive();
+      return true;
+    }
     final ordered = _orderedBlock(block);
     if (ordered.isEmpty) return true;
     final orderedOffset = _toOrderedOffset(
@@ -1319,6 +1330,16 @@ bool readerOcrShouldConsumeMissedTap({
   required bool popupWasVisibleOnPointerDown,
   required bool dismissedPopup,
 }) => popupWasVisibleOnPointerDown || dismissedPopup;
+
+@visibleForTesting
+bool readerOcrShouldDismissRepeatedLookup({
+  required bool popupVisible,
+  required bool triggeredByHover,
+  required bool sameBlock,
+  required int activeOffset,
+  required int hitOffset,
+}) =>
+    popupVisible && !triggeredByHover && sameBlock && activeOffset == hitOffset;
 
 class _OcrLineBox {
   const _OcrLineBox({

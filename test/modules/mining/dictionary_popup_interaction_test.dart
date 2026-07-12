@@ -1,11 +1,29 @@
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 
 void main() {
+  test('route changes dismiss any root-overlay dictionary popup', () {
+    var dismissals = 0;
+    final observer = DictionaryPopupDismissNavigatorObserver(
+      onNavigation: () => dismissals++,
+    );
+    final first = MaterialPageRoute<void>(builder: (_) => const SizedBox());
+    final second = MaterialPageRoute<void>(builder: (_) => const SizedBox());
+
+    observer.didPush(first, null);
+    observer.didPush(second, first);
+    observer.didPop(second, first);
+    observer.didReplace(newRoute: second, oldRoute: first);
+    observer.didRemove(second, first);
+
+    expect(dismissals, 5);
+  });
+
   group('dictionary popup presentation policy', () {
     test('suppresses a current lookup with no results', () async {
       final gate = DictionaryPopupPresentationGate();

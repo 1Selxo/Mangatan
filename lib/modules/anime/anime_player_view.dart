@@ -299,6 +299,8 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _includeSubtitles = false;
   bool _jimakuAutoLoadAttempted = false;
   bool _jimakuLoading = false;
+  final List<SubtitleTrack> _jimakuSubtitleTracks = [];
+  String? _activeJimakuSubtitlePath;
   bool _showSubtitleList = false;
   bool _videoOcrCapturing = false;
   Uint8List? _videoOcrBytes;
@@ -723,8 +725,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   Future<void> _setSubtitleTrack(SubtitleTrack track) async {
     await _player.setSubtitleTrack(track);
+    _activeJimakuSubtitlePath = _jimakuSubtitlePathFor(track);
     _activateSubtitleCuesForTrack(track);
     _hideNativeSubtitlePaintSoon();
+  }
+
+  String? _jimakuSubtitlePathFor(SubtitleTrack track) {
+    for (final subtitle in _jimakuSubtitleTracks) {
+      if (track.id == subtitle.id || track.title == subtitle.title) {
+        return subtitle.id;
+      }
+    }
+    return null;
   }
 
   void _activateSubtitleCuesForTrack(SubtitleTrack track) {
@@ -832,34 +844,37 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _currentPosition.value = position;
     if (_initSubtitleAndAudio) {
       _initSubtitleAndAudio = false;
-      if (_firstVid.subtitles?.isNotEmpty ?? false) {
-        try {
-          final defaultTrack = _firstVid.subtitles!.firstWhere(
-            (sub) => sub.label == widget.defaultSubtitle,
-            orElse: () => _firstVid.subtitles!.first,
-          );
-          final file = defaultTrack.file ?? "";
-          final label = defaultTrack.label;
-          final track = (file.startsWith("http") || file.startsWith("file"))
-              ? SubtitleTrack.uri(file, title: label, language: label)
-              : SubtitleTrack.data(file, title: label, language: label);
-          unawaited(_setSubtitleTrack(track));
-        } catch (_) {}
-        if (_firstVid.audios?.isNotEmpty ?? false) {
-          try {
-            final at = _firstVid.audios!.first;
-            _player.setAudioTrack(
-              AudioTrack.uri(
-                at.file ?? "",
-                title: at.label,
-                language: at.label,
-              ),
-            );
-          } catch (_) {}
-        }
-      }
-      unawaited(_autoLoadJimakuSubtitle());
+      unawaited(_initializeSubtitleAndAudio());
     }
+  }
+
+  Future<void> _initializeSubtitleAndAudio() async {
+    final restoredJimaku = await _restoreJimakuSubtitles();
+    if (!restoredJimaku && (_firstVid.subtitles?.isNotEmpty ?? false)) {
+      try {
+        final defaultTrack = _firstVid.subtitles!.firstWhere(
+          (sub) => sub.label == widget.defaultSubtitle,
+          orElse: () => _firstVid.subtitles!.first,
+        );
+        final file = defaultTrack.file ?? "";
+        final label = defaultTrack.label;
+        final track = (file.startsWith("http") || file.startsWith("file"))
+            ? SubtitleTrack.uri(file, title: label, language: label)
+            : SubtitleTrack.data(file, title: label, language: label);
+        await _setSubtitleTrack(track);
+      } catch (_) {}
+    }
+    if (_firstVid.subtitles?.isNotEmpty ?? false) {
+      if (_firstVid.audios?.isNotEmpty ?? false) {
+        try {
+          final at = _firstVid.audios!.first;
+          await _player.setAudioTrack(
+            AudioTrack.uri(at.file ?? "", title: at.label, language: at.label),
+          );
+        } catch (_) {}
+      }
+    }
+    await _autoLoadJimakuSubtitle();
   }
 
   void _setSkipPhase(int secs) {
@@ -1028,38 +1043,23 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           files: files,
           outputDirectory: outputDir,
         );
+        _jimakuSubtitleTracks
+          ..clear()
+          ..addAll([
+            for (var index = 0; index < subtitleFiles.length; index++)
+              SubtitleTrack.uri(
+                subtitleFiles[index].path,
+                title: files[index].name,
+                language: 'ja',
+              ),
+          ]);
         for (var index = 0; index < subtitleFiles.length; index++) {
           final subtitleFile = subtitleFiles[index];
           final file = files[index];
           final cues = parseAnimeSubtitleFile(subtitleFile);
           _rememberSubtitleCues(file.name, cues);
-          final platform = _player.platform;
-          if (platform is NativePlayer) {
-            await platform.command([
-              'sub-add',
-              subtitleFile.path,
-              index == 0 ? 'select' : 'auto',
-              file.name,
-              'ja',
-            ]);
-          } else if (index == 0) {
-            await _player.setSubtitleTrack(
-              SubtitleTrack.uri(
-                subtitleFile.path,
-                title: file.name,
-                language: 'ja',
-              ),
-            );
-          }
         }
-        if (mounted) {
-          setState(() {
-            _subtitleCues = _subtitleCuesByTitle[files.first.name] ?? const [];
-            _lastSubtitleHistoryText = '';
-            _nextSubtitleHistoryIndex = _subtitleCues.length;
-          });
-        }
-        _hideNativeSubtitlePaintSoon();
+        await _attachJimakuSubtitles(_jimakuSubtitleTracks.first.id);
         if (showFeedback) {
           botToast(
             subtitleFiles.length == 1
@@ -1105,6 +1105,36 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       values: candidates,
       titleOverride: savedTitle,
     );
+  }
+
+  Future<bool> _restoreJimakuSubtitles() async {
+    final activePath = _activeJimakuSubtitlePath;
+    if (activePath == null ||
+        !_jimakuSubtitleTracks.any((track) => track.id == activePath)) {
+      return false;
+    }
+    await _attachJimakuSubtitles(activePath);
+    return true;
+  }
+
+  Future<void> _attachJimakuSubtitles(String selectedPath) async {
+    final selected = _jimakuSubtitleTracks.firstWhere(
+      (track) => track.id == selectedPath,
+    );
+    final platform = _player.platform;
+    if (platform is NativePlayer) {
+      for (final subtitle in _jimakuSubtitleTracks) {
+        if (subtitle == selected) continue;
+        await platform.command([
+          'sub-add',
+          subtitle.id,
+          'auto',
+          subtitle.title ?? path.basename(subtitle.id),
+          subtitle.language ?? 'ja',
+        ]);
+      }
+    }
+    await _setSubtitleTrack(selected);
   }
 
   void _updateRpcTimestamp() {
@@ -1420,17 +1450,16 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 return;
               }
               _video.value = quality;
-              _player.stop();
-              if (quality.isLocal) {
-                if (widget.isLocal) {
-                  _player.setVideoTrack(quality.videoTrack!);
-                } else {
-                  _openMedia(quality);
-                }
+              await _player.stop();
+              if (quality.isLocal && widget.isLocal) {
+                await _player.setVideoTrack(quality.videoTrack!);
+                _initSubtitleAndAudio = true;
               } else {
-                _openMedia(quality);
+                _initSubtitleAndAudio = false;
+                await _openMedia(quality);
+                await _initializeSubtitleAndAudio();
               }
-              _initSubtitleAndAudio = true;
+              if (!context.mounted) return;
               Navigator.pop(context);
             },
           );

@@ -2,6 +2,65 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_cue_list.dart';
 
 void main() {
+  group('subtitle delay snapping', () {
+    const cues = [
+      AnimeSubtitleCue(
+        index: 0,
+        text: 'first',
+        start: Duration(seconds: 5),
+        end: Duration(seconds: 6),
+      ),
+      AnimeSubtitleCue(
+        index: 1,
+        text: 'second',
+        start: Duration(seconds: 10),
+        end: Duration(seconds: 11),
+      ),
+      AnimeSubtitleCue(
+        index: 2,
+        text: 'third',
+        start: Duration(seconds: 15),
+        end: Duration(seconds: 16),
+      ),
+    ];
+
+    test('aligns the next subtitle start to playback', () {
+      expect(
+        subtitleDelayForAdjacentCue(
+          cues: cues,
+          playbackPosition: const Duration(seconds: 12),
+          currentDelayMs: 2000,
+          next: true,
+        ),
+        -3000,
+      );
+    });
+
+    test('aligns the previous subtitle start to playback', () {
+      expect(
+        subtitleDelayForAdjacentCue(
+          cues: cues,
+          playbackPosition: const Duration(seconds: 12),
+          currentDelayMs: 2000,
+          next: false,
+        ),
+        7000,
+      );
+    });
+
+    test('returns null at either end of the subtitle list', () {
+      expect(
+        subtitleDelayForAdjacentCue(
+          cues: cues,
+          playbackPosition: const Duration(seconds: 5),
+          currentDelayMs: 0,
+          next: false,
+        ),
+        isNull,
+      );
+    });
+  });
+
   test('parses and orders SRT cues for the subtitle side list', () {
     final cues = parseAnimeSubtitleContent('episode.srt', '''
 1

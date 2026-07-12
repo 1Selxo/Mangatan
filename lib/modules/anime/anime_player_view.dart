@@ -22,6 +22,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
 import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
 import 'package:mangayomi/modules/anime/widgets/chimahon_primary_controls.dart';
@@ -67,6 +68,8 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:window_manager/window_manager.dart' show windowManager;
 
 import 'widgets/search_subtitles.dart';
+
+final Map<int, String> _sessionVideoStreamPreferences = {};
 
 class AnimePlayerView extends riv.ConsumerStatefulWidget {
   final int episodeId;
@@ -267,7 +270,10 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
     animeStreamControllerProvider(episode: widget.episode).notifier,
   );
   final Stopwatch _watchStopwatch = Stopwatch();
-  late final _firstVid = widget.videos.first;
+  late vid.Video _firstVid = preferredVideoStream(
+    widget.videos,
+    _sessionVideoStreamPreferences[widget.episode.manga.value?.id] ?? '',
+  );
   late final ValueNotifier<VideoPrefs?> _video = ValueNotifier(
     VideoPrefs(
       videoTrack: videoTrackFromVideo(_firstVid),
@@ -1174,7 +1180,71 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       malloc.free(namePtr);
       malloc.free(valuePtr);
       _subDelay = delayMs;
+      unawaited(
+        MiningPreferences.setSubtitleDelay(
+          widget.episode.manga.value?.id,
+          delayMs,
+        ),
+      );
     }
+  }
+
+  Future<void> _restoreEntrySubtitleDelay() async {
+    final delay = await MiningPreferences.getSubtitleDelay(
+      widget.episode.manga.value?.id,
+    );
+    if (!mounted) return;
+    _subDelayController.value = TextEditingValue(text: '$delay');
+  }
+
+  Future<void> _restoreEntryVideoStreamPreference() async {
+    final mediaId = widget.episode.manga.value?.id;
+    final preference = mediaId == null
+        ? ''
+        : _sessionVideoStreamPreferences[mediaId] ??
+              await MiningPreferences.getVideoStreamPreference(mediaId);
+    if (!mounted || preference.isEmpty) return;
+    final selected = preferredVideoStream(widget.videos, preference);
+    _sessionVideoStreamPreferences[mediaId!] = preference;
+    _firstVid = selected;
+    _video.value = VideoPrefs(
+      videoTrack: videoTrackFromVideo(selected),
+      headers: selected.headers,
+      isLocal: false,
+    );
+  }
+
+  void _rememberVideoStreamPreference(String preference) {
+    final mediaId = widget.episode.manga.value?.id;
+    if (mediaId == null || preference.trim().isEmpty) return;
+    _sessionVideoStreamPreferences[mediaId] = preference.trim();
+    unawaited(
+      MiningPreferences.setVideoStreamPreference(mediaId, preference),
+    );
+  }
+
+  Future<void> _snapSubtitleDelay({required bool next}) async {
+    final platform = _player.platform;
+    if (platform is NativePlayer) {
+      try {
+        await platform.command(['sub-step', next ? '1' : '-1']);
+        final seconds = double.tryParse(await platform.getProperty('sub-delay'));
+        if (seconds != null) {
+          _subDelayController.value = TextEditingValue(
+            text: '${(seconds * 1000).round()}',
+          );
+          return;
+        }
+      } catch (_) {}
+    }
+    final delay = subtitleDelayForAdjacentCue(
+      cues: _subtitleCues,
+      playbackPosition: _currentPosition.value,
+      currentDelayMs: _subDelay,
+      next: next,
+    );
+    if (delay == null) return;
+    _subDelayController.value = TextEditingValue(text: '$delay');
   }
 
   void _onSubSpeedChanged() {
@@ -1253,12 +1323,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _subtitleTextSub = _player.stream.subtitle.listen(_updateSubtitleHistory);
     _completed;
     _currentTotalDurationSub;
-    _loadAndroidFont().then((_) {
-      _openMedia(_video.value!, _streamController.getCurrentPosition());
+    _loadAndroidFont().then((_) async {
+      await _restoreEntryVideoStreamPreference();
+      await _openMedia(_video.value!, _streamController.getCurrentPosition());
+      await _restoreEntrySubtitleDelay();
       if (widget.isTorrent) {
-        Future.delayed(const Duration(seconds: 10)).then((_) {
+        Future.delayed(const Duration(seconds: 10)).then((_) async {
           if (mounted) {
-            _openMedia(_video.value!, _streamController.getCurrentPosition());
+            await _openMedia(
+              _video.value!,
+              _streamController.getCurrentPosition(),
+            );
+            await _restoreEntrySubtitleDelay();
           }
         });
       }
@@ -1459,6 +1535,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 return;
               }
               _video.value = quality;
+              final preference = quality.videoTrack?.title ?? '';
+              _rememberVideoStreamPreference(preference);
+              for (final video in widget.videos) {
+                if (video.url == quality.videoTrack?.id) {
+                  _firstVid = video;
+                  break;
+                }
+              }
               await _player.stop();
               if (quality.isLocal && widget.isLocal) {
                 await _player.setVideoTrack(quality.videoTrack!);
@@ -1642,6 +1726,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           Row(
             children: [
               IconButton(
+                tooltip: 'Snap delay to previous subtitle',
+                onPressed:
+                    _subtitleCues.isEmpty && _player.platform is! NativePlayer
+                    ? null
+                    : () => unawaited(_snapSubtitleDelay(next: false)),
+                icon: const Icon(Icons.skip_previous_rounded),
+              ),
+              IconButton(
                 onPressed: () {
                   _subDelay -= 50;
                   _subDelayController.value = TextEditingValue(
@@ -1668,6 +1760,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   );
                 },
                 icon: const Icon(Icons.add_circle),
+              ),
+              IconButton(
+                tooltip: 'Snap delay to next subtitle',
+                onPressed:
+                    _subtitleCues.isEmpty && _player.platform is! NativePlayer
+                    ? null
+                    : () => unawaited(_snapSubtitleDelay(next: true)),
+                icon: const Icon(Icons.skip_next_rounded),
               ),
             ],
           ),
@@ -2023,6 +2123,25 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (_subtitleCues.isNotEmpty ||
+                  _player.platform is NativePlayer) ...[
+                IconButton(
+                  tooltip: 'Snap delay to previous subtitle',
+                  icon: const Icon(Icons.skip_previous_rounded),
+                  color: Colors.white,
+                  onPressed: () => unawaited(
+                    _snapSubtitleDelay(next: false),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Snap delay to next subtitle',
+                  icon: const Icon(Icons.skip_next_rounded),
+                  color: Colors.white,
+                  onPressed: () => unawaited(
+                    _snapSubtitleDelay(next: true),
+                  ),
+                ),
+              ],
               _seekToWidget(),
               if (isDesktop && useMpvConfig)
                 ..._buildMpvSettingsButton(context),

@@ -19,6 +19,36 @@ class AnimeSubtitleCue {
   bool contains(Duration position) => position >= start && position <= end;
 }
 
+int? subtitleDelayForAdjacentCue({
+  required List<AnimeSubtitleCue> cues,
+  required Duration playbackPosition,
+  required int currentDelayMs,
+  required bool next,
+}) {
+  if (cues.isEmpty) return null;
+  final subtitlePosition =
+      playbackPosition - Duration(milliseconds: currentDelayMs);
+  const tolerance = Duration(milliseconds: 2);
+  AnimeSubtitleCue? target;
+  if (next) {
+    for (final cue in cues) {
+      if (cue.start > subtitlePosition + tolerance) {
+        target = cue;
+        break;
+      }
+    }
+  } else {
+    for (final cue in cues.reversed) {
+      if (cue.start < subtitlePosition - tolerance) {
+        target = cue;
+        break;
+      }
+    }
+  }
+  if (target == null) return null;
+  return playbackPosition.inMilliseconds - target.start.inMilliseconds;
+}
+
 List<AnimeSubtitleCue> parseAnimeSubtitleFile(File file) {
   if (!file.existsSync()) return const [];
   return parseAnimeSubtitleContent(file.path, file.readAsStringSync());

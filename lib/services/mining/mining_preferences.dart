@@ -199,6 +199,38 @@ class MiningPreferences {
     await (await _boxOrNull())?.put(_jimakuTitleKey(mediaId), value.trim());
   }
 
+  static Future<int> getSubtitleDelay(int? mediaId) async {
+    if (mediaId == null) return 0;
+    final value = (await _boxOrNull())?.get(_subtitleDelayKey(mediaId));
+    return value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+  }
+
+  static Future<void> setSubtitleDelay(int? mediaId, int delayMs) async {
+    if (mediaId == null) return;
+    await (await _boxOrNull())?.put(_subtitleDelayKey(mediaId), delayMs);
+  }
+
+  static Future<String> getVideoStreamPreference(int? mediaId) async {
+    if (mediaId == null) return '';
+    return (await _boxOrNull())?.get(
+              _videoStreamPreferenceKey(mediaId),
+              defaultValue: '',
+            )
+            as String? ??
+        '';
+  }
+
+  static Future<void> setVideoStreamPreference(
+    int? mediaId,
+    String value,
+  ) async {
+    if (mediaId == null) return;
+    await (await _boxOrNull())?.put(
+      _videoStreamPreferenceKey(mediaId),
+      value.trim(),
+    );
+  }
+
   static Future<Uri> getAnkiEndpoint() async {
     final raw =
         (await _boxOrNull())?.get(
@@ -628,5 +660,13 @@ class MiningPreferences {
 
   static String _jimakuTitleKey(int? mediaId) {
     return 'jimaku_title_${mediaId ?? 'global'}';
+  }
+
+  static String _subtitleDelayKey(int mediaId) {
+    return 'subtitle_delay_$mediaId';
+  }
+
+  static String _videoStreamPreferenceKey(int mediaId) {
+    return 'video_stream_preference_$mediaId';
   }
 }

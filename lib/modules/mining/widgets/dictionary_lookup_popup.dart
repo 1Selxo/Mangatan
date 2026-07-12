@@ -23,10 +23,48 @@ class DictionaryPopupHandle {
 
 enum DictionaryPopupPlacement { aboveOrBelow, leftOrRight }
 
+@visibleForTesting
+enum DictionaryPopupPresentationDecision { present, empty, stale }
+
+/// Orders asynchronous popup lookups before they are allowed to become
+/// visible. The latest lookup wins even when older requests finish later.
+@visibleForTesting
+class DictionaryPopupPresentationGate {
+  int _generation = 0;
+
+  int begin() => ++_generation;
+
+  void cancel() => _generation++;
+
+  bool isCurrent(int generation) => generation == _generation;
+
+  Future<DictionaryPopupPresentationDecision> resolve<T>({
+    required int generation,
+    required Future<List<T>> results,
+  }) async {
+    try {
+      final resolved = await results;
+      if (!isCurrent(generation)) {
+        return DictionaryPopupPresentationDecision.stale;
+      }
+      return resolved.isEmpty
+          ? DictionaryPopupPresentationDecision.empty
+          : DictionaryPopupPresentationDecision.present;
+    } catch (_) {
+      // Lookup failures have a retryable error state in HoshiDictionaryPopup.
+      // Only successful empty lookups should suppress the popup.
+      return isCurrent(generation)
+          ? DictionaryPopupPresentationDecision.present
+          : DictionaryPopupPresentationDecision.stale;
+    }
+  }
+}
+
 final _dictionaryPopupHost = _DictionaryPopupHostController();
 
 class _DictionaryPopupHostController {
   final key = GlobalKey<_DictionaryPopupOverlayHostState>();
+  final _presentationGate = DictionaryPopupPresentationGate();
   OverlayEntry? _entry;
   Future<void>? _initializing;
 
@@ -43,6 +81,7 @@ class _DictionaryPopupHostController {
   }
 
   bool dismissActive() {
+    _presentationGate.cancel();
     final state = key.currentState;
     if (state == null || !state.isVisible) return false;
     state.dismiss();
@@ -90,7 +129,33 @@ class _DictionaryPopupHostController {
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) async {
+    final generation = _presentationGate.begin();
     final resolvedMiningContext = Future<MiningContext>.value(miningContext);
+    final existingState = key.currentState;
+
+    // Hide an older result immediately, then give the persistent WebView the
+    // new request off-screen while the lookup and host initialization overlap.
+    // Reusing the exact Future also preserves EPUB/subtitle prefetch caches.
+    existingState?.dismiss();
+    existingState?.prepare(text: text, initialResults: initialResults);
+    final decisionFuture = _presentationGate.resolve(
+      generation: generation,
+      results: initialResults,
+    );
+
+    await _ensure(context);
+    if (!_presentationGate.isCurrent(generation) || !context.mounted) {
+      return null;
+    }
+    if (existingState == null) {
+      key.currentState?.prepare(text: text, initialResults: initialResults);
+    }
+    final decision = await decisionFuture;
+    if (decision != DictionaryPopupPresentationDecision.present ||
+        !_presentationGate.isCurrent(generation)) {
+      return null;
+    }
+
     DictionaryPopupHandle? present() {
       if (!context.mounted) return null;
       return key.currentState?.present(
@@ -106,12 +171,12 @@ class _DictionaryPopupHostController {
       );
     }
 
-    // Once initialized, replace the request synchronously during the reader's
-    // pointer-up callback. This also invalidates any deferred outside-click
-    // dismissal before Flutter advances to another frame.
+    // A prefetched result can already be rendered by the hidden host, so reveal
+    // it without rebuilding the WebView or starting another lookup.
     final currentHandle = present();
     if (currentHandle != null) return currentHandle;
-    await _ensure(context);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!_presentationGate.isCurrent(generation)) return null;
     return present();
   }
 }

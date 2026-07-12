@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riv;
+import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
@@ -25,6 +26,7 @@ import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
 import 'package:mangayomi/modules/anime/widgets/chimahon_primary_controls.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
+import 'package:mangayomi/modules/anime/widgets/jimaku_subtitle_dialog.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.dart';
 import 'package:mangayomi/modules/anime/widgets/mobile.dart';
@@ -940,61 +942,68 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     await _loadJimakuSubtitle(apiKey: apiKey, showFeedback: false);
   }
 
-  Future<void> _showJimakuSubtitleDialog() async {
+  Future<void> _showJimakuSubtitleDialog({required bool resumePlayback}) async {
     final mediaId = widget.episode.manga.value?.id;
-    final apiKeyController = TextEditingController(
-      text: await MiningPreferences.getJimakuApiKey(),
-    );
+    var apiKey = await MiningPreferences.getJimakuApiKey();
+    final apiKeyController = isDesktop
+        ? null
+        : TextEditingController(text: apiKey);
     final titleController = TextEditingController(
       text: await MiningPreferences.getJimakuTitleOverride(mediaId),
     );
-    if (!mounted) return;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Jimaku subtitles'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: apiKeyController,
-                decoration: const InputDecoration(labelText: 'Jimaku API key'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: titleController,
-                decoration: InputDecoration(
-                  labelText: 'Title override',
-                  hintText: widget.episode.manga.value?.name ?? '',
-                ),
-              ),
-            ],
+    var playbackRestored = false;
+
+    Future<void> restorePlayback() async {
+      if (playbackRestored) return;
+      playbackRestored = true;
+      if (resumePlayback && mounted) await _player.play();
+    }
+
+    try {
+      if (!mounted) return;
+      while (true) {
+        if (!mounted) return;
+        final action = await showDialog<JimakuSubtitleDialogAction>(
+          context: context,
+          builder: (dialogContext) => JimakuSubtitleDialog(
+            apiKeyConfigured: apiKey.trim().isNotEmpty,
+            apiKeyController: apiKeyController,
+            titleController: titleController,
+            titleHint: widget.episode.manga.value?.name ?? '',
+            cancelLabel: dialogContext.l10n.cancel,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Search'),
-            ),
-          ],
         );
-      },
-    );
-    if (result != true) return;
-    await MiningPreferences.setJimakuApiKey(apiKeyController.text);
-    await MiningPreferences.setJimakuTitleOverride(
-      mediaId,
-      titleController.text,
-    );
-    await _loadJimakuSubtitle(
-      apiKey: apiKeyController.text,
-      titleOverride: titleController.text,
-      showFeedback: true,
-    );
+        if (!mounted || action == null) return;
+
+        if (action == JimakuSubtitleDialogAction.openSettings) {
+          await context.push('/playerSubtitles');
+          if (!mounted) return;
+          apiKey = await MiningPreferences.getJimakuApiKey();
+          if (!mounted || apiKey.trim().isEmpty) return;
+          continue;
+        }
+
+        final searchApiKey = apiKeyController?.text ?? apiKey;
+        if (apiKeyController != null) {
+          await MiningPreferences.setJimakuApiKey(searchApiKey);
+        }
+        await MiningPreferences.setJimakuTitleOverride(
+          mediaId,
+          titleController.text,
+        );
+        await restorePlayback();
+        await _loadJimakuSubtitle(
+          apiKey: searchApiKey,
+          titleOverride: titleController.text,
+          showFeedback: true,
+        );
+        return;
+      }
+    } finally {
+      await restorePlayback();
+      apiKeyController?.dispose();
+      titleController.dispose();
+    }
   }
 
   Future<void> _loadJimakuSubtitle({
@@ -1468,13 +1477,16 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
   }
 
-  void _videoSettingDraggableMenu(
+  Future<void> _videoSettingDraggableMenu(
     BuildContext context, {
     int initialIndex = 0,
   }) async {
     final l10n = l10nLocalizations(context)!;
     bool hasSubtitleTrack = false;
-    _player.pause();
+    var openJimaku = false;
+    final resumePlayback = _player.state.playing;
+    await _player.pause();
+    if (!context.mounted) return;
     await customDraggableTabBar(
       tabs: [
         Tab(text: l10n.video_quality),
@@ -1483,7 +1495,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       ],
       children: [
         _videoQualityWidget(context),
-        _videoSubtitle(context, (value) => hasSubtitleTrack = value),
+        _videoSubtitle(
+          context,
+          (value) => hasSubtitleTrack = value,
+          onSearchJimaku: () => openJimaku = true,
+        ),
         _videoAudios(context),
       ],
       context: context,
@@ -1523,11 +1539,20 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         icon: const Icon(Icons.settings_outlined),
       ),
     );
+    if (!mounted) return;
     setState(() {});
-    _player.play();
+    if (openJimaku) {
+      await _showJimakuSubtitleDialog(resumePlayback: resumePlayback);
+    } else if (resumePlayback) {
+      await _player.play();
+    }
   }
 
-  Widget _videoSubtitle(BuildContext context, Function(bool) hasSubtitleTrack) {
+  Widget _videoSubtitle(
+    BuildContext context,
+    Function(bool) hasSubtitleTrack, {
+    required VoidCallback onSearchJimaku,
+  }) {
     List<VideoPrefs> videoSubtitle = _player.state.tracks.subtitle
         .toList()
         .map((e) => VideoPrefs(isLocal: true, subtitle: e))
@@ -1759,8 +1784,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           const SizedBox(height: 30),
           GestureDetector(
             onTap: () {
+              onSearchJimaku();
               Navigator.pop(context);
-              Future.microtask(_showJimakuSubtitleDialog);
             },
             child: textWidget('Search Jimaku', false),
           ),

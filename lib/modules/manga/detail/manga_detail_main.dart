@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/detail/manga_details_view.dart';
+import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
@@ -18,6 +21,12 @@ class MangaReaderDetail extends ConsumerStatefulWidget {
 }
 
 class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
+  void _closeNovelChapterMenu() {
+    ref.read(isLongPressedStateProvider.notifier).update(false);
+    ref.read(chaptersListStateProvider.notifier).clear();
+    Navigator.of(context).pop();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +55,7 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
     return Scaffold(
       body: manga.when(
         data: (manga) {
-          return StreamBuilder(
+          final detail = StreamBuilder(
             stream: isar.sources
                 .filter()
                 .langContains(manga!.lang!, caseSensitive: false)
@@ -112,6 +121,14 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                 ),
               );
             },
+          );
+          if (manga.itemType != ItemType.novel) return detail;
+          return CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape):
+                  _closeNovelChapterMenu,
+            },
+            child: Focus(autofocus: true, child: detail),
           );
         },
         error: (Object error, StackTrace stackTrace) {

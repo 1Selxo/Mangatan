@@ -228,6 +228,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   Timer? _progressPersistDebounce;
   bool _isDisposed = false;
   bool _chapterTransitionInProgress = false;
+  bool _backNavigationInProgress = false;
   bool _dictionaryPopupPrewarmed = false;
   bool _usingTtsuReader = false;
   bool _appIsActive = true;
@@ -327,6 +328,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   @override
   void dispose() {
     _isDisposed = true;
+    HardwareKeyboard.instance.removeHandler(_handleHiddenEpubEscape);
     DictionaryLookupPopup.dismissActive();
     _readingStopwatch.stop();
     WidgetsBinding.instance.removeObserver(this);
@@ -382,6 +384,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleHiddenEpubEscape);
     unawaited(ReaderLookupTriggerState.initialize());
     _epubLayout.addListener(_onEpubLayoutChanged);
     WidgetsBinding.instance.addObserver(this);
@@ -1456,8 +1459,17 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   }
 
   void _goBack(BuildContext context) {
+    if (_backNavigationInProgress) return;
+    _backNavigationInProgress = true;
     restoreSystemUI();
     Navigator.pop(context);
+  }
+
+  bool _handleHiddenEpubEscape(KeyEvent event) {
+    if (!_usingTtsuReader || _isView || event is! KeyDownEvent) return false;
+    if (event.logicalKey != LogicalKeyboardKey.escape) return false;
+    _goBack(context);
+    return true;
   }
 
   void _onBtnTapped(double value) {

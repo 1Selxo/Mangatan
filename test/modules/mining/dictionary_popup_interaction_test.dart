@@ -1,9 +1,114 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 
 void main() {
+  group('dictionary popup presentation policy', () {
+    test('suppresses a current lookup with no results', () async {
+      final gate = DictionaryPopupPresentationGate();
+      final generation = gate.begin();
+
+      expect(
+        await gate.resolve<int>(
+          generation: generation,
+          results: Future.value(const []),
+        ),
+        DictionaryPopupPresentationDecision.empty,
+      );
+    });
+
+    test('presents a current lookup with results', () async {
+      final gate = DictionaryPopupPresentationGate();
+      final generation = gate.begin();
+
+      expect(
+        await gate.resolve<int>(
+          generation: generation,
+          results: Future.value(const [1]),
+        ),
+        DictionaryPopupPresentationDecision.present,
+      );
+    });
+
+    test('preserves the retryable popup for lookup failures', () async {
+      final gate = DictionaryPopupPresentationGate();
+      final generation = gate.begin();
+
+      expect(
+        await gate.resolve<int>(
+          generation: generation,
+          results: Future.error(StateError('lookup failed')),
+        ),
+        DictionaryPopupPresentationDecision.present,
+      );
+    });
+
+    test(
+      'a slow old lookup cannot appear after a newer empty lookup',
+      () async {
+        final gate = DictionaryPopupPresentationGate();
+        final oldResults = Completer<List<int>>();
+        final oldGeneration = gate.begin();
+        final oldDecision = gate.resolve<int>(
+          generation: oldGeneration,
+          results: oldResults.future,
+        );
+
+        final newGeneration = gate.begin();
+        expect(
+          await gate.resolve<int>(
+            generation: newGeneration,
+            results: Future.value(const []),
+          ),
+          DictionaryPopupPresentationDecision.empty,
+        );
+        oldResults.complete(const [1]);
+
+        expect(await oldDecision, DictionaryPopupPresentationDecision.stale);
+      },
+    );
+
+    test('a stale empty lookup cannot hide a newer result', () async {
+      final gate = DictionaryPopupPresentationGate();
+      final oldResults = Completer<List<int>>();
+      final oldGeneration = gate.begin();
+      final oldDecision = gate.resolve<int>(
+        generation: oldGeneration,
+        results: oldResults.future,
+      );
+
+      final newGeneration = gate.begin();
+      expect(
+        await gate.resolve<int>(
+          generation: newGeneration,
+          results: Future.value(const [1]),
+        ),
+        DictionaryPopupPresentationDecision.present,
+      );
+      oldResults.complete(const []);
+
+      expect(await oldDecision, DictionaryPopupPresentationDecision.stale);
+    });
+
+    test('explicit dismissal invalidates a pending lookup', () async {
+      final gate = DictionaryPopupPresentationGate();
+      final results = Completer<List<int>>();
+      final generation = gate.begin();
+      final decision = gate.resolve<int>(
+        generation: generation,
+        results: results.future,
+      );
+
+      gate.cancel();
+      results.complete(const [1]);
+
+      expect(await decision, DictionaryPopupPresentationDecision.stale);
+    });
+  });
+
   group('dictionary popup dismissal policy', () {
     test('Escape, Backspace, and browser back dismiss the popup', () {
       expect(dictionaryPopupIsDismissKey(LogicalKeyboardKey.escape), isTrue);

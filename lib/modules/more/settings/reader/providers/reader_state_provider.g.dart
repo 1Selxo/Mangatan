@@ -945,7 +945,7 @@ final class NovelReaderPaddingStateProvider
 }
 
 String _$novelReaderPaddingStateHash() =>
-    r'572f1a7134c499a9a5107d29552beca9a5fd55ea';
+    r'0f353ceeceddf7d1b63d08fceb5533f8832c7ae0';
 
 abstract class _$NovelReaderPaddingState extends $Notifier<int> {
   int build();
@@ -1216,7 +1216,7 @@ final class NovelEpubReadingLayoutStateProvider
 }
 
 String _$novelEpubReadingLayoutStateHash() =>
-    r'ac010a295f79828fde3cdc9ace92c6a168c58cf2';
+    r'4142fa5a0cd435e944072a5878f0496d0105b8f9';
 
 abstract class _$NovelEpubReadingLayoutState extends $Notifier<int> {
   int build();

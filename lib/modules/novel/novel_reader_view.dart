@@ -71,6 +71,21 @@ EpubReturnButtonEdge epubReturnButtonEdgeFor({
   };
 }
 
+Color _parseNovelReaderColor(String value, {Color? fallback}) {
+  try {
+    final hex = value.trim().replaceAll('#', '');
+    if (hex.length == 6) {
+      return Color(int.parse('FF$hex', radix: 16));
+    }
+    if (hex.length == 8) {
+      return Color(int.parse(hex, radix: 16));
+    }
+  } catch (_) {
+    // Fall through to the configured fallback.
+  }
+  return fallback ?? Colors.grey;
+}
+
 class NovelReaderRouteArgs {
   const NovelReaderRouteArgs({
     required this.chapterId,
@@ -757,6 +772,10 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   Widget build(BuildContext context) {
     final backgroundColor = ref.watch(backgroundColorStateProvider);
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
+    final readerBackgroundColor = _parseNovelReaderColor(
+      ref.watch(novelReaderThemeStateProvider),
+      fallback: const Color(0xFF292832),
+    );
     ref.listen<bool>(novelShowReturnToSavedPositionButtonStateProvider, (
       previous,
       next,
@@ -801,6 +820,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
           return true;
         },
         child: Material(
+          color: readerBackgroundColor,
           child: SafeArea(
             top: !fullScreenReader,
             bottom: false,
@@ -840,29 +860,6 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                               final customTextColor = ref.watch(
                                 novelReaderTextColorStateProvider,
                               );
-
-                              Color parseColor(String hex, {Color? fallback}) {
-                                try {
-                                  String hexColor = hex.trim().replaceAll(
-                                    '#',
-                                    '',
-                                  );
-                                  // Ensure we have a valid 6-character hex color
-                                  if (hexColor.length == 6) {
-                                    return Color(
-                                      int.parse('FF$hexColor', radix: 16),
-                                    );
-                                  } else if (hexColor.length == 8) {
-                                    // Already has alpha channel
-                                    return Color(
-                                      int.parse(hexColor, radix: 16),
-                                    );
-                                  }
-                                } catch (_) {
-                                  // If parsing fails, use fallback
-                                }
-                                return fallback ?? Colors.grey;
-                              }
 
                               TextAlign getTextAlign() {
                                 switch (textAlign) {
@@ -1053,19 +1050,20 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                                   fontSize
                                                                       .toDouble(),
                                                                 ),
-                                                                color: parseColor(
+                                                                color: _parseNovelReaderColor(
                                                                   customTextColor,
                                                                   fallback:
                                                                       Colors
                                                                           .white,
                                                                 ),
-                                                                backgroundColor: parseColor(
-                                                                  customBackgroundColor,
-                                                                  fallback:
-                                                                      const Color(
-                                                                        0xFF292832,
-                                                                      ),
-                                                                ),
+                                                                backgroundColor:
+                                                                    _parseNovelReaderColor(
+                                                                      customBackgroundColor,
+                                                                      fallback:
+                                                                          const Color(
+                                                                            0xFF292832,
+                                                                          ),
+                                                                    ),
                                                                 margin: Margins
                                                                     .zero,
                                                                 padding:
@@ -1125,7 +1123,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                                     ),
                                                               ),
                                                               "h1, h2, h3, h4, h5, h6": Style(
-                                                                color: parseColor(
+                                                                color: _parseNovelReaderColor(
                                                                   customTextColor,
                                                                   fallback:
                                                                       Colors
@@ -1437,10 +1435,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                   ],
                 );
               },
-              loading: () => scaffoldWith(
-                context,
-                Center(child: CircularProgressIndicator()),
-              ),
+              loading: () => ColoredBox(color: readerBackgroundColor),
               error: (err, stack) =>
                   scaffoldWith(context, Center(child: Text(err.toString()))),
             ),

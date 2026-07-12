@@ -307,6 +307,8 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   EpubReaderProgressSnapshot? _previewRestoreAfterReload;
   int _documentRevision = 0;
   int _dictionaryGeneration = 0;
+  // Keeps cold opens covered until the generated document has applied its
+  // exact bookmark or requested spine and reported the settled location.
   bool _initialLocationPending = true;
   String? _prefetchedLookupText;
   Future<List<HoshiLookupResult>>? _prefetchedLookupResults;
@@ -458,6 +460,15 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     padding: widget.padding,
     textAlign: widget.textAlign,
     initialProgress: _restoreAfterReload ?? widget.initialProgress,
+    initialChapterIndex: _initialLocationPending
+        ? widget.initialChapterIndex
+        : null,
+    initialChapterProgress: _initialLocationPending
+        ? widget.initialChapterProgress
+        : null,
+    initialSpineIndex: _initialLocationPending
+        ? widget.initialSpineIndex
+        : null,
     tapToScroll: widget.tapToScroll,
     removeExtraParagraphSpacing: widget.removeExtraParagraphSpacing,
     layout: widget.layout,
@@ -505,24 +516,11 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         _restoreAfterReload = null;
         setState(() {
           _isReady = true;
+          _initialLocationPending = false;
           _showFallback = false;
           _failure = null;
         });
-        if (_initialLocationPending) {
-          _initialLocationPending = false;
-          final spineIndex = widget.initialSpineIndex;
-          if (spineIndex != null) {
-            unawaited(widget.controller.jumpToEpubSpine(spineIndex));
-          } else {
-            final chapterIndex = widget.initialChapterIndex;
-            final chapterProgress = widget.initialChapterProgress;
-            if (chapterIndex != null && chapterProgress != null) {
-              unawaited(
-                widget.controller.jumpToBookmark(chapterIndex, chapterProgress),
-              );
-            }
-          }
-        } else if (previewRestore != null && widget.previewSpineIndex != null) {
+        if (previewRestore != null && widget.previewSpineIndex != null) {
           unawaited(
             widget.controller.restorePreviewPosition(
               spineIndex: widget.previewSpineIndex!,
@@ -732,18 +730,30 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     String documentIdentity,
   ) async {
     // A page can finish navigating while its fonts/images are still changing
-    // layout. The DOM reader announces readiness after two frames, but this
-    // guard keeps an older/buggy WebView implementation from showing a blank
-    // page indefinitely.
+    // layout. Only the DOM readiness signal may uncover a cold open; body text
+    // alone would expose the document before its exact location is restored.
+    // Renderable content remains a fallback for later settings reloads.
     await Future<void>.delayed(const Duration(milliseconds: 500));
     if (!mounted || documentIdentity != _documentIdentity) return;
     try {
-      final value = await controller.evaluateJavascript(
-        source:
-            'Boolean(window.mangatanReader?.isReady?.() || document.body?.innerText?.trim()?.length || document.images?.length);',
+      final readerReady = await controller.evaluateJavascript(
+        source: 'Boolean(window.mangatanReader?.isReady?.());',
       );
-      if (_javascriptBool(value)) {
-        if (!_isReady && mounted) {
+      if (_javascriptBool(readerReady)) {
+        if (mounted && (!_isReady || _initialLocationPending)) {
+          setState(() {
+            _isReady = true;
+            _initialLocationPending = false;
+          });
+        }
+        return;
+      }
+      final hasRenderableContent = await controller.evaluateJavascript(
+        source:
+            'Boolean(document.body?.innerText?.trim()?.length || document.images?.length);',
+      );
+      if (_javascriptBool(hasRenderableContent)) {
+        if (!_initialLocationPending && !_isReady && mounted) {
           setState(() => _isReady = true);
         }
       } else {
@@ -791,7 +801,6 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     if (_isPreparing || documentFile == null) {
       return ColoredBox(
         color: _color(widget.backgroundColor, const Color(0xFF292832)),
-        child: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -816,6 +825,10 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
               ),
               initialSettings: InAppWebViewSettings(
                 transparentBackground: true,
+                underPageBackgroundColor: _color(
+                  widget.backgroundColor,
+                  const Color(0xFF292832),
+                ),
                 supportZoom: false,
                 horizontalScrollBarEnabled: false,
                 verticalScrollBarEnabled: !widget.layout.usesHorizontalScroll,
@@ -869,7 +882,15 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
             ),
           ),
         ),
-        if (!_isReady)
+        if (_initialLocationPending)
+          Positioned.fill(
+            child: AbsorbPointer(
+              child: ColoredBox(
+                color: _color(widget.backgroundColor, const Color(0xFF292832)),
+              ),
+            ),
+          )
+        else if (!_isReady)
           const Positioned.fill(
             child: IgnorePointer(
               child: Center(child: CircularProgressIndicator()),
@@ -1074,6 +1095,9 @@ String buildTtsuEpubDocument({
   required double padding,
   required String textAlign,
   required double initialProgress,
+  int? initialChapterIndex,
+  double? initialChapterProgress,
+  int? initialSpineIndex,
   required bool tapToScroll,
   bool removeExtraParagraphSpacing = false,
   EpubReadingLayout layout = EpubReadingLayout.horizontalContinuous,
@@ -1105,6 +1129,11 @@ String buildTtsuEpubDocument({
       ? textAlign
       : 'left';
   final progress = initialProgress.clamp(0.0, 1.0);
+  final initialChapterIndexValue = initialChapterIndex?.toString() ?? 'null';
+  final initialChapterProgressValue = initialChapterProgress == null
+      ? 'null'
+      : initialChapterProgress.clamp(0.0, 1.0).toString();
+  final initialSpineIndexValue = initialSpineIndex?.toString() ?? 'null';
   final tapZones = tapToScroll ? 'true' : 'false';
   final paragraphSpacing = removeExtraParagraphSpacing ? '0.25em' : '0.8em';
   final documentHref = _safeArchivePath(chapterHref ?? '') ?? 'reader.xhtml';
@@ -1344,6 +1373,9 @@ String buildTtsuEpubDocument({
   <script>
     (() => {
       const initialProgress = $progress;
+      const initialChapterIndex = $initialChapterIndexValue;
+      const initialChapterProgress = $initialChapterProgressValue;
+      const initialSpineIndex = $initialSpineIndexValue;
       const tapZones = $tapZones;
       const pageMode = $pageMode;
       const verticalWriting = $verticalWriting;
@@ -2393,6 +2425,27 @@ String buildTtsuEpubDocument({
           measuredPageMax = measureLastContentPage();
         })
         .then(() => restoreProgress(initialProgress))
+        .then(async () => {
+          let positionedExactly = false;
+          if (initialSpineIndex !== null) {
+            await jumpToLogicalSpine(initialSpineIndex);
+            positionedExactly = true;
+          } else if (
+            initialChapterIndex !== null &&
+            initialChapterProgress !== null
+          ) {
+            await jumpToBookmark(
+              initialChapterIndex,
+              initialChapterProgress,
+            );
+            positionedExactly = true;
+          }
+          if (positionedExactly) {
+            await new Promise((resolve) => requestAnimationFrame(
+              () => requestAnimationFrame(resolve),
+            ));
+          }
+        })
         .then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
           ready = true;
           queueReport();

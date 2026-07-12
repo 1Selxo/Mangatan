@@ -61,6 +61,38 @@ void main() {
     expect(document, contains('metrics,'));
   });
 
+  test('positions an exact cold-open target before reporting ready', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>chapter</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#f4ecd8',
+      textColor: '#302a24',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'left',
+      initialProgress: 0.25,
+      initialChapterIndex: 4,
+      initialChapterProgress: 0.6,
+      initialSpineIndex: 7,
+      tapToScroll: true,
+    );
+
+    expect(document, contains('const initialChapterIndex = 4'));
+    expect(document, contains('const initialChapterProgress = 0.6'));
+    expect(document, contains('const initialSpineIndex = 7'));
+    expect(document, contains('await jumpToLogicalSpine(initialSpineIndex)'));
+    expect(
+      document.indexOf('await jumpToLogicalSpine(initialSpineIndex)'),
+      lessThan(document.indexOf("call('readerReady'")),
+    );
+    expect(
+      document.indexOf('requestAnimationFrame(resolve)'),
+      lessThan(document.indexOf("call('readerReady'")),
+    );
+  });
+
   test('dismisses a repeated EPUB lookup only while its popup is visible', () {
     expect(
       ttsuRepeatedLookupShouldDismiss(repeatedLookup: true, popupVisible: true),

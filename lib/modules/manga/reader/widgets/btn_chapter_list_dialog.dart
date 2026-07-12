@@ -4,6 +4,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
+import 'package:mangayomi/modules/novel/novel_reader_progress.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/modules/manga/reader/reader_view.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -366,7 +367,12 @@ class _ChapterListTileState extends State<ChapterListTile> {
                               const SizedBox(width: 4),
                               Text(
                                 isEpubNavigationChapter(chapter)
-                                    ? "${((double.tryParse(chapter.lastPageRead!) ?? 0) * 100).toStringAsFixed(0)} %"
+                                    ? formatNovelProgressPercentage(
+                                        double.tryParse(
+                                              chapter.lastPageRead!,
+                                            ) ??
+                                            0,
+                                      )
                                     : chapter.manga.value!.itemType ==
                                           ItemType.anime
                                     ? context.l10n.episode_progress(
@@ -380,7 +386,12 @@ class _ChapterListTileState extends State<ChapterListTile> {
                                         chapter.manga.value!.itemType ==
                                                 ItemType.manga
                                             ? chapter.lastPageRead!
-                                            : "${((double.tryParse(chapter.lastPageRead!) ?? 0) * 100).toStringAsFixed(0)} %",
+                                            : formatNovelProgressPercentage(
+                                                double.tryParse(
+                                                      chapter.lastPageRead!,
+                                                    ) ??
+                                                    0,
+                                              ),
                                       ),
                                 style: TextStyle(
                                   fontSize: 11,

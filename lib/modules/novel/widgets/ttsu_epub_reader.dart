@@ -2152,10 +2152,18 @@ String buildTtsuEpubDocument({
         clearLookup();
         call('readerTap', { x: event.clientX, y: event.clientY, width: window.innerWidth, height: window.innerHeight, tapZones });
       });
-      let wheelLocked = false;
-      let wheelUnlockTimer = 0;
       let pageSnapTimer = 0;
       document.addEventListener('wheel', (event) => {
+        if (pageMode) {
+          // Match the manga reader: every unmodified wheel signal is one
+          // discrete page turn, even when several arrive before a frame.
+          if (event.ctrlKey || event.metaKey) return;
+          const pageDelta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
+          if (pageDelta === 0) return;
+          event.preventDefault();
+          scrollPage(pageDelta > 0 ? 1 : -1);
+          return;
+        }
         const rawDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
           ? event.deltaY
           : event.deltaX;
@@ -2165,24 +2173,15 @@ String buildTtsuEpubDocument({
             ? (continuousVertical ? window.innerWidth : window.innerHeight)
             : 1);
         if (Math.abs(delta) < 1) return;
-        if (!pageMode) {
-          // Explicitly bridge high-resolution trackpad wheels into the
-          // reader's logical axis. WebView2 otherwise drops vertical
-          // two-finger deltas when the EPUB itself scrolls horizontally.
-          event.preventDefault();
-          if (scrollByPixels(delta)) {
-            return;
-          }
-          // A trackpad gesture must never turn into a chapter change merely
-          // because the current layout has not finished measuring its extent.
+        // Explicitly bridge high-resolution trackpad wheels into the reader's
+        // logical axis. WebView2 otherwise drops vertical two-finger deltas
+        // when the EPUB itself scrolls horizontally.
+        event.preventDefault();
+        if (scrollByPixels(delta)) {
           return;
         }
-        event.preventDefault();
-        clearTimeout(wheelUnlockTimer);
-        wheelUnlockTimer = setTimeout(() => { wheelLocked = false; }, 180);
-        if (wheelLocked) return;
-        wheelLocked = true;
-        scrollPage(delta > 0 ? 1 : -1);
+        // A trackpad gesture must never turn into a chapter change merely
+        // because the current layout has not finished measuring its extent.
       }, { passive: false });
       const touchCenter = (touches) => {
         if (!touches || touches.length < 2) return null;

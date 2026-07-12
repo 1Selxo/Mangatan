@@ -47,8 +47,11 @@ class EpubChapter {
   /// can resolve images, footnotes, and cross-chapter links correctly.
   final String href;
 
-  /// Stable position in the filtered, renderable spine.
+  /// Stable position in the original OPF spine.
   final int spineIndex;
+
+  /// Whether this item participates in the OPF linear reading order.
+  final bool isLinear;
 
   /// Whether this spine item should appear in the user-facing chapter list.
   /// Non-navigation fragments are still kept for seamless reader paging.
@@ -60,6 +63,7 @@ class EpubChapter {
     required this.path,
     required this.href,
     required this.spineIndex,
+    this.isLinear = true,
     required this.isNavigationEntry,
   });
 
@@ -70,6 +74,7 @@ class EpubChapter {
       path.hashCode ^
       href.hashCode ^
       spineIndex.hashCode ^
+      isLinear.hashCode ^
       isNavigationEntry.hashCode;
 
   @override
@@ -82,6 +87,7 @@ class EpubChapter {
           path == other.path &&
           href == other.href &&
           spineIndex == other.spineIndex &&
+          isLinear == other.isLinear &&
           isNavigationEntry == other.isNavigationEntry;
 }
 

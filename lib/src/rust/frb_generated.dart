@@ -1362,8 +1362,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ClientSettings dco_decode_client_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return ClientSettings(
       timeoutSettings: dco_decode_opt_box_autoadd_timeout_settings(arr[0]),
       throwOnStatusCode: dco_decode_bool(arr[1]),
@@ -1401,7 +1401,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       path: dco_decode_String(arr[2]),
       href: dco_decode_String(arr[3]),
       spineIndex: dco_decode_u_32(arr[4]),
-      isNavigationEntry: dco_decode_bool(arr[5]),
+      isLinear: dco_decode_bool(arr[5]),
+      isNavigationEntry: dco_decode_bool(arr[6]),
     );
   }
 
@@ -2374,6 +2375,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_path = sse_decode_String(deserializer);
     var var_href = sse_decode_String(deserializer);
     var var_spineIndex = sse_decode_u_32(deserializer);
+    var var_isLinear = sse_decode_bool(deserializer);
     var var_isNavigationEntry = sse_decode_bool(deserializer);
     return EpubChapter(
       name: var_name,
@@ -2381,6 +2383,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       path: var_path,
       href: var_href,
       spineIndex: var_spineIndex,
+      isLinear: var_isLinear,
       isNavigationEntry: var_isNavigationEntry,
     );
   }
@@ -3676,6 +3679,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.path, serializer);
     sse_encode_String(self.href, serializer);
     sse_encode_u_32(self.spineIndex, serializer);
+    sse_encode_bool(self.isLinear, serializer);
     sse_encode_bool(self.isNavigationEntry, serializer);
   }
 

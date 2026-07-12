@@ -1,12 +1,10 @@
 import 'dart:collection';
 
+import 'package:mangayomi/services/hoshidicts/kiwi_korean_analyzer.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
-/// Lightweight Korean lookup analysis inspired by the four-stage pipeline in
-/// l337Rooster/Korean-language-parser. That project relies on Khaiii and
-/// KoNLPy, which are not suitable runtime dependencies for a Flutter desktop
-/// app, so this ports the dictionary-relevant stages: tokenization, particle
-/// separation, ending/prefinal analysis, and common Hangul contractions.
+/// Lightweight fallback used only when Kiwi cannot initialize on the device.
+/// Normal Korean lookup is driven by Kiwi's contextual morphology analysis.
 class KoreanLanguageParser {
   const KoreanLanguageParser();
 
@@ -308,6 +306,7 @@ Future<List<HoshiLookupResult>> lookupKoreanDictionary({
   required int scanLength,
   required HoshiLookupCallback lookup,
   KoreanLanguageParser parser = const KoreanLanguageParser(),
+  KoreanMorphologyAnalyzer? morphologyAnalyzer,
 }) async {
   final direct = await lookup(text, maxResults, scanLength);
   final merged = <String, HoshiLookupResult>{};
@@ -322,7 +321,18 @@ Future<List<HoshiLookupResult>> lookupKoreanDictionary({
     merged['${result.term.expression}\u0000${result.term.reading}'] = result;
   }
 
-  final candidates = parser.candidates(text, scanLength: scanLength);
+  List<KoreanLookupCandidate> candidates;
+  try {
+    candidates = await _kiwiLookupCandidates(
+      text,
+      scanLength: scanLength,
+      analyzer: morphologyAnalyzer ?? KiwiKoreanAnalyzer.instance,
+    );
+  } catch (_) {
+    // Keep dictionary lookup usable if the native library or its model cannot
+    // be initialized on a particular device.
+    candidates = parser.candidates(text, scanLength: scanLength);
+  }
   for (final candidate in candidates) {
     if (merged.length >= maxResults) break;
     final remaining = maxResults - merged.length;
@@ -364,6 +374,67 @@ Future<List<HoshiLookupResult>> lookupKoreanDictionary({
     );
   }
   return List.unmodifiable(merged.values.take(maxResults));
+}
+
+Future<List<KoreanLookupCandidate>> _kiwiLookupCandidates(
+  String text, {
+  required int scanLength,
+  required KoreanMorphologyAnalyzer analyzer,
+}) async {
+  final surface = _leadingKoreanToken(text, scanLength);
+  if (surface.isEmpty) return const [];
+  final context = text.trimLeft();
+  final analysisText = context.length <= 160
+      ? context
+      : context.substring(0, 160);
+  final morphemes = await analyzer.analyze(analysisText);
+  final candidates = <String, KoreanLookupCandidate>{};
+  var priority = 0;
+  for (final morpheme in morphemes) {
+    if (morpheme.start >= surface.length) break;
+    if (!_isKiwiDictionaryTag(morpheme.tag)) continue;
+    final lemma = _kiwiDictionaryLemma(morpheme.form, morpheme.tag);
+    if (lemma.isEmpty || lemma == surface) continue;
+    candidates.putIfAbsent(
+      lemma,
+      () => KoreanLookupCandidate(
+        surface: surface,
+        lemma: lemma,
+        trace: [
+          KoreanTransform(
+            'Kiwi ${morpheme.tag}',
+            'Kiwi analyzed $surface as ${morpheme.form}/${morpheme.tag}',
+          ),
+        ],
+        priority: priority++,
+      ),
+    );
+  }
+  return candidates.values.toList(growable: false);
+}
+
+bool _isKiwiDictionaryTag(String rawTag) {
+  final tag = rawTag.split('-').first.toUpperCase();
+  return tag.startsWith('N') ||
+      tag.startsWith('V') ||
+      tag == 'XR' ||
+      tag == 'XSV' ||
+      tag == 'XSA' ||
+      tag == 'XSN' ||
+      tag == 'MM' ||
+      tag == 'MAG' ||
+      tag == 'MAJ' ||
+      tag == 'IC';
+}
+
+String _kiwiDictionaryLemma(String form, String rawTag) {
+  final normalized = form.trim();
+  if (normalized.isEmpty) return '';
+  final tag = rawTag.split('-').first.toUpperCase();
+  final isPredicate = tag.startsWith('V') || tag == 'XSV' || tag == 'XSA';
+  return isPredicate && !normalized.endsWith('다')
+      ? '$normalized다'
+      : normalized;
 }
 
 String _leadingKoreanToken(String text, int scanLength) {

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/services/hoshidicts/kiwi_korean_analyzer.dart';
 import 'package:mangayomi/services/hoshidicts/korean_language_parser.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
@@ -62,6 +63,7 @@ void main() {
         text: '먹었습니다',
         maxResults: 10,
         scanLength: 20,
+        morphologyAnalyzer: const _UnavailableMorphologyAnalyzer(),
         lookup: (text, maxResults, scanLength) async {
           queries.add(text);
           if (text != '먹다') return const [];
@@ -100,6 +102,7 @@ void main() {
         text: '먹었습니다',
         maxResults: 2,
         scanLength: 20,
+        morphologyAnalyzer: const _UnavailableMorphologyAnalyzer(),
         lookup: (text, maxResults, scanLength) async {
           if (text == '먹었습니다') return [_result('먹', '먹')];
           if (text == '먹다') return [_result('먹다', '먹다')];
@@ -111,6 +114,45 @@ void main() {
       expect(results.first.matched, '먹었습니다');
     },
   );
+
+  test('uses Kiwi morphemes as Korean dictionary lemmas', () async {
+    final queries = <String>[];
+    final results = await lookupKoreanDictionary(
+      text: '먹었어요',
+      maxResults: 5,
+      scanLength: 20,
+      morphologyAnalyzer: const _FakeKiwiAnalyzer(),
+      lookup: (text, maxResults, scanLength) async {
+        queries.add(text);
+        return text == '먹다' ? [_result('먹다', '먹다')] : const [];
+      },
+    );
+
+    expect(queries, contains('먹다'));
+    expect(results.single.matched, '먹었어요');
+    expect(results.single.term.expression, '먹다');
+    expect(results.single.trace.first.name, 'Korean Kiwi VV');
+  });
+}
+
+class _UnavailableMorphologyAnalyzer implements KoreanMorphologyAnalyzer {
+  const _UnavailableMorphologyAnalyzer();
+
+  @override
+  Future<List<KoreanMorpheme>> analyze(String text) {
+    throw StateError('Kiwi unavailable in fallback test');
+  }
+}
+
+class _FakeKiwiAnalyzer implements KoreanMorphologyAnalyzer {
+  const _FakeKiwiAnalyzer();
+
+  @override
+  Future<List<KoreanMorpheme>> analyze(String text) async => const [
+    KoreanMorpheme(form: '먹', tag: 'VV', start: 0, length: 1),
+    KoreanMorpheme(form: '었', tag: 'EP', start: 1, length: 1),
+    KoreanMorpheme(form: '어요', tag: 'EF', start: 2, length: 2),
+  ];
 }
 
 HoshiLookupResult _result(String matched, String expression) {

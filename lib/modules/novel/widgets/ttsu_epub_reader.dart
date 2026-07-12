@@ -1667,6 +1667,7 @@ String buildTtsuEpubDocument({
         call('readerTap', { x: event.clientX, y: event.clientY, width: window.innerWidth, height: window.innerHeight, tapZones });
       });
       let wheelLocked = false;
+      let wheelUnlockTimer = 0;
       let pageSnapTimer = 0;
       document.addEventListener('wheel', (event) => {
         const rawDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
@@ -1691,10 +1692,11 @@ String buildTtsuEpubDocument({
           return;
         }
         event.preventDefault();
+        clearTimeout(wheelUnlockTimer);
+        wheelUnlockTimer = setTimeout(() => { wheelLocked = false; }, 180);
         if (wheelLocked) return;
         wheelLocked = true;
         scrollPage(delta > 0 ? 1 : -1);
-        setTimeout(() => { wheelLocked = false; }, 220);
       }, { passive: false });
       const touchCenter = (touches) => {
         if (!touches || touches.length < 2) return null;

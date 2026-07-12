@@ -87,6 +87,11 @@ void main() {
 
     expect(document, contains('event.deltaMode === 1'));
     expect(document, contains('scrollByPixels(delta)'));
+    expect(document, contains('clearTimeout(wheelUnlockTimer)'));
+    expect(
+      document,
+      contains('wheelUnlockTimer = setTimeout(() => { wheelLocked = false; }, 180)'),
+    );
     expect(document, contains('const touchCenter = (touches) =>'));
     expect(document, contains("document.addEventListener('touchstart'"));
     expect(document, contains("document.addEventListener('touchmove'"));

@@ -81,6 +81,15 @@ class JimakuMediaGuess {
     return value == episode || episodeCandidates.contains(value);
   }
 
+  bool matchesAnyEpisode(JimakuMediaGuess other) {
+    final mine = {...episodeCandidates, if (episode != null) episode!};
+    final theirs = {
+      ...other.episodeCandidates,
+      if (other.episode != null) other.episode!,
+    };
+    return mine.any(theirs.contains);
+  }
+
   bool get hasEpisodeCandidates {
     return episode != null || episodeCandidates.isNotEmpty;
   }
@@ -438,7 +447,7 @@ extension JimakuFileMatcher on List<JimakuFile> {
               parsedSeason == guess.season;
           if (!seasonMatches) return false;
           if (guess.episode == null) return true;
-          return parsed?.matchesEpisode(guess.episode!) == true ||
+          return parsed?.matchesAnyEpisode(guess) == true ||
               (episodeFiltered &&
                   parsed?.hasEpisodeCandidates != true &&
                   parsedEpisode == null);
@@ -731,7 +740,7 @@ int _fileScore(JimakuFile file, JimakuMediaGuess guess) {
         : -160;
   }
   if (guess.episode != null) {
-    score += parsed?.matchesEpisode(guess.episode!) == true
+    score += parsed?.matchesAnyEpisode(guess) == true
         ? 100
         : parsed?.hasEpisodeCandidates == true
         ? -80

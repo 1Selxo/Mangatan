@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1-beta+115 — 2026-07-12
+
+- Fixed Jimaku subtitle matching for long-running anime whose files contain both season-relative and absolute episode numbers, such as One Piece `S03E051` / `第279話`.
+- Reduced light-novel trackpad sensitivity so one continuous two-finger gesture advances only one paginated page.
+
 ## 0.1.0-alpha+113 — 2026-07-10
 
 This private alpha build continues the Mangatan language-learning work and includes the changes made since `v0.1.0-alpha`.

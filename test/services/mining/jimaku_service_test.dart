@@ -32,6 +32,35 @@ void main() {
     expect(guess?.title, 'Example Anime');
   });
 
+  test('matches absolute One Piece episodes in season-numbered files', () {
+    const fileName =
+        'ワンピース.S03E051.第279話 滝に向かって飛べ！！ルフィの想い!!'
+        'WEBRip.Amazon.ja-jp.srt';
+    final parsed = guessJimakuMedia(fileName);
+    final files = [
+      JimakuFile(
+        url: Uri.parse('https://jimaku.cc/files/one-piece-279.srt'),
+        name: fileName,
+        size: 32380,
+        lastModified: '',
+      ),
+    ];
+
+    expect(parsed?.episode, 279);
+    expect(parsed?.episodeCandidates, containsAll(<int>{51, 279}));
+    expect(
+      files.matchedSubtitleFiles(
+        const JimakuMediaGuess(
+          title: 'One Piece',
+          episode: 51,
+          episodeCandidates: {51, 279},
+        ),
+        episodeFiltered: false,
+      ),
+      hasLength(1),
+    );
+  });
+
   test('downloads every matched Jimaku file', () async {
     final requested = <String>[];
     final service = JimakuSubtitleService(

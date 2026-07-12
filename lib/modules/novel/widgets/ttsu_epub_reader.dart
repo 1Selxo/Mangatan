@@ -450,6 +450,13 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       },
     );
     controller.addJavaScriptHandler(
+      handlerName: 'readerDismissDictionary',
+      callback: (_) {
+        _dictionaryGeneration++;
+        return DictionaryLookupPopup.dismissActive();
+      },
+    );
+    controller.addJavaScriptHandler(
       handlerName: 'readerLink',
       callback: (arguments) async {
         final href = arguments.firstOrNull?.toString().trim() ?? '';
@@ -1592,9 +1599,19 @@ String buildTtsuEpubDocument({
         return true;
       };
       const triggerHeldLookupAt = (x, y) => {
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          lastHeldLookupKey = null;
+          clearLookup();
+          call('readerDismissDictionary');
+          return false;
+        }
         const hit = characterAt(x, y);
-        if (!hit) { lastHeldLookupKey = null; clearLookup(); return false; }
+        if (!hit) {
+          lastHeldLookupKey = null;
+          clearLookup();
+          call('readerDismissDictionary');
+          return false;
+        }
         let nodeId = textNodeIds.get(hit.node);
         if (nodeId == null) {
           nodeId = ++nextTextNodeId;
@@ -1603,7 +1620,9 @@ String buildTtsuEpubDocument({
         const key = nodeId + ':' + hit.offset;
         if (key === lastHeldLookupKey) return true;
         lastHeldLookupKey = key;
-        return triggerLookupAt(x, y, hit);
+        const triggered = triggerLookupAt(x, y, hit);
+        if (!triggered) call('readerDismissDictionary');
+        return triggered;
       };
       const setShiftLookupActive = (active) => {
         if (lookupTrigger !== 'shift') return false;

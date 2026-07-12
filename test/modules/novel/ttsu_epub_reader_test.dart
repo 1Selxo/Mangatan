@@ -115,6 +115,7 @@ void main() {
     expect(document, contains("document.addEventListener('pointercancel'"));
     expect(document, contains("middleLookupActive"));
     expect(document, contains('triggerHeldLookupAt(x, y)'));
+    expect(document, contains("call('readerDismissDictionary')"));
     expect(document, contains("event.preventDefault()"));
   });
 
@@ -179,6 +180,7 @@ void main() {
     expect(document, contains('setShiftLookupActive(false);'));
     expect(document, contains("event.shiftKey || shiftLookupActive"));
     expect(document, contains('triggerHeldLookupAt(x, y)'));
+    expect(document, contains("call('readerDismissDictionary')"));
   });
 
   test('does not allow EPUB markup to inject executable elements', () {

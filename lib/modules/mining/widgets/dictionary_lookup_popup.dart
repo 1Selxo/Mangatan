@@ -21,6 +21,42 @@ class DictionaryPopupHandle {
   final Future<void> dismissed;
 }
 
+/// Keeps the root-overlay dictionary popup scoped to the current app route.
+///
+/// The popup host is intentionally persistent so its WebView can stay warm,
+/// but a visible or pending presentation must not follow the user onto a new
+/// route.
+class DictionaryPopupDismissNavigatorObserver extends NavigatorObserver {
+  DictionaryPopupDismissNavigatorObserver({VoidCallback? onNavigation})
+    : _onNavigation =
+          onNavigation ??
+          (() {
+            DictionaryLookupPopup.dismissActive();
+          });
+
+  final VoidCallback _onNavigation;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _onNavigation();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _onNavigation();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _onNavigation();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _onNavigation();
+  }
+}
+
 enum DictionaryPopupPlacement { aboveOrBelow, leftOrRight }
 
 @visibleForTesting

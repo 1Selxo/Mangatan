@@ -30,6 +30,7 @@ import 'package:mangayomi/modules/more/settings/player/player_audio_screen.dart'
 import 'package:mangayomi/modules/more/settings/player/player_decoder_screen.dart';
 import 'package:mangayomi/modules/more/settings/player/player_overview_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/statistics/statistics_screen.dart';
 import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/modules/tracker_library/tracker_library_screen.dart';
@@ -78,7 +79,10 @@ GoRouter router(Ref ref) {
       .first;
 
   return GoRouter(
-    observers: [BotToastNavigatorObserver()],
+    observers: [
+      BotToastNavigatorObserver(),
+      DictionaryPopupDismissNavigatorObserver(),
+    ],
     initialLocation: initLocation,
     debugLogDiagnostics: kDebugMode,
     refreshListenable: router,

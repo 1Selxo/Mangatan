@@ -160,7 +160,10 @@ class ReaderOcrState {
     final hoverLookupActive = _hoverLookupActive;
     final hit = _bestGlobalHit(globalPosition);
     if (hit == null) {
-      if (hoverLookupActive) {
+      if (_heldLookupActive) {
+        _dismissHoverPopup();
+        clearActive();
+      } else if (hoverLookupActive) {
         _scheduleHoverDismiss();
       } else {
         clearActive();
@@ -202,16 +205,24 @@ class ReaderOcrState {
     }
     if (!enabled.value || lookupOnHover.value) return false;
     final position = _lastPointerPosition;
-    if (position != null) unawaited(handleHover(position));
+    if (position != null) {
+      unawaited(handleHover(position));
+    } else {
+      _dismissHoverPopup();
+      clearActive();
+    }
     return true;
   }
 
-  static bool get _hoverLookupActive {
-    return lookupOnHover.value ||
-        _middleLookupActive ||
+  static bool get _heldLookupActive {
+    return _middleLookupActive ||
         (ReaderLookupTriggerState.trigger.value ==
                 DictionaryLookupTrigger.shift &&
             HardwareKeyboard.instance.isShiftPressed);
+  }
+
+  static bool get _hoverLookupActive {
+    return lookupOnHover.value || _heldLookupActive;
   }
 
   static _GlobalOcrHit? _bestGlobalHit(Offset globalPosition) {
@@ -288,6 +299,9 @@ class ReaderOcrState {
     _hoveringPopup = false;
     _hoverPopup?.dismiss();
     _hoverPopup = null;
+    // The stored handle can be stale or not assigned yet while lookup results
+    // are loading. Dismiss the shared host as well to cancel those requests.
+    DictionaryLookupPopup.dismissActive();
   }
 
   static void clearActive() {

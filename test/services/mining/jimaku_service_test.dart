@@ -32,6 +32,17 @@ void main() {
     expect(guess?.title, 'Example Anime');
   });
 
+  test('does not strip a title ending in the letter e', () {
+    final candidates = buildJimakuSearchCandidates(
+      values: const ['One Piece Episode 280'],
+    );
+
+    expect(candidates, isNotEmpty);
+    expect(candidates.first.query, 'One Piece');
+    expect(candidates.first.guess.title, 'One Piece');
+    expect(candidates.first.guess.episode, 280);
+  });
+
   test('matches absolute One Piece episodes in season-numbered files', () {
     const fileName =
         'ワンピース.S03E051.第279話 滝に向かって飛べ！！ルフィの想い!!'

@@ -518,7 +518,7 @@ final _seasonCleanupRegex = RegExp(
   caseSensitive: false,
 );
 final _trailingBareEpisodeWordRegex = RegExp(
-  r'\s*(?:[-._]+\s*)?(?:ep|eps|episode|episodes|e)\.?\s*$',
+  r'(?:^|[\s._-]+)(?:ep|eps|episode|episodes|e)\.?\s*$',
   caseSensitive: false,
 );
 final _releaseTailRegex = RegExp(

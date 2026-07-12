@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2-beta+116 — 2026-07-12
+
+- Fixed Jimaku title cleanup truncating titles that end in the letter `e`, including `One Piece`.
+
 ## 1.0.1-beta+115 — 2026-07-12
 
 - Fixed Jimaku subtitle matching for long-running anime whose files contain both season-relative and absolute episode numbers, such as One Piece `S03E051` / `第279話`.

@@ -14,6 +14,7 @@ import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
 import 'package:mangayomi/services/epub_reader_asset_server.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/services/get_html_content.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -119,11 +120,77 @@ class TtsuEpubReaderController {
     );
   }
 
+  Future<void> jumpToEpubSpine(
+    int spineIndex, {
+    bool isolateChapter = true,
+  }) async {
+    await _webView?.evaluateJavascript(
+      source:
+          'window.mangatanReader?.jumpToLogicalSpine($spineIndex, $isolateChapter);',
+    );
+  }
+
+  Future<void> clearLogicalChapterIsolation() async {
+    await _webView?.evaluateJavascript(
+      source: 'window.mangatanReader?.clearLogicalTarget?.();',
+    );
+  }
+
+  Future<bool?> jumpToAdjacentChapter(int direction) async {
+    final value = await _webView?.evaluateJavascript(
+      source:
+          'window.mangatanReader?.jumpToAdjacentChapter(${direction.sign});',
+    );
+    return _javascriptNullableBool(value);
+  }
+
+  Future<void> jumpToBookmark(int chapterIndex, double progress) async {
+    final safeProgress = progress.clamp(0.0, 1.0);
+    await _webView?.evaluateJavascript(
+      source:
+          'window.mangatanReader?.jumpToBookmark($chapterIndex, $safeProgress);',
+    );
+  }
+
+  Future<void> restorePreviewPosition({
+    required int spineIndex,
+    required int chapterIndex,
+    required double chapterProgress,
+  }) async {
+    final safeProgress = chapterProgress.clamp(0.0, 1.0);
+    await _webView?.evaluateJavascript(
+      source:
+          'window.mangatanReader?.restorePreviewPosition($spineIndex, $chapterIndex, $safeProgress);',
+    );
+  }
+
   Future<double> fraction() async {
     final value = await _webView?.evaluateJavascript(
       source: 'window.mangatanReader?.fraction() ?? 0;',
     );
     return _javascriptNumber(value);
+  }
+
+  Future<EpubReaderProgressSnapshot?> currentProgressSnapshot() async {
+    final value = await _webView?.evaluateJavascript(
+      source: 'JSON.stringify(window.mangatanReader?.metrics?.() ?? null);',
+    );
+    if (value is! String || value.isEmpty || value == 'null') return null;
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(value);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map) return null;
+    return EpubReaderProgressSnapshot(
+      offset: _javascriptNumber(decoded['offset']),
+      maxOffset: _javascriptNumber(decoded['max']),
+      chapterIndex: _javascriptNumber(decoded['chapterIndex']).toInt(),
+      chapterProgress: _javascriptNumber(decoded['chapterProgress']),
+      characterCount: _javascriptNumber(decoded['characterCount']).toInt(),
+      spineIndex: _javascriptNumber(decoded['spineIndex']).toInt(),
+    );
   }
 
   Future<bool?> setShiftLookupActive(bool active) async {
@@ -135,6 +202,24 @@ class TtsuEpubReaderController {
     );
     return _javascriptNullableBool(value);
   }
+}
+
+class EpubReaderProgressSnapshot {
+  const EpubReaderProgressSnapshot({
+    required this.offset,
+    required this.maxOffset,
+    required this.chapterIndex,
+    required this.chapterProgress,
+    required this.characterCount,
+    required this.spineIndex,
+  });
+
+  final double offset;
+  final double maxOffset;
+  final int chapterIndex;
+  final double chapterProgress;
+  final int characterCount;
+  final int spineIndex;
 }
 
 /// Hoshi-style EPUB reader.
@@ -158,6 +243,10 @@ class TtsuEpubReader extends StatefulWidget {
     required this.padding,
     required this.textAlign,
     required this.initialProgress,
+    this.initialChapterIndex,
+    this.initialChapterProgress,
+    this.initialSpineIndex,
+    this.previewSpineIndex,
     required this.tapToScroll,
     required this.removeExtraParagraphSpacing,
     this.layout = EpubReadingLayout.horizontalContinuous,
@@ -179,10 +268,22 @@ class TtsuEpubReader extends StatefulWidget {
   final double padding;
   final String textAlign;
   final double initialProgress;
+  final int? initialChapterIndex;
+  final double? initialChapterProgress;
+  final int? initialSpineIndex;
+  final int? previewSpineIndex;
   final bool tapToScroll;
   final bool removeExtraParagraphSpacing;
   final EpubReadingLayout layout;
-  final void Function(double offset, double maxOffset) onProgress;
+  final void Function(
+    double offset,
+    double maxOffset,
+    int chapterIndex,
+    double chapterProgress,
+    int characterCount,
+    int spineIndex,
+  )
+  onProgress;
   final void Function(Offset position, Size viewport) onReaderTap;
   final VoidCallback onBackRequested;
   final void Function(int direction) onChapterRequested;
@@ -203,13 +304,16 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   bool _showFallback = false;
   String? _failure;
   double? _restoreAfterReload;
+  EpubReaderProgressSnapshot? _previewRestoreAfterReload;
   int _documentRevision = 0;
   int _dictionaryGeneration = 0;
+  bool _initialLocationPending = true;
   String? _prefetchedLookupText;
   Future<List<HoshiLookupResult>>? _prefetchedLookupResults;
   DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
 
   String? get _chapterHref {
+    if (isEpubNavigationChapter(widget.chapter)) return null;
     final chapterId = widget.chapter.url;
     if (chapterId == null || chapterId.isEmpty) return null;
     for (final epubChapter in widget.book.chapters) {
@@ -316,9 +420,13 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     final bundle = _bundle;
     if (bundle == null) return;
     final generation = ++_generation;
+    final previewSnapshot = widget.previewSpineIndex == null
+        ? null
+        : await widget.controller.currentProgressSnapshot();
     final previousProgress = await widget.controller.fraction();
     if (!mounted || generation != _generation) return;
     _restoreAfterReload = previousProgress;
+    _previewRestoreAfterReload = previewSnapshot;
     try {
       final document = await bundle.writeDocument(
         _buildDocument(),
@@ -378,19 +486,51 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         if (data == null || !mounted) return;
         final offset = _javascriptNumber(data['offset']);
         final maxOffset = _javascriptNumber(data['max']);
-        widget.onProgress(offset, maxOffset);
+        widget.onProgress(
+          offset,
+          maxOffset,
+          _javascriptNumber(data['chapterIndex']).toInt(),
+          _javascriptNumber(data['chapterProgress']),
+          _javascriptNumber(data['characterCount']).toInt(),
+          _javascriptNumber(data['spineIndex']).toInt(),
+        );
       },
     );
     controller.addJavaScriptHandler(
       handlerName: 'readerReady',
       callback: (_) {
         if (!mounted) return;
+        final previewRestore = _previewRestoreAfterReload;
+        _previewRestoreAfterReload = null;
         _restoreAfterReload = null;
         setState(() {
           _isReady = true;
           _showFallback = false;
           _failure = null;
         });
+        if (_initialLocationPending) {
+          _initialLocationPending = false;
+          final spineIndex = widget.initialSpineIndex;
+          if (spineIndex != null) {
+            unawaited(widget.controller.jumpToEpubSpine(spineIndex));
+          } else {
+            final chapterIndex = widget.initialChapterIndex;
+            final chapterProgress = widget.initialChapterProgress;
+            if (chapterIndex != null && chapterProgress != null) {
+              unawaited(
+                widget.controller.jumpToBookmark(chapterIndex, chapterProgress),
+              );
+            }
+          }
+        } else if (previewRestore != null && widget.previewSpineIndex != null) {
+          unawaited(
+            widget.controller.restorePreviewPosition(
+              spineIndex: widget.previewSpineIndex!,
+              chapterIndex: previewRestore.chapterIndex,
+              chapterProgress: previewRestore.chapterProgress,
+            ),
+          );
+        }
       },
     );
     controller.addJavaScriptHandler(
@@ -1038,6 +1178,12 @@ String buildTtsuEpubDocument({
     #reader-content a { color: #64a8ff; cursor: pointer; }
     #reader-content [hidden] { display: block !important; }
     #reader-content .mangatan-hidden-style { display: initial !important; visibility: visible !important; opacity: 1 !important; }
+    #reader-content .mangatan-logical-marker {
+      display: block;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+    }
 
     /* Use an explicit viewport instead of document.body. WebView2 and
        WKWebView disagree about which document node accepts programmatic
@@ -1089,6 +1235,16 @@ String buildTtsuEpubDocument({
       column-width: calc(100vw - ${padding * 2}vh) !important;
       column-gap: ${padding * 2}vh !important;
     }
+    html[data-mangatan-reader-layout="horizontal-pages"] .mangatan-logical-section,
+    html[data-mangatan-reader-layout="vertical-pages"] .mangatan-logical-section {
+      break-after: column;
+      -webkit-column-break-after: always;
+    }
+    html[data-mangatan-reader-layout="horizontal-pages"] .mangatan-logical-section:not(:first-child),
+    html[data-mangatan-reader-layout="vertical-pages"] .mangatan-logical-section:not(:first-child) {
+      break-before: column;
+      -webkit-column-break-before: always;
+    }
     html[data-mangatan-reader-layout="horizontal-pages"] #reader-content p,
     html[data-mangatan-reader-layout="vertical-pages"] #reader-content p {
       break-inside: avoid;
@@ -1121,6 +1277,12 @@ String buildTtsuEpubDocument({
       overflow-y: hidden !important;
       column-width: auto !important;
       column-gap: normal !important;
+    }
+    html[data-mangatan-reader-layout="horizontal-scroll"] .mangatan-logical-target {
+      min-height: 100vh;
+    }
+    html[data-mangatan-reader-layout="vertical-scroll"] .mangatan-logical-target {
+      min-width: 100vw;
     }
     #dictionary-action {
       position: fixed; z-index: 2147483647; display: none; transform: translate(-50%, -100%);
@@ -1278,17 +1440,176 @@ String buildTtsuEpubDocument({
         const context = pageContext();
         return context.max > 0 ? context.offset / context.max : 0;
       };
+      const readerLocationContext = () => {
+        if (pageMode) return pageContext();
+        if (continuousVertical) return continuousVerticalContext();
+        const root = scrollElement();
+        const max = Math.max(0, root.scrollHeight - window.innerHeight);
+        return {
+          root,
+          axis: 'y',
+          pageSize: window.innerHeight,
+          max,
+          offset: root.scrollTop || window.scrollY || 0,
+        };
+      };
+      const sectionStart = (section, context) => {
+        const rect = section.getBoundingClientRect();
+        if (context.axis === 'y') return rect.top + context.offset;
+        if (verticalWriting) {
+          return window.innerWidth - rect.right + context.offset;
+        }
+        return rect.left + context.offset;
+      };
+      const epubSections = () => Array.from(
+        content.querySelectorAll('section[data-mangatan-chapter-index]'),
+      );
+      const allEpubSections = () => Array.from(
+        content.querySelectorAll('section[data-mangatan-spine-index]'),
+      );
+      const navigationSections = () => Array.from(
+        content.querySelectorAll(
+          'section[data-mangatan-navigation="true"]',
+        ),
+      );
+      const logicalSections = () => Array.from(
+        content.querySelectorAll('article[data-mangatan-navigation-spine]'),
+      );
+      const clearLogicalTarget = () => {
+        for (const section of logicalSections()) {
+          section.classList.remove('mangatan-logical-target');
+        }
+      };
+      const chimahonCountChars = (text) => Array.from(
+        String(text || '').replace(
+          /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ${r'\p'}{Radical}${r'\p'}{Unified_Ideograph}${r'\p'}{Script=Hangul}]+/gimu,
+          '',
+        ),
+      ).length;
+      const chimahonTextWalker = (section) => document.createTreeWalker(
+        section,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: (node) => node.parentElement?.closest?.('rt, rp')
+            ? NodeFilter.FILTER_REJECT
+            : NodeFilter.FILTER_ACCEPT,
+        },
+      );
+      const chimahonContinuousProgress = (section) => {
+        const walker = chimahonTextWalker(section);
+        let total = 0;
+        let explored = 0;
+        let node;
+        while ((node = walker.nextNode())) {
+          const length = chimahonCountChars(node.textContent);
+          total += length;
+          if (!length) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          const rect = range.getBoundingClientRect();
+          range.detach?.();
+          if (verticalWriting
+              ? rect.left > window.innerWidth
+              : rect.bottom < 0) {
+            explored += length;
+          }
+        }
+        return {
+          explored,
+          progress: total > 0 ? explored / total : 0,
+        };
+      };
+      const jumpToChimahonProgress = (section, progress) => {
+        const p = Math.max(0, Math.min(1, Number(progress) || 0));
+        const walker = chimahonTextWalker(section);
+        let total = 0;
+        let node;
+        while ((node = walker.nextNode())) {
+          total += chimahonCountChars(node.textContent);
+        }
+        if (total <= 0) return jumpToFragment(section.id);
+        const targetCount = Math.ceil(total * p);
+        let running = 0;
+        let targetNode = null;
+        walker.currentNode = section;
+        while ((node = walker.nextNode())) {
+          running += chimahonCountChars(node.textContent);
+          targetNode = node;
+          if (running > targetCount) break;
+        }
+        const element = targetNode?.parentElement || section;
+        element.scrollIntoView({
+          block: p >= .999999 ? 'end' : 'start',
+          inline: 'start',
+          behavior: 'auto',
+        });
+        queueReport();
+        return true;
+      };
+      const locationMetrics = () => {
+        const context = readerLocationContext();
+        const sections = epubSections();
+        const allSections = allEpubSections();
+        if (!sections.length) {
+          return {
+            chapterIndex: 0,
+            chapterProgress: calculateProgress(),
+            characterCount: 0,
+            spineIndex: 0,
+          };
+        }
+        const starts = sections.map((section) => sectionStart(section, context));
+        let index = 0;
+        for (let i = 0; i < starts.length; i += 1) {
+          if (starts[i] <= context.offset + 1) index = i;
+          else break;
+        }
+        const section = sections[index];
+        const start = starts[index];
+        const end = index + 1 < starts.length
+          ? starts[index + 1]
+          : Math.max(start + 1, context.max + context.pageSize);
+        const geometricProgress = Math.max(
+          0,
+          Math.min(1, (context.offset - start) / Math.max(1, end - start)),
+        );
+        const continuousProgress = !pageMode
+          ? chimahonContinuousProgress(section)
+          : null;
+        const chapterProgress = continuousProgress?.progress ?? geometricProgress;
+        const characterStart = Number(
+          section.dataset.mangatanCharacterStart || 0,
+        );
+        const characterLength = Number(
+          section.dataset.mangatanCharacterCount || 0,
+        );
+        let physicalSection = allSections[0] || section;
+        for (const candidate of allSections) {
+          if (sectionStart(candidate, context) <= context.offset + 1) {
+            physicalSection = candidate;
+          } else {
+            break;
+          }
+        }
+        return {
+          chapterIndex: Number(section.dataset.mangatanChapterIndex || index),
+          chapterProgress,
+          characterCount: characterStart + Math.floor(characterLength * chapterProgress),
+          spineIndex: Number(physicalSection.dataset.mangatanSpineIndex || 0),
+        };
+      };
       const metrics = () => {
         const root = scrollElement();
+        const location = locationMetrics();
         if (pageMode) {
-          return { offset: calculateProgress(), max: 1 };
+          return { offset: calculateProgress(), max: 1, ...location };
         }
         if (continuousVertical) {
           const context = continuousVerticalContext();
-          return { offset: context.offset, max: context.max };
+          return { offset: context.offset, max: context.max, ...location };
         }
         const max = Math.max(0, root.scrollHeight - window.innerHeight);
-        return { offset: root.scrollTop || window.scrollY || 0, max };
+        return { offset: root.scrollTop || window.scrollY || 0, max, ...location };
       };
       const report = () => { progressFrame = 0; call('readerProgress', metrics()); };
       const queueReport = () => { if (!progressFrame) progressFrame = requestAnimationFrame(report); };
@@ -1339,6 +1660,57 @@ String buildTtsuEpubDocument({
         requestAnimationFrame(() => requestAnimationFrame(queueReport));
       };
       const jumpToFraction = (value) => restoreProgress(value);
+      const jumpToAbsolute = (value) => {
+        const context = readerLocationContext();
+        const target = Math.max(0, Math.min(context.max, Number(value) || 0));
+        if (pageMode && context.pageSize > 0) {
+          setPageOffset(context, alignToPage(context, target));
+        } else {
+          setPageOffset(context, target);
+        }
+        queueReport();
+      };
+      const jumpToBookmark = (chapterIndex, progress, clearIsolation = true) => {
+        if (clearIsolation) clearLogicalTarget();
+        const context = readerLocationContext();
+        const sections = epubSections();
+        if (!sections.length) return false;
+        const index = Math.max(
+          0,
+          Math.min(sections.length - 1, Number(chapterIndex) || 0),
+        );
+        if (!pageMode) {
+          return jumpToChimahonProgress(sections[index], progress);
+        }
+        const starts = sections.map((section) => sectionStart(section, context));
+        const start = starts[index] || 0;
+        const end = index + 1 < starts.length
+          ? starts[index + 1]
+          : Math.max(start + 1, context.max + context.pageSize);
+        jumpToAbsolute(start + Math.max(0, Math.min(1, Number(progress) || 0)) * (end - start));
+        return true;
+      };
+      const jumpToAdjacentChapter = (direction) => {
+        const context = readerLocationContext();
+        const sections = navigationSections();
+        if (!sections.length) return false;
+        const starts = sections.map((section) => sectionStart(section, context));
+        const sign = Math.sign(Number(direction) || 0);
+        let target = -1;
+        if (sign > 0) {
+          target = starts.findIndex((start) => start > context.offset + 1);
+        } else if (sign < 0) {
+          for (let i = starts.length - 1; i >= 0; i -= 1) {
+            if (starts[i] < context.offset - 1) { target = i; break; }
+          }
+        }
+        if (target < 0) return false;
+        const spineIndex = Number(
+          sections[target].dataset.mangatanSpineIndex || 0,
+        );
+        jumpToLogicalSpine(spineIndex, false);
+        return true;
+      };
       const jumpToFragment = async (fragment) => {
         const id = String(fragment || '').replace(/^#/, '');
         const target = id && (document.getElementById(id) || document.getElementsByName(id)[0]);
@@ -1366,6 +1738,48 @@ String buildTtsuEpubDocument({
         }
         queueReport();
         return true;
+      };
+      const jumpToLogicalSpine = async (spineIndex, isolateChapter = true) => {
+        const wanted = Number(spineIndex);
+        const physical = content.querySelector(
+          'section[data-mangatan-spine-index="' + wanted + '"]',
+        );
+        const target = logicalSections().find(
+          (section) => Number(section.dataset.mangatanNavigationSpine) === wanted,
+        ) || physical?.closest('.mangatan-logical-section');
+        if (!target) return false;
+        clearLogicalTarget();
+        if (!pageMode && isolateChapter) {
+          target.classList.add('mangatan-logical-target');
+        }
+        await (document.fonts?.ready || Promise.resolve());
+        const place = () => {
+          const context = readerLocationContext();
+          const marker = target.querySelector('.mangatan-logical-marker') || target;
+          const absolute = sectionStart(marker, context);
+          if (pageMode) {
+            setPageOffset(context, alignToPage(context, absolute));
+          } else {
+            setPageOffset(context, absolute);
+          }
+        };
+        place();
+        requestAnimationFrame(() => {
+          place();
+          requestAnimationFrame(() => {
+            place();
+            queueReport();
+          });
+        });
+        return true;
+      };
+      const restorePreviewPosition = async (
+        spineIndex,
+        chapterIndex,
+        chapterProgress,
+      ) => {
+        await jumpToLogicalSpine(spineIndex, true);
+        return jumpToBookmark(chapterIndex, chapterProgress, false);
       };
       const scrollByPixels = (value) => {
         const before = pageMode ? pageContext().offset : metrics().offset;
@@ -1646,7 +2060,13 @@ String buildTtsuEpubDocument({
         calculateProgress,
         restoreProgress,
         jumpToFraction,
+        jumpToBookmark,
+        restorePreviewPosition,
+        jumpToAdjacentChapter,
         jumpToFragment,
+        jumpToLogicalSpine,
+        clearLogicalTarget,
+        metrics,
         scrollByPixels,
         scrollPage,
         highlightMatch,

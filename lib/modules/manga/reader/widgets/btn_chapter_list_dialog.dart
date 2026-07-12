@@ -7,6 +7,7 @@ import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/modules/manga/reader/reader_view.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/utils/date.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
@@ -17,6 +18,7 @@ Widget btnToShowChapterListDialog(
   String title,
   Chapter chapter, {
   void Function(bool)? onChanged,
+  ValueChanged<Chapter>? onChapterSelected,
   Color? iconColor,
 }) {
   return IconButton(
@@ -86,7 +88,12 @@ Widget btnToShowChapterListDialog(
                       ],
                     ),
                   ),
-                  Flexible(child: ChapterListWidget(chapter: chapter)),
+                  Flexible(
+                    child: ChapterListWidget(
+                      chapter: chapter,
+                      onChapterSelected: onChapterSelected,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -101,7 +108,12 @@ Widget btnToShowChapterListDialog(
 
 class ChapterListWidget extends StatefulWidget {
   final Chapter chapter;
-  const ChapterListWidget({super.key, required this.chapter});
+  final ValueChanged<Chapter>? onChapterSelected;
+  const ChapterListWidget({
+    super.key,
+    required this.chapter,
+    this.onChapterSelected,
+  });
 
   @override
   State<ChapterListWidget> createState() => _ChapterListWidgetState();
@@ -162,6 +174,7 @@ class _ChapterListWidgetState extends State<ChapterListWidget> {
                   child: ChapterListTile(
                     chapter: chapter,
                     currentChap: currentChap,
+                    onChapterSelected: widget.onChapterSelected,
                   ),
                 );
               },
@@ -176,10 +189,12 @@ class _ChapterListWidgetState extends State<ChapterListWidget> {
 class ChapterListTile extends StatefulWidget {
   final Chapter chapter;
   final bool currentChap;
+  final ValueChanged<Chapter>? onChapterSelected;
   const ChapterListTile({
     super.key,
     required this.chapter,
     required this.currentChap,
+    this.onChapterSelected,
   });
 
   @override
@@ -210,8 +225,12 @@ class _ChapterListTileState extends State<ChapterListTile> {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () async {
-            if (!widget.currentChap) {
+            if (!widget.currentChap || widget.onChapterSelected != null) {
               Navigator.pop(context);
+              if (widget.onChapterSelected != null) {
+                widget.onChapterSelected!(chapter);
+                return;
+              }
               MangaChapterPageGalleryState.setNavigatingToChapter();
               pushReplacementMangaReaderView(
                 context: context,
@@ -346,7 +365,10 @@ class _ChapterListTileState extends State<ChapterListTile> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                chapter.manga.value!.itemType == ItemType.anime
+                                isEpubNavigationChapter(chapter)
+                                    ? "${((double.tryParse(chapter.lastPageRead!) ?? 0) * 100).toStringAsFixed(0)} %"
+                                    : chapter.manga.value!.itemType ==
+                                          ItemType.anime
                                     ? context.l10n.episode_progress(
                                         Duration(
                                           milliseconds: int.parse(
@@ -373,6 +395,16 @@ class _ChapterListTileState extends State<ChapterListTile> {
                   ),
                 ),
                 const SizedBox(width: 12),
+                if (isEpubNavigationChapter(chapter)) ...[
+                  Text(
+                    epubChapterCharacterStart(chapter)?.toString() ?? '...',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 // Bookmark button
                 Consumer(
                   builder: (context, ref, child) => Material(

@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/modules/widgets/custom_extended_image_provider.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
-import 'package:mangayomi/utils/cached_network.dart';
+import 'package:mangayomi/modules/novel/novel_reader_progress.dart';
+import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/utils/constant.dart';
 import 'package:marquee/marquee.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/date.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
@@ -18,18 +23,19 @@ import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/download/download_page_widget.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
 
 class ChapterListTileWidget extends ConsumerWidget {
   final Chapter chapter;
   final List<Chapter> chapterList;
   final List<Chapter> allChapters;
   final bool sourceExist;
+  final int displayMode;
   const ChapterListTileWidget({
     required this.chapterList,
     required this.chapter,
     required this.allChapters,
     required this.sourceExist,
+    required this.displayMode,
     super.key,
   });
 
@@ -37,6 +43,14 @@ class ChapterListTileWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = l10nLocalizations(context)!;
     final isLongPressed = ref.watch(isLongPressedStateProvider);
+    final isEpubShortcut = isEpubNavigationChapter(chapter);
+    final epubCharacterStart = epubChapterCharacterStart(chapter);
+    final displayTitle = displayMode == SortChapter.chapterNumberDisplay
+        ? _chapterNumberTitle(
+            chapterLabel: l10n.chapter,
+            episodeLabel: l10n.episode,
+          )
+        : chapter.name!;
     return Dismissible(
       key: ValueKey('chapter_swipe_${chapter.id}'),
       direction: isLongPressed
@@ -79,7 +93,7 @@ class ChapterListTileWidget extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Icon(
-          chapter.isRead! ? Icons.remove_done_sharp : Icons.done_all,
+          chapter.isRead! ? Icons.visibility_off : Icons.done_all,
           color: Colors.white,
         ),
       ),
@@ -128,12 +142,12 @@ class ChapterListTileWidget extends ConsumerWidget {
                         color: context.primaryColor,
                       )
                     : SizedBox.shrink(),
-                chapter.description != null
+                chapter.description != null && !isManagedEpubChapter(chapter)
                     ? Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildTitle(chapter.name!, context),
+                            _buildTitle(displayTitle, context),
                             Text(
                               chapter.description!,
                               style: const TextStyle(fontSize: 11),
@@ -142,7 +156,7 @@ class ChapterListTileWidget extends ConsumerWidget {
                           ],
                         ),
                       )
-                    : Flexible(child: _buildTitle(chapter.name!, context)),
+                    : Flexible(child: _buildTitle(displayTitle, context)),
               ],
             ),
             subtitle: Row(
@@ -160,7 +174,8 @@ class ChapterListTileWidget extends ConsumerWidget {
                       ),
                     ],
                   ),
-                if ((chapter.manga.value!.isLocalArchive ?? false) == false)
+                if (!isEpubNavigationChapter(chapter) &&
+                    (chapter.manga.value!.isLocalArchive ?? false) == false)
                   Text(
                     chapter.dateUpload == null || chapter.dateUpload!.isEmpty
                         ? ""
@@ -178,7 +193,11 @@ class ChapterListTileWidget extends ConsumerWidget {
                       children: [
                         const Text(' • '),
                         Text(
-                          chapter.manga.value!.itemType == ItemType.anime
+                          isEpubNavigationChapter(chapter)
+                              ? formatNovelProgressPercentage(
+                                  double.tryParse(chapter.lastPageRead!) ?? 0,
+                                )
+                              : chapter.manga.value!.itemType == ItemType.anime
                               ? l10n.episode_progress(
                                   Duration(
                                     milliseconds: int.parse(
@@ -190,7 +209,12 @@ class ChapterListTileWidget extends ConsumerWidget {
                                   chapter.manga.value!.itemType ==
                                           ItemType.manga
                                       ? chapter.lastPageRead!
-                                      : "${((double.tryParse(chapter.lastPageRead!) ?? 0) * 100).toStringAsFixed(0)} %",
+                                      : formatNovelProgressPercentage(
+                                          double.tryParse(
+                                                chapter.lastPageRead!,
+                                              ) ??
+                                              0,
+                                        ),
                                 ),
                           style: TextStyle(
                             fontSize: 11,
@@ -235,16 +259,39 @@ class ChapterListTileWidget extends ConsumerWidget {
                   ),
               ],
             ),
-            trailing:
-                // Downloads are hidden on TV (no offline use case there).
-                isTv ||
-                    !sourceExist ||
-                    (chapter.manga.value!.isLocalArchive ?? false)
+            trailing: isEpubShortcut
+                ? Text(
+                    epubCharacterStart?.toString() ?? '...',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : !sourceExist || (chapter.manga.value!.isLocalArchive ?? false)
                 ? null
                 : ChapterPageDownload(chapter: chapter),
           ),
         ),
       ),
+    );
+  }
+
+  String _chapterNumberTitle({
+    required String chapterLabel,
+    required String episodeLabel,
+  }) {
+    final manga = chapter.manga.value;
+    final label = manga?.itemType == ItemType.anime
+        ? episodeLabel
+        : chapterLabel;
+    final capitalized = label.isEmpty
+        ? label
+        : '${label[0].toUpperCase()}${label.substring(1)}';
+    return chapterNumberDisplayTitle(
+      sourceTitle: chapter.name ?? '',
+      mangaTitle: manga?.name ?? '',
+      numberLabel: capitalized,
+      sourceChapterNumber: chapter.chapterNumber,
     );
   }
 
@@ -261,7 +308,21 @@ class ChapterListTileWidget extends ConsumerWidget {
       }
     } else {
       if (context != null) {
-        chapter.pushToReaderView(context, ignoreIsRead: true);
+        final chapterId = chapter.id;
+        if (chapterId != null && isEpubNavigationChapter(chapter)) {
+          final resumesSavedPosition = chapter.lastPageRead?.isNotEmpty == true;
+          context.push(
+            '/novelReaderView',
+            extra: NovelReaderRouteArgs(
+              chapterId: chapterId,
+              initialEpubSpineIndex: resumesSavedPosition
+                  ? null
+                  : epubChapterSpineIndex(chapter),
+            ),
+          );
+        } else {
+          chapter.pushToReaderView(context, ignoreIsRead: true);
+        }
       } else {
         ref.read(chaptersListStateProvider.notifier).update(chapter);
         ref.read(isLongPressedStateProvider.notifier).update(!isLongPressed);
@@ -274,11 +335,14 @@ class ChapterListTileWidget extends ConsumerWidget {
       builder: (context, constraints) {
         // Make sure that (constraints.maxWidth - (35 + 5)) is strictly positive.
         final double availableWidth = constraints.maxWidth - (35 + 5);
-        final textPainter = TextPainter(
-          text: TextSpan(text: text, style: const TextStyle(fontSize: 13)),
-          maxLines: 1,
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: availableWidth > 0 ? availableWidth : 1.0); // - Download icon size (download_page_widget.dart, Widget Build SizedBox width: 35)
+        final textPainter =
+            TextPainter(
+              text: TextSpan(text: text, style: const TextStyle(fontSize: 13)),
+              maxLines: 1,
+              textDirection: TextDirection.ltr,
+            )..layout(
+              maxWidth: availableWidth > 0 ? availableWidth : 1.0,
+            ); // - Download icon size (download_page_widget.dart, Widget Build SizedBox width: 35)
 
         final isOverflowing = textPainter.didExceedMaxLines;
 
@@ -315,9 +379,6 @@ class ChapterListTileWidget extends ConsumerWidget {
     final imageProvider = CustomExtendedNetworkImageProvider(
       toImgUrl(imageUrl ?? ""),
     );
-    // Decode the 50x65 preview at thumbnail resolution; the full-resolution
-    // provider is only handed to the zoom dialog.
-    final thumbnailProvider = coverProvider(toImgUrl(imageUrl ?? ""));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
       child: GestureDetector(
@@ -330,10 +391,7 @@ class ChapterListTileWidget extends ConsumerWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: const BorderRadius.all(Radius.circular(5)),
-              image: DecorationImage(
-                image: thumbnailProvider,
-                fit: BoxFit.cover,
-              ),
+              image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
             ),
           ),
         ),

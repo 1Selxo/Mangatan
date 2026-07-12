@@ -6,6 +6,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/history.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/changed.dart';
@@ -183,6 +184,7 @@ void _removeImport(WidgetRef ref, Manga manga) {
     isar.chapters.deleteSync(chapter.id!);
     provider.addChangedPart(ActionType.removeChapter, chapter.id, "{}", false);
   }
+  isar.epubBookProgress.filter().mangaIdEqualTo(manga.id!).deleteAllSync();
   isar.mangas.deleteSync(manga.id!);
   provider.addChangedPart(ActionType.removeItem, manga.id, "{}", false);
 }

@@ -1,8 +1,10 @@
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/manga/archive_reader/models/models.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
@@ -81,6 +83,9 @@ Future<void> _importArchivesFromPaths(
   if (filePaths.isEmpty) return;
 
   final dateNow = DateTime.now().millisecondsSinceEpoch;
+  // Novel chapters are always persisted now. Keep honoring the legacy flag
+  // in the shared import API so older callers remain source-compatible.
+  final persistEpubChapters = itemType == ItemType.novel || splitChapters;
   final manga =
       mManga ??
       Manga(
@@ -119,7 +124,7 @@ Future<void> _importArchivesFromPaths(
       if (itemType == ItemType.novel) {
         final book = await parseEpubFromPath(
           epubPath: filePath,
-          fullData: splitChapters,
+          fullData: persistEpubChapters,
         );
 
         if (book.cover != null) {
@@ -127,38 +132,31 @@ Future<void> _importArchivesFromPaths(
             manga..customCoverImage = book.cover!.getCoverImage,
           );
         }
-        final chaps = book.chapters;
-
-        if (splitChapters && chaps.isNotEmpty) {
-          for (final epubChapter in chaps) {
-            chapters.add(
-              Chapter(
-                mangaId: mangaId,
-                name: epubChapter.name,
-                archivePath: filePath,
-                url: epubChapter.path,
-                dateUpload: epubChapter.spineIndex.toString(),
-                description: epubChapterMetadata(
-                  spineIndex: epubChapter.spineIndex,
-                  navigationEntry: epubChapter.isNavigationEntry,
-                ),
-                updatedAt: DateTime.now().millisecondsSinceEpoch,
-              )..manga.value = manga,
-            );
-          }
-        } else {
-          // Fallback: single chapter if no spine chapters found
-          chapters.add(
-            Chapter(
+        chapters.addAll(
+          epubShortcutChapters(
+            book: book,
+            manga: manga,
+            mangaId: mangaId,
+            archivePath: filePath,
+          ),
+        );
+        final existingProgress = await isar.epubBookProgress
+            .filter()
+            .mangaIdEqualTo(mangaId)
+            .archivePathEqualTo(filePath)
+            .findFirst();
+        final progress =
+            existingProgress ??
+            EpubBookProgress(
               mangaId: mangaId,
-              name: book.name,
               archivePath: filePath,
-              dateUpload: splitChapters ? '' : '0',
-              description: splitChapters ? null : epubUnsplitChapterMetadata(),
-              updatedAt: DateTime.now().millisecondsSinceEpoch,
-            )..manga.value = manga,
-          );
-        }
+              title: book.name,
+              author: book.author,
+            );
+        progress
+          ..title = book.name
+          ..author = book.author;
+        await isar.epubBookProgress.put(progress);
       } else {
         chapters.add(
           Chapter(

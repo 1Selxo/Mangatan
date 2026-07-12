@@ -9,6 +9,7 @@ import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:mangayomi/modules/widgets/gridview_widget.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 
 class LibraryGridViewWidget extends StatefulWidget {
   final bool isCoverOnlyGrid;
@@ -102,7 +103,7 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
                                       Padding(
                                         padding: const EdgeInsets.only(left: 3),
                                         child: Text(
-                                          entry.chapters
+                                          userFacingChapters(entry)
                                               .where((e) => !e.isRead!)
                                               .length
                                               .toString(),

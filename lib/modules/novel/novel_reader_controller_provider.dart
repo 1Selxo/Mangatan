@@ -1,8 +1,11 @@
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/chapter_reader_settings_mixin.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/chapter_controller_mixin.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'novel_reader_controller_provider.g.dart';
 
@@ -23,19 +26,90 @@ class NovelReaderController extends _$NovelReaderController
   // Scroll-position tracking
   // ---------------------------------------------------------------------------
 
-  void setChapterOffset(double newOffset, double maxOffset) {
+  void setChapterOffset(
+    double newOffset,
+    double maxOffset, {
+    int? epubChapterIndex,
+    double? epubChapterProgress,
+    int? epubCharacterCount,
+  }) {
     if (incognitoMode) return;
-    final isRead = (newOffset / (maxOffset != 0 ? maxOffset : 1)) >= 0.9;
-    // A reader process can be closed without dispose running (crash, OS
-    // shutdown, force-close). Persist the debounced position even before the
-    // 90% "read" threshold so a local EPUB resumes where the reader left it.
+    final progress = maxOffset != 0 ? newOffset / maxOffset : 0.0;
+    final now = DateTime.now().millisecondsSinceEpoch;
     final ch = chapter;
+    if (isEpubNavigationChapter(ch) && ch.archivePath?.isNotEmpty == true) {
+      final bookmark = epubBookmark();
+      if (bookmark == null) return;
+      final nextChapterIndex = epubChapterIndex ?? bookmark.chapterIndex;
+      final nextProgress = (epubChapterProgress ?? bookmark.progress)
+          .clamp(0.0, 1.0)
+          .toDouble();
+      final nextCharacterCount = epubCharacterCount ?? bookmark.characterCount;
+      if (nextChapterIndex == bookmark.chapterIndex &&
+          nextCharacterCount == bookmark.characterCount &&
+          (nextProgress - bookmark.progress).abs() <= 0.0001) {
+        return;
+      }
+      bookmark
+        ..chapterIndex = nextChapterIndex
+        ..progress = nextProgress
+        ..characterCount = nextCharacterCount
+        ..lastModified = now;
+      isar.writeTxnSync(() => isar.epubBookProgress.putSync(bookmark));
+      return;
+    }
+
     isar.writeTxnSync(() {
-      ch.isRead = isRead;
-      ch.lastPageRead = (maxOffset != 0 ? newOffset / maxOffset : 0)
-          .toString();
-      ch.updatedAt = DateTime.now().millisecondsSinceEpoch;
+      if (ch.isRead ?? false) return;
+      ch
+        ..isRead = progress >= 0.9
+        ..lastPageRead = progress.clamp(0.0, 1.0).toString()
+        ..updatedAt = now;
       isar.chapters.putSync(ch);
     });
+  }
+
+  EpubBookProgress? epubBookmark() {
+    final mangaId = chapter.mangaId;
+    final archivePath = chapter.archivePath;
+    if (mangaId == null || archivePath == null || archivePath.isEmpty) {
+      return null;
+    }
+    return isar.epubBookProgress
+        .filter()
+        .mangaIdEqualTo(mangaId)
+        .archivePathEqualTo(archivePath)
+        .findFirstSync();
+  }
+
+  void updateEpubShortcutPosition({
+    required int spineIndex,
+    required double overallProgress,
+  }) {
+    if (incognitoMode) return;
+    final mangaId = chapter.mangaId;
+    final archivePath = chapter.archivePath;
+    if (mangaId == null || archivePath == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final rows = isar.chapters
+        .filter()
+        .idIsNotNull()
+        .mangaIdEqualTo(mangaId)
+        .findAllSync()
+        .where(
+          (row) =>
+              row.archivePath == archivePath && isEpubNavigationChapter(row),
+        )
+        .toList(growable: false);
+    final changed = applyEpubShortcutPositionProjection(
+      chapters: rows,
+      spineIndex: spineIndex,
+      overallProgress: overallProgress,
+    );
+    if (changed.isEmpty) return;
+    for (final shortcut in changed) {
+      shortcut.updatedAt = now;
+    }
+    isar.writeTxnSync(() => isar.chapters.putAllSync(changed));
   }
 }

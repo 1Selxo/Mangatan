@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:isar_community/isar.dart'; // Isar database package for local storage
 import 'package:mangayomi/main.dart'; // Exposes the global `isar` instance
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
@@ -289,6 +290,7 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   }
 
   final chaptersToSave = <Chapter>[];
+  final epubProgressToSave = <EpubBookProgress>[];
   int saveManga = 0; // Just to update the lastUpdate value of not new Mangas
   final mangaByName = {for (var m in processedMangas) p.basename(m.link!): m};
 
@@ -304,26 +306,38 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       if (manga.itemType == ItemType.novel) {
         final book = await parseEpubFromPath(
           epubPath: chapterPath,
-          fullData: false,
+          fullData: true,
         );
 
         if (book.cover != null) {
           manga.customCoverImage = book.cover!.getCoverImage;
           saveManga++;
         }
-        // Local novel imports use the legacy single-entry model. The reader
-        // parses the EPUB spine internally, so persisting every XHTML item as
-        // a library chapter only creates duplicate/garbled chapter lists.
-        chaptersToSave.add(
-          Chapter(
-            mangaId: manga.id,
-            name: book.name,
+        chaptersToSave.addAll(
+          epubShortcutChapters(
+            book: book,
+            manga: manga,
+            mangaId: manga.id!,
             archivePath: chapterPath,
-            dateUpload: '0',
-            description: epubUnsplitChapterMetadata(),
-            downloadSize: null,
-          )..manga.value = manga,
+          ),
         );
+        final existingProgress = await isar.epubBookProgress
+            .filter()
+            .mangaIdEqualTo(manga.id!)
+            .archivePathEqualTo(chapterPath)
+            .findFirst();
+        final progress =
+            existingProgress ??
+            EpubBookProgress(
+              mangaId: manga.id!,
+              archivePath: chapterPath,
+              title: book.name,
+              author: book.author,
+            );
+        progress
+          ..title = book.name
+          ..author = book.author;
+        epubProgressToSave.add(progress);
       } else {
         final chapterFile = File(chapterPath);
         final chap = Chapter(
@@ -361,6 +375,9 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       await isar.writeTxn(() async {
         // insert chapters
         await isar.chapters.putAll(chaptersToSave);
+        if (epubProgressToSave.isNotEmpty) {
+          await isar.epubBookProgress.putAll(epubProgressToSave);
+        }
 
         // for each one, set its link and save it
         for (final chap in chaptersToSave) {

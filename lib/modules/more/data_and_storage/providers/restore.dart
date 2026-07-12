@@ -10,6 +10,7 @@ import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/custom_button.dart';
 import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -19,6 +20,7 @@ import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 import 'package:mangayomi/services/sync/mihon_backup_source_resolver.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
@@ -384,12 +386,50 @@ void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
   final content = decoded.protobufBytes;
   final backup = decoded.backup;
   final localSources = isar.sources.filter().idIsNotNull().findAllSync();
+  final localArchiveMangas = isar.mangas
+      .filter()
+      .isLocalArchiveEqualTo(true)
+      .findAllSync();
+  final localArchiveIds = localArchiveMangas
+      .map((manga) => manga.id)
+      .whereType<int>()
+      .toSet();
+  final localArchiveChapters = isar.chapters
+      .filter()
+      .anyOf(localArchiveIds, (query, id) => query.mangaIdEqualTo(id))
+      .findAllSync();
+  final localArchiveHistories = isar.historys
+      .filter()
+      .anyOf(localArchiveIds, (query, id) => query.mangaIdEqualTo(id))
+      .findAllSync();
+  final localNovelProgress = isar.epubBookProgress.where().findAllSync();
+  final restoredNovelProgress = const ChimahonNovelProgressAdapter()
+      .mergeIntoLocal(local: localNovelProgress, remote: backup.backupNovels);
   List<Category> cats = [];
   isar.writeTxnSync(() {
     isar.categorys.clearSync();
     isar.mangas.clearSync();
     isar.chapters.clearSync();
     isar.historys.clearSync();
+    for (final manga in localArchiveMangas) {
+      manga.categories = [];
+      isar.mangas.putSync(manga);
+    }
+    for (final chapter in localArchiveChapters) {
+      final manga = isar.mangas.getSync(chapter.mangaId!);
+      if (manga == null) continue;
+      isar.chapters.putSync(chapter..manga.value = manga);
+      chapter.manga.saveSync();
+    }
+    for (final history in localArchiveHistories) {
+      final chapter = isar.chapters.getSync(history.chapterId!);
+      if (chapter == null) continue;
+      isar.historys.putSync(history..chapter.value = chapter);
+      history.chapter.saveSync();
+    }
+    if (restoredNovelProgress.isNotEmpty) {
+      isar.epubBookProgress.putAllSync(restoredNovelProgress);
+    }
     for (var category in backup.backupCategories) {
       final cat = Category(
         name: category.name,

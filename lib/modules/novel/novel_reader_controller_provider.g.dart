@@ -59,7 +59,7 @@ final class NovelReaderControllerProvider
 }
 
 String _$novelReaderControllerHash() =>
-    r'df6692739a7cad3abb2a4a559d8d754ecae2fd2c';
+    r'fc684d6ef04e83928638f94390130d429bd4f5be';
 
 final class NovelReaderControllerFamily extends $Family
     with

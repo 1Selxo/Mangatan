@@ -6,6 +6,7 @@ import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/widgets/listview_widget.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 
 class LibraryListViewWidget extends StatelessWidget {
   final List<Manga> entriesManga;
@@ -121,7 +122,7 @@ class LibraryListViewWidget extends StatelessWidget {
                                         right: 3,
                                       ),
                                       child: Text(
-                                        entry.chapters
+                                        userFacingChapters(entry)
                                             .where((e) => !e.isRead!)
                                             .length
                                             .toString(),

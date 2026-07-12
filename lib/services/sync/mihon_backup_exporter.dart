@@ -3,6 +3,7 @@ import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/history.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
@@ -12,6 +13,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMa
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 
 /// Pure mapper from Mangatan's persisted entities to the common Mihon backup
 /// envelope. Database access and scheduling deliberately remain outside it.
@@ -24,6 +26,7 @@ class MihonBackupExporter {
     required Iterable<Chapter> chapters,
     required Iterable<History> histories,
     required Iterable<Source> sources,
+    required Iterable<EpubBookProgress> epubBookProgress,
     Iterable<BackupPreference> appPreferences = const [],
   }) {
     final mangaCategories = categories
@@ -136,6 +139,9 @@ class MihonBackupExporter {
       ],
       backupSources: usedSources.values,
       backupPreferences: appPreferences,
+      backupNovels: const ChimahonNovelProgressAdapter().exportAll(
+        epubBookProgress,
+      ),
     );
   }
 

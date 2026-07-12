@@ -1089,6 +1089,7 @@ String buildTtsuEpubDocument({
     chapterHref: chapterHref,
     resourceUrlFor: resourceUrlFor,
   );
+  _markFullPageMediaCandidates(document);
 
   final content = document.body?.innerHtml ?? html;
   final links = _preservedStylesheetLinks(
@@ -1249,6 +1250,52 @@ String buildTtsuEpubDocument({
     html[data-mangatan-reader-layout="vertical-pages"] #reader-content p {
       break-inside: avoid;
       -webkit-column-break-inside: avoid;
+    }
+    html[data-mangatan-reader-layout="horizontal-pages"] .mangatan-full-page-media,
+    html[data-mangatan-reader-layout="vertical-pages"] .mangatan-full-page-media {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
+      width: calc(100vw - ${padding * 2}vh) !important;
+      height: calc(100vh - ${padding * 2}vh) !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      break-before: column !important;
+      break-after: column !important;
+      break-inside: avoid !important;
+      -webkit-column-break-before: always !important;
+      -webkit-column-break-after: always !important;
+      -webkit-column-break-inside: avoid !important;
+    }
+    html[data-mangatan-reader-layout="horizontal-pages"] .mangatan-full-page-media img,
+    html[data-mangatan-reader-layout="horizontal-pages"] .mangatan-full-page-media svg,
+    html[data-mangatan-reader-layout="vertical-pages"] .mangatan-full-page-media img,
+    html[data-mangatan-reader-layout="vertical-pages"] .mangatan-full-page-media svg {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      margin: auto !important;
+      padding: 0 !important;
+      object-fit: contain !important;
+    }
+    html[data-mangatan-reader-layout="horizontal-pages"] .mangatan-full-page-media-wrapper,
+    html[data-mangatan-reader-layout="vertical-pages"] .mangatan-full-page-media-wrapper {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: none !important;
+      max-height: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      float: none !important;
+      transform: none !important;
     }
     html[data-mangatan-reader-layout="vertical-pages"] #reader-content {
       writing-mode: vertical-rl !important;
@@ -2293,6 +2340,39 @@ String buildTtsuEpubDocument({
         });
       });
 
+      const classifyFullPageMedia = () => {
+        if (!pageMode) return;
+        for (const candidate of content.querySelectorAll(
+          '[data-mangatan-full-page-candidate]',
+        )) {
+          const media = candidate.matches('img, svg')
+            ? candidate
+            : candidate.querySelector('img, svg');
+          if (!media) continue;
+          let width = 0;
+          let height = 0;
+          if (media.tagName.toLowerCase() === 'img') {
+            width = media.naturalWidth;
+            height = media.naturalHeight;
+          } else {
+            const viewBox = media.viewBox?.baseVal;
+            width = viewBox?.width || media.width?.baseVal?.value || 0;
+            height = viewBox?.height || media.height?.baseVal?.value || 0;
+          }
+          const rendered = media.getBoundingClientRect();
+          width ||= rendered.width;
+          height ||= rendered.height;
+          if (width >= 300 || height >= 300) {
+            candidate.classList.add('mangatan-full-page-media');
+            let wrapper = media.parentElement;
+            while (wrapper && wrapper !== candidate) {
+              wrapper.classList.add('mangatan-full-page-media-wrapper');
+              wrapper = wrapper.parentElement;
+            }
+          }
+        }
+      };
+
       if (pageMode && !verticalWriting) {
         const spacer = document.createElement('div');
         spacer.setAttribute('aria-hidden', 'true');
@@ -2306,6 +2386,7 @@ String buildTtsuEpubDocument({
       for (const image of document.images) image.addEventListener('error', () => image.classList.add('mangatan-hidden-style'), { once: true });
       const imagesReady = Promise.all(Array.from(document.images).map((image) => image.complete ? Promise.resolve() : new Promise((resolve) => { image.addEventListener('load', resolve, { once: true }); image.addEventListener('error', resolve, { once: true }); })));
       imagesReady
+        .then(() => classifyFullPageMedia())
         .then(() => new Promise((resolve) => setTimeout(resolve, 50)))
         .then(() => document.fonts?.ready)
         .then(() => {
@@ -2321,6 +2402,160 @@ String buildTtsuEpubDocument({
   </script>
 </body>
 </html>''';
+}
+
+/// Marks structurally standalone media for size classification in the reader.
+///
+/// EPUBs commonly wrap full-page illustrations in several empty `div`, `p`,
+/// or `span` elements. Promote the outermost media-only wrapper so its margins
+/// cannot leave text in the same column. Text-bearing wrappers, headings,
+/// gaiji, and explicitly small media stay in the normal text flow.
+void _markFullPageMediaCandidates(dom.Document document) {
+  final body = document.body;
+  if (body == null) return;
+
+  final media = <dom.Element>[
+    ...body.querySelectorAll('img'),
+    ...body
+        .querySelectorAll('svg')
+        .where((element) => element.querySelector('image') != null),
+  ];
+  for (final element in media) {
+    if (_hasInlineMediaSignal(element) || _hasSmallAuthoredDimension(element)) {
+      continue;
+    }
+
+    dom.Element candidate = element;
+    dom.Element? parent = element.parent;
+    var hasInlineContext = false;
+    while (parent != null && parent != body && !_isReaderSection(parent)) {
+      if (_isHeading(parent) || _hasInlineMediaSignal(parent)) {
+        hasInlineContext = true;
+        break;
+      }
+      if (_containsOnlyMediaBranch(parent, candidate)) {
+        candidate = parent;
+        parent = parent.parent;
+        continue;
+      }
+      if (_hasMeaningfulTextOutside(parent, candidate) ||
+          _hasOtherMediaOutside(parent, candidate)) {
+        hasInlineContext = true;
+      }
+      break;
+    }
+    if (parent != null &&
+        _inlineMediaContextElements.contains(candidate.localName) &&
+        _hasInlineSiblingContent(parent, candidate)) {
+      hasInlineContext = true;
+    }
+    if (!hasInlineContext) {
+      candidate.attributes['data-mangatan-full-page-candidate'] = 'true';
+    }
+  }
+}
+
+bool _isReaderSection(dom.Element element) =>
+    (element.localName == 'section' &&
+        element.attributes.containsKey('data-mangatan-spine-index')) ||
+    element.classes.contains('mangatan-logical-section');
+
+bool _isHeading(dom.Element element) =>
+    const {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}.contains(element.localName);
+
+bool _hasInlineMediaSignal(dom.Element element) {
+  final classNames = element.classes.join(' ').toLowerCase();
+  if (RegExp(
+    r'(^|[\s_-])(gaiji(?:-line)?|inline(?:-img|-image)?|emoji|illus(?:tration)?|float[-_]?img|decorat(?:ive|ion)?)([\s_-]|$)',
+  ).hasMatch(classNames)) {
+    return true;
+  }
+  return element.attributes.entries.any((attribute) {
+    final name = attribute.key.toString().toLowerCase();
+    return name.endsWith('type') &&
+        attribute.value.toLowerCase().contains('illustration');
+  });
+}
+
+bool _hasSmallAuthoredDimension(dom.Element element) =>
+    const ['width', 'height'].any((name) {
+      final value = element.attributes[name];
+      if (value == null) return false;
+      final match = RegExp(
+        r'^\s*(\d+(?:\.\d+)?)\s*(?:px)?\s*$',
+      ).firstMatch(value);
+      final dimension = double.tryParse(match?.group(1) ?? '');
+      return dimension != null && dimension < 300;
+    });
+
+bool _containsOnlyMediaBranch(dom.Element container, dom.Element branch) {
+  if (_hasMeaningfulTextOutside(container, branch)) return false;
+  final otherMedia = <dom.Element>[
+    ...container.querySelectorAll('img'),
+    ...container
+        .querySelectorAll('svg')
+        .where((element) => element.querySelector('image') != null),
+  ];
+  return otherMedia.every(
+    (element) => identical(element, branch) || branch.contains(element),
+  );
+}
+
+bool _hasOtherMediaOutside(dom.Element container, dom.Element branch) {
+  final media = <dom.Element>[
+    ...container.querySelectorAll('img'),
+    ...container
+        .querySelectorAll('svg')
+        .where((element) => element.querySelector('image') != null),
+  ];
+  return media.any(
+    (element) => !identical(element, branch) && !branch.contains(element),
+  );
+}
+
+const _inlineMediaContextElements = {
+  'a',
+  'b',
+  'bdi',
+  'bdo',
+  'cite',
+  'code',
+  'data',
+  'em',
+  'i',
+  'img',
+  'label',
+  'mark',
+  'q',
+  'ruby',
+  's',
+  'small',
+  'span',
+  'strong',
+  'sub',
+  'sup',
+  'svg',
+  'time',
+  'u',
+  'var',
+};
+
+bool _hasInlineSiblingContent(dom.Element container, dom.Element branch) {
+  return container.nodes.any((node) {
+    if (identical(node, branch)) return false;
+    if (node is dom.Text) return node.data.trim().isNotEmpty;
+    return node is dom.Element &&
+        _inlineMediaContextElements.contains(node.localName) &&
+        node.text.trim().isNotEmpty;
+  });
+}
+
+bool _hasMeaningfulTextOutside(dom.Node node, dom.Element excludedBranch) {
+  if (identical(node, excludedBranch)) return false;
+  if (node is dom.Text) return node.data.trim().isNotEmpty;
+  return node.nodes.any(
+    (child) => _hasMeaningfulTextOutside(child, excludedBranch),
+  );
 }
 
 void _sanitizeEpubDocument(dom.Document document) {

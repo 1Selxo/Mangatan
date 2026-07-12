@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
@@ -377,6 +378,74 @@ void main() {
       document,
       contains('background: rgba(160, 160, 160, .4) !important'),
     );
+    expect(document, contains('const classifyFullPageMedia = () =>'));
+    expect(document, contains('if (!pageMode) return'));
+    expect(document, contains("width >= 300 || height >= 300"));
+    expect(document, contains('break-before: column !important'));
+    expect(document, contains('break-after: column !important'));
+    expect(
+      document,
+      contains("candidate.classList.add('mangatan-full-page-media')"),
+    );
+    expect(
+      document,
+      contains("wrapper.classList.add('mangatan-full-page-media-wrapper')"),
+    );
+    expect(
+      document.indexOf('.then(() => classifyFullPageMedia())'),
+      lessThan(document.indexOf('measuredPageMax = measureLastContentPage()')),
+    );
+  });
+
+  test('marks standalone media wrappers without promoting inline images', () {
+    final document = buildTtsuEpubDocument(
+      html: '''
+        <section data-mangatan-spine-index="0">
+          <p id="standalone"><span class="img"><img src="data:image/png;base64,AA=="></span></p>
+          <p id="inline">before <img src="data:image/png;base64,AA=="> after</p>
+          before <img id="direct-inline" src="data:image/png;base64,AA=="> after
+          <p id="small"><img width="96" src="data:image/png;base64,AA=="></p>
+          <p id="gaiji"><img class="gaiji-line" src="data:image/png;base64,AA=="></p>
+          <div id="illustration" class="illustration"><img src="data:image/png;base64,AA=="></div>
+          <h1 id="heading"><img src="data:image/png;base64,AA=="></h1>
+          <div id="fixed"><svg viewBox="0 0 1434 2048"><image href="data:image/png;base64,AA=="></image></svg></div>
+          <p id="page-one"><img src="data:image/png;base64,AA=="></p>
+          <p id="page-two"><img src="data:image/png;base64,AA=="></p>
+          <div id="consecutive"><img id="first" src="data:image/png;base64,AA=="><img id="second" src="data:image/png;base64,AA=="></div>
+        </section>
+      ''',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      layout: EpubReadingLayout.horizontalPaged,
+    );
+
+    final reader = html_parser
+        .parse(document)
+        .querySelector('#reader-content')!;
+    final candidates = reader
+        .querySelectorAll('[data-mangatan-full-page-candidate]')
+        .map((element) => element.id)
+        .toSet();
+    expect(
+      candidates,
+      containsAll(<String>{'standalone', 'fixed', 'page-one', 'page-two'}),
+    );
+    expect(candidates, isNot(contains('inline')));
+    expect(candidates, isNot(contains('direct-inline')));
+    expect(candidates, isNot(contains('small')));
+    expect(candidates, isNot(contains('gaiji')));
+    expect(candidates, isNot(contains('illustration')));
+    expect(candidates, isNot(contains('heading')));
+    expect(candidates, isNot(contains('first')));
+    expect(candidates, isNot(contains('second')));
   });
 
   test(

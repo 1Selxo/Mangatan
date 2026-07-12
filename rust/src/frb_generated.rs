@@ -1144,6 +1144,7 @@ impl SseDecode for crate::api::epub::EpubChapter {
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_href = <String>::sse_decode(deserializer);
         let mut var_spineIndex = <u32>::sse_decode(deserializer);
+        let mut var_isLinear = <bool>::sse_decode(deserializer);
         let mut var_isNavigationEntry = <bool>::sse_decode(deserializer);
         return crate::api::epub::EpubChapter {
             name: var_name,
@@ -1151,6 +1152,7 @@ impl SseDecode for crate::api::epub::EpubChapter {
             path: var_path,
             href: var_href,
             spine_index: var_spineIndex,
+            is_linear: var_isLinear,
             is_navigation_entry: var_isNavigationEntry,
         };
     }
@@ -2280,6 +2282,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::epub::EpubChapter {
             self.path.into_into_dart().into_dart(),
             self.href.into_into_dart().into_dart(),
             self.spine_index.into_into_dart().into_dart(),
+            self.is_linear.into_into_dart().into_dart(),
             self.is_navigation_entry.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -3060,6 +3063,7 @@ impl SseEncode for crate::api::epub::EpubChapter {
         <String>::sse_encode(self.path, serializer);
         <String>::sse_encode(self.href, serializer);
         <u32>::sse_encode(self.spine_index, serializer);
+        <bool>::sse_encode(self.is_linear, serializer);
         <bool>::sse_encode(self.is_navigation_entry, serializer);
     }
 }

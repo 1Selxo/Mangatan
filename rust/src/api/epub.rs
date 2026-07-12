@@ -18,6 +18,9 @@ pub struct EpubChapter {
     pub href: String,
     /// Stable position in the original OPF spine.
     pub spine_index: u32,
+    /// Whether this item participates in the book's linear reading order.
+    /// Chimahon numbers bookmark chapters over this filtered sequence.
+    pub is_linear: bool,
     /// Whether this spine item should appear in the user-facing chapter list.
     /// Non-navigation fragments are still kept for seamless reader paging.
     pub is_navigation_entry: bool,
@@ -45,6 +48,13 @@ pub struct EpubNovel {
 struct NavigationEntry {
     label: String,
     href: String,
+    /// Front/back-matter landmarks can also be present in the table of
+    /// contents, but they are reader destinations rather than book chapters.
+    is_structural: bool,
+    /// Some generated books add a reset counter (usually "001") after every
+    /// named chapter title. It is a body marker within that chapter, not a
+    /// second user-facing chapter or a new logical boundary.
+    is_subsection_marker: bool,
 }
 
 pub fn parse_epub_from_path(epub_path: String, full_data: bool) -> Result<EpubNovel, String> {
@@ -96,33 +106,63 @@ fn parse_epub_with_doc<R: Read + Seek>(
         // Extract chapters from spine with real names from TOC
         let spine = doc.spine.clone();
         let navigation = collect_navigation_entries(doc);
+        let has_logical_chapters = navigation
+            .iter()
+            .any(|entry| !entry.is_structural && !entry.is_subsection_marker);
         let mut current_section_name: Option<String> = None;
         let mut has_renderable_spine_item = false;
         let chapters: Vec<EpubChapter> = spine
             .iter()
             .enumerate()
             .filter_map(|(source_spine_index, item)| {
-                let resource_path = doc.resources.get(&item.idref)?.path.clone();
-                let content = doc
+                let resource_path = doc
+                    .resources
+                    .get(&item.idref)
+                    .map(|resource| resource.path.clone());
+                if resource_path.is_none() && !item.linear {
+                    return None;
+                }
+                let href = resource_path
+                    .as_ref()
+                    .map(|path| normalize_epub_path(&path.to_string_lossy()))
+                    .unwrap_or_else(|| normalize_epub_path(&item.idref));
+                let bytes = doc
                     .get_resource(&item.idref)
-                    .map(|(bytes, _)| decode_text_resource(&bytes))
+                    .map(|(bytes, _)| bytes)
                     .unwrap_or_default();
+                let image_only = is_epub_image_path(&href);
+                let content = if image_only {
+                    let file_name = Path::new(&href)
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or(&href);
+                    format!(
+                        "<html><body><img src=\"./{}\"></body></html>",
+                        escape_html_attribute(file_name)
+                    )
+                } else {
+                    decode_text_resource(&bytes)
+                };
 
-                // `linear="no"` is only a reading-order hint. Real-world
-                // Japanese EPUBs use it for valid cover/title pages which
-                // must remain addressable by the reader. Drop only resources
-                // that cannot render any text or image content.
-                if !epub_content_is_renderable(&content) {
+                // Preserve every linear item even when its XHTML body is
+                // empty. Chimahon numbers bookmarks over the full filtered
+                // OPF spine, so dropping a zero-character item would shift
+                // every following chapter index. Non-linear empty resources
+                // have neither reader content nor bookmark significance.
+                if !epub_content_is_renderable(&content) && !item.linear {
                     return None;
                 }
 
-                let href = normalize_epub_path(&resource_path.to_string_lossy());
-                let toc_name = find_chapter_name_from_navigation(&navigation, &href);
+                let toc_entry = find_chapter_from_navigation(&navigation, &href);
                 let is_first_spine_item = !has_renderable_spine_item;
-                let is_navigation_entry = toc_name.is_some() || is_first_spine_item;
+                let is_navigation_entry = toc_entry
+                    .is_some_and(|entry| !entry.is_structural && !entry.is_subsection_marker)
+                    || (is_first_spine_item && !has_logical_chapters);
 
-                if let Some(toc_name) = toc_name {
-                    current_section_name = Some(toc_name);
+                if let Some(toc_entry) = toc_entry {
+                    if !toc_entry.is_subsection_marker {
+                        current_section_name = Some(toc_entry.label.clone());
+                    }
                 } else if is_first_spine_item {
                     // A surprising number of EPUB2 files have a stale NCX
                     // cover target which is not in the OPF spine. Keep a
@@ -139,6 +179,7 @@ fn parse_epub_with_doc<R: Read + Seek>(
                     path: item.idref.clone(),
                     href,
                     spine_index: source_spine_index as u32,
+                    is_linear: item.linear,
                     is_navigation_entry,
                 })
             })
@@ -249,6 +290,8 @@ fn collect_navigation_entries<R: Read + Seek>(doc: &mut EpubDoc<R>) -> Vec<Navig
     let mut entries = Vec::new();
     flatten_nav_points(&doc.toc, &mut entries);
     if !entries.is_empty() {
+        mark_structural_navigation_entries(doc, &mut entries);
+        mark_repeated_numeric_subsection_markers(&mut entries);
         return entries;
     }
 
@@ -262,6 +305,7 @@ fn collect_navigation_entries<R: Read + Seek>(doc: &mut EpubDoc<R>) -> Vec<Navig
         }
     }
     if !entries.is_empty() {
+        mark_repeated_numeric_subsection_markers(&mut entries);
         return entries;
     }
 
@@ -278,6 +322,7 @@ fn collect_navigation_entries<R: Read + Seek>(doc: &mut EpubDoc<R>) -> Vec<Navig
             entries = parse_ncx_navigation(&decode_text_resource(&bytes), &ncx_path);
         }
     }
+    mark_repeated_numeric_subsection_markers(&mut entries);
     entries
 }
 
@@ -286,6 +331,8 @@ fn flatten_nav_points(points: &[epub::doc::NavPoint], output: &mut Vec<Navigatio
         output.push(NavigationEntry {
             label: point.label.clone(),
             href: normalize_epub_path(&point.content.to_string_lossy()),
+            is_structural: false,
+            is_subsection_marker: false,
         });
         flatten_nav_points(&point.children, output);
     }
@@ -316,6 +363,8 @@ fn parse_ncx_navigation(markup: &str, ncx_path: &str) -> Vec<NavigationEntry> {
             entries.push(NavigationEntry {
                 label,
                 href: resolve_epub_reference(ncx_path, &href),
+                is_structural: false,
+                is_subsection_marker: false,
             });
         }
         // Advance past only this opening token so nested navPoints are also
@@ -347,7 +396,14 @@ fn parse_epub3_navigation(markup: &str, nav_path: &str) -> Vec<NavigationEntry> 
             .find("</nav>")
             .map(|relative| open_end + relative)
             .unwrap_or(markup.len());
-        return parse_navigation_links(&markup[open_end..close], nav_path);
+        let mut entries = parse_navigation_links(&markup[open_end..close], nav_path);
+        let structural_targets = parse_epub3_structural_landmarks(markup, nav_path);
+        for entry in &mut entries {
+            entry.is_structural = structural_targets
+                .iter()
+                .any(|target| epub_paths_match(target, &entry.href));
+        }
+        return entries;
     }
     Vec::new()
 }
@@ -372,6 +428,8 @@ fn parse_navigation_links(markup: &str, base_path: &str) -> Vec<NavigationEntry>
             entries.push(NavigationEntry {
                 label,
                 href: resolve_epub_reference(base_path, &href),
+                is_structural: false,
+                is_subsection_marker: false,
             });
         }
         cursor = close + "</a>".len();
@@ -379,14 +437,149 @@ fn parse_navigation_links(markup: &str, base_path: &str) -> Vec<NavigationEntry>
     entries
 }
 
-fn find_chapter_name_from_navigation(
-    navigation: &[NavigationEntry],
+fn find_chapter_from_navigation<'a>(
+    navigation: &'a [NavigationEntry],
     resource_path: &str,
-) -> Option<String> {
+) -> Option<&'a NavigationEntry> {
     navigation
         .iter()
         .find(|entry| epub_paths_match(&entry.href, resource_path))
-        .map(|entry| entry.label.clone())
+}
+
+fn mark_structural_navigation_entries<R: Read + Seek>(
+    doc: &mut EpubDoc<R>,
+    entries: &mut [NavigationEntry],
+) {
+    let Some(nav_id) = doc.get_nav_id() else {
+        return;
+    };
+    let Some(nav_path) = doc
+        .resources
+        .get(&nav_id)
+        .map(|resource| resource.path.to_string_lossy().into_owned())
+    else {
+        return;
+    };
+    let Some((bytes, _)) = doc.get_resource(&nav_id) else {
+        return;
+    };
+    let targets = parse_epub3_structural_landmarks(&decode_text_resource(&bytes), &nav_path);
+    for entry in entries {
+        entry.is_structural = targets
+            .iter()
+            .any(|target| epub_paths_match(target, &entry.href));
+    }
+}
+
+/// Demotes repeated bare counters which reset below distinct named headings.
+///
+/// Calibre and similar converters sometimes flatten a two-level source TOC
+/// into `Chapter title, 001, Chapter title, 001, ...`. The numeric entry points
+/// at the first body document while the preceding named entry points at the
+/// title/illustration document. Keeping both creates duplicate chapter rows.
+/// A number is demoted only when the same normalized value appears at least
+/// three times and every occurrence directly follows a meaningful,
+/// non-numeric entry. Ordinary sequential numeric chapter lists (`001`, `002`,
+/// `003`) remain untouched.
+fn mark_repeated_numeric_subsection_markers(entries: &mut [NavigationEntry]) {
+    use std::collections::HashMap;
+
+    let mut occurrences = HashMap::<u64, Vec<usize>>::new();
+    for (index, entry) in entries.iter().enumerate() {
+        if let Some(value) = bare_numeric_label(&entry.label) {
+            occurrences.entry(value).or_default().push(index);
+        }
+    }
+
+    for indices in occurrences.values() {
+        if indices.len() < 3 {
+            continue;
+        }
+        let follows_named_entries = indices.iter().all(|&index| {
+            if index == 0 {
+                return false;
+            }
+            let previous = &entries[index - 1];
+            !previous.is_structural && bare_numeric_label(&previous.label).is_none()
+        });
+        if follows_named_entries {
+            for &index in indices {
+                entries[index].is_subsection_marker = true;
+            }
+        }
+    }
+}
+
+fn bare_numeric_label(label: &str) -> Option<u64> {
+    let mut value = 0_u64;
+    let mut saw_digit = false;
+    for character in label.trim().chars() {
+        let digit = match character {
+            '0'..='9' => character as u32 - '0' as u32,
+            '０'..='９' => character as u32 - '０' as u32,
+            character if character.is_whitespace() => continue,
+            _ => return None,
+        };
+        saw_digit = true;
+        value = value.checked_mul(10)?.checked_add(digit as u64)?;
+    }
+    saw_digit.then_some(value)
+}
+
+/// Returns cover/contents/colophon destinations from EPUB 3 landmarks.
+/// `bodymatter` is deliberately not structural: it commonly points at the
+/// first real chapter and must remain visible in the chapter list.
+fn parse_epub3_structural_landmarks(markup: &str, nav_path: &str) -> Vec<String> {
+    let lower = markup.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find("<nav") {
+        let start = cursor + relative_start;
+        let Some(open_end_relative) = lower[start..].find('>') else {
+            break;
+        };
+        let open_end = start + open_end_relative + 1;
+        let tag = &markup[start..open_end];
+        let is_landmarks = attribute_value(tag, "epub:type")
+            .or_else(|| attribute_value(tag, "type"))
+            .is_some_and(|value| value.split_whitespace().any(|part| part == "landmarks"));
+        if !is_landmarks {
+            cursor = open_end;
+            continue;
+        }
+        let close = lower[open_end..]
+            .find("</nav>")
+            .map(|relative| open_end + relative)
+            .unwrap_or(markup.len());
+        let section = &markup[open_end..close];
+        let section_lower = section.to_ascii_lowercase();
+        let mut targets = Vec::new();
+        let mut link_cursor = 0;
+        while let Some(relative_link_start) = section_lower[link_cursor..].find("<a") {
+            let link_start = link_cursor + relative_link_start;
+            let Some(link_end_relative) = section_lower[link_start..].find('>') else {
+                break;
+            };
+            let link_end = link_start + link_end_relative + 1;
+            let link = &section[link_start..link_end];
+            let types = attribute_value(link, "epub:type")
+                .or_else(|| attribute_value(link, "type"))
+                .unwrap_or_default();
+            let is_structural = types.split_whitespace().any(|value| {
+                matches!(
+                    value,
+                    "cover" | "toc" | "titlepage" | "copyright-page" | "colophon"
+                )
+            });
+            if is_structural {
+                if let Some(href) = attribute_value(link, "href") {
+                    targets.push(resolve_epub_reference(nav_path, &href));
+                }
+            }
+            link_cursor = link_end;
+        }
+        return targets;
+    }
+    Vec::new()
 }
 
 fn resolve_epub_reference(base_path: &str, reference: &str) -> String {
@@ -553,6 +746,26 @@ fn percent_decode_path(value: &str) -> String {
     String::from_utf8_lossy(&decoded).into_owned()
 }
 
+fn is_epub_image_path(value: &str) -> bool {
+    let without_suffix = value.split(['#', '?']).next().unwrap_or(value);
+    matches!(
+        Path::new(without_suffix)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.to_ascii_lowercase())
+            .as_deref(),
+        Some("jpg" | "jpeg" | "png" | "gif" | "webp" | "svg")
+    )
+}
+
+fn escape_html_attribute(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 fn epub_content_is_renderable(markup: &str) -> bool {
     let lower = markup.to_ascii_lowercase();
     if lower.contains("<img") || lower.contains("<svg") || lower.contains("<image") {
@@ -655,8 +868,8 @@ fn declared_encoding(declaration: &str) -> Option<&str> {
 mod tests {
     use super::{
         declared_encoding, decode_text_resource, epub_content_is_renderable, epub_paths_match,
-        is_epub_reader_auxiliary_asset, normalize_epub_path, parse_epub3_navigation,
-        parse_epub_from_bytes, parse_ncx_navigation,
+        is_epub_reader_auxiliary_asset, mark_repeated_numeric_subsection_markers,
+        normalize_epub_path, parse_epub3_navigation, parse_epub_from_bytes, parse_ncx_navigation,
     };
     use std::io::{Cursor, Write};
     use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
@@ -702,6 +915,47 @@ mod tests {
     }
 
     #[test]
+    fn demotes_repeated_numeric_resets_but_keeps_sequential_numbered_chapters() {
+        let repeated = r#"<ncx><navMap>
+  <navPoint><navLabel><text>First story</text></navLabel><content src="title-1.xhtml"/></navPoint>
+  <navPoint><navLabel><text>００１</text></navLabel><content src="body-1.xhtml"/></navPoint>
+  <navPoint><navLabel><text>Second story</text></navLabel><content src="title-2.xhtml"/></navPoint>
+  <navPoint><navLabel><text>001</text></navLabel><content src="body-2.xhtml"/></navPoint>
+  <navPoint><navLabel><text>Third story</text></navLabel><content src="title-3.xhtml"/></navPoint>
+  <navPoint><navLabel><text>００１</text></navLabel><content src="body-3.xhtml"/></navPoint>
+</navMap></ncx>"#;
+        let mut repeated_entries = parse_ncx_navigation(repeated, "toc.ncx");
+        mark_repeated_numeric_subsection_markers(&mut repeated_entries);
+
+        assert!(!repeated_entries[0].is_subsection_marker);
+        assert!(repeated_entries[1].is_subsection_marker);
+        assert!(!repeated_entries[2].is_subsection_marker);
+        assert!(repeated_entries[3].is_subsection_marker);
+        assert!(!repeated_entries[4].is_subsection_marker);
+        assert!(repeated_entries[5].is_subsection_marker);
+
+        let sequential = r#"<ncx><navMap>
+  <navPoint><navLabel><text>001</text></navLabel><content src="1.xhtml"/></navPoint>
+  <navPoint><navLabel><text>002</text></navLabel><content src="2.xhtml"/></navPoint>
+  <navPoint><navLabel><text>003</text></navLabel><content src="3.xhtml"/></navPoint>
+</navMap></ncx>"#;
+        let mut sequential_entries = parse_ncx_navigation(sequential, "toc.ncx");
+        mark_repeated_numeric_subsection_markers(&mut sequential_entries);
+
+        assert!(sequential_entries
+            .iter()
+            .all(|entry| !entry.is_subsection_marker));
+
+        let only_twice = r#"<ncx><navMap>
+  <navPoint><navLabel><text>Part A</text></navLabel><content src="a.xhtml"/></navPoint><navPoint><navLabel><text>1</text></navLabel><content src="a1.xhtml"/></navPoint>
+  <navPoint><navLabel><text>Part B</text></navLabel><content src="b.xhtml"/></navPoint><navPoint><navLabel><text>1</text></navLabel><content src="b1.xhtml"/></navPoint>
+</navMap></ncx>"#;
+        let mut two_entries = parse_ncx_navigation(only_twice, "toc.ncx");
+        mark_repeated_numeric_subsection_markers(&mut two_entries);
+        assert!(two_entries.iter().all(|entry| !entry.is_subsection_marker));
+    }
+
+    #[test]
     fn reads_epub3_navigation_xhtml_in_authored_order() {
         let nav = r#"<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
 <nav epub:type="toc"><ol>
@@ -715,6 +969,30 @@ mod tests {
         assert_eq!(entries[0].href, "EPUB/Text/chapter-1.xhtml");
         assert_eq!(entries[1].label, "第二章");
         assert_eq!(entries[1].href, "EPUB/Text/chapter-2.xhtml");
+    }
+
+    #[test]
+    fn classifies_structural_landmarks_without_hiding_bodymatter() {
+        let nav = r#"<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+<nav epub:type="toc"><ol>
+  <li><a href="Text/cover.xhtml">Cover</a></li>
+  <li><a href="Text/contents.xhtml">Contents</a></li>
+  <li><a href="Text/chapter-1.xhtml">Chapter 1</a></li>
+  <li><a href="Text/colophon.xhtml">Colophon</a></li>
+</ol></nav>
+<nav epub:type="landmarks"><ol>
+  <li><a epub:type="cover" href="Text/cover.xhtml">Cover</a></li>
+  <li><a epub:type="toc" href="Text/contents.xhtml">Contents</a></li>
+  <li><a epub:type="bodymatter" href="Text/chapter-1.xhtml">Start</a></li>
+  <li><a epub:type="colophon" href="Text/colophon.xhtml">Colophon</a></li>
+</ol></nav></body></html>"#;
+        let entries = parse_epub3_navigation(nav, "EPUB/nav.xhtml");
+
+        assert_eq!(entries.len(), 4);
+        assert!(entries[0].is_structural);
+        assert!(entries[1].is_structural);
+        assert!(!entries[2].is_structural);
+        assert!(entries[3].is_structural);
     }
 
     #[test]
@@ -774,6 +1052,86 @@ mod tests {
         writer.write_all(chapter).unwrap();
 
         writer.finish().unwrap().into_inner()
+    }
+
+    fn epub_with_repeated_numeric_resets() -> Vec<u8> {
+        let cursor = Cursor::new(Vec::new());
+        let mut writer = ZipWriter::new(cursor);
+        let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+        writer.start_file("mimetype", stored).unwrap();
+        writer.write_all(b"application/epub+zip").unwrap();
+        writer
+            .start_file("META-INF/container.xml", SimpleFileOptions::default())
+            .unwrap();
+        writer
+            .write_all(
+                br#"<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("content.opf", SimpleFileOptions::default())
+            .unwrap();
+        writer
+            .write_all(
+                br#"<package version="2.0" unique-identifier="id" xmlns="http://www.idpf.org/2007/opf">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">fixture</dc:identifier><dc:title>Fixture</dc:title></metadata>
+<manifest>
+  <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+  <item id="title1" href="title1.xhtml" media-type="application/xhtml+xml"/><item id="body1" href="body1.xhtml" media-type="application/xhtml+xml"/>
+  <item id="title2" href="title2.xhtml" media-type="application/xhtml+xml"/><item id="body2" href="body2.xhtml" media-type="application/xhtml+xml"/>
+  <item id="title3" href="title3.xhtml" media-type="application/xhtml+xml"/><item id="body3" href="body3.xhtml" media-type="application/xhtml+xml"/>
+</manifest>
+<spine toc="ncx"><itemref idref="title1"/><itemref idref="body1"/><itemref idref="title2"/><itemref idref="body2"/><itemref idref="title3"/><itemref idref="body3"/></spine>
+</package>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("toc.ncx", SimpleFileOptions::default())
+            .unwrap();
+        writer
+            .write_all(
+                br#"<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap>
+  <navPoint><navLabel><text>First story</text></navLabel><content src="title1.xhtml"/></navPoint><navPoint><navLabel><text>001</text></navLabel><content src="body1.xhtml"/></navPoint>
+  <navPoint><navLabel><text>Second story</text></navLabel><content src="title2.xhtml"/></navPoint><navPoint><navLabel><text>001</text></navLabel><content src="body2.xhtml"/></navPoint>
+  <navPoint><navLabel><text>Third story</text></navLabel><content src="title3.xhtml"/></navPoint><navPoint><navLabel><text>001</text></navLabel><content src="body3.xhtml"/></navPoint>
+</navMap></ncx>"#,
+            )
+            .unwrap();
+        for (path, text) in [
+            ("title1.xhtml", "First title"),
+            ("body1.xhtml", "First body"),
+            ("title2.xhtml", "Second title"),
+            ("body2.xhtml", "Second body"),
+            ("title3.xhtml", "Third title"),
+            ("body3.xhtml", "Third body"),
+        ] {
+            writer
+                .start_file(path, SimpleFileOptions::default())
+                .unwrap();
+            writer
+                .write_all(format!("<html><body><p>{text}</p></body></html>").as_bytes())
+                .unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn repeated_numeric_body_entries_inherit_the_named_chapter() {
+        let book = parse_epub_from_bytes(epub_with_repeated_numeric_resets(), true).unwrap();
+        let visible: Vec<_> = book
+            .chapters
+            .iter()
+            .filter(|chapter| chapter.is_navigation_entry)
+            .map(|chapter| chapter.name.as_str())
+            .collect();
+
+        assert_eq!(visible, ["First story", "Second story", "Third story"]);
+        assert_eq!(book.chapters[1].name, "First story");
+        assert!(!book.chapters[1].is_navigation_entry);
+        assert_eq!(book.chapters[3].name, "Second story");
+        assert_eq!(book.chapters[5].name, "Third story");
     }
 
     #[test]

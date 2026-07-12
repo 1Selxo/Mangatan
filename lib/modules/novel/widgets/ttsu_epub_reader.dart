@@ -470,6 +470,18 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         ? null
         : _javascriptNumber(data['lookupToken']).toInt();
     final lookupTokenLiteral = lookupToken?.toString() ?? 'null';
+    final generation = ++_dictionaryGeneration;
+
+    if (ttsuRepeatedLookupShouldDismiss(
+      repeatedLookup: _javascriptBool(data['repeatedLookup']),
+      popupVisible: DictionaryLookupPopup.isActive,
+    )) {
+      DictionaryLookupPopup.dismissActive();
+      await _webView?.evaluateJavascript(
+        source: 'window.mangatanReader?.clearLookup($lookupTokenLiteral);',
+      );
+      return;
+    }
 
     final box = _webViewKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
@@ -488,7 +500,6 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         ? _prefetchedLookupResults
         : null;
 
-    final generation = ++_dictionaryGeneration;
     final handle = await DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
@@ -1514,8 +1525,16 @@ String buildTtsuEpubDocument({
         const scan = scanLookup(hit.node, hit.offset);
         const query = scan.text;
         if (!query) return null;
+        const repeatedLookup = lookupTrigger === 'leftClick' &&
+          activeLookup?.originNode === hit.node &&
+          activeLookup?.originOffset === hit.offset;
         const lookupToken = ++nextLookupToken;
-        activeLookup = { ranges: scan.ranges, token: lookupToken };
+        activeLookup = {
+          ranges: scan.ranges,
+          token: lookupToken,
+          originNode: hit.node,
+          originOffset: hit.offset,
+        };
         const range = document.createRange();
         const character = String.fromCodePoint(hit.node.textContent.codePointAt(hit.offset));
         range.setStart(hit.node, hit.offset);
@@ -1525,7 +1544,7 @@ String buildTtsuEpubDocument({
           x >= candidate.left && x <= candidate.right &&
           y >= candidate.top && y <= candidate.bottom
         ) || range.getBoundingClientRect();
-        return { text: query, sentence: sentenceFor(hit.node, hit.offset), left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, lookupToken };
+        return { text: query, sentence: sentenceFor(hit.node, hit.offset), left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, lookupToken, repeatedLookup };
       };
       const hideAction = () => { action.style.display = 'none'; selected = null; };
       const selectionText = (selection) => {
@@ -2069,6 +2088,12 @@ double _javascriptNumber(Object? value, {double fallback = 0}) {
 
 bool _javascriptBool(Object? value) =>
     value == true || value?.toString().toLowerCase() == 'true';
+
+@visibleForTesting
+bool ttsuRepeatedLookupShouldDismiss({
+  required bool repeatedLookup,
+  required bool popupVisible,
+}) => repeatedLookup && popupVisible;
 
 bool? _javascriptNullableBool(Object? value) {
   if (value == true || value?.toString().toLowerCase() == 'true') return true;

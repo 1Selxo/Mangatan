@@ -41,6 +41,34 @@ void main() {
     expect(document, contains('const initialProgress = 0.25'));
     expect(document, contains('user-select: text'));
     expect(document, contains("const lookupTrigger = \"leftClick\""));
+    expect(
+      document,
+      contains("const repeatedLookup = lookupTrigger === 'leftClick'"),
+    );
+    expect(document, contains('activeLookup?.originNode === hit.node'));
+    expect(document, contains('originOffset: hit.offset'));
+    expect(document, contains('lookupToken, repeatedLookup'));
+  });
+
+  test('dismisses a repeated EPUB lookup only while its popup is visible', () {
+    expect(
+      ttsuRepeatedLookupShouldDismiss(repeatedLookup: true, popupVisible: true),
+      isTrue,
+    );
+    expect(
+      ttsuRepeatedLookupShouldDismiss(
+        repeatedLookup: true,
+        popupVisible: false,
+      ),
+      isFalse,
+    );
+    expect(
+      ttsuRepeatedLookupShouldDismiss(
+        repeatedLookup: false,
+        popupVisible: true,
+      ),
+      isFalse,
+    );
   });
 
   test('rewrites SVG xlink image references used by fixed-layout EPUBs', () {

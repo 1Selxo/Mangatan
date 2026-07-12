@@ -10,9 +10,11 @@ import 'package:mangayomi/modules/library/providers/add_torrent.dart';
 import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/library/widgets/library_app_bar.dart';
 import 'package:mangayomi/modules/library/widgets/library_body.dart';
 import 'package:mangayomi/modules/library/widgets/library_dialogs.dart';
+import 'package:mangayomi/modules/library/widgets/library_file_drop_target.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
 import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.dart';
@@ -214,88 +216,100 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       );
     }
 
-    return Scaffold(
-      body: mangaAll.when(
-        data: (man) {
-          return withoutCategories.when(
-            data: (withoutCategory) {
-              return categories.when(
-                data: (data) {
-                  // Get the number of items for the app bar
-                  final numberOfItemsList = ref.watch(
-                    filteredLibraryMangaProvider(
-                      data: man,
-                      downloadFilterType: downloadFilterType,
-                      unreadFilterType: unreadFilterType,
-                      startedFilterType: startedFilterType,
-                      bookmarkedFilterType: bookmarkedFilterType,
-                      completedFilterType: completedFilterType,
-                      trackingFilterType: trackingFilterType,
-                      sortType: sortType,
-                      downloadedOnly: downloadedOnly,
-                      searchQuery: searchQuery,
-                      ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
-                    ),
-                  );
-
-                  if (data.isNotEmpty && showCategoryTabs) {
-                    return _buildWithCategories(
-                      data: data,
-                      withoutCategory: withoutCategory,
-                      settings: settings,
-                      showNumbersOfItems: showNumbersOfItems,
-                      isNotFiltering: isNotFiltering,
-                      numberOfItems: numberOfItemsList.length,
-                      bodyForCategory: bodyForCategory,
-                      badgeForCategory: badgeForCategory,
-                      downloadFilterType: downloadFilterType,
-                      downloadedOnly: downloadedOnly,
-                    );
-                  }
-
-                  return Scaffold(
-                    appBar: LibraryAppBar(
-                      itemType: widget.itemType,
-                      isNotFiltering: isNotFiltering,
-                      showNumbersOfItems: showNumbersOfItems,
-                      numberOfItems: numberOfItemsList.length,
-                      entries: _entries,
-                      isCategory: false,
-                      categoryId: null,
-                      settings: settings,
-                      isSearch: _isSearch,
-                      ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
-                      textEditingController: _textEditingController,
-                      onSearchToggle: () =>
-                          setState(() => _isSearch = !_isSearch),
-                      onSearchClear: () {
-                        _searchDebounce?.cancel();
-                        _searchDebounce = Timer(
-                          const Duration(milliseconds: 300),
-                          () {
-                            if (mounted) setState(() {});
-                          },
-                        );
-                      },
-                      onIgnoreFiltersChanged: (val) =>
-                          setState(() => _ignoreFiltersOnSearch = val),
-                      vsync: this,
-                    ),
-                    body: bodyForCategory(),
-                  );
-                },
-                error: (error, _) => ErrorText(error),
-                loading: () => const ProgressCenter(),
-              );
-            },
-            error: (error, _) => ErrorText(error),
-            loading: () => const ProgressCenter(),
-          );
-        },
-        error: (error, _) => ErrorText(error),
-        loading: () => const ProgressCenter(),
+    return LibraryFileDropTarget(
+      itemType: widget.itemType,
+      onImport: (filePaths) => ref.read(
+        importArchivesFromPathsProvider(
+          itemType: widget.itemType,
+          null,
+          filePaths: filePaths,
+          init: true,
+          splitChapters: false,
+        ).future,
       ),
-      bottomNavigationBar: _buildBottomBar(),
+      child: Scaffold(
+        body: mangaAll.when(
+          data: (man) {
+            return withoutCategories.when(
+              data: (withoutCategory) {
+                return categories.when(
+                  data: (data) {
+                    // Get the number of items for the app bar
+                    final numberOfItemsList = ref.watch(
+                      filteredLibraryMangaProvider(
+                        data: man,
+                        downloadFilterType: downloadFilterType,
+                        unreadFilterType: unreadFilterType,
+                        startedFilterType: startedFilterType,
+                        bookmarkedFilterType: bookmarkedFilterType,
+                        completedFilterType: completedFilterType,
+                        trackingFilterType: trackingFilterType,
+                        sortType: sortType,
+                        downloadedOnly: downloadedOnly,
+                        searchQuery: searchQuery,
+                        ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
+                      ),
+                    );
+
+                    if (data.isNotEmpty && showCategoryTabs) {
+                      return _buildWithCategories(
+                        data: data,
+                        withoutCategory: withoutCategory,
+                        settings: settings,
+                        showNumbersOfItems: showNumbersOfItems,
+                        isNotFiltering: isNotFiltering,
+                        numberOfItems: numberOfItemsList.length,
+                        bodyForCategory: bodyForCategory,
+                        badgeForCategory: badgeForCategory,
+                        downloadFilterType: downloadFilterType,
+                        downloadedOnly: downloadedOnly,
+                      );
+                    }
+
+                    return Scaffold(
+                      appBar: LibraryAppBar(
+                        itemType: widget.itemType,
+                        isNotFiltering: isNotFiltering,
+                        showNumbersOfItems: showNumbersOfItems,
+                        numberOfItems: numberOfItemsList.length,
+                        entries: _entries,
+                        isCategory: false,
+                        categoryId: null,
+                        settings: settings,
+                        isSearch: _isSearch,
+                        ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
+                        textEditingController: _textEditingController,
+                        onSearchToggle: () =>
+                            setState(() => _isSearch = !_isSearch),
+                        onSearchClear: () {
+                          _searchDebounce?.cancel();
+                          _searchDebounce = Timer(
+                            const Duration(milliseconds: 300),
+                            () {
+                              if (mounted) setState(() {});
+                            },
+                          );
+                        },
+                        onIgnoreFiltersChanged: (val) =>
+                            setState(() => _ignoreFiltersOnSearch = val),
+                        vsync: this,
+                      ),
+                      body: bodyForCategory(),
+                    );
+                  },
+                  error: (error, _) => ErrorText(error),
+                  loading: () => const ProgressCenter(),
+                );
+              },
+              error: (error, _) => ErrorText(error),
+              loading: () => const ProgressCenter(),
+            );
+          },
+          error: (error, _) => ErrorText(error),
+          loading: () => const ProgressCenter(),
+        ),
+        bottomNavigationBar: _buildBottomBar(),
+      ),
     );
   }
 

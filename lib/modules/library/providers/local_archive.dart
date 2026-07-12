@@ -19,137 +19,196 @@ Future importArchivesFromFile(
   required bool init,
   bool splitChapters = false,
 }) async {
-  final keepAlile = ref.keepAlive();
+  final keepAlive = ref.keepAlive();
   try {
-    FilePickerResult? result = await FilePicker.pickFiles(
+    final result = await FilePicker.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: switch (itemType) {
-        ItemType.manga => ['cbz', 'zip'],
-        ItemType.anime => ['mp4', 'mov', 'avi', 'flv', 'wmv', 'mpeg', 'mkv'],
-        ItemType.novel => ['epub'],
-      },
+      allowedExtensions: supportedLocalArchiveExtensions(itemType),
     );
-    if (result != null) {
-      final dateNow = DateTime.now().millisecondsSinceEpoch;
-      final manga =
-          mManga ??
-          Manga(
-            favorite: true,
-            source: 'archive',
-            author: '',
-            itemType: itemType,
-            genre: [],
-            imageUrl: '',
-            lang: '',
-            link: '',
-            name: _getName(result.files.first.path!),
-            dateAdded: dateNow,
-            lastUpdate: dateNow,
-            status: Status.unknown,
-            description: '',
-            isLocalArchive: true,
-            artist: '',
-            updatedAt: dateNow,
-            sourceId: null,
+    if (result == null) return;
+
+    final filePaths = result.files
+        .map((file) => file.path)
+        .whereType<String>()
+        .toList();
+    await _importArchivesFromPaths(
+      ref,
+      mManga,
+      filePaths: filePaths,
+      itemType: itemType,
+      init: init,
+      splitChapters: splitChapters,
+    );
+  } finally {
+    keepAlive.close();
+  }
+}
+
+/// Imports paths supplied by a non-picker source, such as desktop drag-and-drop.
+@riverpod
+Future<void> importArchivesFromPaths(
+  Ref ref,
+  Manga? mManga, {
+  required List<String> filePaths,
+  required ItemType itemType,
+  required bool init,
+  bool splitChapters = false,
+}) async {
+  final keepAlive = ref.keepAlive();
+  try {
+    await _importArchivesFromPaths(
+      ref,
+      mManga,
+      filePaths: filterSupportedLocalArchivePaths(filePaths, itemType),
+      itemType: itemType,
+      init: init,
+      splitChapters: splitChapters,
+    );
+  } finally {
+    keepAlive.close();
+  }
+}
+
+Future<void> _importArchivesFromPaths(
+  Ref ref,
+  Manga? mManga, {
+  required List<String> filePaths,
+  required ItemType itemType,
+  required bool init,
+  required bool splitChapters,
+}) async {
+  if (filePaths.isEmpty) return;
+
+  final dateNow = DateTime.now().millisecondsSinceEpoch;
+  final manga =
+      mManga ??
+      Manga(
+        favorite: true,
+        source: 'archive',
+        author: '',
+        itemType: itemType,
+        genre: [],
+        imageUrl: '',
+        lang: '',
+        link: '',
+        name: localArchiveName(filePaths.first),
+        dateAdded: dateNow,
+        lastUpdate: dateNow,
+        status: Status.unknown,
+        description: '',
+        isLocalArchive: true,
+        artist: '',
+        updatedAt: dateNow,
+        sourceId: null,
+      );
+
+  for (final filePath in filePaths.reversed) {
+    final (String, LocalExtensionType, Uint8List, String)? data =
+        itemType == ItemType.manga
+        ? await ref.watch(getArchivesDataFromFileProvider(filePath).future)
+        : null;
+    final name = localArchiveName(filePath);
+
+    if (init && itemType == ItemType.manga) {
+      manga.customCoverImage = data!.$3.getCoverImage;
+    }
+    await isar.writeTxn(() async {
+      final mangaId = await isar.mangas.put(manga);
+      final List<Chapter> chapters = [];
+      if (itemType == ItemType.novel) {
+        final book = await parseEpubFromPath(
+          epubPath: filePath,
+          fullData: splitChapters,
+        );
+
+        if (book.cover != null) {
+          await isar.mangas.put(
+            manga..customCoverImage = book.cover!.getCoverImage,
           );
-
-      for (var file in result.files.reversed.toList()) {
-        (String, LocalExtensionType, Uint8List, String)? data =
-            itemType == ItemType.manga
-            ? await ref.watch(
-                getArchivesDataFromFileProvider(file.path!).future,
-              )
-            : null;
-        String name = _getName(file.path!);
-
-        if (init) {
-          if (itemType == ItemType.manga) {
-            manga.customCoverImage = data!.$3.getCoverImage;
-          }
         }
-        await isar.writeTxn(() async {
-          final mangaId = await isar.mangas.put(manga);
-          final List<Chapter> chapters = [];
-          if (itemType == ItemType.novel) {
-            final book = await parseEpubFromPath(
-              epubPath: file.path!,
-              fullData: splitChapters,
-            );
+        final chaps = book.chapters;
 
-            if (book.cover != null) {
-              await isar.mangas.put(
-                manga..customCoverImage = book.cover!.getCoverImage,
-              );
-            }
-            final chaps = book.chapters;
-
-            if (splitChapters && chaps.isNotEmpty) {
-              for (int i = 0; i < chaps.length; i++) {
-                final epubChapter = chaps[i];
-                chapters.add(
-                  Chapter(
-                    mangaId: mangaId,
-                    name: epubChapter.name,
-                    archivePath: file.path,
-                    url: epubChapter.path,
-                    dateUpload: epubChapter.spineIndex.toString(),
-                    description: epubChapterMetadata(
-                      spineIndex: epubChapter.spineIndex,
-                      navigationEntry: epubChapter.isNavigationEntry,
-                    ),
-                    updatedAt: DateTime.now().millisecondsSinceEpoch,
-                  )..manga.value = manga,
-                );
-              }
-            } else {
-              // Fallback: single chapter if no spine chapters found
-              chapters.add(
-                Chapter(
-                  mangaId: mangaId,
-                  name: book.name,
-                  archivePath: file.path,
-                  dateUpload: splitChapters ? '' : '0',
-                  description: splitChapters
-                      ? null
-                      : epubUnsplitChapterMetadata(),
-                  updatedAt: DateTime.now().millisecondsSinceEpoch,
-                )..manga.value = manga,
-              );
-            }
-          } else {
+        if (splitChapters && chaps.isNotEmpty) {
+          for (final epubChapter in chaps) {
             chapters.add(
               Chapter(
-                name: itemType == ItemType.manga ? data!.$1 : name,
-                archivePath: itemType == ItemType.manga ? data!.$4 : file.path,
-                mangaId: manga.id,
+                mangaId: mangaId,
+                name: epubChapter.name,
+                archivePath: filePath,
+                url: epubChapter.path,
+                dateUpload: epubChapter.spineIndex.toString(),
+                description: epubChapterMetadata(
+                  spineIndex: epubChapter.spineIndex,
+                  navigationEntry: epubChapter.isNavigationEntry,
+                ),
                 updatedAt: DateTime.now().millisecondsSinceEpoch,
               )..manga.value = manga,
             );
           }
-          for (final chapter in chapters) {
-            await isar.chapters.put(chapter);
-            await chapter.manga.save();
-          }
-        });
+        } else {
+          // Fallback: single chapter if no spine chapters found
+          chapters.add(
+            Chapter(
+              mangaId: mangaId,
+              name: book.name,
+              archivePath: filePath,
+              dateUpload: splitChapters ? '' : '0',
+              description: splitChapters ? null : epubUnsplitChapterMetadata(),
+              updatedAt: DateTime.now().millisecondsSinceEpoch,
+            )..manga.value = manga,
+          );
+        }
+      } else {
+        chapters.add(
+          Chapter(
+            name: itemType == ItemType.manga ? data!.$1 : name,
+            archivePath: itemType == ItemType.manga ? data!.$4 : filePath,
+            mangaId: manga.id,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          )..manga.value = manga,
+        );
       }
-    }
-    keepAlile.close();
-    return "";
-  } catch (e) {
-    keepAlile.close();
-    rethrow;
+      for (final chapter in chapters) {
+        await isar.chapters.put(chapter);
+        await chapter.manga.save();
+      }
+    });
   }
 }
 
-String _getName(String path) {
+List<String> supportedLocalArchiveExtensions(ItemType itemType) {
+  return switch (itemType) {
+    ItemType.manga => const ['cbz', 'zip'],
+    ItemType.anime => const ['mp4', 'mov', 'avi', 'flv', 'wmv', 'mpeg', 'mkv'],
+    ItemType.novel => const ['epub'],
+  };
+}
+
+List<String> filterSupportedLocalArchivePaths(
+  Iterable<String> filePaths,
+  ItemType itemType,
+) {
+  final extensions = supportedLocalArchiveExtensions(itemType).toSet();
+  return filePaths.where((filePath) {
+    final name = filePath.split(RegExp(r'[/\\]')).last;
+    final dotIndex = name.lastIndexOf('.');
+    if (dotIndex < 0 || dotIndex == name.length - 1) return false;
+    return extensions.contains(name.substring(dotIndex + 1).toLowerCase());
+  }).toList();
+}
+
+String localArchiveName(String path) {
   return path
       .split('/')
       .last
       .split("\\")
       .last
       .replaceAll(
-        RegExp(r'\.(mp4|mov|avi|flv|wmv|mpeg|mkv|cbz|zip|cbt|tar|epub)'),
+        RegExp(
+          r'\.(mp4|mov|avi|flv|wmv|mpeg|mkv|cbz|zip|cbt|tar|epub)$',
+          caseSensitive: false,
+        ),
         '',
       );
 }

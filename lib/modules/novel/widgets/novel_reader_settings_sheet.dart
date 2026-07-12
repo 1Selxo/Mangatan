@@ -130,35 +130,74 @@ class ReaderSettingsTab extends ConsumerWidget {
               child: ValueListenableBuilder<EpubReadingLayout>(
                 valueListenable: epubLayout!,
                 builder: (context, layout, _) {
-                  return SegmentedButton<EpubReadingLayout>(
-                    segments: const [
-                      ButtonSegment(
-                        value: EpubReadingLayout.scroll,
-                        icon: Icon(Icons.vertical_align_center_rounded),
-                        label: Text('Scroll'),
+                  void setLayout({bool? vertical, bool? paged}) {
+                    final next = EpubReadingLayout.fromAxes(
+                      vertical: vertical ?? layout.isVerticalWriting,
+                      paged: paged ?? layout.isPaged,
+                    );
+                    epubLayout!.value = next;
+                    ref
+                        .read(novelEpubReadingLayoutStateProvider.notifier)
+                        .set(next.index);
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Writing direction',
+                        style: Theme.of(context).textTheme.labelLarge,
                       ),
-                      ButtonSegment(
-                        value: EpubReadingLayout.paginated,
-                        icon: Icon(Icons.menu_book_rounded),
-                        label: Text('Pages'),
+                      const SizedBox(height: 8),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.format_textdirection_l_to_r),
+                            label: Text('Horizontal'),
+                          ),
+                          ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.format_textdirection_r_to_l),
+                            label: Text('Vertical'),
+                          ),
+                        ],
+                        selected: {layout.isVerticalWriting},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) {
+                          if (selection.isNotEmpty) {
+                            setLayout(vertical: selection.first);
+                          }
+                        },
                       ),
-                      ButtonSegment(
-                        value: EpubReadingLayout.vertical,
-                        icon: Icon(Icons.format_textdirection_r_to_l_rounded),
-                        label: Text('Vertical'),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Flow',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.view_stream_outlined),
+                            label: Text('Continuous'),
+                          ),
+                          ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.menu_book_rounded),
+                            label: Text('Paged'),
+                          ),
+                        ],
+                        selected: {layout.isPaged},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) {
+                          if (selection.isNotEmpty) {
+                            setLayout(paged: selection.first);
+                          }
+                        },
                       ),
                     ],
-                    selected: {layout},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (selection) {
-                      if (selection.isNotEmpty) {
-                        final layout = selection.first;
-                        epubLayout!.value = layout;
-                        ref
-                            .read(novelEpubReadingLayoutStateProvider.notifier)
-                            .set(layout.index);
-                      }
-                    },
                   );
                 },
               ),
@@ -214,7 +253,7 @@ class ReaderSettingsTab extends ConsumerWidget {
           const SizedBox(height: 16),
 
           _SettingSection(
-            title: 'Padding',
+            title: 'Viewport padding',
             child: Column(
               children: [
                 Row(
@@ -256,9 +295,9 @@ class ReaderSettingsTab extends ConsumerWidget {
                         child: Slider(
                           value: padding.toDouble(),
                           min: 0,
-                          max: 50,
-                          divisions: 50,
-                          label: '$padding px',
+                          max: 25,
+                          divisions: 25,
+                          label: '$padding% of height',
                           onChanged: (value) {
                             ref
                                 .read(novelReaderPaddingStateProvider.notifier)
@@ -279,7 +318,7 @@ class ReaderSettingsTab extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '${padding}px',
+                        '$padding%',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,

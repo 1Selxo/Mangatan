@@ -44,9 +44,18 @@ class DictionaryStorage {
 
   static const _manifestName = '.mangayomi-dictionaries.json';
 
-  Future<DictionaryPaths> paths({Directory? root}) async {
+  Future<DictionaryPaths> paths({
+    Directory? root,
+    List<String> order = const [],
+    Set<String> enabled = const {},
+  }) async {
     final directory = root ?? await rootDirectory;
-    final dictionaries = await _installedFromRoot(directory);
+    final installed = await _installedFromRoot(directory);
+    final dictionaries = _applyProfileOrder(installed, order)
+        .where(
+          (dictionary) => enabled.isEmpty || enabled.contains(dictionary.name),
+        )
+        .toList(growable: false);
     return DictionaryPaths(
       termPaths: [
         for (final dictionary in dictionaries)
@@ -64,8 +73,12 @@ class DictionaryStorage {
     );
   }
 
-  Future<List<InstalledDictionary>> installed({Directory? root}) async {
-    return _installedFromRoot(root ?? await rootDirectory);
+  Future<List<InstalledDictionary>> installed({
+    Directory? root,
+    List<String> order = const [],
+  }) async {
+    final dictionaries = await _installedFromRoot(root ?? await rootDirectory);
+    return _applyProfileOrder(dictionaries, order);
   }
 
   Future<void> recordImport({
@@ -146,6 +159,20 @@ class DictionaryStorage {
           p.basename(directory.path),
           manifest[p.basename(directory.path)],
         ),
+    ];
+  }
+
+  List<InstalledDictionary> _applyProfileOrder(
+    List<InstalledDictionary> dictionaries,
+    List<String> preferredOrder,
+  ) {
+    if (preferredOrder.isEmpty) return dictionaries;
+    final byName = {
+      for (final dictionary in dictionaries) dictionary.name: dictionary,
+    };
+    return [
+      for (final name in preferredOrder) ?byName.remove(name),
+      for (final dictionary in dictionaries) ?byName.remove(dictionary.name),
     ];
   }
 

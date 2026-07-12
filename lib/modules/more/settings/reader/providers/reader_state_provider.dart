@@ -371,16 +371,17 @@ class NovelReaderTextColorState extends _$NovelReaderTextColorState {
 class NovelReaderPaddingState extends _$NovelReaderPaddingState {
   @override
   int build() {
-    return isar.settings.getSync(227)!.novelReaderPadding ?? 16;
+    return (isar.settings.getSync(227)!.novelReaderPadding ?? 12).clamp(0, 25);
   }
 
   void set(int value) {
+    final safeValue = value.clamp(0, 25);
     final settings = isar.settings.getSync(227);
-    state = value;
+    state = safeValue;
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
-          ..novelReaderPadding = value
+          ..novelReaderPadding = safeValue
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );
@@ -474,11 +475,11 @@ class NovelEpubReadingLayoutState extends _$NovelEpubReadingLayoutState {
   @override
   int build() {
     final value = isar.settings.getSync(227)!.novelEpubReadingLayout ?? 0;
-    return value.clamp(0, 2);
+    return value.clamp(0, 3);
   }
 
   void set(int value) {
-    final safeValue = value.clamp(0, 2);
+    final safeValue = value.clamp(0, 3);
     final settings = isar.settings.getSync(227);
     state = safeValue;
     isar.writeTxnSync(

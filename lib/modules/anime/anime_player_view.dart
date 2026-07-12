@@ -30,6 +30,9 @@ import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.d
 import 'package:mangayomi/modules/anime/widgets/mobile.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_setting_widget.dart';
+import 'package:mangayomi/modules/anime/widgets/subtitle_cue_list.dart';
+import 'package:mangayomi/modules/anime/widgets/video_ocr_overlay.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_audio_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_decoder_state_provider.dart';
@@ -296,6 +299,13 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _includeSubtitles = false;
   bool _jimakuAutoLoadAttempted = false;
   bool _jimakuLoading = false;
+  bool _showSubtitleList = false;
+  bool _videoOcrCapturing = false;
+  Uint8List? _videoOcrBytes;
+  List<AnimeSubtitleCue> _subtitleCues = const [];
+  final Map<String, List<AnimeSubtitleCue>> _subtitleCuesByTitle = {};
+  String _lastSubtitleHistoryText = '';
+  int _nextSubtitleHistoryIndex = 0;
   int _subDelay = 0;
   final _subDelayController = TextEditingController(text: "0");
   double _subSpeed = 1;
@@ -303,6 +313,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   int lastRpcTimestampUpdate = DateTime.now().millisecondsSinceEpoch;
 
   late final StreamSubscription<Duration> _currentPositionSub;
+  late final StreamSubscription<List<String>> _subtitleTextSub;
 
   late final StreamSubscription<Duration> _currentTotalDurationSub = _player
       .stream
@@ -712,7 +723,89 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   Future<void> _setSubtitleTrack(SubtitleTrack track) async {
     await _player.setSubtitleTrack(track);
+    _activateSubtitleCuesForTrack(track);
     _hideNativeSubtitlePaintSoon();
+  }
+
+  void _activateSubtitleCuesForTrack(SubtitleTrack track) {
+    List<AnimeSubtitleCue>? cues;
+    for (final key in [track.title, track.language, track.id]) {
+      if (key == null || key.trim().isEmpty) continue;
+      cues ??= _subtitleCuesByTitle[key];
+      cues ??= _subtitleCuesByTitle[path.basename(key)];
+    }
+    if (cues == null && track.uri) {
+      final uri = Uri.tryParse(track.id);
+      final filePath = uri?.scheme == 'file' ? uri!.toFilePath() : track.id;
+      final file = File(filePath);
+      if (file.existsSync()) {
+        cues = parseAnimeSubtitleFile(file);
+        _rememberSubtitleCues(track.title ?? path.basename(file.path), cues);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _subtitleCues = cues ?? const [];
+      _lastSubtitleHistoryText = '';
+      _nextSubtitleHistoryIndex = _subtitleCues.length;
+    });
+  }
+
+  void _rememberSubtitleCues(String title, List<AnimeSubtitleCue> cues) {
+    if (title.trim().isEmpty || cues.isEmpty) return;
+    _subtitleCuesByTitle[title] = cues;
+    _subtitleCuesByTitle[path.basename(title)] = cues;
+    _subtitleCuesByTitle['Jimaku $title'] = cues;
+  }
+
+  void _updateSubtitleHistory(List<String> lines) {
+    if (_subtitleCues.isNotEmpty) return;
+    final text = lines
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .join('\n');
+    if (text.isEmpty) {
+      _lastSubtitleHistoryText = '';
+      return;
+    }
+    if (text == _lastSubtitleHistoryText) return;
+    _lastSubtitleHistoryText = text;
+    final cue = AnimeSubtitleCue(
+      index: _nextSubtitleHistoryIndex++,
+      text: text,
+      start: _currentPosition.value,
+      end: _currentPosition.value + const Duration(seconds: 5),
+    );
+    if (mounted) {
+      setState(() {
+        final updated = [..._subtitleCues, cue];
+        _subtitleCues = updated.length > 500
+            ? updated.sublist(updated.length - 500)
+            : updated;
+      });
+    }
+  }
+
+  Future<void> _showVideoOcr() async {
+    if (_videoOcrCapturing || _videoOcrBytes != null) return;
+    setState(() => _videoOcrCapturing = true);
+    await _player.pause();
+    try {
+      final bytes = await _player.screenshot(
+        format: 'image/png',
+        includeLibassSubtitles: _includeSubtitles,
+      );
+      if (!mounted) return;
+      if (bytes == null || bytes.isEmpty) {
+        botToast('Unable to capture the current video frame', second: 4);
+        return;
+      }
+      setState(() => _videoOcrBytes = bytes);
+    } catch (error) {
+      if (mounted) botToast('Video OCR capture failed: $error', second: 5);
+    } finally {
+      if (mounted) setState(() => _videoOcrCapturing = false);
+    }
   }
 
   void _hideNativeSubtitlePaintSoon() {
@@ -930,19 +1023,51 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         final outputDir = Directory(
           path.join((await getTemporaryDirectory()).path, 'jimaku_subtitles'),
         );
-        final subtitleFile = await service.downloadFile(
+        final subtitleFiles = await service.downloadFiles(
           apiKey: apiKey,
-          file: files.first,
+          files: files,
           outputDirectory: outputDir,
         );
-        await _setSubtitleTrack(
-          SubtitleTrack.uri(
-            subtitleFile.path,
-            title: 'Jimaku ${files.first.name}',
-            language: 'ja',
-          ),
-        );
-        if (showFeedback) botToast('Jimaku subtitle added', second: 3);
+        for (var index = 0; index < subtitleFiles.length; index++) {
+          final subtitleFile = subtitleFiles[index];
+          final file = files[index];
+          final cues = parseAnimeSubtitleFile(subtitleFile);
+          _rememberSubtitleCues(file.name, cues);
+          final platform = _player.platform;
+          if (platform is NativePlayer) {
+            await platform.command([
+              'sub-add',
+              subtitleFile.path,
+              index == 0 ? 'select' : 'auto',
+              file.name,
+              'ja',
+            ]);
+          } else if (index == 0) {
+            await _player.setSubtitleTrack(
+              SubtitleTrack.uri(
+                subtitleFile.path,
+                title: file.name,
+                language: 'ja',
+              ),
+            );
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _subtitleCues = _subtitleCuesByTitle[files.first.name] ?? const [];
+            _lastSubtitleHistoryText = '';
+            _nextSubtitleHistoryIndex = _subtitleCues.length;
+          });
+        }
+        _hideNativeSubtitlePaintSoon();
+        if (showFeedback) {
+          botToast(
+            subtitleFiles.length == 1
+                ? 'Jimaku subtitle added'
+                : 'Added ${subtitleFiles.length} Jimaku subtitles',
+            second: 3,
+          );
+        }
         return;
       }
       if (showFeedback) {
@@ -1086,6 +1211,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _currentPositionSub = _player.stream.position.listen(
       _unifiedPositionHandler,
     );
+    _subtitleTextSub = _player.stream.subtitle.listen(_updateSubtitleHistory);
     _completed;
     _currentTotalDurationSub;
     _loadAndroidFont().then((_) {
@@ -1184,6 +1310,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _player.stop();
     _completed.cancel();
     _currentPositionSub.cancel();
+    _subtitleTextSub.cancel();
     _currentTotalDurationSub.cancel();
     _currentPosition.dispose();
     _currentTotalDuration.dispose();
@@ -2050,6 +2177,28 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   },
                 ),
               IconButton(
+                tooltip: 'Video OCR',
+                icon: _videoOcrCapturing
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.document_scanner_rounded),
+                color: Colors.white,
+                onPressed: _videoOcrCapturing ? null : _showVideoOcr,
+              ),
+              IconButton(
+                tooltip: 'Subtitle list',
+                icon: const Icon(Icons.format_list_bulleted_rounded),
+                color: Colors.white,
+                onPressed: () {
+                  setState(() => _showSubtitleList = !_showSubtitleList);
+                },
+              ),
+              IconButton(
                 tooltip: context.l10n.video_subtitle,
                 icon: const Icon(Icons.subtitles_rounded),
                 color: Colors.white,
@@ -2238,6 +2387,26 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 );
               },
             ),
+          ),
+        if (_showSubtitleList)
+          AnimeSubtitleListPanel(
+            cues: _subtitleCues,
+            position: _currentPosition,
+            onSelect: (cue) {
+              unawaited(_player.seek(cue.start));
+              setState(() => _showSubtitleList = false);
+            },
+            onDismiss: () => setState(() => _showSubtitleList = false),
+          ),
+        if (_videoOcrBytes case final imageBytes?)
+          VideoOcrOverlay(
+            imageBytes: imageBytes,
+            fit: fit,
+            miningContextBuilder: _subtitleMiningContext,
+            onDismiss: () {
+              DictionaryLookupPopup.dismissActive();
+              setState(() => _videoOcrBytes = null);
+            },
           ),
       ],
     );

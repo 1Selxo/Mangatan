@@ -483,7 +483,7 @@ class Settings {
     this.novelTextAlign = NovelTextAlign.left,
     this.novelReaderTheme = '#292832',
     this.novelReaderTextColor = '#CCCCCC',
-    this.novelReaderPadding = 16,
+    this.novelReaderPadding = 12,
     this.novelReaderLineHeight = 1.5,
     this.novelShowScrollPercentage = true,
     this.novelRemoveExtraParagraphSpacing = false,

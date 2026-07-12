@@ -143,6 +143,7 @@ flutter:
   assets:
     - assets/
     - assets/hoshi_popup/
+    - assets/yomitan_transforms/
     - path: assets/fonts/
       platforms: [android]
     - assets/trackers_icons/

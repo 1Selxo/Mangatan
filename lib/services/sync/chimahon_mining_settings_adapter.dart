@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
+import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/sync/chimahon_preferences.dart';
 
 /// Bridges settings Mangatan already supports. Unsupported Chimahon keys stay
@@ -18,34 +20,39 @@ class ChimahonMiningSettingsAdapter {
     DictionaryStorage? dictionaryStorage,
   }) async {
     final popup = await MiningPreferences.getDictionaryPopupPreferences();
-    final anki = await MiningPreferences.getAnkiProfile();
+    final profiles = await MiningPreferences.getDictionaryProfiles();
+    final active = await MiningPreferences.getActiveDictionaryProfile();
     final installed = await (dictionaryStorage ?? DictionaryStorage.instance)
         .installed();
-    const profileId = 'mangatan-default';
-    final profile = ChimahonLanguageProfile(
-      id: profileId,
-      name: 'Default',
-      ankiEnabled: anki.ankiEnabled,
-      ankiDeck: anki.deckName,
-      ankiModel: anki.modelName,
-      ankiFieldMap: anki.fieldMap,
-      ankiTags: anki.tags.join(' '),
-      ankiDuplicateCheck: anki.duplicateCheck,
-      ankiDuplicateScope: anki.duplicateScope,
-      ankiDuplicateAction: 'prevent',
-      ankiCropMode: 'full',
-      ankiSyncOnCreate: anki.syncOnCreate,
-      dictionaryOrder: installed.map((dictionary) => dictionary.name).toList(),
-      enabledDictionaries: const {},
-      dictionaryCollapseMode: 'expand_all',
-      dictionaryDisplayModes: const {},
-      languageCode: '',
-    );
+    final installedNames = installed
+        .map((dictionary) => dictionary.name)
+        .toList();
+    final chimahonProfiles = [
+      for (final profile in profiles)
+        _exportProfile(
+          profile.copyWith(
+            dictionaryOrder: profile.dictionaryOrder.isEmpty
+                ? installedNames
+                : profile.dictionaryOrder,
+          ),
+        ),
+    ];
 
     return [
-      codec.encode('pref_anki_profiles', jsonEncode([profile.toJson()])),
-      codec.encode('pref_active_profile_id', profileId),
-      codec.encode('pref_dictionary_order', profile.dictionaryOrder.join(',')),
+      codec.encode(
+        'pref_anki_profiles',
+        jsonEncode(
+          chimahonProfiles.map((profile) => profile.toJson()).toList(),
+        ),
+      ),
+      codec.encode('pref_active_profile_id', active.id),
+      codec.encode(
+        'pref_dictionary_order',
+        (active.dictionaryOrder.isEmpty
+                ? installedNames
+                : active.dictionaryOrder)
+            .join(','),
+      ),
       codec.encode('pref_dictionary_popup_width', popup.width.round()),
       codec.encode('pref_dictionary_popup_height', popup.height.round()),
       codec.encode('pref_dictionary_popup_mode', 'floating'),
@@ -78,6 +85,16 @@ class ChimahonMiningSettingsAdapter {
       preferences,
       codec: codec,
     );
+    final importedProfiles = payload.languageProfiles
+        .map(_importProfile)
+        .where((profile) => profile.id.isNotEmpty)
+        .toList(growable: false);
+    if (importedProfiles.isNotEmpty) {
+      await MiningPreferences.setDictionaryProfiles(
+        importedProfiles,
+        activeId: payload.activeProfileId,
+      );
+    }
     final profile = payload.activeLanguageProfile;
     if (profile != null) {
       final current = await MiningPreferences.getAnkiProfile();
@@ -176,4 +193,54 @@ class ChimahonMiningSettingsAdapter {
     'pure_black' => DictionaryThemePreference.black,
     _ => DictionaryThemePreference.system,
   };
+
+  ChimahonLanguageProfile _exportProfile(DictionaryProfile profile) {
+    final anki = profile.anki;
+    return ChimahonLanguageProfile(
+      id: profile.id,
+      name: profile.name,
+      ankiEnabled: anki.ankiEnabled,
+      ankiDeck: anki.deckName,
+      ankiModel: anki.modelName,
+      ankiFieldMap: anki.fieldMap,
+      ankiTags: anki.tags.join(' '),
+      ankiDuplicateCheck: anki.duplicateCheck,
+      ankiDuplicateScope: anki.duplicateScope,
+      ankiDuplicateAction: profile.duplicateAction,
+      ankiCropMode: profile.cropMode,
+      ankiSyncOnCreate: anki.syncOnCreate,
+      dictionaryOrder: profile.dictionaryOrder,
+      enabledDictionaries: profile.enabledDictionaries,
+      dictionaryCollapseMode: profile.dictionaryCollapseMode,
+      dictionaryDisplayModes: profile.dictionaryDisplayModes,
+      languageCode: profile.languageCode,
+    );
+  }
+
+  DictionaryProfile _importProfile(ChimahonLanguageProfile profile) {
+    return DictionaryProfile(
+      id: profile.id,
+      name: profile.name,
+      languageCode: profile.languageCode,
+      anki: const AnkiMiningProfile().copyWith(
+        ankiEnabled: profile.ankiEnabled,
+        deckName: profile.ankiDeck,
+        modelName: profile.ankiModel,
+        tags: profile.ankiTags
+            .split(RegExp(r'[\s,]+'))
+            .where((tag) => tag.isNotEmpty)
+            .toList(),
+        duplicateCheck: profile.ankiDuplicateCheck,
+        duplicateScope: profile.ankiDuplicateScope,
+        syncOnCreate: profile.ankiSyncOnCreate,
+        fieldMap: profile.ankiFieldMap,
+      ),
+      dictionaryOrder: profile.dictionaryOrder,
+      enabledDictionaries: profile.enabledDictionaries,
+      dictionaryCollapseMode: profile.dictionaryCollapseMode,
+      dictionaryDisplayModes: profile.dictionaryDisplayModes,
+      duplicateAction: profile.ankiDuplicateAction,
+      cropMode: profile.ankiCropMode,
+    );
+  }
 }

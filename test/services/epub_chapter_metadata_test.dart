@@ -1,12 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/src/rust/api/epub.dart';
 
 void main() {
   Chapter chapter({
     required int id,
     required int spineIndex,
     required bool navigation,
+    int? logicalChapterSpineIndex,
+    int? characterStart,
     String archivePath = 'book.epub',
   }) => Chapter(
     id: id,
@@ -17,6 +20,8 @@ void main() {
     description: epubChapterMetadata(
       spineIndex: spineIndex,
       navigationEntry: navigation,
+      logicalChapterSpineIndex: logicalChapterSpineIndex,
+      characterStart: characterStart,
     ),
   );
 
@@ -42,6 +47,62 @@ void main() {
     expect(isEpubNavigationChapter(internal), isFalse);
     expect(isInternalEpubSpineChapter(navigation), isFalse);
     expect(isEpubNavigationChapter(navigation), isTrue);
+  });
+
+  test('stores Chimahon accumulated character positions on TOC rows', () {
+    final counted = chapter(
+      id: 1,
+      spineIndex: 6,
+      navigation: true,
+      characterStart: 1200,
+    );
+    final legacy = Chapter(
+      id: 2,
+      mangaId: 1,
+      name: 'Legacy',
+      archivePath: 'book.epub',
+      description: 'mangatan:epub:v6:navigation:6:6',
+    );
+
+    expect(epubChapterCharacterStart(counted), 1200);
+    expect(epubChapterCharacterStart(legacy), isNull);
+  });
+
+  test('calculates accumulated character positions over the linear spine', () {
+    const book = EpubNovel(
+      name: 'fixture',
+      chapters: [
+        EpubChapter(
+          name: 'First',
+          content: '<body>abc日本</body>',
+          path: 'first',
+          href: 'first.xhtml',
+          spineIndex: 2,
+          isNavigationEntry: true,
+        ),
+        EpubChapter(
+          name: 'Aside',
+          content: '<body>ignored</body>',
+          path: 'aside',
+          href: 'aside.xhtml',
+          spineIndex: 3,
+          isLinear: false,
+          isNavigationEntry: false,
+        ),
+        EpubChapter(
+          name: 'Second',
+          content: '<body>かな12</body>',
+          path: 'second',
+          href: 'second.xhtml',
+          spineIndex: 4,
+          isNavigationEntry: true,
+        ),
+      ],
+      images: [],
+      stylesheets: [],
+    );
+
+    expect(epubCharacterStartsBySpine(book), {2: 0, 4: 5});
   });
 
   test('managed metadata hides unmatched legacy spine fragments', () {
@@ -102,7 +163,7 @@ void main() {
     expect(epubNavigationChaptersInSpineOrder([unsplit]), [unsplit]);
   });
 
-  test('hides stale spine rows beside an unsplit legacy EPUB row', () {
+  test('prefers reconciled navigation rows over an obsolete unsplit row', () {
     final unsplit = Chapter(
       id: 1,
       mangaId: 1,
@@ -119,7 +180,60 @@ void main() {
         unsplit,
         staleInternal,
       ]),
-      [unsplit],
+      [staleNavigation],
+    );
+  });
+
+  test('recognizes legacy EPUB navigation metadata during migration', () {
+    final legacy = Chapter(
+      id: 1,
+      mangaId: 1,
+      name: 'Legacy shortcut',
+      archivePath: 'book.epub',
+      dateUpload: '12',
+      description: 'mangatan:epub:v5:navigation:12:12',
+    );
+
+    expect(isEpubNavigationChapter(legacy), isTrue);
+    expect(isManagedEpubChapter(legacy), isFalse);
+    expect(epubChapterSpineIndex(legacy), 12);
+  });
+
+  test('projects read rows and whole-book progress from the live position', () {
+    final first = chapter(id: 1, spineIndex: 0, navigation: true);
+    final current = chapter(id: 2, spineIndex: 5, navigation: true);
+    final later = chapter(id: 3, spineIndex: 20, navigation: true)
+      ..isRead = true
+      ..lastPageRead = '0.9';
+
+    final changed = applyEpubShortcutPositionProjection(
+      chapters: [later, current, first],
+      spineIndex: 7,
+      overallProgress: 0.42,
+    );
+
+    expect(changed, containsAll([first, current, later]));
+    expect((first.isRead, first.lastPageRead), (true, ''));
+    expect((current.isRead, current.lastPageRead), (false, '0.42'));
+    expect((later.isRead, later.lastPageRead), (false, ''));
+
+    applyEpubShortcutPositionProjection(
+      chapters: [first, current, later],
+      spineIndex: 0,
+      overallProgress: 0.1,
+    );
+    expect((first.isRead, first.lastPageRead), (false, '0.1'));
+    expect(current.isRead, isFalse);
+
+    applyEpubShortcutPositionProjection(
+      chapters: [first, current, later],
+      spineIndex: 20,
+      overallProgress: 1,
+    );
+    expect([first, current, later].every((row) => row.isRead == true), isTrue);
+    expect(
+      [first, current, later].every((row) => row.lastPageRead == ''),
+      isTrue,
     );
   });
 }

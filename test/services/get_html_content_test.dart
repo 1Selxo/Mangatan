@@ -52,6 +52,106 @@ void main() {
 
     expect(content, contains('探偵はもう、死んでいる。'));
     expect(content, contains('辞書検索できます。'));
+    expect(content, contains('id="mangatan-spine-0"'));
+    expect(content, contains('data-mangatan-chapter-index="0"'));
+    expect(content, contains('data-mangatan-chapter-index="1"'));
+    final document = parse(content);
+    expect(
+      document.querySelectorAll('.mangatan-logical-section'),
+      hasLength(2),
+    );
+  });
+
+  test('groups physical spine files under logical TOC chapter boundaries', () {
+    const grouped = EpubNovel(
+      name: 'fixture',
+      chapters: [
+        EpubChapter(
+          name: 'One',
+          content: '<body><p>one</p></body>',
+          path: 'one',
+          href: 'one.xhtml',
+          spineIndex: 0,
+          isNavigationEntry: true,
+        ),
+        EpubChapter(
+          name: 'One continued',
+          content: '<body><p>continued</p></body>',
+          path: 'one-b',
+          href: 'one-b.xhtml',
+          spineIndex: 1,
+          isNavigationEntry: false,
+        ),
+        EpubChapter(
+          name: 'Two',
+          content: '<body><p>two</p></body>',
+          path: 'two',
+          href: 'two.xhtml',
+          spineIndex: 2,
+          isNavigationEntry: true,
+        ),
+      ],
+      images: [],
+      stylesheets: [],
+    );
+
+    final document = parse(buildContinuousEpubContent(grouped));
+    final logical = document.querySelectorAll('.mangatan-logical-section');
+    expect(logical, hasLength(2));
+    expect(logical.first.attributes['data-mangatan-navigation-spine'], '0');
+    expect(
+      logical.first.querySelectorAll('section[data-mangatan-spine-index]'),
+      hasLength(2),
+    );
+    expect(logical.last.attributes['data-mangatan-navigation-spine'], '2');
+    expect(
+      logical.last.querySelectorAll('section[data-mangatan-spine-index]'),
+      hasLength(1),
+    );
+  });
+
+  test('uses Chimahon character counting semantics', () {
+    const content = '''<html><body>
+      <ruby>漢<rt>かん</rt></ruby> ABC １２３ 한글 😀
+      <script>ignored漢字</script><style>.ignored{}</style>
+    </body></html>''';
+
+    expect(chimahonChapterCharacterCount(content), 9);
+  });
+
+  test('non-linear spine items do not consume Chimahon chapter indices', () {
+    const withNonLinear = EpubNovel(
+      name: 'fixture',
+      chapters: [
+        EpubChapter(
+          name: 'Cover',
+          content: '<body><p>Cover</p></body>',
+          path: 'cover',
+          href: 'cover.xhtml',
+          spineIndex: 0,
+          isLinear: false,
+          isNavigationEntry: false,
+        ),
+        EpubChapter(
+          name: 'Chapter',
+          content: '<body><p>本文</p></body>',
+          path: 'chapter',
+          href: 'chapter.xhtml',
+          spineIndex: 1,
+          isNavigationEntry: true,
+        ),
+      ],
+      images: [],
+      stylesheets: [],
+    );
+
+    final content = buildContinuousEpubContent(withNonLinear);
+    expect(content, contains('id="mangatan-spine-0"'));
+    expect(content, contains('id="mangatan-spine-1"'));
+    expect(
+      RegExp(r'data-mangatan-chapter-index=').allMatches(content).length,
+      1,
+    );
   });
 
   test('empty markup is not considered readable chapter content', () {

@@ -68,6 +68,7 @@ void main() {
       chapters: [chapter],
       histories: [history],
       sources: [source],
+      epubBookProgress: const [],
     );
 
     expect(backup.backupSources.single.sourceId, Int64(123456789));

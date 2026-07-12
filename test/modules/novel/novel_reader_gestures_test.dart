@@ -65,6 +65,43 @@ void main() {
     );
   });
 
+  testWidgets('vertical progress bar runs from right to left', (tester) async {
+    double? changedValue;
+
+    Future<void> pumpProgressBar({required bool reverseHorizontal}) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 900,
+              child: NovelReaderProgressBar(
+                reverseHorizontal: reverseHorizontal,
+                progressFraction: 0.69,
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                onChanged: (value) => changedValue = value,
+                onChangeEnd: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pumpProgressBar(reverseHorizontal: false);
+    expect(tester.getCenter(find.text('69')).dx, lessThan(450));
+    expect(tester.getCenter(find.text('100')).dx, greaterThan(450));
+
+    await pumpProgressBar(reverseHorizontal: true);
+    expect(tester.getCenter(find.text('69')).dx, greaterThan(450));
+    expect(tester.getCenter(find.text('100')).dx, lessThan(450));
+
+    final sliderBounds = tester.getRect(find.byType(Slider));
+    await tester.tapAt(Offset(sliderBounds.left + 10, sliderBounds.center.dy));
+    expect(changedValue, isNotNull);
+    expect(changedValue!, greaterThan(0.9));
+  });
+
   test('EPUB navigation preserves exact spine order and duplicate names', () {
     const book = EpubNovel(
       name: 'fixture',

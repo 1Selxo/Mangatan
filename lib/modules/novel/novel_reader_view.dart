@@ -1399,147 +1399,42 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         child: Column(
           children: [
             if (_isView)
-              Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: CircleAvatar(
-                      radius: 21,
-                      backgroundColor: _backgroundColor(context),
-                      child: IconButton(
-                        onPressed: hasPrevChapter
-                            ? () => _goToChapter(false)
-                            : null,
-                        icon: Icon(
-                          Icons.skip_previous_rounded,
-                          color: hasPrevChapter
-                              ? bodyLargeColor
-                              : bodyLargeColor!.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Flexible(
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: _backgroundColor(context),
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: StreamBuilder(
-                        stream: _rebuildDetail.stream,
-                        builder: (context, asyncSnapshot) {
-                          return Consumer(
-                            builder: (context, ref, child) {
-                              final double progressFraction =
-                                  _pendingSeekFraction ??
-                                  (maxOffset > 0
-                                      ? (offset / maxOffset)
-                                            .clamp(0.0, 1.0)
-                                            .toDouble()
-                                      : 0.0);
-                              final scrollPercentage = (progressFraction * 100)
-                                  .round();
-                              return Row(
-                                children: [
-                                  SizedBox(width: 10),
-                                  Padding(
-                                    padding: const EdgeInsets.all(4),
-                                    child: Text(
-                                      scrollPercentage.toInt().toString(),
-                                      style: TextStyle(
-                                        color: bodyLargeColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  if (_isView)
-                                    Expanded(
-                                      flex: 14,
-                                      child: SliderTheme(
-                                        data: SliderTheme.of(context).copyWith(
-                                          trackHeight: 2.0,
-                                          thumbShape:
-                                              const RoundSliderThumbShape(
-                                                enabledThumbRadius: 6.0,
-                                              ),
-                                          overlayShape:
-                                              const RoundSliderOverlayShape(
-                                                overlayRadius: 12.0,
-                                              ),
-                                        ),
-                                        child: Slider(
-                                          onChanged: (value) {
-                                            if (_usingTtsuReader) {
-                                              setState(() {
-                                                _pendingSeekFraction = value;
-                                              });
-                                            } else if (_scrollController
-                                                .hasClients) {
-                                              _scrollController.jumpTo(
-                                                _scrollController
-                                                        .position
-                                                        .maxScrollExtent *
-                                                    value,
-                                              );
-                                            }
-                                          },
-                                          onChangeEnd: (value) {
-                                            if (!_usingTtsuReader) return;
-                                            unawaited(
-                                              _epubReaderController
-                                                  .jumpToFraction(value),
-                                            );
-                                          },
-                                          value: progressFraction,
-                                          min: 0,
-                                          max: 1,
-                                        ),
-                                      ),
-                                    ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(4.0),
-                                    child: Text(
-                                      '100',
-                                      style: TextStyle(
-                                        color: bodyLargeColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 10),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: CircleAvatar(
-                      radius: 21,
-                      backgroundColor: _backgroundColor(context),
-                      child: IconButton(
-                        onPressed: hasNextChapter
-                            ? () => _goToChapter(true)
-                            : null,
-                        icon: Transform.scale(
-                          scaleX: 1,
-                          child: Icon(
-                            Icons.skip_next_rounded,
-                            color: hasNextChapter
-                                ? bodyLargeColor
-                                : bodyLargeColor!.withValues(alpha: 0.4),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              StreamBuilder(
+                stream: _rebuildDetail.stream,
+                builder: (context, asyncSnapshot) {
+                  final double progressFraction =
+                      _pendingSeekFraction ??
+                      (maxOffset > 0
+                          ? (offset / maxOffset).clamp(0.0, 1.0).toDouble()
+                          : 0.0);
+                  return NovelReaderProgressBar(
+                    reverseHorizontal: _epubLayout.value.isVerticalWriting,
+                    progressFraction: progressFraction,
+                    backgroundColor: _backgroundColor(context),
+                    foregroundColor: bodyLargeColor!,
+                    onPreviousChapter: hasPrevChapter
+                        ? () => _goToChapter(false)
+                        : null,
+                    onNextChapter: hasNextChapter
+                        ? () => _goToChapter(true)
+                        : null,
+                    onChanged: (value) {
+                      if (_usingTtsuReader) {
+                        setState(() {
+                          _pendingSeekFraction = value;
+                        });
+                      } else if (_scrollController.hasClients) {
+                        _scrollController.jumpTo(
+                          _scrollController.position.maxScrollExtent * value,
+                        );
+                      }
+                    },
+                    onChangeEnd: (value) {
+                      if (!_usingTtsuReader) return;
+                      unawaited(_epubReaderController.jumpToFraction(value));
+                    },
+                  );
+                },
               ),
             if (_isView)
               Expanded(
@@ -1794,5 +1689,136 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     }
 
     return null;
+  }
+}
+
+class NovelReaderProgressBar extends StatelessWidget {
+  const NovelReaderProgressBar({
+    super.key,
+    required this.reverseHorizontal,
+    required this.progressFraction,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.onChanged,
+    required this.onChangeEnd,
+    this.onPreviousChapter,
+    this.onNextChapter,
+  });
+
+  final bool reverseHorizontal;
+  final double progressFraction;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
+  final VoidCallback? onPreviousChapter;
+  final VoidCallback? onNextChapter;
+
+  @override
+  Widget build(BuildContext context) {
+    final scaleX = reverseHorizontal ? -1.0 : 1.0;
+    return Transform.scale(
+      scaleX: scaleX,
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: CircleAvatar(
+              radius: 21,
+              backgroundColor: backgroundColor,
+              child: IconButton(
+                onPressed: onPreviousChapter,
+                icon: Icon(
+                  Icons.skip_previous_rounded,
+                  color: onPreviousChapter == null
+                      ? foregroundColor.withValues(alpha: 0.4)
+                      : foregroundColor,
+                ),
+              ),
+            ),
+          ),
+          Flexible(
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 10),
+                  Transform.scale(
+                    scaleX: scaleX,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Text(
+                        (progressFraction * 100).round().toString(),
+                        style: TextStyle(
+                          color: foregroundColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 14,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 2,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 12,
+                        ),
+                      ),
+                      child: Slider(
+                        onChanged: onChanged,
+                        onChangeEnd: onChangeEnd,
+                        value: progressFraction,
+                        min: 0,
+                        max: 1,
+                      ),
+                    ),
+                  ),
+                  Transform.scale(
+                    scaleX: scaleX,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Text(
+                        '100',
+                        style: TextStyle(
+                          color: foregroundColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: CircleAvatar(
+              radius: 21,
+              backgroundColor: backgroundColor,
+              child: IconButton(
+                onPressed: onNextChapter,
+                icon: Icon(
+                  Icons.skip_next_rounded,
+                  color: onNextChapter == null
+                      ? foregroundColor.withValues(alpha: 0.4)
+                      : foregroundColor,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

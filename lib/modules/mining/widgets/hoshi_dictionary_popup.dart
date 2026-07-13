@@ -352,6 +352,47 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     }
   }
 
+  Future<List<int>> _duplicateNoteIds(String expression) async {
+    try {
+      final dictionaryProfile =
+          await MiningPreferences.getActiveDictionaryProfile();
+      final profile = dictionaryProfile.anki;
+      if (!profile.ankiEnabled) return const [];
+      return AnkiConnectService(
+        endpoint: await MiningPreferences.getAnkiEndpoint(),
+      ).findDuplicateNoteIds(
+        deckName: profile.deckName,
+        modelName: profile.modelName,
+        expression: expression,
+        duplicateScope: profile.duplicateScope,
+      );
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<bool> _browseDuplicateNotes(Object? rawIds) async {
+    final ids = rawIds is Iterable
+        ? rawIds
+              .map(
+                (value) =>
+                    value is num ? value.toInt() : int.tryParse('$value'),
+              )
+              .whereType<int>()
+              .toList(growable: false)
+        : const <int>[];
+    if (ids.isEmpty) return false;
+    try {
+      await AnkiConnectService(
+        endpoint: await MiningPreferences.getAnkiEndpoint(),
+      ).browseNotes(ids);
+      return true;
+    } catch (error) {
+      botToast('Could not open Anki browser: $error', second: 5);
+      return false;
+    }
+  }
+
   Future<bool> _mine(Map<String, dynamic> content) async {
     final expression = content['expression']?.toString() ?? '';
     final reading = content['reading']?.toString() ?? '';
@@ -399,7 +440,9 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           ).exportDraft(
             draft,
             duplicateCheck: profile.duplicateCheck,
-            allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
+            allowDuplicate:
+                content['allowDuplicate'] == true ||
+                dictionaryProfile.duplicateAction == 'allow',
             duplicateScope: profile.duplicateScope,
             checkAllModels: profile.checkAllModels,
             syncOnCreate: profile.syncOnCreate,
@@ -489,6 +532,17 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       handlerName: 'duplicateCheck',
       callback: (arguments) =>
           _isDuplicate(arguments.isEmpty ? '' : arguments.first.toString()),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'duplicateNotes',
+      callback: (arguments) => _duplicateNoteIds(
+        arguments.isEmpty ? '' : arguments.first.toString(),
+      ),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'browseNotes',
+      callback: (arguments) =>
+          _browseDuplicateNotes(arguments.isEmpty ? null : arguments.first),
     );
     controller.addJavaScriptHandler(
       handlerName: 'mineEntry',
@@ -887,6 +941,8 @@ String buildHoshiPopupHtml({
     'dismissPopup',
     'mineEntry',
     'duplicateCheck',
+    'duplicateNotes',
+    'browseNotes',
     'openLink',
     'getTermAudioSources',
     'playWordAudio',
@@ -941,6 +997,7 @@ String buildHoshiPopupHtml({
 	      font-size: calc(14px * var(--popup-scale));
 	    }
 		    .button-slot { cursor: pointer; display: grid; place-items: center; color: var(--text-color-light2); }
+		    .button-slot[hidden] { display: none; }
 		    .button-slot::before { content: none; }
 		    .button-slot[data-state="loading"] .slot-icon,
 		    .button-slot[data-state="error"] .slot-icon,
@@ -958,6 +1015,12 @@ String buildHoshiPopupHtml({
 		    }
 		    .audio-icon { transform: translate(calc(1px * var(--popup-scale)), calc(1px * var(--popup-scale))); }
 		    .audio-speaker-body { fill: currentColor; }
+		    .browse-line {
+		      fill: none;
+		      stroke: currentColor;
+		      stroke-width: 1.8;
+		      stroke-linejoin: round;
+		    }
 			    .audio-wave {
 			      fill: none;
 			      stroke: currentColor;
@@ -1008,6 +1071,7 @@ String buildHoshiPopupHtml({
 	      const index = Number(slot.dataset.entryIndex);
 	      if (slot.dataset.kind === 'mine') mineEntryAtIndex(index);
 	      if (slot.dataset.kind === 'audio') playEntryAudio(index);
+	      if (slot.dataset.kind === 'browse') browseEntryNotes(index);
 	    }, true);
 	    document.addEventListener('contextmenu', (event) => {
 	      const slot = event.target.closest?.('.button-slot[data-kind="audio"]');

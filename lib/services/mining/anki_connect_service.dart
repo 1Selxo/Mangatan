@@ -111,6 +111,36 @@ class AnkiConnectService {
     return (result as List).map((item) => item as int).toList();
   }
 
+  Future<List<int>> findDuplicateNoteIds({
+    required String deckName,
+    required String modelName,
+    required String expression,
+    String duplicateScope = 'deck',
+  }) async {
+    final fields = await modelFieldNames(modelName);
+    if (fields.isEmpty || expression.trim().isEmpty) return const [];
+    final escapedDeck = _escapeSearch(deckName);
+    final rootDeck = _escapeSearch(deckName.split('::').first);
+    final escapedExpression = _escapeSearch(expression);
+    final scope = switch (duplicateScope) {
+      'collection' => '',
+      'deckroot' => '"deck:$rootDeck" ',
+      _ => '"deck:$escapedDeck" ',
+    };
+    return findNotes(
+      '$scope"${fields.first.toLowerCase()}:$escapedExpression"',
+    );
+  }
+
+  Future<List<int>> browseNotes(List<int> noteIds) async {
+    if (noteIds.isEmpty) return const [];
+    final result = await invoke(
+      'guiBrowse',
+      params: {'query': 'nid:${noteIds.join(',')}'},
+    );
+    return (result as List).map((item) => item as int).toList();
+  }
+
   Future<String?> storeMediaFile({
     required String filename,
     required Uint8List data,
@@ -307,6 +337,8 @@ class AnkiConnectService {
     }
     return options;
   }
+
+  static String _escapeSearch(String value) => value.replaceAll('"', '');
 
   Future<AnkiCardDraft> _normalizeFieldsForModel(AnkiCardDraft draft) async {
     final modelFields = await modelFieldNames(draft.modelName);

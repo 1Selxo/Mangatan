@@ -6,6 +6,52 @@ import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 
 void main() {
+  test('preserves the original hovered OCR appearance as defaults', () {
+    expect(MiningPreferences.defaultOcrBackgroundOpacity, 0.70);
+    expect(MiningPreferences.defaultOcrTextOpacity, 1.0);
+  });
+
+  test('keeps inactive OCR bubbles invisible', () {
+    expect(
+      readerOcrContentOpacities(
+        backgroundOpacity: 1,
+        textOpacity: 1,
+        active: false,
+      ),
+      (background: 0.0, text: 0.0),
+    );
+  });
+
+  test('applies separate opacities to the active OCR bubble', () {
+    expect(
+      readerOcrContentOpacities(
+        backgroundOpacity: 0.70,
+        textOpacity: 1,
+        active: true,
+      ),
+      (background: 0.70, text: 1.0),
+    );
+    expect(
+      readerOcrContentOpacities(
+        backgroundOpacity: 0.25,
+        textOpacity: 0.60,
+        active: true,
+      ),
+      (background: 0.25, text: 0.60),
+    );
+  });
+
+  test('clamps OCR content opacity to the slider range', () {
+    expect(
+      readerOcrContentOpacities(
+        backgroundOpacity: -0.5,
+        textOpacity: 1.5,
+        active: true,
+      ),
+      (background: 0.0, text: 1.0),
+    );
+  });
+
   test('keeps single-page OCR paint rect unchanged', () {
     final rect = Rect.fromLTWH(24, 48, 320, 480);
 

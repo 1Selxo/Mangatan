@@ -5,19 +5,15 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
 class JimakuException implements Exception {
-  final String message;
   const JimakuException(this.message);
+
+  final String message;
 
   @override
   String toString() => message;
 }
 
 class JimakuEntry {
-  final int id;
-  final String name;
-  final String? englishName;
-  final String? japaneseName;
-
   const JimakuEntry({
     required this.id,
     required this.name,
@@ -25,22 +21,20 @@ class JimakuEntry {
     this.japaneseName,
   });
 
-  factory JimakuEntry.fromJson(Map<String, dynamic> json) {
-    return JimakuEntry(
-      id: (json['id'] as num).toInt(),
-      name: json['name']?.toString() ?? '',
-      englishName: json['english_name']?.toString(),
-      japaneseName: json['japanese_name']?.toString(),
-    );
-  }
+  factory JimakuEntry.fromJson(Map<String, dynamic> json) => JimakuEntry(
+    id: (json['id'] as num).toInt(),
+    name: json['name']?.toString() ?? '',
+    englishName: json['english_name']?.toString(),
+    japaneseName: json['japanese_name']?.toString(),
+  );
+
+  final int id;
+  final String name;
+  final String? englishName;
+  final String? japaneseName;
 }
 
 class JimakuFile {
-  final Uri url;
-  final String name;
-  final int size;
-  final String lastModified;
-
   const JimakuFile({
     required this.url,
     required this.name,
@@ -48,28 +42,31 @@ class JimakuFile {
     required this.lastModified,
   });
 
-  factory JimakuFile.fromJson(Map<String, dynamic> json) {
-    return JimakuFile(
-      url: _absoluteJimakuUri(json['url']?.toString() ?? ''),
-      name: json['name']?.toString() ?? 'jimaku-subtitle.srt',
-      size: (json['size'] as num?)?.toInt() ?? 0,
-      lastModified: json['last_modified']?.toString() ?? '',
-    );
-  }
+  factory JimakuFile.fromJson(Map<String, dynamic> json) => JimakuFile(
+    url: Uri.parse(json['url']?.toString() ?? ''),
+    name: json['name']?.toString() ?? 'jimaku-subtitle.srt',
+    size: (json['size'] as num?)?.toInt() ?? 0,
+    lastModified: json['last_modified']?.toString() ?? '',
+  );
+
+  final Uri url;
+  final String name;
+  final int size;
+  final String lastModified;
 }
 
 class JimakuMediaGuess {
-  final String title;
-  final int? episode;
-  final int? season;
-  final Set<int> episodeCandidates;
-
   const JimakuMediaGuess({
     required this.title,
     this.episode,
     this.season,
-    this.episodeCandidates = const {},
-  });
+    Set<int>? episodeCandidates,
+  }) : episodeCandidates = episodeCandidates ?? const {};
+
+  final String title;
+  final int? episode;
+  final int? season;
+  final Set<int> episodeCandidates;
 
   String get displayName {
     final seasonText = season == null ? '' : ' season $season';
@@ -77,68 +74,30 @@ class JimakuMediaGuess {
     return '$title$seasonText$episodeText';
   }
 
-  bool matchesEpisode(int value) {
-    return value == episode || episodeCandidates.contains(value);
-  }
+  bool matchesEpisode(int value) =>
+      value == episode || episodeCandidates.contains(value);
 
-  bool matchesAnyEpisode(JimakuMediaGuess other) {
-    final mine = {...episodeCandidates, if (episode != null) episode!};
-    final theirs = {
-      ...other.episodeCandidates,
-      if (other.episode != null) other.episode!,
-    };
-    return mine.any(theirs.contains);
-  }
-
-  bool get hasEpisodeCandidates {
-    return episode != null || episodeCandidates.isNotEmpty;
-  }
-}
-
-class JimakuSearchCandidate {
-  final String query;
-  final JimakuMediaGuess guess;
-  final List<String> scoringTitles;
-
-  const JimakuSearchCandidate({
-    required this.query,
-    required this.guess,
-    required this.scoringTitles,
-  });
-
-  String get displayName {
-    final suffix = query == guess.title ? '' : ' via "$query"';
-    return '${guess.displayName}$suffix';
-  }
+  bool get hasEpisodeCandidates =>
+      episode != null || episodeCandidates.isNotEmpty;
 }
 
 class JimakuSubtitleService {
-  static const _baseUrl = 'https://jimaku.cc/api';
-
-  final http.Client _client;
-
   JimakuSubtitleService({http.Client? client})
     : _client = client ?? http.Client();
+
+  static const _baseUrl = 'https://jimaku.cc/api';
+  final http.Client _client;
 
   Future<List<JimakuEntry>> searchEntries({
     required String apiKey,
     required String query,
   }) async {
-    final anime = await _searchEntries(
-      apiKey: apiKey,
-      query: query,
-      anime: true,
-    );
-    final nonAnime = await _searchEntries(
-      apiKey: apiKey,
-      query: query,
-      anime: false,
-    );
-    final byId = <int, JimakuEntry>{};
-    for (final entry in [...anime, ...nonAnime]) {
-      byId[entry.id] = entry;
-    }
-    return byId.values.toList();
+    final entries = [
+      ...await _searchEntries(apiKey: apiKey, query: query, anime: true),
+      ...await _searchEntries(apiKey: apiKey, query: query, anime: false),
+    ];
+    final seen = <int>{};
+    return entries.where((entry) => seen.add(entry.id)).toList();
   }
 
   Future<List<JimakuFile>> getFiles({
@@ -146,16 +105,15 @@ class JimakuSubtitleService {
     required int entryId,
     int? episode,
   }) async {
-    final query = <String, String>{};
-    if (episode != null) query['episode'] = episode.toString();
-    final uri = Uri.parse(
-      '$_baseUrl/entries/$entryId/files',
-    ).replace(queryParameters: query.isEmpty ? null : query);
+    final builder = Uri.parse('$_baseUrl/entries/$entryId/files');
+    final uri = episode == null
+        ? builder
+        : builder.replace(queryParameters: {'episode': episode.toString()});
     final response = await _client.get(uri, headers: _headers(apiKey));
     _throwIfBad(response);
     return (jsonDecode(response.body) as List)
         .whereType<Map>()
-        .map((item) => JimakuFile.fromJson(item.cast<String, dynamic>()))
+        .map((value) => JimakuFile.fromJson(value.cast<String, dynamic>()))
         .toList();
   }
 
@@ -165,14 +123,12 @@ class JimakuSubtitleService {
     required Directory outputDirectory,
   }) async {
     await outputDirectory.create(recursive: true);
-    final outputFile = File(
-      p.join(outputDirectory.path, _safeFileName(file.name)),
-    );
-    if (await outputFile.exists()) await outputFile.delete();
+    final output = File(p.join(outputDirectory.path, _safeFileName(file.name)));
+    if (await output.exists()) await output.delete();
     final response = await _client.get(file.url, headers: _headers(apiKey));
     _throwIfBad(response);
-    await outputFile.writeAsBytes(response.bodyBytes);
-    return outputFile;
+    await output.writeAsBytes(response.bodyBytes);
+    return output;
   }
 
   Future<List<File>> downloadFiles({
@@ -198,15 +154,22 @@ class JimakuSubtitleService {
     required JimakuEntry entry,
     required JimakuMediaGuess guess,
   }) async {
-    var files = await getFiles(
+    final episodeFiles = await getFiles(
       apiKey: apiKey,
       entryId: entry.id,
       episode: guess.episode,
     );
-    var matched = files.matchedSubtitleFiles(guess, episodeFiltered: true);
-    if (matched.isNotEmpty || guess.episode == null) return matched;
-    files = await getFiles(apiKey: apiKey, entryId: entry.id);
-    return files.matchedSubtitleFiles(guess, episodeFiltered: false);
+    final matched = episodeFiles.matchedSrtFiles(
+      guess,
+      episodeFiltered: guess.episode != null,
+    );
+    if (matched.isNotEmpty || guess.episode == null) {
+      return _distinctJimakuFilesByUrl(matched);
+    }
+    final allFiles = await getFiles(apiKey: apiKey, entryId: entry.id);
+    return _distinctJimakuFilesByUrl(
+      allFiles.matchedSrtFiles(guess, episodeFiltered: false),
+    );
   }
 
   Future<List<JimakuEntry>> _searchEntries({
@@ -221,13 +184,13 @@ class JimakuSubtitleService {
     _throwIfBad(response);
     return (jsonDecode(response.body) as List)
         .whereType<Map>()
-        .map((item) => JimakuEntry.fromJson(item.cast<String, dynamic>()))
+        .map((value) => JimakuEntry.fromJson(value.cast<String, dynamic>()))
         .toList();
   }
 
-  Map<String, String> _headers(String apiKey) {
-    return {'Authorization': apiKey.trim()};
-  }
+  Map<String, String> _headers(String apiKey) => {
+    'Authorization': apiKey.trim(),
+  };
 
   void _throwIfBad(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
@@ -237,226 +200,123 @@ class JimakuSubtitleService {
   }
 }
 
+class _JimakuEpisodeNumbers {
+  const _JimakuEpisodeNumbers(this.primary, this.candidates);
+
+  final int? primary;
+  final Set<int> candidates;
+}
+
 JimakuMediaGuess? guessJimakuMedia(String value) {
-  final withoutExtension = value.toJimakuFilename().replaceAll(
-    _knownExtensionRegex,
-    '',
+  final withoutExtension = _toJimakuFilename(
+    value,
+  ).replaceAll(_knownExtensionRegex, '');
+  final season = _firstNumber(_seasonRegexes, withoutExtension);
+  final episodeNumbers = _jimakuEpisodeNumbers(withoutExtension);
+  final title = _cleanJimakuTitleCandidate(
+    _preferredJimakuTitleSeed(withoutExtension),
   );
-  final season = _seasonRegexes
-      .map((regex) => regex.firstMatch(withoutExtension)?.group(1))
-      .map((value) => int.tryParse(value ?? ''))
-      .whereType<int>()
-      .firstOrNull;
-  final episodes = withoutExtension.jimakuEpisodeNumbers();
-  final title = withoutExtension.preferredJimakuTitleSeed().cleanJimakuTitle();
   if (title.trim().isEmpty) return null;
   return JimakuMediaGuess(
     title: title,
-    episode: episodes.$1,
+    episode: episodeNumbers.primary,
     season: season,
-    episodeCandidates: episodes.$2,
+    episodeCandidates: episodeNumbers.candidates,
   );
 }
 
-List<JimakuSearchCandidate> buildJimakuSearchCandidates({
-  required Iterable<String> values,
-  String titleOverride = '',
+JimakuMediaGuess buildChimahonJimakuGuess({
+  String overrideTitle = '',
+  String animeTitle = '',
+  String mediaTitle = '',
+  String videoTitle = '',
+  String videoUrl = '',
+  int? episodeNumber,
 }) {
-  final parsed = values
-      .map(_parseJimakuName)
-      .whereType<_ParsedJimakuName>()
+  final candidates = [
+    animeTitle,
+    mediaTitle,
+    videoTitle,
+    videoUrl,
+  ].where((value) => value.trim().isNotEmpty);
+  final parsedCandidates = candidates
+      .map(guessJimakuMedia)
+      .whereType<JimakuMediaGuess>()
       .toList();
-  final firstParsed = parsed.firstOrNull;
-  final episodeCandidates = parsed
-      .expand((item) => item.episodeCandidates)
-      .toSet();
-  final episode = parsed
-      .map((item) => item.episode)
-      .whereType<int>()
-      .firstOrNull;
-  final season = parsed.map((item) => item.season).whereType<int>().firstOrNull;
-  final candidates = <JimakuSearchCandidate>[];
-
-  void addCandidate({
-    required String query,
-    required String title,
-    int? candidateSeason,
-    int? candidateEpisode,
-    Set<int> candidateEpisodeCandidates = const {},
-    Iterable<String> scoringTitles = const [],
-  }) {
-    final cleanedQuery = query.cleanJimakuTitle(keepSeason: true);
-    final cleanedTitle = title.cleanJimakuTitle(keepSeason: true);
-    if (cleanedQuery.normalizedJimakuText().length < 2 ||
-        cleanedTitle.normalizedJimakuText().length < 2) {
-      return;
-    }
-    final allScoringTitles =
-        [
-              cleanedTitle,
-              cleanedTitle.withoutSeasonDescriptor(),
-              cleanedQuery,
-              cleanedQuery.withoutSeasonDescriptor(),
-              ...scoringTitles,
-            ]
-            .map((item) => item.cleanJimakuTitle(keepSeason: true))
-            .where((item) => item.normalizedJimakuText().length >= 2)
-            .toList();
-    final uniqueScoringTitles = _uniqueStrings(allScoringTitles);
-    final guess = JimakuMediaGuess(
-      title: cleanedTitle,
-      season: candidateSeason ?? season,
-      episode: candidateEpisode ?? episode,
-      episodeCandidates: {...episodeCandidates, ...candidateEpisodeCandidates},
-    );
-    final duplicate = candidates.any((candidate) {
-      return candidate.query.normalizedJimakuText() ==
-              cleanedQuery.normalizedJimakuText() &&
-          candidate.guess.title.normalizedJimakuText() ==
-              guess.title.normalizedJimakuText() &&
-          candidate.guess.season == guess.season &&
-          candidate.guess.episode == guess.episode;
-    });
-    if (!duplicate) {
-      candidates.add(
-        JimakuSearchCandidate(
-          query: cleanedQuery,
-          guess: guess,
-          scoringTitles: uniqueScoringTitles,
-        ),
-      );
+  JimakuMediaGuess? parsed;
+  for (final candidate in parsedCandidates) {
+    if (candidate.season != null || candidate.episode != null) {
+      parsed = candidate;
+      break;
     }
   }
-
-  final override = titleOverride.trim();
-  if (override.isNotEmpty) {
-    final overrideParsed = _parseJimakuName(override);
-    final title = overrideParsed?.titleWithSeason ?? override;
-    addCandidate(
-      query: title,
-      title: title,
-      candidateSeason: overrideParsed?.season,
-      candidateEpisode: overrideParsed?.episode,
-      candidateEpisodeCandidates: overrideParsed?.episodeCandidates ?? const {},
-      scoringTitles: [
-        if (firstParsed != null) firstParsed.titleWithSeason,
-        if (firstParsed != null) firstParsed.title,
-      ],
-    );
-    final titleWithoutSeason = title.withoutSeasonDescriptor();
-    if (titleWithoutSeason != title) {
-      addCandidate(
-        query: titleWithoutSeason,
-        title: title,
-        candidateSeason: overrideParsed?.season,
-        candidateEpisode: overrideParsed?.episode,
-        candidateEpisodeCandidates:
-            overrideParsed?.episodeCandidates ?? const {},
-        scoringTitles: [title],
-      );
-    }
-    return candidates;
-  }
-
-  for (final item in parsed) {
-    addCandidate(
-      query: item.titleWithSeason,
-      title: item.titleWithSeason,
-      candidateSeason: item.season,
-      candidateEpisode: item.episode,
-      candidateEpisodeCandidates: item.episodeCandidates,
-      scoringTitles: [item.title],
-    );
-    if (item.title != item.titleWithSeason) {
-      addCandidate(
-        query: item.title,
-        title: item.titleWithSeason,
-        candidateSeason: item.season,
-        candidateEpisode: item.episode,
-        candidateEpisodeCandidates: item.episodeCandidates,
-        scoringTitles: [item.titleWithSeason],
-      );
-    }
-  }
-
-  return candidates;
+  parsed ??= parsedCandidates.firstOrNull;
+  final title = overrideTitle.trim().isNotEmpty
+      ? overrideTitle.trim()
+      : animeTitle.trim().isNotEmpty
+      ? animeTitle.trim()
+      : parsed?.title.trim().isNotEmpty == true
+      ? parsed!.title.trim()
+      : mediaTitle.trim();
+  final episode = episodeNumber != null && episodeNumber >= 0
+      ? episodeNumber
+      : parsed?.episode;
+  return JimakuMediaGuess(
+    title: title,
+    episode: episode,
+    season: parsed?.season,
+  );
 }
 
 JimakuEntry? selectBestJimakuEntry(List<JimakuEntry> entries, String title) {
   if (entries.isEmpty) return null;
   if (entries.length == 1) return entries.first;
-  final target = title.normalizedJimakuText();
+
+  final target = _normalizedJimakuText(title);
   for (final entry in entries) {
     final names = [
       entry.name,
       entry.englishName ?? '',
       entry.japaneseName ?? '',
     ];
-    if (names.any((name) => name.normalizedJimakuText() == target)) {
+    if (names.any((name) => _normalizedJimakuText(name) == target)) {
       return entry;
     }
   }
-  final ranked = [...entries]
-    ..sort((a, b) {
-      return _entryScore(b, title).compareTo(_entryScore(a, title));
-    });
-  return ranked.first;
-}
 
-JimakuEntry? selectBestJimakuEntryForTitles(
-  List<JimakuEntry> entries,
-  Iterable<String> titles,
-) {
-  if (entries.isEmpty) return null;
-  if (entries.length == 1) return entries.first;
-  final cleanedTitles = _uniqueStrings(
-    titles
-        .map((title) => title.cleanJimakuTitle(keepSeason: true))
-        .where((title) => title.normalizedJimakuText().length >= 2),
-  );
-  if (cleanedTitles.isEmpty) return entries.first;
-  final ranked = [...entries]
-    ..sort((a, b) {
-      return _bestEntryScore(
-        b,
-        cleanedTitles,
-      ).compareTo(_bestEntryScore(a, cleanedTitles));
-    });
-  return ranked.first;
+  final ranked =
+      entries.map((entry) => (entry, _entryScore(entry, title))).toList()
+        ..sort((a, b) => b.$2.compareTo(a.$2));
+  return ranked.firstOrNull?.$1;
 }
 
 extension JimakuFileMatcher on List<JimakuFile> {
-  List<JimakuFile> matchedSubtitleFiles(
+  List<JimakuFile> matchedSrtFiles(
     JimakuMediaGuess guess, {
     required bool episodeFiltered,
   }) {
-    final files =
-        where((file) {
-          final lower = file.name.toLowerCase();
-          return lower.endsWith('.srt') ||
-              lower.endsWith('.ass') ||
-              lower.endsWith('.ssa') ||
-              lower.endsWith('.vtt');
-        }).where((file) {
+    final result = where((file) => file.name.toLowerCase().endsWith('.srt'))
+        .where((file) {
           final parsed = guessJimakuMedia(file.name);
-          final parsedSeason = parsed?.season;
           final parsedEpisode = parsed?.episode;
+          final parsedSeason = parsed?.season;
           final seasonMatches =
               guess.season == null ||
               parsedSeason == null ||
               parsedSeason == guess.season;
-          if (!seasonMatches) return false;
-          if (guess.episode == null) return true;
-          return parsed?.matchesAnyEpisode(guess) == true ||
-              (episodeFiltered &&
-                  parsed?.hasEpisodeCandidates != true &&
-                  parsedEpisode == null);
-        }).toList();
-    files.sort((a, b) {
+          return seasonMatches &&
+              (guess.episode == null ||
+                  parsed?.matchesEpisode(guess.episode!) == true ||
+                  (episodeFiltered &&
+                      parsed?.hasEpisodeCandidates != true &&
+                      parsedEpisode == null));
+        })
+        .toList();
+    result.sort((a, b) {
       final score = _fileScore(b, guess).compareTo(_fileScore(a, guess));
       return score == 0 ? a.name.compareTo(b.name) : score;
     });
-    return files;
+    return result;
   }
 }
 
@@ -482,7 +342,12 @@ final _episodeRegexes = [
 ];
 
 final _standaloneEpisodeRegex = RegExp(
-  r'(?:^|[^A-Za-z0-9])(\d{1,4})(?![A-Za-z0-9pP])',
+  r'(?<![A-Za-z0-9])(\d{1,4})(?![A-Za-z0-9]|p|P)',
+);
+
+final _episodeCleanupRegex = RegExp(
+  r'\bS\s*\d{1,3}\s*[._ -]*(?:E|xE?|x)\s*\d{1,4}\b|\b\d{1,3}\s*x\s*\d{1,4}\b|\b(?:ep|eps|episode|episodes|episodio|episodios|capitulo|capitulos|cap|e)\.?\s*[-_ ]?\d{1,4}(?:v\d+)?\b|[#\uff03]\s*\d{1,4}\b|\u7b2c\s*\d{1,4}\s*[\u8a71\u96c6\u56de]|\d{1,4}\s*[\u8a71\u96c6\u56de]|(?:\uc81c\s*)?\d{1,4}\s*(?:\ud654|\ud68c)',
+  caseSensitive: false,
 );
 
 final _seasonRegexes = [
@@ -495,11 +360,12 @@ final _seasonRegexes = [
     r'\b(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione|temp|s)\.?\s*(\d{1,3})\b',
     caseSensitive: false,
   ),
-  RegExp(
-    r'\b(\d{1,3})(?:st|nd|rd|th)?[._ -]*(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione)\b',
-    caseSensitive: false,
-  ),
 ];
+
+final _seasonCleanupRegex = RegExp(
+  r'\bseason[ ._-]*\d{1,3}\b',
+  caseSensitive: false,
+);
 
 final _knownExtensionRegex = RegExp(
   r'\.(?:3g2|3gp|avi|divx|flv|m2ts|m4v|mkv|mov|mp4|mpeg|mpg|ogm|ogv|rmvb|ts|vob|webm|wmv|ass|idx|smi|srt|ssa|sub|vtt)$',
@@ -507,41 +373,29 @@ final _knownExtensionRegex = RegExp(
 );
 
 const _releaseInfoPattern =
-    r'144p|240p|360p|368p|480p|540p|576p|720p|900p|960p|1080[pi]|1440p|2160p|4320p|4k|8k|uhd|fhd|vhs(?:rip)?|cam(?:rip)?|hdcam|telesync|hdts|workprint|telecine|hdtc|ppv|sdtv|hdtv|tvrip|dvb|vod(?:rip)?|web(?:rip|dl|cap|uhd)?|web-?dl|dvd(?:rip|r|5|9)?|blu-?ray|b[dr](?:rip|remux)?|brrip|bdrip|remux|xvid|divx|x264|x265|h[._-]?264|h[._-]?265|hevc|avc|av1|vp9|hi10p|10bit|8bit|aac|ac-?3|e-?ac-?3|ddp?|dts(?:-?hd|-?ma|-?x)?|true-?hd|atmos|flac|opus|dual[ ._-]?audio|multi[ ._-]?audio|fansub|hardsub|softsub|subbed|dubbed|vostfr|hdr(?:10\+?)?|proper|repack|uncensored|uncut|remastered|complete|amzn|amazon|nf|netflix|cr|crunchyroll|hidive|bilibili';
+    r'144p|240p|360p|368p|480p|540p|576p|720p|900p|960p|1080[pi]|1440p|2160p|4320p|4k|8k|uhd|fhd|vhs(?:rip)?|cam(?:rip)?|hdcam|telesync|hdts|ts|workprint|wp|telecine|hdtc|tc|ppv|sdtv|pdtv|hdtv|tvrip|dvb|dsr|dth|satrip|vod(?:rip)?|web(?:rip|dl|cap|uhd)?|webrip|web-dl|webdl|webcap|dlweb|dvd(?:rip|r|5|9)?|dvdrip|hddvd|blu-?ray|b[dr](?:rip|remux)?|brrip|bdrip|remux|xvid|divx|x264|x265|h[._-]?264|h[._-]?265|hevc|avc|av1|vp9|vc-?1|mpeg-?2|hi10p|10bit|8bit|mp3|mp2|aac|ac-?3|e-?ac-?3|ddp?|dd\+|dts(?:-?hd|-?ma|-?x)?|true-?hd|atmos|flac|opus|vorbis|pcm|lpcm|[257]\.?1(?:ch)?|[12678]ch|dual[ ._-]?audio|multi[ ._-]?audio|fansub|fastsub|hardsub|softsub|subbed|dubbed|vostfr|vost|pal|ntsc|secam|hdr(?:10\+?)?|dv|dolby[ ._-]?vision|sdr|bt[ ._-]?2020|proper|repack|rerip|internal|limited|extended|uncensored|uncut|remastered|directors?[ ._-]?cut|hybrid|complete|amzn|amazon|nf|netflix|hulu|dsnp|disney\+?|cr|crunchyroll|hidive|hbo|hmax|atvp|baha|bilibili|funi|yye?ts';
 
-final _episodeCleanupRegex = RegExp(
-  r'\bS\s*\d{1,3}\s*[._ -]*(?:E|xE?|x)\s*\d{1,4}\b|\b\d{1,3}\s*x\s*\d{1,4}\b|\b(?:ep|eps|episode|episodes|episodio|episodios|capitulo|capitulos|cap|e)\.?\s*[-_ ]?\d{1,4}(?:v\d+)?\b|[#\uff03]\s*\d{1,4}\b|\u7b2c\s*\d{1,4}\s*[\u8a71\u96c6\u56de]|\d{1,4}\s*[\u8a71\u96c6\u56de]|(?:\uc81c\s*)?\d{1,4}\s*(?:\ud654|\ud68c)',
-  caseSensitive: false,
-);
-final _seasonCleanupRegex = RegExp(
-  r'\b(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione|temp|s)[ ._-]*\d{1,3}\b|\b\d{1,3}(?:st|nd|rd|th)?[ ._-]*(?:season|seasons|saison|saisons|seizoen|temporada|temporadas|stagione)\b',
-  caseSensitive: false,
-);
-final _trailingBareEpisodeWordRegex = RegExp(
-  r'(?:^|[\s._-]+)(?:ep|eps|episode|episodes|e)\.?\s*$',
-  caseSensitive: false,
-);
-final _releaseTailRegex = RegExp(
-  '(?:[\\s._-]+|[\\[(]\\s*)(?:$_releaseInfoPattern)(?:\$|[\\s._-]|\\]|\\)|\\}).*\$',
+final _filenameReleaseTailRegex = RegExp(
+  '(?<=\\S)(?:[\\s._-]+|[\\[(]\\s*)(?:$_releaseInfoPattern)(?=\$|[\\s._-]|\\]|\\)|\\}).*\$',
   caseSensitive: false,
 );
 final _filenameJunkRegex = RegExp(
-  '(?:^|[\\s._-])(?:$_releaseInfoPattern)(?:\$|[\\s._-])|\\[[^\\]]*]|\\([^)]*\\)|\\{[^}]*\\}',
+  '(?:^|[\\s._-])(?:$_releaseInfoPattern)(?=\$|[\\s._-])|\\[[^\\]]*]|\\([^)]*\\)|\\{[^}]*\\}',
   caseSensitive: false,
 );
 final _trailingEpisodeCleanupRegex = RegExp(
-  r'\s*(?:[-._]+\s*(?:ep|episode|e)?\.?|(?:ep|episode|e)\.?\s*)\d{1,4}\s*$',
+  r'(?<=\S)\s*(?:[-._]+\s*(?:ep|episode|e)?\.?|(?:ep|episode|e)\.?\s*)\d{1,4}\s*$',
   caseSensitive: false,
 );
 final _leadingReleaseGroupRegex = RegExp(
   r'^\s*(?:\[[^\]]{1,80}]|\([^)]{1,80}\)|\{[^}]{1,80}\})\s*',
 );
 final _trailingReleaseGroupRegex = RegExp(
-  r'-[A-Za-z0-9][A-Za-z0-9._-]{1,40}$',
+  r'(?<=\S)-[A-Za-z0-9][A-Za-z0-9._-]{1,40}$',
   caseSensitive: false,
 );
 final _hashRegex = RegExp(
-  r'[\[(]?[A-F0-9]{8}(?:[A-F0-9]{8})?[\])]?(?:$|[\s._-])',
+  r'[\[(]?[A-F0-9]{8}(?:[A-F0-9]{8})?[\])]?(?=$|[\s._-])',
   caseSensitive: false,
 );
 final _websiteRegex = RegExp(
@@ -579,129 +433,101 @@ final _titleAfterLeadingEpisodeRegexes = [
 
 const _ignoredNumbers = {480, 720, 1080, 2160, 264, 265, 10};
 
-extension _JimakuStringParsing on String {
-  String toJimakuFilename() {
-    return split(
-      '?',
-    ).first.split('#').first.split('/').last.split('\\').last.trim();
-  }
+String _toJimakuFilename(String value) => value
+    .split('?')
+    .first
+    .split('#')
+    .first
+    .split('/')
+    .last
+    .split('\\')
+    .last
+    .trim();
 
-  (int?, Set<int>) jimakuEpisodeNumbers() {
-    final absolute = _numbersFrom(_absoluteEpisodeRegexes);
-    final marked = _numbersFrom(_episodeRegexes);
-    final standalone = _standaloneEpisodeRegex
-        .allMatches(this)
-        .map((match) => int.tryParse(match.group(1) ?? ''))
-        .whereType<int>()
-        .where(
-          (number) =>
-              _isValidEpisode(number) && !_ignoredNumbers.contains(number),
-        )
-        .toList();
-    final weak = absolute.isEmpty && marked.isEmpty ? standalone : <int>[];
-    final primary =
-        absolute.firstOrNull ?? marked.firstOrNull ?? weak.lastOrNull;
-    return (primary, {...absolute, ...marked, ...weak});
-  }
-
-  List<int> _numbersFrom(List<RegExp> regexes) {
-    return regexes
-        .expand((regex) => regex.allMatches(this))
-        .map((match) => int.tryParse(match.group(match.groupCount) ?? ''))
-        .whereType<int>()
-        .where(_isValidEpisode)
-        .toList();
-  }
-
-  String preferredJimakuTitleSeed() {
-    for (final regex in _titleBeforeEpisodeRegexes) {
-      final candidate = regex.firstMatch(this)?.group(1) ?? '';
-      if (candidate.cleanJimakuTitle().normalizedJimakuText().length >= 2) {
-        return candidate;
-      }
-    }
-    for (final regex in _titleAfterLeadingEpisodeRegexes) {
-      final candidate = regex.firstMatch(this)?.group(1) ?? '';
-      if (candidate.cleanJimakuTitle().normalizedJimakuText().length >= 2) {
-        return candidate;
-      }
-    }
-    return this;
-  }
-
-  String cleanJimakuTitle({bool keepSeason = false}) {
-    return replaceAll(_knownExtensionRegex, '')
-        .replaceAll(_leadingReleaseGroupRegex, ' ')
-        .replaceAll(_hashRegex, ' ')
-        .replaceAll(_websiteRegex, ' ')
-        .replaceAll(_episodeCleanupRegex, ' ')
-        .replaceAll(keepSeason ? _neverRegex : _seasonCleanupRegex, ' ')
-        .replaceAll(_releaseTailRegex, ' ')
-        .replaceAll(_filenameJunkRegex, ' ')
-        .replaceAll(_subtitleLanguageSuffixRegex, ' ')
-        .replaceAll(_trailingEpisodeCleanupRegex, ' ')
-        .replaceAll(_trailingBareEpisodeWordRegex, ' ')
-        .replaceAll(_trailingReleaseGroupRegex, ' ')
-        .replaceAll(RegExp(r'[._-]+'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-  }
-
-  String withoutSeasonDescriptor() {
-    return replaceAll(
-      _seasonCleanupRegex,
-      ' ',
-    ).replaceAll(RegExp(r'\s+'), ' ').trim();
-  }
-
-  String normalizedJimakuText() {
-    final buffer = StringBuffer();
-    var lastWasSpace = true;
-    for (final rune in toLowerCase().runes) {
-      final char = String.fromCharCode(rune);
-      if (RegExp(r'[A-Za-z0-9]').hasMatch(char) || rune > 127) {
-        buffer.write(char);
-        lastWasSpace = false;
-      } else if (!lastWasSpace) {
-        buffer.write(' ');
-        lastWasSpace = true;
-      }
-    }
-    return buffer.toString().trim();
-  }
+_JimakuEpisodeNumbers _jimakuEpisodeNumbers(String value) {
+  final absolute = _numbersFrom(_absoluteEpisodeRegexes, value);
+  final marked = _numbersFrom(_episodeRegexes, value);
+  final standalone = _standaloneEpisodeRegex
+      .allMatches(value)
+      .map((match) => int.tryParse(match.group(1) ?? ''))
+      .whereType<int>()
+      .where(
+        (number) => _validEpisode(number) && !_ignoredNumbers.contains(number),
+      )
+      .toList();
+  final weak = absolute.isEmpty && marked.isEmpty ? standalone : <int>[];
+  final primary = absolute.firstOrNull ?? marked.firstOrNull ?? weak.lastOrNull;
+  final candidates = <int>{...absolute, ...marked, ...weak}
+    ..removeWhere((number) => !_validEpisode(number));
+  return _JimakuEpisodeNumbers(primary, candidates);
 }
 
-bool _isValidEpisode(int value) => value >= 0 && value <= 9999;
+List<int> _numbersFrom(List<RegExp> regexes, String value) => regexes
+    .expand((regex) => regex.allMatches(value))
+    .map((match) => int.tryParse(match.group(match.groupCount) ?? ''))
+    .whereType<int>()
+    .where(_validEpisode)
+    .toList();
 
-_ParsedJimakuName? _parseJimakuName(String value) {
-  final withoutExtension = value.toJimakuFilename().replaceAll(
-    _knownExtensionRegex,
-    '',
-  );
-  final season = _seasonRegexes
-      .map((regex) => regex.firstMatch(withoutExtension)?.group(1))
-      .map((value) => int.tryParse(value ?? ''))
-      .whereType<int>()
-      .firstOrNull;
-  final episodes = withoutExtension.jimakuEpisodeNumbers();
-  final seed = withoutExtension.preferredJimakuTitleSeed();
-  final titleWithSeason = seed.cleanJimakuTitle(keepSeason: true);
-  final title = titleWithSeason.withoutSeasonDescriptor();
-  if (titleWithSeason.normalizedJimakuText().length < 2 &&
-      title.normalizedJimakuText().length < 2) {
-    return null;
+int? _firstNumber(List<RegExp> regexes, String value) => regexes
+    .map((regex) => int.tryParse(regex.firstMatch(value)?.group(1) ?? ''))
+    .whereType<int>()
+    .firstOrNull;
+
+bool _validEpisode(int value) => value >= 0 && value <= 9999;
+
+String _preferredJimakuTitleSeed(String value) {
+  for (final regex in _titleBeforeEpisodeRegexes) {
+    final candidate = regex.firstMatch(value)?.group(1) ?? '';
+    if (_normalizedJimakuText(_cleanJimakuTitleCandidate(candidate)).length >=
+        2) {
+      return candidate;
+    }
   }
-  return _ParsedJimakuName(
-    titleWithSeason: titleWithSeason,
-    title: title.normalizedJimakuText().length >= 2 ? title : titleWithSeason,
-    episode: episodes.$1,
-    season: season,
-    episodeCandidates: episodes.$2,
-  );
+  for (final regex in _titleAfterLeadingEpisodeRegexes) {
+    final candidate = regex.firstMatch(value)?.group(1) ?? '';
+    if (_normalizedJimakuText(_cleanJimakuTitleCandidate(candidate)).length >=
+        2) {
+      return candidate;
+    }
+  }
+  return value;
+}
+
+String _cleanJimakuTitleCandidate(String value) => value
+    .replaceAll(_knownExtensionRegex, '')
+    .replaceAll(_leadingReleaseGroupRegex, ' ')
+    .replaceAll(_hashRegex, ' ')
+    .replaceAll(_websiteRegex, ' ')
+    .replaceAll(_episodeCleanupRegex, ' ')
+    .replaceAll(_seasonCleanupRegex, ' ')
+    .replaceAll(_filenameReleaseTailRegex, ' ')
+    .replaceAll(_filenameJunkRegex, ' ')
+    .replaceAll(_subtitleLanguageSuffixRegex, ' ')
+    .replaceAll(_trailingEpisodeCleanupRegex, ' ')
+    .replaceAll(_trailingReleaseGroupRegex, ' ')
+    .replaceAll(RegExp(r'[._-]+'), ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
+String _normalizedJimakuText(String value) {
+  final buffer = StringBuffer();
+  var lastWasSpace = true;
+  for (final rune in value.toLowerCase().runes) {
+    final character = String.fromCharCode(rune);
+    if (RegExp(r'[\p{L}\p{N}]', unicode: true).hasMatch(character)) {
+      buffer.write(character);
+      lastWasSpace = false;
+    } else if (!lastWasSpace) {
+      buffer.write(' ');
+      lastWasSpace = true;
+    }
+  }
+  return buffer.toString().trim();
 }
 
 int _entryScore(JimakuEntry entry, String title) {
-  final target = title.normalizedJimakuText();
+  final target = _normalizedJimakuText(title);
   var best = 0;
   for (final candidate in [
     entry.name,
@@ -709,21 +535,12 @@ int _entryScore(JimakuEntry entry, String title) {
     entry.japaneseName ?? '',
   ]) {
     if (candidate.trim().isEmpty) continue;
-    final normalized = candidate.normalizedJimakuText();
+    final normalized = _normalizedJimakuText(candidate);
     final score = normalized == target
         ? 100
         : normalized.contains(target) || target.contains(normalized)
         ? 90
         : _tokenScore(target, normalized);
-    if (score > best) best = score;
-  }
-  return best;
-}
-
-int _bestEntryScore(JimakuEntry entry, Iterable<String> titles) {
-  var best = 0;
-  for (final title in titles) {
-    final score = _entryScore(entry, title);
     if (score > best) best = score;
   }
   return best;
@@ -740,7 +557,7 @@ int _fileScore(JimakuFile file, JimakuMediaGuess guess) {
         : -160;
   }
   if (guess.episode != null) {
-    score += parsed?.matchesAnyEpisode(guess) == true
+    score += parsed?.matchesEpisode(guess.episode!) == true
         ? 100
         : parsed?.hasEpisodeCandidates == true
         ? -80
@@ -748,8 +565,8 @@ int _fileScore(JimakuFile file, JimakuMediaGuess guess) {
         ? 20
         : -80;
   }
-  final fileTitle = parsed?.title.normalizedJimakuText() ?? '';
-  final targetTitle = guess.title.normalizedJimakuText();
+  final fileTitle = _normalizedJimakuText(parsed?.title ?? '');
+  final targetTitle = _normalizedJimakuText(guess.title);
   if (fileTitle.isNotEmpty &&
       targetTitle.isNotEmpty &&
       (fileTitle.contains(targetTitle) || targetTitle.contains(fileTitle))) {
@@ -793,42 +610,12 @@ String _safeFileName(String value) {
   return safe.isEmpty ? 'jimaku-subtitle.srt' : safe;
 }
 
-Uri _absoluteJimakuUri(String value) {
-  final parsed = Uri.parse(value);
-  if (parsed.hasScheme) return parsed;
-  final prefix = value.startsWith('/') ? '' : '/';
-  return Uri.parse('https://jimaku.cc$prefix$value');
+List<JimakuFile> _distinctJimakuFilesByUrl(Iterable<JimakuFile> files) {
+  final seen = <Uri>{};
+  return files.where((file) => seen.add(file.url)).toList();
 }
-
-List<String> _uniqueStrings(Iterable<String> values) {
-  final seen = <String>{};
-  final result = <String>[];
-  for (final value in values) {
-    final normalized = value.normalizedJimakuText();
-    if (normalized.isEmpty || !seen.add(normalized)) continue;
-    result.add(value);
-  }
-  return result;
-}
-
-class _ParsedJimakuName {
-  final String titleWithSeason;
-  final String title;
-  final int? episode;
-  final int? season;
-  final Set<int> episodeCandidates;
-
-  const _ParsedJimakuName({
-    required this.titleWithSeason,
-    required this.title,
-    required this.episode,
-    required this.season,
-    required this.episodeCandidates,
-  });
-}
-
-final _neverRegex = RegExp(r'a^');
 
 extension _FirstOrNull<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
+  T? get lastOrNull => isEmpty ? null : last;
 }

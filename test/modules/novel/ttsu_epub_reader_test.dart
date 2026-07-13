@@ -50,6 +50,11 @@ void main() {
     expect(document, contains('originOffset: hit.offset'));
     expect(document, contains('lookupToken, repeatedLookup'));
     expect(document, contains(r'\p{Radical}'));
+    expect(
+      RegExp(r'\\p\{Script=Hangul\}').allMatches(document).length,
+      greaterThanOrEqualTo(2),
+      reason: 'Hangul must be accepted by progress and dictionary scanning',
+    );
     expect(document, contains('chimahonContinuousProgress'));
     expect(document, contains('jumpToChimahonProgress'));
     expect(document, contains('jumpToLogicalSpine'));

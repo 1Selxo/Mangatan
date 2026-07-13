@@ -1906,7 +1906,7 @@ String buildTtsuEpubDocument({
       const walker = (root = content) => document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
         acceptNode: (node) => isIgnored(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
       });
-      const isLookupChar = (character) => /[\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Han}A-Za-z0-9々〆ヶー]/u.test(character || '');
+      const isLookupChar = (character) => /[\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Han}\\p{Script=Hangul}A-Za-z0-9々〆ヶー]/u.test(character || '');
       const sentenceBoundary = (character) => /[。！？!?\\n\\r]/u.test(character || '');
       const textContainer = (node) => node?.parentElement?.closest?.('p, li, blockquote, td, th, figcaption, .glossary-content') || content;
       const caretAt = (x, y) => {

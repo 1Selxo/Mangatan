@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:mangayomi/eval/javascript/http.dart';
@@ -26,9 +25,17 @@ class MihonExtensionService implements ExtensionService {
   late String androidProxyServer;
   @override
   late Source source;
-  late final http.Client client = _createClient();
+  late final http.Client client;
+  final Map<String, String>? requestHeaders;
 
-  MihonExtensionService(this.source, this.androidProxyServer);
+  MihonExtensionService(
+    this.source,
+    this.androidProxyServer, {
+    http.Client? client,
+    this.requestHeaders,
+  }) {
+    this.client = client ?? _createClient();
+  }
 
   @override
   void dispose() {
@@ -83,7 +90,7 @@ class MihonExtensionService implements ExtensionService {
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getPopular$name",
-        "page": page + 1,
+        "page": mihonCataloguePage(page),
         "search": "",
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
@@ -120,7 +127,7 @@ class MihonExtensionService implements ExtensionService {
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getLatest$name",
-        "page": page + 1,
+        "page": mihonCataloguePage(page),
         "search": "",
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
@@ -157,7 +164,7 @@ class MihonExtensionService implements ExtensionService {
       Uri.parse("$androidProxyServer/dalvik"),
       body: jsonEncode({
         "method": "getSearch$name",
-        "page": max(1, page),
+        "page": mihonCataloguePage(page),
         "search": query,
         "filterList": _convertFilters(filters),
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
@@ -385,6 +392,8 @@ class MihonExtensionService implements ExtensionService {
   }
 
   Map<String, String> getCookie() {
+    if (requestHeaders != null) return requestHeaders!;
+
     final userAgent = isar.settings.getSync(227)!.userAgent;
     return {
       ...MClient.getCookiesPref(source.baseUrl!),

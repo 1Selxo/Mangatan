@@ -11,6 +11,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/modules/manga/home/providers/state_provider.dart';
+import 'package:mangayomi/modules/manga/home/manga_home_pagination.dart';
 import 'package:mangayomi/modules/manga/home/widget/filter_widget.dart';
 import 'package:mangayomi/modules/widgets/listview_widget.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
@@ -55,11 +56,7 @@ class TypeMangaSelector {
 }
 
 class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
-  bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
-  int _fullDataLength = 50;
-  int _page = 1;
-  bool _hasNextPage = true;
   late int _selectedIndex = widget.isLatest
       ? 1
       : widget.isSearch
@@ -68,7 +65,9 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
   late Source source = widget.source;
   late bool isLocal = source.name == "local" && source.lang == "";
   late List<dynamic> filters = isLocal ? [] : getFilterList(source: source);
-  final List<MManga> _mangaList = [];
+  late MangaHomePagination _pagination;
+  bool _isInitialPageScheduled = false;
+  int _paginationGeneration = 0;
   late StreamSubscription<List<Manga>> _mangaStreamSub;
   Map<String, Manga> _libraryIndex = {};
   List<TypeMangaSelector> _types(BuildContext context) {
@@ -80,49 +79,111 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
     ];
   }
 
-  Future<MPages?> _loadMore() async {
-    MPages? mangaRes;
-    if (_isLoading) {
-      if (source.isFullData!) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        _fullDataLength = _fullDataLength + 50;
-      } else {
-        if (_selectedIndex == 0 && !_isSearch && _query.isEmpty) {
-          mangaRes = await ref.read(
-            getPopularProvider(source: source, page: _page + 1).future,
-          );
-        } else if (_selectedIndex == 1 && !_isSearch && _query.isEmpty) {
-          mangaRes = await ref.read(
-            getLatestUpdatesProvider(source: source, page: _page + 1).future,
-          );
-        } else if (_selectedIndex == 2 && (_isSearch && _query.isNotEmpty) ||
-            _isFiltering) {
-          mangaRes = await ref.read(
-            searchProvider(
-              source: source,
-              query: _query,
-              page: _page + 1,
-              filterList: filters,
-            ).future,
-          );
-        }
+  bool get _isPopularBrowse =>
+      _selectedIndex == 0 && !_isSearch && _query.isEmpty;
+
+  Future<MPages?> _fetchPage(int page) {
+    if (_isPopularBrowse) {
+      return ref.read(getPopularProvider(source: source, page: page).future);
+    }
+    if (_selectedIndex == 1 && !_isSearch && _query.isEmpty) {
+      return ref.read(
+        getLatestUpdatesProvider(source: source, page: page).future,
+      );
+    }
+    if (_selectedIndex == 2 &&
+        (_isSearch && _query.isNotEmpty || _isFiltering)) {
+      return ref.read(
+        searchProvider(
+          source: source,
+          query: _query,
+          page: page,
+          filterList: filters,
+        ).future,
+      );
+    }
+    return Future.value(null);
+  }
+
+  Future<void> _loadMore({bool reportError = true}) async {
+    if (!_pagination.canLoadMore) return;
+
+    final generation = _paginationGeneration;
+    final pagination = _pagination;
+    final load = pagination.loadNext(_fetchPage);
+    if (mounted) setState(() {});
+    try {
+      await load;
+    } catch (error) {
+      if (reportError &&
+          mounted &&
+          generation == _paginationGeneration &&
+          identical(pagination, _pagination)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
-      if (mangaRes!.list.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _page = _page + 1;
-            _hasNextPage = mangaRes!.hasNextPage;
-          });
-        }
+    } finally {
+      if (mounted &&
+          generation == _paginationGeneration &&
+          identical(pagination, _pagination)) {
+        setState(() {});
       }
     }
-
-    return mangaRes;
   }
+
+  Future<void> _loadInitialPopularPages(int generation) async {
+    if (isLocal ||
+        !_isPopularBrowse ||
+        _pagination.isFullData ||
+        !_pagination.canLoadMore) {
+      return;
+    }
+
+    final load = _pagination.loadThroughPage(
+      popularInitialPageTarget,
+      _fetchPage,
+    );
+    if (mounted) setState(() {});
+    try {
+      await load;
+    } catch (_) {
+      // Page one remains usable and the footer can retry the failed page.
+    } finally {
+      if (mounted && generation == _paginationGeneration) setState(() {});
+    }
+  }
+
+  void _scheduleInitialPage(MPages page) {
+    if (_isInitialPageScheduled || _pagination.isInitialized) return;
+
+    _isInitialPageScheduled = true;
+    final generation = _paginationGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _paginationGeneration) return;
+      _pagination.initialize(page);
+      setState(() {});
+      unawaited(_loadInitialPopularPages(generation));
+    });
+  }
+
+  void _resetPagination() {
+    _paginationGeneration++;
+    _pagination = _createPagination();
+    _isInitialPageScheduled = false;
+  }
+
+  MangaHomePagination _createPagination() => MangaHomePagination(
+    isFullData: source.isFullData ?? false,
+    fullDataInitialItemCount: _isPopularBrowse
+        ? popularFullDataInitialItemCount
+        : 50,
+  );
 
   @override
   void initState() {
     super.initState();
+    _pagination = _createPagination();
     _scrollController.addListener(_onScroll);
     _mangaStreamSub = isar.mangas
         .filter()
@@ -159,21 +220,15 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels ==
-        _scrollController.position.maxScrollExtent) {
-      if (_mangaList.isNotEmpty &&
-          _hasNextPage &&
-          !_isLoading &&
+    // Popular uses an explicit footer after its larger two-page initial batch.
+    if (_isPopularBrowse) return;
+
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 48) {
+      if (_pagination.items.isNotEmpty &&
+          _pagination.canLoadMore &&
           !(_getManga?.isLoading ?? false)) {
-        setState(() => _isLoading = true);
-        _loadMore().then((value) {
-          if (mounted && value != null) {
-            setState(() {
-              _mangaList.addAll(value.list);
-              _isLoading = false;
-            });
-          }
-        });
+        unawaited(_loadMore());
       }
     }
   }
@@ -190,8 +245,8 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
   late final filterList = isLocal ? [] : getFilterList(source: source);
   @override
   Widget build(BuildContext context) {
-    if (_selectedIndex == 2 && (_isSearch && _query.isNotEmpty) ||
-        _isFiltering) {
+    if (_selectedIndex == 2 &&
+        (_isSearch && _query.isNotEmpty || _isFiltering)) {
       _getManga = ref.watch(
         searchProvider(
           source: source,
@@ -251,24 +306,30 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
           _isSearch
               ? SeachFormTextField(
                   onFieldSubmitted: (submit) {
-                    _mangaList.clear();
                     setState(() {
                       if (submit.isNotEmpty) {
                         _selectedIndex = 2;
-
+                        _isFiltering = false;
                         _query = submit;
                       } else {
                         _selectedIndex = 0;
+                        _isSearch = false;
+                        _isFiltering = false;
+                        _query = "";
                       }
-                      _page = 1;
+                      _resetPagination();
                     });
                   },
                   onChanged: (value) {},
                   onSuffixPressed: () {
-                    _textEditingController.clear();
-                    _mangaList.clear();
-                    _query = "";
-                    setState(() {});
+                    setState(() {
+                      _textEditingController.clear();
+                      _query = "";
+                      _isSearch = false;
+                      _isFiltering = false;
+                      _selectedIndex = 0;
+                      _resetPagination();
+                    });
                   },
                   onPressed: () {
                     setState(() {
@@ -277,9 +338,8 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                         _query = "";
                         _isFiltering = false;
                         _selectedIndex = 0;
-                        _page = 1;
                         _textEditingController.clear();
-                        _mangaList.clear();
+                        _resetPagination();
                       } else {
                         Navigator.pop(context);
                       }
@@ -370,6 +430,7 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                   if (res != null && mounted) {
                     setState(() {
                       source = res as Source;
+                      _resetPagination();
                     });
                   }
                 }
@@ -461,13 +522,11 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                             ),
                           );
                           if (result == 'filter') {
-                            _mangaList.clear();
                             if (mounted) {
                               setState(() {
                                 _selectedIndex = 2;
                                 _isFiltering = true;
-                                _page = 1;
-                                _isLoading = false;
+                                _resetPagination();
                               });
                             }
 
@@ -481,15 +540,13 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                             );
                           }
                         } else {
-                          _mangaList.clear();
                           setState(() {
                             _selectedIndex = index;
                             _isFiltering = false;
                             _isSearch = false;
                             _query = "";
                             _textEditingController.clear();
-                            _page = 1;
-                            _isLoading = false;
+                            _resetPagination();
                           });
                         }
                       },
@@ -510,23 +567,16 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
           ? const ProgressCenter()
           : _getManga!.when(
               data: (data) {
-                if (_hasNextPage) {
-                  if (!data!.hasNextPage) {
-                    if (mounted) {
-                      setState(() {
-                        _hasNextPage = false;
-                      });
-                    }
-                  }
+                if (data == null) {
+                  return Center(child: Text(l10n.no_result));
                 }
-                if (_mangaList.isEmpty && data!.list.isNotEmpty) {
-                  _mangaList.addAll(data.list);
+                if (!_pagination.isInitialized) {
+                  _scheduleInitialPage(data);
+                  return const ProgressCenter();
                 }
+
                 Widget buildProgressIndicator() {
-                  return !(data!.list.isNotEmpty &&
-                          (data.hasNextPage || _hasNextPage))
-                      ? Container()
-                      : _isLoading
+                  return _pagination.isLoading
                       ? const Center(
                           child: SizedBox(
                             height: 100,
@@ -537,28 +587,15 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                       : Padding(
                           padding: const EdgeInsets.all(4),
                           child: ElevatedButton(
+                            key: const Key('manga-home-load-more'),
                             style: ElevatedButton.styleFrom(
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(5),
                               ),
                             ),
-                            onPressed: () {
-                              if (!_getManga!.isLoading) {
-                                if (mounted) {
-                                  setState(() {
-                                    _isLoading = true;
-                                  });
-                                }
-                                _loadMore().then((value) {
-                                  if (mounted && value != null) {
-                                    setState(() {
-                                      _mangaList.addAll(value.list);
-                                      _isLoading = false;
-                                    });
-                                  }
-                                });
-                              }
-                            },
+                            onPressed: _getManga!.isLoading
+                                ? null
+                                : () => unawaited(_loadMore()),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -577,15 +614,12 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                         );
                 }
 
-                if (data!.list.isEmpty) {
+                if (_pagination.items.isEmpty) {
                   return Center(child: Text(l10n.no_result));
                 }
-                _length = source.isFullData!
-                    ? _fullDataLength
-                    : _mangaList.length;
-                _length = (_mangaList.length < _length
-                    ? _mangaList.length
-                    : _length);
+                _length = _pagination.visibleItemCount;
+                final paginationItemCount =
+                    _pagination.hasNextPage || _pagination.isLoading ? 1 : 0;
                 final isComfortableGrid =
                     displayType == DisplayType.comfortableGrid;
                 return Padding(
@@ -596,17 +630,19 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                         child: displayType == DisplayType.list
                             ? SuperListViewWidget(
                                 controller: _scrollController,
-                                itemCount: _length + 1,
+                                itemCount: _length + paginationItemCount,
                                 itemBuilder: (context, index) {
                                   if (index == _length) {
                                     return buildProgressIndicator();
                                   }
                                   return MangaHomeImageCardListTile(
                                     itemType: source.itemType,
-                                    manga: _mangaList[index],
+                                    manga: _pagination.items[index],
                                     source: source,
                                     libraryManga:
-                                        _libraryIndex[_mangaList[index].name],
+                                        _libraryIndex[_pagination
+                                            .items[index]
+                                            .name],
                                   );
                                 },
                               )
@@ -621,7 +657,7 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                                   return GridViewWidget(
                                     gridSize: gridSize,
                                     controller: _scrollController,
-                                    itemCount: _length + 1,
+                                    itemCount: _length + paginationItemCount,
                                     childAspectRatio: isComfortableGrid
                                         ? 0.642
                                         : 0.69,
@@ -631,11 +667,12 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                                       }
                                       return MangaHomeImageCard(
                                         itemType: source.itemType,
-                                        manga: _mangaList[index],
+                                        manga: _pagination.items[index],
                                         source: source,
                                         isComfortableGrid: isComfortableGrid,
                                         libraryManga:
-                                            _libraryIndex[_mangaList[index]
+                                            _libraryIndex[_pagination
+                                                .items[index]
                                                 .name],
                                       );
                                     },
@@ -660,9 +697,10 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                           children: [
                             IconButton(
                               onPressed: () {
+                                _resetPagination();
                                 if (_selectedIndex == 2 &&
-                                        (_isSearch && _query.isNotEmpty) ||
-                                    _isFiltering) {
+                                    (_isSearch && _query.isNotEmpty ||
+                                        _isFiltering)) {
                                   ref.invalidate(
                                     searchProvider(
                                       source: source,

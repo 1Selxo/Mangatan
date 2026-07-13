@@ -5,6 +5,9 @@ import 'package:mangayomi/models/source.dart';
 
 const mihonBridgeContextKey = '__mangatan_bridge_context__';
 
+/// Mihon catalogue sources use one-based page numbers.
+int mihonCataloguePage(int page) => page < 1 ? 1 : page;
+
 class MihonSourceDescriptor {
   const MihonSourceDescriptor({
     required this.id,

@@ -49,6 +49,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   final GlobalKey _subtitleTextKey = GlobalKey();
   int _highlightStart = -1;
   int _highlightEnd = -1;
+  int _highlightPopupGeneration = 0;
   Timer? _hoverLookupTimer;
   Timer? _hoverExitTimer;
   DictionaryPopupHandle? _hoverPopup;
@@ -209,7 +210,8 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     final anchor = paragraph == null
         ? Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1)
         : _lookupAnchorRect(paragraph: paragraph, selection: selection);
-    return DictionaryLookupPopup.show(
+    final popupGeneration = ++_highlightPopupGeneration;
+    final handle = await DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
       text: selection.text,
@@ -228,6 +230,27 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       },
       onHoverChanged: hoverTriggered ? _onPopupHoverChanged : null,
     );
+    if (handle != null) {
+      unawaited(_clearHighlightWhenPopupDismissed(handle, popupGeneration));
+    } else if (mounted && popupGeneration == _highlightPopupGeneration) {
+      _clearHighlightIfNeeded();
+    }
+    return handle;
+  }
+
+  Future<void> _clearHighlightWhenPopupDismissed(
+    DictionaryPopupHandle handle,
+    int popupGeneration,
+  ) async {
+    await handle.dismissed;
+    if (!mounted ||
+        !subtitleHighlightDismissalIsCurrent(
+          popupGeneration: popupGeneration,
+          currentGeneration: _highlightPopupGeneration,
+        )) {
+      return;
+    }
+    _clearHighlightIfNeeded();
   }
 
   void _handleSubtitleHover({
@@ -489,6 +512,12 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     );
   }
 }
+
+@visibleForTesting
+bool subtitleHighlightDismissalIsCurrent({
+  required int popupGeneration,
+  required int currentGeneration,
+}) => popupGeneration == currentGeneration;
 
 _SubtitleLookupSelection _extractSubtitleLookupSelection(
   String text,

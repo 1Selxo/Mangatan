@@ -44,12 +44,26 @@ class HoshiDictionaryNavigationState {
   final bool canGoForward;
 }
 
+class HoshiDictionaryTextSelection {
+  const HoshiDictionaryTextSelection({
+    required this.text,
+    required this.sentence,
+    required this.rect,
+  });
+
+  final String text;
+  final String sentence;
+  final Rect rect;
+}
+
 class HoshiDictionaryPopupController {
   _HoshiDictionaryPopupState? _state;
 
   Future<void> goBack() => _state?._navigateBack() ?? Future.value();
 
   Future<void> goForward() => _state?._navigateForward() ?? Future.value();
+
+  Future<void> clearSelection() => _state?._clearSelection() ?? Future.value();
 
   void _attach(_HoshiDictionaryPopupState state) => _state = state;
 
@@ -71,6 +85,8 @@ class HoshiDictionaryPopup extends StatefulWidget {
     this.onLoadingChanged,
     this.onLookupError,
     this.onNavigationChanged,
+    this.onTextSelected,
+    this.onTapOutside,
   });
 
   final String text;
@@ -83,6 +99,9 @@ class HoshiDictionaryPopup extends StatefulWidget {
   final ValueChanged<bool>? onLoadingChanged;
   final ValueChanged<Object>? onLookupError;
   final ValueChanged<HoshiDictionaryNavigationState>? onNavigationChanged;
+  final FutureOr<int> Function(HoshiDictionaryTextSelection selection)?
+  onTextSelected;
+  final VoidCallback? onTapOutside;
 
   @override
   State<HoshiDictionaryPopup> createState() => _HoshiDictionaryPopupState();
@@ -512,13 +531,54 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     controller.addJavaScriptHandler(
       handlerName: 'textSelected',
       callback: (arguments) async {
-        final text = _argumentMap(arguments)['text']?.toString() ?? '';
+        final body = _argumentMap(arguments);
+        final text = body['text']?.toString() ?? '';
         if (text.trim().isEmpty) return 0;
+        final onTextSelected = widget.onTextSelected;
+        if (onTextSelected != null) {
+          final rawRect = body['rect'];
+          final rect = rawRect is Map
+              ? Rect.fromLTWH(
+                  (rawRect['x'] as num?)?.toDouble() ?? 0,
+                  (rawRect['y'] as num?)?.toDouble() ?? 0,
+                  (rawRect['width'] as num?)?.toDouble() ?? 1,
+                  (rawRect['height'] as num?)?.toDouble() ?? 1,
+                )
+              : const Rect.fromLTWH(0, 0, 1, 1);
+          final count = await onTextSelected(
+            HoshiDictionaryTextSelection(
+              text: text,
+              sentence: body['sentence']?.toString() ?? '',
+              rect: rect,
+            ),
+          );
+          if (count > 0) {
+            await _evaluateJavascript(
+              'window.hoshiSelection?.highlightSelection?.($count);',
+            );
+          }
+          return count;
+        }
         final count = await _lookupRedirect(text);
         if (count > 0) {
           await _evaluateJavascript('redirect($count);');
         }
         return count;
+      },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'dictionaryMedia',
+      callback: (arguments) async {
+        final body = _argumentMap(arguments);
+        final dictionary = body['dictionary']?.toString() ?? '';
+        final path = body['path']?.toString() ?? '';
+        if (dictionary.isEmpty || path.isEmpty) return null;
+        final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
+          dictName: dictionary,
+          mediaPath: path,
+        );
+        if (bytes == null || bytes.isEmpty) return null;
+        return 'data:${_mediaMimeType(path)};base64,${base64Encode(bytes)}';
       },
     );
     controller.addJavaScriptHandler(
@@ -577,7 +637,14 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         return true;
       },
     );
-    for (final name in const ['tapOutside', 'swipeDismiss', 'buttonRects']) {
+    controller.addJavaScriptHandler(
+      handlerName: 'tapOutside',
+      callback: (_) {
+        widget.onTapOutside?.call();
+        return true;
+      },
+    );
+    for (final name in const ['swipeDismiss', 'buttonRects']) {
       controller.addJavaScriptHandler(handlerName: name, callback: (_) => null);
     }
   }
@@ -665,6 +732,11 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
 
   Future<void> _navigateForward() =>
       _evaluateJavascript('window.navigateForward?.();');
+
+  Future<void> _clearSelection() => _evaluateJavascript(
+    'window.hoshiSelection?.clearSelection?.();'
+    'window.getSelection?.()?.removeAllRanges?.();',
+  );
 
   void _scrollPopupBy(Offset delta) {
     if (!_webReady || delta == Offset.zero) return;

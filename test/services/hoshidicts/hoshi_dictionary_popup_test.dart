@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -247,6 +248,17 @@ void main() {
       expect(script, contains('data:image/jpeg;base64,/9j/2Q=='));
     },
   );
+
+  test('requests missing dictionary images through the host media bridge', () {
+    final script = File('assets/hoshi_popup/popup.js').readAsStringSync();
+
+    expect(
+      script,
+      contains('webkit.messageHandlers.dictionaryMedia.postMessage'),
+    );
+    expect(script, contains('window.hoshiDictionaryMedia[dictionary][path]'));
+    expect(script, contains('img.src = imageUrl'));
+  });
 
   test('keeps frequency and pitch labels white on accent tags', () {
     const preferences = DictionaryPopupPreferences(

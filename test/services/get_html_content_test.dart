@@ -168,4 +168,59 @@ void main() {
 
     expect(parse(result).body?.text, contains('<探偵> & 辞書'));
   });
+
+  test('EPUB document cache shares one parse across TOC shortcuts', () async {
+    var loads = 0;
+    final cache = EpubDocumentCache(
+      loader: (_) async {
+        loads++;
+        return book;
+      },
+      fingerprintLoader: (_) async => 'same-file',
+    );
+
+    final results = await Future.wait([
+      cache.load('fixture.epub'),
+      cache.load('fixture.epub'),
+    ]);
+
+    expect(loads, 1);
+    expect(identical(results.first.book, results.last.book), isTrue);
+    expect(results.first.html, results.last.html);
+  });
+
+  test('EPUB document cache invalidates when the file changes', () async {
+    var loads = 0;
+    var fingerprint = 'first';
+    final cache = EpubDocumentCache(
+      loader: (_) async {
+        loads++;
+        return book;
+      },
+      fingerprintLoader: (_) async => fingerprint,
+    );
+
+    await cache.load('fixture.epub');
+    fingerprint = 'second';
+    await cache.load('fixture.epub');
+
+    expect(loads, 2);
+  });
+
+  test('EPUB document cache retries a failed parse', () async {
+    var loads = 0;
+    final cache = EpubDocumentCache(
+      loader: (_) async {
+        loads++;
+        if (loads == 1) throw const FormatException('broken once');
+        return book;
+      },
+      fingerprintLoader: (_) async => 'same-file',
+    );
+
+    await expectLater(cache.load('fixture.epub'), throwsFormatException);
+    await cache.load('fixture.epub');
+
+    expect(loads, 2);
+  });
 }

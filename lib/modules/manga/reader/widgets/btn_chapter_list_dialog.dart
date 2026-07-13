@@ -279,7 +279,8 @@ class _ChapterListTileState extends State<ChapterListTile> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          if (!(chapter.manga.value!.isLocalArchive ?? false))
+                          if (!isEpubNavigationChapter(chapter) &&
+                              !(chapter.manga.value!.isLocalArchive ?? false))
                             Consumer(
                               builder: (context, ref, child) {
                                 final dateText =

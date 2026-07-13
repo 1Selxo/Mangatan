@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Made novel paragraph spacing adjustable and changed its default to zero instead of forcing a gap between paragraphs.
+- Fixed local EPUB TOC entries repeatedly reparsing the same book, replaced blank cold-load screens with visible progress, and prevented failed initialization from leaving the reader permanently blank.
+- Hid stale internal EPUB character offsets that could appear as chapter dates after upgrading an existing library.
+- Replaced raw Kiwi Korean POS codes such as `VV` and `VA-I` with readable part-of-speech and conjugation labels in dictionary lookups.
+- Replaced Mangatan's Jimaku search and subtitle matching path with Chimahon's exact API, title-selection, entry-ranking, SRT filtering, and episode fallback behavior.
+
 ## 1.0.3-beta+117 — 2026-07-13
 
 - Added explicit duplicate-card creation and an Anki browser button for existing matching cards.

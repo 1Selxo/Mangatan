@@ -40,6 +40,7 @@ void main() {
     expect(document, isNot(contains('bad()')));
     expect(document, contains("call('readerDictionary'"));
     expect(document, contains('const initialProgress = 0.25'));
+    expect(document, contains('margin-block-end: 0.00em !important'));
     expect(document, contains('user-select: text'));
     expect(document, contains("const lookupTrigger = \"leftClick\""));
     expect(
@@ -64,6 +65,27 @@ void main() {
     expect(document, contains('break-after: column'));
     expect(document, contains('min-height: 100vh'));
     expect(document, contains('metrics,'));
+  });
+
+  test('applies configurable logical paragraph spacing', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>first</p><p>second</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 12,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      paragraphSpacing: 1.2,
+      layout: EpubReadingLayout.verticalPaged,
+    );
+
+    expect(document, contains('margin-block-end: 1.20em !important'));
+    expect(document, isNot(contains('margin: 0 0 0 1.2')));
   });
 
   test('positions an exact cold-open target before reporting ready', () {
@@ -94,6 +116,10 @@ void main() {
     );
     expect(
       document.indexOf('requestAnimationFrame(resolve)'),
+      lessThan(document.indexOf("call('readerReady'")),
+    );
+    expect(
+      document.indexOf(".catch((error) =>"),
       lessThan(document.indexOf("call('readerReady'")),
     );
   });

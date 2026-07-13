@@ -1073,55 +1073,54 @@ abstract class _$NovelShowScrollPercentageState extends $Notifier<bool> {
   }
 }
 
-@ProviderFor(NovelRemoveExtraParagraphSpacingState)
-final novelRemoveExtraParagraphSpacingStateProvider =
-    NovelRemoveExtraParagraphSpacingStateProvider._();
+@ProviderFor(NovelReaderParagraphSpacingState)
+final novelReaderParagraphSpacingStateProvider =
+    NovelReaderParagraphSpacingStateProvider._();
 
-final class NovelRemoveExtraParagraphSpacingStateProvider
-    extends $NotifierProvider<NovelRemoveExtraParagraphSpacingState, bool> {
-  NovelRemoveExtraParagraphSpacingStateProvider._()
+final class NovelReaderParagraphSpacingStateProvider
+    extends $NotifierProvider<NovelReaderParagraphSpacingState, double> {
+  NovelReaderParagraphSpacingStateProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'novelRemoveExtraParagraphSpacingStateProvider',
+        name: r'novelReaderParagraphSpacingStateProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() =>
-      _$novelRemoveExtraParagraphSpacingStateHash();
+  String debugGetCreateSourceHash() => _$novelReaderParagraphSpacingStateHash();
 
   @$internal
   @override
-  NovelRemoveExtraParagraphSpacingState create() =>
-      NovelRemoveExtraParagraphSpacingState();
+  NovelReaderParagraphSpacingState create() =>
+      NovelReaderParagraphSpacingState();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
+  Override overrideWithValue(double value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
+      providerOverride: $SyncValueProvider<double>(value),
     );
   }
 }
 
-String _$novelRemoveExtraParagraphSpacingStateHash() =>
-    r'5c784a57ce5ee57524317dd00d4b40020e5e0582';
+String _$novelReaderParagraphSpacingStateHash() =>
+    r'5d07da6c2b2932729cadbf87f7fbf311af50b440';
 
-abstract class _$NovelRemoveExtraParagraphSpacingState extends $Notifier<bool> {
-  bool build();
+abstract class _$NovelReaderParagraphSpacingState extends $Notifier<double> {
+  double build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<bool, bool>;
+    final ref = this.ref as $Ref<double, double>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
+              AnyNotifier<double, double>,
+              double,
               Object?,
               Object?
             >;

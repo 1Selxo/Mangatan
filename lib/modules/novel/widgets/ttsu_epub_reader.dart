@@ -248,7 +248,7 @@ class TtsuEpubReader extends StatefulWidget {
     this.initialSpineIndex,
     this.previewSpineIndex,
     required this.tapToScroll,
-    required this.removeExtraParagraphSpacing,
+    required this.paragraphSpacing,
     this.layout = EpubReadingLayout.horizontalContinuous,
     required this.onProgress,
     required this.onReaderTap,
@@ -273,7 +273,7 @@ class TtsuEpubReader extends StatefulWidget {
   final int? initialSpineIndex;
   final int? previewSpineIndex;
   final bool tapToScroll;
-  final bool removeExtraParagraphSpacing;
+  final double paragraphSpacing;
   final EpubReadingLayout layout;
   final void Function(
     double offset,
@@ -364,8 +364,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         oldWidget.padding != widget.padding ||
         oldWidget.textAlign != widget.textAlign ||
         oldWidget.tapToScroll != widget.tapToScroll ||
-        oldWidget.removeExtraParagraphSpacing !=
-            widget.removeExtraParagraphSpacing ||
+        oldWidget.paragraphSpacing != widget.paragraphSpacing ||
         oldWidget.layout != widget.layout;
     if (appearanceChanged) unawaited(_reloadAtCurrentPosition());
   }
@@ -470,7 +469,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         ? widget.initialSpineIndex
         : null,
     tapToScroll: widget.tapToScroll,
-    removeExtraParagraphSpacing: widget.removeExtraParagraphSpacing,
+    paragraphSpacing: widget.paragraphSpacing,
     layout: widget.layout,
     lookupTrigger: _lookupTrigger,
     chapterHref: _chapterHref,
@@ -801,6 +800,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     if (_isPreparing || documentFile == null) {
       return ColoredBox(
         color: _color(widget.backgroundColor, const Color(0xFF292832)),
+        child: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -887,6 +887,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
             child: AbsorbPointer(
               child: ColoredBox(
                 color: _color(widget.backgroundColor, const Color(0xFF292832)),
+                child: const Center(child: CircularProgressIndicator()),
               ),
             ),
           )
@@ -1099,7 +1100,7 @@ String buildTtsuEpubDocument({
   double? initialChapterProgress,
   int? initialSpineIndex,
   required bool tapToScroll,
-  bool removeExtraParagraphSpacing = false,
+  double paragraphSpacing = 0,
   EpubReadingLayout layout = EpubReadingLayout.horizontalContinuous,
   DictionaryLookupTrigger lookupTrigger = DictionaryLookupTrigger.leftClick,
   String? chapterHref,
@@ -1135,7 +1136,9 @@ String buildTtsuEpubDocument({
       : initialChapterProgress.clamp(0.0, 1.0).toString();
   final initialSpineIndexValue = initialSpineIndex?.toString() ?? 'null';
   final tapZones = tapToScroll ? 'true' : 'false';
-  final paragraphSpacing = removeExtraParagraphSpacing ? '0.25em' : '0.8em';
+  final safeParagraphSpacing = paragraphSpacing
+      .clamp(0.0, 2.0)
+      .toStringAsFixed(2);
   final documentHref = _safeArchivePath(chapterHref ?? '') ?? 'reader.xhtml';
   final layoutValue = layout.documentValue;
   final pageMode = layout.isPaged;
@@ -1191,7 +1194,10 @@ String buildTtsuEpubDocument({
       color: inherit;
       background: rgba(160, 160, 160, .4) !important;
     }
-    #reader-content p { margin: 0 0 $paragraphSpacing; }
+    #reader-content p {
+      margin-block-start: 0 !important;
+      margin-block-end: ${safeParagraphSpacing}em !important;
+    }
     #reader-content ruby { ruby-position: over; }
     #reader-content rt { font-size: 0.55em; user-select: none; }
     #reader-content img, #reader-content svg {
@@ -1333,10 +1339,6 @@ String buildTtsuEpubDocument({
       /* Column width + gap must equal one physical viewport. Any mismatch
          accumulates on every page and eventually seeks into blank columns. */
       column-gap: ${padding * 2}vh !important;
-    }
-    html[data-mangatan-reader-layout="vertical-pages"] #reader-content p,
-    html[data-mangatan-reader-layout="vertical-scroll"] #reader-content p {
-      margin: 0 0 0 $paragraphSpacing;
     }
     html[data-mangatan-reader-layout="vertical-pages"] #reader-content img,
     html[data-mangatan-reader-layout="vertical-pages"] #reader-content svg,
@@ -2445,6 +2447,9 @@ String buildTtsuEpubDocument({
               () => requestAnimationFrame(resolve),
             ));
           }
+        })
+        .catch((error) => {
+          console.error('Mangatan EPUB initialization failed', error);
         })
         .then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
           ready = true;

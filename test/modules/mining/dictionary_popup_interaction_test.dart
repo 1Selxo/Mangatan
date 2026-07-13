@@ -5,6 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
+
+class _UnusedBuildContext implements BuildContext {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('A mismatched prefetch must not inspect its context');
+}
 
 void main() {
   test('route changes dismiss any root-overlay dictionary popup', () {
@@ -124,6 +131,112 @@ void main() {
       results.complete(const [1]);
 
       expect(await decision, DictionaryPopupPresentationDecision.stale);
+    });
+  });
+
+  group('dictionary popup profile prefetch', () {
+    const profile = DictionaryProfile(
+      id: 'profile-ko',
+      name: 'Korean',
+      languageCode: 'ko',
+    );
+
+    test(
+      'keeps the normalized lookup text and exact profile together',
+      () async {
+        final prefetch = DictionaryLookupPopup.prefetch(
+          '   ',
+          profile: profile,
+        );
+
+        expect(prefetch.text, isEmpty);
+        expect(await prefetch.profile, same(profile));
+        expect(await prefetch.results, isEmpty);
+      },
+    );
+
+    test('prepare rejects a prefetch produced for different text', () async {
+      final prefetch = DictionaryLookupPopup.prefetch('', profile: profile);
+
+      await DictionaryLookupPopup.prepare(
+        context: _UnusedBuildContext(),
+        text: 'different lookup',
+        prefetch: prefetch,
+      );
+    });
+  });
+
+  group('native dictionary expansion policy', () {
+    const dictionaries = ['Unordered', 'First', 'Second'];
+
+    test('expands every available dictionary by default', () {
+      const profile = DictionaryProfile(
+        id: 'all',
+        name: 'All',
+        dictionaryOrder: ['Second', 'Missing', 'First'],
+      );
+
+      expect(
+        initiallyExpandedDictionaries(
+          profile: profile,
+          dictionaries: dictionaries,
+        ),
+        {'Second', 'First', 'Unordered'},
+      );
+    });
+
+    test('collapses every dictionary in collapse-all mode', () {
+      const profile = DictionaryProfile(
+        id: 'none',
+        name: 'None',
+        dictionaryCollapseMode: 'collapse_all',
+      );
+
+      expect(
+        initiallyExpandedDictionaries(
+          profile: profile,
+          dictionaries: dictionaries,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('expands the first available dictionary in profile order', () {
+      const profile = DictionaryProfile(
+        id: 'first',
+        name: 'First',
+        dictionaryOrder: ['Missing', 'Second', 'First'],
+        dictionaryCollapseMode: 'expand_first_available',
+      );
+
+      expect(
+        initiallyExpandedDictionaries(
+          profile: profile,
+          dictionaries: dictionaries,
+        ),
+        {'Second'},
+      );
+    });
+
+    test('applies custom overrides before the fallback cascade', () {
+      const profile = DictionaryProfile(
+        id: 'custom',
+        name: 'Custom',
+        dictionaryOrder: ['Second', 'First', 'Unordered'],
+        dictionaryCollapseMode: 'custom',
+        dictionaryDisplayModes: {
+          'Second': 'always_collapsed',
+          'Unordered': 'always_expanded',
+        },
+      );
+
+      expect(
+        initiallyExpandedDictionaries(
+          profile: profile,
+          dictionaries: dictionaries,
+        ),
+        {'First', 'Unordered'},
+      );
     });
   });
 

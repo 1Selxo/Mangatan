@@ -96,6 +96,7 @@ class EpubNovel {
   final Uint8List? cover;
   final String? summary;
   final String? author;
+  final String? language;
   final String? artist;
   final List<EpubChapter> chapters;
   final List<EpubResource> images;
@@ -106,6 +107,7 @@ class EpubNovel {
     this.cover,
     this.summary,
     this.author,
+    this.language,
     this.artist,
     required this.chapters,
     required this.images,
@@ -118,6 +120,7 @@ class EpubNovel {
       cover.hashCode ^
       summary.hashCode ^
       author.hashCode ^
+      language.hashCode ^
       artist.hashCode ^
       chapters.hashCode ^
       images.hashCode ^
@@ -132,6 +135,7 @@ class EpubNovel {
           cover == other.cover &&
           summary == other.summary &&
           author == other.author &&
+          language == other.language &&
           artist == other.artist &&
           chapters == other.chapters &&
           images == other.images &&

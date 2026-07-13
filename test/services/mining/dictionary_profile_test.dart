@@ -37,13 +37,38 @@ void main() {
     expect(profile.isDictionaryEnabled('Frequency'), isTrue);
   });
 
-  test('invalid profile language falls back to Japanese', () {
+  test('unknown and blank profile languages survive compatible storage', () {
     final profile = DictionaryProfile.fromJson({
       'id': 'legacy',
       'name': 'Legacy',
-      'languageCode': 'not-supported',
+      'languageCode': 'x-future-language',
+    });
+    final blank = DictionaryProfile.fromJson({
+      'id': 'language-neutral',
+      'name': 'Language neutral',
+      'languageCode': '',
     });
 
-    expect(profile.languageCode, 'ja');
+    expect(profile.languageCode, 'x-future-language');
+    expect(blank.languageCode, isEmpty);
+  });
+
+  test('install and delete update every Chimahon dictionary field', () {
+    const profile = DictionaryProfile(
+      id: 'profile',
+      name: 'Profile',
+      dictionaryOrder: ['Alpha'],
+      enabledDictionaries: {'Alpha'},
+      dictionaryDisplayModes: {'Alpha': 'always_collapsed'},
+    );
+
+    final installed = profile.withInstalledDictionary('Beta');
+    expect(installed.dictionaryOrder, ['Alpha', 'Beta']);
+    expect(installed.enabledDictionaries, {'Alpha', 'Beta'});
+
+    final deleted = installed.withoutDictionary('Alpha');
+    expect(deleted.dictionaryOrder, ['Beta']);
+    expect(deleted.enabledDictionaries, {'Beta'});
+    expect(deleted.dictionaryDisplayModes, isNot(contains('Alpha')));
   });
 }

@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/korean_language_parser.dart';
 import 'package:mangayomi/services/hoshidicts/yomitan_language_parser.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts/native.dart' as hoshidicts;
@@ -16,18 +17,21 @@ class HoshidictsLookupBackend {
   // Hovering commonly revisits nearby words, so retain a small LRU without
   // holding an entire subtitle or chapter's materialized glossary data.
   static const _maxCachedLookups = 32;
+  static const _directProfileKey = '<direct-rebuild>';
 
   final YomitanLanguageParser _yomitanParser = YomitanLanguageParser();
 
   hoshidicts.HoshiLookupSession? _session;
   Future<hoshidicts.HoshiLookupSession>? _initializing;
   bool _configured = false;
+  String? _configuredProfileKey;
+  Future<void> _queryQueue = Future.value();
   int _queryGeneration = 0;
   final Map<_LookupRequest, List<HoshiLookupResult>> _lookupCache = {};
   final Map<_LookupRequest, Future<List<HoshiLookupResult>>> _lookupsInFlight =
       {};
-  List<HoshiDictionaryStyle>? _cachedStyles;
-  Future<List<HoshiDictionaryStyle>>? _stylesInFlight;
+  final Map<String, List<HoshiDictionaryStyle>> _stylesCache = {};
+  final Map<String, Future<List<HoshiDictionaryStyle>>> _stylesInFlight = {};
 
   bool get hasSession => _session != null;
 
@@ -48,28 +52,31 @@ class HoshidictsLookupBackend {
     List<String> freqPaths = const [],
     List<String> pitchPaths = const [],
   }) async {
-    final pending = _initializing;
-    if (pending != null) await pending;
-    _configured = false;
-    _invalidateQueryCaches();
-
-    late final Future<hoshidicts.HoshiLookupSession> rebuilding;
-    rebuilding =
-        _rebuildQuery(
-          termPaths: termPaths,
-          freqPaths: freqPaths,
-          pitchPaths: pitchPaths,
-        ).whenComplete(() {
-          if (identical(_initializing, rebuilding)) _initializing = null;
-        });
-    _initializing = rebuilding;
-    await rebuilding;
+    await _enqueueQuery(() async {
+      final pending = _initializing;
+      if (pending != null) await pending;
+      _configured = false;
+      _configuredProfileKey = null;
+      _invalidateQueryCaches();
+      await _rebuildQuery(
+        termPaths: termPaths,
+        freqPaths: freqPaths,
+        pitchPaths: pitchPaths,
+      );
+      // A direct rebuild has always remained active until an explicit reload.
+      // Profile-less operations preserve it; an explicitly supplied profile
+      // still opts into profile-managed dictionary paths.
+      _configuredProfileKey = _directProfileKey;
+    });
   }
 
   Future<void> reloadFromStorage() async {
-    _configured = false;
-    _invalidateQueryCaches();
-    await _ensureSession();
+    await _enqueueQuery(() async {
+      _configured = false;
+      _configuredProfileKey = null;
+      _invalidateQueryCaches();
+      await _ensureSession();
+    });
   }
 
   Future<List<HoshiLookupResult>> lookup(
@@ -77,19 +84,27 @@ class HoshidictsLookupBackend {
     int maxResults = 10,
     int scanLength = 20,
     String? language,
+    DictionaryProfile? profile,
   }) async {
     final query = text.trim();
     if (query.isEmpty || maxResults <= 0 || scanLength <= 0) {
       return const [];
     }
 
-    final lookupLanguage =
-        language ?? await MiningPreferences.getDictionaryLanguage();
+    final preserveDirectConfiguration = profile == null;
+    final resolvedProfile =
+        profile ?? await MiningPreferences.getActiveDictionaryProfile();
+    final lookupLanguage = language ?? resolvedProfile.languageCode;
+    final profileKey = _cacheProfileKey(
+      _profileKey(resolvedProfile),
+      preserveDirectConfiguration,
+    );
     final request = _LookupRequest(
       query,
       maxResults,
       scanLength,
-      normalizeDictionaryLanguage(lookupLanguage),
+      lookupLanguage.toLowerCase(),
+      profileKey,
     );
     final cached = _lookupCache.remove(request);
     if (cached != null) {
@@ -101,32 +116,64 @@ class HoshidictsLookupBackend {
     if (pending != null) return pending;
 
     final generation = _queryGeneration;
-    final lookup = _performLookup(request, generation);
+    final lookup = _performLookup(
+      request,
+      generation,
+      resolvedProfile,
+      preserveDirectConfiguration,
+    );
     _lookupsInFlight[request] = lookup;
     return lookup;
   }
 
-  Future<List<HoshiDictionaryStyle>> getStyles() async {
-    final cached = _cachedStyles;
+  Future<List<HoshiDictionaryStyle>> getStyles({
+    DictionaryProfile? profile,
+  }) async {
+    final preserveDirectConfiguration = profile == null;
+    final resolvedProfile =
+        profile ?? await MiningPreferences.getActiveDictionaryProfile();
+    final resolvedProfileKey = _profileKey(resolvedProfile);
+    if (!_matchesConfiguredProfile(
+      resolvedProfileKey,
+      preserveDirectConfiguration,
+    )) {
+      await _enqueueQuery(
+        () => _ensureSession(resolvedProfile, preserveDirectConfiguration),
+      );
+    }
+    final profileKey = _cacheProfileKey(
+      resolvedProfileKey,
+      preserveDirectConfiguration,
+    );
+    final cached = _stylesCache[profileKey];
     if (cached != null) return cached;
-    final pending = _stylesInFlight;
+    final pending = _stylesInFlight[profileKey];
     if (pending != null) return pending;
 
     final generation = _queryGeneration;
-    final styles = _loadStyles(generation);
-    _stylesInFlight = styles;
+    final styles = _loadStyles(
+      generation,
+      resolvedProfile,
+      profileKey,
+      preserveDirectConfiguration,
+    );
+    _stylesInFlight[profileKey] = styles;
     return styles;
   }
 
   Future<Uint8List?> getMediaFile({
     required String dictName,
     required String mediaPath,
+    DictionaryProfile? profile,
   }) async {
     if (dictName.isEmpty || mediaPath.isEmpty) return null;
-    return hoshidicts.getMediaFile(
-      session: await _ensureSession(),
-      dictName: dictName,
-      mediaPath: mediaPath,
+    final preserveDirectConfiguration = profile == null;
+    return _enqueueQuery(
+      () async => hoshidicts.getMediaFile(
+        session: await _ensureSession(profile, preserveDirectConfiguration),
+        dictName: dictName,
+        mediaPath: mediaPath,
+      ),
     );
   }
 
@@ -134,39 +181,63 @@ class HoshidictsLookupBackend {
     _session = null;
     _initializing = null;
     _configured = false;
+    _configuredProfileKey = null;
     _invalidateQueryCaches();
   }
 
   void invalidateLookups() => _invalidateQueryCaches();
 
-  Future<hoshidicts.HoshiLookupSession> _ensureSession() async {
+  Future<hoshidicts.HoshiLookupSession> _ensureSession([
+    DictionaryProfile? profile,
+    bool preserveDirectConfiguration = false,
+  ]) async {
+    final resolvedProfile =
+        profile ?? await MiningPreferences.getActiveDictionaryProfile();
+    final profileKey = _profileKey(resolvedProfile);
     final session = _session;
-    if (session != null && _configured) return session;
+    if (session != null &&
+        _configured &&
+        _matchesConfiguredProfile(profileKey, preserveDirectConfiguration)) {
+      return session;
+    }
 
     final pending = _initializing;
-    if (pending != null) return pending;
+    if (pending != null) {
+      await pending;
+      final initialized = _session;
+      if (initialized != null &&
+          _configured &&
+          _matchesConfiguredProfile(profileKey, preserveDirectConfiguration)) {
+        return initialized;
+      }
+    }
 
     late final Future<hoshidicts.HoshiLookupSession> initialization;
-    initialization = _initializeFromStorage().whenComplete(() {
-      if (identical(_initializing, initialization)) {
-        _initializing = null;
-      }
-    });
+    initialization = _initializeFromStorage(resolvedProfile, profileKey)
+        .whenComplete(() {
+          if (identical(_initializing, initialization)) {
+            _initializing = null;
+          }
+        });
     _initializing = initialization;
     return initialization;
   }
 
-  Future<hoshidicts.HoshiLookupSession> _initializeFromStorage() async {
-    final profile = await MiningPreferences.getActiveDictionaryProfile();
+  Future<hoshidicts.HoshiLookupSession> _initializeFromStorage(
+    DictionaryProfile profile,
+    String profileKey,
+  ) async {
     final paths = await DictionaryStorage.instance.paths(
       order: profile.dictionaryOrder,
       enabled: profile.enabledDictionaries,
     );
-    return _rebuildQuery(
+    final session = await _rebuildQuery(
       termPaths: paths.termPaths,
       freqPaths: paths.frequencyPaths,
       pitchPaths: paths.pitchPaths,
     );
+    _configuredProfileKey = profileKey;
+    return session;
   }
 
   Future<hoshidicts.HoshiLookupSession> _rebuildQuery({
@@ -188,49 +259,56 @@ class HoshidictsLookupBackend {
   Future<List<HoshiLookupResult>> _performLookup(
     _LookupRequest request,
     int generation,
+    DictionaryProfile profile,
+    bool preserveDirectConfiguration,
   ) async {
     try {
-      final session = await _ensureSession();
-      Future<List<HoshiLookupResult>> nativeLookup(
-        String text,
-        int maxResults,
-        int scanLength,
-      ) {
-        return hoshidicts.lookup(
-          session: session,
-          text: text,
-          maxResults: maxResults,
-          scanLength: BigInt.from(scanLength),
+      final rawResults = await _enqueueQuery(() async {
+        final session = await _ensureSession(
+          profile,
+          preserveDirectConfiguration,
         );
-      }
+        Future<List<HoshiLookupResult>> nativeLookup(
+          String text,
+          int maxResults,
+          int scanLength,
+        ) {
+          return hoshidicts.lookup(
+            session: session,
+            text: text,
+            maxResults: maxResults,
+            scanLength: BigInt.from(scanLength),
+          );
+        }
 
-      final rawResults = switch (request.language) {
-        'ja' => await nativeLookup(
-          request.text,
-          request.maxResults,
-          request.scanLength,
-        ),
-        'ko' => await lookupKoreanDictionary(
-          text: request.text,
-          maxResults: request.maxResults,
-          scanLength: request.scanLength,
-          lookup: nativeLookup,
-        ),
-        _ => await lookupYomitanDictionary(
-          language: request.language,
-          text: request.text,
-          maxResults: request.maxResults,
-          scanLength: request.scanLength,
-          lookup: nativeLookup,
-          loadCandidates: (language, text, scanLength, maxCandidates) =>
-              _yomitanParser.candidates(
-                language,
-                text,
-                scanLength: scanLength,
-                maxCandidates: maxCandidates,
-              ),
-        ),
-      };
+        return switch (request.language) {
+          'ja' => await nativeLookup(
+            request.text,
+            request.maxResults,
+            request.scanLength,
+          ),
+          'ko' => await lookupKoreanDictionary(
+            text: request.text,
+            maxResults: request.maxResults,
+            scanLength: request.scanLength,
+            lookup: nativeLookup,
+          ),
+          _ => await lookupYomitanDictionary(
+            language: request.language,
+            text: request.text,
+            maxResults: request.maxResults,
+            scanLength: request.scanLength,
+            lookup: nativeLookup,
+            loadCandidates: (language, text, scanLength, maxCandidates) =>
+                _yomitanParser.candidates(
+                  language,
+                  text,
+                  scanLength: scanLength,
+                  maxCandidates: maxCandidates,
+                ),
+          ),
+        };
+      });
       final results = List<HoshiLookupResult>.unmodifiable(rawResults);
       if (generation == _queryGeneration) {
         _lookupCache[request] = results;
@@ -244,15 +322,26 @@ class HoshidictsLookupBackend {
     }
   }
 
-  Future<List<HoshiDictionaryStyle>> _loadStyles(int generation) async {
+  Future<List<HoshiDictionaryStyle>> _loadStyles(
+    int generation,
+    DictionaryProfile profile,
+    String profileKey,
+    bool preserveDirectConfiguration,
+  ) async {
     try {
       final styles = List<HoshiDictionaryStyle>.unmodifiable(
-        await hoshidicts.getStyles(session: await _ensureSession()),
+        await _enqueueQuery(
+          () async => hoshidicts.getStyles(
+            session: await _ensureSession(profile, preserveDirectConfiguration),
+          ),
+        ),
       );
-      if (generation == _queryGeneration) _cachedStyles = styles;
+      if (generation == _queryGeneration) _stylesCache[profileKey] = styles;
       return styles;
     } finally {
-      if (generation == _queryGeneration) _stylesInFlight = null;
+      if (generation == _queryGeneration) {
+        _stylesInFlight.remove(profileKey);
+      }
     }
   }
 
@@ -260,9 +349,36 @@ class HoshidictsLookupBackend {
     _queryGeneration++;
     _lookupCache.clear();
     _lookupsInFlight.clear();
-    _cachedStyles = null;
-    _stylesInFlight = null;
+    _stylesCache.clear();
+    _stylesInFlight.clear();
   }
+
+  Future<T> _enqueueQuery<T>(Future<T> Function() operation) {
+    final result = _queryQueue.then((_) => operation());
+    _queryQueue = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
+  }
+
+  bool _matchesConfiguredProfile(
+    String profileKey,
+    bool preserveDirectConfiguration,
+  ) =>
+      _configuredProfileKey == profileKey ||
+      (preserveDirectConfiguration &&
+          _configuredProfileKey == _directProfileKey);
+
+  String _cacheProfileKey(
+    String profileKey,
+    bool preserveDirectConfiguration,
+  ) => preserveDirectConfiguration && _configuredProfileKey == _directProfileKey
+      ? _directProfileKey
+      : profileKey;
+
+  String _profileKey(DictionaryProfile profile) => jsonEncode({
+    'id': profile.id,
+    'dictionaryOrder': profile.dictionaryOrder,
+    'enabledDictionaries': profile.enabledDictionaries.toList()..sort(),
+  });
 }
 
 class _LookupRequest {
@@ -271,12 +387,14 @@ class _LookupRequest {
     this.maxResults,
     this.scanLength,
     this.language,
+    this.profileKey,
   );
 
   final String text;
   final int maxResults;
   final int scanLength;
   final String language;
+  final String profileKey;
 
   @override
   bool operator ==(Object other) =>
@@ -284,8 +402,10 @@ class _LookupRequest {
       other.text == text &&
       other.maxResults == maxResults &&
       other.scanLength == scanLength &&
-      other.language == language;
+      other.language == language &&
+      other.profileKey == profileKey;
 
   @override
-  int get hashCode => Object.hash(text, maxResults, scanLength, language);
+  int get hashCode =>
+      Object.hash(text, maxResults, scanLength, language, profileKey);
 }

@@ -8,8 +8,11 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
@@ -18,8 +21,9 @@ import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/services/get_html_content.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
-import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -312,7 +316,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   // exact bookmark or requested spine and reported the settled location.
   bool _initialLocationPending = true;
   String? _prefetchedLookupText;
-  Future<List<HoshiLookupResult>>? _prefetchedLookupResults;
+  DictionaryLookupPrefetch? _prefetchedLookup;
   DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
   bool _additionalLeftClick = false;
 
@@ -581,23 +585,27 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         final data = _firstMap(arguments);
         final text = data?['text']?.toString().trim() ?? '';
         if (text.isEmpty || text == _prefetchedLookupText) return false;
-        final results = DictionaryLookupPopup.lookup(text);
+        final miningContext = _dictionaryMiningContext(text);
+        final prefetch = DictionaryLookupPopup.prefetch(
+          text,
+          miningContext: miningContext,
+        );
         _prefetchedLookupText = text;
-        _prefetchedLookupResults = results;
+        _prefetchedLookup = prefetch;
         unawaited(
           DictionaryLookupPopup.prepare(
             context: context,
             text: text,
-            initialResults: results,
+            prefetch: prefetch,
           ),
         );
         unawaited(
-          results.then<void>(
+          prefetch.results.then<void>(
             (_) {},
             onError: (_) {
               if (_prefetchedLookupText == text) {
                 _prefetchedLookupText = null;
-                _prefetchedLookupResults = null;
+                _prefetchedLookup = null;
               }
             },
           ),
@@ -655,24 +663,20 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       box.localToGlobal(localAnchor.bottomRight),
     );
     final sentence = data['sentence']?.toString().trim();
-    final prefetchedResults = text == _prefetchedLookupText
-        ? _prefetchedLookupResults
+    final prefetchedLookup = text == _prefetchedLookupText
+        ? _prefetchedLookup
         : null;
 
     final handle = await DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
       text: text,
-      initialResults: prefetchedResults,
+      prefetch: prefetchedLookup,
       placement: widget.layout.isVerticalWriting
           ? DictionaryPopupPlacement.leftOrRight
           : DictionaryPopupPlacement.aboveOrBelow,
-      miningContext: MiningContext(
-        mediaType: MiningMediaType.novel,
-        sourceTitle: widget.chapter.manga.value?.name ?? widget.book.name,
-        chapterTitle: widget.chapter.name ?? '',
-        sentence: sentence?.isNotEmpty == true ? sentence! : text,
-        sourceUri: Uri.tryParse(widget.chapter.archivePath ?? ''),
+      miningContext: _dictionaryMiningContext(
+        sentence?.isNotEmpty == true ? sentence! : text,
       ),
       onMatchChanged: (length) {
         if (!mounted ||
@@ -704,6 +708,42 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
           source: 'window.mangatanReader?.clearLookup($lookupTokenLiteral);',
         );
       }),
+    );
+  }
+
+  MiningContext _dictionaryMiningContext(String sentence) {
+    final manga = widget.chapter.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
+    final archivePath = widget.chapter.archivePath ?? '';
+    final progress = manga?.id == null || archivePath.isEmpty
+        ? null
+        : isar.epubBookProgress
+              .filter()
+              .mangaIdEqualTo(manga!.id!)
+              .archivePathEqualTo(archivePath)
+              .findFirstSync();
+    final isLocalNovel = archivePath.isNotEmpty;
+    return MiningContext(
+      mediaType: MiningMediaType.novel,
+      mangaId: isLocalNovel ? null : manga?.id,
+      sourceId: isLocalNovel
+          ? null
+          : DictionaryProfileResolver.overrideIdForSource(source),
+      sourceLanguage: isLocalNovel
+          ? progress?.lang ?? widget.book.language ?? ''
+          : source?.lang ?? manga?.lang ?? '',
+      novelId: isLocalNovel
+          ? const ChimahonNovelProgressAdapter().stableId(
+              title: progress?.title ?? widget.book.name,
+              author: progress?.author ?? widget.book.author,
+            )
+          : null,
+      sourceTitle: manga?.name ?? widget.book.name,
+      chapterTitle: widget.chapter.name ?? '',
+      sentence: sentence,
+      sourceUri: Uri.tryParse(widget.chapter.archivePath ?? ''),
     );
   }
 

@@ -1649,11 +1649,42 @@ function createEntryHeader(entry, idx) {
     return header;
 }
 
-function createGlossarySection(dictName, contents, isFirst, entryIdx) {
+function initialOpenDictionaries(dictNames) {
+    const configuredOrder = Array.isArray(window.dictionaryOrder) ? window.dictionaryOrder : [];
+    const available = new Set(dictNames);
+    const ordered = [];
+    for (const name of configuredOrder) {
+        if (available.has(name) && !ordered.includes(name)) ordered.push(name);
+    }
+    for (const name of dictNames) {
+        if (!ordered.includes(name)) ordered.push(name);
+    }
+
+    const mode = window.dictionaryCollapseMode || 'expand_all';
+    if (mode === 'collapse_all') return new Set();
+    if (mode === 'expand_first_available') {
+        return new Set(ordered.length ? [ordered[0]] : []);
+    }
+    if (mode === 'custom') {
+        const displayModes = window.dictionaryDisplayModes || {};
+        const open = new Set();
+        let contentOpened = false;
+        for (const name of ordered) {
+            const displayMode = displayModes[name] || 'fallback';
+            if (displayMode === 'always_collapsed') continue;
+            if (displayMode === 'always_expanded' || !contentOpened) {
+                open.add(name);
+                contentOpened = true;
+            }
+        }
+        return open;
+    }
+    return new Set(ordered);
+}
+
+function createGlossarySection(dictName, contents, initiallyOpen, entryIdx) {
     const details = el('details', { className: 'glossary-group' });
-    const collapsed = window.collapseMode === 'Collapse All'
-    || (window.collapseMode === 'Custom' && window.collapsedDictionaries.includes(dictName));
-    details.open = !collapsed || (window.expandFirstDictionary && isFirst);
+    details.open = initiallyOpen;
     
     const summary = el('summary', { className: 'dict-label' });
     summary.appendChild(el('span', { className: 'dict-name', textContent: dictName }));
@@ -1922,9 +1953,11 @@ window.renderPopup = function() {
             });
             
             const dictNames = Object.keys(grouped);
+            const openDictionaries = initialOpenDictionaries(dictNames);
             glossarySections.classList.toggle('single-section', dictNames.length === 1);
             for (let dictIdx = 0; dictIdx < dictNames.length; dictIdx++) {
-                glossarySections.appendChild(createGlossarySection(dictNames[dictIdx], grouped[dictNames[dictIdx]], dictIdx === 0, idx));
+                const dictName = dictNames[dictIdx];
+                glossarySections.appendChild(createGlossarySection(dictName, grouped[dictName], openDictionaries.has(dictName), idx));
                 if (idx === 0) {
                     scheduleMasonry();
                     await new Promise(r => requestAnimationFrame(r));

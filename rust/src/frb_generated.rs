@@ -1165,6 +1165,7 @@ impl SseDecode for crate::api::epub::EpubNovel {
         let mut var_cover = <Option<Vec<u8>>>::sse_decode(deserializer);
         let mut var_summary = <Option<String>>::sse_decode(deserializer);
         let mut var_author = <Option<String>>::sse_decode(deserializer);
+        let mut var_language = <Option<String>>::sse_decode(deserializer);
         let mut var_artist = <Option<String>>::sse_decode(deserializer);
         let mut var_chapters = <Vec<crate::api::epub::EpubChapter>>::sse_decode(deserializer);
         let mut var_images = <Vec<crate::api::epub::EpubResource>>::sse_decode(deserializer);
@@ -1174,6 +1175,7 @@ impl SseDecode for crate::api::epub::EpubNovel {
             cover: var_cover,
             summary: var_summary,
             author: var_author,
+            language: var_language,
             artist: var_artist,
             chapters: var_chapters,
             images: var_images,
@@ -2304,6 +2306,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::epub::EpubNovel {
             self.cover.into_into_dart().into_dart(),
             self.summary.into_into_dart().into_dart(),
             self.author.into_into_dart().into_dart(),
+            self.language.into_into_dart().into_dart(),
             self.artist.into_into_dart().into_dart(),
             self.chapters.into_into_dart().into_dart(),
             self.images.into_into_dart().into_dart(),
@@ -3075,6 +3078,7 @@ impl SseEncode for crate::api::epub::EpubNovel {
         <Option<Vec<u8>>>::sse_encode(self.cover, serializer);
         <Option<String>>::sse_encode(self.summary, serializer);
         <Option<String>>::sse_encode(self.author, serializer);
+        <Option<String>>::sse_encode(self.language, serializer);
         <Option<String>>::sse_encode(self.artist, serializer);
         <Vec<crate::api::epub::EpubChapter>>::sse_encode(self.chapters, serializer);
         <Vec<crate::api::epub::EpubResource>>::sse_encode(self.images, serializer);

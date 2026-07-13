@@ -32,7 +32,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     name: 'Default',
   );
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
-  String _language = 'ja';
   String _dictionaryLanguage = 'ja';
   double _backgroundOpacity = MiningPreferences.defaultOcrBackgroundOpacity;
   double _textOpacity = MiningPreferences.defaultOcrTextOpacity;
@@ -67,7 +66,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     final values = await Future.wait<dynamic>([
       DictionaryStorage.instance.installed(),
       MiningPreferences.getOcrEngine(),
-      MiningPreferences.getOcrLanguage(),
       MiningPreferences.getOcrBackgroundOpacity(),
       MiningPreferences.getOcrTextOpacity(),
       MiningPreferences.getOcrBoxScaleX(),
@@ -88,29 +86,28 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     ]);
     if (!mounted) return;
     setState(() {
-      _profiles = values[18] as List<DictionaryProfile>;
-      _activeProfile = values[19] as DictionaryProfile;
+      _profiles = values[17] as List<DictionaryProfile>;
+      _activeProfile = values[18] as DictionaryProfile;
       _dictionaries = _orderDictionaries(
         values[0] as List<InstalledDictionary>,
         _activeProfile.dictionaryOrder,
       );
       _engine = values[1] as OcrEnginePreference;
-      _language = values[2] as String;
-      _backgroundOpacity = values[3] as double;
-      _textOpacity = values[4] as double;
-      _boxScale = values[5] as double;
-      _boxScaleY = values[6] as double;
-      _outlineVisible = values[7] as bool;
-      _lookupOnHover = values[8] as bool;
-      _overlayEnabled = values[9] as bool;
-      _popupPreferences = values[10] as DictionaryPopupPreferences;
-      _ankiProfile = values[11] as AnkiMiningProfile;
-      _ankiAudioPreferences = values[12] as AnkiAudioPreferences;
-      _ankiEndpoint = values[13] as Uri;
-      _screenAiAvailable = values[14] as bool;
-      _lookupTrigger = values[15] as DictionaryLookupTrigger;
-      _additionalLeftClick = values[16] as bool;
-      _dictionaryLanguage = values[17] as String;
+      _backgroundOpacity = values[2] as double;
+      _textOpacity = values[3] as double;
+      _boxScale = values[4] as double;
+      _boxScaleY = values[5] as double;
+      _outlineVisible = values[6] as bool;
+      _lookupOnHover = values[7] as bool;
+      _overlayEnabled = values[8] as bool;
+      _popupPreferences = values[9] as DictionaryPopupPreferences;
+      _ankiProfile = values[10] as AnkiMiningProfile;
+      _ankiAudioPreferences = values[11] as AnkiAudioPreferences;
+      _ankiEndpoint = values[12] as Uri;
+      _screenAiAvailable = values[13] as bool;
+      _lookupTrigger = values[14] as DictionaryLookupTrigger;
+      _additionalLeftClick = values[15] as bool;
+      _dictionaryLanguage = values[16] as String;
       _loading = false;
     });
     unawaited(_refreshAnki(silent: true));
@@ -143,6 +140,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         );
         importedNames.add(imported.title);
       }
+      var updatedProfile = _activeProfile;
+      for (final name in importedNames) {
+        updatedProfile = updatedProfile.withInstalledDictionary(name);
+      }
+      if (!identical(updatedProfile, _activeProfile)) {
+        await _updateActiveProfile(updatedProfile);
+      }
       await HoshidictsLookupBackend.instance.reloadFromStorage();
       await _load();
       botToast('Imported ${importedNames.join(', ')}', second: 4);
@@ -173,6 +177,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     );
     if (confirmed != true) return;
     await DictionaryStorage.instance.delete(dictionary.name);
+    await _updateActiveProfile(
+      _activeProfile.withoutDictionary(dictionary.name),
+    );
     await HoshidictsLookupBackend.instance.reloadFromStorage();
     await _load();
   }
@@ -540,6 +547,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final collapseMode =
+        const {
+          'expand_all',
+          'expand_first_available',
+          'collapse_all',
+          'custom',
+        }.contains(_activeProfile.dictionaryCollapseMode)
+        ? _activeProfile.dictionaryCollapseMode
+        : 'expand_all';
     return Scaffold(
       appBar: AppBar(title: const Text('Dictionary & OCR')),
       body: _loading
@@ -621,6 +637,37 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       : const Icon(Icons.add),
                   onTap: _importing ? null : _importDictionary,
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: collapseMode,
+                    decoration: const InputDecoration(
+                      labelText: 'Dictionary collapse mode',
+                      prefixIcon: Icon(Icons.unfold_less),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'expand_all',
+                        child: Text('Expand all dictionaries'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'expand_first_available',
+                        child: Text('Expand first available dictionary'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'collapse_all',
+                        child: Text('Collapse all dictionaries'),
+                      ),
+                      DropdownMenuItem(value: 'custom', child: Text('Custom')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _updateActiveProfile(
+                        _activeProfile.copyWith(dictionaryCollapseMode: value),
+                      );
+                    },
+                  ),
+                ),
                 if (_dictionaries.isEmpty)
                   const ListTile(
                     leading: Icon(Icons.menu_book_outlined),
@@ -647,8 +694,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         enabled: _activeProfile.isDictionaryEnabled(
                           dictionary.name,
                         ),
+                        displayMode: collapseMode == 'custom'
+                            ? _activeProfile.dictionaryDisplayModes[dictionary
+                                      .name] ??
+                                  'fallback'
+                            : null,
                         onEnabledChanged: (enabled) =>
                             _toggleDictionary(dictionary.name, enabled),
+                        onDisplayModeChanged: (mode) => _updateActiveProfile(
+                          _activeProfile.copyWith(
+                            dictionaryDisplayModes: {
+                              ..._activeProfile.dictionaryDisplayModes,
+                              dictionary.name: mode,
+                            },
+                          ),
+                        ),
                         onMoveUp: () => _moveDictionary(index, -1),
                         onMoveDown: () => _moveDictionary(index, 1),
                         onDelete: () => _deleteDictionary(dictionary),
@@ -859,6 +919,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       prefixIcon: Icon(Icons.translate),
                     ),
                     items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Any (not matched automatically)'),
+                      ),
+                      if (_dictionaryLanguage.isNotEmpty &&
+                          !dictionaryLanguages.any(
+                            (language) => language.code == _dictionaryLanguage,
+                          ))
+                        DropdownMenuItem(
+                          value: _dictionaryLanguage,
+                          child: Text(_dictionaryLanguage),
+                        ),
                       for (final language in dictionaryLanguages)
                         DropdownMenuItem(
                           value: language.code,
@@ -868,7 +940,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     onChanged: (value) async {
                       if (value == null) return;
                       setState(() => _dictionaryLanguage = value);
-                      await MiningPreferences.setDictionaryLanguage(value);
                       await _updateActiveProfile(
                         _activeProfile.copyWith(languageCode: value),
                       );
@@ -995,25 +1066,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         : 'Local Chrome ScreenAI component was not detected.',
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _language,
-                    decoration: const InputDecoration(
-                      labelText: 'OCR language',
-                      prefixIcon: Icon(Icons.translate),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'ja', child: Text('Japanese')),
-                      DropdownMenuItem(value: 'en', child: Text('English')),
-                      DropdownMenuItem(value: 'zh', child: Text('Chinese')),
-                      DropdownMenuItem(value: 'ko', child: Text('Korean')),
-                    ],
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      setState(() => _language = value);
-                      await MiningPreferences.setOcrLanguage(value);
-                    },
+                const ListTile(
+                  leading: Icon(Icons.translate),
+                  title: Text('OCR language follows the dictionary profile'),
+                  subtitle: Text(
+                    'The profile resolved for the current entry or source '
+                    'selects the OCR language.',
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1482,7 +1540,9 @@ class _DictionaryListTile extends StatelessWidget {
     required this.canMoveUp,
     required this.canMoveDown,
     required this.enabled,
+    required this.displayMode,
     required this.onEnabledChanged,
+    required this.onDisplayModeChanged,
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onDelete,
@@ -1493,7 +1553,9 @@ class _DictionaryListTile extends StatelessWidget {
   final bool canMoveUp;
   final bool canMoveDown;
   final bool enabled;
+  final String? displayMode;
   final ValueChanged<bool> onEnabledChanged;
+  final ValueChanged<String> onDisplayModeChanged;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
   final VoidCallback onDelete;
@@ -1531,6 +1593,30 @@ class _DictionaryListTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (displayMode != null)
+            PopupMenuButton<String>(
+              tooltip: 'Dictionary display mode',
+              initialValue: displayMode,
+              onSelected: onDisplayModeChanged,
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'always_expanded',
+                  child: Text('Always expanded'),
+                ),
+                PopupMenuItem(value: 'fallback', child: Text('Fallback')),
+                PopupMenuItem(
+                  value: 'always_collapsed',
+                  child: Text('Always collapsed'),
+                ),
+              ],
+              icon: Icon(
+                displayMode == 'always_expanded'
+                    ? Icons.unfold_more
+                    : displayMode == 'always_collapsed'
+                    ? Icons.unfold_less
+                    : Icons.low_priority,
+              ),
+            ),
           Switch(value: enabled, onChanged: onEnabledChanged),
           IconButton(
             tooltip: 'Move dictionary up',

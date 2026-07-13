@@ -19,6 +19,10 @@ class EpubBookProgress {
 
   String? author;
 
+  /// Language declared by the EPUB package. This remains nullable so a book
+  /// without metadata does not accidentally match a language profile.
+  String? lang;
+
   int chapterIndex;
 
   double progress;
@@ -33,6 +37,7 @@ class EpubBookProgress {
     required this.archivePath,
     required this.title,
     this.author,
+    this.lang,
     this.chapterIndex = 0,
     this.progress = 0,
     this.characterCount = 0,

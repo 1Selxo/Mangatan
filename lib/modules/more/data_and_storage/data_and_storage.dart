@@ -231,11 +231,11 @@ class DataAndStorage extends ConsumerWidget {
 
                                             if (file != null &&
                                                 context.mounted) {
-                                              ref.watch(
+                                              await ref.read(
                                                 doRestoreProvider(
                                                   path: file.path!,
                                                   context: context,
-                                                ),
+                                                ).future,
                                               );
                                             }
                                             if (!context.mounted) return;

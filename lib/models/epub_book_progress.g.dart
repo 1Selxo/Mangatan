@@ -7,7 +7,7 @@ part of 'epub_book_progress.dart';
 // **************************************************************************
 
 // coverage:ignore-file
-// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, experimental_member_use, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
 
 extension GetEpubBookProgressCollection on Isar {
   IsarCollection<EpubBookProgress> get epubBookProgress => this.collection();
@@ -33,18 +33,19 @@ const EpubBookProgressSchema = CollectionSchema(
       name: r'characterCount',
       type: IsarType.long,
     ),
+    r'lang': PropertySchema(id: 4, name: r'lang', type: IsarType.string),
     r'lastModified': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'lastModified',
       type: IsarType.long,
     ),
-    r'mangaId': PropertySchema(id: 5, name: r'mangaId', type: IsarType.long),
+    r'mangaId': PropertySchema(id: 6, name: r'mangaId', type: IsarType.long),
     r'progress': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'progress',
       type: IsarType.double,
     ),
-    r'title': PropertySchema(id: 7, name: r'title', type: IsarType.string),
+    r'title': PropertySchema(id: 8, name: r'title', type: IsarType.string),
   },
 
   estimateSize: _epubBookProgressEstimateSize,
@@ -94,6 +95,12 @@ int _epubBookProgressEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.lang;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
 }
@@ -108,10 +115,11 @@ void _epubBookProgressSerialize(
   writer.writeString(offsets[1], object.author);
   writer.writeLong(offsets[2], object.chapterIndex);
   writer.writeLong(offsets[3], object.characterCount);
-  writer.writeLong(offsets[4], object.lastModified);
-  writer.writeLong(offsets[5], object.mangaId);
-  writer.writeDouble(offsets[6], object.progress);
-  writer.writeString(offsets[7], object.title);
+  writer.writeString(offsets[4], object.lang);
+  writer.writeLong(offsets[5], object.lastModified);
+  writer.writeLong(offsets[6], object.mangaId);
+  writer.writeDouble(offsets[7], object.progress);
+  writer.writeString(offsets[8], object.title);
 }
 
 EpubBookProgress _epubBookProgressDeserialize(
@@ -126,10 +134,11 @@ EpubBookProgress _epubBookProgressDeserialize(
     chapterIndex: reader.readLongOrNull(offsets[2]) ?? 0,
     characterCount: reader.readLongOrNull(offsets[3]) ?? 0,
     id: id,
-    lastModified: reader.readLongOrNull(offsets[4]),
-    mangaId: reader.readLong(offsets[5]),
-    progress: reader.readDoubleOrNull(offsets[6]) ?? 0,
-    title: reader.readString(offsets[7]),
+    lang: reader.readStringOrNull(offsets[4]),
+    lastModified: reader.readLongOrNull(offsets[5]),
+    mangaId: reader.readLong(offsets[6]),
+    progress: reader.readDoubleOrNull(offsets[7]) ?? 0,
+    title: reader.readString(offsets[8]),
   );
   return object;
 }
@@ -150,12 +159,14 @@ P _epubBookProgressDeserializeProp<P>(
     case 3:
       return (reader.readLongOrNull(offset) ?? 0) as P;
     case 4:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 6:
-      return (reader.readDoubleOrNull(offset) ?? 0) as P;
+      return (reader.readLong(offset)) as P;
     case 7:
+      return (reader.readDoubleOrNull(offset) ?? 0) as P;
+    case 8:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1019,6 +1030,165 @@ extension EpubBookProgressQueryFilter
   }
 
   QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lang'),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lang'),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lang',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lang',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lang',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lang',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'lang',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'lang',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'lang',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'lang',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lang', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
+  langIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'lang', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterFilterCondition>
   lastModifiedIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1427,6 +1597,19 @@ extension EpubBookProgressQuerySortBy
     });
   }
 
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterSortBy> sortByLang() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lang', Sort.asc);
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterSortBy>
+  sortByLangDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lang', Sort.desc);
+    });
+  }
+
   QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterSortBy>
   sortByLastModified() {
     return QueryBuilder.apply(this, (query) {
@@ -1554,6 +1737,19 @@ extension EpubBookProgressQuerySortThenBy
     });
   }
 
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterSortBy> thenByLang() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lang', Sort.asc);
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterSortBy>
+  thenByLangDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lang', Sort.desc);
+    });
+  }
+
   QueryBuilder<EpubBookProgress, EpubBookProgress, QAfterSortBy>
   thenByLastModified() {
     return QueryBuilder.apply(this, (query) {
@@ -1641,6 +1837,14 @@ extension EpubBookProgressQueryWhereDistinct
     });
   }
 
+  QueryBuilder<EpubBookProgress, EpubBookProgress, QDistinct> distinctByLang({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lang', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<EpubBookProgress, EpubBookProgress, QDistinct>
   distinctByLastModified() {
     return QueryBuilder.apply(this, (query) {
@@ -1702,6 +1906,12 @@ extension EpubBookProgressQueryProperty
   characterCountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'characterCount');
+    });
+  }
+
+  QueryBuilder<EpubBookProgress, String?, QQueryOperations> langProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lang');
     });
   }
 

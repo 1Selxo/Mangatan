@@ -276,4 +276,16 @@ class ChimahonSettingsPayload {
           entry.key == 'pref_active_profile_id')
         entry.key: entry.value,
   };
+
+  Map<String, String> get dictionaryProfileOverrides => {
+    for (final entry in preferences.entries)
+      if (_isDictionaryProfileOverrideKey(entry.key) &&
+          entry.value.value is String)
+        entry.key: entry.value.value! as String,
+  };
+
+  static bool _isDictionaryProfileOverrideKey(String key) =>
+      key.startsWith('pref_dict_profile_manga_') ||
+      key.startsWith('pref_dict_profile_source_') ||
+      key.startsWith('pref_dict_profile_novel_');
 }

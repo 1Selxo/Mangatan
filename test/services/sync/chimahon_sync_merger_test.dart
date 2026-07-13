@@ -70,6 +70,36 @@ void main() {
     );
   });
 
+  test(
+    'remote profile snapshot authoritatively replaces cascade overrides',
+    () {
+      final merged = merger.merge(
+        local: BackupMihon(
+          backupPreferences: [
+            preferenceCodec.encode('pref_anki_profiles', 'local profiles'),
+            preferenceCodec.encode('pref_dict_profile_manga_42', 'local'),
+            preferenceCodec.encode('pref_dict_profile_novel_old', 'local'),
+          ],
+        ),
+        remote: BackupMihon(
+          backupPreferences: [
+            preferenceCodec.encode('pref_anki_profiles', 'remote profiles'),
+            preferenceCodec.encode('pref_dict_profile_source_7', 'remote'),
+          ],
+        ),
+      );
+
+      final preferences = {
+        for (final preference in merged.backupPreferences)
+          preference.key: preferenceCodec.decode(preference).value,
+      };
+      expect(preferences['pref_anki_profiles'], 'remote profiles');
+      expect(preferences['pref_dict_profile_source_7'], 'remote');
+      expect(preferences, isNot(contains('pref_dict_profile_manga_42')));
+      expect(preferences, isNot(contains('pref_dict_profile_novel_old')));
+    },
+  );
+
   // Adapted from Chimahon's SyncServiceTest.
   test('preserves anime categories and merges episodes', () {
     final merged = merger.merge(
@@ -114,12 +144,14 @@ void main() {
       int statModified,
       int characters, {
       List<String> categoryIds = const [],
+      String? lang,
     }) => BackupNovel(
       id: 'different-device-id-$modified',
       title: 'Novel',
       author: 'Author',
       lastModified: Int64(modified),
       categoryIds: categoryIds,
+      lang: lang,
       stats: [
         BackupNovelStat(
           dateKey: '2026-07-10',
@@ -132,7 +164,7 @@ void main() {
     final merged = merger.merge(
       local: BackupMihon(
         backupNovels: [
-          novel(10, 10, 100, categoryIds: ['default']),
+          novel(10, 10, 100, categoryIds: ['default'], lang: 'ja'),
         ],
         backupMangaStats: [
           BackupMangaStats(
@@ -162,6 +194,7 @@ void main() {
     expect(merged.backupNovels.single.lastModified, Int64(20));
     expect(merged.backupNovels.single.stats.single.charactersRead, 250);
     expect(merged.backupNovels.single.categoryIds, ['reading']);
+    expect(merged.backupNovels.single.lang, 'ja');
     expect(merged.backupMangaStats.single.charactersRead, 250);
     expect(merged.backupMangaStats.single.readingTime, Int64(200));
   });

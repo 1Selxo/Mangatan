@@ -851,8 +851,8 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                               final textAlign = ref.watch(
                                 novelTextAlignStateProvider,
                               );
-                              final removeExtraSpacing = ref.watch(
-                                novelRemoveExtraParagraphSpacingStateProvider,
+                              final paragraphSpacing = ref.watch(
+                                novelReaderParagraphSpacingStateProvider,
                               );
                               final customBackgroundColor = ref.watch(
                                 novelReaderThemeStateProvider,
@@ -949,8 +949,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                               ? _explorationTargetSpineIndex
                                               : null,
                                           tapToScroll: usePageTapZones,
-                                          removeExtraParagraphSpacing:
-                                              removeExtraSpacing,
+                                          paragraphSpacing: paragraphSpacing,
                                           layout: layout,
                                           onProgress:
                                               (
@@ -1079,16 +1078,11 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                                     getTextAlign(),
                                                               ),
                                                               "p": Style(
-                                                                margin:
-                                                                    removeExtraSpacing
-                                                                    ? Margins.only(
-                                                                        bottom:
-                                                                            4,
-                                                                      )
-                                                                    : Margins.only(
-                                                                        bottom:
-                                                                            8,
-                                                                      ),
+                                                                margin: Margins.only(
+                                                                  bottom:
+                                                                      fontSize *
+                                                                      paragraphSpacing,
+                                                                ),
                                                                 fontSize: FontSize(
                                                                   fontSize
                                                                       .toDouble(),
@@ -1435,7 +1429,10 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                   ],
                 );
               },
-              loading: () => ColoredBox(color: readerBackgroundColor),
+              loading: () => ColoredBox(
+                color: readerBackgroundColor,
+                child: const Center(child: CircularProgressIndicator()),
+              ),
               error: (err, stack) =>
                   scaffoldWith(context, Center(child: Text(err.toString()))),
             ),

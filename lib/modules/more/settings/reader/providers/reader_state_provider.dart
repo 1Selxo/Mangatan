@@ -429,21 +429,24 @@ class NovelShowScrollPercentageState extends _$NovelShowScrollPercentageState {
 }
 
 @riverpod
-class NovelRemoveExtraParagraphSpacingState
-    extends _$NovelRemoveExtraParagraphSpacingState {
+class NovelReaderParagraphSpacingState
+    extends _$NovelReaderParagraphSpacingState {
   @override
-  bool build() {
-    return isar.settings.getSync(227)!.novelRemoveExtraParagraphSpacing ??
-        false;
+  double build() {
+    final settings = isar.settings.getSync(227)!;
+    return (settings.novelReaderParagraphSpacing ??
+            (settings.novelRemoveExtraParagraphSpacing == true ? 0.25 : 0.0))
+        .clamp(0.0, 2.0);
   }
 
-  void set(bool value) {
+  void set(double value) {
+    final safeValue = value.clamp(0.0, 2.0);
     final settings = isar.settings.getSync(227);
-    state = value;
+    state = safeValue;
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
-          ..novelRemoveExtraParagraphSpacing = value
+          ..novelReaderParagraphSpacing = safeValue
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );

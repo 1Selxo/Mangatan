@@ -164,7 +164,8 @@ class ChapterListTileWidget extends ConsumerWidget {
                       ),
                     ],
                   ),
-                if ((chapter.manga.value!.isLocalArchive ?? false) == false)
+                if (!isEpubNavigationChapter(chapter) &&
+                    (chapter.manga.value!.isLocalArchive ?? false) == false)
                   Text(
                     chapter.dateUpload == null || chapter.dateUpload!.isEmpty
                         ? ""

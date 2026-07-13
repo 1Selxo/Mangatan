@@ -18,6 +18,9 @@ class ReaderSettingsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final padding = ref.watch(novelReaderPaddingStateProvider);
     final lineHeight = ref.watch(novelReaderLineHeightStateProvider);
+    final paragraphSpacing = ref.watch(
+      novelReaderParagraphSpacingStateProvider,
+    );
     final textAlign = ref.watch(novelTextAlignStateProvider);
     final backgroundColor = ref.watch(novelReaderThemeStateProvider);
     final textColor = ref.watch(novelReaderTextColorStateProvider);
@@ -415,6 +418,61 @@ class ReaderSettingsTab extends ConsumerWidget {
               ],
             ),
           ),
+
+          const SizedBox(height: 16),
+
+          _SettingSection(
+            title: 'Paragraph spacing',
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.format_line_spacing_rounded,
+                    size: 22,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Slider(
+                    value: paragraphSpacing,
+                    min: 0,
+                    max: 2,
+                    divisions: 20,
+                    label: '${paragraphSpacing.toStringAsFixed(1)} em',
+                    onChanged: (value) {
+                      ref
+                          .read(
+                            novelReaderParagraphSpacingStateProvider.notifier,
+                          )
+                          .set(value);
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 58,
+                  child: Text(
+                    paragraphSpacing == 0
+                        ? '0'
+                        : '${paragraphSpacing.toStringAsFixed(1)} em',
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -488,16 +546,6 @@ class GeneralSettingsTab extends ConsumerWidget {
               );
             },
           ),
-          _SwitchListTileSetting(
-            title: context.l10n.remove_extra_paragraph_spacing,
-            value: ref.watch(novelRemoveExtraParagraphSpacingStateProvider),
-            onChanged: (value) {
-              ref
-                  .read(novelRemoveExtraParagraphSpacingStateProvider.notifier)
-                  .set(value);
-            },
-          ),
-
           _SwitchListTileSetting(
             title: context.l10n.use_page_tap_zones,
             value: ref.watch(novelTapToScrollStateProvider),

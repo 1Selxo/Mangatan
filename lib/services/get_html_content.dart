@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:collection';
 import 'dart:io';
 import 'package:html/dom.dart' as dom;
 import 'package:mangayomi/src/rust/api/epub.dart';
@@ -11,6 +12,90 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'get_html_content.g.dart';
+
+typedef EpubBookLoader = Future<EpubNovel> Function(String path);
+typedef EpubFingerprintLoader = Future<String> Function(String path);
+
+class CachedEpubDocument {
+  const CachedEpubDocument({required this.book, required this.html});
+
+  final EpubNovel book;
+  final String html;
+}
+
+/// Shares the expensive full-book parse across every TOC shortcut belonging
+/// to the same EPUB. A file fingerprint prevents stale content reuse, while
+/// the small LRU bound limits retained media.
+class EpubDocumentCache {
+  EpubDocumentCache({
+    EpubBookLoader? loader,
+    EpubFingerprintLoader? fingerprintLoader,
+    this.maximumEntries = 2,
+  }) : _loader = loader ?? _parseBook,
+       _fingerprintLoader = fingerprintLoader ?? _fileFingerprint;
+
+  final EpubBookLoader _loader;
+  final EpubFingerprintLoader _fingerprintLoader;
+  final int maximumEntries;
+  final LinkedHashMap<String, Future<CachedEpubDocument>> _entries =
+      LinkedHashMap<String, Future<CachedEpubDocument>>();
+
+  Future<CachedEpubDocument> load(String path) async {
+    final normalizedPath = _normalizedCachePath(path);
+    final fingerprint = await _fingerprintLoader(path);
+    final key = '$normalizedPath\u0000$fingerprint';
+
+    _entries.removeWhere(
+      (candidate, _) =>
+          candidate.startsWith('$normalizedPath\u0000') && candidate != key,
+    );
+    final cached = _entries.remove(key);
+    if (cached != null) {
+      _entries[key] = cached;
+      return cached;
+    }
+
+    final pending = _load(path);
+    _entries[key] = pending;
+    while (_entries.length > maximumEntries && _entries.isNotEmpty) {
+      _entries.remove(_entries.keys.first);
+    }
+    try {
+      return await pending;
+    } catch (_) {
+      if (identical(_entries[key], pending)) _entries.remove(key);
+      rethrow;
+    }
+  }
+
+  void clear() => _entries.clear();
+
+  Future<CachedEpubDocument> _load(String path) async {
+    final book = await _loader(path);
+    final html = selectEpubChapterContent(book, null);
+    if (!readerHtmlHasRenderableContent(html)) {
+      throw const FormatException(
+        'The EPUB contains no readable chapter content.',
+      );
+    }
+    return CachedEpubDocument(book: book, html: html);
+  }
+
+  static Future<EpubNovel> _parseBook(String path) =>
+      parseEpubFromPath(epubPath: path, fullData: true);
+
+  static Future<String> _fileFingerprint(String path) async {
+    final stat = await File(path).stat();
+    return '${stat.size}:${stat.modified.millisecondsSinceEpoch}';
+  }
+
+  static String _normalizedCachePath(String path) {
+    final normalized = p.normalize(p.absolute(path));
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
+  }
+}
+
+final epubDocumentCache = EpubDocumentCache();
 
 @riverpod
 Future<(String, EpubNovel?)> getHtmlContent(
@@ -25,25 +110,16 @@ Future<(String, EpubNovel?)> getHtmlContent(
     }
     if (chapter.archivePath != null && chapter.archivePath!.isNotEmpty) {
       try {
-        final book = await parseEpubFromPath(
-          epubPath: chapter.archivePath!,
-          fullData: true,
-        );
+        final document = await epubDocumentCache.load(chapter.archivePath!);
         // A local EPUB is always one continuous reader document. `Chapter`
         // rows are TOC shortcuts only and must never select a physical XHTML
         // file as the reader's state owner.
-        final htmlContent = selectEpubChapterContent(book, null);
-        if (!readerHtmlHasRenderableContent(htmlContent)) {
-          throw const FormatException(
-            'The EPUB contains no readable chapter content.',
-          );
-        }
         // Keep the original EPUB XHTML for the browser reader. It needs the
         // document head and relative URLs to resolve publisher CSS, images,
         // footnotes, and SVG resources from the materialized EPUB session.
         // The compatibility Flutter renderer still sanitizes this through
         // buildReaderHtml when it is used as a fallback.
-        result = (htmlContent, book);
+        result = (document.html, document.book);
       } catch (error) {
         final message = const HtmlEscape().convert(error.toString());
         result = (

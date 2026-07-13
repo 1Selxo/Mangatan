@@ -294,6 +294,7 @@ class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
   bool _pointerHandledByOcr = false;
   bool _lookupPointer = false;
   bool _lookupPointerUsesPrimaryButton = false;
+  bool _popupDismissPointer = false;
   bool _middleHoverPointer = false;
 
   @override
@@ -318,6 +319,10 @@ class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
         behavior: HitTestBehavior.translucent,
         onPointerDown: (event) {
           _lookupPointerUsesPrimaryButton = event.buttons == kPrimaryButton;
+          _popupDismissPointer =
+              isDesktop &&
+              event.kind == PointerDeviceKind.mouse &&
+              _lookupPointerUsesPrimaryButton;
           _middleHoverPointer = ReaderOcrState.handleMiddleLookupStart(
             event.position,
             event.buttons,
@@ -341,12 +346,15 @@ class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
         onPointerUp: (event) {
           if (_middleHoverPointer) {
             ReaderOcrState.handleMiddleLookupEnd();
-          } else if (_lookupPointer) {
-            final handled = ReaderOcrState.handlePointerUp(event.position);
+          } else {
+            final handled = _lookupPointer
+                ? ReaderOcrState.handlePointerUp(event.position)
+                : _popupDismissPointer && ReaderOcrState.dismissActiveLookup();
             _pointerHandledByOcr = _lookupPointerUsesPrimaryButton && handled;
           }
           _lookupPointer = false;
           _lookupPointerUsesPrimaryButton = false;
+          _popupDismissPointer = false;
           _middleHoverPointer = false;
         },
         onPointerCancel: (_) {
@@ -354,6 +362,7 @@ class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
           if (_middleHoverPointer) ReaderOcrState.handleMiddleLookupEnd();
           _lookupPointer = false;
           _lookupPointerUsesPrimaryButton = false;
+          _popupDismissPointer = false;
           _middleHoverPointer = false;
         },
         child: const SizedBox.expand(),

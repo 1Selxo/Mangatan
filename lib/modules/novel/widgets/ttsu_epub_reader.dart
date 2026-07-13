@@ -642,17 +642,6 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     final lookupTokenLiteral = lookupToken?.toString() ?? 'null';
     final generation = ++_dictionaryGeneration;
 
-    if (ttsuRepeatedLookupShouldDismiss(
-      repeatedLookup: _javascriptBool(data['repeatedLookup']),
-      popupVisible: DictionaryLookupPopup.isActive,
-    )) {
-      DictionaryLookupPopup.dismissActive();
-      await _webView?.evaluateJavascript(
-        source: 'window.mangatanReader?.clearLookup($lookupTokenLiteral);',
-      );
-      return;
-    }
-
     final box = _webViewKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
     final localAnchor = Rect.fromLTRB(
@@ -2054,20 +2043,12 @@ String buildTtsuEpubDocument({
         CSS.highlights.set('hoshi-selection', new Highlight(...ranges));
         return true;
       };
-      const lookupAt = (
-        x,
-        y,
-        existingHit = null,
-        detectRepeatedLookup = false,
-      ) => {
+      const lookupAt = (x, y, existingHit = null) => {
         const hit = existingHit || characterAt(x, y);
         if (!hit) return null;
         const scan = scanLookup(hit.node, hit.offset);
         const query = scan.text;
         if (!query) return null;
-        const repeatedLookup = detectRepeatedLookup &&
-          activeLookup?.originNode === hit.node &&
-          activeLookup?.originOffset === hit.offset;
         const lookupToken = ++nextLookupToken;
         activeLookup = {
           ranges: scan.ranges,
@@ -2084,7 +2065,7 @@ String buildTtsuEpubDocument({
           x >= candidate.left && x <= candidate.right &&
           y >= candidate.top && y <= candidate.bottom
         ) || range.getBoundingClientRect();
-        return { text: query, sentence: sentenceFor(hit.node, hit.offset), left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, lookupToken, repeatedLookup };
+        return { text: query, sentence: sentenceFor(hit.node, hit.offset), left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, lookupToken };
       };
       const hideAction = () => { action.style.display = 'none'; selected = null; };
       const selectionText = (selection) => {
@@ -2123,18 +2104,26 @@ String buildTtsuEpubDocument({
         return true;
       };
       const clearSelection = () => clearLookup();
-      const triggerLookupAt = (
-        x,
-        y,
-        hit = null,
-        detectRepeatedLookup = false,
-      ) => {
+      const triggerLookupAt = (x, y, hit = null) => {
         if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
         hideAction();
-        const lookup = lookupAt(x, y, hit, detectRepeatedLookup);
+        const lookup = lookupAt(x, y, hit);
         if (!lookup) { clearLookup(); return false; }
         call('readerDictionary', lookup);
         return true;
+      };
+      const pointsAtActiveLookup = (x, y) => {
+        if (!activeLookup || !Number.isFinite(x) || !Number.isFinite(y)) {
+          return false;
+        }
+        const hit = characterAt(x, y);
+        return hit != null &&
+          activeLookup.originNode === hit.node &&
+          activeLookup.originOffset === hit.offset;
+      };
+      const dismissReaderDictionary = () => {
+        call('readerDismissDictionary');
+        clearLookup();
       };
       const triggerHeldLookupAt = (x, y) => {
         if (!Number.isFinite(x) || !Number.isFinite(y)) {
@@ -2264,12 +2253,21 @@ String buildTtsuEpubDocument({
         const selection = window.getSelection(); if (selectionText(selection)) return;
         const link = event.target.closest?.('a[href]');
         if (link) { event.preventDefault(); clearLookup(); const href = link.getAttribute('href') || ''; if (href.startsWith('#')) jumpToFragment(href); else call('readerLink', href); return; }
+        const hadActiveLookup = activeLookup != null;
         if (leftClickLookupEnabled(event)) {
+          if (pointsAtActiveLookup(event.clientX, event.clientY)) {
+            dismissReaderDictionary();
+            return;
+          }
           const triggered = lookupTrigger === 'shift' &&
               (event.shiftKey || shiftLookupActive)
             ? triggerHeldLookupAt(event.clientX, event.clientY)
-            : triggerLookupAt(event.clientX, event.clientY, null, true);
+            : triggerLookupAt(event.clientX, event.clientY);
           if (triggered) return;
+        }
+        if (hadActiveLookup) {
+          dismissReaderDictionary();
+          return;
         }
         clearLookup();
         call('readerTap', { x: event.clientX, y: event.clientY, width: window.innerWidth, height: window.innerHeight, tapZones });
@@ -2887,12 +2885,6 @@ double _javascriptNumber(Object? value, {double fallback = 0}) {
 
 bool _javascriptBool(Object? value) =>
     value == true || value?.toString().toLowerCase() == 'true';
-
-@visibleForTesting
-bool ttsuRepeatedLookupShouldDismiss({
-  required bool repeatedLookup,
-  required bool popupVisible,
-}) => repeatedLookup && popupVisible;
 
 bool? _javascriptNullableBool(Object? value) {
   if (value == true || value?.toString().toLowerCase() == 'true') return true;

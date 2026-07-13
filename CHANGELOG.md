@@ -3,6 +3,7 @@
 ## 1.0.3-beta+117 — 2026-07-13
 
 - Added explicit duplicate-card creation and an Anki browser button for existing matching cards.
+- Reduced Anki media usage by resizing and JPEG-compressing mined screenshots before upload.
 - Fixed unreadable dictionary description text when a light popup is used with a dark operating-system theme.
 - Fixed EPUB dictionary lookup ignoring Korean clicks by accepting Hangul during reader word scanning.
 - Replaced the hand-written Korean lookup analyzer with Kiwi contextual morphology, retaining the legacy rules only as a runtime fallback.

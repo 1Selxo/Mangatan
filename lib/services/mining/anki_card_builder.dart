@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
+import 'package:image/image.dart' as image;
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
@@ -196,12 +197,9 @@ class AnkiCardBuilder {
     final bytes = await loader();
     if (bytes == null || bytes.isEmpty) return null;
     final original = Uint8List.fromList(bytes);
-    if (original.length <= _maxScreenshotUploadBytes) {
-      return _ScreenshotPayload(original, _extensionForImage(original));
-    }
-    final resized = await _resizeScreenshot(original);
-    if (resized != null && resized.length < original.length) {
-      return _ScreenshotPayload(resized, 'png');
+    final compressed = await Isolate.run(() => _compressScreenshot(original));
+    if (compressed != null && compressed.length < original.length) {
+      return _ScreenshotPayload(compressed, 'jpg');
     }
     if (original.length <= _absoluteScreenshotUploadBytes) {
       return _ScreenshotPayload(original, _extensionForImage(original));
@@ -471,40 +469,8 @@ class AnkiCardBuilder {
   static final _markerPattern = RegExp(r'\{([^{}]+)\}');
 
   static const _legacyPopupSelectionTextMarker = '{popup-selection-text}';
-  static const _maxScreenshotUploadBytes = 4 * 1024 * 1024;
   static const _absoluteScreenshotUploadBytes = 8 * 1024 * 1024;
   static const _maxScreenshotDimension = 1280;
-
-  static Future<Uint8List?> _resizeScreenshot(Uint8List bytes) async {
-    ui.ImmutableBuffer? buffer;
-    ui.ImageDescriptor? descriptor;
-    ui.Codec? codec;
-    ui.Image? image;
-    try {
-      buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-      descriptor = await ui.ImageDescriptor.encoded(buffer);
-      final width = descriptor.width;
-      final height = descriptor.height;
-      final longest = width > height ? width : height;
-      if (longest <= _maxScreenshotDimension) return null;
-      final scale = _maxScreenshotDimension / longest;
-      codec = await descriptor.instantiateCodec(
-        targetWidth: (width * scale).round().clamp(1, width),
-        targetHeight: (height * scale).round().clamp(1, height),
-      );
-      final frame = await codec.getNextFrame();
-      image = frame.image;
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      return data?.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    } finally {
-      image?.dispose();
-      codec?.dispose();
-      descriptor?.dispose();
-      buffer?.dispose();
-    }
-  }
 
   static String _extensionForImage(Uint8List bytes) {
     if (bytes.length >= 8 &&
@@ -532,6 +498,31 @@ class AnkiCardBuilder {
       return 'webp';
     }
     return 'png';
+  }
+}
+
+Uint8List? _compressScreenshot(Uint8List bytes) {
+  try {
+    final decoded = image.decodeImage(bytes);
+    if (decoded == null) return null;
+    final longest = decoded.width > decoded.height
+        ? decoded.width
+        : decoded.height;
+    final resized = longest > AnkiCardBuilder._maxScreenshotDimension
+        ? image.copyResize(
+            decoded,
+            width: decoded.width >= decoded.height
+                ? AnkiCardBuilder._maxScreenshotDimension
+                : null,
+            height: decoded.height > decoded.width
+                ? AnkiCardBuilder._maxScreenshotDimension
+                : null,
+            interpolation: image.Interpolation.average,
+          )
+        : decoded;
+    return Uint8List.fromList(image.encodeJpg(resized, quality: 82));
+  } catch (_) {
+    return null;
   }
 }
 

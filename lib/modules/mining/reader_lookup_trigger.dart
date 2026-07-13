@@ -12,6 +12,7 @@ class ReaderLookupTriggerState {
   static final trigger = ValueNotifier<DictionaryLookupTrigger>(
     DictionaryLookupTrigger.leftClick,
   );
+  static final additionalLeftClick = ValueNotifier<bool>(false);
 
   static bool _initialized = false;
   static Future<void>? _initializing;
@@ -26,7 +27,12 @@ class ReaderLookupTriggerState {
 
   static Future<void> _load() async {
     try {
-      trigger.value = await MiningPreferences.getDictionaryLookupTrigger();
+      final values = await Future.wait<dynamic>([
+        MiningPreferences.getDictionaryLookupTrigger(),
+        MiningPreferences.getDictionaryAdditionalLeftClick(),
+      ]);
+      trigger.value = values[0] as DictionaryLookupTrigger;
+      additionalLeftClick.value = values[1] as bool;
       _initialized = true;
     } finally {
       _initializing = null;
@@ -38,14 +44,24 @@ class ReaderLookupTriggerState {
     trigger.value = value;
     await MiningPreferences.setDictionaryLookupTrigger(value);
   }
+
+  static Future<void> setAdditionalLeftClick(bool value) async {
+    await initialize();
+    additionalLeftClick.value = value;
+    await MiningPreferences.setDictionaryAdditionalLeftClick(value);
+  }
 }
 
 bool readerLookupTriggerMatchesPointer(
   DictionaryLookupTrigger trigger,
-  int buttons,
-) {
+  int buttons, {
+  bool additionalLeftClick = false,
+}) {
+  if (buttons == kPrimaryButton) {
+    return trigger == DictionaryLookupTrigger.leftClick || additionalLeftClick;
+  }
   return switch (trigger) {
-    DictionaryLookupTrigger.leftClick => buttons == kPrimaryButton,
+    DictionaryLookupTrigger.leftClick => false,
     DictionaryLookupTrigger.middleClick => buttons == kMiddleMouseButton,
     DictionaryLookupTrigger.shift => false,
   };

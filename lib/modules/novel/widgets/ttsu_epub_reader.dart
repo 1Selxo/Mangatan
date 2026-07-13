@@ -20,6 +20,7 @@ import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -313,6 +314,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   String? _prefetchedLookupText;
   Future<List<HoshiLookupResult>>? _prefetchedLookupResults;
   DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
+  bool _additionalLeftClick = false;
 
   String? get _chapterHref {
     if (isEpubNavigationChapter(widget.chapter)) return null;
@@ -331,14 +333,25 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   @override
   void initState() {
     super.initState();
-    ReaderLookupTriggerState.trigger.addListener(_handleLookupTriggerChanged);
+    ReaderLookupTriggerState.trigger.addListener(
+      _handleLookupPreferencesChanged,
+    );
+    ReaderLookupTriggerState.additionalLeftClick.addListener(
+      _handleLookupPreferencesChanged,
+    );
     unawaited(_prepareBundle());
   }
 
-  void _handleLookupTriggerChanged() {
+  void _handleLookupPreferencesChanged() {
     final trigger = ReaderLookupTriggerState.trigger.value;
-    if (trigger == _lookupTrigger) return;
+    final additionalLeftClick =
+        ReaderLookupTriggerState.additionalLeftClick.value;
+    if (trigger == _lookupTrigger &&
+        additionalLeftClick == _additionalLeftClick) {
+      return;
+    }
     _lookupTrigger = trigger;
+    _additionalLeftClick = additionalLeftClick;
     if (_bundle != null && !_isPreparing) {
       unawaited(_reloadAtCurrentPosition());
     }
@@ -385,6 +398,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     try {
       await ReaderLookupTriggerState.initialize();
       _lookupTrigger = ReaderLookupTriggerState.trigger.value;
+      _additionalLeftClick = ReaderLookupTriggerState.additionalLeftClick.value;
       bundle = await _EpubRenderBundle.create(
         book: widget.book,
         chapterHref: _chapterHref,
@@ -472,6 +486,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     paragraphSpacing: widget.paragraphSpacing,
     layout: widget.layout,
     lookupTrigger: _lookupTrigger,
+    additionalLeftClick: isDesktop && _additionalLeftClick,
     chapterHref: _chapterHref,
     resourceUrlFor: resourceUrlFor ?? _bundle?.relativeUrlFor,
   );
@@ -479,7 +494,10 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   @override
   void dispose() {
     ReaderLookupTriggerState.trigger.removeListener(
-      _handleLookupTriggerChanged,
+      _handleLookupPreferencesChanged,
+    );
+    ReaderLookupTriggerState.additionalLeftClick.removeListener(
+      _handleLookupPreferencesChanged,
     );
     final controller = _webView;
     if (controller != null) widget.controller.detach(controller);
@@ -1103,6 +1121,7 @@ String buildTtsuEpubDocument({
   double paragraphSpacing = 0,
   EpubReadingLayout layout = EpubReadingLayout.horizontalContinuous,
   DictionaryLookupTrigger lookupTrigger = DictionaryLookupTrigger.leftClick,
+  bool additionalLeftClick = false,
   String? chapterHref,
   String? Function(EpubResource resource)? resourceUrlFor,
 }) {
@@ -1144,6 +1163,7 @@ String buildTtsuEpubDocument({
   final pageMode = layout.isPaged;
   final verticalWriting = layout.isVerticalWriting;
   final lookupTriggerValue = jsonEncode(lookupTrigger.name);
+  final additionalLeftClickValue = additionalLeftClick ? 'true' : 'false';
   final pageGap = (padding * 2).toStringAsFixed(1);
 
   return '''<!doctype html>
@@ -1383,6 +1403,11 @@ String buildTtsuEpubDocument({
       const verticalWriting = $verticalWriting;
       const continuousVertical = verticalWriting && !pageMode;
       const lookupTrigger = $lookupTriggerValue;
+      const additionalLeftClick = $additionalLeftClickValue;
+      const leftClickLookupEnabled = (event) =>
+        lookupTrigger === 'leftClick' ||
+        (additionalLeftClick &&
+          (!event.pointerType || event.pointerType === 'mouse'));
       const content = document.getElementById('reader-content');
       const action = document.getElementById('dictionary-action');
       let progressFrame = 0;
@@ -2029,13 +2054,18 @@ String buildTtsuEpubDocument({
         CSS.highlights.set('hoshi-selection', new Highlight(...ranges));
         return true;
       };
-      const lookupAt = (x, y, existingHit = null) => {
+      const lookupAt = (
+        x,
+        y,
+        existingHit = null,
+        detectRepeatedLookup = false,
+      ) => {
         const hit = existingHit || characterAt(x, y);
         if (!hit) return null;
         const scan = scanLookup(hit.node, hit.offset);
         const query = scan.text;
         if (!query) return null;
-        const repeatedLookup = lookupTrigger === 'leftClick' &&
+        const repeatedLookup = detectRepeatedLookup &&
           activeLookup?.originNode === hit.node &&
           activeLookup?.originOffset === hit.offset;
         const lookupToken = ++nextLookupToken;
@@ -2093,10 +2123,15 @@ String buildTtsuEpubDocument({
         return true;
       };
       const clearSelection = () => clearLookup();
-      const triggerLookupAt = (x, y, hit = null) => {
+      const triggerLookupAt = (
+        x,
+        y,
+        hit = null,
+        detectRepeatedLookup = false,
+      ) => {
         if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
         hideAction();
-        const lookup = lookupAt(x, y, hit);
+        const lookup = lookupAt(x, y, hit, detectRepeatedLookup);
         if (!lookup) { clearLookup(); return false; }
         call('readerDictionary', lookup);
         return true;
@@ -2229,7 +2264,13 @@ String buildTtsuEpubDocument({
         const selection = window.getSelection(); if (selectionText(selection)) return;
         const link = event.target.closest?.('a[href]');
         if (link) { event.preventDefault(); clearLookup(); const href = link.getAttribute('href') || ''; if (href.startsWith('#')) jumpToFragment(href); else call('readerLink', href); return; }
-        if (lookupTrigger === 'leftClick' && triggerLookupAt(event.clientX, event.clientY)) return;
+        if (leftClickLookupEnabled(event)) {
+          const triggered = lookupTrigger === 'shift' &&
+              (event.shiftKey || shiftLookupActive)
+            ? triggerHeldLookupAt(event.clientX, event.clientY)
+            : triggerLookupAt(event.clientX, event.clientY, null, true);
+          if (triggered) return;
+        }
         clearLookup();
         call('readerTap', { x: event.clientX, y: event.clientY, width: window.innerWidth, height: window.innerHeight, tapZones });
       });

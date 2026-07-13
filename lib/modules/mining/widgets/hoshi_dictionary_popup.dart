@@ -928,6 +928,11 @@ String buildHoshiPopupHtml({
 	    .glossary-content, .glossary-content * { color: var(--text-color); }
 	    .tag-row, .tag-row * { color: var(--text-color-light1); }
 	    .frequency-dict-label, .pitch-dict-label { color: #fff; }
+	    .overlay {
+	      background: var(--background-color-dark1);
+	      color: var(--text-color);
+	    }
+	    .overlay-content, .overlay-close { color: var(--text-color); }
 		    .popup-empty {
 	      min-height: calc(140px * var(--popup-scale));
 	      display: grid;

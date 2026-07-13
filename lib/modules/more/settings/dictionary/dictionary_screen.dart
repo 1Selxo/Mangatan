@@ -15,6 +15,7 @@ import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class DictionaryScreen extends StatefulWidget {
   const DictionaryScreen({super.key});
@@ -39,6 +40,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _outlineVisible = true;
   bool _lookupOnHover = false;
   DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
+  bool _additionalLeftClick = false;
   bool _overlayEnabled = true;
   bool _screenAiAvailable = false;
   bool _loading = true;
@@ -77,14 +79,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getAnkiEndpoint(),
       ScreenAiOcrClient.isAvailable(),
       MiningPreferences.getDictionaryLookupTrigger(),
+      MiningPreferences.getDictionaryAdditionalLeftClick(),
       MiningPreferences.getDictionaryLanguage(),
       MiningPreferences.getDictionaryProfiles(),
       MiningPreferences.getActiveDictionaryProfile(),
     ]);
     if (!mounted) return;
     setState(() {
-      _profiles = values[16] as List<DictionaryProfile>;
-      _activeProfile = values[17] as DictionaryProfile;
+      _profiles = values[17] as List<DictionaryProfile>;
+      _activeProfile = values[18] as DictionaryProfile;
       _dictionaries = _orderDictionaries(
         values[0] as List<InstalledDictionary>,
         _activeProfile.dictionaryOrder,
@@ -103,7 +106,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _ankiEndpoint = values[12] as Uri;
       _screenAiAvailable = values[13] as bool;
       _lookupTrigger = values[14] as DictionaryLookupTrigger;
-      _dictionaryLanguage = values[15] as String;
+      _additionalLeftClick = values[15] as bool;
+      _dictionaryLanguage = values[16] as String;
       _loading = false;
     });
     unawaited(_refreshAnki(silent: true));
@@ -901,6 +905,30 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     },
                   ),
                 ),
+                if (isDesktop)
+                  SwitchListTile(
+                    secondary: const Icon(Icons.ads_click_outlined),
+                    title: const Text('Also allow left click'),
+                    subtitle: Text(
+                      _lookupTrigger == DictionaryLookupTrigger.leftClick
+                          ? 'Left click is already the selected lookup trigger'
+                          : 'Use left click in addition to the selected trigger',
+                    ),
+                    value:
+                        _lookupTrigger == DictionaryLookupTrigger.leftClick ||
+                        _additionalLeftClick,
+                    onChanged:
+                        _lookupTrigger == DictionaryLookupTrigger.leftClick
+                        ? null
+                        : (value) {
+                            setState(() => _additionalLeftClick = value);
+                            unawaited(
+                              ReaderLookupTriggerState.setAdditionalLeftClick(
+                                value,
+                              ),
+                            );
+                          },
+                  ),
                 const Divider(height: 24),
                 const _SectionHeader('OCR overlay'),
                 SwitchListTile(

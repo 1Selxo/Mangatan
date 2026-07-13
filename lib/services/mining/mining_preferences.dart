@@ -143,6 +143,8 @@ class MiningPreferences {
   static const _ocrBoxScaleY = 'ocr_box_scale_y';
   static const _dictionaryPopupWidth = 'dictionary_popup_width';
   static const _dictionaryLookupTrigger = 'dictionary_lookup_trigger';
+  static const _dictionaryAdditionalLeftClick =
+      'dictionary_additional_left_click';
   static const _dictionaryPopupHeight = 'dictionary_popup_height';
   static const _dictionaryFontSize = 'dictionary_font_size';
   static const _dictionaryTheme = 'dictionary_theme';
@@ -516,6 +518,19 @@ class MiningPreferences {
     DictionaryLookupTrigger value,
   ) async {
     await (await _boxOrNull())?.put(_dictionaryLookupTrigger, value.name);
+  }
+
+  static Future<bool> getDictionaryAdditionalLeftClick() async {
+    return (await _boxOrNull())?.get(
+              _dictionaryAdditionalLeftClick,
+              defaultValue: false,
+            )
+            as bool? ??
+        false;
+  }
+
+  static Future<void> setDictionaryAdditionalLeftClick(bool value) async {
+    await (await _boxOrNull())?.put(_dictionaryAdditionalLeftClick, value);
   }
 
   static Future<DictionaryPopupPreferences>

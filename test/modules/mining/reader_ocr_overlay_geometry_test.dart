@@ -135,6 +135,37 @@ void main() {
       ),
       isFalse,
     );
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.shift,
+        kPrimaryButton,
+      ),
+      isFalse,
+    );
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.shift,
+        kPrimaryButton,
+        additionalLeftClick: true,
+      ),
+      isTrue,
+    );
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.middleClick,
+        kPrimaryButton,
+        additionalLeftClick: true,
+      ),
+      isTrue,
+    );
+    expect(
+      readerLookupTriggerMatchesPointer(
+        DictionaryLookupTrigger.middleClick,
+        kPrimaryButton | kMiddleMouseButton,
+        additionalLeftClick: true,
+      ),
+      isFalse,
+    );
   });
 
   test('matches either Shift key on key down and key up', () {

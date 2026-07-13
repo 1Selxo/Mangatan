@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 /// Navigation layout variants matching Mihon.
 ///
@@ -321,12 +322,17 @@ class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
             event.position,
             event.buttons,
           );
+          final additionalLeftClick =
+              isDesktop &&
+              event.kind == PointerDeviceKind.mouse &&
+              ReaderLookupTriggerState.additionalLeftClick.value;
           _lookupPointer = ReaderOcrState.lookupOnHover.value
               ? _lookupPointerUsesPrimaryButton
               : _middleHoverPointer ||
                     readerLookupTriggerMatchesPointer(
                       ReaderLookupTriggerState.trigger.value,
                       event.buttons,
+                      additionalLeftClick: additionalLeftClick,
                     );
           if (_lookupPointer && !_middleHoverPointer) {
             ReaderOcrState.handlePointerDown(event.position);

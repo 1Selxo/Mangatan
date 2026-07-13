@@ -101,6 +101,10 @@ class ReaderOcrState {
     final popupWasVisible = _popupWasVisibleOnPointerDown;
     _popupWasVisibleOnPointerDown = false;
     if (!enabled.value) return false;
+    if (!lookupOnHover.value && _heldLookupActive) {
+      unawaited(handleHover(globalPosition));
+      return true;
+    }
     if (lookupOnHover.value) {
       if (!popupWasVisible) return false;
       _dismissHoverPopup();

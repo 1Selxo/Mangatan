@@ -43,9 +43,10 @@ void main() {
     expect(document, contains('margin-block-end: 0.00em !important'));
     expect(document, contains('user-select: text'));
     expect(document, contains("const lookupTrigger = \"leftClick\""));
+    expect(document, contains('const additionalLeftClick = false'));
     expect(
       document,
-      contains("const repeatedLookup = lookupTrigger === 'leftClick'"),
+      contains('const repeatedLookup = detectRepeatedLookup &&'),
     );
     expect(document, contains('activeLookup?.originNode === hit.node'));
     expect(document, contains('originOffset: hit.offset'));
@@ -293,9 +294,21 @@ void main() {
       initialProgress: 0,
       tapToScroll: true,
       lookupTrigger: DictionaryLookupTrigger.shift,
+      additionalLeftClick: true,
     );
 
     expect(document, contains("const lookupTrigger = \"shift\""));
+    expect(document, contains('const additionalLeftClick = true'));
+    expect(document, contains('const leftClickLookupEnabled = (event) =>'));
+    expect(document, contains("event.pointerType === 'mouse'"));
+    expect(
+      document,
+      contains('triggerLookupAt(event.clientX, event.clientY, null, true)'),
+    );
+    expect(
+      document,
+      contains('const repeatedLookup = detectRepeatedLookup &&'),
+    );
     expect(document, contains("event.key === 'Shift'"));
     expect(document, contains('!event.repeat'));
     expect(document, contains('const setShiftLookupActive = (active) =>'));
@@ -366,7 +379,8 @@ void main() {
       expect(document, contains('src="../images/cover.png"'));
       expect(document, isNot(contains('data:image/png;base64,')));
       expect(document, isNot(contains('display:none')));
-      expect(document, contains("const lookupAt = (x, y, existingHit = null)"));
+      expect(document, contains('const lookupAt = ('));
+      expect(document, contains('existingHit = null'));
       expect(document, contains("call('readerLink', href)"));
       expect(document, contains('sentenceFor'));
     },

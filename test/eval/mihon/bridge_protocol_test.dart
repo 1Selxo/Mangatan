@@ -35,6 +35,20 @@ void main() {
       );
     });
 
+    test('keeps package display metadata alongside each source id', () {
+      final encoded = encodeMihonSourceMetadata(
+        sourceId: '1',
+        packageName: 'eu.kanade.tachiyomi.extension.all.comick',
+        extensionName: 'Comick',
+        packageLang: 'all',
+      );
+
+      final metadata = MihonSourceMetadata.fromAdditionalParams(encoded);
+
+      expect(metadata?.extensionName, 'Comick');
+      expect(metadata?.packageLang, 'all');
+    });
+
     test('groups sibling sources from the same APK package', () {
       final first = _source('1100359934660540567');
       final second = _source('5716273013801838310');

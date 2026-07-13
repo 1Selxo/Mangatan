@@ -14,7 +14,7 @@ void main() {
     ),
   ];
 
-  test('enables All and OS locale languages by default', () {
+  test('enables multi-language and OS locale sources by default', () {
     expect(
       shouldEnableExtensionLanguageByDefault('all', deviceLocales),
       isTrue,
@@ -65,6 +65,42 @@ void main() {
         deviceLocales: deviceLocales,
       ),
       isTrue,
+    );
+  });
+
+  test('uninstalled catalog sources follow their language group', () {
+    expect(
+      extensionLanguageEnabledForCatalogSource(
+        'all',
+        isInstalled: false,
+        currentValue: false,
+        savedLanguageStates: const {'all': true},
+        deviceLocales: const [],
+      ),
+      isTrue,
+    );
+    expect(
+      extensionLanguageEnabledForCatalogSource(
+        'all',
+        isInstalled: false,
+        currentValue: true,
+        savedLanguageStates: const {'all': false},
+        deviceLocales: const [],
+      ),
+      isFalse,
+    );
+  });
+
+  test('installed sources preserve their individual activation state', () {
+    expect(
+      extensionLanguageEnabledForCatalogSource(
+        'all',
+        isInstalled: true,
+        currentValue: false,
+        savedLanguageStates: const {'all': true},
+        deviceLocales: const [],
+      ),
+      isFalse,
     );
   });
 }

@@ -5,15 +5,13 @@ import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_pr
 import 'package:mangayomi/modules/widgets/custom_sliver_grouped_list_view.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/browse/extension/extension_package.dart';
 import 'package:mangayomi/modules/browse/extension/providers/extensions_provider.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/extension_list_tile_widget.dart';
-import 'package:mangayomi/modules/widgets/extension_server_warning_banner.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
 
 class ExtensionScreen extends ConsumerStatefulWidget {
   final ItemType itemType;
@@ -80,57 +78,42 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
     return RefreshIndicator(
       onRefresh: _refreshSources,
       child: Padding(
-        // Match the sources tab's inset so the two Browse tabs line up on TV.
-        padding: EdgeInsets.only(
-          top: 10,
-          left: isTv ? 8 : 0,
-          right: isTv ? 8 : 0,
-        ),
+        padding: const EdgeInsets.only(top: 10),
         child: streamExtensions.when(
           data: (data) {
+            final packages = groupExtensionPackages(data);
             final filteredData = widget.query.isEmpty
-                ? data
-                : data
-                      .where(
-                        (element) =>
-                            element.name?.toLowerCase().contains(
-                              widget.query.toLowerCase(),
-                            ) ??
-                            false,
-                      )
+                ? packages
+                : packages
+                      .where((package) => package.matchesQuery(widget.query))
                       .toList();
 
-            final updateEntries = <Source>[];
-            final installedEntries = <Source>[];
-            final notInstalledEntries = <Source>[];
-            var showWarning = false;
+            final updateEntries = <ExtensionCatalogEntry>[];
+            final installedEntries = <ExtensionCatalogEntry>[];
+            final notInstalledEntries = <ExtensionCatalogEntry>[];
 
-            for (var element in filteredData) {
+            for (final package in filteredData) {
+              final element = package.source;
               if (repositories
                       .firstWhereOrNull((e) => e == element.repo)
                       ?.hidden ??
                   false) {
                 continue;
               }
-              if (!showNSFW && (element.isNsfw ?? false)) {
+              if (!showNSFW && package.isNsfw) {
                 continue;
               }
-              if (element.sourceCodeLanguage == SourceCodeLanguage.mihon) {
-                showWarning = true;
-              }
-              final isLatestVersion = element.version == element.versionLast;
-
-              if (compareVersions(
-                    element.version ?? '',
-                    element.versionLast ?? '',
-                  ) <
-                  0) {
-                updateEntries.add(element);
-              } else if (isLatestVersion) {
-                if (element.isAdded ?? false) {
-                  installedEntries.add(element);
-                } else {
-                  notInstalledEntries.add(element);
+              for (final entry in package.catalogEntries) {
+                switch (entry.section) {
+                  case ExtensionCatalogSection.update:
+                    updateEntries.add(entry);
+                    break;
+                  case ExtensionCatalogSection.installed:
+                    installedEntries.add(entry);
+                    break;
+                  case ExtensionCatalogSection.available:
+                    notInstalledEntries.add(entry);
+                    break;
                 }
               }
             }
@@ -143,10 +126,6 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
               child: CustomScrollView(
                 controller: controller,
                 slivers: [
-                  if (showWarning)
-                    const SliverToBoxAdapter(
-                      child: ExtensionServerWarningBanner(),
-                    ),
                   if (updateEntries.isNotEmpty)
                     _buildUpdateSection(updateEntries, l10n),
                   if (installedEntries.isNotEmpty)
@@ -169,8 +148,11 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
     );
   }
 
-  Widget _buildUpdateSection(List<Source> updateEntries, dynamic l10n) {
-    return CustomSliverGroupedListView<Source, String>(
+  Widget _buildUpdateSection(
+    List<ExtensionCatalogEntry> updateEntries,
+    dynamic l10n,
+  ) {
+    return CustomSliverGroupedListView<ExtensionCatalogEntry, String>(
       elements: updateEntries,
       groupBy: (_) => "",
       groupSeparatorBuilder: (_) => StatefulBuilder(
@@ -193,8 +175,8 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
                       : () async {
                           setState(() => isUpdating = true);
                           try {
-                            for (var source in updateEntries) {
-                              await _updateSource(source);
+                            for (final entry in updateEntries) {
+                              await _updateSource(entry.source);
                             }
                           } finally {
                             if (context.mounted) {
@@ -215,17 +197,19 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
           );
         },
       ),
-      itemBuilder: (context, Source element) =>
-          ExtensionListTileWidget(source: element),
+      itemBuilder: (context, ExtensionCatalogEntry entry) =>
+          ExtensionListTileWidget(entry: entry),
       groupComparator: (group1, group2) => group1.compareTo(group2),
-      itemComparator: (item1, item2) =>
-          item1.name?.compareTo(item2.name ?? '') ?? 0,
+      itemComparator: (item1, item2) => item1.name.compareTo(item2.name),
       order: GroupedListOrder.ASC,
     );
   }
 
-  Widget _buildInstalledSection(List<Source> installedEntries, dynamic l10n) {
-    return CustomSliverGroupedListView<Source, String>(
+  Widget _buildInstalledSection(
+    List<ExtensionCatalogEntry> installedEntries,
+    dynamic l10n,
+  ) {
+    return CustomSliverGroupedListView<ExtensionCatalogEntry, String>(
       elements: installedEntries,
       groupBy: (_) => "",
       groupSeparatorBuilder: (_) => Padding(
@@ -235,20 +219,20 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
       ),
-      itemBuilder: (context, Source element) =>
-          ExtensionListTileWidget(source: element),
+      itemBuilder: (context, ExtensionCatalogEntry entry) =>
+          ExtensionListTileWidget(entry: entry),
       groupComparator: (group1, group2) => group1.compareTo(group2),
-      itemComparator: (item1, item2) =>
-          item1.name?.compareTo(item2.name ?? '') ?? 0,
+      itemComparator: (item1, item2) => item1.name.compareTo(item2.name),
       order: GroupedListOrder.ASC,
     );
   }
 
-  Widget _buildNotInstalledSection(List<Source> notInstalledEntries) {
-    return CustomSliverGroupedListView<Source, String>(
+  Widget _buildNotInstalledSection(
+    List<ExtensionCatalogEntry> notInstalledEntries,
+  ) {
+    return CustomSliverGroupedListView<ExtensionCatalogEntry, String>(
       elements: notInstalledEntries,
-      groupBy: (element) =>
-          completeLanguageName(element.lang?.toLowerCase() ?? ''),
+      groupBy: (entry) => completeLanguageName(entry.lang.toLowerCase()),
       groupSeparatorBuilder: (String groupByValue) => Padding(
         padding: const EdgeInsets.only(left: 12),
         child: Text(
@@ -256,11 +240,10 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
       ),
-      itemBuilder: (context, Source element) =>
-          ExtensionListTileWidget(source: element),
+      itemBuilder: (context, ExtensionCatalogEntry entry) =>
+          ExtensionListTileWidget(entry: entry),
       groupComparator: (group1, group2) => group1.compareTo(group2),
-      itemComparator: (item1, item2) =>
-          item1.name?.compareTo(item2.name ?? '') ?? 0,
+      itemComparator: (item1, item2) => item1.name.compareTo(item2.name),
       order: GroupedListOrder.ASC,
     );
   }

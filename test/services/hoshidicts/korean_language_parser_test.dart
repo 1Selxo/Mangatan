@@ -131,7 +131,31 @@ void main() {
     expect(queries, contains('먹다'));
     expect(results.single.matched, '먹었어요');
     expect(results.single.term.expression, '먹다');
-    expect(results.single.trace.first.name, 'Korean Kiwi VV');
+    expect(results.single.trace.first.name, 'Korean Kiwi Verb');
+    expect(results.single.trace.first.description, contains('(verb)'));
+    expect(results.single.trace.first.name, isNot(contains('VV')));
+  });
+
+  test('renders Kiwi conjugation suffixes as meaningful text', () async {
+    final results = await lookupKoreanDictionary(
+      text: '가는다랗고',
+      maxResults: 5,
+      scanLength: 20,
+      morphologyAnalyzer: const _FakeIrregularKiwiAnalyzer(),
+      lookup: (text, maxResults, scanLength) async {
+        return text == '가느다랗다' ? [_result('가느다랗다', '가느다랗다')] : const [];
+      },
+    );
+
+    expect(
+      results.single.trace.first.name,
+      'Korean Kiwi Adjective · Irregular conjugation',
+    );
+    expect(
+      results.single.trace.first.description,
+      contains('(adjective, irregular conjugation)'),
+    );
+    expect(results.single.trace.first.name, isNot(contains('VA-I')));
   });
 }
 
@@ -152,6 +176,16 @@ class _FakeKiwiAnalyzer implements KoreanMorphologyAnalyzer {
     KoreanMorpheme(form: '먹', tag: 'VV', start: 0, length: 1),
     KoreanMorpheme(form: '었', tag: 'EP', start: 1, length: 1),
     KoreanMorpheme(form: '어요', tag: 'EF', start: 2, length: 2),
+  ];
+}
+
+class _FakeIrregularKiwiAnalyzer implements KoreanMorphologyAnalyzer {
+  const _FakeIrregularKiwiAnalyzer();
+
+  @override
+  Future<List<KoreanMorpheme>> analyze(String text) async => const [
+    KoreanMorpheme(form: '가느다랗', tag: 'VA-I', start: 0, length: 5),
+    KoreanMorpheme(form: '고', tag: 'EC', start: 5, length: 1),
   ];
 }
 

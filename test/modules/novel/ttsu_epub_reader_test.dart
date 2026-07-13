@@ -44,13 +44,10 @@ void main() {
     expect(document, contains('user-select: text'));
     expect(document, contains("const lookupTrigger = \"leftClick\""));
     expect(document, contains('const additionalLeftClick = false'));
-    expect(
-      document,
-      contains('const repeatedLookup = detectRepeatedLookup &&'),
-    );
-    expect(document, contains('activeLookup?.originNode === hit.node'));
+    expect(document, contains('const pointsAtActiveLookup = (x, y)'));
+    expect(document, contains('activeLookup.originNode === hit.node'));
     expect(document, contains('originOffset: hit.offset'));
-    expect(document, contains('lookupToken, repeatedLookup'));
+    expect(document, contains('lookupToken }'));
     expect(document, contains(r'\p{Radical}'));
     expect(
       RegExp(r'\\p\{Script=Hangul\}').allMatches(document).length,
@@ -125,25 +122,44 @@ void main() {
     );
   });
 
-  test('dismisses a repeated EPUB lookup only while its popup is visible', () {
-    expect(
-      ttsuRepeatedLookupShouldDismiss(repeatedLookup: true, popupVisible: true),
-      isTrue,
-    );
-    expect(
-      ttsuRepeatedLookupShouldDismiss(
-        repeatedLookup: true,
-        popupVisible: false,
-      ),
-      isFalse,
-    );
-    expect(
-      ttsuRepeatedLookupShouldDismiss(
-        repeatedLookup: false,
-        popupVisible: true,
-      ),
-      isFalse,
-    );
+  test('dismisses an active EPUB lookup from any primary click', () {
+    for (final trigger in DictionaryLookupTrigger.values) {
+      final document = buildTtsuEpubDocument(
+        html: '<p>辞書</p>',
+        book: book,
+        title: 'fixture',
+        backgroundColor: '#101010',
+        textColor: '#f0f0f0',
+        fontSize: 18,
+        lineHeight: 1.8,
+        padding: 24,
+        textAlign: 'left',
+        initialProgress: 0,
+        tapToScroll: true,
+        lookupTrigger: trigger,
+        additionalLeftClick: false,
+      );
+
+      expect(document, contains('const additionalLeftClick = false'));
+      expect(document, contains('const dismissReaderDictionary = () =>'));
+      expect(document, contains("call('readerDismissDictionary')"));
+      expect(
+        document,
+        contains('const hadActiveLookup = activeLookup != null'),
+      );
+      final lookupModeIndex = document.indexOf(
+        'if (leftClickLookupEnabled(event))',
+      );
+      final fallbackDismissalIndex = document.indexOf('if (hadActiveLookup)');
+      expect(lookupModeIndex, greaterThanOrEqualTo(0));
+      expect(
+        lookupModeIndex,
+        lessThan(fallbackDismissalIndex),
+        reason:
+            '${trigger.name} must allow an enabled click lookup to replace '
+            'the popup before applying the anywhere-dismiss fallback',
+      );
+    }
   });
 
   test('rewrites SVG xlink image references used by fixed-layout EPUBs', () {
@@ -301,14 +317,7 @@ void main() {
     expect(document, contains('const additionalLeftClick = true'));
     expect(document, contains('const leftClickLookupEnabled = (event) =>'));
     expect(document, contains("event.pointerType === 'mouse'"));
-    expect(
-      document,
-      contains('triggerLookupAt(event.clientX, event.clientY, null, true)'),
-    );
-    expect(
-      document,
-      contains('const repeatedLookup = detectRepeatedLookup &&'),
-    );
+    expect(document, contains('triggerLookupAt(event.clientX, event.clientY)'));
     expect(document, contains("event.key === 'Shift'"));
     expect(document, contains('!event.repeat'));
     expect(document, contains('const setShiftLookupActive = (active) =>'));

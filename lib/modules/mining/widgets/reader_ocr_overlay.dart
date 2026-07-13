@@ -101,6 +101,7 @@ class ReaderOcrState {
     final popupWasVisible = _popupWasVisibleOnPointerDown;
     _popupWasVisibleOnPointerDown = false;
     if (!enabled.value) return false;
+    if (dismissActiveLookupAt(globalPosition)) return true;
     if (!lookupOnHover.value && _heldLookupActive) {
       unawaited(handleHover(globalPosition));
       return true;
@@ -122,6 +123,31 @@ class ReaderOcrState {
     }
     _activateGlobalHit(hit);
     unawaited(hit.controller._activateHit(hit.context, hit.tapHit));
+    return true;
+  }
+
+  /// Dismisses the popup only when [globalPosition] is the active OCR hit.
+  static bool dismissActiveLookupAt(Offset globalPosition) {
+    if (!enabled.value) return false;
+    final hit = _bestGlobalHit(globalPosition);
+    if (hit == null ||
+        !readerOcrShouldDismissRepeatedLookup(
+          popupVisible: DictionaryLookupPopup.isActive,
+          triggeredByHover: false,
+          sameBlock: identical(hit.controller._activeBlock, hit.tapHit.block),
+          activeOffset: hit.controller._activeOffset,
+          hitOffset: hit.tapHit.rawOffset,
+        )) {
+      return false;
+    }
+    return dismissActiveLookup();
+  }
+
+  /// Dismisses the active reader lookup without changing the scan trigger.
+  static bool dismissActiveLookup() {
+    if (!DictionaryLookupPopup.isActive) return false;
+    _dismissHoverPopup();
+    clearActive();
     return true;
   }
 
@@ -764,14 +790,25 @@ class ReaderOcrController extends ChangeNotifier {
       rawOffset,
     ).clamp(0, ordered.length - 1);
     if (!_isLookupStartChar(ordered[orderedOffset])) {
-      if (triggeredByHover) ReaderOcrState._dismissHoverPopup();
-      _activeBlock = block;
-      _activeOffset = rawOffset;
-      _matchLength = 0;
-      notifyListeners();
+      if (triggeredByHover) {
+        ReaderOcrState._dismissHoverPopup();
+      } else if (!ReaderOcrState.dismissActiveLookup()) {
+        _activeBlock = block;
+        _activeOffset = rawOffset;
+        _matchLength = 0;
+        notifyListeners();
+      }
       return true;
     }
     final lookup = _extractOcrLookupString(ordered, orderedOffset);
+    if (lookup.isEmpty) {
+      if (triggeredByHover) {
+        ReaderOcrState._dismissHoverPopup();
+      } else {
+        ReaderOcrState.dismissActiveLookup();
+      }
+      return true;
+    }
     final hoverKey = triggeredByHover
         ? '${identityHashCode(this)}:${identityHashCode(block)}:'
               '$orderedOffset:$lookup'
@@ -784,7 +821,7 @@ class ReaderOcrController extends ChangeNotifier {
     _activeOffset = rawOffset;
     _matchLength = 0;
     notifyListeners();
-    if (lookup.isEmpty || !context.mounted) {
+    if (!context.mounted) {
       if (triggeredByHover) ReaderOcrState._dismissHoverPopup();
       return true;
     }

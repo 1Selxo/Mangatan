@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image;
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -419,4 +421,55 @@ void main() {
       expect(draft.fields['Picture'], contains('<img src="'));
     },
   );
+
+  test('compresses screenshots before adding them to Anki media', () async {
+    final source = image.Image(width: 1500, height: 900);
+    final random = Random(7);
+    for (var y = 0; y < source.height; y++) {
+      for (var x = 0; x < source.width; x++) {
+        source.setPixelRgb(
+          x,
+          y,
+          random.nextInt(256),
+          random.nextInt(256),
+          random.nextInt(256),
+        );
+      }
+    }
+    final png = Uint8List.fromList(image.encodePng(source));
+    final result = HoshiLookupResult(
+      matched: '事件',
+      deinflected: '事件',
+      trace: const [],
+      preprocessorSteps: 0,
+      term: const HoshiTermResult(
+        expression: '事件',
+        reading: 'じけん',
+        rules: 'n',
+        score: 1,
+        glossaries: [],
+        frequencies: [],
+        pitches: [],
+      ),
+    );
+
+    final draft = await const AnkiCardBuilder().build(
+      result: result,
+      context: MiningContext(
+        sentence: '事件が起きた。',
+        imageBytesLoader: () async => png,
+      ),
+      profile: const AnkiMiningProfile(
+        fieldMap: {'Picture': AnkiMarker.screenshot},
+      ),
+    );
+
+    expect(draft.screenshotFileName, endsWith('.jpg'));
+    expect(draft.screenshotBytes, isNotNull);
+    expect(draft.screenshotBytes!.length, lessThan(png.length));
+    expect(draft.screenshotBytes!.take(3), [0xff, 0xd8, 0xff]);
+    final compressed = image.decodeImage(draft.screenshotBytes!);
+    expect(compressed, isNotNull);
+    expect(compressed!.width, lessThanOrEqualTo(1280));
+  });
 }

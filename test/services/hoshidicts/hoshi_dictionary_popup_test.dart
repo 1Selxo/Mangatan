@@ -282,6 +282,47 @@ void main() {
     expect(labelColorRule, greaterThan(tagRowColorRule));
   });
 
+  test('keeps the description overlay readable in a light popup', () {
+    const preferences = DictionaryPopupPreferences(
+      width: 540,
+      height: 450,
+      fontSize: 15,
+      theme: DictionaryThemePreference.light,
+      eInkMode: false,
+      paginatedScrolling: false,
+      customCss: '',
+      showFrequencyHarmonic: true,
+      showFrequencyAverage: false,
+      showPitchNumber: true,
+      showPitchText: true,
+    );
+
+    final html = buildHoshiPopupHtml(
+      popupCss:
+          '@media (prefers-color-scheme: dark) { .overlay { background: #222; } }',
+      popupJs: 'window.renderPopup = function() {};',
+      selectionJs: 'window.hoshiSelection = {};',
+      audioPreferences: AnkiAudioPreferences.defaults,
+      allowDuplicates: false,
+      preferences: preferences,
+      theme: ThemeData.light(),
+      dark: false,
+    );
+    final upstreamDarkOverlay = html.indexOf('.overlay { background: #222; }');
+    final themedOverlay = html.indexOf(
+      'background: var(--background-color-dark1);',
+    );
+
+    expect(upstreamDarkOverlay, isNonNegative);
+    expect(themedOverlay, greaterThan(upstreamDarkOverlay));
+    expect(
+      html,
+      contains(
+        '.overlay-content, .overlay-close { color: var(--text-color); }',
+      ),
+    );
+  });
+
   test('bundles the upstream Hoshi renderer and license', () async {
     final popup = await rootBundle.loadString('assets/hoshi_popup/popup.js');
     final css = await rootBundle.loadString('assets/hoshi_popup/popup.css');

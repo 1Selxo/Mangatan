@@ -2,6 +2,7 @@
 
 ## 1.0.3-beta+117 — 2026-07-13
 
+- Fixed unreadable dictionary description text when a light popup is used with a dark operating-system theme.
 - Fixed EPUB dictionary lookup ignoring Korean clicks by accepting Hangul during reader word scanning.
 - Replaced the hand-written Korean lookup analyzer with Kiwi contextual morphology, retaining the legacy rules only as a runtime fallback.
 - Added previous/next subtitle synchronization controls and saved subtitle delay per anime entry across episodes.

@@ -38,6 +38,7 @@ pub struct EpubNovel {
     pub cover: Option<Vec<u8>>,
     pub summary: Option<String>,
     pub author: Option<String>,
+    pub language: Option<String>,
     pub artist: Option<String>,
     pub chapters: Vec<EpubChapter>,
     pub images: Vec<EpubResource>,
@@ -97,6 +98,7 @@ fn parse_epub_with_doc<R: Read + Seek>(
         .unwrap_or_else(|| "Untitled".to_string());
 
     let author = doc.mdata("creator").map(|m| m.value.clone());
+    let language = doc.mdata("language").map(|m| m.value.clone());
     let artist = doc.mdata("contributor").map(|m| m.value.clone());
     let summary = doc.mdata("description").map(|m| m.value.clone());
     // Extract cover
@@ -203,6 +205,7 @@ fn parse_epub_with_doc<R: Read + Seek>(
         cover,
         summary,
         author,
+        language,
         artist,
         chapters,
         images,
@@ -1039,7 +1042,7 @@ mod tests {
                 br#"<?xml version="1.0" encoding="UTF-8"?>
 <package version="2.0" unique-identifier="book-id" xmlns="http://www.idpf.org/2007/opf">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <dc:identifier id="book-id">fixture</dc:identifier><dc:title>Japanese fixture</dc:title>
+    <dc:identifier id="book-id">fixture</dc:identifier><dc:title>Japanese fixture</dc:title><dc:language>ja</dc:language>
   </metadata>
   <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>
   <spine><itemref idref="chapter"/></spine>
@@ -1166,6 +1169,7 @@ mod tests {
 
         let book = parse_epub_from_bytes(epub_with_chapter(&chapter), true).unwrap();
 
+        assert_eq!(book.language.as_deref(), Some("ja"));
         assert_eq!(book.chapters.len(), 1);
         assert_eq!(book.chapters[0].spine_index, 0);
         assert!(book.chapters[0].is_navigation_entry);

@@ -5,15 +5,20 @@ import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/chrome_lens_ocr.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/mokuro_parser.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:mangayomi/services/mining/ocr_block_merger.dart';
+import 'package:mangayomi/services/mining/profile_ocr_language.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 
@@ -516,16 +521,39 @@ class ReaderOcrController extends ChangeNotifier {
   }
 
   static Future<_ReaderOcrPage> _preload(UChapDataPreload data) async {
-    final engine = await MiningPreferences.getOcrEngine();
-    final language = await MiningPreferences.getOcrLanguage();
+    final manga = data.chapter?.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
+    final sourceLanguage = source?.lang ?? manga?.lang ?? '';
+    final values = await Future.wait<dynamic>([
+      MiningPreferences.getOcrEngine(),
+      DictionaryProfileResolver.resolve(
+        mangaId: manga?.id,
+        sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+        sourceLanguage: sourceLanguage,
+      ),
+    ]);
+    final engine = values[0] as OcrEnginePreference;
+    final profile = values[1] as DictionaryProfile;
+    final language = profileOcrLanguage(profile.languageCode);
+    final ocrAllowed = isProfileOcrAllowed(
+      sourceLanguage: sourceLanguage,
+      profileLanguage: profile.languageCode,
+    );
     final key =
         '${data.pageUrl?.url ?? data.directory?.path ?? ''}:'
         '${data.chapter?.id}:${data.index}:${data.pageIndex}:'
-        '${engine.name}:$language';
+        '${engine.name}:$language:$ocrAllowed';
     try {
       return await _cache.putIfAbsent(
         key,
-        () => _recognize(data, engine: engine, language: language),
+        () => _recognize(
+          data,
+          engine: engine,
+          language: language,
+          ocrAllowed: ocrAllowed,
+        ),
       );
     } catch (_) {
       _cache.remove(key);
@@ -769,12 +797,34 @@ class ReaderOcrController extends ChangeNotifier {
     if (_prefetchedLookupKey == key) return;
     _prefetchedLookupKey = key;
     unawaited(
-      DictionaryLookupPopup.lookup(lookup).then<void>(
+      DictionaryLookupPopup.lookup(
+        lookup,
+        miningContext: Future.value(_miningContext(ordered)),
+      ).then<void>(
         (_) {},
         onError: (_) {
           if (_prefetchedLookupKey == key) _prefetchedLookupKey = null;
         },
       ),
+    );
+  }
+
+  MiningContext _miningContext(String sentence) {
+    final manga = data.chapter?.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
+    return MiningContext(
+      mediaType: MiningMediaType.manga,
+      mangaId: manga?.id,
+      sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+      sourceLanguage: source?.lang ?? manga?.lang ?? '',
+      sourceTitle: manga?.name ?? data.mangaName ?? '',
+      chapterTitle: data.chapter?.name ?? '',
+      sentence: sentence,
+      pageIndex: data.pageIndex,
+      sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
+      imageBytesLoader: () async => data.cropImage ?? await data.getImageBytes,
     );
   }
 
@@ -867,16 +917,7 @@ class ReaderOcrController extends ChangeNotifier {
       context: context,
       anchor: anchor,
       text: lookup,
-      miningContext: MiningContext(
-        mediaType: MiningMediaType.manga,
-        sourceTitle: data.chapter?.manga.value?.name ?? data.mangaName ?? '',
-        chapterTitle: data.chapter?.name ?? '',
-        sentence: ordered,
-        pageIndex: data.pageIndex,
-        sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
-        imageBytesLoader: () async =>
-            data.cropImage ?? await data.getImageBytes,
-      ),
+      miningContext: _miningContext(ordered),
       placement: hit.vertical
           ? DictionaryPopupPlacement.leftOrRight
           : DictionaryPopupPlacement.aboveOrBelow,
@@ -953,6 +994,7 @@ class ReaderOcrController extends ChangeNotifier {
     UChapDataPreload data, {
     required OcrEnginePreference engine,
     required String language,
+    required bool ocrAllowed,
   }) async {
     final values = await Future.wait<dynamic>([
       MiningPreferences.getOcrBoxScaleX(),
@@ -960,6 +1002,14 @@ class ReaderOcrController extends ChangeNotifier {
     ]);
     final boxScaleX = values[0] as double;
     final boxScaleY = values[1] as double;
+
+    if (!ocrAllowed) {
+      return _ReaderOcrPage(
+        blocks: const [],
+        boxScaleX: boxScaleX,
+        boxScaleY: boxScaleY,
+      );
+    }
 
     if (engine != OcrEnginePreference.googleLens &&
         engine != OcrEnginePreference.screenAi) {

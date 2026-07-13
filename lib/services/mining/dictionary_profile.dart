@@ -1,4 +1,3 @@
-import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 
 /// A Chimahon-compatible language profile. Dictionary order, enabled state,
@@ -22,9 +21,9 @@ class DictionaryProfile {
     return DictionaryProfile(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Default',
-      languageCode: normalizeDictionaryLanguage(
-        json['languageCode']?.toString(),
-      ),
+      // Chimahon deliberately permits an empty language (not eligible for
+      // automatic matching) and future BCP-47 codes unknown to this build.
+      languageCode: json['languageCode']?.toString() ?? '',
       anki: AnkiMiningProfile.fromJson(
         json['anki'] is Map ? json['anki'] as Map : null,
       ),
@@ -54,6 +53,27 @@ class DictionaryProfile {
   bool isDictionaryEnabled(String name) =>
       enabledDictionaries.isEmpty || enabledDictionaries.contains(name);
 
+  /// Applies Chimahon's profile update when a dictionary is imported.
+  DictionaryProfile withInstalledDictionary(String name) {
+    if (name.isEmpty || dictionaryOrder.contains(name)) return this;
+    return copyWith(
+      dictionaryOrder: [...dictionaryOrder, name],
+      enabledDictionaries: enabledDictionaries.isEmpty
+          ? enabledDictionaries
+          : {...enabledDictionaries, name},
+    );
+  }
+
+  /// Removes every profile reference to a deleted dictionary. This prevents
+  /// stale enable/collapse state from returning if the title is reinstalled.
+  DictionaryProfile withoutDictionary(String name) => copyWith(
+    dictionaryOrder: dictionaryOrder
+        .where((dictionary) => dictionary != name)
+        .toList(growable: false),
+    enabledDictionaries: {...enabledDictionaries}..remove(name),
+    dictionaryDisplayModes: {...dictionaryDisplayModes}..remove(name),
+  );
+
   DictionaryProfile copyWith({
     String? id,
     String? name,
@@ -69,9 +89,7 @@ class DictionaryProfile {
     return DictionaryProfile(
       id: id ?? this.id,
       name: name ?? this.name,
-      languageCode: normalizeDictionaryLanguage(
-        languageCode ?? this.languageCode,
-      ),
+      languageCode: languageCode ?? this.languageCode,
       anki: anki ?? this.anki,
       dictionaryOrder: dictionaryOrder ?? this.dictionaryOrder,
       enabledDictionaries: enabledDictionaries ?? this.enabledDictionaries,

@@ -76,6 +76,7 @@ class HoshiDictionaryPopup extends StatefulWidget {
   const HoshiDictionaryPopup({
     super.key,
     required this.text,
+    this.profile,
     this.miningContext,
     this.initialResults,
     this.controller,
@@ -90,6 +91,7 @@ class HoshiDictionaryPopup extends StatefulWidget {
   });
 
   final String text;
+  final DictionaryProfile? profile;
   final FutureOr<MiningContext?> miningContext;
   final Future<List<HoshiLookupResult>>? initialResults;
   final HoshiDictionaryPopupController? controller;
@@ -109,7 +111,7 @@ class HoshiDictionaryPopup extends StatefulWidget {
 
 class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   Future<_HoshiPopupData>? _shellFuture;
-  late final Future<Map<String, String>> _stylesFuture;
+  late Future<Map<String, String>> _stylesFuture;
   InAppWebViewController? _controller;
   List<HoshiLookupResult> _results = const [];
   List<Map<String, dynamic>> _entries = const [];
@@ -148,7 +150,13 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       oldWidget.controller?._detach(this);
       widget.controller?._attach(this);
     }
-    if (oldWidget.text != widget.text) {
+    final profileChanged =
+        _profileRevision(oldWidget.profile) != _profileRevision(widget.profile);
+    if (profileChanged) {
+      _shellFuture = null;
+      _stylesFuture = _loadStyles();
+    }
+    if (oldWidget.text != widget.text || profileChanged) {
       unawaited(
         _lookupAndRender(
           widget.text,
@@ -204,16 +212,17 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       rootBundle.loadString('assets/hoshi_popup/popup.js'),
       rootBundle.loadString('assets/hoshi_popup/selection.js'),
       MiningPreferences.getAnkiAudioPreferences(),
-      MiningPreferences.getActiveDictionaryProfile(),
+      _resolvedProfile(),
     ]);
+    final profile = values[4] as DictionaryProfile;
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
         popupCss: values[0] as String,
         popupJs: values[1] as String,
         selectionJs: values[2] as String,
         audioPreferences: values[3] as AnkiAudioPreferences,
-        allowDuplicates:
-            (values[4] as DictionaryProfile).duplicateAction == 'allow',
+        allowDuplicates: profile.duplicateAction == 'allow',
+        profile: profile,
         preferences: widget.preferences,
         theme: theme,
         dark: dark,
@@ -223,7 +232,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
 
   Future<Map<String, String>> _loadStyles() async {
     final styles = await HoshidictsLookupBackend.instance
-        .getStyles()
+        .getStyles(profile: widget.profile)
         .catchError((_) => <HoshiDictionaryStyle>[]);
     return {for (final style in styles) style.dictName: style.styles};
   }
@@ -246,6 +255,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       (dictionary, path) => HoshidictsLookupBackend.instance.getMediaFile(
         dictName: dictionary,
         mediaPath: path,
+        profile: widget.profile,
       ),
       existing: _dictionaryMediaData,
     );
@@ -269,6 +279,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
                   query,
                   maxResults: hoshiPopupMaxResults,
                   scanLength: hoshiPopupScanLength,
+                  profile: widget.profile,
                 ));
       if (!mounted || generation != _lookupGeneration) return;
       final unchanged = query == _resultQuery && identical(results, _results);
@@ -339,6 +350,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       normalized,
       maxResults: hoshiPopupMaxResults,
       scanLength: hoshiPopupScanLength,
+      profile: widget.profile,
     );
     if (!mounted || generation != _lookupGeneration) return 0;
     final dictionaryMediaData = await _loadPopupMedia(results);
@@ -351,8 +363,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
 
   Future<bool> _isDuplicate(String expression) async {
     try {
-      final dictionaryProfile =
-          await MiningPreferences.getActiveDictionaryProfile();
+      final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled || !profile.duplicateCheck) return false;
       final service = AnkiConnectService(
@@ -373,8 +384,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
 
   Future<List<int>> _duplicateNoteIds(String expression) async {
     try {
-      final dictionaryProfile =
-          await MiningPreferences.getActiveDictionaryProfile();
+      final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled) return const [];
       return AnkiConnectService(
@@ -428,8 +438,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     try {
       final miningContext = await widget.miningContext;
       if (miningContext == null) return false;
-      final dictionaryProfile =
-          await MiningPreferences.getActiveDictionaryProfile();
+      final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled) {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
@@ -499,6 +508,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
         dictName: dictionary,
         mediaPath: path,
+        profile: widget.profile,
       );
       if (bytes == null || bytes.isEmpty) continue;
       files.add(
@@ -576,6 +586,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
           dictName: dictionary,
           mediaPath: path,
+          profile: widget.profile,
         );
         if (bytes == null || bytes.isEmpty) return null;
         return 'data:${_mediaMimeType(path)};base64,${base64Encode(bytes)}';
@@ -689,6 +700,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
       dictName: dictionary,
       mediaPath: path,
+      profile: widget.profile,
     );
     if (bytes == null) return null;
     return CustomSchemeResponse(
@@ -737,6 +749,12 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     'window.hoshiSelection?.clearSelection?.();'
     'window.getSelection?.()?.removeAllRanges?.();',
   );
+
+  Future<DictionaryProfile> _resolvedProfile() async =>
+      widget.profile ?? await MiningPreferences.getActiveDictionaryProfile();
+
+  String _profileRevision(DictionaryProfile? profile) =>
+      profile == null ? '' : jsonEncode(profile.toJson());
 
   void _scrollPopupBy(Offset delta) {
     if (!_webReady || delta == Offset.zero) return;
@@ -970,6 +988,10 @@ String buildHoshiPopupHtml({
   required String selectionJs,
   required AnkiAudioPreferences audioPreferences,
   required bool allowDuplicates,
+  DictionaryProfile profile = const DictionaryProfile(
+    id: 'mangatan-default',
+    name: 'Default',
+  ),
   required DictionaryPopupPreferences preferences,
   required ThemeData theme,
   required bool dark,
@@ -977,6 +999,10 @@ String buildHoshiPopupHtml({
   final scale = preferences.fontSize / 15;
   final customCss = jsonEncode(preferences.customCss);
   final colorScheme = dark ? 'dark' : 'light';
+  final language = const HtmlEscape(
+    HtmlEscapeMode.attribute,
+  ).convert(profile.languageCode);
+  final languageAttribute = language.isEmpty ? '' : ' lang="$language"';
   final scheme = theme.colorScheme;
   final background = _cssColor(
     preferences.theme == DictionaryThemePreference.black
@@ -1022,7 +1048,7 @@ String buildHoshiPopupHtml({
   ];
   final html =
       '''<!DOCTYPE html>
-<html style="color-scheme: $colorScheme">
+<html$languageAttribute style="color-scheme: $colorScheme">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>$popupCss</style>
@@ -1106,9 +1132,9 @@ String buildHoshiPopupHtml({
 	    .button-slot[data-enabled="false"] { opacity: .45; pointer-events: none; }
 	  </style>
   <script>
-    window.collapseMode = 'Expand All';
-    window.expandFirstDictionary = true;
-    window.collapsedDictionaries = [];
+    window.dictionaryCollapseMode = ${jsonEncode(profile.dictionaryCollapseMode)};
+    window.dictionaryDisplayModes = ${jsonEncode(profile.dictionaryDisplayModes)};
+    window.dictionaryOrder = ${jsonEncode(profile.dictionaryOrder)};
     window.twoColumnLayout = false;
     window.compactGlossaries = false;
     window.showExpressionTags = false;

@@ -27,14 +27,14 @@ class ChimahonMiningSettingsAdapter {
     final installedNames = installed
         .map((dictionary) => dictionary.name)
         .toList();
+    final overrides = await MiningPreferences.getDictionaryProfileOverrides();
     final chimahonProfiles = [
       for (final profile in profiles)
         _exportProfile(
-          profile.copyWith(
-            dictionaryOrder: profile.dictionaryOrder.isEmpty
-                ? installedNames
-                : profile.dictionaryOrder,
-          ),
+          profile,
+          dictionaryOrder: profile.dictionaryOrder.isEmpty
+              ? installedNames
+              : profile.dictionaryOrder,
         ),
     ];
 
@@ -74,6 +74,8 @@ class ChimahonMiningSettingsAdapter {
       ),
       codec.encode('pref_dict_show_pitch_number', popup.showPitchNumber),
       codec.encode('pref_dict_show_pitch_text', popup.showPitchText),
+      for (final override in overrides.entries)
+        codec.encode(override.key, override.value),
     ];
   }
 
@@ -93,6 +95,14 @@ class ChimahonMiningSettingsAdapter {
       await MiningPreferences.setDictionaryProfiles(
         importedProfiles,
         activeId: payload.activeProfileId,
+      );
+    }
+    // A normal Mihon backup can omit app preferences entirely. Treat the
+    // dynamic override keys as an authoritative snapshot only when the
+    // Chimahon profile payload itself is present.
+    if (payload.preferences.containsKey('pref_anki_profiles')) {
+      await MiningPreferences.setDictionaryProfileOverrides(
+        payload.dictionaryProfileOverrides,
       );
     }
     final profile = payload.activeLanguageProfile;
@@ -194,7 +204,10 @@ class ChimahonMiningSettingsAdapter {
     _ => DictionaryThemePreference.system,
   };
 
-  ChimahonLanguageProfile _exportProfile(DictionaryProfile profile) {
+  ChimahonLanguageProfile _exportProfile(
+    DictionaryProfile profile, {
+    required List<String> dictionaryOrder,
+  }) {
     final anki = profile.anki;
     return ChimahonLanguageProfile(
       id: profile.id,
@@ -209,7 +222,7 @@ class ChimahonMiningSettingsAdapter {
       ankiDuplicateAction: profile.duplicateAction,
       ankiCropMode: profile.cropMode,
       ankiSyncOnCreate: anki.syncOnCreate,
-      dictionaryOrder: profile.dictionaryOrder,
+      dictionaryOrder: dictionaryOrder,
       enabledDictionaries: profile.enabledDictionaries,
       dictionaryCollapseMode: profile.dictionaryCollapseMode,
       dictionaryDisplayModes: profile.dictionaryDisplayModes,

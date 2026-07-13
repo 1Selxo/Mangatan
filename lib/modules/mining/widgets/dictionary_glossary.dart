@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 
 class DictionaryGlossary extends StatefulWidget {
   const DictionaryGlossary({
     super.key,
     required this.rawGlossary,
     required this.dictionaryName,
+    required this.profile,
     this.dictionaryCss = '',
     this.customCss = '',
     this.fontSize = 14,
@@ -16,6 +18,7 @@ class DictionaryGlossary extends StatefulWidget {
 
   final String rawGlossary;
   final String dictionaryName;
+  final DictionaryProfile profile;
   final String dictionaryCss;
   final String customCss;
   final double fontSize;
@@ -26,6 +29,7 @@ class DictionaryGlossary extends StatefulWidget {
 
 class _DictionaryGlossaryState extends State<DictionaryGlossary> {
   Map<String, String> _media = const {};
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -37,13 +41,15 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
   void didUpdateWidget(covariant DictionaryGlossary oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.rawGlossary != widget.rawGlossary ||
-        oldWidget.dictionaryName != widget.dictionaryName) {
+        oldWidget.dictionaryName != widget.dictionaryName ||
+        oldWidget.profile != widget.profile) {
       _media = const {};
       _loadMedia();
     }
   }
 
   Future<void> _loadMedia() async {
+    final generation = ++_loadGeneration;
     final paths = yomitanGlossaryMediaPaths(widget.rawGlossary);
     if (paths.isEmpty) return;
     final loaded = <String, String>{};
@@ -51,12 +57,21 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
       final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
         dictName: widget.dictionaryName,
         mediaPath: path,
+        profile: widget.profile,
       );
       if (bytes != null) {
         loaded[path] = 'data:${_mimeType(path)};base64,${base64Encode(bytes)}';
       }
     }
-    if (mounted) setState(() => _media = loaded);
+    if (mounted && generation == _loadGeneration) {
+      setState(() => _media = loaded);
+    }
+  }
+
+  @override
+  void dispose() {
+    _loadGeneration++;
+    super.dispose();
   }
 
   @override

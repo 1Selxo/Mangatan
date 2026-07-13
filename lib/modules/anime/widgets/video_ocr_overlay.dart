@@ -4,10 +4,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/chrome_lens_ocr.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/ocr_block_merger.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
+import 'package:mangayomi/services/mining/profile_ocr_language.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 
 class VideoOcrResult {
@@ -22,13 +24,13 @@ class VideoOcrResult {
   final List<OcrTextBlock> blocks;
 }
 
-Future<VideoOcrResult> recognizeVideoFrame(Uint8List bytes) async {
-  final values = await Future.wait<dynamic>([
-    MiningPreferences.getOcrEngine(),
-    MiningPreferences.getOcrLanguage(),
-  ]);
-  final engine = values[0] as OcrEnginePreference;
-  final language = values[1] as String;
+Future<VideoOcrResult> recognizeVideoFrame(
+  Uint8List bytes, {
+  String? language,
+}) async {
+  final engine = await MiningPreferences.getOcrEngine();
+  final effectiveLanguage =
+      language ?? await MiningPreferences.getOcrLanguage();
 
   final tryScreenAi =
       engine == OcrEnginePreference.screenAi ||
@@ -42,7 +44,7 @@ Future<VideoOcrResult> recognizeVideoFrame(Uint8List bytes) async {
         return VideoOcrResult(
           imageWidth: result.imageWidth,
           imageHeight: result.imageHeight,
-          blocks: mergeOcrBlocks(result.blocks, language: language),
+          blocks: mergeOcrBlocks(result.blocks, language: effectiveLanguage),
         );
       }
     } catch (_) {
@@ -57,11 +59,11 @@ Future<VideoOcrResult> recognizeVideoFrame(Uint8List bytes) async {
   }
   final client = ChromeLensOcrClient();
   try {
-    final result = await client.recognize(bytes, language: language);
+    final result = await client.recognize(bytes, language: effectiveLanguage);
     return VideoOcrResult(
       imageWidth: result.imageWidth,
       imageHeight: result.imageHeight,
-      blocks: mergeOcrBlocks(result.blocks, language: language),
+      blocks: mergeOcrBlocks(result.blocks, language: effectiveLanguage),
     );
   } finally {
     client.close();
@@ -101,7 +103,24 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
 
   Future<void> _recognize() async {
     try {
-      final result = await recognizeVideoFrame(widget.imageBytes);
+      final miningContext = await widget.miningContextBuilder('');
+      final profile = await DictionaryProfileResolver.resolveMiningContext(
+        miningContext,
+      );
+      if (!isProfileOcrAllowed(
+        sourceLanguage: miningContext.sourceLanguage,
+        profileLanguage: profile.languageCode,
+      )) {
+        throw StateError(
+          'OCR is disabled because the source and dictionary profile '
+          'languages do not match.',
+        );
+      }
+      final language = profileOcrLanguage(profile.languageCode);
+      final result = await recognizeVideoFrame(
+        widget.imageBytes,
+        language: language,
+      );
       if (!mounted) return;
       setState(() => _result = result);
     } catch (error) {
@@ -134,13 +153,17 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
     if (selection.text.isEmpty) return;
     _popup?.dismiss();
     setState(() => _selection = selection);
-    final lookup = DictionaryLookupPopup.lookup(selection.text);
+    final miningContext = widget.miningContextBuilder(block.text);
+    final prefetch = DictionaryLookupPopup.prefetch(
+      selection.text,
+      miningContext: miningContext,
+    );
     final handle = await DictionaryLookupPopup.show(
       context: context,
       anchor: anchor,
       text: selection.text,
-      miningContext: widget.miningContextBuilder(block.text),
-      initialResults: lookup,
+      miningContext: miningContext,
+      prefetch: prefetch,
       onMatchChanged: (count) {
         if (!mounted || count <= 0) return;
         setState(() {

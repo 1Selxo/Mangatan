@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
@@ -94,7 +95,7 @@ void main() {
     expect(html, contains('/* upstream popup css */'));
     expect(html, contains('window.renderPopup = function() {};'));
     expect(html, contains('window.hoshiSelection = {};'));
-    expect(html, contains("window.collapseMode = 'Expand All'"));
+    expect(html, contains('window.dictionaryCollapseMode = "expand_all"'));
     expect(html, contains('window.harmonicFrequency = true'));
     expect(hoshiPopupMaxResults, 3);
     expect(hoshiPopupScanLength, 24);
@@ -116,6 +117,56 @@ void main() {
     expect(html, contains('.audio-icon'));
     expect(html, contains('.audio-speaker-body'));
     expect(html, isNot(contains('\u{1F50A}')));
+  });
+
+  test('injects the exact dictionary profile into the popup document', () {
+    const profile = DictionaryProfile(
+      id: 'zh-learning',
+      name: 'Traditional Chinese',
+      languageCode: 'zh-Hant',
+      dictionaryOrder: ['Frequency', 'Terms'],
+      dictionaryCollapseMode: 'custom',
+      dictionaryDisplayModes: {
+        'Terms': 'always_collapsed',
+        'Frequency': 'always_expanded',
+      },
+    );
+    const preferences = DictionaryPopupPreferences(
+      width: 540,
+      height: 450,
+      fontSize: 15,
+      theme: DictionaryThemePreference.light,
+      eInkMode: false,
+      paginatedScrolling: false,
+      customCss: '',
+      showFrequencyHarmonic: true,
+      showFrequencyAverage: false,
+      showPitchNumber: true,
+      showPitchText: true,
+    );
+
+    final html = buildHoshiPopupHtml(
+      popupCss: '',
+      popupJs: '',
+      selectionJs: '',
+      audioPreferences: AnkiAudioPreferences.defaults,
+      allowDuplicates: false,
+      profile: profile,
+      preferences: preferences,
+      theme: ThemeData.light(),
+      dark: false,
+    );
+
+    expect(html, contains('<html lang="zh-Hant"'));
+    expect(html, contains('window.dictionaryCollapseMode = "custom";'));
+    expect(
+      html,
+      contains(
+        'window.dictionaryDisplayModes = '
+        '{"Terms":"always_collapsed","Frequency":"always_expanded"};',
+      ),
+    );
+    expect(html, contains('window.dictionaryOrder = ["Frequency","Terms"];'));
   });
 
   test('injects enabled audio preferences into popup document', () {

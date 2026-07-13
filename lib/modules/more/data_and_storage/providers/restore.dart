@@ -19,6 +19,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_mining_settings_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 import 'package:mangayomi/services/sync/mihon_backup_source_resolver.dart';
@@ -36,11 +37,15 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'restore.g.dart';
 
 @riverpod
-void doRestore(Ref ref, {required String path, required BuildContext context}) {
+Future<void> doRestore(
+  Ref ref, {
+  required String path,
+  required BuildContext context,
+}) async {
   final tachiType = _tachiBackupTypeFromPath(path);
   if (tachiType != null) {
     try {
-      ref.read(restoreTachiBkBackupProvider(path, tachiType));
+      await ref.read(restoreTachiBkBackupProvider(path, tachiType).future);
       showBotToast("Backup restored!");
     } catch (e, s) {
       botToast('$e\n$s');
@@ -375,7 +380,11 @@ void restoreKotatsuBackup(Ref ref, Archive archive) {
 }
 
 @riverpod
-void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
+Future<void> restoreTachiBkBackup(
+  Ref ref,
+  String path,
+  BackupType bkType,
+) async {
   final inputStream = InputFileStream(path);
   late final DecodedChimahonSync decoded;
   try {
@@ -629,6 +638,7 @@ void restoreTachiBkBackup(Ref ref, String path, BackupType bkType) {
     isar.trackPreferences.clearSync();
     _invalidateCommonState(ref);
   });
+  await const ChimahonMiningSettingsAdapter().import(backup.backupPreferences);
 }
 
 int _protoInt(Object value) {

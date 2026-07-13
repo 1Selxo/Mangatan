@@ -129,6 +129,12 @@ class MiningPreferences {
   static const _ankiProfile = 'anki_profile';
   static const _dictionaryProfiles = 'dictionary_profiles';
   static const _activeDictionaryProfileId = 'active_dictionary_profile_id';
+  static const dictionaryProfileMangaOverridePrefix =
+      'pref_dict_profile_manga_';
+  static const dictionaryProfileSourceOverridePrefix =
+      'pref_dict_profile_source_';
+  static const dictionaryProfileNovelOverridePrefix =
+      'pref_dict_profile_novel_';
   static const _ankiAudioEnabled = 'anki_audio_enabled';
   static const _ankiAudioSourceType = 'anki_audio_source_type';
   static const _ankiAudioUrl = 'anki_audio_url';
@@ -333,8 +339,72 @@ class MiningPreferences {
       remaining,
       activeId: active.id == id ? remaining.first.id : active.id,
     );
+    await _deleteDictionaryProfileOverridesFor(id);
     return true;
   }
+
+  /// Returns the raw profile ID stored for a Chimahon-compatible override key.
+  /// An empty value means that the level participates in automatic cascading.
+  static Future<String> getDictionaryProfileOverride(String key) async {
+    if (!isDictionaryProfileOverrideKey(key)) return '';
+    return (await _boxOrNull())?.get(key)?.toString() ?? '';
+  }
+
+  static Future<void> setDictionaryProfileOverride(
+    String key,
+    String? profileId,
+  ) async {
+    if (!isDictionaryProfileOverrideKey(key)) {
+      throw ArgumentError.value(key, 'key', 'Unsupported profile override');
+    }
+    final box = await _boxOrNull();
+    if (box == null) return;
+    final value = profileId ?? '';
+    if (value.isEmpty) {
+      await box.delete(key);
+    } else {
+      await box.put(key, value);
+    }
+  }
+
+  /// Snapshot of every dynamic override preference, ready for Chimahon backup
+  /// serialization. Insertion order is irrelevant because keys are unique.
+  static Future<Map<String, String>> getDictionaryProfileOverrides() async {
+    final box = await _boxOrNull();
+    if (box == null) return const {};
+    return {
+      for (final key in box.keys.whereType<String>())
+        if (isDictionaryProfileOverrideKey(key) &&
+            (box.get(key)?.toString().isNotEmpty ?? false))
+          key: box.get(key).toString(),
+    };
+  }
+
+  /// Replaces the complete dynamic override snapshot from a Chimahon backup.
+  /// Keys absent from the snapshot represent Auto and are removed locally.
+  static Future<void> setDictionaryProfileOverrides(
+    Map<String, String> overrides,
+  ) async {
+    final box = await _boxOrNull();
+    if (box == null) return;
+    final replacement = {
+      for (final entry in overrides.entries)
+        if (isDictionaryProfileOverrideKey(entry.key) && entry.value.isNotEmpty)
+          entry.key: entry.value,
+    };
+    final staleKeys = box.keys
+        .whereType<String>()
+        .where(isDictionaryProfileOverrideKey)
+        .where((key) => !replacement.containsKey(key))
+        .toList(growable: false);
+    await box.deleteAll(staleKeys);
+    await box.putAll(replacement);
+  }
+
+  static bool isDictionaryProfileOverrideKey(String key) =>
+      key.startsWith(dictionaryProfileMangaOverridePrefix) ||
+      key.startsWith(dictionaryProfileSourceOverridePrefix) ||
+      key.startsWith(dictionaryProfileNovelOverridePrefix);
 
   static Future<void> setActiveDictionaryProfile(String id) async {
     final box = await _boxOrNull();
@@ -427,16 +497,16 @@ class MiningPreferences {
   }
 
   static Future<void> setDictionaryLanguage(String value) async {
-    final normalized = normalizeDictionaryLanguage(value);
+    final languageCode = value;
     final box = await _boxOrNull();
     if (box == null) return;
-    await box.put(_dictionaryLanguage, normalized);
+    await box.put(_dictionaryLanguage, languageCode);
     final profiles = await _profilesOrMigrate(box);
     final activeId = _activeProfileId(box, profiles);
     await _writeProfiles(box, [
       for (final profile in profiles)
         profile.id == activeId
-            ? profile.copyWith(languageCode: normalized)
+            ? profile.copyWith(languageCode: languageCode)
             : profile,
     ]);
   }
@@ -698,6 +768,19 @@ class MiningPreferences {
     );
     await box.put(_ankiProfile, active.anki.toJson());
     await box.put(_dictionaryLanguage, active.languageCode);
+  }
+
+  static Future<void> _deleteDictionaryProfileOverridesFor(
+    String profileId,
+  ) async {
+    final box = await _boxOrNull();
+    if (box == null) return;
+    final staleKeys = box.keys
+        .whereType<String>()
+        .where(isDictionaryProfileOverrideKey)
+        .where((key) => box.get(key)?.toString() == profileId)
+        .toList(growable: false);
+    await box.deleteAll(staleKeys);
   }
 
   static String _jimakuTitleKey(int? mediaId) {

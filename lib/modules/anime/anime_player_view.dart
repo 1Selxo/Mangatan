@@ -20,6 +20,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/custom_button.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
@@ -49,6 +50,7 @@ import 'package:mangayomi/services/fetch_subtitles.dart';
 import 'package:mangayomi/services/mining/anime_sentence_audio_service.dart';
 import 'package:mangayomi/services/get_video_list.dart';
 import 'package:mangayomi/services/mining/jimaku_service.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/torrent_server.dart';
@@ -903,6 +905,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   Future<MiningContext> _subtitleMiningContext(String subtitleText) async {
+    final manga = widget.episode.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
     final video = _video.value;
     final snapshot = await AnimeSentenceAudioService.snapshot(
       player: _player,
@@ -919,7 +925,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         : Map<String, String>.unmodifiable(video!.headers!);
     return MiningContext(
       mediaType: MiningMediaType.anime,
-      sourceTitle: widget.episode.manga.value?.name ?? '',
+      mangaId: manga?.id,
+      sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+      sourceLanguage: source?.lang ?? manga?.lang ?? '',
+      sourceTitle: manga?.name ?? '',
       chapterTitle: widget.episode.name ?? '',
       sentence: subtitleText,
       position: _currentPosition.value,

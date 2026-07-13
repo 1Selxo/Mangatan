@@ -13,6 +13,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
@@ -37,6 +38,8 @@ import 'package:mangayomi/modules/widgets/custom_extended_image_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/riverpod.dart';
 import 'package:mangayomi/utils/utils.dart';
@@ -52,6 +55,7 @@ import 'package:mangayomi/modules/manga/detail/widgets/chapter_filter_list_tile_
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_list_tile_widget.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_sort_list_tile_widget.dart';
 import 'package:mangayomi/modules/manga/download/providers/download_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:photo_view/photo_view.dart';
@@ -89,6 +93,79 @@ class MangaDetailView extends ConsumerStatefulWidget {
 
 class _MangaDetailViewState extends ConsumerState<MangaDetailView>
     with TickerProviderStateMixin {
+  List<EpubBookProgress> _localNovelProgresses() {
+    final mangaId = widget.manga?.id;
+    if (mangaId == null || !isLocalArchive) return const [];
+    return isar.epubBookProgress.filter().mangaIdEqualTo(mangaId).findAllSync();
+  }
+
+  Future<EpubBookProgress?> _selectLocalNovel(
+    List<EpubBookProgress> books,
+  ) async {
+    if (books.length == 1) return books.first;
+    if (books.isEmpty || !mounted) return null;
+    return showDialog<EpubBookProgress>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Choose a book'),
+        children: [
+          for (final book in books)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, book),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(book.title),
+                subtitle: book.author?.trim().isNotEmpty == true
+                    ? Text(book.author!)
+                    : null,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _setDictionaryProfile() async {
+    final manga = widget.manga!;
+    final mangaId = manga.id;
+    if (mangaId == null) return;
+
+    final localNovels = _localNovelProgresses();
+    if (localNovels.isNotEmpty) {
+      final localNovel = await _selectLocalNovel(localNovels);
+      if (localNovel == null) return;
+      const adapter = ChimahonNovelProgressAdapter();
+      final novelId = adapter.stableId(
+        title: localNovel.title,
+        author: localNovel.author,
+      );
+      if (!mounted) return;
+      await showDictionaryProfileOverrideDialog(
+        context: context,
+        overrideKey: DictionaryProfileResolver.novelOverrideKey(novelId),
+        autoProfile: DictionaryProfileResolver.resolve(
+          sourceLanguage: localNovel.lang ?? '',
+        ),
+        title: 'Dictionary profile for ${localNovel.title}',
+      );
+      return;
+    }
+
+    final source = manga.lang == null || manga.source == null
+        ? null
+        : getSource(manga.lang!, manga.source!, manga.sourceId);
+    if (!mounted) return;
+    await showDictionaryProfileOverrideDialog(
+      context: context,
+      overrideKey: DictionaryProfileResolver.mangaOverrideKey(mangaId),
+      autoProfile: DictionaryProfileResolver.resolve(
+        sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+        sourceLanguage: source?.lang ?? manga.lang ?? '',
+      ),
+      title: 'Dictionary profile for this entry',
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -516,6 +593,12 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                     value: 1,
                                     child: Text(l10n.set_categories),
                                   ),
+                                if (widget.manga!.favorite! ||
+                                    _localNovelProgresses().isNotEmpty)
+                                  const PopupMenuItem<int>(
+                                    value: 7,
+                                    child: Text('Set dictionary profile'),
+                                  ),
                                 if (!isLocalArchive)
                                   PopupMenuItem<int>(
                                     value: 2,
@@ -646,6 +729,9 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                     extra: widget.manga,
                                   );
                                   break;
+                                case 7:
+                                  await _setDictionaryProfile();
+                                  break;
                               }
                             },
                           ),
@@ -768,7 +854,8 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                                                 manga.itemType,
                                                             manga,
                                                             init: false,
-                                                            splitChapters: false,
+                                                            splitChapters:
+                                                                false,
                                                           ).future,
                                                         );
                                                       }

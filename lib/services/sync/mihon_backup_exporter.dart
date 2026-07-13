@@ -167,9 +167,9 @@ class MihonBackupExporter {
     if (source == null) return null;
     final metadata = mihonSourceMetadata(source);
     if (metadata != null) return int.tryParse(metadata.sourceId);
-    return source.sourceCodeLanguage == SourceCodeLanguage.mihon
-        ? source.id
-        : null;
+    // Mangatan's local Mihon ID is a hash and is not portable. A source with
+    // missing native metadata cannot be represented compatibly.
+    return null;
   }
 
   double _chapterNumber(String? name) {

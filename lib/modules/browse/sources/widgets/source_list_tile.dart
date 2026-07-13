@@ -5,7 +5,9 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
@@ -25,6 +27,8 @@ class SourceListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dictionaryProfileSourceId =
+        DictionaryProfileResolver.overrideIdForSource(source);
     return Consumer(
       builder: (context, ref, child) => ListTile(
         onTap: () {
@@ -106,47 +110,63 @@ class SourceListTile extends StatelessWidget {
               ? source.name!
               : "${context.l10n.local_source} ${source.itemType.localized(context.l10n)}",
         ),
-        trailing: SizedBox(
-          width: 150,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Consumer(
-                builder: (context, ref, child) {
-                  // final supportsLatest =  ref.watch(supportsLatestProvider(source: source));
-                  // if (supportsLatest) {
-                  return TextButton(
-                    style: const ButtonStyle(
-                      padding: WidgetStatePropertyAll(EdgeInsets.all(10)),
-                    ),
-                    onPressed: () =>
-                        context.push('/mangaHome', extra: (source, true)),
-                    child: Text(context.l10n.latest),
-                  );
-                  // }
-                  // return const SizedBox.shrink();
-                },
-              ),
-              const SizedBox(width: 10),
-              if (!isLocal)
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Consumer(
+              builder: (context, ref, child) {
+                // final supportsLatest =  ref.watch(supportsLatestProvider(source: source));
+                // if (supportsLatest) {
+                return TextButton(
+                  style: const ButtonStyle(
+                    padding: WidgetStatePropertyAll(EdgeInsets.all(10)),
+                  ),
+                  onPressed: () =>
+                      context.push('/mangaHome', extra: (source, true)),
+                  child: Text(context.l10n.latest),
+                );
+                // }
+                // return const SizedBox.shrink();
+              },
+            ),
+            const SizedBox(width: 10),
+            if (!isLocal) ...[
+              if (dictionaryProfileSourceId != null)
                 IconButton(
-                  padding: const EdgeInsets.all(0),
-                  onPressed: () {
-                    isar.writeTxnSync(
-                      () => isar.sources.putSync(
-                        source
-                          ..isPinned = !source.isPinned!
-                          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+                  tooltip: 'Set dictionary profile',
+                  onPressed: () async {
+                    await showDictionaryProfileOverrideDialog(
+                      context: context,
+                      overrideKey: DictionaryProfileResolver.sourceOverrideKey(
+                        dictionaryProfileSourceId,
                       ),
+                      autoProfile: DictionaryProfileResolver.resolve(
+                        sourceLanguage: source.lang ?? '',
+                      ),
+                      title: 'Dictionary profile for this source',
                     );
                   },
-                  icon: Icon(
-                    Icons.push_pin_outlined,
-                    color: source.isPinned! ? context.primaryColor : null,
-                  ),
+                  icon: const Icon(Icons.menu_book_outlined),
                 ),
+              IconButton(
+                padding: const EdgeInsets.all(0),
+                onPressed: () {
+                  isar.writeTxnSync(
+                    () => isar.sources.putSync(
+                      source
+                        ..isPinned = !source.isPinned!
+                        ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+                    ),
+                  );
+                },
+                icon: Icon(
+                  Icons.push_pin_outlined,
+                  color: source.isPinned! ? context.primaryColor : null,
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

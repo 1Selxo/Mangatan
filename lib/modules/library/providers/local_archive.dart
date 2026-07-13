@@ -152,10 +152,12 @@ Future<void> _importArchivesFromPaths(
               archivePath: filePath,
               title: book.name,
               author: book.author,
+              lang: book.language,
             );
         progress
           ..title = book.name
           ..author = book.author;
+        progress.lang ??= book.language;
         await isar.epubBookProgress.put(progress);
       } else {
         chapters.add(

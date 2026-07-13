@@ -333,10 +333,12 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
               archivePath: chapterPath,
               title: book.name,
               author: book.author,
+              lang: book.language,
             );
         progress
           ..title = book.name
           ..author = book.author;
+        progress.lang ??= book.language;
         epubProgressToSave.add(progress);
       } else {
         final chapterFile = File(chapterPath);

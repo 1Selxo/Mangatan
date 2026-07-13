@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
@@ -12,6 +13,7 @@ import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:share_plus/share_plus.dart';
@@ -215,11 +217,17 @@ class _ImageActionsSheet extends StatelessWidget {
   }
 
   Future<void> _lookupText(BuildContext context) async {
+    final source = manga.sourceId == null
+        ? null
+        : isar.sources.getSync(manga.sourceId!);
     await MiningLookupSheet.show(
       context: context,
       text: '',
       miningContext: MiningContext(
         mediaType: MiningMediaType.manga,
+        mangaId: manga.id,
+        sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+        sourceLanguage: source?.lang ?? manga.lang ?? '',
         sourceTitle: manga.name ?? '',
         chapterTitle: chapterName,
         pageIndex: data.pageIndex,

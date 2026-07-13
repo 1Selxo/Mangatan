@@ -1410,17 +1410,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EpubNovel dco_decode_epub_novel(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return EpubNovel(
       name: dco_decode_String(arr[0]),
       cover: dco_decode_opt_list_prim_u_8_strict(arr[1]),
       summary: dco_decode_opt_String(arr[2]),
       author: dco_decode_opt_String(arr[3]),
-      artist: dco_decode_opt_String(arr[4]),
-      chapters: dco_decode_list_epub_chapter(arr[5]),
-      images: dco_decode_list_epub_resource(arr[6]),
-      stylesheets: dco_decode_list_epub_resource(arr[7]),
+      language: dco_decode_opt_String(arr[4]),
+      artist: dco_decode_opt_String(arr[5]),
+      chapters: dco_decode_list_epub_chapter(arr[6]),
+      images: dco_decode_list_epub_resource(arr[7]),
+      stylesheets: dco_decode_list_epub_resource(arr[8]),
     );
   }
 
@@ -2395,6 +2396,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_cover = sse_decode_opt_list_prim_u_8_strict(deserializer);
     var var_summary = sse_decode_opt_String(deserializer);
     var var_author = sse_decode_opt_String(deserializer);
+    var var_language = sse_decode_opt_String(deserializer);
     var var_artist = sse_decode_opt_String(deserializer);
     var var_chapters = sse_decode_list_epub_chapter(deserializer);
     var var_images = sse_decode_list_epub_resource(deserializer);
@@ -2404,6 +2406,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       cover: var_cover,
       summary: var_summary,
       author: var_author,
+      language: var_language,
       artist: var_artist,
       chapters: var_chapters,
       images: var_images,
@@ -3690,6 +3693,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_list_prim_u_8_strict(self.cover, serializer);
     sse_encode_opt_String(self.summary, serializer);
     sse_encode_opt_String(self.author, serializer);
+    sse_encode_opt_String(self.language, serializer);
     sse_encode_opt_String(self.artist, serializer);
     sse_encode_list_epub_chapter(self.chapters, serializer);
     sse_encode_list_epub_resource(self.images, serializer);

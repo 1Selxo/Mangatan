@@ -79,4 +79,20 @@ void main() {
     );
     expect(payload.ankiPreferences, contains('pref_anki_profiles'));
   });
+
+  test('extracts exact dynamic cascade overrides as strings', () {
+    final payload = ChimahonSettingsPayload.fromBackup([
+      codec.encode('pref_dict_profile_manga_42', 'japanese'),
+      codec.encode('pref_dict_profile_source_9001', 'english'),
+      codec.encode('pref_dict_profile_novel_book-id', 'korean'),
+      codec.encode('pref_dict_profile_source_ignored', 123),
+      codec.encode('pref_dictionary_popup_width', 500),
+    ]);
+
+    expect(payload.dictionaryProfileOverrides, {
+      'pref_dict_profile_manga_42': 'japanese',
+      'pref_dict_profile_source_9001': 'english',
+      'pref_dict_profile_novel_book-id': 'korean',
+    });
+  });
 }

@@ -10,6 +10,8 @@ import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
@@ -19,6 +21,23 @@ class DictionaryPopupHandle {
 
   final VoidCallback dismiss;
   final Future<void> dismissed;
+}
+
+/// A lookup Future coupled to the exact profile that produced it.
+///
+/// Keeping these together prevents an override change between hover-prefetch
+/// and presentation from combining one profile's results with another
+/// profile's styles, media, or Anki settings.
+class DictionaryLookupPrefetch {
+  const DictionaryLookupPrefetch._({
+    required this.text,
+    required this.profile,
+    required this.results,
+  });
+
+  final String text;
+  final Future<DictionaryProfile> profile;
+  final Future<List<HoshiLookupResult>> results;
 }
 
 /// Keeps the root-overlay dictionary popup scoped to the current app route.
@@ -110,10 +129,15 @@ class _DictionaryPopupHostController {
     required BuildContext context,
     required String text,
     required Future<List<HoshiLookupResult>> initialResults,
+    required DictionaryProfile profile,
   }) async {
     await _ensure(context);
     if (!context.mounted) return;
-    key.currentState?.prepare(text: text, initialResults: initialResults);
+    key.currentState?.prepare(
+      text: text,
+      initialResults: initialResults,
+      profile: profile,
+    );
   }
 
   bool dismissActive() {
@@ -159,24 +183,53 @@ class _DictionaryPopupHostController {
     required Rect anchor,
     required String text,
     required FutureOr<MiningContext> miningContext,
-    required Future<List<HoshiLookupResult>> initialResults,
+    DictionaryLookupPrefetch? prefetch,
     required DictionaryPopupPlacement placement,
     bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
     ValueChanged<bool>? onHoverChanged,
   }) async {
     final generation = _presentationGate.begin();
-    final resolvedMiningContext = Future<MiningContext>.value(miningContext);
+    final resolvedMiningContext = await Future<MiningContext>.value(
+      miningContext,
+    );
+    if (!_presentationGate.isCurrent(generation) || !context.mounted) {
+      return null;
+    }
+    final compatiblePrefetch = prefetch?.text == text.trim() ? prefetch : null;
+    final profile = compatiblePrefetch == null
+        ? await DictionaryProfileResolver.resolveMiningContext(
+            resolvedMiningContext,
+          )
+        : await compatiblePrefetch.profile;
+    if (!_presentationGate.isCurrent(generation) || !context.mounted) {
+      return null;
+    }
+    final results =
+        compatiblePrefetch?.results ??
+        HoshidictsLookupBackend.instance.lookup(
+          text,
+          maxResults: hoshiPopupMaxResults,
+          scanLength: hoshiPopupScanLength,
+          profile: profile,
+        );
+    final miningContextFuture = Future<MiningContext?>.value(
+      resolvedMiningContext,
+    );
     final existingState = key.currentState;
 
     // Hide an older result immediately, then give the persistent WebView the
     // new request off-screen while the lookup and host initialization overlap.
     // Reusing the exact Future also preserves EPUB/subtitle prefetch caches.
     existingState?.dismiss();
-    existingState?.prepare(text: text, initialResults: initialResults);
+    existingState?.prepare(
+      text: text,
+      initialResults: results,
+      profile: profile,
+    );
     final decisionFuture = _presentationGate.resolve(
       generation: generation,
-      results: initialResults,
+      results: results,
     );
 
     await _ensure(context);
@@ -184,7 +237,11 @@ class _DictionaryPopupHostController {
       return null;
     }
     if (existingState == null) {
-      key.currentState?.prepare(text: text, initialResults: initialResults);
+      key.currentState?.prepare(
+        text: text,
+        initialResults: results,
+        profile: profile,
+      );
     }
     final decision = await decisionFuture;
     if (decision != DictionaryPopupPresentationDecision.present ||
@@ -198,8 +255,9 @@ class _DictionaryPopupHostController {
         screen: MediaQuery.sizeOf(context),
         anchor: anchor,
         text: text,
-        miningContext: resolvedMiningContext,
-        initialResults: initialResults,
+        miningContext: miningContextFuture,
+        initialResults: results,
+        profile: profile,
         placement: placement,
         dismissOnOutsideTap: dismissOnOutsideTap,
         onMatchChanged: onMatchChanged,
@@ -222,6 +280,7 @@ class _DictionaryPopupRequest {
     required this.text,
     required this.miningContext,
     required this.initialResults,
+    required this.profile,
     required this.onMatchChanged,
     required this.onHoverChanged,
   });
@@ -229,6 +288,7 @@ class _DictionaryPopupRequest {
   final String text;
   final Future<MiningContext?> miningContext;
   final Future<List<HoshiLookupResult>> initialResults;
+  final DictionaryProfile? profile;
   final ValueChanged<int>? onMatchChanged;
   final ValueChanged<bool>? onHoverChanged;
 }
@@ -262,6 +322,7 @@ class _DictionaryPopupOverlayHostState
     text: '',
     miningContext: Future<MiningContext?>.value(null),
     initialResults: Future<List<HoshiLookupResult>>.value(const []),
+    profile: null,
     onMatchChanged: null,
     onHoverChanged: null,
   );
@@ -369,8 +430,9 @@ class _DictionaryPopupOverlayHostState
     required Size screen,
     required Rect anchor,
     required String text,
-    required Future<MiningContext> miningContext,
+    required Future<MiningContext?> miningContext,
     required Future<List<HoshiLookupResult>> initialResults,
+    required DictionaryProfile profile,
     required DictionaryPopupPlacement placement,
     required bool dismissOnOutsideTap,
     ValueChanged<int>? onMatchChanged,
@@ -393,6 +455,7 @@ class _DictionaryPopupOverlayHostState
         text: text,
         miningContext: miningContext,
         initialResults: initialResults,
+        profile: profile,
         onMatchChanged: onMatchChanged,
         onHoverChanged: onHoverChanged,
       );
@@ -413,6 +476,7 @@ class _DictionaryPopupOverlayHostState
   void prepare({
     required String text,
     required Future<List<HoshiLookupResult>> initialResults,
+    required DictionaryProfile profile,
   }) {
     final query = text.trim();
     if (_visible || query.isEmpty) return;
@@ -425,6 +489,7 @@ class _DictionaryPopupOverlayHostState
         text: query,
         miningContext: Future<MiningContext?>.value(null),
         initialResults: initialResults,
+        profile: profile,
         onMatchChanged: null,
         onHoverChanged: null,
       );
@@ -471,7 +536,10 @@ class _DictionaryPopupOverlayHostState
     final query = selection.text.trim();
     if (query.isEmpty) return 0;
     final generation = ++_childLookupGeneration;
-    final resultsFuture = DictionaryLookupPopup.lookup(query);
+    final resultsFuture = DictionaryLookupPopup.lookup(
+      query,
+      profile: _request.profile,
+    );
     final results = await resultsFuture;
     if (!mounted || generation != _childLookupGeneration || results.isEmpty) {
       return 0;
@@ -494,6 +562,7 @@ class _DictionaryPopupOverlayHostState
         text: query,
         miningContext: _request.miningContext,
         initialResults: resultsFuture,
+        profile: _request.profile,
         onMatchChanged: null,
         onHoverChanged: _request.onHoverChanged,
       ),
@@ -563,6 +632,7 @@ class _DictionaryPopupOverlayHostState
                     child: HoshiDictionaryPopup(
                       controller: _rootController,
                       text: request.text,
+                      profile: request.profile,
                       miningContext: request.miningContext,
                       initialResults: request.initialResults,
                       preferences: widget.preferences,
@@ -614,6 +684,7 @@ class _DictionaryPopupOverlayHostState
                   child: HoshiDictionaryPopup(
                     controller: indexed.$2.controller,
                     text: indexed.$2.request.text,
+                    profile: indexed.$2.request.profile,
                     miningContext: indexed.$2.request.miningContext,
                     initialResults: indexed.$2.request.initialResults,
                     preferences: widget.preferences,
@@ -666,7 +737,7 @@ class DictionaryLookupPopup extends StatelessWidget {
     required Rect anchor,
     required String text,
     required FutureOr<MiningContext> miningContext,
-    Future<List<HoshiLookupResult>>? initialResults,
+    DictionaryLookupPrefetch? prefetch,
     DictionaryPopupPlacement placement = DictionaryPopupPlacement.aboveOrBelow,
     bool dismissOnOutsideTap = true,
     ValueChanged<int>? onMatchChanged,
@@ -679,7 +750,7 @@ class DictionaryLookupPopup extends StatelessWidget {
       anchor: anchor,
       text: lookupText,
       miningContext: miningContext,
-      initialResults: initialResults ?? lookup(lookupText),
+      prefetch: prefetch,
       placement: placement,
       dismissOnOutsideTap: dismissOnOutsideTap,
       onMatchChanged: onMatchChanged,
@@ -696,12 +767,18 @@ class DictionaryLookupPopup extends StatelessWidget {
   static Future<void> prepare({
     required BuildContext context,
     required String text,
-    required Future<List<HoshiLookupResult>> initialResults,
-  }) => _dictionaryPopupHost.prepare(
-    context: context,
-    text: text,
-    initialResults: initialResults,
-  );
+    required DictionaryLookupPrefetch prefetch,
+  }) async {
+    if (prefetch.text != text.trim()) return;
+    final profile = await prefetch.profile;
+    if (!context.mounted) return;
+    return _dictionaryPopupHost.prepare(
+      context: context,
+      text: text,
+      initialResults: prefetch.results,
+      profile: profile,
+    );
+  }
 
   /// Dismisses the active popup without affecting the current app route.
   /// Returns whether a popup consumed the back action.
@@ -709,13 +786,43 @@ class DictionaryLookupPopup extends StatelessWidget {
 
   static bool get isActive => _dictionaryPopupHost.isActive;
 
-  static Future<List<HoshiLookupResult>> lookup(String text) {
+  static Future<List<HoshiLookupResult>> lookup(
+    String text, {
+    FutureOr<MiningContext?> miningContext,
+    DictionaryProfile? profile,
+  }) async {
+    return prefetch(
+      text,
+      miningContext: miningContext,
+      profile: profile,
+    ).results;
+  }
+
+  static DictionaryLookupPrefetch prefetch(
+    String text, {
+    FutureOr<MiningContext?> miningContext,
+    DictionaryProfile? profile,
+  }) {
     final query = text.trim();
-    if (query.isEmpty) return Future.value(const []);
-    return HoshidictsLookupBackend.instance.lookup(
-      query,
-      maxResults: hoshiPopupMaxResults,
-      scanLength: hoshiPopupScanLength,
+    final profileFuture = profile == null
+        ? Future<MiningContext?>.value(
+            miningContext,
+          ).then(DictionaryProfileResolver.resolveMiningContext)
+        : Future<DictionaryProfile>.value(profile);
+    final results = query.isEmpty
+        ? Future<List<HoshiLookupResult>>.value(const [])
+        : profileFuture.then(
+            (resolvedProfile) => HoshidictsLookupBackend.instance.lookup(
+              query,
+              maxResults: hoshiPopupMaxResults,
+              scanLength: hoshiPopupScanLength,
+              profile: resolvedProfile,
+            ),
+          );
+    return DictionaryLookupPrefetch._(
+      text: query,
+      profile: profileFuture,
+      results: results,
     );
   }
 
@@ -873,6 +980,12 @@ class DictionaryLookupResultsView extends StatefulWidget {
       _DictionaryLookupResultsViewState();
 }
 
+bool _sameDictionaryProfileContext(MiningContext left, MiningContext right) =>
+    left.mangaId == right.mangaId &&
+    left.sourceId == right.sourceId &&
+    left.sourceLanguage == right.sourceLanguage &&
+    left.novelId == right.novelId;
+
 class _DictionaryLookupResultsViewState
     extends State<DictionaryLookupResultsView> {
   late Future<_LookupPayload> _future = _lookup();
@@ -884,32 +997,36 @@ class _DictionaryLookupResultsViewState
     if (oldWidget.text != widget.text ||
         oldWidget.maxResults != widget.maxResults ||
         oldWidget.scanLength != widget.scanLength ||
-        oldWidget.preferences != widget.preferences) {
+        oldWidget.preferences != widget.preferences ||
+        !_sameDictionaryProfileContext(
+          oldWidget.miningContext,
+          widget.miningContext,
+        )) {
       _future = _lookup();
     }
   }
 
   Future<_LookupPayload> _lookup() async {
+    final profile = await DictionaryProfileResolver.resolveMiningContext(
+      widget.miningContext,
+    );
+    final preferences =
+        widget.preferences ??
+        await MiningPreferences.getDictionaryPopupPreferences();
     final lookupText = widget.text.trim();
     if (lookupText.isEmpty) {
-      return _LookupPayload.empty(
-        widget.preferences ??
-            await MiningPreferences.getDictionaryPopupPreferences(),
-      );
+      return _LookupPayload.empty(preferences, profile);
     }
     final values = await Future.wait<dynamic>([
       HoshidictsLookupBackend.instance.lookup(
         lookupText,
         maxResults: widget.maxResults,
         scanLength: widget.scanLength,
+        profile: profile,
       ),
-      HoshidictsLookupBackend.instance.getStyles().catchError(
-        (_) => <HoshiDictionaryStyle>[],
-      ),
-      if (widget.preferences == null)
-        MiningPreferences.getDictionaryPopupPreferences()
-      else
-        Future<DictionaryPopupPreferences>.value(widget.preferences),
+      HoshidictsLookupBackend.instance
+          .getStyles(profile: profile)
+          .catchError((_) => <HoshiDictionaryStyle>[]),
     ]);
     final results = values[0] as List<HoshiLookupResult>;
     if (results.isNotEmpty) {
@@ -919,15 +1036,17 @@ class _DictionaryLookupResultsViewState
     return _LookupPayload(
       results: results,
       styles: {for (final style in styles) style.dictName: style.styles},
-      preferences: values[2] as DictionaryPopupPreferences,
+      preferences: preferences,
+      profile: profile,
     );
   }
 
-  Future<void> _export(HoshiLookupResult result) async {
+  Future<void> _export(
+    HoshiLookupResult result,
+    DictionaryProfile dictionaryProfile,
+  ) async {
     setState(() => _exporting = true);
     try {
-      final dictionaryProfile =
-          await MiningPreferences.getActiveDictionaryProfile();
       final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled) {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
@@ -971,7 +1090,10 @@ class _DictionaryLookupResultsViewState
           return _EmptyLookupState(text: 'Lookup failed: ${snapshot.error}');
         }
         final payload = snapshot.data;
-        final results = payload?.results ?? const [];
+        if (payload == null) {
+          return const _EmptyLookupState(text: 'No dictionary results found.');
+        }
+        final results = payload.results;
         if (widget.text.trim().isEmpty) {
           return const _EmptyLookupState(text: 'Enter text to look up.');
         }
@@ -992,12 +1114,13 @@ class _DictionaryLookupResultsViewState
             final result = results[index];
             return _LookupResultTile(
               result: result,
-              preferences: payload!.preferences,
+              profile: payload.profile,
+              preferences: payload.preferences,
               styles: payload.styles,
               exporting: _exporting,
               showAnkiButton: widget.showAnkiButton,
               compact: widget.compact,
-              onExport: () => _export(result),
+              onExport: () => _export(result, payload.profile),
             );
           },
         );
@@ -1009,6 +1132,7 @@ class _DictionaryLookupResultsViewState
 class _LookupResultTile extends StatelessWidget {
   const _LookupResultTile({
     required this.result,
+    required this.profile,
     required this.preferences,
     required this.styles,
     required this.exporting,
@@ -1018,6 +1142,7 @@ class _LookupResultTile extends StatelessWidget {
   });
 
   final HoshiLookupResult result;
+  final DictionaryProfile profile;
   final DictionaryPopupPreferences preferences;
   final Map<String, String> styles;
   final bool exporting;
@@ -1029,6 +1154,10 @@ class _LookupResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final term = result.term;
     final glossaryGroups = _groupGlossariesByDictionary(term.glossaries);
+    final expandedDictionaries = initiallyExpandedDictionaries(
+      profile: profile,
+      dictionaries: glossaryGroups.map((group) => group.dictionaryName),
+    );
     final senseTermTags = _uniqueTags(
       term.glossaries.expand((entry) => _splitTags(entry.termTags)),
     ).toSet();
@@ -1096,7 +1225,15 @@ class _LookupResultTile extends StatelessWidget {
                 ],
                 for (final group in glossaryGroups)
                   _DictionaryGlossaryGroup(
+                    // A fresh lookup must reapply the configured collapse
+                    // policy instead of retaining the user's toggle from the
+                    // previous result with the same dictionary name.
+                    key: ValueKey((group.dictionaryName, result)),
                     group: group,
+                    profile: profile,
+                    initiallyExpanded: expandedDictionaries.contains(
+                      group.dictionaryName,
+                    ),
                     styles: styles,
                     preferences: preferences,
                     compact: compact,
@@ -1112,13 +1249,18 @@ class _LookupResultTile extends StatelessWidget {
 
 class _DictionaryGlossaryGroup extends StatefulWidget {
   const _DictionaryGlossaryGroup({
+    super.key,
     required this.group,
+    required this.profile,
+    required this.initiallyExpanded,
     required this.styles,
     required this.preferences,
     required this.compact,
   });
 
   final _GlossaryGroup group;
+  final DictionaryProfile profile;
+  final bool initiallyExpanded;
   final Map<String, String> styles;
   final DictionaryPopupPreferences preferences;
   final bool compact;
@@ -1129,7 +1271,16 @@ class _DictionaryGlossaryGroup extends StatefulWidget {
 }
 
 class _DictionaryGlossaryGroupState extends State<_DictionaryGlossaryGroup> {
-  bool _expanded = true;
+  late bool _expanded = widget.initiallyExpanded;
+
+  @override
+  void didUpdateWidget(covariant _DictionaryGlossaryGroup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.group.dictionaryName != widget.group.dictionaryName ||
+        oldWidget.initiallyExpanded != widget.initiallyExpanded) {
+      _expanded = widget.initiallyExpanded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1208,6 +1359,7 @@ class _DictionaryGlossaryGroupState extends State<_DictionaryGlossaryGroup> {
                       index: indexed.$1 + 1,
                       showIndex: hasMultipleSenses,
                       glossary: indexed.$2,
+                      profile: widget.profile,
                       styles: widget.styles,
                       preferences: widget.preferences,
                       compact: widget.compact,
@@ -1356,6 +1508,7 @@ class _GlossarySense extends StatelessWidget {
     required this.index,
     required this.showIndex,
     required this.glossary,
+    required this.profile,
     required this.styles,
     required this.preferences,
     required this.compact,
@@ -1365,6 +1518,7 @@ class _GlossarySense extends StatelessWidget {
   final int index;
   final bool showIndex;
   final HoshiGlossaryEntry glossary;
+  final DictionaryProfile profile;
   final Map<String, String> styles;
   final DictionaryPopupPreferences preferences;
   final bool compact;
@@ -1416,6 +1570,7 @@ class _GlossarySense extends StatelessWidget {
                 DictionaryGlossary(
                   rawGlossary: glossary.glossary,
                   dictionaryName: glossary.dictName,
+                  profile: profile,
                   dictionaryCss: styles[glossary.dictName] ?? '',
                   customCss: preferences.customCss,
                   fontSize: preferences.fontSize,
@@ -1525,19 +1680,25 @@ class _LookupPayload {
     required this.results,
     required this.styles,
     required this.preferences,
+    required this.profile,
   });
 
-  factory _LookupPayload.empty(DictionaryPopupPreferences preferences) {
+  factory _LookupPayload.empty(
+    DictionaryPopupPreferences preferences,
+    DictionaryProfile profile,
+  ) {
     return _LookupPayload(
       results: const [],
       styles: const {},
       preferences: preferences,
+      profile: profile,
     );
   }
 
   final List<HoshiLookupResult> results;
   final Map<String, String> styles;
   final DictionaryPopupPreferences preferences;
+  final DictionaryProfile profile;
 }
 
 class _GlossaryGroup {
@@ -1545,6 +1706,45 @@ class _GlossaryGroup {
 
   final String dictionaryName;
   final List<HoshiGlossaryEntry> entries;
+}
+
+@visibleForTesting
+Set<String> initiallyExpandedDictionaries({
+  required DictionaryProfile profile,
+  required Iterable<String> dictionaries,
+}) {
+  final available = dictionaries.toSet();
+  final ordered = <String>[
+    for (final name in profile.dictionaryOrder)
+      if (available.remove(name)) name,
+    ...available,
+  ];
+  return switch (profile.dictionaryCollapseMode) {
+    'collapse_all' => <String>{},
+    'expand_first_available' => ordered.isEmpty ? <String>{} : {ordered.first},
+    'custom' => _customExpandedDictionaries(
+      ordered,
+      profile.dictionaryDisplayModes,
+    ),
+    _ => ordered.toSet(),
+  };
+}
+
+Set<String> _customExpandedDictionaries(
+  List<String> ordered,
+  Map<String, String> displayModes,
+) {
+  final expanded = <String>{};
+  var contentOpened = false;
+  for (final name in ordered) {
+    final mode = displayModes[name] ?? 'fallback';
+    if (mode == 'always_collapsed') continue;
+    if (mode == 'always_expanded' || !contentOpened) {
+      expanded.add(name);
+      contentOpened = true;
+    }
+  }
+  return expanded;
 }
 
 List<_GlossaryGroup> _groupGlossariesByDictionary(

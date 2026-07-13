@@ -303,6 +303,7 @@ Future<void> repairLocalEpubChapterMetadata(Manga manga) async {
           archivePath: entry.key,
           title: book.name,
           author: book.author,
+          lang: book.language,
         );
     if (existingProgress == null) {
       progress
@@ -326,6 +327,7 @@ Future<void> repairLocalEpubChapterMetadata(Manga manga) async {
     progress
       ..title = book.name
       ..author = book.author;
+    progress.lang ??= book.language;
 
     final usedRows = <Chapter>{};
     final shortcuts = <Chapter>[];

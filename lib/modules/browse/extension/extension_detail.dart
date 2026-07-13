@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/browse/extension/providers/extension_preferences_providers.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/source_preference_widget.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -17,6 +19,9 @@ import 'package:mangayomi/services/get_source_preference.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/reconcile_mihon_sources.dart';
 import 'package:mangayomi/services/uninstall_extension.dart';
 import 'package:mangayomi/utils/cached_network.dart';
@@ -35,6 +40,10 @@ class ExtensionDetail extends ConsumerStatefulWidget {
 class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
   late Source source = isar.sources.getSync(widget.source.id!)!;
   bool _isRefreshingPreferences = false;
+  String _dictionaryProfileLabel = 'Loading…';
+
+  String? get _dictionaryProfileSourceId =>
+      DictionaryProfileResolver.overrideIdForSource(source);
 
   String get _extensionName {
     final name = mihonSourceMetadata(source)?.extensionName;
@@ -65,11 +74,49 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadDictionaryProfileLabel());
     if (source.sourceCodeLanguage == SourceCodeLanguage.mihon) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _refreshMihonPreferences();
       });
     }
+  }
+
+  Future<void> _loadDictionaryProfileLabel() async {
+    final sourceId = _dictionaryProfileSourceId;
+    if (sourceId == null) return;
+    final values = await Future.wait<dynamic>([
+      MiningPreferences.getDictionaryProfiles(),
+      MiningPreferences.getDictionaryProfileOverride(
+        DictionaryProfileResolver.sourceOverrideKey(sourceId),
+      ),
+      DictionaryProfileResolver.resolve(sourceLanguage: source.lang ?? ''),
+    ]);
+    if (!mounted) return;
+    final profiles = values[0] as List<DictionaryProfile>;
+    final overrideId = values[1] as String;
+    final autoProfile = values[2] as DictionaryProfile;
+    final overrideProfile = profiles
+        .where((profile) => profile.id == overrideId)
+        .firstOrNull;
+    setState(() {
+      _dictionaryProfileLabel =
+          overrideProfile?.name ?? 'Auto (${autoProfile.name})';
+    });
+  }
+
+  Future<void> _selectDictionaryProfile() async {
+    final sourceId = _dictionaryProfileSourceId;
+    if (sourceId == null) return;
+    final changed = await showDictionaryProfileOverrideDialog(
+      context: context,
+      overrideKey: DictionaryProfileResolver.sourceOverrideKey(sourceId),
+      autoProfile: DictionaryProfileResolver.resolve(
+        sourceLanguage: source.lang ?? '',
+      ),
+      title: 'Dictionary profile for this source',
+    );
+    if (changed) await _loadDictionaryProfileLabel();
   }
 
   Future<void> _refreshMihonPreferences({
@@ -283,6 +330,14 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
                 ),
               ),
             ),
+            if (_dictionaryProfileSourceId != null)
+              ListTile(
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text('Dictionary profile'),
+                subtitle: Text(_dictionaryProfileLabel),
+                trailing: const Icon(Icons.arrow_drop_down),
+                onTap: _selectDictionaryProfile,
+              ),
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: SizedBox(

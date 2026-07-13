@@ -54,11 +54,9 @@ class ChimahonSyncMerger {
       ),
       // Remote wins preference conflicts. This prevents a fresh target device's
       // defaults from erasing Chimahon's filled dictionary/Anki fields.
-      backupPreferences: _mergeByKey<BackupPreference, String>(
+      backupPreferences: _mergePreferences(
         local.backupPreferences,
         remote.backupPreferences,
-        (preference) => preference.key,
-        remoteWins: true,
       ),
       backupSourcePreferences: _mergeSourcePreferences(
         local.backupSourcePreferences,
@@ -390,7 +388,12 @@ class ChimahonSyncMerger {
       if (left == null) return right!.deepCopy();
       if (right == null) return left.deepCopy();
       final latest = left.lastModified >= right.lastModified ? left : right;
-      return latest.deepCopy()
+      final fallback = identical(latest, left) ? right : left;
+      final merged = latest.deepCopy();
+      if (!merged.hasLang() && fallback.hasLang()) {
+        merged.lang = fallback.lang;
+      }
+      return merged
         ..id = key
         ..categoryIds.clear()
         ..categoryIds.addAll(
@@ -448,7 +451,12 @@ class ChimahonSyncMerger {
 
   BackupNovel _mergeDuplicateNovel(BackupNovel first, BackupNovel second) {
     final latest = first.lastModified >= second.lastModified ? first : second;
-    return latest.deepCopy()
+    final fallback = identical(latest, first) ? second : first;
+    final merged = latest.deepCopy();
+    if (!merged.hasLang() && fallback.hasLang()) {
+      merged.lang = fallback.lang;
+    }
+    return merged
       ..categoryIds.clear()
       ..categoryIds.addAll(
         _normalizeNovelCategoryIds([
@@ -534,6 +542,43 @@ class ChimahonSyncMerger {
     }
     return values.values.toList();
   }
+
+  List<BackupPreference> _mergePreferences(
+    Iterable<BackupPreference> local,
+    Iterable<BackupPreference> remote,
+  ) {
+    final remotePreferences = remote.toList(growable: false);
+    final merged = _mergeByKey<BackupPreference, String>(
+      local,
+      remotePreferences,
+      (preference) => preference.key,
+      remoteWins: true,
+    );
+    if (!remotePreferences.any(
+      (preference) => preference.key == 'pref_anki_profiles',
+    )) {
+      return merged;
+    }
+
+    // Override preferences are a snapshot, not independent settings. Auto is
+    // represented by deleting the key, so retaining a local-only key when the
+    // remote profile snapshot omits it would resurrect a cleared override.
+    final remoteOverrides = <String, BackupPreference>{
+      for (final preference in remotePreferences)
+        if (_isDictionaryProfileOverrideKey(preference.key))
+          preference.key: preference,
+    };
+    return [
+      for (final preference in merged)
+        if (!_isDictionaryProfileOverrideKey(preference.key)) preference,
+      ...remoteOverrides.values,
+    ];
+  }
+
+  bool _isDictionaryProfileOverrideKey(String key) =>
+      key.startsWith('pref_dict_profile_manga_') ||
+      key.startsWith('pref_dict_profile_source_') ||
+      key.startsWith('pref_dict_profile_novel_');
 
   Iterable<K> _orderedKeys<K, T>(Map<K, T> first, Map<K, T> second) sync* {
     final seen = <K>{};

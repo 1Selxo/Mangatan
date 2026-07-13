@@ -812,13 +812,28 @@ function createDefinitionImage(data, dictionary, exporting = false) {
     
     if (!exporting) {
         const embeddedImage = window.hoshiDictionaryMedia?.[dictionary]?.[path];
-        const imageUrl = typeof embeddedImage === 'string' && embeddedImage.length > 0
-            ? embeddedImage
-            : `image://?dictionary=${encodeURIComponent(dictionary)}&path=${encodeURIComponent(path)}`;
+        const fallbackUrl = `image://?dictionary=${encodeURIComponent(dictionary)}&path=${encodeURIComponent(path)}`;
+        const resolveImageUrl = async () => {
+            if (typeof embeddedImage === 'string' && embeddedImage.length > 0) {
+                return embeddedImage;
+            }
+            try {
+                const dataUri = await webkit.messageHandlers.dictionaryMedia.postMessage({dictionary, path});
+                if (typeof dataUri === 'string' && dataUri.length > 0) {
+                    window.hoshiDictionaryMedia ??= {};
+                    window.hoshiDictionaryMedia[dictionary] ??= {};
+                    window.hoshiDictionaryMedia[dictionary][path] = dataUri;
+                    return dataUri;
+                }
+            } catch (_) {}
+            return fallbackUrl;
+        };
         if (shouldRenderDefinitionImageToCanvas(path, appearance, usedWidth, invAspectRatio)) {
-            imageContainer.appendChild(createDefinitionImageCanvas(imageUrl, nodeData?.alt || title || '', (canvas, sourceImage) => {
-                renderDefinitionImageToCanvas(canvas, sourceImage, usedWidth, invAspectRatio, appearance);
-            }));
+            resolveImageUrl().then((imageUrl) => {
+                imageContainer.appendChild(createDefinitionImageCanvas(imageUrl, nodeData?.alt || title || '', (canvas, sourceImage) => {
+                    renderDefinitionImageToCanvas(canvas, sourceImage, usedWidth, invAspectRatio, appearance);
+                }));
+            });
         } else {
             const img = document.createElement('img');
             img.classList.add('gloss-image');
@@ -836,8 +851,8 @@ function createDefinitionImage(data, dictionary, exporting = false) {
                     aspectRatioSizer.style.paddingTop = `${aspectRatio * 100}%`;
                 }, {once: true});
             }
-            img.src = imageUrl;
             imageContainer.appendChild(img);
+            resolveImageUrl().then((imageUrl) => { img.src = imageUrl; });
         }
     } else {
         const alt = nodeData?.alt || title || '';

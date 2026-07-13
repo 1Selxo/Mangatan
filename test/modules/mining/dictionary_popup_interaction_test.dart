@@ -217,6 +217,18 @@ void main() {
   });
 
   group('dictionary popup placement', () {
+    test(
+      'positions recursive lookup anchors in the parent popup coordinate space',
+      () {
+        final anchor = dictionaryPopupChildAnchor(
+          parentRect: const Rect.fromLTWH(900, 535, 540, 450),
+          localSelectionRect: const Rect.fromLTWH(24, 112, 38, 22),
+        );
+
+        expect(anchor, const Rect.fromLTWH(924, 647, 38, 22));
+      },
+    );
+
     test('keeps the default popup below horizontal text', () {
       final rect = dictionaryPopupRect(
         screen: const Size(1000, 800),

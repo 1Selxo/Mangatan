@@ -233,6 +233,19 @@ class _DictionaryPopupRequest {
   final ValueChanged<bool>? onHoverChanged;
 }
 
+class _DictionaryChildPopup {
+  _DictionaryChildPopup({
+    required this.id,
+    required this.request,
+    required this.rect,
+  });
+
+  final int id;
+  final _DictionaryPopupRequest request;
+  final Rect rect;
+  final controller = HoshiDictionaryPopupController();
+}
+
 class _DictionaryPopupOverlayHost extends StatefulWidget {
   const _DictionaryPopupOverlayHost({super.key, required this.preferences});
 
@@ -264,6 +277,10 @@ class _DictionaryPopupOverlayHostState
   int _presentationGeneration = 0;
   int? _pendingOutsidePointer;
   int? _pendingOutsideGeneration;
+  final _rootController = HoshiDictionaryPopupController();
+  final List<_DictionaryChildPopup> _children = [];
+  int _nextChildId = 0;
+  int _childLookupGeneration = 0;
 
   bool get isVisible => _visible;
 
@@ -279,8 +296,20 @@ class _DictionaryPopupOverlayHostState
 
   Rect get _popupBounds => Rect.fromLTWH(_left, _top, _width, _height);
 
+  Iterable<Rect> get _visiblePopupBounds sync* {
+    yield _popupBounds;
+    for (final child in _children) {
+      yield child.rect;
+    }
+  }
+
   void _handleGlobalPointer(PointerEvent event) {
     if (event is PointerDownEvent) {
+      if (_visiblePopupBounds.any(
+        (bounds) => bounds.contains(event.position),
+      )) {
+        return;
+      }
       if (!dictionaryPopupShouldDismissForPointer(
         visible: _visible,
         dismissOnOutsideTap: _dismissOnOutsideTap,
@@ -328,6 +357,10 @@ class _DictionaryPopupOverlayHostState
   bool _handleHardwareKey(KeyEvent event) {
     if (!_visible || event is! KeyDownEvent) return false;
     if (!dictionaryPopupIsDismissKey(event.logicalKey)) return false;
+    if (_children.isNotEmpty) {
+      _dismissChild(_children.length - 1);
+      return true;
+    }
     dismiss();
     return true;
   }
@@ -354,6 +387,8 @@ class _DictionaryPopupOverlayHostState
     );
     final completer = Completer<void>();
     setState(() {
+      _children.clear();
+      _childLookupGeneration++;
       _request = _DictionaryPopupRequest(
         text: text,
         miningContext: miningContext,
@@ -413,6 +448,8 @@ class _DictionaryPopupOverlayHostState
     // lookup state survive dismissal and can be reused across reader bubbles.
     setState(() {
       _visible = false;
+      _children.clear();
+      _childLookupGeneration++;
       _dismissOnOutsideTap = true;
       _left = -_width - 100;
       _top = 0;
@@ -424,6 +461,69 @@ class _DictionaryPopupOverlayHostState
     final completer = _dismissed;
     _dismissed = null;
     if (completer != null && !completer.isCompleted) completer.complete();
+  }
+
+  Future<int> _openChild({
+    required int parentIndex,
+    required Rect parentRect,
+    required HoshiDictionaryTextSelection selection,
+  }) async {
+    final query = selection.text.trim();
+    if (query.isEmpty) return 0;
+    final generation = ++_childLookupGeneration;
+    final resultsFuture = DictionaryLookupPopup.lookup(query);
+    final results = await resultsFuture;
+    if (!mounted || generation != _childLookupGeneration || results.isEmpty) {
+      return 0;
+    }
+    final matched = results.first.matched.length;
+    final anchor = dictionaryPopupChildAnchor(
+      parentRect: parentRect,
+      localSelectionRect: selection.rect,
+    );
+    final screen = MediaQuery.sizeOf(context);
+    final rect = dictionaryPopupRect(
+      screen: screen,
+      anchor: anchor,
+      preferredSize: Size(widget.preferences.width, widget.preferences.height),
+    );
+    final child = _DictionaryChildPopup(
+      id: ++_nextChildId,
+      rect: rect,
+      request: _DictionaryPopupRequest(
+        text: query,
+        miningContext: _request.miningContext,
+        initialResults: resultsFuture,
+        onMatchChanged: null,
+        onHoverChanged: _request.onHoverChanged,
+      ),
+    );
+    setState(() {
+      final keep = parentIndex + 1;
+      if (_children.length > keep) {
+        _children.removeRange(keep, _children.length);
+      }
+      _children.add(child);
+    });
+    return matched;
+  }
+
+  void _closeChildrenAfter(int parentIndex) {
+    final keep = parentIndex + 1;
+    if (_children.length <= keep) return;
+    _childLookupGeneration++;
+    setState(() => _children.removeRange(keep, _children.length));
+  }
+
+  void _dismissChild(int index) {
+    if (index < 0 || index >= _children.length) return;
+    _childLookupGeneration++;
+    if (index == 0) {
+      unawaited(_rootController.clearSelection());
+    } else {
+      unawaited(_children[index - 1].controller.clearSelection());
+    }
+    setState(() => _children.removeRange(index, _children.length));
   }
 
   @override
@@ -461,6 +561,7 @@ class _DictionaryPopupOverlayHostState
                     ),
                     color: popupTheme.colorScheme.surface,
                     child: HoshiDictionaryPopup(
+                      controller: _rootController,
                       text: request.text,
                       miningContext: request.miningContext,
                       initialResults: request.initialResults,
@@ -474,6 +575,12 @@ class _DictionaryPopupOverlayHostState
                       },
                       onDismiss: () =>
                           dismiss(expectedGeneration: presentationGeneration),
+                      onTextSelected: (selection) => _openChild(
+                        parentIndex: -1,
+                        parentRect: _popupBounds,
+                        selection: selection,
+                      ),
+                      onTapOutside: () => _closeChildrenAfter(-1),
                     ),
                   ),
                 ),
@@ -481,6 +588,48 @@ class _DictionaryPopupOverlayHostState
             ),
           ),
         ),
+        for (final indexed in _children.indexed)
+          Positioned(
+            key: ValueKey('dictionary-child-popup-${indexed.$2.id}'),
+            left: indexed.$2.rect.left,
+            top: indexed.$2.rect.top,
+            width: indexed.$2.rect.width,
+            height: indexed.$2.rect.height,
+            child: MouseRegion(
+              onEnter: (_) => indexed.$2.request.onHoverChanged?.call(true),
+              onExit: (_) => indexed.$2.request.onHoverChanged?.call(false),
+              child: Theme(
+                data: popupTheme.copyWith(
+                  textTheme: popupTheme.textTheme.apply(
+                    fontSizeFactor: widget.preferences.fontSize / 14,
+                  ),
+                ),
+                child: Material(
+                  elevation: widget.preferences.eInkMode ? 0 : 12,
+                  clipBehavior: Clip.antiAlias,
+                  borderRadius: BorderRadius.circular(
+                    widget.preferences.eInkMode ? 0 : 8,
+                  ),
+                  color: popupTheme.colorScheme.surface,
+                  child: HoshiDictionaryPopup(
+                    controller: indexed.$2.controller,
+                    text: indexed.$2.request.text,
+                    miningContext: indexed.$2.request.miningContext,
+                    initialResults: indexed.$2.request.initialResults,
+                    preferences: widget.preferences,
+                    onMatchChanged: (_) {},
+                    onDismiss: () => _dismissChild(indexed.$1),
+                    onTextSelected: (selection) => _openChild(
+                      parentIndex: indexed.$1,
+                      parentRect: indexed.$2.rect,
+                      selection: selection,
+                    ),
+                    onTapOutside: () => _closeChildrenAfter(indexed.$1),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -684,6 +833,12 @@ Rect dictionaryPopupRect({
       .toDouble();
   return Rect.fromLTWH(left, top, width, height);
 }
+
+@visibleForTesting
+Rect dictionaryPopupChildAnchor({
+  required Rect parentRect,
+  required Rect localSelectionRect,
+}) => localSelectionRect.shift(parentRect.topLeft);
 
 class DictionaryLookupResultsView extends StatefulWidget {
   const DictionaryLookupResultsView({

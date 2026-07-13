@@ -4,6 +4,23 @@ import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
 
 void main() {
+  test('only the currently dismissed popup clears the subtitle highlight', () {
+    expect(
+      subtitleHighlightDismissalIsCurrent(
+        popupGeneration: 4,
+        currentGeneration: 4,
+      ),
+      isTrue,
+    );
+    expect(
+      subtitleHighlightDismissalIsCurrent(
+        popupGeneration: 3,
+        currentGeneration: 4,
+      ),
+      isFalse,
+    );
+  });
+
   test('subtitle lookup starts at the hovered Japanese character', () {
     final selection = subtitleLookupSelectionForTesting('夜払いがきます', 1);
 

@@ -395,6 +395,7 @@ Future<List<KoreanLookupCandidate>> _kiwiLookupCandidates(
     if (!_isKiwiDictionaryTag(morpheme.tag)) continue;
     final lemma = _kiwiDictionaryLemma(morpheme.form, morpheme.tag);
     if (lemma.isEmpty || lemma == surface) continue;
+    final partOfSpeech = _kiwiPartOfSpeech(morpheme.tag);
     candidates.putIfAbsent(
       lemma,
       () => KoreanLookupCandidate(
@@ -402,8 +403,9 @@ Future<List<KoreanLookupCandidate>> _kiwiLookupCandidates(
         lemma: lemma,
         trace: [
           KoreanTransform(
-            'Kiwi ${morpheme.tag}',
-            'Kiwi analyzed $surface as ${morpheme.form}/${morpheme.tag}',
+            'Kiwi ${partOfSpeech.label}',
+            'Kiwi analyzed $surface as ${morpheme.form} '
+                '(${partOfSpeech.description})',
           ),
         ],
         priority: priority++,
@@ -412,6 +414,101 @@ Future<List<KoreanLookupCandidate>> _kiwiLookupCandidates(
   }
   return candidates.values.toList(growable: false);
 }
+
+class _KiwiPartOfSpeech {
+  const _KiwiPartOfSpeech(this.label, [String? description])
+    : _description = description;
+
+  final String label;
+  final String? _description;
+
+  String get description => _description ?? label.toLowerCase();
+}
+
+_KiwiPartOfSpeech _kiwiPartOfSpeech(String rawTag) {
+  final components = rawTag.trim().toUpperCase().split('-');
+  final baseTag = components.first;
+  final conjugation = components.length > 1
+      ? switch (components[1]) {
+          'R' => 'regular conjugation',
+          'I' => 'irregular conjugation',
+          _ => null,
+        }
+      : null;
+  final base =
+      _kiwiPartOfSpeechTags[baseTag] ?? const _KiwiPartOfSpeech('Korean word');
+  if (conjugation == null) return base;
+  return _KiwiPartOfSpeech(
+    '${base.label} · ${_capitalize(conjugation)}',
+    '${base.description}, $conjugation',
+  );
+}
+
+String _capitalize(String value) =>
+    value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
+
+const _kiwiPartOfSpeechTags = <String, _KiwiPartOfSpeech>{
+  'NNG': _KiwiPartOfSpeech('Common noun'),
+  'NNP': _KiwiPartOfSpeech('Proper noun'),
+  'NNB': _KiwiPartOfSpeech('Dependent noun'),
+  'NR': _KiwiPartOfSpeech('Numeral'),
+  'NP': _KiwiPartOfSpeech('Pronoun'),
+  'VV': _KiwiPartOfSpeech('Verb'),
+  'VA': _KiwiPartOfSpeech('Adjective'),
+  'VX': _KiwiPartOfSpeech('Auxiliary predicate'),
+  'VCP': _KiwiPartOfSpeech('Affirmative copula', 'affirmative copula (이다)'),
+  'VCN': _KiwiPartOfSpeech('Negative copula', 'negative copula (아니다)'),
+  'MM': _KiwiPartOfSpeech('Determiner'),
+  'MAG': _KiwiPartOfSpeech('General adverb'),
+  'MAJ': _KiwiPartOfSpeech('Conjunctive adverb'),
+  'IC': _KiwiPartOfSpeech('Interjection'),
+  'JKS': _KiwiPartOfSpeech('Subject particle'),
+  'JKC': _KiwiPartOfSpeech('Complement particle'),
+  'JKG': _KiwiPartOfSpeech('Adnominal particle'),
+  'JKO': _KiwiPartOfSpeech('Object particle'),
+  'JKB': _KiwiPartOfSpeech('Adverbial particle'),
+  'JKV': _KiwiPartOfSpeech('Vocative particle'),
+  'JKQ': _KiwiPartOfSpeech('Quotation particle'),
+  'JX': _KiwiPartOfSpeech('Auxiliary particle'),
+  'JC': _KiwiPartOfSpeech('Conjunctive particle'),
+  'EP': _KiwiPartOfSpeech('Pre-final ending'),
+  'EF': _KiwiPartOfSpeech('Final ending'),
+  'EC': _KiwiPartOfSpeech('Connective ending'),
+  'ETN': _KiwiPartOfSpeech('Nominalizing ending'),
+  'ETM': _KiwiPartOfSpeech('Adnominalizing ending'),
+  'XPN': _KiwiPartOfSpeech('Noun prefix'),
+  'XSN': _KiwiPartOfSpeech('Noun-forming suffix'),
+  'XSV': _KiwiPartOfSpeech('Verb-forming suffix'),
+  'XSA': _KiwiPartOfSpeech('Adjective-forming suffix'),
+  'XSM': _KiwiPartOfSpeech('Adverb-forming suffix'),
+  'XR': _KiwiPartOfSpeech('Root'),
+  'SF': _KiwiPartOfSpeech('Sentence-final punctuation'),
+  'SP': _KiwiPartOfSpeech('Separator punctuation'),
+  'SS': _KiwiPartOfSpeech('Quotation mark or bracket'),
+  'SSO': _KiwiPartOfSpeech('Opening quotation mark or bracket'),
+  'SSC': _KiwiPartOfSpeech('Closing quotation mark or bracket'),
+  'SE': _KiwiPartOfSpeech('Ellipsis'),
+  'SO': _KiwiPartOfSpeech('Hyphen or tilde'),
+  'SW': _KiwiPartOfSpeech('Other symbol'),
+  'SL': _KiwiPartOfSpeech('Latin alphabet'),
+  'SH': _KiwiPartOfSpeech('Chinese character'),
+  'SN': _KiwiPartOfSpeech('Number'),
+  'SB': _KiwiPartOfSpeech('Ordered list marker'),
+  'UN': _KiwiPartOfSpeech('Unanalyzed text'),
+  'W_URL': _KiwiPartOfSpeech('URL'),
+  'W_EMAIL': _KiwiPartOfSpeech('Email address'),
+  'W_HASHTAG': _KiwiPartOfSpeech('Hashtag'),
+  'W_MENTION': _KiwiPartOfSpeech('Mention'),
+  'W_SERIAL': _KiwiPartOfSpeech('Serial number'),
+  'W_EMOJI': _KiwiPartOfSpeech('Emoji'),
+  'Z_CODA': _KiwiPartOfSpeech('Added final consonant'),
+  'Z_SIOT': _KiwiPartOfSpeech('Interfix siot'),
+  'USER0': _KiwiPartOfSpeech('User-defined word'),
+  'USER1': _KiwiPartOfSpeech('User-defined word'),
+  'USER2': _KiwiPartOfSpeech('User-defined word'),
+  'USER3': _KiwiPartOfSpeech('User-defined word'),
+  'USER4': _KiwiPartOfSpeech('User-defined word'),
+};
 
 bool _isKiwiDictionaryTag(String rawTag) {
   final tag = rawTag.split('-').first.toUpperCase();
@@ -432,9 +529,7 @@ String _kiwiDictionaryLemma(String form, String rawTag) {
   if (normalized.isEmpty) return '';
   final tag = rawTag.split('-').first.toUpperCase();
   final isPredicate = tag.startsWith('V') || tag == 'XSV' || tag == 'XSA';
-  return isPredicate && !normalized.endsWith('다')
-      ? '$normalized다'
-      : normalized;
+  return isPredicate && !normalized.endsWith('다') ? '$normalized다' : normalized;
 }
 
 String _leadingKoreanToken(String text, int scanLength) {

@@ -194,6 +194,20 @@ function createPlusIcon() {
     ]);
 }
 
+function createBrowseIcon() {
+    return svgEl('svg', {
+        class: 'slot-icon browse-icon',
+        viewBox: '0 0 24 24',
+        'aria-hidden': 'true',
+        focusable: 'false'
+    }, [
+        svgEl('path', {
+            class: 'browse-line',
+            d: 'M3 5h18v14H3zM3 9h18M8 9v10'
+        })
+    ]);
+}
+
 function toHiragana(text) {
     return text.replace(/[\u30A1-\u30F6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
@@ -951,7 +965,7 @@ function getFrequencyHarmonicRank(frequencies) {
     return String(Math.floor(values.length / sumOfReciprocals));
 }
 
-async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText) {
+async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText, allowDuplicate = false) {
     const idx = entryIndex || 0;
     const furiganaPlain = constructFuriganaPlain(expression, reading);
     currentDictionaryMedia = new Map();
@@ -985,6 +999,7 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
         pitchPositions,
         pitchCategories,
         popupSelectionText,
+        allowDuplicate,
         audio,
         selectedDictionary: selectedDictionaries[idx]?.name || '',
         dictionaryMedia: JSON.stringify([...dictionaryMedia.values()])
@@ -1488,6 +1503,8 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
         slot.appendChild(createAudioIcon());
     } else if (kind === 'mine') {
         slot.appendChild(createPlusIcon());
+    } else if (kind === 'browse') {
+        slot.appendChild(createBrowseIcon());
     }
     return slot;
 }
@@ -1532,13 +1549,14 @@ async function mineEntryAtIndex(entryIndex) {
     const selectedText = rememberPopupTextSelection() || lastSelection;
     updateButtonSlot(mineSlot, { enabled: false });
     
-    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, selectedText);
+    const allowDuplicate = mineSlot.dataset.state === 'duplicate';
+    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, selectedText, allowDuplicate);
     lastSelection = '';
     const checkDuplicate = async () => {
         const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
         updateButtonSlot(mineSlot, {
             state: wasAdded ? 'duplicate' : 'default',
-            enabled: !(wasAdded && !window.allowDupes)
+            enabled: true
         });
     };
     
@@ -1546,6 +1564,21 @@ async function mineEntryAtIndex(entryIndex) {
         await checkDuplicate();
     } else {
         setTimeout(checkDuplicate, 1000);
+    }
+}
+
+async function browseEntryNotes(entryIndex) {
+    const slot = getButtonSlot('browse', entryIndex);
+    const noteIds = String(slot?.dataset.noteIds || '')
+        .split(' ')
+        .map(Number)
+        .filter(Number.isFinite);
+    if (!noteIds.length) { return; }
+    updateButtonSlot(slot, { enabled: false, state: 'loading' });
+    const opened = await webkit.messageHandlers.browseNotes.postMessage(noteIds);
+    updateButtonSlot(slot, { enabled: true, state: opened ? 'default' : 'error' });
+    if (!opened) {
+        setTimeout(() => updateButtonSlot(slot, { state: 'default' }), 1500);
     }
 }
 
@@ -1570,12 +1603,25 @@ function createEntryHeader(entry, idx) {
     
     const buttonsContainer = el('div', { className: 'header-buttons' });
     const mineSlot = createButtonSlot('mine', idx, false);
+    mineSlot.title = 'Add card';
     buttonsContainer.appendChild(mineSlot);
-    webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
+    const browseSlot = createButtonSlot('browse', idx, false);
+    browseSlot.hidden = true;
+    browseSlot.title = 'View existing card(s) in Anki';
+    buttonsContainer.appendChild(browseSlot);
+    Promise.all([
+        webkit.messageHandlers.duplicateCheck.postMessage(expression),
+        webkit.messageHandlers.duplicateNotes.postMessage(expression)
+    ]).then(([isDuplicate, noteIds]) => {
+        const ids = Array.isArray(noteIds) ? noteIds : [];
         updateButtonSlot(mineSlot, {
             state: isDuplicate ? 'duplicate' : 'default',
-            enabled: !(isDuplicate && !window.allowDupes)
+            enabled: true
         });
+        mineSlot.title = isDuplicate ? 'Add duplicate card' : 'Add card';
+        browseSlot.dataset.noteIds = ids.join(' ');
+        browseSlot.hidden = ids.length === 0;
+        updateButtonSlot(browseSlot, { enabled: ids.length > 0 });
     });
 
     if (window.audioSources?.length) {

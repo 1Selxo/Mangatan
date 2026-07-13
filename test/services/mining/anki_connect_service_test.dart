@@ -195,4 +195,51 @@ void main() {
       'addNote',
     ]);
   });
+
+  test(
+    'finds duplicate note ids using Yomitan-compatible field queries',
+    () async {
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        switch (body['action']) {
+          case 'modelFieldNames':
+            return http.Response(
+              '{"result": ["Expression", "Meaning"], "error": null}',
+              200,
+            );
+          case 'findNotes':
+            expect(
+              (body['params'] as Map<String, dynamic>)['query'],
+              '"deck:Japanese" "expression:事件"',
+            );
+            return http.Response('{"result": [41, 42], "error": null}', 200);
+        }
+        fail('Unexpected action: ${body['action']}');
+      });
+
+      final ids = await AnkiConnectService(client: client).findDuplicateNoteIds(
+        deckName: 'Japanese::Mining',
+        modelName: 'Mining',
+        expression: '事件',
+        duplicateScope: 'deckroot',
+      );
+
+      expect(ids, [41, 42]);
+    },
+  );
+
+  test('opens matching notes in the Anki card browser', () async {
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      expect(body['action'], 'guiBrowse');
+      expect(body['params'], {'query': 'nid:41,42'});
+      return http.Response('{"result": [101, 102], "error": null}', 200);
+    });
+
+    final cards = await AnkiConnectService(
+      client: client,
+    ).browseNotes([41, 42]);
+
+    expect(cards, [101, 102]);
+  });
 }

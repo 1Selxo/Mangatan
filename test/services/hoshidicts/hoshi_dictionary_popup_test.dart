@@ -107,6 +107,8 @@ void main() {
     expect(html, contains('getTermAudioSources'));
     expect(html, contains('playWordAudio'));
     expect(html, contains("'duplicateCheck'"));
+    expect(html, contains('"duplicateNotes"'));
+    expect(html, contains('"browseNotes"'));
     expect(html, contains('window.allowDupes = false;'));
     expect(html, contains('\\229E'));
     expect(html, contains('.plus-line'));
@@ -353,6 +355,9 @@ void main() {
     expect(popup, contains("node.type === 'image' || node.tag === 'img'"));
     expect(popup, contains('function hasPopupTextSelection()'));
     expect(popup, contains('function rememberPopupTextSelection()'));
+    expect(popup, contains('function browseEntryNotes(entryIndex)'));
+    expect(popup, contains("? 'Add duplicate card' : 'Add card'"));
+    expect(popup, contains('allowDuplicate,'));
     expect(
       css,
       contains(

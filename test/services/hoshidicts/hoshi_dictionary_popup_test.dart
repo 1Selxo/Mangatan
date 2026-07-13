@@ -401,6 +401,13 @@ void main() {
       css,
       contains('.gloss-image-link[data-path^="gaiji/bs"] .gloss-image'),
     );
+    expect(
+      css,
+      contains(
+        '.gloss-image-link[data-path^="gaiji/bs"]>.gloss-image-container',
+      ),
+    );
+    expect(css, contains('width: 15em !important;'));
     expect(license, contains('GNU GENERAL PUBLIC LICENSE'));
   });
 }

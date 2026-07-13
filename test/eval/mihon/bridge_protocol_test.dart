@@ -8,6 +8,12 @@ import 'package:mangayomi/modules/browse/extension/widgets/source_preference_wid
 
 void main() {
   group('Mihon bridge protocol', () {
+    test('keeps catalogue pagination one-based without skipping page 1', () {
+      expect(mihonCataloguePage(0), 1);
+      expect(mihonCataloguePage(1), 1);
+      expect(mihonCataloguePage(2), 2);
+    });
+
     test('keeps native 64-bit source ids as strings', () {
       final encoded = encodeMihonSourceMetadata(
         sourceId: '7066619062139039107',

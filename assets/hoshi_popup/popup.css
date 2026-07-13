@@ -279,6 +279,17 @@ a {
     font-size: 1em;
 }
 
+/*
+ * Meikyo uses dimensionless gaiji/bs*.svg images as inline section badges.
+ * Its dictionary CSS normally shrinks Yomitan's 100-unit image fallback,
+ * but the badges must stay inline-sized even if that stylesheet is missing or
+ * cannot be scoped by the host WebView.
+ */
+.gloss-image-link[data-path^="gaiji/bs"]>.gloss-image-container {
+    width: 15em !important;
+    margin-inline-end: 2em;
+}
+
 .glossary-group {
     position: relative;
     margin-top: calc(5px * var(--popup-scale));

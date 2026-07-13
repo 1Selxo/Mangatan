@@ -2,23 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/changed.dart';
-import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/browse/extension/extension_package.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/uninstall_extension.dart';
 import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
 
-final extensionListTileWidget = Provider.family<Widget, Source>((ref, source) {
-  return ExtensionListTileWidget(source: source);
-});
-
 class ExtensionListTileWidget extends ConsumerStatefulWidget {
-  final Source source;
-  const ExtensionListTileWidget({super.key, required this.source});
+  final ExtensionCatalogEntry entry;
+  const ExtensionListTileWidget({super.key, required this.entry});
 
   @override
   ConsumerState<ExtensionListTileWidget> createState() =>
@@ -44,11 +39,8 @@ class _ExtensionListTileWidgetState
   }
 
   void _updateState() {
-    _updateAvailable =
-        compareVersions(widget.source.version!, widget.source.versionLast!) < 0;
-    _sourceNotEmpty =
-        widget.source.sourceCode != null &&
-        widget.source.sourceCode!.isNotEmpty;
+    _updateAvailable = widget.entry.package.updateAvailable;
+    _sourceNotEmpty = widget.entry.package.hasInstalledCode;
   }
 
   Future<void> _handleSourceFetch() async {
@@ -56,9 +48,9 @@ class _ExtensionListTileWidgetState
 
     try {
       final provider = fetchItemSourcesListProvider(
-        id: widget.source.id,
+        id: widget.entry.source.id,
         reFresh: true,
-        itemType: widget.source.itemType,
+        itemType: widget.entry.source.itemType,
       );
 
       // A keep-alive family can otherwise return a completed prior attempt.
@@ -72,9 +64,7 @@ class _ExtensionListTileWidgetState
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(
-              'Failed to install ${widget.source.name ?? 'extension'}: $error',
-            ),
+            content: Text('Failed to install ${widget.entry.name}: $error'),
           ),
         );
     } finally {
@@ -101,7 +91,7 @@ class _ExtensionListTileWidgetState
                         if (!_updateAvailable && _sourceNotEmpty) {
                           context.push(
                             '/extension_detail',
-                            extra: widget.source,
+                            extra: widget.entry.source,
                           );
                         } else {
                           _handleSourceFetch();
@@ -123,9 +113,9 @@ class _ExtensionListTileWidgetState
                       context: context,
                       builder: (ctx) {
                         return AlertDialog(
-                          title: Text(widget.source.name!),
+                          title: Text(widget.entry.name),
                           content: Text(
-                            ctx.l10n.uninstall_extension(widget.source.name!),
+                            ctx.l10n.uninstall_extension(widget.entry.name),
                           ),
                           actions: [
                             Row(
@@ -141,7 +131,7 @@ class _ExtensionListTileWidgetState
                                 TextButton(
                                   onPressed: () {
                                     final result = uninstallExtension(
-                                      widget.source,
+                                      widget.entry.source,
                                     );
                                     for (final sourceId
                                         in result.removedObsoleteSourceIds) {
@@ -190,7 +180,7 @@ class _ExtensionListTileWidgetState
           ? null
           : () {
               if (_sourceNotEmpty) {
-                context.push('/extension_detail', extra: widget.source);
+                context.push('/extension_detail', extra: widget.entry.source);
               } else {
                 _handleSourceFetch();
               }
@@ -202,10 +192,10 @@ class _ExtensionListTileWidgetState
           color: Theme.of(context).secondaryHeaderColor.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(5),
         ),
-        child: widget.source.iconUrl!.isEmpty
+        child: (widget.entry.source.iconUrl ?? '').isEmpty
             ? const Icon(Icons.extension_rounded)
             : cachedNetworkImage(
-                imageUrl: widget.source.iconUrl!,
+                imageUrl: widget.entry.source.iconUrl!,
                 fit: BoxFit.contain,
                 width: 37,
                 height: 37,
@@ -217,20 +207,20 @@ class _ExtensionListTileWidgetState
                 useCustomNetworkImage: false,
               ),
       ),
-      title: Text(widget.source.name!),
+      title: Text(widget.entry.name),
       subtitle: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            completeLanguageName(widget.source.lang!.toLowerCase()),
+            completeLanguageName(widget.entry.lang.toLowerCase()),
             style: const TextStyle(fontWeight: FontWeight.w300, fontSize: 12),
           ),
           const SizedBox(width: 4),
           Text(
-            widget.source.version!,
+            widget.entry.source.version ?? '',
             style: const TextStyle(fontWeight: FontWeight.w300, fontSize: 12),
           ),
-          if (widget.source.isNsfw ?? false)
+          if (widget.entry.package.isNsfw)
             Padding(
               padding: const EdgeInsets.only(left: 4),
               child: Container(
@@ -249,15 +239,15 @@ class _ExtensionListTileWidgetState
                 ),
               ),
             ),
-          if (widget.source.repo?.name != null)
+          if (widget.entry.source.repo?.name != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
-                "- ${widget.source.repo!.name!}",
+                "- ${widget.entry.source.repo!.name!}",
                 style: TextStyle(fontSize: 12),
               ),
             ),
-          if (widget.source.isObsolete ?? false)
+          if (widget.entry.source.isObsolete ?? false)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(

@@ -9,7 +9,7 @@ String completeLanguageName(String lang) {
 }
 
 final languagesMap = {
-  'All': 'all',
+  'Multi': 'all',
   'Français': 'fr',
   'Català': 'ca',
   'English': 'en',
@@ -134,7 +134,7 @@ String completeLanguageNameEnglish(String lang) {
 }
 
 final languagesMapEnglish = {
-  'All': 'all',
+  'Multi': 'all',
   'French': 'fr',
   'English': 'en',
   'Vietnamese': 'vi',

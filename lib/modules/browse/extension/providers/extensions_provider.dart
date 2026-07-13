@@ -17,7 +17,6 @@ Stream<List<Source>> getExtensionsStream(Ref ref, ItemType itemType) async* {
           (q) => q.hiddenIsNull().or().hiddenEqualTo(false),
         ),
       )
-      .isActiveEqualTo(true)
       .itemTypeEqualTo(itemType)
       .watch(fireImmediately: true);
 }

@@ -10,6 +10,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/services/extension_catalog_reconciler.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/utils/extension_language_defaults.dart';
@@ -70,6 +71,11 @@ Future<void> fetchSourcesList({
               ..additionalParams = encodeMihonSourceMetadata(
                 sourceId: source['id'],
                 packageName: e['pkg'],
+                extensionName: (e['name'] as String).replaceFirst(
+                  RegExp(r'^(Tachiyomi|Aniyomi):\s*'),
+                  '',
+                ),
+                packageLang: e['lang'],
               )
               ..itemType =
                   (e['pkg'] as String).startsWith(
@@ -161,23 +167,24 @@ Future<void> fetchSourcesList({
         await _addNewSource(source, repo, itemType, isActive: isActive);
         continue;
       }
-      final existingMihonMetadata = mihonSourceMetadata(existingSource);
-      final catalogMihonMetadata = mihonSourceMetadata(source);
-      final updatedAdditionalParams = catalogMihonMetadata == null
-          ? source.additionalParams
-          : encodeMihonSourceMetadata(
-              sourceId: catalogMihonMetadata.sourceId,
-              packageName: catalogMihonMetadata.packageName,
-              factoryAvailable: existingMihonMetadata?.factoryAvailable ?? true,
-            );
-      if (source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
-          existingSource.additionalParams != updatedAdditionalParams) {
+      final metadataChanged = applyExtensionCatalogMetadata(
+        existingSource,
+        source,
+        repo: repo,
+      );
+      final isActive = extensionLanguageEnabledForCatalogSource(
+        source.lang,
+        isInstalled: existingSource.isAdded ?? false,
+        currentValue: existingSource.isActive,
+        savedLanguageStates: languageStates,
+        deviceLocales: deviceLocales,
+      );
+      final activationChanged = existingSource.isActive != isActive;
+      if (activationChanged) existingSource.isActive = isActive;
+      if (metadataChanged || activationChanged) {
         await isar.writeTxn(() async {
           isar.sources.put(
-            existingSource
-              ..additionalParams = updatedAdditionalParams
-              ..sourceCodeUrl = source.sourceCodeUrl
-              ..repo = repo,
+            existingSource..updatedAt = DateTime.now().millisecondsSinceEpoch,
           );
         });
       }
@@ -287,6 +294,8 @@ Future<void> _updateSources(
             factoryAvailable:
                 installedMetadata?.factoryAvailable ??
                 incomingMetadata.factoryAvailable,
+            extensionName: incomingMetadata.extensionName,
+            packageLang: incomingMetadata.packageLang,
           );
     final existingPreferences = _decodePreferences(
       existingSource?.preferenceList,

@@ -35,6 +35,17 @@ class ExtensionDetail extends ConsumerStatefulWidget {
 class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
   late Source source = isar.sources.getSync(widget.source.id!)!;
   bool _isRefreshingPreferences = false;
+
+  String get _extensionName {
+    final name = mihonSourceMetadata(source)?.extensionName;
+    return name?.isNotEmpty == true ? name! : source.name ?? '';
+  }
+
+  String get _extensionLang {
+    final lang = mihonSourceMetadata(source)?.packageLang;
+    return lang?.isNotEmpty == true ? lang! : source.lang ?? '';
+  }
+
   late List<SourcePreference>? sourcePreference = () {
     try {
       if (source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
@@ -217,7 +228,7 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
-                widget.source.name!,
+                _extensionName,
                 style: const TextStyle(
                   fontSize: 23,
                   fontWeight: FontWeight.bold,
@@ -255,7 +266,7 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
                       Column(
                         children: [
                           Text(
-                            completeLanguageName(widget.source.lang!),
+                            completeLanguageName(_extensionLang),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -373,9 +384,9 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
                       context: context,
                       builder: (ctx) {
                         return AlertDialog(
-                          title: Text(widget.source.name!),
+                          title: Text(_extensionName),
                           content: Text(
-                            l10n.uninstall_extension(widget.source.name!),
+                            l10n.uninstall_extension(_extensionName),
                           ),
                           actions: [
                             Row(

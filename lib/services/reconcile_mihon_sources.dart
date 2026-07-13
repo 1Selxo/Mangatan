@@ -13,6 +13,8 @@ Future<void> reconcileMihonFactorySources(
   }
 
   final packageName = mihonSourceMetadata(template)?.packageName ?? '';
+  final extensionName = mihonSourceMetadata(template)?.extensionName;
+  final packageLang = mihonSourceMetadata(template)?.packageLang;
   final group = await isar.sources
       .filter()
       .sourceCodeUrlEqualTo(template.sourceCodeUrl)
@@ -43,6 +45,8 @@ Future<void> reconcileMihonFactorySources(
         ..additionalParams = encodeMihonSourceMetadata(
           sourceId: descriptor.id,
           packageName: packageName,
+          extensionName: extensionName,
+          packageLang: packageLang,
         )
         ..isObsolete = false
         ..updatedAt = now;
@@ -81,6 +85,8 @@ Future<void> reconcileMihonFactorySources(
         ..additionalParams = encodeMihonSourceMetadata(
           sourceId: descriptor.id,
           packageName: packageName,
+          extensionName: extensionName,
+          packageLang: packageLang,
         )
         ..isLocal = false
         ..isObsolete = false
@@ -102,6 +108,8 @@ Future<void> reconcileMihonFactorySources(
             sourceId: nativeId,
             packageName: metadata?.packageName ?? packageName,
             factoryAvailable: false,
+            extensionName: metadata?.extensionName ?? extensionName,
+            packageLang: metadata?.packageLang ?? packageLang,
           )
           ..updatedAt = now,
       );

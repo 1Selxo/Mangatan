@@ -32,16 +32,22 @@ class MihonSourceMetadata {
     required this.sourceId,
     required this.packageName,
     this.factoryAvailable = true,
+    this.extensionName,
+    this.packageLang,
   });
 
   final String sourceId;
   final String packageName;
   final bool factoryAvailable;
+  final String? extensionName;
+  final String? packageLang;
 
   Map<String, dynamic> toJson() => {
     'mihonSourceId': sourceId,
     'mihonPackage': packageName,
     'mihonFactoryAvailable': factoryAvailable,
+    if (extensionName != null) 'mihonExtensionName': extensionName,
+    if (packageLang != null) 'mihonPackageLang': packageLang,
   };
 
   static MihonSourceMetadata? fromAdditionalParams(String? value) {
@@ -55,6 +61,8 @@ class MihonSourceMetadata {
         sourceId: sourceId,
         packageName: packageName ?? '',
         factoryAvailable: data['mihonFactoryAvailable'] as bool? ?? true,
+        extensionName: data['mihonExtensionName']?.toString(),
+        packageLang: data['mihonPackageLang']?.toString(),
       );
     } catch (_) {
       return null;
@@ -66,11 +74,15 @@ String encodeMihonSourceMetadata({
   required Object sourceId,
   required String packageName,
   bool factoryAvailable = true,
+  String? extensionName,
+  String? packageLang,
 }) => jsonEncode(
   MihonSourceMetadata(
     sourceId: sourceId.toString(),
     packageName: packageName,
     factoryAvailable: factoryAvailable,
+    extensionName: extensionName,
+    packageLang: packageLang,
   ).toJson(),
 );
 

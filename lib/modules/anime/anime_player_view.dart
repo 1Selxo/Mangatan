@@ -53,6 +53,7 @@ import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/torrent_server.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/system_ui.dart';
@@ -1021,78 +1022,76 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (_jimakuLoading) return;
     _jimakuLoading = true;
     try {
-      final candidates = await _buildJimakuCandidates(titleOverride);
-      if (candidates.isEmpty) {
+      final guess = await _currentJimakuGuess(titleOverride);
+      if (guess.title.trim().isEmpty) {
         if (showFeedback) botToast('Set a Jimaku title first', second: 3);
         return;
       }
       if (showFeedback) {
-        botToast('Searching Jimaku: ${candidates.first.displayName}');
+        botToast('Searching Jimaku: ${guess.displayName}');
       }
       final service = JimakuSubtitleService();
-      final attemptedQueries = <String>[];
-      var sawEntries = false;
-      for (final candidate in candidates) {
-        attemptedQueries.add(candidate.query);
-        final entries = await service.searchEntries(
-          apiKey: apiKey,
-          query: candidate.query,
-        );
-        if (entries.isEmpty) continue;
-        sawEntries = true;
-        final entry = selectBestJimakuEntryForTitles(
-          entries,
-          candidate.scoringTitles,
-        );
-        if (entry == null) continue;
-        final files = await service.matchingFiles(
-          apiKey: apiKey,
-          entry: entry,
-          guess: candidate.guess,
-        );
-        if (files.isEmpty) continue;
-        final outputDir = Directory(
-          path.join((await getTemporaryDirectory()).path, 'jimaku_subtitles'),
-        );
-        final subtitleFiles = await service.downloadFiles(
-          apiKey: apiKey,
-          files: files,
-          outputDirectory: outputDir,
-        );
-        _jimakuSubtitleTracks
-          ..clear()
-          ..addAll([
-            for (var index = 0; index < subtitleFiles.length; index++)
-              SubtitleTrack.uri(
-                subtitleFiles[index].path,
-                title: files[index].name,
-                language: 'ja',
-              ),
-          ]);
-        for (var index = 0; index < subtitleFiles.length; index++) {
-          final subtitleFile = subtitleFiles[index];
-          final file = files[index];
-          final cues = parseAnimeSubtitleFile(subtitleFile);
-          _rememberSubtitleCues(file.name, cues);
+      final entries = await service.searchEntries(
+        apiKey: apiKey,
+        query: guess.title,
+      );
+      if (entries.isEmpty) {
+        if (showFeedback) {
+          botToast('No Jimaku entries found for "${guess.title}"', second: 4);
         }
-        await _attachJimakuSubtitles(_jimakuSubtitleTracks.first.id);
+        return;
+      }
+      final entry =
+          selectBestJimakuEntry(entries, guess.title) ?? entries.first;
+      final files = await service.matchingFiles(
+        apiKey: apiKey,
+        entry: entry,
+        guess: guess,
+      );
+      if (files.isEmpty) {
+        final episodeText = guess.episode == null
+            ? ''
+            : ' episode ${guess.episode}';
         if (showFeedback) {
           botToast(
-            subtitleFiles.length == 1
-                ? 'Jimaku subtitle added'
-                : 'Added ${subtitleFiles.length} Jimaku subtitles',
-            second: 3,
+            'No matching SRT Jimaku subtitles found for '
+            '${entry.name}$episodeText',
+            second: 4,
           );
         }
         return;
       }
+      final outputDir = Directory(
+        path.join((await getTemporaryDirectory()).path, 'jimaku_subtitles'),
+      );
+      final subtitleFiles = await service.downloadFiles(
+        apiKey: apiKey,
+        files: files,
+        outputDirectory: outputDir,
+      );
+      _jimakuSubtitleTracks
+        ..clear()
+        ..addAll([
+          for (var index = 0; index < subtitleFiles.length; index++)
+            SubtitleTrack.uri(
+              subtitleFiles[index].path,
+              title: files[index].name,
+              language: 'ja',
+            ),
+        ]);
+      for (var index = 0; index < subtitleFiles.length; index++) {
+        final subtitleFile = subtitleFiles[index];
+        final file = files[index];
+        final cues = parseAnimeSubtitleFile(subtitleFile);
+        _rememberSubtitleCues(file.name, cues);
+      }
+      await _attachJimakuSubtitles(_jimakuSubtitleTracks.first.id);
       if (showFeedback) {
-        final tried = attemptedQueries.take(3).join(', ');
         botToast(
-          sawEntries
-              ? 'No matching Jimaku subtitle files found'
-              : 'No Jimaku entries found for $tried',
-          second: 4,
+          subtitleFiles.length == 1
+              ? 'Jimaku subtitle added'
+              : 'Added ${subtitleFiles.length} Jimaku subtitles',
+          second: 3,
         );
       }
     } catch (e) {
@@ -1102,24 +1101,24 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
   }
 
-  Future<List<JimakuSearchCandidate>> _buildJimakuCandidates(
-    String titleOverride,
-  ) async {
-    final savedTitle = titleOverride.trim().isNotEmpty
+  Future<JimakuMediaGuess> _currentJimakuGuess(String titleOverride) async {
+    final overrideTitle = titleOverride.trim().isNotEmpty
         ? titleOverride.trim()
         : await MiningPreferences.getJimakuTitleOverride(
             widget.episode.manga.value?.id,
           );
-    final candidates = [
-      if (savedTitle.trim().isNotEmpty) savedTitle,
-      '${widget.episode.manga.value?.name ?? ''} ${widget.episode.name ?? ''}',
+    final animeTitle = widget.episode.manga.value?.name ?? '';
+    final episode = ChapterRecognition().parseEpisodeNumber(
+      animeTitle,
       widget.episode.name ?? '',
-      _firstVid.originalUrl,
-      _firstVid.url,
-    ];
-    return buildJimakuSearchCandidates(
-      values: candidates,
-      titleOverride: savedTitle,
+    );
+    return buildChimahonJimakuGuess(
+      overrideTitle: overrideTitle,
+      animeTitle: animeTitle,
+      mediaTitle: widget.episode.name ?? '',
+      videoTitle: _firstVid.quality,
+      videoUrl: _firstVid.originalUrl,
+      episodeNumber: episode > 0 ? episode : null,
     );
   }
 
@@ -1219,9 +1218,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     final mediaId = widget.episode.manga.value?.id;
     if (mediaId == null || preference.trim().isEmpty) return;
     _sessionVideoStreamPreferences[mediaId] = preference.trim();
-    unawaited(
-      MiningPreferences.setVideoStreamPreference(mediaId, preference),
-    );
+    unawaited(MiningPreferences.setVideoStreamPreference(mediaId, preference));
   }
 
   Future<void> _snapSubtitleDelay({required bool next}) async {
@@ -1229,7 +1226,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (platform is NativePlayer) {
       try {
         await platform.command(['sub-step', next ? '1' : '-1']);
-        final seconds = double.tryParse(await platform.getProperty('sub-delay'));
+        final seconds = double.tryParse(
+          await platform.getProperty('sub-delay'),
+        );
         if (seconds != null) {
           _subDelayController.value = TextEditingValue(
             text: '${(seconds * 1000).round()}',
@@ -2130,17 +2129,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   tooltip: 'Snap delay to previous subtitle',
                   icon: const Icon(Icons.skip_previous_rounded),
                   color: Colors.white,
-                  onPressed: () => unawaited(
-                    _snapSubtitleDelay(next: false),
-                  ),
+                  onPressed: () => unawaited(_snapSubtitleDelay(next: false)),
                 ),
                 IconButton(
                   tooltip: 'Snap delay to next subtitle',
                   icon: const Icon(Icons.skip_next_rounded),
                   color: Colors.white,
-                  onPressed: () => unawaited(
-                    _snapSubtitleDelay(next: true),
-                  ),
+                  onPressed: () => unawaited(_snapSubtitleDelay(next: true)),
                 ),
               ],
               _seekToWidget(),

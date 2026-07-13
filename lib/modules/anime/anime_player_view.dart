@@ -907,6 +907,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       player: _player,
       fallbackSource: video?.videoTrack?.id ?? _firstVid.url,
       fallbackPosition: _currentPosition.value,
+      subtitleDelay: Duration(milliseconds: _subDelay),
     );
     final activeAudio = _player.state.track.audio;
     final audioSource = activeAudio.uri && activeAudio.id != 'no'

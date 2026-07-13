@@ -35,6 +35,7 @@ class AnimeSentenceAudioService {
     required Player player,
     required String fallbackSource,
     required Duration fallbackPosition,
+    Duration subtitleDelay = Duration.zero,
   }) async {
     var source = fallbackSource;
     Duration? subtitleStart;
@@ -63,6 +64,7 @@ class AnimeSentenceAudioService {
         subtitleStart: subtitleStart,
         subtitleEnd: subtitleEnd,
         currentPosition: currentPosition,
+        subtitleDelay: subtitleDelay,
       ),
     );
   }
@@ -128,8 +130,11 @@ SubtitleAudioTiming subtitleAudioTimingForCue({
   Duration? subtitleStart,
   Duration? subtitleEnd,
   required Duration currentPosition,
+  Duration subtitleDelay = Duration.zero,
   Duration padding = _sentenceAudioPadding,
 }) {
+  if (subtitleStart != null) subtitleStart += subtitleDelay;
+  if (subtitleEnd != null) subtitleEnd += subtitleDelay;
   var start =
       subtitleStart ??
       currentPosition - const Duration(seconds: 1, milliseconds: 500);
@@ -192,10 +197,10 @@ List<String> sentenceAudioFfmpegArguments({
       '0',
     ],
     if (httpHeaders != null) ...['-headers', httpHeaders],
-    if (!isHlsInput) ...['-ss', _seconds(timing.start)],
+    '-ss',
+    _seconds(timing.start),
     '-i',
     source,
-    if (isHlsInput) ...['-ss', _seconds(timing.start)],
     '-t',
     _seconds(timing.duration),
     '-map',

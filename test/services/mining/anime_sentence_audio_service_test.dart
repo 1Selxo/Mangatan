@@ -14,6 +14,18 @@ void main() {
     expect(timing.end, const Duration(seconds: 11, milliseconds: 650));
   });
 
+  test('applies the active subtitle delay to sentence audio timing', () {
+    final timing = subtitleAudioTimingForCue(
+      subtitleStart: const Duration(seconds: 85),
+      subtitleEnd: const Duration(seconds: 87),
+      currentPosition: const Duration(seconds: 244),
+      subtitleDelay: const Duration(seconds: 158),
+    );
+
+    expect(timing.start, const Duration(seconds: 242, milliseconds: 750));
+    expect(timing.end, const Duration(seconds: 245, milliseconds: 250));
+  });
+
   test(
     'uses a bounded current-position fallback when cue timing is absent',
     () {
@@ -60,10 +72,10 @@ void main() {
     expect(
       args,
       containsAllInOrder([
-        '-i',
-        'https://video.example/playlist.m3u8',
         '-ss',
         '0.000',
+        '-i',
+        'https://video.example/playlist.m3u8',
       ]),
     );
     expect(
@@ -119,7 +131,7 @@ void main() {
     expect(fileArgs, isNot(contains('-allowed_extensions')));
     expect(
       proxyArgs.indexOf('-ss'),
-      greaterThan(
+      lessThan(
         proxyArgs.indexOf(
           'http://localhost:53858/m3u8?url=https%3A%2F%2Fvideo.example',
         ),

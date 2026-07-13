@@ -18,11 +18,20 @@ class AnkiCardBuilder {
     List<AnkiMediaFile> dictionaryMedia = const [],
     AnkiMediaFile? wordAudio,
   }) async {
-    final sentenceAudio =
+    final sentenceAudioFuture =
         _usesMarker(profile.fieldMap, AnkiMarker.sentenceAudio)
-        ? await context.sentenceAudioLoader?.call(profile.sentenceAudioFormat)
-        : null;
-    final screenshot = await _loadScreenshot(context);
+        ? Future<AnkiMediaFile?>.sync(
+            () =>
+                context.sentenceAudioLoader?.call(profile.sentenceAudioFormat),
+          )
+        : Future<AnkiMediaFile?>.value();
+    final screenshotFuture = _loadScreenshot(context);
+    final media = await Future.wait<Object?>([
+      sentenceAudioFuture,
+      screenshotFuture,
+    ]);
+    final sentenceAudio = media[0] as AnkiMediaFile?;
+    final screenshot = media[1] as _ScreenshotPayload?;
     final screenshotName = screenshot == null
         ? null
         : _safeMediaName(

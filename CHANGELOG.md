@@ -4,6 +4,7 @@
 
 - Added explicit duplicate-card creation and an Anki browser button for existing matching cards.
 - Reduced Anki media usage by resizing and JPEG-compressing mined screenshots before upload.
+- Sped up streamed anime card mining and applied subtitle delay to sentence-audio clip timing.
 - Fixed unreadable dictionary description text when a light popup is used with a dark operating-system theme.
 - Fixed EPUB dictionary lookup ignoring Korean clicks by accepting Hangul during reader word scanning.
 - Replaced the hand-written Korean lookup analyzer with Kiwi contextual morphology, retaining the legacy rules only as a runtime fallback.

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -274,6 +275,62 @@ void main() {
       ),
     );
     expect(loads, 1);
+  });
+
+  test('captures anime audio and screenshot concurrently', () async {
+    final audioStarted = Completer<void>();
+    final imageStarted = Completer<void>();
+    final release = Completer<void>();
+    final result = HoshiLookupResult(
+      matched: '事件',
+      deinflected: '事件',
+      trace: const [],
+      preprocessorSteps: 0,
+      term: const HoshiTermResult(
+        expression: '事件',
+        reading: 'じけん',
+        rules: 'n',
+        score: 1,
+        glossaries: [],
+        frequencies: [],
+        pitches: [],
+      ),
+    );
+    final context = MiningContext(
+      sentence: '事件が起きた。',
+      imageBytesLoader: () async {
+        imageStarted.complete();
+        await release.future;
+        return Uint8List.fromList([0x89, 0x50, 0x4e, 0x47]);
+      },
+      sentenceAudioLoader: (format) async {
+        audioStarted.complete();
+        await release.future;
+        return AnkiMediaFile(
+          filename: 'sentence.${format.name}',
+          bytes: Uint8List.fromList([1, 2, 3]),
+        );
+      },
+    );
+
+    final build = const AnkiCardBuilder().build(
+      result: result,
+      context: context,
+      profile: const AnkiMiningProfile(
+        fieldMap: {
+          'Audio': AnkiMarker.sentenceAudio,
+          'Picture': AnkiMarker.screenshot,
+        },
+      ),
+    );
+    await Future.wait([
+      audioStarted.future,
+      imageStarted.future,
+    ]).timeout(const Duration(seconds: 1));
+    release.complete();
+
+    final draft = await build;
+    expect(draft.mediaFiles.single.filename, 'sentence.mp3');
   });
 
   test(

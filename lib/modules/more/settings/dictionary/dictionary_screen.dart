@@ -34,7 +34,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
   String _language = 'ja';
   String _dictionaryLanguage = 'ja';
-  double _opacity = 0.0;
+  double _backgroundOpacity = MiningPreferences.defaultOcrBackgroundOpacity;
+  double _textOpacity = MiningPreferences.defaultOcrTextOpacity;
   double _boxScale = 1;
   double _boxScaleY = 1;
   bool _outlineVisible = true;
@@ -67,7 +68,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       DictionaryStorage.instance.installed(),
       MiningPreferences.getOcrEngine(),
       MiningPreferences.getOcrLanguage(),
-      MiningPreferences.getOcrOverlayOpacity(),
+      MiningPreferences.getOcrBackgroundOpacity(),
+      MiningPreferences.getOcrTextOpacity(),
       MiningPreferences.getOcrBoxScaleX(),
       MiningPreferences.getOcrBoxScaleY(),
       MiningPreferences.getOcrOutlineVisible(),
@@ -86,28 +88,29 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     ]);
     if (!mounted) return;
     setState(() {
-      _profiles = values[17] as List<DictionaryProfile>;
-      _activeProfile = values[18] as DictionaryProfile;
+      _profiles = values[18] as List<DictionaryProfile>;
+      _activeProfile = values[19] as DictionaryProfile;
       _dictionaries = _orderDictionaries(
         values[0] as List<InstalledDictionary>,
         _activeProfile.dictionaryOrder,
       );
       _engine = values[1] as OcrEnginePreference;
       _language = values[2] as String;
-      _opacity = values[3] as double;
-      _boxScale = values[4] as double;
-      _boxScaleY = values[5] as double;
-      _outlineVisible = values[6] as bool;
-      _lookupOnHover = values[7] as bool;
-      _overlayEnabled = values[8] as bool;
-      _popupPreferences = values[9] as DictionaryPopupPreferences;
-      _ankiProfile = values[10] as AnkiMiningProfile;
-      _ankiAudioPreferences = values[11] as AnkiAudioPreferences;
-      _ankiEndpoint = values[12] as Uri;
-      _screenAiAvailable = values[13] as bool;
-      _lookupTrigger = values[14] as DictionaryLookupTrigger;
-      _additionalLeftClick = values[15] as bool;
-      _dictionaryLanguage = values[16] as String;
+      _backgroundOpacity = values[3] as double;
+      _textOpacity = values[4] as double;
+      _boxScale = values[5] as double;
+      _boxScaleY = values[6] as double;
+      _outlineVisible = values[7] as bool;
+      _lookupOnHover = values[8] as bool;
+      _overlayEnabled = values[9] as bool;
+      _popupPreferences = values[10] as DictionaryPopupPreferences;
+      _ankiProfile = values[11] as AnkiMiningProfile;
+      _ankiAudioPreferences = values[12] as AnkiAudioPreferences;
+      _ankiEndpoint = values[13] as Uri;
+      _screenAiAvailable = values[14] as bool;
+      _lookupTrigger = values[15] as DictionaryLookupTrigger;
+      _additionalLeftClick = values[16] as bool;
+      _dictionaryLanguage = values[17] as String;
       _loading = false;
     });
     unawaited(_refreshAnki(silent: true));
@@ -1015,15 +1018,27 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 const SizedBox(height: 8),
                 _SliderSetting(
-                  title: 'Text overlay opacity',
-                  value: _opacity,
+                  title: 'Hovered OCR background opacity',
+                  value: _backgroundOpacity,
                   min: 0,
                   max: 1,
                   divisions: 20,
-                  label: '${(_opacity * 100).round()}%',
+                  label: '${(_backgroundOpacity * 100).round()}%',
                   onChanged: (value) {
-                    setState(() => _opacity = value);
-                    MiningPreferences.setOcrOverlayOpacity(value);
+                    setState(() => _backgroundOpacity = value);
+                    unawaited(ReaderOcrState.setBackgroundOpacity(value));
+                  },
+                ),
+                _SliderSetting(
+                  title: 'Hovered OCR text opacity',
+                  value: _textOpacity,
+                  min: 0,
+                  max: 1,
+                  divisions: 20,
+                  label: '${(_textOpacity * 100).round()}%',
+                  onChanged: (value) {
+                    setState(() => _textOpacity = value);
+                    unawaited(ReaderOcrState.setTextOpacity(value));
                   },
                 ),
                 _SliderSetting(

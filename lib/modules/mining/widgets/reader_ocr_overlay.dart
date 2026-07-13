@@ -21,6 +21,12 @@ class ReaderOcrState {
   ReaderOcrState._();
 
   static final enabled = ValueNotifier<bool>(true);
+  static final backgroundOpacity = ValueNotifier<double>(
+    MiningPreferences.defaultOcrBackgroundOpacity,
+  );
+  static final textOpacity = ValueNotifier<double>(
+    MiningPreferences.defaultOcrTextOpacity,
+  );
   static final outlineVisible = ValueNotifier<bool>(false);
   static final lookupOnHover = ValueNotifier<bool>(false);
   static bool _initialized = false;
@@ -52,13 +58,17 @@ class ReaderOcrState {
     try {
       final values = await Future.wait<dynamic>([
         MiningPreferences.getOcrOverlayEnabled(),
+        MiningPreferences.getOcrBackgroundOpacity(),
+        MiningPreferences.getOcrTextOpacity(),
         MiningPreferences.getOcrOutlineVisible(),
         MiningPreferences.getOcrLookupOnHover(),
         ReaderLookupTriggerState.initialize(),
       ]);
       enabled.value = values[0] as bool;
-      outlineVisible.value = values[1] as bool;
-      lookupOnHover.value = values[2] as bool;
+      backgroundOpacity.value = values[1] as double;
+      textOpacity.value = values[2] as double;
+      outlineVisible.value = values[3] as bool;
+      lookupOnHover.value = values[4] as bool;
       _initialized = true;
     } finally {
       _initializing = null;
@@ -83,6 +93,20 @@ class ReaderOcrState {
   }
 
   static Future<void> toggle() => setEnabled(!enabled.value);
+
+  static Future<void> setBackgroundOpacity(double value) async {
+    await initialize();
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    backgroundOpacity.value = clamped;
+    await MiningPreferences.setOcrBackgroundOpacity(clamped);
+  }
+
+  static Future<void> setTextOpacity(double value) async {
+    await initialize();
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    textOpacity.value = clamped;
+    await MiningPreferences.setOcrTextOpacity(clamped);
+  }
 
   static Future<void> setOutlineVisible(bool value) async {
     await initialize();
@@ -440,7 +464,9 @@ class ReaderOcrProgressHud extends StatelessWidget {
 class ReaderOcrController extends ChangeNotifier {
   ReaderOcrController(this.data, {required this.imageKey}) {
     ReaderOcrState.enabled.addListener(_enabledChanged);
-    ReaderOcrState.outlineVisible.addListener(_outlineVisibleChanged);
+    ReaderOcrState.backgroundOpacity.addListener(_appearanceChanged);
+    ReaderOcrState.textOpacity.addListener(_appearanceChanged);
+    ReaderOcrState.outlineVisible.addListener(_appearanceChanged);
     ReaderOcrState._controllers.add(this);
     unawaited(ReaderOcrState.initialize());
   }
@@ -523,6 +549,8 @@ class ReaderOcrController extends ChangeNotifier {
       return;
     }
     final paintedBlocks = <_PaintedOcrBlock>[];
+    final backgroundOpacity = ReaderOcrState.backgroundOpacity.value;
+    final textOpacity = ReaderOcrState.textOpacity.value;
     final outlineVisible = ReaderOcrState.outlineVisible.value;
     for (final block in page.blocks) {
       final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
@@ -556,7 +584,8 @@ class ReaderOcrController extends ChangeNotifier {
           text: _orderedBlock(block),
           vertical: block.vertical,
           active: active,
-          opacity: page.opacity,
+          backgroundOpacity: backgroundOpacity,
+          textOpacity: textOpacity,
           highlight: active
               ? _lineHighlightFor(
                   lineStart: 0,
@@ -581,7 +610,8 @@ class ReaderOcrController extends ChangeNotifier {
           text: lineBox.text,
           vertical: lineBox.vertical,
           active: active,
-          opacity: page.opacity,
+          backgroundOpacity: backgroundOpacity,
+          textOpacity: textOpacity,
           rotation: lineBox.rotation,
           highlight: active
               ? _lineHighlightFor(
@@ -894,7 +924,7 @@ class ReaderOcrController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  void _outlineVisibleChanged() {
+  void _appearanceChanged() {
     if (!_disposed) notifyListeners();
   }
 
@@ -912,7 +942,9 @@ class ReaderOcrController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     ReaderOcrState.enabled.removeListener(_enabledChanged);
-    ReaderOcrState.outlineVisible.removeListener(_outlineVisibleChanged);
+    ReaderOcrState.backgroundOpacity.removeListener(_appearanceChanged);
+    ReaderOcrState.textOpacity.removeListener(_appearanceChanged);
+    ReaderOcrState.outlineVisible.removeListener(_appearanceChanged);
     ReaderOcrState._controllers.remove(this);
     super.dispose();
   }
@@ -923,13 +955,11 @@ class ReaderOcrController extends ChangeNotifier {
     required String language,
   }) async {
     final values = await Future.wait<dynamic>([
-      MiningPreferences.getOcrOverlayOpacity(),
       MiningPreferences.getOcrBoxScaleX(),
       MiningPreferences.getOcrBoxScaleY(),
     ]);
-    final opacity = values[0] as double;
-    final boxScaleX = values[1] as double;
-    final boxScaleY = values[2] as double;
+    final boxScaleX = values[0] as double;
+    final boxScaleY = values[1] as double;
 
     if (engine != OcrEnginePreference.googleLens &&
         engine != OcrEnginePreference.screenAi) {
@@ -943,7 +973,6 @@ class ReaderOcrController extends ChangeNotifier {
         if (blocks.isNotEmpty || engine == OcrEnginePreference.mokuroOnly) {
           return _ReaderOcrPage(
             blocks: blocks,
-            opacity: opacity,
             boxScaleX: boxScaleX,
             boxScaleY: boxScaleY,
           );
@@ -952,7 +981,6 @@ class ReaderOcrController extends ChangeNotifier {
       if (engine == OcrEnginePreference.mokuroOnly) {
         return _ReaderOcrPage(
           blocks: const [],
-          opacity: opacity,
           boxScaleX: boxScaleX,
           boxScaleY: boxScaleY,
         );
@@ -978,7 +1006,6 @@ class ReaderOcrController extends ChangeNotifier {
               engine == OcrEnginePreference.screenAi) {
             return _ReaderOcrPage(
               blocks: mergeOcrBlocks(result.blocks, language: language),
-              opacity: opacity,
               boxScaleX: boxScaleX,
               boxScaleY: boxScaleY,
             );
@@ -996,7 +1023,6 @@ class ReaderOcrController extends ChangeNotifier {
       final result = await client.recognize(bytes, language: language);
       return _ReaderOcrPage(
         blocks: mergeOcrBlocks(result.blocks, language: language),
-        opacity: opacity,
         boxScaleX: boxScaleX,
         boxScaleY: boxScaleY,
       );
@@ -1032,36 +1058,43 @@ class ReaderOcrController extends ChangeNotifier {
     required String text,
     required bool vertical,
     required bool active,
-    required double opacity,
+    required double backgroundOpacity,
+    required double textOpacity,
     Rect? highlight,
     double rotation = 0,
   }) {
     if (text.isEmpty) return;
-    final backgroundAlpha = active ? math.max(0.70, opacity) : opacity;
-    final textAlpha = active ? 1.0 : opacity;
+    final contentOpacity = readerOcrContentOpacities(
+      backgroundOpacity: backgroundOpacity,
+      textOpacity: textOpacity,
+      active: active,
+    );
     canvas.save();
     if (rotation.abs() > 0.01) {
       canvas.translate(rect.center.dx, rect.center.dy);
       canvas.rotate(rotation * math.pi / 180);
       canvas.translate(-rect.center.dx, -rect.center.dy);
     }
-    if (backgroundAlpha > 0.01) {
+    if (contentOpacity.background > 0) {
       canvas.drawRect(
         rect,
-        Paint()..color = Colors.white.withValues(alpha: backgroundAlpha),
+        Paint()
+          ..color = Colors.white.withValues(alpha: contentOpacity.background),
       );
     }
+    // Lookup highlighting stays independent so 0% resembles native selection
+    // drawn directly over the source image.
     if (highlight != null && !highlight.isEmpty) {
       canvas.drawRect(
         highlight.intersect(rect),
         Paint()..color = _highlightColor.withValues(alpha: 0.45),
       );
     }
-    if (textAlpha > 0.01) {
+    if (contentOpacity.text > 0) {
       if (vertical) {
-        _paintVerticalText(canvas, rect, text, textAlpha);
+        _paintVerticalText(canvas, rect, text, contentOpacity.text);
       } else {
-        _paintHorizontalText(canvas, rect, text, textAlpha);
+        _paintHorizontalText(canvas, rect, text, contentOpacity.text);
       }
     }
     canvas.restore();
@@ -1236,13 +1269,11 @@ class ReaderOcrController extends ChangeNotifier {
 class _ReaderOcrPage {
   const _ReaderOcrPage({
     required this.blocks,
-    required this.opacity,
     required this.boxScaleX,
     required this.boxScaleY,
   });
 
   final List<OcrTextBlock> blocks;
-  final double opacity;
   final double boxScaleX;
   final double boxScaleY;
 }
@@ -1395,6 +1426,19 @@ bool readerOcrShouldDismissRepeatedLookup({
   required int hitOffset,
 }) =>
     popupVisible && !triggeredByHover && sameBlock && activeOffset == hitOffset;
+
+@visibleForTesting
+({double background, double text}) readerOcrContentOpacities({
+  required double backgroundOpacity,
+  required double textOpacity,
+  required bool active,
+}) {
+  if (!active) return (background: 0.0, text: 0.0);
+  return (
+    background: backgroundOpacity.clamp(0.0, 1.0).toDouble(),
+    text: textOpacity.clamp(0.0, 1.0).toDouble(),
+  );
+}
 
 class _OcrLineBox {
   const _OcrLineBox({

@@ -119,6 +119,9 @@ class DictionaryPopupPreferences {
 }
 
 class MiningPreferences {
+  static const defaultOcrBackgroundOpacity = 0.70;
+  static const defaultOcrTextOpacity = 1.0;
+
   static const _boxName = 'mining_preferences';
   static const _jimakuApiKey = 'jimaku_api_key';
   static const _autoJimaku = 'auto_jimaku';
@@ -135,7 +138,9 @@ class MiningPreferences {
   static const _ocrOverlayEnabled = 'ocr_overlay_enabled';
   static const _ocrLanguage = 'ocr_language';
   static const _dictionaryLanguage = 'dictionary_language';
-  static const _ocrOverlayOpacity = 'ocr_overlay_opacity';
+  // Keep the existing key so saved overlay opacity becomes background opacity.
+  static const _ocrBackgroundOpacity = 'ocr_overlay_opacity';
+  static const _ocrTextOpacity = 'ocr_text_opacity';
   static const _ocrBoxScale = 'ocr_box_scale';
   static const _ocrOutlineVisible = 'ocr_outline_visible';
   static const _ocrLookupOnHover = 'ocr_lookup_on_hover';
@@ -436,15 +441,37 @@ class MiningPreferences {
     ]);
   }
 
-  static Future<double> getOcrOverlayOpacity() async {
-    return ((await _boxOrNull())?.get(_ocrOverlayOpacity, defaultValue: 0.0)
-                as num? ??
-            0.0)
-        .toDouble();
+  static Future<double> getOcrBackgroundOpacity() async {
+    final value =
+        (await _boxOrNull())?.get(
+              _ocrBackgroundOpacity,
+              defaultValue: defaultOcrBackgroundOpacity,
+            )
+            as num? ??
+        defaultOcrBackgroundOpacity;
+    return value.toDouble().clamp(0.0, 1.0).toDouble();
   }
 
-  static Future<void> setOcrOverlayOpacity(double value) async {
-    await (await _boxOrNull())?.put(_ocrOverlayOpacity, value.clamp(0.0, 1.0));
+  static Future<void> setOcrBackgroundOpacity(double value) async {
+    await (await _boxOrNull())?.put(
+      _ocrBackgroundOpacity,
+      value.clamp(0.0, 1.0),
+    );
+  }
+
+  static Future<double> getOcrTextOpacity() async {
+    final value =
+        (await _boxOrNull())?.get(
+              _ocrTextOpacity,
+              defaultValue: defaultOcrTextOpacity,
+            )
+            as num? ??
+        defaultOcrTextOpacity;
+    return value.toDouble().clamp(0.0, 1.0).toDouble();
+  }
+
+  static Future<void> setOcrTextOpacity(double value) async {
+    await (await _boxOrNull())?.put(_ocrTextOpacity, value.clamp(0.0, 1.0));
   }
 
   static Future<double> getOcrBoxScale() async {

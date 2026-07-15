@@ -57,7 +57,7 @@ void main() {
       activeProfile: english,
       mangaOverrideId: 'deleted-profile',
       sourceOverrideId: 'also-deleted',
-      sourceLanguage: 'JA',
+      sourceLanguage: ' JA ',
     );
 
     expect(resolved.profile.id, japaneseFirst.id);
@@ -131,5 +131,18 @@ void main() {
       ..sourceCodeLanguage = SourceCodeLanguage.dart;
 
     expect(DictionaryProfileResolver.overrideIdForSource(source), '42');
+  });
+
+  test('normalizes source language from source or fallback', () {
+    final source = Source()..lang = ' ZH ';
+
+    expect(DictionaryProfileResolver.sourceLanguageForSource(source), 'zh');
+    expect(
+      DictionaryProfileResolver.sourceLanguageForSource(
+        Source(),
+        fallback: ' KO ',
+      ),
+      'ko',
+    );
   });
 }

@@ -525,7 +525,10 @@ class ReaderOcrController extends ChangeNotifier {
     final source = manga?.sourceId == null
         ? null
         : isar.sources.getSync(manga!.sourceId!);
-    final sourceLanguage = source?.lang ?? manga?.lang ?? '';
+    final sourceLanguage = DictionaryProfileResolver.sourceLanguageForSource(
+      source,
+      fallback: manga?.lang ?? '',
+    );
     final values = await Future.wait<dynamic>([
       MiningPreferences.getOcrEngine(),
       DictionaryProfileResolver.resolve(
@@ -818,7 +821,10 @@ class ReaderOcrController extends ChangeNotifier {
       mediaType: MiningMediaType.manga,
       mangaId: manga?.id,
       sourceId: DictionaryProfileResolver.overrideIdForSource(source),
-      sourceLanguage: source?.lang ?? manga?.lang ?? '',
+      sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+        source,
+        fallback: manga?.lang ?? '',
+      ),
       sourceTitle: manga?.name ?? data.mangaName ?? '',
       chapterTitle: data.chapter?.name ?? '',
       sentence: sentence,

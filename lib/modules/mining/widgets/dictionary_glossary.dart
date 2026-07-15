@@ -206,7 +206,18 @@ Object? _decodeGlossary(String raw) {
   }
 }
 
+Object? _unwrapYomitanContent(Object? value) {
+  if (value is Map && value['value'] is List) {
+    final keys = value.keys.map((key) => key.toString()).toSet();
+    if (keys.length == 1 || keys.contains('Count')) {
+      return value['value'];
+    }
+  }
+  return value;
+}
+
 String _renderGlossaryValue(Object? value, Map<String, String> media) {
+  value = _unwrapYomitanContent(value);
   if (value is List) {
     return value
         .map(
@@ -219,6 +230,7 @@ String _renderGlossaryValue(Object? value, Map<String, String> media) {
 }
 
 String _renderDefinition(Object? value, Map<String, String> media) {
+  value = _unwrapYomitanContent(value);
   if (value is String) return _renderText(value);
   if (value is List) {
     return '<ul class="glossary-list">${value.map((item) => '<li>${_renderDefinition(item, media)}</li>').join()}</ul>';
@@ -236,6 +248,7 @@ String _renderDefinition(Object? value, Map<String, String> media) {
 }
 
 String _renderNode(Object? value, Map<String, String> media) {
+  value = _unwrapYomitanContent(value);
   if (value is String) return _renderText(value);
   if (value is List) {
     final strings = value.every((item) => item is String);

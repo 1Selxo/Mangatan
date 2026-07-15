@@ -1078,6 +1078,11 @@ function renderStructuredContent(parent, node, language = null, dictName = null,
     if (!node || typeof node !== 'object') {
         return;
     }
+
+    if (!Array.isArray(node) && Array.isArray(node.value) && ('Count' in node || Object.keys(node).length === 1)) {
+        renderStructuredContent(parent, node.value, language, dictName, exporting);
+        return;
+    }
     
     if (node.type === 'structured-content') {
         const container = document.createElement('span');

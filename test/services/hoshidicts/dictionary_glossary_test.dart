@@ -32,6 +32,41 @@ void main() {
     expect(yomitanGlossaryMediaPaths(raw), {'legacy.png', 'nested.webp'});
   });
 
+  test('unwraps Yomitan v3 value glossary objects', () {
+    const raw = '''{
+      "value": [
+        {
+          "type": "structured-content",
+          "content": {
+            "tag": "span",
+            "content": [
+              {"tag": "span", "content": "來", "data": {"moedict": "traditional-term"}},
+              {"tag": "span", "content": "来", "data": {"moedict": "simplified-term"}},
+              {
+                "tag": "span",
+                "content": [
+                  {"tag": "span", "content": "例", "data": {"moedict": "definition-entry-example-label"}},
+                  {"tag": "span", "content": "回來", "data": {"moedict": "definition-entry-example-content"}}
+                ],
+                "data": {"moedict": "definition-entry-example-parent", "type": "例"}
+              }
+            ]
+          }
+        }
+      ],
+      "Count": 1
+    }''';
+
+    final html = yomitanGlossaryToHtml(raw);
+
+    expect(html, contains('data-sc-moedict="traditional-term"'));
+    expect(html, contains('data-sc-moedict="simplified-term"'));
+    expect(html, contains('data-sc-moedict="definition-entry-example-label"'));
+    expect(html, contains('data-sc-type="例"'));
+    expect(html, isNot(contains('&quot;value&quot;')));
+    expect(html, isNot(contains('&quot;Count&quot;')));
+  });
+
   test('ports Hoshi structured content attributes and base styles', () {
     const raw = '''{
       "type":"structured-content",

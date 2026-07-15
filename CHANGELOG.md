@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.4-beta+118 — 2026-07-15
+
+- Added Chimahon-compatible cascading dictionary profiles with automatic selection by title, source, local novel, source language, and global fallback.
+- Added dictionary-profile override pickers for individual titles, local novels, and extension sources, including an automatic-selection preview.
+- Made dictionary lookup, OCR, and Anki mining use the profile resolved for the current content, with OCR language following that profile.
+- Added per-profile dictionary collapse behavior and custom expand/collapse settings for individual dictionaries.
+- Preserved dictionary-profile overrides, display settings, and local-novel language metadata through Chimahon-compatible backup and sync.
 - Made novel paragraph spacing adjustable and changed its default to zero instead of forcing a gap between paragraphs.
 - Fixed local EPUB TOC entries repeatedly reparsing the same book, replaced blank cold-load screens with visible progress, and prevented failed initialization from leaving the reader permanently blank.
 - Hid stale internal EPUB character offsets that could appear as chapter dates after upgrading an existing library.

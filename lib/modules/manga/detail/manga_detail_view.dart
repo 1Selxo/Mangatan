@@ -144,7 +144,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
         context: context,
         overrideKey: DictionaryProfileResolver.novelOverrideKey(novelId),
         autoProfile: DictionaryProfileResolver.resolve(
-          sourceLanguage: localNovel.lang ?? '',
+          sourceLanguage: (localNovel.lang ?? '').trim().toLowerCase(),
         ),
         title: 'Dictionary profile for ${localNovel.title}',
       );
@@ -160,7 +160,10 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
       overrideKey: DictionaryProfileResolver.mangaOverrideKey(mangaId),
       autoProfile: DictionaryProfileResolver.resolve(
         sourceId: DictionaryProfileResolver.overrideIdForSource(source),
-        sourceLanguage: source?.lang ?? manga.lang ?? '',
+        sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+          source,
+          fallback: manga.lang ?? '',
+        ),
       ),
       title: 'Dictionary profile for this entry',
     );

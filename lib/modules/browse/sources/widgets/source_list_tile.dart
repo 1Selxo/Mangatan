@@ -142,7 +142,10 @@ class SourceListTile extends StatelessWidget {
                         dictionaryProfileSourceId,
                       ),
                       autoProfile: DictionaryProfileResolver.resolve(
-                        sourceLanguage: source.lang ?? '',
+                        sourceLanguage:
+                            DictionaryProfileResolver.sourceLanguageForSource(
+                              source,
+                            ),
                       ),
                       title: 'Dictionary profile for this source',
                     );

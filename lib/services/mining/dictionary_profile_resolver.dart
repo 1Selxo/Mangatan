@@ -49,6 +49,12 @@ class DictionaryProfileResolver {
     return source.id?.toString();
   }
 
+  static String sourceLanguageForSource(Source? source, {String fallback = ''}) {
+    final language = source?.lang?.trim();
+    if (language?.isNotEmpty == true) return language!.toLowerCase();
+    return fallback.trim().toLowerCase();
+  }
+
   static Future<DictionaryProfile> resolve({
     Object? mangaId,
     Object? sourceId,
@@ -126,8 +132,8 @@ class DictionaryProfileResolver {
       if (match != null) return ResolvedDictionaryProfile(match, candidate.$1);
     }
 
-    if (sourceLanguage.trim().isNotEmpty && sourceLanguage != 'all') {
-      final language = sourceLanguage.toLowerCase();
+    final language = sourceLanguage.trim().toLowerCase();
+    if (language.isNotEmpty && language != 'all') {
       for (final profile in profiles) {
         if (profile.languageCode.toLowerCase() == language) {
           return ResolvedDictionaryProfile(

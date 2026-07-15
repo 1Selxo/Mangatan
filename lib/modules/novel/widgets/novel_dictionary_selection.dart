@@ -65,7 +65,10 @@ class _NovelDictionarySelectionState extends State<NovelDictionarySelection> {
             : DictionaryProfileResolver.overrideIdForSource(source),
         sourceLanguage: isLocalNovel
             ? progress.lang ?? ''
-            : source?.lang ?? manga?.lang ?? '',
+            : DictionaryProfileResolver.sourceLanguageForSource(
+                source,
+                fallback: manga?.lang ?? '',
+              ),
         novelId: progress == null
             ? null
             : const ChimahonNovelProgressAdapter().stableId(

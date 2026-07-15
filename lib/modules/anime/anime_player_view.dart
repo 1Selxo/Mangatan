@@ -927,7 +927,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       mediaType: MiningMediaType.anime,
       mangaId: manga?.id,
       sourceId: DictionaryProfileResolver.overrideIdForSource(source),
-      sourceLanguage: source?.lang ?? manga?.lang ?? '',
+      sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+        source,
+        fallback: manga?.lang ?? '',
+      ),
       sourceTitle: manga?.name ?? '',
       chapterTitle: widget.episode.name ?? '',
       sentence: subtitleText,

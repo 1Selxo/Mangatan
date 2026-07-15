@@ -90,7 +90,11 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
       MiningPreferences.getDictionaryProfileOverride(
         DictionaryProfileResolver.sourceOverrideKey(sourceId),
       ),
-      DictionaryProfileResolver.resolve(sourceLanguage: source.lang ?? ''),
+      DictionaryProfileResolver.resolve(
+        sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+          source,
+        ),
+      ),
     ]);
     if (!mounted) return;
     final profiles = values[0] as List<DictionaryProfile>;
@@ -112,7 +116,9 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
       context: context,
       overrideKey: DictionaryProfileResolver.sourceOverrideKey(sourceId),
       autoProfile: DictionaryProfileResolver.resolve(
-        sourceLanguage: source.lang ?? '',
+        sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+          source,
+        ),
       ),
       title: 'Dictionary profile for this source',
     );

@@ -227,7 +227,10 @@ class _ImageActionsSheet extends StatelessWidget {
         mediaType: MiningMediaType.manga,
         mangaId: manga.id,
         sourceId: DictionaryProfileResolver.overrideIdForSource(source),
-        sourceLanguage: source?.lang ?? manga.lang ?? '',
+        sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+          source,
+          fallback: manga.lang ?? '',
+        ),
         sourceTitle: manga.name ?? '',
         chapterTitle: chapterName,
         pageIndex: data.pageIndex,

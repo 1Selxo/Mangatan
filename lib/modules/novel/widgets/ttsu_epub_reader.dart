@@ -733,7 +733,10 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
           : DictionaryProfileResolver.overrideIdForSource(source),
       sourceLanguage: isLocalNovel
           ? progress?.lang ?? widget.book.language ?? ''
-          : source?.lang ?? manga?.lang ?? '',
+          : DictionaryProfileResolver.sourceLanguageForSource(
+              source,
+              fallback: manga?.lang ?? '',
+            ),
       novelId: isLocalNovel
           ? const ChimahonNovelProgressAdapter().stableId(
               title: progress?.title ?? widget.book.name,

@@ -406,6 +406,7 @@ void main() {
     );
     expect(popup, contains('function installScopedDictionaryStyle'));
     expect(popup, contains('scopeDictionaryStyleRules(style.sheet.cssRules'));
+    expect(popup, contains('Array.isArray(node.value)'));
     expect(popup, isNot(contains('[data-dictionary="\${dictName}"] {')));
     expect(popup, contains('window.resetHoshiNavigation = () =>'));
     expect(popup, contains('window.navigateBack = () =>'));

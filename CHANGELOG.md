@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.6-beta+120 - 2026-07-16
+
 - Removed the Kiwi Korean runtime/model dependency and routed Korean lookup through the existing Yomitan language pipeline, including extra Korean irregular and particle-shortening lookup variants.
 - Fixed manga OCR uploads for WebP and other source formats by normalizing decoded page images to PNG before sending them to Google Lens OCR.
 - Fixed dictionary profile lookup/session caching when switching between languages such as Mandarin and Japanese.

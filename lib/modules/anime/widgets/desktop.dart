@@ -27,6 +27,7 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
   final ValueNotifier<List<(String, int)>> chapterMarks;
   final Future<MiningContext> Function(String text)?
   subtitleMiningContextBuilder;
+  final Future<void> Function()? onVideoOcrShortcut;
   const DesktopControllerWidget({
     super.key,
     required this.videoController,
@@ -39,6 +40,7 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
     required this.desktopFullScreenPlayer,
     required this.chapterMarks,
     this.subtitleMiningContextBuilder,
+    this.onVideoOcrShortcut,
   });
 
   @override
@@ -71,6 +73,7 @@ class _DesktopControllerWidgetState
   final List<StreamSubscription> subscriptions = [];
   DateTime last = DateTime.now();
   Timer? _tapTimer;
+  DateTime? _lastSpaceShortcutAt;
 
   @override
   void setState(VoidCallback fn) {
@@ -183,6 +186,24 @@ class _DesktopControllerWidgetState
 
   final bool modifyVolumeOnScroll = true; // TODO. The variable is never changed
   final bool toggleFullscreenOnDoublePress = true; // TODO. variable not changed
+  static const _spaceDoublePressWindow = Duration(milliseconds: 360);
+
+  void _handleSpaceShortcut() {
+    final now = DateTime.now();
+    final lastSpaceShortcutAt = _lastSpaceShortcutAt;
+    if (lastSpaceShortcutAt != null &&
+        now.difference(lastSpaceShortcutAt) <= _spaceDoublePressWindow) {
+      _lastSpaceShortcutAt = null;
+      final onVideoOcrShortcut = widget.onVideoOcrShortcut;
+      if (onVideoOcrShortcut != null) {
+        unawaited(onVideoOcrShortcut());
+        return;
+      }
+    }
+    _lastSpaceShortcutAt = now;
+    widget.videoController.player.playOrPause();
+  }
+
   @override
   Widget build(BuildContext context) {
     _scheduleSubtitleAnchorUpdate();
@@ -200,8 +221,7 @@ class _DesktopControllerWidgetState
             widget.videoController.player.next(),
         const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious): () =>
             widget.videoController.player.previous(),
-        const SingleActivator(LogicalKeyboardKey.space): () =>
-            widget.videoController.player.playOrPause(),
+        const SingleActivator(LogicalKeyboardKey.space): _handleSpaceShortcut,
         const SingleActivator(LogicalKeyboardKey.keyJ): () {
           final rate =
               widget.videoController.player.state.position -

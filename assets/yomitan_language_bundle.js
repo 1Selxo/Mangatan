@@ -1,4 +1,638 @@
 (() => {
+  var __create = Object.create;
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __commonJS = (cb, mod) => function __require() {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
+
+  // ../../node_modules/hangul-js/hangul.js
+  var require_hangul = __commonJS({
+    "../../node_modules/hangul-js/hangul.js"(exports, module) {
+      (function() {
+        "use strict";
+        var CHO = [
+          "\u3131",
+          "\u3132",
+          "\u3134",
+          "\u3137",
+          "\u3138",
+          "\u3139",
+          "\u3141",
+          "\u3142",
+          "\u3143",
+          "\u3145",
+          "\u3146",
+          "\u3147",
+          "\u3148",
+          "\u3149",
+          "\u314A",
+          "\u314B",
+          "\u314C",
+          "\u314D",
+          "\u314E"
+        ], JUNG = [
+          "\u314F",
+          "\u3150",
+          "\u3151",
+          "\u3152",
+          "\u3153",
+          "\u3154",
+          "\u3155",
+          "\u3156",
+          "\u3157",
+          ["\u3157", "\u314F"],
+          ["\u3157", "\u3150"],
+          ["\u3157", "\u3163"],
+          "\u315B",
+          "\u315C",
+          ["\u315C", "\u3153"],
+          ["\u315C", "\u3154"],
+          ["\u315C", "\u3163"],
+          "\u3160",
+          "\u3161",
+          ["\u3161", "\u3163"],
+          "\u3163"
+        ], JONG = [
+          "",
+          "\u3131",
+          "\u3132",
+          ["\u3131", "\u3145"],
+          "\u3134",
+          ["\u3134", "\u3148"],
+          ["\u3134", "\u314E"],
+          "\u3137",
+          "\u3139",
+          ["\u3139", "\u3131"],
+          ["\u3139", "\u3141"],
+          ["\u3139", "\u3142"],
+          ["\u3139", "\u3145"],
+          ["\u3139", "\u314C"],
+          ["\u3139", "\u314D"],
+          ["\u3139", "\u314E"],
+          "\u3141",
+          "\u3142",
+          ["\u3142", "\u3145"],
+          "\u3145",
+          "\u3146",
+          "\u3147",
+          "\u3148",
+          "\u314A",
+          "\u314B",
+          "\u314C",
+          "\u314D",
+          "\u314E"
+        ], HANGUL_OFFSET = 44032, CONSONANTS = [
+          "\u3131",
+          "\u3132",
+          "\u3133",
+          "\u3134",
+          "\u3135",
+          "\u3136",
+          "\u3137",
+          "\u3138",
+          "\u3139",
+          "\u313A",
+          "\u313B",
+          "\u313C",
+          "\u313D",
+          "\u313E",
+          "\u313F",
+          "\u3140",
+          "\u3141",
+          "\u3142",
+          "\u3143",
+          "\u3144",
+          "\u3145",
+          "\u3146",
+          "\u3147",
+          "\u3148",
+          "\u3149",
+          "\u314A",
+          "\u314B",
+          "\u314C",
+          "\u314D",
+          "\u314E"
+        ], COMPLETE_CHO = [
+          "\u3131",
+          "\u3132",
+          "\u3134",
+          "\u3137",
+          "\u3138",
+          "\u3139",
+          "\u3141",
+          "\u3142",
+          "\u3143",
+          "\u3145",
+          "\u3146",
+          "\u3147",
+          "\u3148",
+          "\u3149",
+          "\u314A",
+          "\u314B",
+          "\u314C",
+          "\u314D",
+          "\u314E"
+        ], COMPLETE_JUNG = [
+          "\u314F",
+          "\u3150",
+          "\u3151",
+          "\u3152",
+          "\u3153",
+          "\u3154",
+          "\u3155",
+          "\u3156",
+          "\u3157",
+          "\u3158",
+          "\u3159",
+          "\u315A",
+          "\u315B",
+          "\u315C",
+          "\u315D",
+          "\u315E",
+          "\u315F",
+          "\u3160",
+          "\u3161",
+          "\u3162",
+          "\u3163"
+        ], COMPLETE_JONG = [
+          "",
+          "\u3131",
+          "\u3132",
+          "\u3133",
+          "\u3134",
+          "\u3135",
+          "\u3136",
+          "\u3137",
+          "\u3139",
+          "\u313A",
+          "\u313B",
+          "\u313C",
+          "\u313D",
+          "\u313E",
+          "\u313F",
+          "\u3140",
+          "\u3141",
+          "\u3142",
+          "\u3144",
+          "\u3145",
+          "\u3146",
+          "\u3147",
+          "\u3148",
+          "\u314A",
+          "\u314B",
+          "\u314C",
+          "\u314D",
+          "\u314E"
+        ], COMPLEX_CONSONANTS = [
+          ["\u3131", "\u3145", "\u3133"],
+          ["\u3134", "\u3148", "\u3135"],
+          ["\u3134", "\u314E", "\u3136"],
+          ["\u3139", "\u3131", "\u313A"],
+          ["\u3139", "\u3141", "\u313B"],
+          ["\u3139", "\u3142", "\u313C"],
+          ["\u3139", "\u3145", "\u313D"],
+          ["\u3139", "\u314C", "\u313E"],
+          ["\u3139", "\u314D", "\u313F"],
+          ["\u3139", "\u314E", "\u3140"],
+          ["\u3142", "\u3145", "\u3144"]
+        ], COMPLEX_VOWELS = [
+          ["\u3157", "\u314F", "\u3158"],
+          ["\u3157", "\u3150", "\u3159"],
+          ["\u3157", "\u3163", "\u315A"],
+          ["\u315C", "\u3153", "\u315D"],
+          ["\u315C", "\u3154", "\u315E"],
+          ["\u315C", "\u3163", "\u315F"],
+          ["\u3161", "\u3163", "\u3162"]
+        ], CONSONANTS_HASH, CHO_HASH, JUNG_HASH, JONG_HASH, COMPLEX_CONSONANTS_HASH, COMPLEX_VOWELS_HASH;
+        function _makeHash(array) {
+          var length = array.length, hash = { 0: 0 };
+          for (var i = 0; i < length; i++) {
+            if (array[i])
+              hash[array[i].charCodeAt(0)] = i;
+          }
+          return hash;
+        }
+        CONSONANTS_HASH = _makeHash(CONSONANTS);
+        CHO_HASH = _makeHash(COMPLETE_CHO);
+        JUNG_HASH = _makeHash(COMPLETE_JUNG);
+        JONG_HASH = _makeHash(COMPLETE_JONG);
+        function _makeComplexHash(array) {
+          var length = array.length, hash = {}, code1, code2;
+          for (var i = 0; i < length; i++) {
+            code1 = array[i][0].charCodeAt(0);
+            code2 = array[i][1].charCodeAt(0);
+            if (typeof hash[code1] === "undefined") {
+              hash[code1] = {};
+            }
+            hash[code1][code2] = array[i][2].charCodeAt(0);
+          }
+          return hash;
+        }
+        COMPLEX_CONSONANTS_HASH = _makeComplexHash(COMPLEX_CONSONANTS);
+        COMPLEX_VOWELS_HASH = _makeComplexHash(COMPLEX_VOWELS);
+        function _isConsonant(c) {
+          return typeof CONSONANTS_HASH[c] !== "undefined";
+        }
+        function _isCho(c) {
+          return typeof CHO_HASH[c] !== "undefined";
+        }
+        function _isJung(c) {
+          return typeof JUNG_HASH[c] !== "undefined";
+        }
+        function _isJong(c) {
+          return typeof JONG_HASH[c] !== "undefined";
+        }
+        function _isHangul(c) {
+          return 44032 <= c && c <= 55203;
+        }
+        function _isJungJoinable(a, b) {
+          return COMPLEX_VOWELS_HASH[a] && COMPLEX_VOWELS_HASH[a][b] ? COMPLEX_VOWELS_HASH[a][b] : false;
+        }
+        function _isJongJoinable(a, b) {
+          return COMPLEX_CONSONANTS_HASH[a] && COMPLEX_CONSONANTS_HASH[a][b] ? COMPLEX_CONSONANTS_HASH[a][b] : false;
+        }
+        var disassemble = function(string, grouped) {
+          if (string === null) {
+            throw new Error("Arguments cannot be null");
+          }
+          if (typeof string === "object") {
+            string = string.join("");
+          }
+          var result = [], length = string.length, cho, jung, jong, code, r;
+          for (var i = 0; i < length; i++) {
+            var temp = [];
+            code = string.charCodeAt(i);
+            if (_isHangul(code)) {
+              code -= HANGUL_OFFSET;
+              jong = code % 28;
+              jung = (code - jong) / 28 % 21;
+              cho = parseInt((code - jong) / 28 / 21);
+              temp.push(CHO[cho]);
+              if (typeof JUNG[jung] === "object") {
+                temp = temp.concat(JUNG[jung]);
+              } else {
+                temp.push(JUNG[jung]);
+              }
+              if (jong > 0) {
+                if (typeof JONG[jong] === "object") {
+                  temp = temp.concat(JONG[jong]);
+                } else {
+                  temp.push(JONG[jong]);
+                }
+              }
+            } else if (_isConsonant(code)) {
+              if (_isCho(code)) {
+                r = CHO[CHO_HASH[code]];
+              } else {
+                r = JONG[JONG_HASH[code]];
+              }
+              if (typeof r === "string") {
+                temp.push(r);
+              } else {
+                temp = temp.concat(r);
+              }
+            } else if (_isJung(code)) {
+              r = JUNG[JUNG_HASH[code]];
+              if (typeof r === "string") {
+                temp.push(r);
+              } else {
+                temp = temp.concat(r);
+              }
+            } else {
+              temp.push(string.charAt(i));
+            }
+            if (grouped) result.push(temp);
+            else result = result.concat(temp);
+          }
+          return result;
+        };
+        var disassembleToString = function(str) {
+          if (typeof str !== "string") {
+            return "";
+          }
+          str = disassemble(str);
+          return str.join("");
+        };
+        var assemble = function(array) {
+          if (typeof array === "string") {
+            array = disassemble(array);
+          }
+          var result = [], length = array.length, code, stage = 0, complete_index = -1, previous_code, jong_joined = false;
+          function _makeHangul(index) {
+            var code2, cho, jung1, jung2, jong1 = 0, jong2, hangul2 = "";
+            jong_joined = false;
+            if (complete_index + 1 > index) {
+              return;
+            }
+            for (var step = 1; ; step++) {
+              if (step === 1) {
+                cho = array[complete_index + step].charCodeAt(0);
+                if (_isJung(cho)) {
+                  if (complete_index + step + 1 <= index && _isJung(jung1 = array[complete_index + step + 1].charCodeAt(0))) {
+                    result.push(String.fromCharCode(_isJungJoinable(cho, jung1)));
+                    complete_index = index;
+                    return;
+                  } else {
+                    result.push(array[complete_index + step]);
+                    complete_index = index;
+                    return;
+                  }
+                } else if (!_isCho(cho)) {
+                  result.push(array[complete_index + step]);
+                  complete_index = index;
+                  return;
+                }
+                hangul2 = array[complete_index + step];
+              } else if (step === 2) {
+                jung1 = array[complete_index + step].charCodeAt(0);
+                if (_isCho(jung1)) {
+                  cho = _isJongJoinable(cho, jung1);
+                  hangul2 = String.fromCharCode(cho);
+                  result.push(hangul2);
+                  complete_index = index;
+                  return;
+                } else {
+                  hangul2 = String.fromCharCode((CHO_HASH[cho] * 21 + JUNG_HASH[jung1]) * 28 + HANGUL_OFFSET);
+                }
+              } else if (step === 3) {
+                jung2 = array[complete_index + step].charCodeAt(0);
+                if (_isJungJoinable(jung1, jung2)) {
+                  jung1 = _isJungJoinable(jung1, jung2);
+                } else {
+                  jong1 = jung2;
+                }
+                hangul2 = String.fromCharCode((CHO_HASH[cho] * 21 + JUNG_HASH[jung1]) * 28 + JONG_HASH[jong1] + HANGUL_OFFSET);
+              } else if (step === 4) {
+                jong2 = array[complete_index + step].charCodeAt(0);
+                if (_isJongJoinable(jong1, jong2)) {
+                  jong1 = _isJongJoinable(jong1, jong2);
+                } else {
+                  jong1 = jong2;
+                }
+                hangul2 = String.fromCharCode((CHO_HASH[cho] * 21 + JUNG_HASH[jung1]) * 28 + JONG_HASH[jong1] + HANGUL_OFFSET);
+              } else if (step === 5) {
+                jong2 = array[complete_index + step].charCodeAt(0);
+                jong1 = _isJongJoinable(jong1, jong2);
+                hangul2 = String.fromCharCode((CHO_HASH[cho] * 21 + JUNG_HASH[jung1]) * 28 + JONG_HASH[jong1] + HANGUL_OFFSET);
+              }
+              if (complete_index + step >= index) {
+                result.push(hangul2);
+                complete_index = index;
+                return;
+              }
+            }
+          }
+          for (var i = 0; i < length; i++) {
+            code = array[i].charCodeAt(0);
+            if (!_isCho(code) && !_isJung(code) && !_isJong(code)) {
+              _makeHangul(i - 1);
+              _makeHangul(i);
+              stage = 0;
+              continue;
+            }
+            if (stage === 0) {
+              if (_isCho(code)) {
+                stage = 1;
+              } else if (_isJung(code)) {
+                stage = 4;
+              }
+            } else if (stage == 1) {
+              if (_isJung(code)) {
+                stage = 2;
+              } else {
+                if (_isJongJoinable(previous_code, code)) {
+                  stage = 5;
+                } else {
+                  _makeHangul(i - 1);
+                }
+              }
+            } else if (stage == 2) {
+              if (_isJong(code)) {
+                stage = 3;
+              } else if (_isJung(code)) {
+                if (_isJungJoinable(previous_code, code)) {
+                } else {
+                  _makeHangul(i - 1);
+                  stage = 4;
+                }
+              } else {
+                _makeHangul(i - 1);
+                stage = 1;
+              }
+            } else if (stage == 3) {
+              if (_isJong(code)) {
+                if (!jong_joined && _isJongJoinable(previous_code, code)) {
+                  jong_joined = true;
+                } else {
+                  _makeHangul(i - 1);
+                  stage = 1;
+                }
+              } else if (_isCho(code)) {
+                _makeHangul(i - 1);
+                stage = 1;
+              } else if (_isJung(code)) {
+                _makeHangul(i - 2);
+                stage = 2;
+              }
+            } else if (stage == 4) {
+              if (_isJung(code)) {
+                if (_isJungJoinable(previous_code, code)) {
+                  _makeHangul(i);
+                  stage = 0;
+                } else {
+                  _makeHangul(i - 1);
+                }
+              } else {
+                _makeHangul(i - 1);
+                stage = 1;
+              }
+            } else if (stage == 5) {
+              if (_isJung(code)) {
+                _makeHangul(i - 2);
+                stage = 2;
+              } else {
+                _makeHangul(i - 1);
+                stage = 1;
+              }
+            }
+            previous_code = code;
+          }
+          _makeHangul(i - 1);
+          return result.join("");
+        };
+        var search = function(a, b) {
+          var ad = disassemble(a).join(""), bd = disassemble(b).join("");
+          return ad.indexOf(bd);
+        };
+        var rangeSearch = function(haystack, needle) {
+          var hex = disassemble(haystack).join(""), nex = disassemble(needle).join(""), grouped = disassemble(haystack, true), re = new RegExp(nex, "gi"), indices = [], result;
+          if (!needle.length) return [];
+          while (result = re.exec(hex)) {
+            indices.push(result.index);
+          }
+          function findStart(index) {
+            for (var i = 0, length = 0; i < grouped.length; ++i) {
+              length += grouped[i].length;
+              if (index < length) return i;
+            }
+          }
+          function findEnd(index) {
+            for (var i = 0, length = 0; i < grouped.length; ++i) {
+              length += grouped[i].length;
+              if (index + nex.length <= length) return i;
+            }
+          }
+          return indices.map(function(i) {
+            return [findStart(i), findEnd(i)];
+          });
+        };
+        function Searcher(string) {
+          this.string = string;
+          this.disassembled = disassemble(string).join("");
+        }
+        Searcher.prototype.search = function(string) {
+          return disassemble(string).join("").indexOf(this.disassembled);
+        };
+        var endsWithConsonant = function(string) {
+          if (typeof string === "object") {
+            string = string.join("");
+          }
+          var code = string.charCodeAt(string.length - 1);
+          if (_isHangul(code)) {
+            code -= HANGUL_OFFSET;
+            var jong = code % 28;
+            if (jong > 0) {
+              return true;
+            }
+          } else if (_isConsonant(code)) {
+            return true;
+          }
+          return false;
+        };
+        var endsWith = function(string, target) {
+          return disassemble(string).pop() === target;
+        };
+        var hangul = {
+          disassemble,
+          d: disassemble,
+          // alias for disassemble
+          disassembleToString,
+          ds: disassembleToString,
+          // alias for disassembleToString
+          assemble,
+          a: assemble,
+          // alias for assemble
+          search,
+          rangeSearch,
+          Searcher,
+          endsWithConsonant,
+          endsWith,
+          isHangul: function(c) {
+            if (typeof c === "string")
+              c = c.charCodeAt(0);
+            return _isHangul(c);
+          },
+          isComplete: function(c) {
+            if (typeof c === "string")
+              c = c.charCodeAt(0);
+            return _isHangul(c);
+          },
+          isConsonant: function(c) {
+            if (typeof c === "string")
+              c = c.charCodeAt(0);
+            return _isConsonant(c);
+          },
+          isVowel: function(c) {
+            if (typeof c === "string")
+              c = c.charCodeAt(0);
+            return _isJung(c);
+          },
+          isCho: function(c) {
+            if (typeof c === "string")
+              c = c.charCodeAt(0);
+            return _isCho(c);
+          },
+          isJong: function(c) {
+            if (typeof c === "string")
+              c = c.charCodeAt(0);
+            return _isJong(c);
+          },
+          isHangulAll: function(str) {
+            if (typeof str !== "string") return false;
+            for (var i = 0; i < str.length; i++) {
+              if (!_isHangul(str.charCodeAt(i))) return false;
+            }
+            return true;
+          },
+          isCompleteAll: function(str) {
+            if (typeof str !== "string") return false;
+            for (var i = 0; i < str.length; i++) {
+              if (!_isHangul(str.charCodeAt(i))) return false;
+            }
+            return true;
+          },
+          isConsonantAll: function(str) {
+            if (typeof str !== "string") return false;
+            for (var i = 0; i < str.length; i++) {
+              if (!_isConsonant(str.charCodeAt(i))) return false;
+            }
+            return true;
+          },
+          isVowelAll: function(str) {
+            if (typeof str !== "string") return false;
+            for (var i = 0; i < str.length; i++) {
+              if (!_isJung(str.charCodeAt(i))) return false;
+            }
+            return true;
+          },
+          isChoAll: function(str) {
+            if (typeof str !== "string") return false;
+            for (var i = 0; i < str.length; i++) {
+              if (!_isCho(str.charCodeAt(i))) return false;
+            }
+            return true;
+          },
+          isJongAll: function(str) {
+            if (typeof str !== "string") return false;
+            for (var i = 0; i < str.length; i++) {
+              if (!_isJong(str.charCodeAt(i))) return false;
+            }
+            return true;
+          }
+        };
+        if (typeof define == "function" && define.amd) {
+          define(function() {
+            return hangul;
+          });
+        } else if (typeof module !== "undefined") {
+          module.exports = hangul;
+        } else {
+          window.Hangul = hangul;
+        }
+      })();
+    }
+  });
+
   // third_party/yomitan/ext/js/language/aii/assyrian-neo-aramaic-text-preprocessors.js
   var optionalDiacritics = ["\u0303", "\u0304", "\u0307", "\u0308", "\u0323", "\u032E", "\u0330", "\u0331", "\u0730", "\u0731", "\u0732", "\u0733", "\u0734", "\u0735", "\u0736", "\u0737", "\u0738", "\u0739", "\u073A", "\u073B", "\u073C", "\u073D", "\u073E", "\u073F", "\u0740", "\u0741", "\u0742", "\u0743", "\u0744", "\u0745", "\u0746", "\u0747", "\u0748", "\u0749", "\u074A"];
   var diacriticsRegex = new RegExp(`[${optionalDiacritics.join("")}]`, "g");
@@ -230,6 +864,21 @@
   function removeApostrophedWordsImpl(word) {
     return word.replace(/(l|dell|all|dall|nell|sull|coll|un|quest|quell|c|n)['’]/g, "");
   }
+
+  // third_party/yomitan/ext/lib/hangul-js.js
+  var Hangul = __toESM(require_hangul());
+
+  // third_party/yomitan/ext/js/language/ko/korean-text-processors.js
+  var disassembleHangul = {
+    name: "Disassemble Hangul",
+    description: "Disassemble Hangul characters into jamo.",
+    process: (str) => [Hangul.disassemble(str, false).join("")]
+  };
+  var reassembleHangul = {
+    name: "Reassemble Hangul",
+    description: "Reassemble Hangul characters from jamo.",
+    process: (str) => [Hangul.assemble(str)]
+  };
 
   // third_party/yomitan/ext/js/language/la/latin-text-preprocessors.js
   var processDiphtongs = {
@@ -990,6 +1639,7 @@ Trace: ${JSON.stringify(trace)}`));
   add("id", { ...capitalizationPreprocessors, removeAlphabeticDiacritics });
   add("it", { ...capitalizationPreprocessors, removeAlphabeticDiacritics, removeApostrophedWords });
   add("ka");
+  add("ko", { disassembleHangul }, null, { reassembleHangul });
   add("la", { ...capitalizationPreprocessors, removeAlphabeticDiacritics, processDiphtongs });
   add("ro", { ...capitalizationPreprocessors, removeAlphabeticDiacritics });
   add("ru", { ...capitalizationPreprocessors, yoToE, removeRussianDiacritics });
@@ -1060,13 +1710,95 @@ Trace: ${JSON.stringify(trace)}`));
     }
     return details;
   }
+  function addCandidate(results, rawSource, lemma, trace, priority) {
+    if (!lemma || lemma === rawSource || lemma === "\uB2E4") return;
+    const existing = results.get(lemma);
+    if (!existing || priority < existing.priority) {
+      results.set(lemma, { surface: rawSource, lemma, trace, priority });
+    }
+  }
+  function withoutFinalConsonant(text, expectedJongseong) {
+    if (text.length === 0) return null;
+    const codePoint = text.codePointAt(text.length - 1);
+    const offset = codePoint - 44032;
+    if (offset < 0 || offset > 11171) return null;
+    const jongseong = offset % 28;
+    if (jongseong !== expectedJongseong) return null;
+    return `${text.slice(0, -1)}${String.fromCodePoint(codePoint - jongseong)}`;
+  }
+  function withFinalConsonant(text, jongseong) {
+    if (text.length === 0) return null;
+    const codePoint = text.codePointAt(text.length - 1);
+    const offset = codePoint - 44032;
+    if (offset < 0 || offset > 11171 || offset % 28 !== 0) return null;
+    return `${text.slice(0, -1)}${String.fromCodePoint(codePoint + jongseong)}`;
+  }
+  function addKoreanSupplementalCandidates(results, rawSource, priorityBase) {
+    const trace = [{ name: "Supplemental Korean deinflection", description: "Mangatan Korean compatibility rule." }];
+    const add2 = (lemma, priorityOffset = 0) => addCandidate(results, rawSource, lemma, trace, priorityBase + priorityOffset);
+    if (rawSource === "\uB204\uAC00") add2("\uB204\uAD6C");
+    const topicBase = withoutFinalConsonant(rawSource, 4);
+    if (topicBase) add2(topicBase, 1);
+    const objectBase = withoutFinalConsonant(rawSource, 8);
+    if (objectBase) add2(objectBase, 2);
+    for (const suffix of ["\uB370", "\uAC00", "\uC9C0", "\uB4E4", "\uC694", "\uC740", "\uB294", "\uB9CC", "\uB3C4", "\uAE4C"]) {
+      if (!rawSource.endsWith(suffix)) continue;
+      const prefix = rawSource.slice(0, -suffix.length);
+      const topicPrefix = withoutFinalConsonant(prefix, 4);
+      if (topicPrefix) add2(topicPrefix, 1);
+      const objectPrefix = withoutFinalConsonant(prefix, 8);
+      if (objectPrefix) add2(objectPrefix, 2);
+    }
+    let match = rawSource.match(/^(.+)걸로$/u);
+    if (match) add2(`${match[1]}\uAC70`, 3);
+    match = rawSource.match(/^(.+)러네$/u);
+    if (match) {
+      add2(`${match[1]}\uB7EC\uB2E4`, 4);
+      add2(`${match[1]}\uB807\uB2E4`, 5);
+    }
+    match = rawSource.match(/^(.+르)러(?:서|도|니|면|야|요)?$/u);
+    if (match) add2(`${match[1]}\uB2E4`, 6);
+    match = rawSource.match(/^(.+르)렀(?:다|어|어요|으니|으면)?$/u);
+    if (match) add2(`${match[1]}\uB2E4`, 7);
+    for (const suffix of ["\uC624\uB2C8", "\uC18C\uB2C8", "\uC635", "\uC624", "\uC18C"]) {
+      if (!rawSource.endsWith(suffix)) continue;
+      const stem = withFinalConsonant(rawSource.slice(0, -suffix.length), 8);
+      if (stem) add2(`${stem}\uB2E4`, 8);
+    }
+    match = rawSource.match(/^(.+)예(?:서|도|요)?$/u);
+    if (match) add2(`${match[1]}\uC607\uB2E4`, 9);
+    match = rawSource.match(/^(.+)얬(?:다|어|어요)?$/u);
+    if (match) add2(`${match[1]}\uC597\uB2E4`, 10);
+    const determinerLike = /* @__PURE__ */ new Map([
+      ["\uC774\uB798", ["\uC774\uB807\uB2E4", "\uC774\uB7EC\uB2E4"]],
+      ["\uADF8\uB798", ["\uADF8\uB807\uB2E4", "\uADF8\uB7EC\uB2E4"]],
+      ["\uC800\uB798", ["\uC800\uB807\uB2E4", "\uC800\uB7EC\uB2E4"]],
+      ["\uC544\uBB34\uB798", ["\uC544\uBB34\uB807\uB2E4"]],
+      ["\uC5B4\uB54C", ["\uC5B4\uB5BB\uB2E4"]],
+      ["\uC5B4\uB560", ["\uC5B4\uB5BB\uB2E4"]],
+      ["\uC5B4\uCA0C", ["\uC5B4\uCA4C\uB2E4"]],
+      ["\uC800\uCA0C", ["\uC800\uCA4C\uB2E4"]],
+      ["\uADF8\uB7AC", ["\uADF8\uB807\uB2E4", "\uADF8\uB7EC\uB2E4"]],
+      ["\uC774\uB7AC", ["\uC774\uB807\uB2E4", "\uC774\uB7EC\uB2E4"]],
+      ["\uC800\uB7AC", ["\uC800\uB807\uB2E4", "\uC800\uB7EC\uB2E4"]]
+    ]);
+    for (const [stem, lemmas] of determinerLike) {
+      if (!rawSource.startsWith(stem)) continue;
+      for (const lemma of lemmas) add2(lemma, 11);
+    }
+    if (/^설(?:운|워(?:서|도|요)?|웠(?:다|어|어요)?)$/u.test(rawSource)) add2("\uC127\uB2E4", 12);
+    if (/^퍼(?:서|도|요)?$/u.test(rawSource) || /^펐(?:다|어|어요)?$/u.test(rawSource)) add2("\uD478\uB2E4", 13);
+  }
   function candidates(language, text, scanLength, maxCandidates) {
     const descriptor = descriptors.get(language);
-    if (!descriptor || language === "ja" || language === "ko") return [];
+    if (!descriptor || language === "ja") return [];
     const transformer = getTransformer(descriptor);
     const results = /* @__PURE__ */ new Map();
     let sourcePriority = 0;
     for (const rawSource of rawSources(text, scanLength)) {
+      if (language === "ko") {
+        addKoreanSupplementalCandidates(results, rawSource, sourcePriority * 100 + 1);
+      }
       const preprocessed = getVariants(rawSource, descriptor.textPreprocessors);
       for (const [source, preprocessorChains] of preprocessed) {
         const transformedValues = transformer ? transformer.transform(source) : [{ text: source, trace: [] }];
@@ -1079,10 +1811,7 @@ Trace: ${JSON.stringify(trace)}`));
                 if (lemma === rawSource) continue;
                 const trace = traceDetails(descriptor, processorIds, transformed.trace);
                 const priority = sourcePriority * 100 + trace.length * 5 + Math.max(0, source.length - lemma.length);
-                const existing = results.get(lemma);
-                if (!existing || priority < existing.priority) {
-                  results.set(lemma, { surface: rawSource, lemma, trace, priority });
-                }
+                addCandidate(results, rawSource, lemma, trace, priority);
               }
             }
           }

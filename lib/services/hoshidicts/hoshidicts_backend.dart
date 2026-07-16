@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
-import 'package:mangayomi/services/hoshidicts/korean_language_parser.dart';
 import 'package:mangayomi/services/hoshidicts/yomitan_language_parser.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -287,12 +286,6 @@ class HoshidictsLookupBackend {
             request.maxResults,
             request.scanLength,
           ),
-          'ko' => await lookupKoreanDictionary(
-            text: request.text,
-            maxResults: request.maxResults,
-            scanLength: request.scanLength,
-            lookup: nativeLookup,
-          ),
           _ => await lookupYomitanDictionary(
             language: request.language,
             text: request.text,
@@ -376,6 +369,7 @@ class HoshidictsLookupBackend {
 
   String _profileKey(DictionaryProfile profile) => jsonEncode({
     'id': profile.id,
+    'languageCode': profile.languageCode.toLowerCase(),
     'dictionaryOrder': profile.dictionaryOrder,
     'enabledDictionaries': profile.enabledDictionaries.toList()..sort(),
   });

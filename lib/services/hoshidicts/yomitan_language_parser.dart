@@ -27,6 +27,7 @@ class YomitanLanguageParser {
     'ga': 'ga',
     'grc': 'grc',
     'ka': 'ka',
+    'ko': 'ko',
     'la': 'la',
     'sga': 'sga',
     'sq': 'sq',
@@ -41,7 +42,6 @@ class YomitanLanguageParser {
     int maxCandidates = 48,
   }) async {
     if (language == 'ja' ||
-        language == 'ko' ||
         !supportedDictionaryLanguageCodes.contains(language) ||
         text.trim().isEmpty) {
       return const [];

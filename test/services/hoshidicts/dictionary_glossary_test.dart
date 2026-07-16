@@ -67,6 +67,72 @@ void main() {
     expect(html, isNot(contains('&quot;Count&quot;')));
   });
 
+  test('renders MOE Concised Pinyin structured-content with MOE styling hooks', () {
+    const raw = '''[
+      {
+        "type": "structured-content",
+        "content": {
+          "tag": "span",
+          "content": [
+            {
+              "tag": "span",
+              "content": [
+                {
+                  "tag": "span",
+                  "content": [
+                    {"tag": "span", "content": "來", "data": {"moedict": "traditional-term"}},
+                    {"tag": "span", "content": "来", "data": {"moedict": "simplified-term"}, "lang": "zh-CN"}
+                  ],
+                  "data": {"moedict": "terms-parent"}
+                }
+              ],
+              "data": {"moedict": "first-row-parent"}
+            },
+            {
+              "tag": "div",
+              "content": {
+                "tag": "div",
+                "content": [
+                  {
+                    "tag": "div",
+                    "content": [
+                      {"tag": "span", "content": "1.從別處到此處。", "data": {"moedict": "definition-entry-content"}},
+                      "",
+                      [
+                        {
+                          "tag": "span",
+                          "content": [
+                            {"tag": "span", "content": "例", "data": {"moedict": "definition-entry-example-label"}},
+                            {"tag": "span", "content": "回來、有朋自遠方來", "data": {"moedict": "definition-entry-example-content"}}
+                          ],
+                          "data": {"moedict": "definition-entry-example-parent", "type": "例"}
+                        }
+                      ]
+                    ],
+                    "data": {"moedict": "definition-entry"}
+                  }
+                ],
+                "data": {"moedict": "meaning-parent"}
+              },
+              "data": {"moedict": "meanings-parent"}
+            }
+          ],
+          "lang": "zh-TW"
+        }
+      }
+    ]''';
+
+    final html = yomitanGlossaryToHtml(raw);
+
+    expect(html, contains('data-sc-moedict="traditional-term"'));
+    expect(html, contains('data-sc-moedict="simplified-term"'));
+    expect(html, contains('lang="zh-CN"'));
+    expect(html, contains('data-sc-moedict="definition-entry-example-label"'));
+    expect(html, contains('data-sc-type="例"'));
+    expect(html, contains('[data-sc-moedict="terms-parent"]'));
+    expect(html, contains('[data-sc-moedict="definition-entry"]'));
+  });
+
   test('ports Hoshi structured content attributes and base styles', () {
     const raw = '''{
       "type":"structured-content",

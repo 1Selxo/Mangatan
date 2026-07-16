@@ -69,6 +69,18 @@ void main() {
     name: 'Beta first',
     dictionaryOrder: ['Beta', 'Alpha'],
   );
+  const mandarinProfile = DictionaryProfile(
+    id: 'shared-language-id',
+    name: 'Mandarin',
+    languageCode: 'zh',
+    enabledDictionaries: {'Alpha'},
+  );
+  const japaneseProfile = DictionaryProfile(
+    id: 'shared-language-id',
+    name: 'Japanese',
+    languageCode: 'ja',
+    enabledDictionaries: {'Beta'},
+  );
 
   test('isolates lookup caches by structural profile configuration', () async {
     final backend = HoshidictsLookupBackend.instance;
@@ -105,6 +117,33 @@ void main() {
     expect(alphaFirst.single.matched, 'Alpha,Beta');
     expect(betaFirst.single.matched, 'Beta,Alpha');
     expect(rustApi.lookupCalls, 2);
+  });
+
+  test('isolates lookup caches and sessions when profile language changes', () async {
+    final backend = HoshidictsLookupBackend.instance;
+
+    final mandarin = await backend.lookup(
+      'same text',
+      profile: mandarinProfile,
+    );
+    final japanese = await backend.lookup(
+      'same text',
+      profile: japaneseProfile,
+    );
+    final mandarinAgain = await backend.lookup(
+      'same text',
+      profile: mandarinProfile,
+    );
+
+    expect(mandarin.single.matched, 'Alpha');
+    expect(japanese.single.matched, 'Beta');
+    expect(mandarinAgain.single.matched, 'Alpha');
+    expect(rustApi.lookupCalls, 3);
+    expect(rustApi.rebuildHistory, [
+      ['Alpha'],
+      ['Beta'],
+      ['Alpha'],
+    ]);
   });
 
   test('isolates style caches by structural profile configuration', () async {

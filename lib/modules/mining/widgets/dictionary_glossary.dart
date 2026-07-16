@@ -153,6 +153,57 @@ String yomitanGlossaryToHtml(
   padding-left: var(--list-padding1);
 }
 .dictionary-glossary li { margin: .08em 0; }
+.dictionary-glossary [data-sc-moedict="first-row-parent"] {
+  display: block;
+  margin-bottom: .4em;
+}
+.dictionary-glossary [data-sc-moedict="terms-parent"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .33em;
+  align-items: center;
+  margin-bottom: .25em;
+}
+.dictionary-glossary [data-sc-moedict="traditional-term"],
+.dictionary-glossary [data-sc-moedict="simplified-term"] {
+  display: inline-block;
+  padding: .13em .33em;
+  border: 1px solid rgba(128, 128, 128, .42);
+  border-radius: .27em;
+  background: rgba(128, 128, 128, .12);
+  line-height: 1.25;
+}
+.dictionary-glossary [data-sc-moedict="simplified-term"] {
+  color: var(--accent-color, #0b57d0);
+}
+.dictionary-glossary [data-sc-moedict="meaning-parent"],
+.dictionary-glossary [data-sc-moedict="meanings-parent"] {
+  display: block;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry"] {
+  display: block;
+  margin: .4em 0;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-content"] {
+  display: inline;
+  line-height: 1.45;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-example-parent"] {
+  display: inline;
+  color: var(--text-color-light1);
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-example-label"] {
+  display: inline-block;
+  margin: 0 .2em;
+  padding: 0 .27em;
+  border-radius: .27em;
+  background: var(--danger-color-lightest, rgba(160, 48, 48, .22));
+  color: var(--danger-color, var(--text-color));
+  line-height: 1.3;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-example-content"] {
+  color: var(--text-color-light1);
+}
 .gloss-image-link, .gloss-image-container {
   display: inline-block;
   max-width: 100%;

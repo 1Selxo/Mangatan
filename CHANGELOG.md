@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Removed the Kiwi Korean runtime/model dependency and routed Korean lookup through the existing Yomitan language pipeline, including extra Korean irregular and particle-shortening lookup variants.
+- Fixed manga OCR uploads for WebP and other source formats by normalizing decoded page images to PNG before sending them to Google Lens OCR.
+- Fixed dictionary profile lookup/session caching when switching between languages such as Mandarin and Japanese.
+- Improved MOE Concised Pinyin structured-content rendering in dictionary popups with MOE-specific layout styling.
+- Added an optional live video OCR overlay that scans frames while playback continues, without changing the existing paused-frame OCR flow.
+- Added a quick double-space shortcut for the existing manual video OCR capture, while keeping the toolbar OCR button.
+
 ## 1.0.5-beta+119 - 2026-07-15
 
 - Fixed dictionary profile Auto resolution using normalized source languages consistently across lookup, OCR, Anki mining, entry menus, and extension/source menus.

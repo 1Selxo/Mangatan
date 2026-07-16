@@ -150,6 +150,7 @@ class MiningPreferences {
   static const _ocrBoxScale = 'ocr_box_scale';
   static const _ocrOutlineVisible = 'ocr_outline_visible';
   static const _ocrLookupOnHover = 'ocr_lookup_on_hover';
+  static const _liveVideoOcrEnabled = 'live_video_ocr_enabled';
   static const _ocrBoxScaleX = 'ocr_box_scale_x';
   static const _ocrBoxScaleY = 'ocr_box_scale_y';
   static const _dictionaryPopupWidth = 'dictionary_popup_width';
@@ -599,6 +600,16 @@ class MiningPreferences {
 
   static Future<void> setOcrLookupOnHover(bool value) async {
     await (await _boxOrNull())?.put(_ocrLookupOnHover, value);
+  }
+
+  static Future<bool> getLiveVideoOcrEnabled() async {
+    return (await _boxOrNull())?.get(_liveVideoOcrEnabled, defaultValue: false)
+            as bool? ??
+        false;
+  }
+
+  static Future<void> setLiveVideoOcrEnabled(bool value) async {
+    await (await _boxOrNull())?.put(_liveVideoOcrEnabled, value);
   }
 
   static Future<DictionaryLookupTrigger> getDictionaryLookupTrigger() async {

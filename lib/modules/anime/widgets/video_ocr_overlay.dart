@@ -340,6 +340,300 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
   }
 }
 
+class LiveVideoOcrOverlay extends StatefulWidget {
+  const LiveVideoOcrOverlay({
+    super.key,
+    required this.imageBytesLoader,
+    required this.fit,
+    required this.miningContextBuilder,
+    required this.onDismiss,
+  });
+
+  final Future<Uint8List?> Function() imageBytesLoader;
+  final BoxFit fit;
+  final Future<MiningContext> Function(String text) miningContextBuilder;
+  final VoidCallback onDismiss;
+
+  @override
+  State<LiveVideoOcrOverlay> createState() => _LiveVideoOcrOverlayState();
+}
+
+class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
+  static const _scanInterval = Duration(milliseconds: 2200);
+
+  Timer? _timer;
+  VideoOcrResult? _result;
+  Object? _error;
+  bool _scanning = false;
+  String _lastSignature = '';
+  _VideoOcrSelection? _selection;
+  DictionaryPopupHandle? _popup;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(DictionaryLookupPopup.prewarm(context));
+    unawaited(_scanFrame());
+    _timer = Timer.periodic(_scanInterval, (_) => unawaited(_scanFrame()));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _popup?.dismiss();
+    super.dispose();
+  }
+
+  Future<void> _scanFrame() async {
+    if (_scanning) return;
+    if (mounted) {
+      setState(() => _scanning = true);
+    } else {
+      _scanning = true;
+    }
+    try {
+      final miningContext = await widget.miningContextBuilder('');
+      final profile = await DictionaryProfileResolver.resolveMiningContext(
+        miningContext,
+      );
+      if (!isProfileOcrAllowed(
+        sourceLanguage: miningContext.sourceLanguage,
+        profileLanguage: profile.languageCode,
+      )) {
+        throw StateError(
+          'Live OCR is disabled because the source and dictionary profile '
+          'languages do not match.',
+        );
+      }
+      final bytes = await widget.imageBytesLoader();
+      if (bytes == null || bytes.isEmpty) return;
+      final result = await recognizeVideoFrame(
+        bytes,
+        language: profileOcrLanguage(profile.languageCode),
+      );
+      if (!mounted) return;
+      final signature = result.blocks.map((block) => block.text).join('\n');
+      if (signature == _lastSignature && _error == null) return;
+      setState(() {
+        _lastSignature = signature;
+        _result = result;
+        _error = null;
+        if (signature.isEmpty) {
+          _popup?.dismiss();
+          _selection = null;
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) {
+        setState(() => _scanning = false);
+      } else {
+        _scanning = false;
+      }
+    }
+  }
+
+  Future<void> _lookup(
+    BuildContext context,
+    OcrTextBlock block,
+    Rect rect,
+    Offset position,
+  ) async {
+    final renderBox = context.findRenderObject();
+    final localPosition = renderBox is RenderBox
+        ? renderBox.globalToLocal(position)
+        : position;
+    final anchorOrigin = renderBox is RenderBox
+        ? renderBox.localToGlobal(rect.topLeft)
+        : rect.topLeft;
+    final anchor = anchorOrigin & rect.size;
+    final selection = _videoOcrSelectionAtPosition(block, rect, localPosition);
+    if (selection.text.isEmpty) return;
+    _popup?.dismiss();
+    setState(() => _selection = selection);
+    final miningContext = widget.miningContextBuilder(block.text);
+    final prefetch = DictionaryLookupPopup.prefetch(
+      selection.text,
+      miningContext: miningContext,
+    );
+    final handle = await DictionaryLookupPopup.show(
+      context: context,
+      anchor: anchor,
+      text: selection.text,
+      miningContext: miningContext,
+      prefetch: prefetch,
+      onMatchChanged: (count) {
+        if (!mounted || count <= 0) return;
+        setState(() {
+          _selection = selection.copyWith(matchLength: count);
+        });
+      },
+    );
+    if (!mounted) {
+      handle?.dismiss();
+      return;
+    }
+    _popup = handle;
+    if (handle != null) {
+      await handle.dismissed;
+      if (mounted && identical(_popup, handle)) {
+        setState(() {
+          _popup = null;
+          _selection = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: false,
+        child: Material(
+          color: Colors.transparent,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final outputSize = Size(
+                constraints.maxWidth,
+                constraints.maxHeight,
+              );
+              final result = _result;
+              final mapping = result == null
+                  ? null
+                  : _VideoFrameMapping.create(
+                      imageSize: Size(
+                        result.imageWidth.toDouble(),
+                        result.imageHeight.toDouble(),
+                      ),
+                      outputSize: outputSize,
+                      fit: widget.fit,
+                    );
+              final mappedBlocks = result == null || mapping == null
+                  ? const <_MappedVideoOcrBlock>[]
+                  : [
+                          for (final block in result.blocks)
+                            _MappedVideoOcrBlock(
+                              block: block,
+                              rect: mapping.mapBlock(block),
+                            ),
+                        ]
+                        .where(
+                          (item) =>
+                              item.rect.overlaps(Offset.zero & outputSize),
+                        )
+                        .toList();
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  for (final item in mappedBlocks)
+                    Positioned.fromRect(
+                      rect: item.rect,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapDown: (details) => _lookup(
+                            context,
+                            item.block,
+                            item.rect,
+                            details.globalPosition,
+                          ),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            decoration: BoxDecoration(
+                              color: identical(_selection?.block, item.block)
+                                  ? Colors.amber.withValues(alpha: 0.28)
+                                  : Colors.lightBlueAccent.withValues(
+                                      alpha: 0.08,
+                                    ),
+                              border: Border.all(
+                                color: identical(_selection?.block, item.block)
+                                    ? Colors.amber
+                                    : Colors.lightBlueAccent.withValues(
+                                        alpha: 0.75,
+                                      ),
+                                width: identical(_selection?.block, item.block)
+                                    ? 2
+                                    : 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  SafeArea(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: DecoratedBox(
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.all(Radius.circular(18)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_scanning)
+                                  const SizedBox.square(
+                                    dimension: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                else
+                                  const Icon(
+                                    Icons.visibility_rounded,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _error == null
+                                      ? 'Live OCR'
+                                      : 'Live OCR paused: $_error',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: widget.onDismiss,
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(2),
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _VideoFrameMapping {
   const _VideoFrameMapping({
     required this.imageSize,

@@ -143,19 +143,22 @@ class ChromeLensOcrClient {
     final frame = await codec.getNextFrame();
     final originalWidth = frame.image.width;
     final originalHeight = frame.image.height;
-    frame.image.dispose();
     codec.dispose();
 
     final largest = math.max(originalWidth, originalHeight);
     if (largest <= _maxDimension) {
+      final png = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      frame.image.dispose();
+      if (png == null) throw StateError('Could not encode image for OCR');
       return _PreparedImage(
-        bytes: bytes,
+        bytes: png.buffer.asUint8List(),
         width: originalWidth,
         height: originalHeight,
         originalWidth: originalWidth,
         originalHeight: originalHeight,
       );
     }
+    frame.image.dispose();
 
     final scale = _maxDimension / largest;
     final width = math.max(1, (originalWidth * scale).round());

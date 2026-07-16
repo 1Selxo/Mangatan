@@ -314,6 +314,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   String? _activeJimakuSubtitlePath;
   bool _showSubtitleList = false;
   bool _videoOcrCapturing = false;
+  bool _liveVideoOcrEnabled = false;
   Uint8List? _videoOcrBytes;
   List<AnimeSubtitleCue> _subtitleCues = const [];
   final Map<String, List<AnimeSubtitleCue>> _subtitleCuesByTitle = {};
@@ -811,7 +812,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   Future<void> _showVideoOcr() async {
     if (_videoOcrCapturing || _videoOcrBytes != null) return;
-    setState(() => _videoOcrCapturing = true);
+    setState(() {
+      _videoOcrCapturing = true;
+      _liveVideoOcrEnabled = false;
+    });
+    unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
     await _player.pause();
     try {
       final bytes = await _player.screenshot(
@@ -829,6 +834,25 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     } finally {
       if (mounted) setState(() => _videoOcrCapturing = false);
     }
+  }
+
+  Future<void> _toggleLiveVideoOcr() async {
+    final enabled = !_liveVideoOcrEnabled;
+    DictionaryLookupPopup.dismissActive();
+    setState(() {
+      _liveVideoOcrEnabled = enabled;
+      if (enabled) {
+        _videoOcrBytes = null;
+      }
+    });
+    await MiningPreferences.setLiveVideoOcrEnabled(enabled);
+  }
+
+  Future<Uint8List?> _captureLiveVideoOcrFrame() {
+    return _player.screenshot(
+      format: 'image/png',
+      includeLibassSubtitles: _includeSubtitles,
+    );
   }
 
   void _hideNativeSubtitlePaintSoon() {
@@ -1358,6 +1382,12 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _currentPosition.addListener(_updateRpcTimestamp);
     _subDelayController.addListener(_onSubDelayChanged);
     _subSpeedController.addListener(_onSubSpeedChanged);
+    unawaited(
+      MiningPreferences.getLiveVideoOcrEnabled().then((enabled) {
+        if (!mounted) return;
+        setState(() => _liveVideoOcrEnabled = enabled);
+      }),
+    );
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -2372,6 +2402,20 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 onPressed: _videoOcrCapturing ? null : _showVideoOcr,
               ),
               IconButton(
+                tooltip: _liveVideoOcrEnabled
+                    ? 'Turn off live OCR'
+                    : 'Turn on live OCR',
+                icon: Icon(
+                  _liveVideoOcrEnabled
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_outlined,
+                ),
+                color: _liveVideoOcrEnabled
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.white,
+                onPressed: _videoOcrCapturing ? null : _toggleLiveVideoOcr,
+              ),
+              IconButton(
                 tooltip: 'Subtitle list',
                 icon: const Icon(Icons.format_list_bulleted_rounded),
                 color: Colors.white,
@@ -2587,6 +2631,17 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             onDismiss: () {
               DictionaryLookupPopup.dismissActive();
               setState(() => _videoOcrBytes = null);
+            },
+          ),
+        if (_liveVideoOcrEnabled && _videoOcrBytes == null)
+          LiveVideoOcrOverlay(
+            imageBytesLoader: _captureLiveVideoOcrFrame,
+            fit: fit,
+            miningContextBuilder: _subtitleMiningContext,
+            onDismiss: () {
+              DictionaryLookupPopup.dismissActive();
+              setState(() => _liveVideoOcrEnabled = false);
+              unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
             },
           ),
       ],

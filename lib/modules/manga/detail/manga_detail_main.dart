@@ -9,10 +9,11 @@ import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/manga_chapter_file_drop_target.dart';
-import 'package:mangayomi/modules/manga/detail/widgets/media_detail_keyboard_navigation.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/utils/source_lookup.dart';
 
 class MangaReaderDetail extends ConsumerStatefulWidget {
   final int mangaId;
@@ -61,25 +62,34 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
     return Scaffold(
       body: manga.when(
         data: (manga) {
+          final currentManga = manga;
+          if (currentManga == null) return const ProgressCenter();
+          // Language filters only hide Browse rows. Installed sources remain
+          // available to refresh items already in the library.
           final detail = StreamBuilder(
             stream: isar.sources
-                .where()
-                .itemTypeIsAddedEqualTo(manga!.itemType, true)
                 .filter()
-                .langContains(manga.lang!, caseSensitive: false)
+                .idIsNotNull()
                 .and()
-                .nameContains(manga.source!, caseSensitive: false)
-                .and()
-                .isActiveEqualTo(true)
+                .isAddedEqualTo(true)
                 .watch(fireImmediately: true),
             builder: (context, snapshot) {
-              final sourceExist = snapshot.hasData && snapshot.data!.isNotEmpty;
+              final resolvedSource = snapshot.hasData
+                  ? findSourceFromList(
+                      snapshot.data!,
+                      lang: currentManga.lang!,
+                      name: currentManga.source!,
+                      sourceId: currentManga.sourceId,
+                      installedOnly: true,
+                    )
+                  : null;
+              final sourceExist = resolvedSource != null;
               return RefreshIndicator(
                 onRefresh: () async {
                   if (sourceExist && !_isLoading) {
                     await ref.read(
                       updateMangaDetailProvider(
-                        mangaId: manga.id,
+                        mangaId: currentManga.id,
                         isInit: false,
                       ).future,
                     );
@@ -88,7 +98,8 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                 child: Stack(
                   children: [
                     MangaDetailsView(
-                      manga: manga,
+                      manga: currentManga,
+                      source: resolvedSource,
                       sourceExist: sourceExist,
                       checkForUpdate: (value) async {
                         if (!_isLoading) {
@@ -98,7 +109,7 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                           if (sourceExist) {
                             await ref.read(
                               updateMangaDetailProvider(
-                                mangaId: manga.id,
+                                mangaId: currentManga.id,
                                 isInit: false,
                               ).future,
                             );
@@ -126,13 +137,13 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
               );
             },
           );
-          final mediaDetail = manga.itemType == ItemType.manga
+          final mediaDetail = currentManga.itemType == ItemType.manga
               ? MangaChapterFileDropTarget(
-                  manga: manga,
+                  manga: currentManga,
                   onImport: (filePaths) => ref.read(
                     importArchivesFromPathsProvider(
                       itemType: ItemType.manga,
-                      manga,
+                      currentManga,
                       filePaths: filePaths,
                       init: false,
                       splitChapters: false,
@@ -141,9 +152,9 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                   child: detail,
                 )
               : detail;
-          return MediaDetailKeyboardNavigation(
-            onEscape: _goBack,
-            child: mediaDetail,
+          return DesktopBackNavigationScope(
+            onBack: _goBack,
+            child: Focus(autofocus: true, child: mediaDetail),
           );
         },
         error: (Object error, StackTrace stackTrace) {

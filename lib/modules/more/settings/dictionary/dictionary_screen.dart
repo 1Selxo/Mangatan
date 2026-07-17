@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dialog.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
@@ -18,7 +19,12 @@ import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
 class DictionaryScreen extends StatefulWidget {
-  const DictionaryScreen({super.key});
+  const DictionaryScreen({
+    super.key,
+    this.section = DictionarySettingsSection.dictionariesAndAudio,
+  });
+
+  final DictionarySettingsSection section;
 
   @override
   State<DictionaryScreen> createState() => _DictionaryScreenState();
@@ -113,7 +119,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _dictionaryLanguage = values[16] as String;
       _loading = false;
     });
-    unawaited(_refreshAnki(silent: true));
+    if (widget.section == DictionarySettingsSection.anki) {
+      unawaited(_refreshAnki(silent: true));
+    }
   }
 
   Future<void> _importDictionary() async {
@@ -548,6 +556,75 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     await _saveAnki(_ankiProfile.copyWith(fieldMap: saved));
   }
 
+  List<Widget> _childrenForSection(List<Widget> children) {
+    // Keep one source of truth for the existing controls while presenting
+    // Chimahon's Dictionary, Popup, and Anki pages as separate routes.
+    final visibleGroups = switch (widget.section) {
+      DictionarySettingsSection.dictionariesAndAudio => {
+        _DictionarySettingsGroup.profiles,
+        _DictionarySettingsGroup.dictionaries,
+      },
+      DictionarySettingsSection.dictionaryPopup => {
+        _DictionarySettingsGroup.popup,
+      },
+      DictionarySettingsSection.anki => {
+        _DictionarySettingsGroup.profiles,
+        _DictionarySettingsGroup.anki,
+      },
+    };
+    var currentGroup = _DictionarySettingsGroup.profiles;
+    final visibleChildren = <Widget>[];
+    for (final child in children) {
+      if (child is _DictionarySettingsGroupMarker) {
+        currentGroup = child.group;
+      } else if (visibleGroups.contains(currentGroup)) {
+        visibleChildren.add(child);
+      }
+    }
+    if (visibleChildren.isNotEmpty && visibleChildren.first is Divider) {
+      visibleChildren.removeAt(0);
+    }
+    return visibleChildren;
+  }
+
+  Widget _dictionaryLanguagePreference() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: DropdownButtonFormField<String>(
+        initialValue: _dictionaryLanguage,
+        decoration: const InputDecoration(
+          labelText: 'Dictionary language',
+          helperText: 'Controls word parsing and deinflection during lookup',
+          prefixIcon: Icon(Icons.translate),
+        ),
+        items: [
+          const DropdownMenuItem(
+            value: '',
+            child: Text('Any (not matched automatically)'),
+          ),
+          if (_dictionaryLanguage.isNotEmpty &&
+              !dictionaryLanguages.any(
+                (language) => language.code == _dictionaryLanguage,
+              ))
+            DropdownMenuItem(
+              value: _dictionaryLanguage,
+              child: Text(_dictionaryLanguage),
+            ),
+          for (final language in dictionaryLanguages)
+            DropdownMenuItem(value: language.code, child: Text(language.name)),
+        ],
+        onChanged: (value) async {
+          if (value == null) return;
+          setState(() => _dictionaryLanguage = value);
+          await _updateActiveProfile(
+            _activeProfile.copyWith(languageCode: value),
+          );
+          HoshidictsLookupBackend.instance.invalidateLookups();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final collapseMode =
@@ -560,11 +637,14 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         ? _activeProfile.dictionaryCollapseMode
         : 'expand_all';
     return Scaffold(
-      appBar: AppBar(title: const Text('Dictionary & OCR')),
+      appBar: AppBar(title: Text(widget.section.title)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              children: [
+              children: _childrenForSection([
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.profiles,
+                ),
                 const _SectionHeader('Profiles'),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
@@ -625,6 +705,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   subtitle: const Text(
                     'Language, dictionary priority, enabled dictionaries, and Anki settings are saved per profile.',
                   ),
+                ),
+                _dictionaryLanguagePreference(),
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.dictionaries,
                 ),
                 const Divider(height: 24),
                 const _SectionHeader('Dictionaries'),
@@ -718,8 +802,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       );
                     },
                   ),
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.popup,
+                ),
                 const Divider(height: 24),
-                const _SectionHeader('Popup appearance'),
+                const _SectionHeader('Layout'),
                 _SliderSetting(
                   title: 'Popup width',
                   value: _popupPreferences.width,
@@ -752,6 +839,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     MiningPreferences.setDictionaryPopupHeight(value);
                   },
                 ),
+                const Divider(height: 24),
+                const _SectionHeader('Typography'),
                 _SliderSetting(
                   title: 'Dictionary font size',
                   value: _popupPreferences.fontSize,
@@ -768,6 +857,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     MiningPreferences.setDictionaryFontSize(value);
                   },
                 ),
+                const Divider(height: 24),
+                const _SectionHeader('Theme'),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: DropdownButtonFormField<DictionaryThemePreference>(
@@ -860,7 +951,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   },
                 ),
                 const Divider(height: 24),
-                const _SectionHeader('Dictionary display'),
+                const _SectionHeader('Content'),
                 SwitchListTile(
                   title: const Text('Show harmonic frequency'),
                   value: _popupPreferences.showFrequencyHarmonic,
@@ -908,47 +999,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     });
                     MiningPreferences.setShowPitchText(value);
                   },
-                ),
-                const Divider(height: 24),
-                const _SectionHeader('Lookup behavior'),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _dictionaryLanguage,
-                    decoration: const InputDecoration(
-                      labelText: 'Dictionary language',
-                      helperText:
-                          'Controls word parsing and deinflection during lookup',
-                      prefixIcon: Icon(Icons.translate),
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: '',
-                        child: Text('Any (not matched automatically)'),
-                      ),
-                      if (_dictionaryLanguage.isNotEmpty &&
-                          !dictionaryLanguages.any(
-                            (language) => language.code == _dictionaryLanguage,
-                          ))
-                        DropdownMenuItem(
-                          value: _dictionaryLanguage,
-                          child: Text(_dictionaryLanguage),
-                        ),
-                      for (final language in dictionaryLanguages)
-                        DropdownMenuItem(
-                          value: language.code,
-                          child: Text(language.name),
-                        ),
-                    ],
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      setState(() => _dictionaryLanguage = value);
-                      await _updateActiveProfile(
-                        _activeProfile.copyWith(languageCode: value),
-                      );
-                      HoshidictsLookupBackend.instance.invalidateLookups();
-                    },
-                  ),
                 ),
                 const SizedBox(height: 12),
                 Padding(
@@ -1007,7 +1057,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                           },
                   ),
                 const Divider(height: 24),
-                const _SectionHeader('OCR overlay'),
+                const _SectionHeader('OCR'),
                 SwitchListTile(
                   secondary: const Icon(Icons.document_scanner_outlined),
                   title: const Text('Show OCR in reader'),
@@ -1165,6 +1215,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   subtitle: Text(
                     'Uses Chromium’s Lens endpoint. Page images are sent to Google when this engine runs.',
                   ),
+                ),
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.anki,
                 ),
                 const Divider(height: 24),
                 const _SectionHeader('AnkiConnect'),
@@ -1541,10 +1594,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       _saveAnki(_ankiProfile.copyWith(syncOnCreate: value)),
                 ),
                 const SizedBox(height: 24),
-              ],
+              ]),
             ),
     );
   }
+}
+
+enum _DictionarySettingsGroup { profiles, dictionaries, popup, anki }
+
+class _DictionarySettingsGroupMarker extends StatelessWidget {
+  const _DictionarySettingsGroupMarker(this.group);
+
+  final _DictionarySettingsGroup group;
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class _DictionaryListTile extends StatelessWidget {

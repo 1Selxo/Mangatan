@@ -1712,6 +1712,7 @@ Trace: ${JSON.stringify(trace)}`));
   }
   function addCandidate(results, rawSource, lemma, trace, priority) {
     if (!lemma || lemma === rawSource || lemma === "\uB2E4") return;
+    if (rawSource.startsWith("\uC544\uBB34\uB798") && lemma === "\uC544\uBB34\uB9AC\uB2E4") return;
     const existing = results.get(lemma);
     if (!existing || priority < existing.priority) {
       results.set(lemma, { surface: rawSource, lemma, trace, priority });
@@ -1737,6 +1738,67 @@ Trace: ${JSON.stringify(trace)}`));
     const trace = [{ name: "Supplemental Korean deinflection", description: "Mangatan Korean compatibility rule." }];
     const add2 = (lemma, priorityOffset = 0) => addCandidate(results, rawSource, lemma, trace, priorityBase + priorityOffset);
     if (rawSource === "\uB204\uAC00") add2("\uB204\uAD6C");
+    if (rawSource === "\uAC78\uB85C") add2("\uAC70", 0);
+    if (/^\uD14C(?:\uB2C8\uAE4C|\uB2C8|\uBA74|\uACE0|\uC11C|\uC694|\uC8E0|\uC9C0|\uB2E4|\uB77C|\uAD70|\uB124)?$/u.test(rawSource) || /^\uD150(?:\uB370|\uAC00|\uC9C0|\uAC78|\uAC70|\uAC00\uC694)?$/u.test(rawSource)) {
+      add2("\uD130", 0);
+    }
+    if (rawSource.startsWith("\uD390") || rawSource.startsWith("\uD37C")) {
+      add2("\uD478\uB2E4", 0);
+    }
+    if (rawSource.startsWith("\uC124\uC6B0")) {
+      add2("\uC127\uB2E4", 0);
+    }
+    const hIrregularColorLike = /* @__PURE__ */ new Map([
+      ["\uBFCC\uC608", ["\uBFCC\uC607\uB2E4"]],
+      ["\uBFCC\uC598", ["\uBFCC\uC607\uB2E4"]],
+      ["\uD30C\uB798", ["\uD30C\uB797\uB2E4", "\uD37C\uB807\uB2E4"]],
+      ["\uD37C\uB808", ["\uD30C\uB797\uB2E4", "\uD37C\uB807\uB2E4"]],
+      ["\uAE4C\uB9E4", ["\uAE4C\uB9E3\uB2E4", "\uAEBC\uBA93\uB2E4"]],
+      ["\uAEBC\uBA54", ["\uAE4C\uB9E3\uB2E4", "\uAEBC\uBA93\uB2E4"]],
+      ["\uD558\uC598", ["\uD558\uC597\uB2E4", "\uD5C8\uC607\uB2E4"]],
+      ["\uD5C8\uC608", ["\uD558\uC597\uB2E4", "\uD5C8\uC607\uB2E4"]]
+    ]);
+    for (const [surface, lemmas] of hIrregularColorLike) {
+      if (!rawSource.startsWith(surface)) continue;
+      for (const lemma of lemmas) add2(lemma, 0);
+    }
+    if (rawSource.endsWith("\uC544") && rawSource.length > 1) {
+      add2(`${rawSource.slice(0, -1)}\uC774`, 1);
+    }
+    const vocativeNounLike = /* @__PURE__ */ new Map([
+      ["\uB108\uAD74\uC544", "\uB108\uAD6C\uB9AC"],
+      ["\uB108\uAD6C\uB77C", "\uB108\uAD6C\uB9AC"],
+      ["\uAE30\uB7ED\uC544", "\uAE30\uB7EC\uAE30"],
+      ["\uAE30\uB7EC\uAC00", "\uAE30\uB7EC\uAE30"],
+      ["\uBA70\uB298\uC544", "\uBA70\uB290\uB9AC"],
+      ["\uBA70\uB290\uB77C", "\uBA70\uB290\uB9AC"],
+      ["\uBED0\uAFB9\uC544", "\uBED0\uAFB8\uAE30"],
+      ["\uBED0\uAFB8\uAC00", "\uBED0\uAFB8\uAE30"],
+      ["\uAC1C\uAD74\uC544", "\uAC1C\uAD6C\uB9AC"],
+      ["\uAC1C\uAD6C\uB77C", "\uAC1C\uAD6C\uB9AC"],
+      ["\uAF80\uAF34\uC544", "\uAF80\uAF2C\uB9AC"],
+      ["\uAF80\uAF2C\uB77C", "\uAF80\uAF2C\uB9AC"],
+      ["\uADC0\uB69C\uB78C\uC544", "\uADC0\uB69C\uB77C\uBBF8"],
+      ["\uADC0\uB69C\uB77C\uB9C8", "\uADC0\uB69C\uB77C\uBBF8"],
+      ["\uADC0\uB69C\uC544", "\uADC0\uB69C\uB9AC"],
+      ["\uADC0\uB69C\uB77C", "\uADC0\uB69C\uB9AC"],
+      ["\uC62C\uBE80\uC544", "\uC62C\uBE7C\uBBF8"],
+      ["\uC62C\uBE7C\uB9C8", "\uC62C\uBE7C\uBBF8"],
+      ["\uC871\uC81D\uC544", "\uC871\uC81C\uBE44"],
+      ["\uC871\uC81C\uBC14", "\uC871\uC81C\uBE44"],
+      ["\uBE44\uB465\uC544", "\uBE44\uB458\uAE30"],
+      ["\uBE44\uB458\uAC00", "\uBE44\uB458\uAE30"],
+      ["\uD574\uC624\uB77D\uC544", "\uD574\uC624\uB77C\uAE30"],
+      ["\uD574\uC624\uB77C\uAC00", "\uD574\uC624\uB77C\uAE30"]
+    ]);
+    const vocativeLemma = vocativeNounLike.get(rawSource);
+    if (vocativeLemma) add2(vocativeLemma, 0);
+    if (rawSource.endsWith("\uB124")) {
+      const stem = rawSource.slice(0, -1);
+      add2(`${stem}\uB2E4`, 1);
+      const hStem = withFinalConsonant(stem, 27);
+      if (hStem) add2(`${hStem}\uB2E4`, 1);
+    }
     const topicBase = withoutFinalConsonant(rawSource, 4);
     if (topicBase) add2(topicBase, 1);
     const objectBase = withoutFinalConsonant(rawSource, 8);

@@ -431,7 +431,9 @@ class ReaderOcrProgress {
 }
 
 class ReaderOcrProgressHud extends StatelessWidget {
-  const ReaderOcrProgressHud({super.key});
+  const ReaderOcrProgressHud({super.key, this.top = 12});
+
+  final double top;
 
   @override
   Widget build(BuildContext context) {
@@ -439,9 +441,11 @@ class ReaderOcrProgressHud extends StatelessWidget {
       valueListenable: ReaderOcrState.progress,
       builder: (context, progress, _) {
         if (progress == null) return const SizedBox.shrink();
-        return Positioned(
-          top: 12,
+        return AnimatedPositioned(
+          top: top,
           right: 12,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.ease,
           child: Material(
             color: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
             borderRadius: BorderRadius.circular(6),

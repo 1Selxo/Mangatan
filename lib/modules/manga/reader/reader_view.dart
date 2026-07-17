@@ -390,6 +390,9 @@ class _MangaChapterPageGalleryState
       return const SizedBox.shrink();
     }
     final bool isHorizontalContinuous = readerMode.isHorizontalContinuous;
+    final ocrProgressTop = _isView
+        ? ReaderAppBar.visibleHeight(fullScreenReader: fullScreenReader) + 12
+        : 12.0;
 
     return ReaderKeyboardHandler(
       onPreviousPage: () => _handlePageNavigation(forward: false),
@@ -540,7 +543,7 @@ class _MangaChapterPageGalleryState
                             }
                           : null,
                     ),
-                    const ReaderOcrProgressHud(),
+                    ReaderOcrProgressHud(top: ocrProgressTop),
                     ReaderBottomBar(
                       chapter: chapter,
                       isVisible: _isView,

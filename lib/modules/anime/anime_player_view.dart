@@ -42,6 +42,7 @@ import 'package:mangayomi/modules/more/settings/player/providers/player_audio_st
 import 'package:mangayomi/modules/more/settings/player/providers/player_decoder_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
@@ -2542,7 +2543,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   defaultSkipIntroLength: skipIntroLength,
                   desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
                   chapterMarks: _chapterMarks,
-                  onEscape: _handleEscape,
                   subtitleMiningContextBuilder: _subtitleMiningContext,
                   onVideoOcrShortcut: _showVideoOcr,
                 )
@@ -2866,7 +2866,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(body: _videoPlayer(context));
+    return DesktopBackNavigationScope(
+      onBack: _handleEscape,
+      child: Scaffold(body: _videoPlayer(context)),
+    );
   }
 }
 

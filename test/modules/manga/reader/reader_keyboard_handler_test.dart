@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 
 void main() {
   test('shift keys are ignored as standalone reader shortcuts', () {
@@ -177,25 +178,20 @@ void main() {
     expect(pageCalls, 0);
   });
 
-  testWidgets('handled reader shortcuts do not propagate to ancestors', (
+  testWidgets('reader back action overrides the generic desktop action', (
     tester,
   ) async {
-    var escapeCalls = 0;
-    var ancestorCalls = 0;
+    var readerBackCalls = 0;
+    var genericBackCalls = 0;
     final readerFocusNode = FocusNode();
     addTearDown(readerFocusNode.dispose);
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Focus(
-          onKeyEvent: (_, event) {
-            if (event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              ancestorCalls++;
-            }
-            return KeyEventResult.handled;
-          },
-          child: ReaderKeyboardHandler(onEscape: () => escapeCalls++)
+        home: DesktopBackNavigationHandler(
+          canGoBack: () => true,
+          onBack: () => genericBackCalls++,
+          child: ReaderKeyboardHandler(onBack: () => readerBackCalls++)
               .wrapWithKeyboardListener(
                 focusNode: readerFocusNode,
                 child: const SizedBox(),
@@ -209,7 +205,7 @@ void main() {
     await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
 
-    expect(escapeCalls, 1);
-    expect(ancestorCalls, 0);
+    expect(readerBackCalls, 1);
+    expect(genericBackCalls, 0);
   });
 }

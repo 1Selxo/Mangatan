@@ -9,7 +9,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
-import 'package:go_router/go_router.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/adapters.dart';
@@ -29,6 +28,7 @@ import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/storage_usage.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/general_state_provider.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
@@ -279,7 +279,12 @@ class _MyAppState extends ConsumerState<MyApp>
       builder: (context, child) {
         final base = BotToastInit()(context, child);
         Widget content = !isMobile
-            ? _MouseBackButtonHandler(router: router, child: base)
+            ? DesktopBackNavigationHandler(
+                canGoBack: router.canPop,
+                onBack: router.pop,
+                dismissTransientUi: DictionaryLookupPopup.dismissActive,
+                child: base,
+              )
             : base;
 
         if (!Platform.isLinux) {
@@ -559,26 +564,6 @@ class _MyAppState extends ConsumerState<MyApp>
           )
           .checkRefresh();
     }
-  }
-}
-
-class _MouseBackButtonHandler extends StatelessWidget {
-  final GoRouter router;
-  final Widget child;
-
-  const _MouseBackButtonHandler({required this.router, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: (event) {
-        if (event.buttons & kBackMouseButton != 0) {
-          if (DictionaryLookupPopup.dismissActive()) return;
-          if (router.canPop()) router.pop();
-        }
-      },
-      child: child,
-    );
   }
 }
 

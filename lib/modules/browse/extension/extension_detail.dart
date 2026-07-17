@@ -16,6 +16,7 @@ import 'package:mangayomi/modules/browse/extension/widgets/source_preference_wid
 import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/get_source_preference.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
@@ -254,10 +255,12 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
   @override
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
-    return Scaffold(
+    void goBack() => Navigator.pop(context, source);
+
+    final page = Scaffold(
       appBar: AppBar(
         title: Text(l10n.extension_detail),
-        leading: BackButton(onPressed: () => Navigator.pop(context, source)),
+        leading: BackButton(onPressed: goBack),
         actions: [
           if (source.sourceCodeLanguage == SourceCodeLanguage.mihon)
             IconButton(
@@ -563,6 +566,10 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
           ],
         ),
       ),
+    );
+    return DesktopBackNavigationScope(
+      onBack: goBack,
+      child: Focus(autofocus: true, child: page),
     );
   }
 }

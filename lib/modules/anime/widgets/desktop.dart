@@ -28,7 +28,6 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
   final Future<MiningContext> Function(String text)?
   subtitleMiningContextBuilder;
   final Future<void> Function()? onVideoOcrShortcut;
-  final Future<void> Function() onEscape;
   const DesktopControllerWidget({
     super.key,
     required this.videoController,
@@ -40,7 +39,6 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
     required this.defaultSkipIntroLength,
     required this.desktopFullScreenPlayer,
     required this.chapterMarks,
-    required this.onEscape,
     this.subtitleMiningContextBuilder,
     this.onVideoOcrShortcut,
   });
@@ -271,7 +269,6 @@ class _DesktopControllerWidgetState
         const SingleActivator(LogicalKeyboardKey.keyF): () async {
           await _changeFullScreen(ref, widget.desktopFullScreenPlayer);
         },
-        const SingleActivator(LogicalKeyboardKey.escape): widget.onEscape,
         const SingleActivator(LogicalKeyboardKey.digit0, control: true): () {
           (widget.videoController.player.platform as NativePlayer).command([
             "script-message",

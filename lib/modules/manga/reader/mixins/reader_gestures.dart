@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 
 /// Handler for keyboard shortcuts in the reader.
 class ReaderKeyboardHandler {
-  final VoidCallback? onEscape;
+  final VoidCallback? onBack;
   final VoidCallback? onFullScreen;
   final VoidCallback? onPreviousPage;
   final VoidCallback? onNextPage;
@@ -14,7 +15,7 @@ class ReaderKeyboardHandler {
   final bool delegateHorizontalPageKeysToChild;
 
   const ReaderKeyboardHandler({
-    this.onEscape,
+    this.onBack,
     this.onFullScreen,
     this.onPreviousPage,
     this.onNextPage,
@@ -34,9 +35,8 @@ class ReaderKeyboardHandler {
         onFullScreen?.call();
         return true;
 
-      case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.backspace:
-        onEscape?.call();
+        onBack?.call();
         return true;
 
       case LogicalKeyboardKey.arrowUp:
@@ -102,7 +102,7 @@ class ReaderKeyboardHandler {
     bool isReverseHorizontal = false,
     FocusNode? focusNode,
   }) {
-    return Focus(
+    final keyboardListener = Focus(
       autofocus: true,
       focusNode: focusNode,
       onKeyEvent: (_, event) =>
@@ -111,5 +111,9 @@ class ReaderKeyboardHandler {
           : KeyEventResult.ignored,
       child: child,
     );
+    final onBack = this.onBack;
+    return onBack == null
+        ? keyboardListener
+        : DesktopBackNavigationScope(onBack: onBack, child: keyboardListener);
   }
 }

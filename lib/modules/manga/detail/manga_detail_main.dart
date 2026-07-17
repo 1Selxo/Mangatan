@@ -9,8 +9,8 @@ import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/manga_chapter_file_drop_target.dart';
-import 'package:mangayomi/modules/manga/detail/widgets/media_detail_keyboard_navigation.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 
@@ -143,9 +143,9 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                   child: detail,
                 )
               : detail;
-          return MediaDetailKeyboardNavigation(
-            onEscape: _goBack,
-            child: mediaDetail,
+          return DesktopBackNavigationScope(
+            onBack: _goBack,
+            child: Focus(autofocus: true, child: mediaDetail),
           );
         },
         error: (Object error, StackTrace stackTrace) {

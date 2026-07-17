@@ -398,7 +398,7 @@ class _MangaChapterPageGalleryState
     return ReaderKeyboardHandler(
       onPreviousPage: () => _handlePageNavigation(forward: false),
       onNextPage: () => _handlePageNavigation(forward: true),
-      onEscape: () => _goBack(context),
+      onBack: () => _goBack(context),
       onFullScreen: () => _setFullScreen(),
       onNextChapter: () => _goToChapter(true),
       onPreviousChapter: () => _goToChapter(false),

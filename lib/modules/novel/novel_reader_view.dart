@@ -29,6 +29,7 @@ import 'package:mangayomi/modules/novel/widgets/novel_reader_settings_sheet.dart
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/services/get_html_content.dart';
@@ -788,7 +789,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     final delegateHorizontalPageKeysToChild =
         widget.result.asData?.value.$2 != null && !Platform.isLinux;
     return ReaderKeyboardHandler(
-      onEscape: () => _goBack(context),
+      onBack: () => _goBack(context),
       onFullScreen: () => _setFullScreen(),
       onPreviousPage: () => _onBtnTapped(-100),
       onNextPage: () => _onBtnTapped(100),
@@ -1473,11 +1474,14 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     Navigator.pop(context);
   }
 
+  /// The embedded EPUB renderer can retain platform focus while its controls
+  /// are hidden. Route that hardware fallback through the shared back action;
+  /// returning true prevents the app-level focus handler seeing it again.
   bool _handleHiddenEpubEscape(KeyEvent event) {
     if (!_usingTtsuReader || _isView || event is! KeyDownEvent) return false;
     if (event.logicalKey != LogicalKeyboardKey.escape) return false;
-    _goBack(context);
-    return true;
+    final focusContext = _keyboardFocusNode.context;
+    return focusContext != null && DesktopBackNavigation.invoke(focusContext);
   }
 
   void _onBtnTapped(double value) {

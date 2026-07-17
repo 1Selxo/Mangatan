@@ -134,6 +134,34 @@ void main() {
 
       expect(groupExtensionPackages([first, second]), hasLength(2));
     });
+
+    test(
+      'keeps factory child settings separate inside an installed package',
+      () {
+        final webtoon = _mihonSource('1', name: 'Wolf - Webtoon', lang: 'ko');
+        final comics = _mihonSource('2', name: 'Wolf - Comics', lang: 'ko');
+        final photo = _mihonSource('3', name: 'Wolf - Photo', lang: 'ko');
+        final unrelated = _mihonSource('4', name: 'Other', lang: 'ko')
+          ..sourceCodeUrl = 'https://example.test/apk/other.apk'
+          ..additionalParams = encodeMihonSourceMetadata(
+            sourceId: '4',
+            packageName: 'eu.kanade.tachiyomi.extension.ko.other',
+          );
+
+        final settingsSources = extensionSettingsSources(webtoon, [
+          webtoon,
+          comics,
+          photo,
+          unrelated,
+        ]);
+
+        expect(settingsSources.map((source) => source.name), [
+          'Wolf - Comics',
+          'Wolf - Photo',
+          'Wolf - Webtoon',
+        ]);
+      },
+    );
   });
 }
 

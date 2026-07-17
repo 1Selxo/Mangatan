@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
@@ -9,11 +9,12 @@ import 'package:path/path.dart' as p;
 import 'package:mangayomi/eval/javascript/http.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/reg_exp_matcher.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
@@ -60,26 +61,56 @@ Future<GetChapterPagesModel> getChapterPages(
     );
 
     List<Uint8List?> archiveImages = [];
-    bool pagesFromCache = false;
     final isLocalArchive = (chapter.archivePath ?? '').isNotEmpty;
-    final resolvedArchivePath = isLocalArchive
-        ? await resolveLocalArchivePath(chapter.archivePath!)
+    final downloadedCbz = downloadedMangaChapterCbz(mangaDirectory!, chapter);
+    final hasDownloadedCbz = await downloadedCbz.exists();
+    final download = chapter.id == null
+        ? null
+        : isar.downloads.getSync(chapter.id!);
+    final downloadedImagePageCount = download?.isDownload ?? false
+        ? await downloadedMangaChapterImagePageCount(path!)
+        : 0;
+    final hasDownloadedImageFolder = downloadedImagePageCount > 0;
+    final hasDownloadedArtifact = hasDownloadedCbz || hasDownloadedImageFolder;
+    final localArtifactPath = isLocalArchive
+        ? chapter.archivePath
+        : hasDownloadedCbz
+        ? downloadedCbz.path
+        : hasDownloadedImageFolder
+        ? path!.path
         : null;
-    if (!chapter.manga.value!.isLocalArchive!) {
+
+    // Downloads are complete, self-contained copies. Resolve them before
+    // touching the source so they remain readable while offline.
+    if (isLocalArchive || hasDownloadedCbz) {
+      final archivePath = isLocalArchive
+          ? chapter.archivePath
+          : downloadedCbz.path;
+      final local = await ref.read(
+        getArchiveDataFromFileProvider(archivePath!).future,
+      );
+      for (var image in local.images!) {
+        pageUrls.add(PageUrl(''));
+        archiveImages.add(image.image!);
+        isLocaleList.add(true);
+      }
+    } else if (hasDownloadedImageFolder) {
+      pageUrls = List.generate(downloadedImagePageCount, (_) => PageUrl(''));
+      archiveImages = List.filled(downloadedImagePageCount, null);
+      isLocaleList = List.filled(downloadedImagePageCount, true);
+    } else if (!chapter.manga.value!.isLocalArchive!) {
       final source = getSource(
         chapter.manga.value!.lang!,
         chapter.manga.value!.source!,
         chapter.manga.value!.sourceId,
       )!;
-      if ((isarPageUrls?.urls?.isNotEmpty ?? false) &&
+      if (canReuseCachedMihonPageUrls(isarPageUrls?.urls) &&
           (isarPageUrls?.chapterUrl ?? chapter.url) == chapter.url) {
-        pagesFromCache = true;
         for (var i = 0; i < isarPageUrls!.urls!.length; i++) {
           Map<String, String>? headers;
           if (isarPageUrls.headers?.isNotEmpty ?? false) {
-            headers = (jsonDecode(
-              isarPageUrls.headers![i],
-            ) as Map?)?.toMapStringString;
+            headers = (jsonDecode(isarPageUrls.headers![i]) as Map?)
+                ?.toMapStringString;
           }
           pageUrls.add(PageUrl(isarPageUrls.urls![i], headers: headers));
         }
@@ -102,21 +133,8 @@ Future<GetChapterPagesModel> getChapterPages(
       uChapDataPreload: [],
     );
 
-    if (pageUrls.isNotEmpty || isLocalArchive) {
-      if (await File(p.join(mangaDirectory!.path, "${chapter.name}.cbz"))
-              .exists() ||
-          isLocalArchive) {
-        final path = isLocalArchive
-            ? resolvedArchivePath
-            : p.join(mangaDirectory.path, "${chapter.name}.cbz");
-        final local = await ref.read(
-          getArchiveDataFromFileProvider(path!).future,
-        );
-        for (var image in local.images!) {
-          archiveImages.add(image.image!);
-          isLocaleList.add(true);
-        }
-      } else {
+    if (pageUrls.isNotEmpty) {
+      if (!hasDownloadedArtifact && !isLocalArchive) {
         for (var i = 0; i < pageUrls.length; i++) {
           archiveImages.add(null);
           if (await File(p.join(path!.path, '${padIndex(i)}.jpg')).exists()) {
@@ -126,23 +144,7 @@ Future<GetChapterPagesModel> getChapterPages(
           }
         }
       }
-      if (isLocalArchive) {
-        for (var i = 0; i < archiveImages.length; i++) {
-          pageUrls.add(PageUrl(""));
-        }
-        // Archives store placeholder urls only for the page count; skip the
-        // write when the stored entry already matches.
-        if ((isarPageUrls?.urls?.length ?? -1) == pageUrls.length &&
-            (isarPageUrls?.chapterUrl ?? chapter.url) == chapter.url) {
-          pagesFromCache = true;
-        }
-      }
-      // Persisting the page-URL cache rewrites the entire (large) settings
-      // row, so only do it when there is something new to store — never when
-      // the pages came from that cache. The cache is also capped to the most
-      // recent chapters so the row doesn't grow with reading history.
-      if (!incognitoMode && !pagesFromCache) {
-        const maxCachedChapters = 40;
+      if (!incognitoMode && !hasDownloadedArtifact) {
         List<ChapterPageurls>? chapterPageUrls = [];
         for (var chapterPageUrl in settings.chapterPageUrlsList ?? []) {
           if (chapterPageUrl.chapterId != chapter.id) {
@@ -152,21 +154,18 @@ Future<GetChapterPagesModel> getChapterPages(
         final chapterPageHeaders = pageUrls
             .map((e) => e.headers == null ? null : jsonEncode(e.headers))
             .toList();
+        final urls = pageUrls.map((e) => e.url).toList();
+        // Proxy URLs are transient and must be refreshed on the next open, but
+        // their count is still needed while reading to persist page progress.
         chapterPageUrls.add(
           ChapterPageurls()
             ..chapterId = chapter.id
-            ..urls = pageUrls.map((e) => e.url).toList()
+            ..urls = urls
             ..chapterUrl = chapter.url
             ..headers = chapterPageHeaders.first != null
                 ? chapterPageHeaders.map((e) => e.toString()).toList()
                 : null,
         );
-        if (chapterPageUrls.length > maxCachedChapters) {
-          chapterPageUrls.removeRange(
-            0,
-            chapterPageUrls.length - maxCachedChapters,
-          );
-        }
         isar.writeTxnSync(() {
           isar.settings.putSync(
             settings
@@ -186,6 +185,7 @@ Future<GetChapterPagesModel> getChapterPages(
             i,
             chapterModel,
             i,
+            localArtifactPath: localArtifactPath,
           ),
         );
       }

@@ -116,6 +116,30 @@ List<ExtensionPackage> groupExtensionPackages(Iterable<Source> sources) {
   return grouped.values.map(ExtensionPackage._).toList();
 }
 
+/// Returns the independently configurable sources exposed by one installed APK.
+///
+/// Mihon keys source preferences by native source ID, so factory children must
+/// remain separate even though the Extensions tab groups their APK into one row.
+List<Source> extensionSettingsSources(
+  Source selectedSource,
+  Iterable<Source> candidates,
+) {
+  if (selectedSource.sourceCodeLanguage != SourceCodeLanguage.mihon) {
+    return [selectedSource];
+  }
+
+  final matches =
+      candidates
+          .where(
+            (candidate) =>
+                candidate.itemType == selectedSource.itemType &&
+                belongsToSameMihonExtension(selectedSource, candidate),
+          )
+          .toList()
+        ..sort((left, right) => (left.name ?? '').compareTo(right.name ?? ''));
+  return matches.isEmpty ? [selectedSource] : matches;
+}
+
 Source _selectSource(List<Source> sources) {
   return sources.firstWhere(
     _sourceHasUpdate,

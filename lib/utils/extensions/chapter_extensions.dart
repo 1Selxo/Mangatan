@@ -14,7 +14,9 @@ import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/modules/more/settings/track/providers/track_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/download_manager/download_isolate_pool.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar_path.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path/path.dart' as p;
@@ -69,8 +71,10 @@ extension ChapterExtension on Chapter {
     );
 
     try {
-      final cbzFile = File(p.join(mangaDir!.path, "$name.cbz"));
+      final cbzFile = downloadedMangaChapterCbz(mangaDir!, this);
       if (cbzFile.existsSync()) cbzFile.deleteSync();
+      final sidecar = mokuroSidecarFor(cbzFile);
+      if (sidecar.existsSync()) sidecar.deleteSync();
     } catch (_) {}
     try {
       final mp4File = File(

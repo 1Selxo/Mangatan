@@ -35,6 +35,7 @@ void main() {
 
     final hud = find.byKey(const ValueKey('ocr-progress'));
     expect(tester.getTopLeft(hud).dy, 12);
+    expect(find.text('OCR 1/3'), findsOneWidget);
 
     setHarnessState(() => top = 92);
     await tester.pump();
@@ -50,5 +51,41 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.getTopLeft(hud).dy, 12);
+  });
+
+  testWidgets('shows a compact label while website Mokuro data loads', (
+    tester,
+  ) async {
+    ReaderOcrState.progress.value = const ReaderOcrProgress(
+      completed: 0,
+      total: 12,
+      stage: ReaderOcrProgressStage.loadingMokuro,
+    );
+    addTearDown(() => ReaderOcrState.progress.value = null);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Stack(children: [ReaderOcrProgressHud()])),
+    );
+
+    expect(find.text('Loading Mokuro'), findsOneWidget);
+    expect(find.text('OCR 0/12'), findsNothing);
+  });
+
+  testWidgets('keeps Mokuro distinct during cached page preparation', (
+    tester,
+  ) async {
+    ReaderOcrState.progress.value = const ReaderOcrProgress(
+      completed: 4,
+      total: 12,
+      stage: ReaderOcrProgressStage.mokuro,
+    );
+    addTearDown(() => ReaderOcrState.progress.value = null);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Stack(children: [ReaderOcrProgressHud()])),
+    );
+
+    expect(find.text('Mokuro 4/12'), findsOneWidget);
+    expect(find.text('OCR 4/12'), findsNothing);
   });
 }

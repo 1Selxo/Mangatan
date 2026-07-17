@@ -14,6 +14,7 @@ class UChapDataPreload {
   int? index;
   GetChapterPagesModel? chapterUrlModel;
   int? pageIndex;
+  String? localArtifactPath;
   Uint8List? cropImage;
   bool isTransitionPage;
   Chapter? nextChapter;
@@ -33,6 +34,7 @@ class UChapDataPreload {
     this.index,
     this.chapterUrlModel,
     this.pageIndex, {
+    this.localArtifactPath,
     this.cropImage,
     this.isTransitionPage = false,
     this.nextChapter,
@@ -54,5 +56,6 @@ class UChapDataPreload {
        archiveImage = null,
        index = null,
        chapterUrlModel = null,
+       localArtifactPath = null,
        cropImage = null;
 }

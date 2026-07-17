@@ -13,6 +13,7 @@ import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/reg_exp_matcher.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
@@ -96,13 +97,15 @@ Future<GetChapterPagesModel> getChapterPages(
     );
 
     if (pageUrls.isNotEmpty || isLocalArchive) {
-      if (await File(
-            p.join(mangaDirectory!.path, "${chapter.name}.cbz"),
-          ).exists() ||
-          isLocalArchive) {
-        final path = isLocalArchive
-            ? chapter.archivePath
-            : p.join(mangaDirectory.path, "${chapter.name}.cbz");
+      final downloadedCbz = downloadedMangaChapterCbz(mangaDirectory!, chapter);
+      final hasDownloadedCbz = await downloadedCbz.exists();
+      final localArtifactPath = isLocalArchive
+          ? chapter.archivePath
+          : hasDownloadedCbz
+          ? downloadedCbz.path
+          : path?.path;
+      if (hasDownloadedCbz || isLocalArchive) {
+        final path = isLocalArchive ? chapter.archivePath : downloadedCbz.path;
         final local = await ref.read(
           getArchiveDataFromFileProvider(path!).future,
         );
@@ -166,6 +169,7 @@ Future<GetChapterPagesModel> getChapterPages(
             i,
             chapterModel,
             i,
+            localArtifactPath: localArtifactPath,
           ),
         );
       }

@@ -141,6 +141,7 @@ class MiningPreferences {
   static const _ankiAudioTimeoutMs = 'anki_audio_timeout_ms';
   static const _ankiAudioLanguage = 'anki_audio_language';
   static const _ocrEngine = 'ocr_engine';
+  static const _mokuroWebsiteOcrEnabled = 'mokuro_website_ocr_enabled';
   static const _ocrOverlayEnabled = 'ocr_overlay_enabled';
   static const _ocrLanguage = 'ocr_language';
   static const _dictionaryLanguage = 'dictionary_language';
@@ -471,6 +472,19 @@ class MiningPreferences {
 
   static Future<void> setOcrEngine(OcrEnginePreference value) async {
     await (await _boxOrNull())?.put(_ocrEngine, value.name);
+  }
+
+  static Future<bool> getMokuroWebsiteOcrEnabled() async {
+    return (await _boxOrNull())?.get(
+              _mokuroWebsiteOcrEnabled,
+              defaultValue: true,
+            )
+            as bool? ??
+        true;
+  }
+
+  static Future<void> setMokuroWebsiteOcrEnabled(bool value) async {
+    await (await _boxOrNull())?.put(_mokuroWebsiteOcrEnabled, value);
   }
 
   static Future<bool> getOcrOverlayEnabled() async {

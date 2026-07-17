@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -15,7 +16,9 @@ import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/mokuro_extension_ocr.dart';
 import 'package:mangayomi/services/mining/mokuro_parser.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:mangayomi/services/mining/ocr_block_merger.dart';
 import 'package:mangayomi/services/mining/profile_ocr_language.dart';
@@ -44,6 +47,8 @@ class ReaderOcrState {
   static bool _hoveringPopup = false;
   static int _hoverGeneration = 0;
   static int _scanGeneration = 0;
+  static int _mokuroWebsiteLoads = 0;
+  static bool _usingMokuroWebsiteData = false;
   static int _paintGeneration = 0;
   static bool _popupWasVisibleOnPointerDown = false;
   static Offset? _lastPointerPosition;
@@ -382,13 +387,14 @@ class ReaderOcrState {
     final scanPages = pages.where((page) => !page.isTransitionPage).toList();
     if (scanPages.isEmpty) return;
     final generation = ++_scanGeneration;
+    _usingMokuroWebsiteData = false;
     final start = startIndex.clamp(0, scanPages.length - 1);
     final ordered = [
       ...scanPages.sublist(start),
       ...scanPages.sublist(0, start),
     ];
     var completed = 0;
-    progress.value = ReaderOcrProgress(completed: 0, total: ordered.length);
+    progress.value = _scanProgress(completed: 0, total: ordered.length);
     for (var index = 0; index < ordered.length; index += 2) {
       if (generation != _scanGeneration || !enabled.value) return;
       final end = math.min(index + 2, ordered.length);
@@ -404,7 +410,7 @@ class ReaderOcrState {
       );
       completed = end;
       if (generation == _scanGeneration) {
-        progress.value = ReaderOcrProgress(
+        progress.value = _scanProgress(
           completed: completed,
           total: ordered.length,
         );
@@ -422,12 +428,60 @@ class ReaderOcrState {
       _lastPreparePage = null;
     }
   }
+
+  static ReaderOcrProgress _scanProgress({
+    required int completed,
+    required int total,
+  }) => ReaderOcrProgress(
+    completed: completed,
+    total: total,
+    stage: _progressStage,
+  );
+
+  static ReaderOcrProgressStage get _progressStage {
+    if (_mokuroWebsiteLoads > 0) {
+      return ReaderOcrProgressStage.loadingMokuro;
+    }
+    if (_usingMokuroWebsiteData) return ReaderOcrProgressStage.mokuro;
+    return ReaderOcrProgressStage.recognizing;
+  }
+
+  static void _setMokuroWebsiteLoading(bool loading) {
+    _mokuroWebsiteLoads = math.max(0, _mokuroWebsiteLoads + (loading ? 1 : -1));
+    final current = progress.value;
+    if (current == null) return;
+    _refreshProgressStage();
+  }
+
+  static void _setUsingMokuroWebsiteData() {
+    _usingMokuroWebsiteData = true;
+    _refreshProgressStage();
+  }
+
+  static void _refreshProgressStage() {
+    final stage = _progressStage;
+    final current = progress.value;
+    if (current == null) return;
+    if (current.stage == stage) return;
+    progress.value = ReaderOcrProgress(
+      completed: current.completed,
+      total: current.total,
+      stage: stage,
+    );
+  }
 }
 
+enum ReaderOcrProgressStage { recognizing, loadingMokuro, mokuro }
+
 class ReaderOcrProgress {
-  const ReaderOcrProgress({required this.completed, required this.total});
+  const ReaderOcrProgress({
+    required this.completed,
+    required this.total,
+    this.stage = ReaderOcrProgressStage.recognizing,
+  });
   final int completed;
   final int total;
+  final ReaderOcrProgressStage stage;
 }
 
 class ReaderOcrProgressHud extends StatelessWidget {
@@ -459,7 +513,13 @@ class ReaderOcrProgressHud extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   const SizedBox(width: 8),
-                  Text('OCR ${progress.completed}/${progress.total}'),
+                  Text(switch (progress.stage) {
+                    ReaderOcrProgressStage.loadingMokuro => 'Loading Mokuro',
+                    ReaderOcrProgressStage.mokuro =>
+                      'Mokuro ${progress.completed}/${progress.total}',
+                    ReaderOcrProgressStage.recognizing =>
+                      'OCR ${progress.completed}/${progress.total}',
+                  }),
                 ],
               ),
             ),
@@ -535,6 +595,7 @@ class ReaderOcrController extends ChangeNotifier {
     );
     final values = await Future.wait<dynamic>([
       MiningPreferences.getOcrEngine(),
+      MiningPreferences.getMokuroWebsiteOcrEnabled(),
       DictionaryProfileResolver.resolve(
         mangaId: manga?.id,
         sourceId: DictionaryProfileResolver.overrideIdForSource(source),
@@ -542,7 +603,9 @@ class ReaderOcrController extends ChangeNotifier {
       ),
     ]);
     final engine = values[0] as OcrEnginePreference;
-    final profile = values[1] as DictionaryProfile;
+    final useMokuroWebsiteOcr = values[1] as bool;
+    final profile = values[2] as DictionaryProfile;
+    final sourceName = source?.name ?? manga?.source ?? '';
     final language = profileOcrLanguage(profile.languageCode);
     final ocrAllowed = isProfileOcrAllowed(
       sourceLanguage: sourceLanguage,
@@ -551,17 +614,24 @@ class ReaderOcrController extends ChangeNotifier {
     final key =
         '${data.pageUrl?.url ?? data.directory?.path ?? ''}:'
         '${data.chapter?.id}:${data.index}:${data.pageIndex}:'
-        '${engine.name}:$language:$ocrAllowed';
+        '${engine.name}:$useMokuroWebsiteOcr:$sourceName:'
+        '$language:$ocrAllowed';
     try {
-      return await _cache.putIfAbsent(
+      final page = await _cache.putIfAbsent(
         key,
         () => _recognize(
           data,
           engine: engine,
+          sourceName: sourceName,
+          useMokuroWebsiteOcr: useMokuroWebsiteOcr,
           language: language,
           ocrAllowed: ocrAllowed,
         ),
       );
+      if (page.usesMokuroWebsiteData) {
+        ReaderOcrState._setUsingMokuroWebsiteData();
+      }
+      return page;
     } catch (_) {
       _cache.remove(key);
       rethrow;
@@ -1000,9 +1070,37 @@ class ReaderOcrController extends ChangeNotifier {
     super.dispose();
   }
 
+  static Future<void> _backfillMokuroSidecar(
+    UChapDataPreload data, {
+    required String sourceName,
+  }) async {
+    final path = data.localArtifactPath;
+    if (path == null || path.trim().isEmpty) return;
+    final type = await FileSystemEntity.type(path);
+    final FileSystemEntity? artifact = switch (type) {
+      FileSystemEntityType.file => File(path),
+      FileSystemEntityType.directory => Directory(path),
+      _ => null,
+    };
+    if (artifact == null) return;
+
+    final store = MokuroSidecarStore();
+    try {
+      await store.ensureDownloaded(
+        sourceName: sourceName,
+        chapterUrl: data.chapter?.url ?? '',
+        artifact: artifact,
+      );
+    } finally {
+      store.close();
+    }
+  }
+
   static Future<_ReaderOcrPage> _recognize(
     UChapDataPreload data, {
     required OcrEnginePreference engine,
+    required String sourceName,
+    required bool useMokuroWebsiteOcr,
     required String language,
     required bool ocrAllowed,
   }) async {
@@ -1021,9 +1119,9 @@ class ReaderOcrController extends ChangeNotifier {
       );
     }
 
+    const parser = MokuroParser();
     if (engine != OcrEnginePreference.googleLens &&
         engine != OcrEnginePreference.screenAi) {
-      const parser = MokuroParser();
       final volume = await parser.findForReaderPage(data);
       final mokuroPage = volume == null
           ? null
@@ -1038,13 +1136,41 @@ class ReaderOcrController extends ChangeNotifier {
           );
         }
       }
-      if (engine == OcrEnginePreference.mokuroOnly) {
-        return _ReaderOcrPage(
-          blocks: const [],
-          boxScaleX: boxScaleX,
-          boxScaleY: boxScaleY,
+    }
+
+    if (useMokuroWebsiteOcr) {
+      final client = MokuroExtensionOcrClient();
+      try {
+        final volume = await client.fetchVolume(
+          sourceName: sourceName,
+          chapterUrl: data.chapter?.url ?? '',
+          onLoadingChanged: ReaderOcrState._setMokuroWebsiteLoading,
         );
+        if (volume != null) {
+          await _backfillMokuroSidecar(data, sourceName: sourceName);
+        }
+        final mokuroPage = volume == null
+            ? null
+            : parser.resolvePage(volume, data: data);
+        if (mokuroPage != null) {
+          return _ReaderOcrPage(
+            blocks: parser.convertPage(mokuroPage),
+            boxScaleX: boxScaleX,
+            boxScaleY: boxScaleY,
+            usesMokuroWebsiteData: true,
+          );
+        }
+      } finally {
+        client.close();
       }
+    }
+
+    if (engine == OcrEnginePreference.mokuroOnly) {
+      return _ReaderOcrPage(
+        blocks: const [],
+        boxScaleX: boxScaleX,
+        boxScaleY: boxScaleY,
+      );
     }
 
     Uint8List? bytes = data.cropImage ?? await data.getImageBytes;
@@ -1331,11 +1457,13 @@ class _ReaderOcrPage {
     required this.blocks,
     required this.boxScaleX,
     required this.boxScaleY,
+    this.usesMokuroWebsiteData = false,
   });
 
   final List<OcrTextBlock> blocks;
   final double boxScaleX;
   final double boxScaleY;
+  final bool usesMokuroWebsiteData;
 }
 
 List<int> _orderedLineIndices(OcrTextBlock block) {

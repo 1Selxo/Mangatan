@@ -9,6 +9,8 @@ import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/modules/manga/download/providers/download_provider.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar_path.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/global_style.dart';
@@ -35,7 +37,7 @@ class ChapterPageDownload extends ConsumerWidget {
 
     List<XFile> files = [];
 
-    final cbzFile = File(p.join(mangaDir!.path, "${chapter.name}.cbz"));
+    final cbzFile = downloadedMangaChapterCbz(mangaDir!, chapter);
     final mp4File = File(
       p.join(
         mangaDir.path,
@@ -45,6 +47,8 @@ class ChapterPageDownload extends ConsumerWidget {
     final htmlFile = File(p.join(mangaDir.path, "${chapter.name}.html"));
     if (cbzFile.existsSync()) {
       files = [XFile(cbzFile.path)];
+      final sidecar = mokuroSidecarFor(cbzFile);
+      if (sidecar.existsSync()) files.add(XFile(sidecar.path));
     } else if (mp4File.existsSync()) {
       files = [XFile(mp4File.path)];
     } else if (htmlFile.existsSync()) {

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar_path.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:path/path.dart' as p;
 
@@ -64,7 +66,13 @@ class MokuroParser {
   Future<MokuroVolume?> findForReaderPage(UChapDataPreload data) async {
     for (final candidate in _candidateFiles(data)) {
       if (await candidate.exists()) {
-        return parse(await candidate.readAsString());
+        try {
+          return parse(await candidate.readAsString());
+        } catch (_) {
+          // Ignore stale, partial, or manually copied files and continue to
+          // another local candidate before the reader falls back to network
+          // or generated OCR.
+        }
       }
     }
     return null;
@@ -74,7 +82,9 @@ class MokuroParser {
     MokuroVolume volume, {
     required UChapDataPreload data,
   }) {
-    final pageIndex = data.pageIndex ?? data.index ?? 0;
+    // [index] is chapter-local, while [pageIndex] becomes global when the
+    // continuous reader appends or prepends adjacent chapters.
+    final pageIndex = data.index ?? data.pageIndex ?? 0;
     final localName = data.isLocale == true && data.index != null
         ? '${data.index.toString().padLeft(5, '0')}.jpg'
         : null;
@@ -179,6 +189,11 @@ class MokuroParser {
   }
 
   Iterable<File> _candidateFiles(UChapDataPreload data) sync* {
+    final localArtifactPath = data.localArtifactPath;
+    if (localArtifactPath != null && localArtifactPath.trim().isNotEmpty) {
+      yield* _artifactCandidates(localArtifactPath);
+    }
+
     final archivePath = data.chapter?.archivePath;
     if (archivePath != null && archivePath.trim().isNotEmpty) {
       final parsed = p.setExtension(archivePath, '.mokuro');
@@ -194,6 +209,17 @@ class MokuroParser {
     if (directory != null) {
       yield File(p.join(directory.path, '.mokuro'));
       yield File(p.join(directory.path, 'mokuro.json'));
+      yield mokuroSidecarFor(directory);
+
+      // Reader data created before [localArtifactPath] was added still knows
+      // the intended chapter directory. Derive the exact downloaded CBZ
+      // sibling rather than scanning the manga directory and risking another
+      // chapter's OCR.
+      final chapter = data.chapter;
+      if (chapter != null) {
+        final cbz = downloadedMangaChapterCbz(directory.parent, chapter);
+        yield mokuroSidecarFor(cbz);
+      }
       if (directory.existsSync()) {
         for (final entity in directory.listSync()) {
           if (entity is File &&
@@ -204,6 +230,21 @@ class MokuroParser {
         }
       }
     }
+  }
+
+  Iterable<File> _artifactCandidates(String artifactPath) sync* {
+    final type = FileSystemEntity.typeSync(artifactPath);
+    final isDirectory = type == FileSystemEntityType.directory;
+    if (isDirectory) {
+      final directory = Directory(artifactPath);
+      yield File(p.join(directory.path, '.mokuro'));
+      yield File(p.join(directory.path, 'mokuro.json'));
+      yield mokuroSidecarFor(directory);
+      return;
+    }
+
+    yield File(p.setExtension(artifactPath, '.mokuro'));
+    yield File(p.setExtension(artifactPath, '.json'));
   }
 
   static int _asInt(dynamic value) {

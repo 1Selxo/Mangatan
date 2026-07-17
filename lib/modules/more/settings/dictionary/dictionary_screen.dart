@@ -32,6 +32,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     name: 'Default',
   );
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
+  bool _mokuroWebsiteOcrEnabled = true;
   String _dictionaryLanguage = 'ja';
   double _backgroundOpacity = MiningPreferences.defaultOcrBackgroundOpacity;
   double _textOpacity = MiningPreferences.defaultOcrTextOpacity;
@@ -83,11 +84,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getDictionaryLanguage(),
       MiningPreferences.getDictionaryProfiles(),
       MiningPreferences.getActiveDictionaryProfile(),
+      MiningPreferences.getMokuroWebsiteOcrEnabled(),
     ]);
     if (!mounted) return;
     setState(() {
       _profiles = values[17] as List<DictionaryProfile>;
       _activeProfile = values[18] as DictionaryProfile;
+      _mokuroWebsiteOcrEnabled = values[19] as bool;
       _dictionaries = _orderDictionaries(
         values[0] as List<InstalledDictionary>,
         _activeProfile.dictionaryOrder,
@@ -1052,7 +1055,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
+                SwitchListTile(
+                  secondary: const Icon(Icons.cloud_download_outlined),
+                  title: const Text('Use Mokuro website OCR'),
+                  subtitle: const Text(
+                    'For the Mokuro extension, prefer the website\'s saved '
+                    'OCR instead of generating it on the fly',
+                  ),
+                  value: _mokuroWebsiteOcrEnabled,
+                  onChanged: (value) async {
+                    setState(() => _mokuroWebsiteOcrEnabled = value);
+                    await MiningPreferences.setMokuroWebsiteOcrEnabled(value);
+                  },
+                ),
                 ListTile(
                   leading: Icon(
                     _screenAiAvailable

@@ -61,6 +61,55 @@ class SyncScreen extends ConsumerWidget {
                   },
                 ),
                 ListTile(
+                  title: const Text('Sync mode'),
+                  subtitle: Text(
+                    syncPreference.syncMode == SyncMode.chimahon
+                        ? 'Chimahon / SyncYomi compatible'
+                        : 'Mangayomi native',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.secondaryColor,
+                    ),
+                  ),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Sync mode'),
+                        content: RadioGroup(
+                          groupValue: syncPreference.syncMode,
+                          onChanged: (value) {
+                            if (value == null) return;
+                            ref
+                                .read(synchingProvider(syncId: 1).notifier)
+                                .setSyncMode(value);
+                            Navigator.pop(context);
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              RadioListTile(
+                                value: SyncMode.native,
+                                title: Text('Mangayomi native'),
+                                subtitle: Text(
+                                  'Uses the existing Mangayomi sync server.',
+                                ),
+                              ),
+                              RadioListTile(
+                                value: SyncMode.chimahon,
+                                title: Text('Chimahon / SyncYomi compatible'),
+                                subtitle: Text(
+                                  'Uses Chimahon-compatible protobuf sync data.',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
                   enabled: syncPreference.syncOn,
                   onTap: () {
                     showDialog(
@@ -243,6 +292,9 @@ class SyncScreen extends ConsumerWidget {
                   },
                   id: 1,
                   preference: syncPreference,
+                  text: syncPreference.syncMode == SyncMode.chimahon
+                      ? 'SyncYomi'
+                      : null,
                 ),
                 ListTile(
                   title: Padding(
@@ -430,11 +482,12 @@ class SyncScreen extends ConsumerWidget {
     WidgetRef ref,
     SyncPreference syncPreference,
   ) {
+    final isChimahonSync = syncPreference.syncMode == SyncMode.chimahon;
     final serverController = TextEditingController(text: syncPreference.server);
     final emailController = TextEditingController(text: syncPreference.email);
     final passwordController = TextEditingController();
-    String server = "";
-    String email = "";
+    String server = serverController.text;
+    String email = emailController.text;
     String password = "";
     String errorMessage = "";
     bool isLoading = false;
@@ -446,11 +499,13 @@ class SyncScreen extends ConsumerWidget {
         builder: (context, setState) {
           return AlertDialog(
             title: Text(
-              l10n.login_into("SyncServer"),
+              isChimahonSync
+                  ? 'Connect SyncYomi'
+                  : l10n.login_into("SyncServer"),
               style: const TextStyle(fontSize: 30),
             ),
             content: SizedBox(
-              height: 400,
+              height: isChimahonSync ? 300 : 400,
               width: MediaQuery.of(context).size.width,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,55 +538,61 @@ class SyncScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: TextFormField(
-                      controller: emailController,
-                      autofocus: true,
-                      onChanged: (value) => setState(() {
-                        email = value;
-                      }),
-                      decoration: InputDecoration(
-                        hintText: l10n.email_adress,
-                        filled: false,
-                        contentPadding: const EdgeInsets.all(12),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(width: 0.4),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(5),
-                          borderSide: const BorderSide(),
+                  if (!isChimahonSync) ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: TextFormField(
+                        controller: emailController,
+                        autofocus: true,
+                        onChanged: (value) => setState(() {
+                          email = value;
+                        }),
+                        decoration: InputDecoration(
+                          hintText: l10n.email_adress,
+                          filled: false,
+                          contentPadding: const EdgeInsets.all(12),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: const BorderSide(width: 0.4),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: const BorderSide(),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(5),
+                            borderSide: const BorderSide(),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: TextFormField(
                       controller: passwordController,
-                      obscureText: obscureText,
+                      obscureText: !isChimahonSync && obscureText,
                       onChanged: (value) => setState(() {
                         password = value;
                       }),
                       decoration: InputDecoration(
-                        hintText: l10n.sync_password,
-                        suffixIcon: IconButton(
-                          onPressed: () => setState(() {
-                            obscureText = !obscureText;
-                          }),
-                          icon: Icon(
-                            obscureText
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                        ),
+                        hintText: isChimahonSync
+                            ? 'SyncYomi API token'
+                            : l10n.sync_password,
+                        suffixIcon: isChimahonSync
+                            ? null
+                            : IconButton(
+                                onPressed: () => setState(() {
+                                  obscureText = !obscureText;
+                                }),
+                                icon: Icon(
+                                  obscureText
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                              ),
                         filled: false,
                         contentPadding: const EdgeInsets.all(12),
                         enabledBorder: OutlineInputBorder(
@@ -564,11 +625,19 @@ class SyncScreen extends ConsumerWidget {
                                 setState(() {
                                   isLoading = true;
                                 });
-                                final res = await ref
-                                    .read(
-                                      syncServerProvider(syncId: 1).notifier,
-                                    )
-                                    .login(l10n, server, email, password);
+                                final res = isChimahonSync
+                                    ? _saveSyncYomiCredentials(
+                                        ref,
+                                        server,
+                                        password,
+                                      )
+                                    : await ref
+                                          .read(
+                                            syncServerProvider(
+                                              syncId: 1,
+                                            ).notifier,
+                                          )
+                                          .login(l10n, server, email, password);
                                 if (!res.$1) {
                                   setState(() {
                                     isLoading = false;
@@ -593,5 +662,20 @@ class SyncScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  (bool, String) _saveSyncYomiCredentials(
+    WidgetRef ref,
+    String server,
+    String token,
+  ) {
+    if (server.trim().isEmpty || token.trim().isEmpty) {
+      return (false, 'SyncYomi server and API token required');
+    }
+    ref
+        .read(synchingProvider(syncId: 1).notifier)
+        .login(server.trim(), 'SyncYomi', token.trim());
+    botToast('SyncYomi token saved');
+    return (true, '');
   }
 }

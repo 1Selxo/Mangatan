@@ -19,6 +19,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_mining_settings_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
@@ -394,6 +395,15 @@ Future<void> restoreTachiBkBackup(
   }
   final content = decoded.protobufBytes;
   final backup = decoded.backup;
+  await restoreTachiBkBackupData(ref, backup, content, bkType);
+}
+
+Future<void> restoreTachiBkBackupData(
+  Ref ref,
+  BackupMihon backup,
+  List<int> content,
+  BackupType bkType,
+) async {
   final localSources = isar.sources.filter().idIsNotNull().findAllSync();
   final localArchiveMangas = isar.mangas
       .filter()

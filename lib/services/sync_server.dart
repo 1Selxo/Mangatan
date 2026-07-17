@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
@@ -5,11 +8,16 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/update.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/restore.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
@@ -19,7 +27,14 @@ import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_pr
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/http/m_client.dart';
-import 'dart:convert';
+import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
+import 'package:mangayomi/services/sync/chimahon_mining_settings_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
+import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
+import 'package:mangayomi/services/sync/cross_device_sync_engine.dart';
+import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
+import 'package:mangayomi/services/sync/mihon_backup_exporter.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 part 'sync_server.g.dart';
@@ -82,6 +97,19 @@ class SyncServer extends _$SyncServer {
     try {
       final syncPreference = ref.read(synchingProvider(syncId: syncId));
       final syncNotifier = ref.read(synchingProvider(syncId: syncId).notifier);
+      if (syncPreference.syncMode == SyncMode.chimahon) {
+        await _startChimahonSync(
+          syncPreference,
+          syncNotifier,
+          upload: upload,
+          download: download,
+        );
+        ref.invalidate(synchingProvider(syncId: syncId));
+        if (!silent) {
+          botToast(l10n.sync_finished, second: 2);
+        }
+        return;
+      }
 
       final resultManga = await _syncManga(
         l10n,
@@ -136,6 +164,93 @@ class SyncServer extends _$SyncServer {
     } catch (error) {
       botToast(error.toString(), second: 5);
     }
+  }
+
+  Future<void> _startChimahonSync(
+    SyncPreference syncPreference,
+    Synching syncNotifier, {
+    bool upload = false,
+    bool download = false,
+  }) async {
+    final server = _normalizeServer(syncPreference.server);
+    final token = syncPreference.authToken ?? '';
+    if (server.isEmpty || token.isEmpty) {
+      throw const SyncStorageException('SyncYomi server and API token required');
+    }
+
+    final storage = SyncYomiStorage(baseUrl: Uri.parse(server), apiToken: token);
+    final codec = const ChimahonSyncCodec();
+    final deferredStore = await _chimahonDeferredStore();
+
+    if (download) {
+      final remote = await storage.download();
+      if (remote == null) {
+        throw const SyncStorageException('No remote Chimahon sync data found');
+      }
+      final backup = codec.decode(remote.bytes).backup;
+      await restoreTachiBkBackupData(
+        ref,
+        backup,
+        backup.writeToBuffer(),
+        BackupType.mihon,
+      );
+      await deferredStore.save(backup);
+    } else if (upload) {
+      final local = await _exportChimahonBackup();
+      final deferred = await deferredStore.load();
+      final backup = deferred == null
+          ? local
+          : const ChimahonSyncMerger().merge(local: deferred, remote: local);
+      await storage.upload(codec.encode(backup, format: storage.wireFormat));
+      await deferredStore.save(backup);
+    } else {
+      await CrossDeviceSyncEngine(
+        storage: storage,
+        exportLocal: _exportChimahonBackup,
+        importMerged: (backup) => restoreTachiBkBackupData(
+          ref,
+          backup,
+          backup.writeToBuffer(),
+          BackupType.mihon,
+        ),
+        deferredPayloadStore: deferredStore,
+      ).synchronize();
+    }
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    syncNotifier.setLastSyncManga(timestamp);
+    syncNotifier.setLastSyncHistory(timestamp);
+    syncNotifier.setLastSyncUpdate(timestamp);
+  }
+
+  Future<FileChimahonDeferredPayloadStore> _chimahonDeferredStore() async {
+    final support = await getApplicationSupportDirectory();
+    return FileChimahonDeferredPayloadStore(
+      File(
+        '${support.path}${Platform.pathSeparator}sync'
+        '${Platform.pathSeparator}chimahon_deferred.tachibk',
+      ),
+    );
+  }
+
+  Future<BackupMihon> _exportChimahonBackup() async {
+    const settingsAdapter = ChimahonMiningSettingsAdapter();
+    final appPreferences = await settingsAdapter.export();
+    return const MihonBackupExporter().export(
+      mangas: isar.mangas.filter().idIsNotNull().findAllSync(),
+      categories: isar.categorys.filter().idIsNotNull().findAllSync(),
+      chapters: isar.chapters.filter().idIsNotNull().findAllSync(),
+      histories: isar.historys.filter().idIsNotNull().findAllSync(),
+      sources: isar.sources.filter().idIsNotNull().findAllSync(),
+      epubBookProgress: isar.epubBookProgress.where().findAllSync(),
+      appPreferences: appPreferences,
+    );
+  }
+
+  String _normalizeServer(String? server) {
+    final value = (server ?? '').trim();
+    if (value.endsWith('/')) return value.substring(0, value.length - 1);
+    return value;
   }
 
   Future<bool> _syncManga(

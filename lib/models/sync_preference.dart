@@ -1,6 +1,8 @@
 import 'package:isar_community/isar.dart';
 part 'sync_preference.g.dart';
 
+enum SyncMode { native, chimahon }
+
 @collection
 @Name("Sync Preference")
 class SyncPreference {
@@ -28,6 +30,9 @@ class SyncPreference {
 
   bool syncSettings = false;
 
+  @enumerated
+  SyncMode syncMode = SyncMode.native;
+
   SyncPreference({
     this.syncId,
     this.email,
@@ -38,6 +43,7 @@ class SyncPreference {
     this.server,
     this.syncOn = false,
     this.autoSyncFrequency = 0,
+    this.syncMode = SyncMode.native,
   });
 
   SyncPreference.fromJson(Map<String, dynamic> json) {
@@ -53,6 +59,7 @@ class SyncPreference {
     syncHistories = json['syncHistories'] ?? false;
     syncUpdates = json['syncUpdates'] ?? false;
     syncSettings = json['syncSettings'] ?? false;
+    syncMode = SyncMode.values[json['syncMode'] ?? SyncMode.native.index];
   }
 
   Map<String, dynamic> toJson() => {
@@ -67,5 +74,6 @@ class SyncPreference {
     'syncHistories': syncHistories,
     'syncUpdates': syncUpdates,
     'syncSettings': syncSettings,
+    'syncMode': syncMode.index,
   };
 }

@@ -47,6 +47,26 @@ class DefaultReadingDirectionState extends _$DefaultReadingDirectionState {
 }
 
 @riverpod
+class DefaultPageModeState extends _$DefaultPageModeState {
+  @override
+  PageMode build() {
+    return isar.settings.getSync(227)!.defaultPageMode;
+  }
+
+  void set(PageMode value) {
+    final settings = isar.settings.getSync(227);
+    state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..defaultPageMode = value
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
+@riverpod
 class AnimatePageTransitionsState extends _$AnimatePageTransitionsState {
   @override
   bool build() {

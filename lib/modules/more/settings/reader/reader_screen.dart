@@ -16,6 +16,7 @@ class ReaderScreen extends ConsumerWidget {
     final defaultReadingDirection = ref.watch(
       defaultReadingDirectionStateProvider,
     );
+    final defaultPageMode = ref.watch(defaultPageModeStateProvider);
     final animatePageTransitions = ref.watch(
       animatePageTransitionsStateProvider,
     );
@@ -138,6 +139,42 @@ class ReaderScreen extends ConsumerWidget {
               title: Text(context.l10n.reading_direction),
               subtitle: Text(
                 getReadingDirectionName(defaultReadingDirection, context),
+                style: TextStyle(fontSize: 11, color: context.secondaryColor),
+              ),
+            ),
+            ListTile(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(context.l10n.default_page_mode),
+                    content: RadioGroup(
+                      groupValue: defaultPageMode,
+                      onChanged: (value) {
+                        ref
+                            .read(defaultPageModeStateProvider.notifier)
+                            .set(value!);
+                        Navigator.pop(context);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final pageMode in PageMode.values)
+                            RadioListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: pageMode,
+                              title: Text(getPageModeName(pageMode, context)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              title: Text(context.l10n.default_page_mode),
+              subtitle: Text(
+                getPageModeName(defaultPageMode, context),
                 style: TextStyle(fontSize: 11, color: context.secondaryColor),
               ),
             ),
@@ -539,6 +576,14 @@ String getReadingDirectionName(
   return switch (readingDirection) {
     ReadingDirection.leftToRight => context.l10n.reading_mode_left_to_right,
     ReadingDirection.rightToLeft => context.l10n.reading_mode_right_to_left,
+  };
+}
+
+String getPageModeName(PageMode pageMode, BuildContext context) {
+  return switch (pageMode) {
+    PageMode.onePage => context.l10n.page_mode_single,
+    PageMode.doublePage => context.l10n.page_mode_double,
+    PageMode.doublePageCover => context.l10n.page_mode_double_cover,
   };
 }
 

@@ -637,6 +637,18 @@ class AppLocalizationsHi extends AppLocalizations {
   String get reading_mode_webtoon => 'वेबटून';
 
   @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
   String get double_tap_animation_speed => 'डबल टैप एनिमेशन गति';
 
   @override

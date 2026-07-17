@@ -42,4 +42,27 @@ void main() {
       ReadingDirection.rightToLeft,
     );
   });
+
+  test('page mode persistence falls back safely for old or invalid data', () {
+    expect(PageModeExtension.fromPersistedIndex(null), PageMode.onePage);
+    expect(PageModeExtension.fromPersistedIndex(-1), PageMode.onePage);
+    expect(PageModeExtension.fromPersistedIndex(99), PageMode.onePage);
+    expect(
+      PageModeExtension.fromPersistedIndex(PageMode.doublePage.index),
+      PageMode.doublePage,
+    );
+    expect(
+      PageModeExtension.fromPersistedIndex(PageMode.doublePageCover.index),
+      PageMode.doublePageCover,
+    );
+  });
+
+  test('default page mode is included in settings backups', () {
+    final settings = Settings(defaultPageMode: PageMode.doublePageCover);
+    final backup = settings.toJson();
+    final restored = Settings.fromJson(backup);
+
+    expect(backup['defaultPageMode'], PageMode.doublePageCover.index);
+    expect(restored.defaultPageMode, PageMode.doublePageCover);
+  });
 }

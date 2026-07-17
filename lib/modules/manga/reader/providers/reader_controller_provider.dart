@@ -95,7 +95,7 @@ class ReaderController extends _$ReaderController
     if (personalPageMode.isNotEmpty) {
       return personalPageMode.first.pageMode;
     }
-    return PageMode.onePage;
+    return getIsarSetting().defaultPageMode;
   }
 
   void setReaderMode(ReaderMode newReaderMode) {

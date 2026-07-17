@@ -76,6 +76,9 @@ class Settings {
   /// Persisted enum index. Nullable so legacy combined RTL modes can migrate.
   int? defaultReadingDirectionIndex;
 
+  @enumerated
+  late PageMode defaultPageMode;
+
   List<PersonalReaderMode>? personalReaderModeList;
 
   bool? animatePageTransitions;
@@ -405,6 +408,7 @@ class Settings {
     this.cookiesList,
     this.defaultReaderMode = ReaderMode.verticalPaged,
     this.defaultReadingDirectionIndex = 0,
+    this.defaultPageMode = PageMode.onePage,
     this.personalReaderModeList,
     this.animatePageTransitions = true,
     this.doubleTapAnimationSpeed = 1,
@@ -614,6 +618,9 @@ class Settings {
                     json['defaultReadingDirection'],
                   ))
             .index;
+    defaultPageMode = PageModeExtension.fromPersistedIndex(
+      json['defaultPageMode'],
+    );
     displayType = DisplayType.values[json['displayType']];
     doubleTapAnimationSpeed = json['doubleTapAnimationSpeed'];
     downloadLocation = json['downloadLocation'];
@@ -885,6 +892,7 @@ class Settings {
     'dateFormat': dateFormat,
     'defaultReaderMode': effectiveDefaultReaderMode.index,
     'defaultReadingDirection': effectiveDefaultReadingDirection.index,
+    'defaultPageMode': defaultPageMode.index,
     'displayType': displayType.index,
     'doubleTapAnimationSpeed': doubleTapAnimationSpeed,
     'downloadLocation': downloadLocation,
@@ -1403,6 +1411,14 @@ enum NovelTextAlign { left, center, right, block }
 enum PageMode { onePage, doublePage, doublePageCover }
 
 extension PageModeExtension on PageMode {
+  static PageMode fromPersistedIndex(Object? value) {
+    final index = value is int ? value : null;
+    if (index == null || index < 0 || index >= PageMode.values.length) {
+      return PageMode.onePage;
+    }
+    return PageMode.values[index];
+  }
+
   bool get isDoublePage =>
       this == PageMode.doublePage || this == PageMode.doublePageCover;
 

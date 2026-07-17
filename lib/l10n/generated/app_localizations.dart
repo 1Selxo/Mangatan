@@ -1175,6 +1175,30 @@ abstract class AppLocalizations {
   /// **'Webtoon'**
   String get reading_mode_webtoon;
 
+  /// No description provided for @default_page_mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Default page mode'**
+  String get default_page_mode;
+
+  /// No description provided for @page_mode_single.
+  ///
+  /// In en, this message translates to:
+  /// **'Single page'**
+  String get page_mode_single;
+
+  /// No description provided for @page_mode_double.
+  ///
+  /// In en, this message translates to:
+  /// **'Double page'**
+  String get page_mode_double;
+
+  /// No description provided for @page_mode_double_cover.
+  ///
+  /// In en, this message translates to:
+  /// **'Double page with cover offset'**
+  String get page_mode_double_cover;
+
   /// No description provided for @double_tap_animation_speed.
   ///
   /// In en, this message translates to:

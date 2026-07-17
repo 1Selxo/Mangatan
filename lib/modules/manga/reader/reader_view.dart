@@ -168,6 +168,7 @@ class _MangaChapterPageGalleryState
   /// chapters via pushReplacement. The old widget's dispose runs after the new
   /// widget is created, which would clobber the new reader's fullscreen state.
   static bool _isNavigatingToChapter = false;
+  bool _backNavigationInProgress = false;
 
   @override
   void dispose() {
@@ -1447,6 +1448,8 @@ class _MangaChapterPageGalleryState
   }
 
   void _goBack(BuildContext context) {
+    if (_backNavigationInProgress) return;
+    _backNavigationInProgress = true;
     restoreSystemUI();
     Navigator.pop(context);
   }

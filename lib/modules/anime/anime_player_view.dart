@@ -204,6 +204,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
         _AlwaysOnTopStateMixin,
         TickerProviderStateMixin,
         WidgetsBindingObserver {
+  bool _backNavigationInProgress = false;
   late final GlobalKey<VideoState> _key = GlobalKey<VideoState>();
   late final useLibass = ref.read(useLibassStateProvider);
   late final useMpvConfig = ref.read(useMpvConfigStateProvider);
@@ -727,6 +728,33 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (context.mounted) {
       pushReplacementMangaReaderView(context: context, chapter: episode);
     }
+  }
+
+  Future<void> _exitDesktopFullScreen() async {
+    final isFullScreen = await setFullScreen(value: false);
+    if (!mounted) return;
+    ref.read(fullscreenProvider.notifier).state = isFullScreen;
+    widget.desktopFullScreenPlayer.call(isFullScreen);
+  }
+
+  Future<void> _handleEscape() async {
+    if (isDesktop && ref.read(fullscreenProvider)) {
+      await _exitDesktopFullScreen();
+      return;
+    }
+    await _goBackToDetail();
+  }
+
+  Future<void> _goBackToDetail() async {
+    if (_backNavigationInProgress) return;
+    _backNavigationInProgress = true;
+    if (isDesktop && ref.read(fullscreenProvider)) {
+      await _exitDesktopFullScreen();
+    }
+    restoreSystemUI();
+    if (!mounted) return;
+    _firstTime = true;
+    Navigator.pop(context);
   }
 
   void _unifiedPositionHandler(Duration position) {
@@ -2327,24 +2355,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       ),
       child: Row(
         children: [
-          BackButton(
-            color: Colors.white,
-            onPressed: () {
-              if (isDesktop && fullScreen) {
-                setFullScreen(value: !fullScreen);
-                ref.read(fullscreenProvider.notifier).state = !fullScreen;
-                widget.desktopFullScreenPlayer.call(!fullScreen);
-              } else {
-                restoreSystemUI();
-              }
-              if (mounted) {
-                // Set variable to true, so the player uses the global
-                // "Use Fullscreen" setting again.
-                _firstTime = true;
-                Navigator.pop(context);
-              }
-            },
-          ),
+          BackButton(color: Colors.white, onPressed: _goBackToDetail),
           Flexible(
             child: ListTile(
               dense: true,
@@ -2531,6 +2542,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   defaultSkipIntroLength: skipIntroLength,
                   desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
                   chapterMarks: _chapterMarks,
+                  onEscape: _handleEscape,
                   subtitleMiningContextBuilder: _subtitleMiningContext,
                   onVideoOcrShortcut: _showVideoOcr,
                 )

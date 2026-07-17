@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
@@ -10,6 +9,7 @@ import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/manga_chapter_file_drop_target.dart';
+import 'package:mangayomi/modules/manga/detail/widgets/media_detail_keyboard_navigation.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
@@ -23,7 +23,11 @@ class MangaReaderDetail extends ConsumerStatefulWidget {
 }
 
 class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
-  void _closeNovelChapterMenu() {
+  bool _backNavigationInProgress = false;
+
+  void _goBack() {
+    if (_backNavigationInProgress) return;
+    _backNavigationInProgress = true;
     ref.read(isLongPressedStateProvider.notifier).update(false);
     ref.read(chaptersListStateProvider.notifier).clear();
     Navigator.of(context).pop();
@@ -124,28 +128,24 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
               );
             },
           );
-          if (manga.itemType == ItemType.manga) {
-            return MangaChapterFileDropTarget(
-              manga: manga,
-              onImport: (filePaths) => ref.read(
-                importArchivesFromPathsProvider(
-                  itemType: ItemType.manga,
-                  manga,
-                  filePaths: filePaths,
-                  init: false,
-                  splitChapters: false,
-                ).future,
-              ),
-              child: detail,
-            );
-          }
-          if (manga.itemType != ItemType.novel) return detail;
-          return CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.escape):
-                  _closeNovelChapterMenu,
-            },
-            child: Focus(autofocus: true, child: detail),
+          final mediaDetail = manga.itemType == ItemType.manga
+              ? MangaChapterFileDropTarget(
+                  manga: manga,
+                  onImport: (filePaths) => ref.read(
+                    importArchivesFromPathsProvider(
+                      itemType: ItemType.manga,
+                      manga,
+                      filePaths: filePaths,
+                      init: false,
+                      splitChapters: false,
+                    ).future,
+                  ),
+                  child: detail,
+                )
+              : detail;
+          return MediaDetailKeyboardNavigation(
+            onEscape: _goBack,
+            child: mediaDetail,
           );
         },
         error: (Object error, StackTrace stackTrace) {

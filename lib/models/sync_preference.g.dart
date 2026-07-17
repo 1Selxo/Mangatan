@@ -60,6 +60,12 @@ const SyncPreferenceSchema = CollectionSchema(
       name: r'syncUpdates',
       type: IsarType.bool,
     ),
+    r'syncMode': PropertySchema(
+      id: 11,
+      name: r'syncMode',
+      type: IsarType.byte,
+      enumMap: _SyncPreferencesyncModeEnumValueMap,
+    ),
   },
 
   estimateSize: _syncPreferenceEstimateSize,
@@ -121,6 +127,7 @@ void _syncPreferenceSerialize(
   writer.writeBool(offsets[8], object.syncOn);
   writer.writeBool(offsets[9], object.syncSettings);
   writer.writeBool(offsets[10], object.syncUpdates);
+  writer.writeByte(offsets[11], object.syncMode.index);
 }
 
 SyncPreference _syncPreferenceDeserialize(
@@ -138,6 +145,11 @@ SyncPreference _syncPreferenceDeserialize(
     lastSyncUpdate: reader.readLongOrNull(offsets[5]),
     server: reader.readStringOrNull(offsets[6]),
     syncId: id,
+    syncMode:
+        _SyncPreferencesyncModeValueEnumMap[reader.readByteOrNull(
+          offsets[11],
+        )] ??
+        SyncMode.native,
     syncOn: reader.readBoolOrNull(offsets[8]) ?? false,
   );
   object.syncHistories = reader.readBool(offsets[7]);
@@ -175,10 +187,25 @@ P _syncPreferenceDeserializeProp<P>(
       return (reader.readBool(offset)) as P;
     case 10:
       return (reader.readBool(offset)) as P;
+    case 11:
+      return (_SyncPreferencesyncModeValueEnumMap[reader.readByteOrNull(
+                offset,
+              )] ??
+              SyncMode.native)
+          as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
 }
+
+const _SyncPreferencesyncModeEnumValueMap = {
+  'native': 0,
+  'chimahon': 1,
+};
+const _SyncPreferencesyncModeValueEnumMap = {
+  0: SyncMode.native,
+  1: SyncMode.chimahon,
+};
 
 Id _syncPreferenceGetId(SyncPreference object) {
   return object.syncId ?? Isar.autoIncrement;

@@ -95,6 +95,14 @@ class Synching extends _$Synching {
     ref.invalidateSelf();
   }
 
+  void setSyncMode(SyncMode value) {
+    isar.writeTxnSync(() {
+      isar.syncPreferences.putSync(state..syncMode = value);
+    });
+    ref.invalidateSelf();
+    ref.invalidate(syncServerProvider(syncId: syncId!));
+  }
+
   List<ChangedPart> getAllChangedParts() {
     return isar.changedParts.filter().idIsNotNull().findAllSync();
   }

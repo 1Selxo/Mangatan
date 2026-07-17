@@ -6,8 +6,10 @@ import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
@@ -127,6 +129,84 @@ class MihonBackupExporter {
       );
     }
 
+    final animeCategories = categories
+        .where((category) => category.forItemType == ItemType.anime)
+        .toList();
+    final animeCategoryOrderById = <int, int>{};
+    for (final indexed in animeCategories.indexed) {
+      final category = indexed.$2;
+      if (category.id != null) {
+        animeCategoryOrderById[category.id!] = category.pos ?? indexed.$1;
+      }
+    }
+
+    final exportedAnime = <BackupAnime>[];
+    final usedAnimeSources = <int, BackupSource>{};
+    for (final anime in mangas.where(
+      (manga) =>
+          manga.itemType == ItemType.anime &&
+          (manga.favorite ?? false) &&
+          !(manga.isLocalArchive ?? false),
+    )) {
+      final localSource = anime.sourceId == null
+          ? null
+          : sourceByLocalId[anime.sourceId!];
+      final nativeId = _nativeSourceId(localSource);
+      if (nativeId == null || anime.id == null) continue;
+      usedAnimeSources[nativeId] = BackupSource(
+        name: localSource?.name ?? anime.source ?? 'Unknown',
+        sourceId: Int64(nativeId),
+      );
+
+      final animeEpisodes = chaptersByManga[anime.id!] ?? const [];
+      final episodesById = {
+        for (final episode in animeEpisodes)
+          if (episode.id != null) episode.id!: episode,
+      };
+      final backupHistory = <BackupHistory>[];
+      for (final history in historiesByManga[anime.id!] ?? const []) {
+        final episode = history.chapterId == null
+            ? null
+            : episodesById[history.chapterId!];
+        if (episode == null || (episode.url?.isEmpty ?? true)) continue;
+        backupHistory.add(
+          BackupHistory(
+            url: episode.url,
+            lastRead: Int64(int.tryParse(history.date ?? '') ?? 0),
+            readDuration: Int64((history.readingTimeSeconds ?? 0) * 1000),
+          ),
+        );
+      }
+
+      exportedAnime.add(
+        BackupAnime(
+          source: Int64(nativeId),
+          url: anime.link ?? '',
+          title: anime.name ?? '',
+          artist: anime.artist,
+          author: anime.author,
+          description: anime.description,
+          genre: anime.genre,
+          status: _status(anime.status),
+          thumbnailUrl: anime.imageUrl,
+          dateAdded: Int64(anime.dateAdded ?? 0),
+          episodes: [
+            for (final indexed in animeEpisodes.indexed)
+              _backupEpisode(indexed.$2, indexed.$1),
+          ],
+          categories: (anime.categories ?? const [])
+              .map((id) => animeCategoryOrderById[id])
+              .nonNulls
+              .map(Int64.new),
+          favorite: anime.favorite ?? true,
+          history: backupHistory,
+          lastModifiedAt: Int64(anime.lastUpdate ?? anime.updatedAt ?? 0),
+          favoriteModifiedAt: Int64(anime.updatedAt ?? 0),
+          version: Int64(anime.updatedAt ?? 0),
+        ),
+      );
+    }
+
     return BackupMihon(
       backupManga: exportedManga,
       backupCategories: [
@@ -138,6 +218,16 @@ class MihonBackupExporter {
           ),
       ],
       backupSources: usedSources.values,
+      backupAnime: exportedAnime,
+      backupAnimeCategories: [
+        for (final indexed in animeCategories.indexed)
+          BackupCategory(
+            name: indexed.$2.name ?? '',
+            order: Int64(indexed.$2.pos ?? indexed.$1),
+            id: Int64(indexed.$2.id ?? indexed.$1),
+          ),
+      ],
+      backupAnimeSources: usedAnimeSources.values,
       backupPreferences: appPreferences,
       backupNovels: const ChimahonNovelProgressAdapter().exportAll(
         epubBookProgress,
@@ -157,6 +247,24 @@ class MihonBackupExporter {
       dateFetch: Int64(0),
       dateUpload: Int64(int.tryParse(chapter.dateUpload ?? '') ?? 0),
       chapterNumber: _chapterNumber(chapter.name),
+      sourceOrder: Int64(sourceOrder),
+      lastModifiedAt: Int64(modified),
+      version: Int64(modified),
+    );
+  }
+
+  BackupEpisode _backupEpisode(Chapter episode, int sourceOrder) {
+    final modified = episode.updatedAt ?? 0;
+    return BackupEpisode(
+      url: episode.url ?? '',
+      name: episode.name ?? '',
+      scanlator: episode.scanlator,
+      seen: episode.isRead ?? false,
+      bookmark: episode.isBookmarked ?? false,
+      lastSecondSeen: Int64(int.tryParse(episode.lastPageRead ?? '') ?? 0),
+      dateFetch: Int64(0),
+      dateUpload: Int64(int.tryParse(episode.dateUpload ?? '') ?? 0),
+      episodeNumber: _chapterNumber(episode.name),
       sourceOrder: Int64(sourceOrder),
       lastModifiedAt: Int64(modified),
       version: Int64(modified),

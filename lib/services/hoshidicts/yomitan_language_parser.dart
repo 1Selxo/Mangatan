@@ -222,10 +222,11 @@ Future<List<HoshiLookupResult>> lookupYomitanDictionary({
           deinflected: result.deinflected,
           trace: [
             for (final transform in candidate.trace)
-              HoshiTransformGroup(
-                name: '${dictionaryLanguageName(language)} ${transform.name}',
-                description: transform.description,
-              ),
+              if (!_isInternalYomitanTrace(transform))
+                HoshiTransformGroup(
+                  name: '${dictionaryLanguageName(language)} ${transform.name}',
+                  description: transform.description,
+                ),
             ...result.trace,
           ],
           preprocessorSteps: result.preprocessorSteps,
@@ -258,4 +259,14 @@ bool _isWordRune(int rune) {
   if (rune == 0x27 || rune == 0x2019) return true;
   final character = String.fromCharCode(rune);
   return RegExp(r'[\p{L}\p{N}\p{M}]', unicode: true).hasMatch(character);
+}
+
+bool _isInternalYomitanTrace(YomitanTransform transform) {
+  switch (transform.name) {
+    case 'Disassemble Hangul':
+    case 'Reassemble Hangul':
+      return true;
+    default:
+      return false;
+  }
 }

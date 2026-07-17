@@ -83,6 +83,49 @@ void main() {
       expect(results.single.trace.single.name, 'English past');
     },
   );
+
+  test('internal Korean Hangul processor traces are hidden from popup chips', () async {
+    final results = await lookupYomitanDictionary(
+      language: 'ko',
+      text: '노라네',
+      maxResults: 5,
+      scanLength: 20,
+      lookup: (text, maxResults, scanLength) async {
+        if (text == '노랗다') {
+          return [_result(expression: '노랗다', matched: '노랗다')];
+        }
+        return const [];
+      },
+      loadCandidates: (language, text, scanLength, maxCandidates) async =>
+          const [
+            YomitanLookupCandidate(
+              surface: '노라네',
+              lemma: '노랗다',
+              priority: 1,
+              trace: [
+                YomitanTransform(
+                  'Disassemble Hangul',
+                  'Disassemble Hangul characters into jamo.',
+                ),
+                YomitanTransform(
+                  'Supplemental Korean deinflection',
+                  'Mangatan Korean compatibility rule.',
+                ),
+                YomitanTransform(
+                  'Reassemble Hangul',
+                  'Reassemble Hangul characters from jamo.',
+                ),
+              ],
+            ),
+          ],
+    );
+
+    expect(results.single.matched, '노라네');
+    expect(
+      results.single.trace.map((trace) => trace.name),
+      ['Korean Supplemental Korean deinflection'],
+    );
+  });
 }
 
 HoshiLookupResult _result({

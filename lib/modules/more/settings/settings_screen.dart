@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/widgets/list_tile_widget.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -20,6 +21,7 @@ class SettingsScreen extends StatelessWidget {
         padding: tvPageInsets,
         child: Column(
           children: [
+            const _SettingsSectionHeader('General'),
             ListTileWidget(
               autofocus: isTv,
               title: l10n.general,
@@ -31,6 +33,13 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.color_lens_rounded,
               onTap: () => context.push('/appearance'),
             ),
+            if (!Platform.isLinux)
+              ListTileWidget(
+                title: l10n.security,
+                icon: Icons.security_rounded,
+                onTap: () => context.push('/security'),
+              ),
+            const _SettingsSectionHeader('Media'),
             // Reader is manga/novel-only — hide it on the anime-only layout.
             Consumer(
               builder: (context, ref, _) {
@@ -43,11 +52,6 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () => context.push('/readerMode'),
                 );
               },
-            ),
-            ListTileWidget(
-              title: 'Dictionary & OCR',
-              icon: Icons.menu_book_outlined,
-              onTap: () => context.push('/dictionary'),
             ),
             ListTileWidget(
               title: l10n.player,
@@ -66,6 +70,31 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => context.push('/downloads'),
             ),
             ListTileWidget(
+              title: l10n.browse,
+              icon: Icons.explore_rounded,
+              onTap: () => context.push('/browseS'),
+            ),
+            const _SettingsSectionHeader('Learning'),
+            ListTileWidget(
+              title: DictionarySettingsSection.dictionariesAndAudio.title,
+              subtitle: DictionarySettingsSection.dictionariesAndAudio.summary,
+              icon: Icons.translate,
+              onTap: () => context.push('/dictionary'),
+            ),
+            ListTileWidget(
+              title: DictionarySettingsSection.dictionaryPopup.title,
+              subtitle: DictionarySettingsSection.dictionaryPopup.summary,
+              icon: Icons.tab_outlined,
+              onTap: () => context.push('/dictionaryPopup'),
+            ),
+            ListTileWidget(
+              title: DictionarySettingsSection.anki.title,
+              subtitle: DictionarySettingsSection.anki.summary,
+              icon: Icons.style_outlined,
+              onTap: () => context.push('/ankiSettings'),
+            ),
+            const _SettingsSectionHeader('Sync'),
+            ListTileWidget(
               title: l10n.tracking,
               icon: Icons.sync_outlined,
               onTap: () => context.push('/track'),
@@ -76,23 +105,29 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => context.push('/sync'),
             ),
             ListTileWidget(
-              title: l10n.browse,
-              icon: Icons.explore_rounded,
-              onTap: () => context.push('/browseS'),
-            ),
-            if (!Platform.isLinux)
-              ListTileWidget(
-                title: l10n.security,
-                icon: Icons.security_rounded,
-                onTap: () => context.push('/security'),
-              ),
-            ListTileWidget(
               title: l10n.about,
               icon: Icons.info_outline,
               onTap: () => context.push('/about'),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SettingsSectionHeader extends StatelessWidget {
+  const _SettingsSectionHeader(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+        child: Text(title, style: Theme.of(context).textTheme.titleSmall),
       ),
     );
   }

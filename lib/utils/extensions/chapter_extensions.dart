@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
@@ -10,13 +9,14 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/modules/more/settings/track/providers/track_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/download_manager/download_isolate_pool.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar_path.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path/path.dart' as p;
@@ -64,32 +64,31 @@ extension ChapterExtension on Chapter {
     if (download == null) return;
 
     final storageProvider = StorageProvider();
-    final chapterName = name!.replaceForbiddenCharacters(' ');
-    final folders = await getAllLocalFolders();
-    for (final folder in folders) {
-      final folderPath = folder.path;
-      if (folderPath == null || folderPath.isEmpty) continue;
-      final mangaDir = Directory(
-        p.join(folderPath, manga.value!.name!.replaceForbiddenCharacters('_')),
-      );
-      final chapterDir = await storageProvider.getMangaChapterDirectory(
-        this,
-        mangaMainDirectory: mangaDir,
-      );
+    final mangaDir = await storageProvider.getMangaMainDirectory(this);
+    final chapterDir = await storageProvider.getMangaChapterDirectory(
+      this,
+      mangaMainDirectory: mangaDir,
+    );
 
-      for (final entity in [
-        File(p.join(mangaDir.path, "$name.cbz")),
-        File(p.join(mangaDir.path, "$chapterName.cbz")),
-        File(p.join(mangaDir.path, "$chapterName.mp4")),
-        File(p.join(mangaDir.path, "$name.html")),
-        File(p.join(chapterDir!.path, "$chapterName.html")),
-        chapterDir,
-      ]) {
-        try {
-          if (entity.existsSync()) entity.deleteSync(recursive: true);
-        } catch (_) {}
-      }
-    }
+    try {
+      final cbzFile = downloadedMangaChapterCbz(mangaDir!, this);
+      if (cbzFile.existsSync()) cbzFile.deleteSync();
+      final sidecar = mokuroSidecarFor(cbzFile);
+      if (sidecar.existsSync()) sidecar.deleteSync();
+    } catch (_) {}
+    try {
+      final mp4File = File(
+        p.join(mangaDir!.path, "${name!.replaceForbiddenCharacters(' ')}.mp4"),
+      );
+      if (mp4File.existsSync()) mp4File.deleteSync();
+    } catch (_) {}
+    try {
+      final htmlFile = File(p.join(mangaDir!.path, "$name.html"));
+      if (htmlFile.existsSync()) htmlFile.deleteSync();
+    } catch (_) {}
+    try {
+      chapterDir?.deleteSync(recursive: true);
+    } catch (_) {}
 
     cancelDownloads(download.id);
   }
@@ -110,8 +109,10 @@ extension ChapterExtension on Chapter {
         .toInt();
 
     final tracks = isar.tracks
-        .where()
-        .mangaIdItemTypeEqualTo(manga.id!, manga.itemType)
+        .filter()
+        .idIsNotNull()
+        .itemTypeEqualTo(manga.itemType)
+        .mangaIdEqualTo(manga.id!)
         .findAllSync();
 
     for (var track in tracks) {

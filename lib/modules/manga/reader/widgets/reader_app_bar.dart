@@ -24,6 +24,12 @@ import 'package:mangayomi/utils/utils.dart';
 /// This widget is designed to be used directly in reader_view.dart
 /// as a drop-in replacement for the _appBar() method.
 class ReaderAppBar extends ConsumerWidget {
+  static double visibleHeight({required bool fullScreenReader}) {
+    if (Platform.isIOS) return 120.0;
+    if (!fullScreenReader && !isDesktop) return 55.0;
+    return 80.0;
+  }
+
   /// The chapter being read
   final Chapter chapter;
 
@@ -77,12 +83,8 @@ class ReaderAppBar extends ConsumerWidget {
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
     final isLocalArchive = chapter.manga.value?.isLocalArchive ?? false;
 
-    double height = isVisible
-        ? Platform.isIOS
-              ? 120.0
-              : !fullScreenReader && !isDesktop
-              ? 55.0
-              : 80.0
+    final height = isVisible
+        ? visibleHeight(fullScreenReader: fullScreenReader)
         : 0.0;
 
     return Positioned(

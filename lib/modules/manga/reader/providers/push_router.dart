@@ -10,6 +10,7 @@ Future<void> pushMangaReaderView({
   required BuildContext context,
   required Chapter chapter,
 }) async {
+  // Do not gate library reading on the Browse language visibility filter.
   final sourceExist = isar.sources
       .filter()
       .langContains(chapter.manga.value!.lang!, caseSensitive: false)
@@ -17,8 +18,6 @@ Future<void> pushMangaReaderView({
       .nameContains(chapter.manga.value!.source!, caseSensitive: false)
       .and()
       .idIsNotNull()
-      .and()
-      .isActiveEqualTo(true)
       .and()
       .isAddedEqualTo(true)
       .findAllSync()

@@ -61,6 +61,8 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
     return Scaffold(
       body: manga.when(
         data: (manga) {
+          // Language filters only hide Browse rows. Installed sources remain
+          // available to refresh items already in the library.
           final detail = StreamBuilder(
             stream: isar.sources
                 .filter()
@@ -69,8 +71,6 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                 .nameContains(manga.source!, caseSensitive: false)
                 .and()
                 .idIsNotNull()
-                .and()
-                .isActiveEqualTo(true)
                 .and()
                 .isAddedEqualTo(true)
                 .watch(fireImmediately: true),

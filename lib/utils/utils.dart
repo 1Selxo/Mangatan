@@ -1,6 +1,7 @@
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/utils/source_lookup.dart';
 
 Source? getSource(
   String lang,
@@ -11,16 +12,17 @@ Source? getSource(
   try {
     var sourcesFilter = isar.sources.filter().idIsNotNull();
     if (installedOnly) {
-      sourcesFilter = sourcesFilter.isActiveEqualTo(true).isAddedEqualTo(true);
+      // isActive is the Browse language/source visibility filter. A hidden
+      // source remains installed and must still serve existing library items.
+      sourcesFilter = sourcesFilter.isAddedEqualTo(true);
     }
     final sourcesList = sourcesFilter.findAllSync();
-    return sourcesList.firstWhere(
-      (element) => sourceId != null
-          ? element.id == sourceId && element.sourceCode != null
-          : element.name!.toLowerCase() == name.toLowerCase() &&
-                element.lang == lang &&
-                element.sourceCode != null,
-      orElse: () => throw ("Error when getting source"),
+    return findSourceFromList(
+      sourcesList,
+      lang: lang,
+      name: name,
+      sourceId: sourceId,
+      installedOnly: installedOnly,
     );
   } catch (_) {
     return null;

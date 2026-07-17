@@ -117,6 +117,59 @@ abstract class _$DefaultReadingDirectionState
   }
 }
 
+@ProviderFor(DefaultPageModeState)
+final defaultPageModeStateProvider = DefaultPageModeStateProvider._();
+
+final class DefaultPageModeStateProvider
+    extends $NotifierProvider<DefaultPageModeState, PageMode> {
+  DefaultPageModeStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'defaultPageModeStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$defaultPageModeStateHash();
+
+  @$internal
+  @override
+  DefaultPageModeState create() => DefaultPageModeState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PageMode value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PageMode>(value),
+    );
+  }
+}
+
+String _$defaultPageModeStateHash() =>
+    r'7bea65041fbfc552a2b25a14ce77764d950cae70';
+
+abstract class _$DefaultPageModeState extends $Notifier<PageMode> {
+  PageMode build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<PageMode, PageMode>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<PageMode, PageMode>,
+              PageMode,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(AnimatePageTransitionsState)
 final animatePageTransitionsStateProvider =
     AnimatePageTransitionsStateProvider._();

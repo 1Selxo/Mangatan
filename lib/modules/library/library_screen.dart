@@ -218,9 +218,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     return LibraryFileDropTarget(
       itemType: widget.itemType,
-      onImport: (filePaths) => ref.read(
+      onImport: (filePaths, importItemType) => ref.read(
         importArchivesFromPathsProvider(
-          itemType: widget.itemType,
+          itemType: importItemType,
           null,
           filePaths: filePaths,
           init: true,

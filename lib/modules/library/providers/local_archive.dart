@@ -179,7 +179,7 @@ Future<void> _importArchivesFromPaths(
 
 List<String> supportedLocalArchiveExtensions(ItemType itemType) {
   return switch (itemType) {
-    ItemType.manga => const ['cbz', 'zip'],
+    ItemType.manga => const ['cbz', 'zip', 'epub'],
     ItemType.anime => const ['mp4', 'mov', 'avi', 'flv', 'wmv', 'mpeg', 'mkv'],
     ItemType.novel => const ['epub'],
   };

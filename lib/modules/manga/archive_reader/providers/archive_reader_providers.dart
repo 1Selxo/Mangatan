@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/modules/manga/archive_reader/models/models.dart';
+import 'package:mangayomi/services/epub_manga.dart';
+import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:path/path.dart' as p;
 part 'archive_reader_providers.g.dart';
@@ -35,12 +37,36 @@ Future<(String, LocalExtensionType, Uint8List, String)> getArchivesDataFromFile(
   Ref ref,
   String path,
 ) async {
+  if (_isEpubFile(path)) {
+    final archive = await _extractEpubArchive(path);
+    return (archive.name!, LocalExtensionType.epub, archive.coverImage!, path);
+  }
   return compute(_extractArchiveMetadata, path);
 }
 
 @riverpod
-Future<LocalArchive> getArchiveDataFromFile(Ref ref, String path) async {
+Future<LocalArchive> getArchiveDataFromFile(Ref ref, String path) {
+  if (_isEpubFile(path)) return _extractEpubArchive(path);
   return compute(_extractArchive, path);
+}
+
+Future<LocalArchive> _extractEpubArchive(String path) async {
+  final book = await parseEpubFromPath(epubPath: path, fullData: true);
+  final pages = epubMangaPageImages(book);
+  if (pages.isEmpty) {
+    throw Exception(
+      'No image pages were found in the EPUB spine. Import it as a novel instead.',
+    );
+  }
+  final title = book.name.trim().isEmpty
+      ? p.basenameWithoutExtension(path)
+      : book.name.trim();
+  return LocalArchive()
+    ..path = path
+    ..extensionType = LocalExtensionType.epub
+    ..name = title
+    ..images = pages
+    ..coverImage = book.cover ?? pages.first.image;
 }
 
 /// Extract full archive data from all archives in a directory (recursive)
@@ -146,6 +172,8 @@ bool _isArchiveFile(String path) {
   final extension = p.extension(path).toLowerCase();
   return _kArchiveExtensions.any((ext) => extension.endsWith(ext));
 }
+
+bool _isEpubFile(String path) => p.extension(path).toLowerCase() == '.epub';
 
 /// Extract full archive with all images
 Future<LocalArchive> _extractArchive(String path) async {
@@ -345,6 +373,7 @@ Archive _decodeArchive(InputFileStream stream, LocalExtensionType type) {
       return TarDecoder().decodeStream(stream);
     case LocalExtensionType.zip:
     case LocalExtensionType.cbz:
+    case LocalExtensionType.epub:
     case LocalExtensionType.folder:
       return ZipDecoder().decodeStream(stream);
   }
@@ -366,6 +395,7 @@ LocalExtensionType setTypeExtension(String extension) {
     'zip' => LocalExtensionType.zip,
     'tar' => LocalExtensionType.tar,
     'cbz' => LocalExtensionType.cbz,
+    'epub' => LocalExtensionType.epub,
     _ => LocalExtensionType.cbz,
   };
 }

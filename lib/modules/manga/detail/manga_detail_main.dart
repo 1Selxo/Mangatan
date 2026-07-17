@@ -9,6 +9,8 @@ import 'package:mangayomi/modules/manga/detail/manga_details_view.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
+import 'package:mangayomi/modules/manga/detail/widgets/manga_chapter_file_drop_target.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 
@@ -122,6 +124,21 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
               );
             },
           );
+          if (manga.itemType == ItemType.manga) {
+            return MangaChapterFileDropTarget(
+              manga: manga,
+              onImport: (filePaths) => ref.read(
+                importArchivesFromPathsProvider(
+                  itemType: ItemType.manga,
+                  manga,
+                  filePaths: filePaths,
+                  init: false,
+                  splitChapters: false,
+                ).future,
+              ),
+              child: detail,
+            );
+          }
           if (manga.itemType != ItemType.novel) return detail;
           return CallbackShortcuts(
             bindings: {

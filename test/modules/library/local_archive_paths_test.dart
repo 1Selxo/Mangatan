@@ -5,7 +5,11 @@ import 'package:mangayomi/modules/library/providers/local_archive.dart';
 void main() {
   group('supportedLocalArchiveExtensions', () {
     test('matches the picker formats for every library type', () {
-      expect(supportedLocalArchiveExtensions(ItemType.manga), ['cbz', 'zip']);
+      expect(supportedLocalArchiveExtensions(ItemType.manga), [
+        'cbz',
+        'zip',
+        'epub',
+      ]);
       expect(supportedLocalArchiveExtensions(ItemType.anime), [
         'mp4',
         'mov',
@@ -28,7 +32,7 @@ void main() {
           r'C:\library\second.ZiP',
           '/library/book.epub',
         ], ItemType.manga),
-        ['/library/first.CBZ', r'C:\library\second.ZiP'],
+        ['/library/first.CBZ', r'C:\library\second.ZiP', '/library/book.epub'],
       );
     });
 

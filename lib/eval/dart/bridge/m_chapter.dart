@@ -12,6 +12,7 @@ class MChapterBridge {
           url: namedArgs.get<String?>('url'),
           dateUpload: namedArgs.get<String?>('dateUpload'),
           scanlator: namedArgs.get<String?>('scanlator'),
+          chapterNumber: namedArgs.get<double?>('chapterNumber'),
           isFiller: namedArgs.get<bool?>('isFiller'),
           thumbnailUrl: namedArgs.get<String?>('scanlator'),
           description: namedArgs.get<String?>('scanlator'),
@@ -25,6 +26,7 @@ class MChapterBridge {
       'url': (visitor, target) => (target as MChapter).url,
       'dateUpload': (visitor, target) => (target as MChapter).dateUpload,
       'scanlator': (visitor, target) => (target as MChapter).scanlator,
+      'chapterNumber': (visitor, target) => (target as MChapter).chapterNumber,
       'isFiller': (visitor, target) => (target as MChapter).isFiller,
       'thumbnailUrl': (visitor, target) => (target as MChapter).thumbnailUrl,
       'description': (visitor, target) => (target as MChapter).description,
@@ -40,6 +42,8 @@ class MChapterBridge {
           (target as MChapter).dateUpload = value as String?,
       'scanlator': (visitor, target, value) =>
           (target as MChapter).scanlator = value as String?,
+      'chapterNumber': (visitor, target, value) =>
+          (target as MChapter).chapterNumber = value as double?,
       'isFiller': (visitor, target, value) =>
           (target as MChapter).isFiller = value as bool?,
       'thumbnailUrl': (visitor, target, value) =>

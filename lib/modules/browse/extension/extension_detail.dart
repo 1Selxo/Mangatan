@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
@@ -10,6 +11,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/browse/extension/providers/extension_preferences_providers.dart';
+import 'package:mangayomi/modules/browse/extension/extension_package.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/source_preference_widget.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
@@ -38,7 +40,9 @@ class ExtensionDetail extends ConsumerStatefulWidget {
 }
 
 class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
-  late Source source = isar.sources.getSync(widget.source.id!)!;
+  late Source source;
+  late List<Source> _packageSources;
+  List<SourcePreference>? sourcePreference;
   bool _isRefreshingPreferences = false;
   String _dictionaryProfileLabel = 'Loading…';
 
@@ -55,31 +59,55 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
     return lang?.isNotEmpty == true ? lang! : source.lang ?? '';
   }
 
-  late List<SourcePreference>? sourcePreference = () {
+  List<SourcePreference>? _loadSourcePreferences(Source selectedSource) {
     try {
-      if (source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
-          source.preferenceList != null) {
-        return (jsonDecode(source.preferenceList!) as List)
+      if (selectedSource.sourceCodeLanguage == SourceCodeLanguage.mihon &&
+          selectedSource.preferenceList != null) {
+        return (jsonDecode(selectedSource.preferenceList!) as List)
             .map((e) => SourcePreference.fromJson(e))
             .toList();
       }
-      return getSourcePreference(
-        source: source,
-      ).map((e) => getSourcePreferenceEntry(e.key!, source.id!)).toList();
+      return getSourcePreference(source: selectedSource)
+          .map((e) => getSourcePreferenceEntry(e.key!, selectedSource.id!))
+          .toList();
     } catch (e) {
       return null;
     }
-  }();
+  }
+
+  List<Source> _loadPackageSources(Source selectedSource) {
+    return extensionSettingsSources(
+      selectedSource,
+      isar.sources.filter().idIsNotNull().findAllSync(),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    source = isar.sources.getSync(widget.source.id!)!;
+    _packageSources = _loadPackageSources(source);
+    sourcePreference = _loadSourcePreferences(source);
     unawaited(_loadDictionaryProfileLabel());
     if (source.sourceCodeLanguage == SourceCodeLanguage.mihon) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _refreshMihonPreferences();
       });
     }
+  }
+
+  Future<void> _selectSourceSettings(int? sourceId) async {
+    if (sourceId == null || sourceId == source.id) return;
+    final selectedSource = isar.sources.getSync(sourceId);
+    if (selectedSource == null) return;
+
+    setState(() {
+      source = selectedSource;
+      sourcePreference = _loadSourcePreferences(selectedSource);
+      _dictionaryProfileLabel = 'Loading…';
+    });
+    await _loadDictionaryProfileLabel();
+    await _refreshMihonPreferences();
   }
 
   Future<void> _loadDictionaryProfileLabel() async {
@@ -336,6 +364,28 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
                 ),
               ),
             ),
+            if (_packageSources.length > 1)
+              ListTile(
+                leading: const Icon(Icons.source_outlined),
+                title: const Text('Source settings'),
+                subtitle: Text(source.name ?? ''),
+                trailing: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: source.id,
+                    onChanged: _isRefreshingPreferences
+                        ? null
+                        : _selectSourceSettings,
+                    items: _packageSources
+                        .map(
+                          (packageSource) => DropdownMenuItem<int>(
+                            value: packageSource.id,
+                            child: Text(packageSource.name ?? ''),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
             if (_dictionaryProfileSourceId != null)
               ListTile(
                 leading: const Icon(Icons.menu_book_outlined),
@@ -503,6 +553,7 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
             ),
             if (sourcePreference != null)
               SourcePreferenceWidget(
+                key: ValueKey(source.id),
                 sourcePreference: sourcePreference!,
                 source: source,
                 isRefreshing: _isRefreshingPreferences,

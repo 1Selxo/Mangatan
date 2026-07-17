@@ -7,8 +7,8 @@ import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.d
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/webview_url.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
-import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/utils.dart';
 
@@ -172,14 +172,17 @@ class ReaderAppBar extends ConsumerWidget {
 }
 
 /// Builds the web view navigation data.
-Map<String, dynamic>? buildWebViewData(Chapter chapter) {
+Future<Map<String, dynamic>?> buildWebViewData(
+  WidgetRef ref,
+  Chapter chapter,
+) async {
   final manga = chapter.manga.value;
   if (manga == null) return null;
 
   final source = getSource(manga.lang!, manga.source!, manga.sourceId);
   if (source == null) return null;
 
-  final url = "${source.baseUrl}${chapter.url!.getUrlWithoutDomain}";
+  final url = await getChapterWebViewUrl(ref, source: source, chapter: chapter);
 
   return {'url': url, 'sourceId': source.id.toString(), 'title': chapter.name!};
 }

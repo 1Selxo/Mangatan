@@ -535,11 +535,10 @@ class _MangaChapterPageGalleryState
                       onWebViewPressed:
                           (chapter.manga.value!.isLocalArchive ?? false) ==
                               false
-                          ? () {
-                              final data = buildWebViewData(chapter);
-                              if (data != null) {
-                                context.push("/mangawebview", extra: data);
-                              }
+                          ? () async {
+                              final data = await buildWebViewData(ref, chapter);
+                              if (data == null || !context.mounted) return;
+                              context.push("/mangawebview", extra: data);
                             }
                           : null,
                     ),

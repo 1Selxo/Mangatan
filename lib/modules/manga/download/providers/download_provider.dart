@@ -108,9 +108,10 @@ Future<void> downloadChapter(
       if (!ref.read(saveAsCBZArchiveStateProvider)) return;
       try {
         // Extract chapter number from name (e.g., "Chapter 5" → "5")
-        final chapterNumber = ChapterRecognition().parseChapterNumber(
+        final chapterNumber = ChapterRecognition().resolveChapterNumber(
           chapter.manga.value!.name!,
           chapter.name!,
+          sourceChapterNumber: chapter.chapterNumber,
         );
 
         final comicInfo = ComicInfoData(
@@ -188,10 +189,11 @@ Future<void> downloadChapter(
       final chapterPageHeaders = pageUrls
           .map((e) => e.headers == null ? null : jsonEncode(e.headers))
           .toList();
+      final urls = pageUrls.map((e) => e.url).toList();
       chapterPageUrls.add(
         ChapterPageurls()
           ..chapterId = chapter.id
-          ..urls = pageUrls.map((e) => e.url).toList()
+          ..urls = urls
           ..chapterUrl = chapter.url
           ..headers = chapterPageHeaders.first != null
               ? chapterPageHeaders.map((e) => e.toString()).toList()

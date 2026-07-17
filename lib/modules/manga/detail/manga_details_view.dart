@@ -6,6 +6,7 @@ import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/custom_floating_action_btn.dart';
+import 'package:mangayomi/modules/manga/detail/resume_chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -15,6 +16,7 @@ import 'package:mangayomi/modules/manga/detail/manga_detail_view.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
+import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 
 class MangaDetailsView extends ConsumerStatefulWidget {
   final Manga manga;
@@ -80,10 +82,9 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                     String buttonLabel = widget.manga.itemType != ItemType.anime
                         ? l10n.read
                         : l10n.watch;
+                    Chapter? historyChapter;
+                    final incognitoMode = ref.watch(incognitoModeStateProvider);
                     if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                      final incognitoMode = ref.watch(
-                        incognitoModeStateProvider,
-                      );
                       final entries = snapshot.data!
                           .where(
                             (element) => element.mangaId == widget.manga.id,
@@ -91,21 +92,21 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                           .toList();
 
                       if (entries.isNotEmpty && !incognitoMode) {
-                        final chap = entries.last.chapter.value!;
-                        return CustomFloatingActionBtn(
-                          isExtended: !isExtended,
-                          label: l10n.resume,
-                          onPressed: () {
-                            chap.pushToReaderView(context);
-                          },
-                        );
+                        historyChapter = entries.last.chapter.value;
+                        buttonLabel = l10n.resume;
                       }
                     }
+                    final chapter = selectResumeChapter(
+                      widget.manga.getChapterListForReading(
+                        sourceChapters: chaptersList,
+                      ),
+                      historyChapter: historyChapter,
+                    );
                     return CustomFloatingActionBtn(
                       isExtended: !isExtended,
                       label: buttonLabel,
                       onPressed: () {
-                        chaptersList.first.pushToReaderView(context);
+                        chapter?.pushToReaderView(context);
                       },
                     );
                   },

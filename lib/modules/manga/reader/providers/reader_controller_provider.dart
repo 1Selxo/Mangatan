@@ -235,21 +235,26 @@ class ReaderController extends _$ReaderController
       if (isRead && autoReadDuplChap) {
         final manga = chapter.manga.value;
         if (manga != null) {
-          final chapterNumber = ChapterRecognition().parseChapterNumber(
+          final recognition = ChapterRecognition();
+          final chapterNumber = recognition.resolveChapterNumber(
             manga.name!,
             chapter.name!,
+            sourceChapterNumber: chapter.chapterNumber,
           );
-          for (final c in manga.chapters) {
-            if (c.id == chapter.id || (c.isRead ?? false)) continue;
-            final n = ChapterRecognition().parseChapterNumber(
-              manga.name!,
-              c.name!,
-            );
-            if (n == chapterNumber) {
-              c.isRead = true;
-              c.lastPageRead = '1';
-              c.updatedAt = now;
-              siblings.add(c);
+          if (chapterNumber > 0) {
+            for (final c in manga.chapters) {
+              if (c.id == chapter.id || (c.isRead ?? false)) continue;
+              final n = recognition.resolveChapterNumber(
+                manga.name!,
+                c.name!,
+                sourceChapterNumber: c.chapterNumber,
+              );
+              if (n == chapterNumber) {
+                c.isRead = true;
+                c.lastPageRead = '1';
+                c.updatedAt = now;
+                siblings.add(c);
+              }
             }
           }
         }

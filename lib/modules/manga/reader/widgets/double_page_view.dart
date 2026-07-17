@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_paged.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_colors.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
@@ -304,16 +305,21 @@ class DoublePageViewState extends State<DoublePageView>
 
   Widget _buildFailedState(ExtendedImageState state, dynamic l10n) {
     widget.onFailedToLoadImage?.call(true);
+    final backgroundColor =
+        getBackgroundColor(widget.backgroundColor) ??
+        Theme.of(context).scaffoldBackgroundColor;
 
     return Container(
-      color: getBackgroundColor(widget.backgroundColor),
+      color: backgroundColor,
       height: context.height(0.8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             l10n.image_loading_error,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            style: TextStyle(
+              color: readerErrorForegroundColor(backgroundColor),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -340,7 +346,10 @@ class DoublePageViewState extends State<DoublePageView>
           borderRadius: BorderRadius.circular(30),
         ),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Text(l10n.retry),
+        child: Text(
+          l10n.retry,
+          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+        ),
       ),
     );
   }

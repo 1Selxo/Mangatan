@@ -42,11 +42,13 @@ extension MangaExtensions on Manga {
     final mangaTitle = name ?? '';
 
     // Memoize so each chapter name is parsed at most once during the sort.
-    final numCache = <int?, int>{};
-    int chapNum(Chapter c) => numCache[c.id] ??= recognition.parseChapterNumber(
-      mangaTitle,
-      c.name ?? '',
-    );
+    final numCache = <Chapter, double>{};
+    double chapNum(Chapter c) =>
+        numCache[c] ??= recognition.resolveChapterNumber(
+          mangaTitle,
+          c.name ?? '',
+          sourceChapterNumber: c.chapterNumber,
+        );
 
     // Sort by chapter number — DB insertion order is NOT guaranteed to be ascending
     final chapterSource = sourceChapters ?? chapters;
@@ -120,9 +122,13 @@ extension MangaExtensions on Manga {
 
         // Returns the parsed chapter number for a chapter, used as the primary
         // numeric sort key for cases 0 and 1.
-        final numCache = <int?, int>{};
-        int chapNum(Chapter c) => numCache[c.id] ??= recognition
-            .parseChapterNumber(mangaTitle, c.name ?? '');
+        final numCache = <Chapter, double>{};
+        double chapNum(Chapter c) =>
+            numCache[c] ??= recognition.resolveChapterNumber(
+              mangaTitle,
+              c.name ?? '',
+              sourceChapterNumber: c.chapterNumber,
+            );
         list.sort((a, b) {
           final s = (a.scanlator ?? '').compareTo(b.scanlator ?? '');
           if (s != 0) return s;
@@ -161,13 +167,14 @@ extension MangaExtensions on Manga {
     if (isLocalEpubManga(this)) return list;
     final mangaTitle = name ?? '';
     final recognition = ChapterRecognition();
-    final seen = <int>{};
-    return list
-        .where(
-          (c) => seen.add(
-            recognition.parseChapterNumber(mangaTitle, c.name ?? ''),
-          ),
-        )
-        .toList();
+    final seen = <double>{};
+    return list.where((c) {
+      final number = recognition.resolveChapterNumber(
+        mangaTitle,
+        c.name ?? '',
+        sourceChapterNumber: c.chapterNumber,
+      );
+      return number <= 0 || seen.add(number);
+    }).toList();
   }
 }

@@ -32,6 +32,7 @@ import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/services/get_html_content.dart';
+import 'package:mangayomi/services/webview_url.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:mangayomi/utils/extensions/dom_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -1648,9 +1649,11 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                 manga.source!,
                 manga.sourceId,
               )!;
-              final url = chapter.url!.startsWith('/')
-                  ? '${source.baseUrl}/${chapter.url!}'
-                  : chapter.url!;
+              final url = await getChapterWebViewUrl(
+                ref,
+                source: source,
+                chapter: chapter,
+              );
               if (Platform.isLinux) {
                 final uri = Uri.parse(url);
                 await launchUrl(
@@ -1660,6 +1663,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                   (_) => launchUrl(uri, mode: LaunchMode.externalApplication),
                 );
               } else {
+                if (!mounted) return;
                 context.push(
                   '/mangawebview',
                   extra: {

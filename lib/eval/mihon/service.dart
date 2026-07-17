@@ -11,6 +11,7 @@ import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
@@ -257,9 +258,64 @@ class MihonExtensionService implements ExtensionService {
                 (e['date_upload'] as int?)?.toString() ??
                 DateTime.now().millisecondsSinceEpoch.toString(),
             scanlator: e['scanlator'],
+            chapterNumber:
+                (e[source.itemType == ItemType.anime
+                            ? 'episode_number'
+                            : 'chapter_number']
+                        as num?)
+                    ?.toDouble(),
           ),
         )
         .toList();
+  }
+
+  Future<String> getMangaWebViewUrl(Manga manga) async {
+    final isAnime = source.itemType == ItemType.anime;
+    final mediaData = {
+      'url': manga.link,
+      'title': manga.name,
+      'artist': manga.artist,
+      'author': manga.author,
+      'description': manga.description,
+      'genre': manga.genre?.join(', '),
+      'thumbnail_url': manga.imageUrl,
+      'initialized': true,
+    };
+    final res = await _postDalvik(
+      Uri.parse('$androidProxyServer/dalvik'),
+      body: jsonEncode({
+        'method': isAnime ? 'getAnimeUrl' : 'getMangaUrl',
+        isAnime ? 'animeData' : 'mangaData': mediaData,
+        'preferences': mihonPreferencePayload(source, getSourcePreferences()),
+        'data': source.sourceCode,
+      }),
+      headers: getCookie(),
+    );
+    hasError(res);
+    return jsonDecode(res.body) as String;
+  }
+
+  Future<String> getChapterWebViewUrl(Chapter chapter) async {
+    final isAnime = source.itemType == ItemType.anime;
+    final chapterData = {
+      'url': chapter.url,
+      'name': chapter.name,
+      'date_upload': int.tryParse(chapter.dateUpload ?? ''),
+      isAnime ? 'episode_number' : 'chapter_number': chapter.chapterNumber,
+      'scanlator': chapter.scanlator,
+    };
+    final res = await _postDalvik(
+      Uri.parse('$androidProxyServer/dalvik'),
+      body: jsonEncode({
+        'method': isAnime ? 'getEpisodeUrl' : 'getChapterUrl',
+        isAnime ? 'episodeData' : 'chapterData': chapterData,
+        'preferences': mihonPreferencePayload(source, getSourcePreferences()),
+        'data': source.sourceCode,
+      }),
+      headers: getCookie(),
+    );
+    hasError(res);
+    return jsonDecode(res.body) as String;
   }
 
   @override

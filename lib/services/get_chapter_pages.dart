@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
@@ -65,7 +66,7 @@ Future<GetChapterPagesModel> getChapterPages(
         chapter.manga.value!.source!,
         chapter.manga.value!.sourceId,
       )!;
-      if ((isarPageUrls?.urls?.isNotEmpty ?? false) &&
+      if (canReuseCachedMihonPageUrls(isarPageUrls?.urls) &&
           (isarPageUrls?.chapterUrl ?? chapter.url) == chapter.url) {
         for (var i = 0; i < isarPageUrls!.urls!.length; i++) {
           Map<String, String>? headers;
@@ -134,10 +135,13 @@ Future<GetChapterPagesModel> getChapterPages(
         final chapterPageHeaders = pageUrls
             .map((e) => e.headers == null ? null : jsonEncode(e.headers))
             .toList();
+        final urls = pageUrls.map((e) => e.url).toList();
+        // Proxy URLs are transient and must be refreshed on the next open, but
+        // their count is still needed while reading to persist page progress.
         chapterPageUrls.add(
           ChapterPageurls()
             ..chapterId = chapter.id
-            ..urls = pageUrls.map((e) => e.url).toList()
+            ..urls = urls
             ..chapterUrl = chapter.url
             ..headers = chapterPageHeaders.first != null
                 ? chapterPageHeaders.map((e) => e.toString()).toList()

@@ -96,10 +96,13 @@ extension ChapterExtension on Chapter {
     );
     if (!updateProgressAfterReading) return;
     final manga = this.manga.value!;
-    final chapterNumber = ChapterRecognition().parseEpisodeNumber(
-      manga.name!,
-      name!,
-    );
+    final chapterNumber = ChapterRecognition()
+        .resolveEpisodeNumber(
+          manga.name!,
+          name!,
+          sourceEpisodeNumber: this.chapterNumber,
+        )
+        .toInt();
 
     final tracks = isar.tracks
         .filter()

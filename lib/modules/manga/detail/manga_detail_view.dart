@@ -40,7 +40,7 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
-import 'package:mangayomi/utils/extensions/string_extensions.dart';
+import 'package:mangayomi/services/webview_url.dart';
 import 'package:mangayomi/utils/riverpod.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/cached_network.dart';
@@ -646,8 +646,12 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                     widget.manga!.sourceId,
                                   );
                                   if (source == null) return;
-                                  final url =
-                                      "${source.baseUrl}${widget.manga!.link!.getUrlWithoutDomain}";
+                                  final url = await getMangaWebViewUrl(
+                                    ref,
+                                    source: source,
+                                    manga: widget.manga!,
+                                  );
+                                  if (!context.mounted) return;
                                   final box =
                                       context.findRenderObject() as RenderBox?;
                                   SharePlus.instance.share(
@@ -1948,8 +1952,12 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                       widget.manga!.sourceId,
                     );
                     if (source == null) return;
-                    final url =
-                        "${source.baseUrl}${widget.manga!.link!.getUrlWithoutDomain}";
+                    final url = await getMangaWebViewUrl(
+                      ref,
+                      source: source,
+                      manga: manga,
+                    );
+                    if (!mounted) return;
 
                     Map<String, dynamic> data = {
                       'url': url,

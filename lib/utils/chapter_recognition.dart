@@ -9,6 +9,12 @@ class ChapterRecognition {
   static final _episodeKeyword = RegExp(
     r"\b(?:folge|episode|ep\.?)\s*([0-9]+(?:\.[0-9]+)?)",
   );
+  static final _japaneseVolume = RegExp(
+    r"第\s*([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?\s*巻",
+  );
+  static final _westernVolume = RegExp(
+    r"\b(?:v|vol(?:ume)?)\.?\s*([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?",
+  );
   // lookbehind for "ch." then zero or more spaces.
   static final _chNotation = RegExp(
     r"(?<=ch\.) *([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?",
@@ -25,6 +31,34 @@ class ChapterRecognition {
   /// so season is stripped.
   int parseEpisodeNumber(String mangaTitle, String chapterName) =>
       _parse(mangaTitle, chapterName, applySeason: false);
+
+  /// Prefers a number supplied by the source, as Mihon and Chimahon do, and
+  /// falls back to filename recognition for sources without that metadata.
+  double resolveChapterNumber(
+    String mangaTitle,
+    String chapterName, {
+    double? sourceChapterNumber,
+  }) {
+    final sourceNumber = _knownSourceNumber(sourceChapterNumber);
+    if (sourceNumber != null) return sourceNumber;
+    return parseChapterNumber(mangaTitle, chapterName).toDouble();
+  }
+
+  /// Episode equivalent of [resolveChapterNumber]. The filename fallback does
+  /// not fold season numbers into the result, matching tracker expectations.
+  double resolveEpisodeNumber(
+    String mangaTitle,
+    String episodeName, {
+    double? sourceEpisodeNumber,
+  }) {
+    final sourceNumber = _knownSourceNumber(sourceEpisodeNumber);
+    if (sourceNumber != null) return sourceNumber;
+    return parseEpisodeNumber(mangaTitle, episodeName).toDouble();
+  }
+
+  double? _knownSourceNumber(double? number) {
+    return number == -2 || (number ?? -1) >= 0 ? number : null;
+  }
 
   int _parse(
     String mangaTitle,
@@ -50,10 +84,29 @@ class ChapterRecognition {
       return _withSeason(season, ep);
     }
 
+    final chapterMatch = _chNotation.firstMatch(name);
+    if (chapterMatch != null) {
+      return _withSeason(season, _fromMatch(chapterMatch).toInt());
+    }
+
+    // Mokuro volume filenames often contain an unrelated number in the title,
+    // e.g. "14歳の恋 第12巻". Prefer the explicit Japanese volume marker.
+    final japaneseVolumeMatch = _japaneseVolume.firstMatch(name);
+    if (japaneseVolumeMatch != null) {
+      return _withSeason(season, _fromMatch(japaneseVolumeMatch).toInt());
+    }
+
     // strip season/volume noise, then look for ch. or bare number.
     final stripped = name.replaceAll(_unwanted, '');
     final ep = _extractNumber(stripped);
-    return ep != null ? _withSeason(season, ep) : 0;
+    if (ep != null) return _withSeason(season, ep);
+
+    // If stripping removed the only useful token (such as Mokuro's "v22"),
+    // use that explicit volume number as the final fallback.
+    final westernVolumeMatch = _westernVolume.firstMatch(name);
+    return westernVolumeMatch != null
+        ? _withSeason(season, _fromMatch(westernVolumeMatch).toInt())
+        : 0;
   }
 
   // Combines season + episode into a sortable integer.

@@ -27,44 +27,105 @@ const SyncPreferenceSchema = CollectionSchema(
       name: r'autoSyncFrequency',
       type: IsarType.long,
     ),
-    r'email': PropertySchema(id: 2, name: r'email', type: IsarType.string),
-    r'lastSyncHistory': PropertySchema(
+    r'chimahonDeviceId': PropertySchema(
+      id: 2,
+      name: r'chimahonDeviceId',
+      type: IsarType.string,
+    ),
+    r'chimahonMediaSelectionGeneration': PropertySchema(
       id: 3,
+      name: r'chimahonMediaSelectionGeneration',
+      type: IsarType.long,
+    ),
+    r'chimahonMediaSelectionInitialized': PropertySchema(
+      id: 4,
+      name: r'chimahonMediaSelectionInitialized',
+      type: IsarType.bool,
+    ),
+    r'chimahonMediaSelectionScopeToken': PropertySchema(
+      id: 5,
+      name: r'chimahonMediaSelectionScopeToken',
+      type: IsarType.string,
+    ),
+    r'chimahonMediaSelectionUserSelected': PropertySchema(
+      id: 6,
+      name: r'chimahonMediaSelectionUserSelected',
+      type: IsarType.bool,
+    ),
+    r'chimahonSyncAnime': PropertySchema(
+      id: 7,
+      name: r'chimahonSyncAnime',
+      type: IsarType.bool,
+    ),
+    r'chimahonSyncManga': PropertySchema(
+      id: 8,
+      name: r'chimahonSyncManga',
+      type: IsarType.bool,
+    ),
+    r'chimahonSyncNovels': PropertySchema(
+      id: 9,
+      name: r'chimahonSyncNovels',
+      type: IsarType.bool,
+    ),
+    r'chimahonSyncProvider': PropertySchema(
+      id: 10,
+      name: r'chimahonSyncProvider',
+      type: IsarType.byte,
+      enumMap: _SyncPreferencechimahonSyncProviderEnumValueMap,
+    ),
+    r'email': PropertySchema(id: 11, name: r'email', type: IsarType.string),
+    r'googleDriveConnected': PropertySchema(
+      id: 12,
+      name: r'googleDriveConnected',
+      type: IsarType.bool,
+    ),
+    r'lastSyncHistory': PropertySchema(
+      id: 13,
       name: r'lastSyncHistory',
       type: IsarType.long,
     ),
     r'lastSyncManga': PropertySchema(
-      id: 4,
+      id: 14,
       name: r'lastSyncManga',
       type: IsarType.long,
     ),
     r'lastSyncUpdate': PropertySchema(
-      id: 5,
+      id: 15,
       name: r'lastSyncUpdate',
       type: IsarType.long,
     ),
-    r'server': PropertySchema(id: 6, name: r'server', type: IsarType.string),
+    r'server': PropertySchema(id: 16, name: r'server', type: IsarType.string),
     r'syncHistories': PropertySchema(
-      id: 7,
+      id: 17,
       name: r'syncHistories',
       type: IsarType.bool,
     ),
-    r'syncOn': PropertySchema(id: 8, name: r'syncOn', type: IsarType.bool),
+    r'syncMode': PropertySchema(
+      id: 18,
+      name: r'syncMode',
+      type: IsarType.byte,
+      enumMap: _SyncPreferencesyncModeEnumValueMap,
+    ),
+    r'syncOn': PropertySchema(id: 19, name: r'syncOn', type: IsarType.bool),
     r'syncSettings': PropertySchema(
-      id: 9,
+      id: 20,
       name: r'syncSettings',
       type: IsarType.bool,
     ),
     r'syncUpdates': PropertySchema(
-      id: 10,
+      id: 21,
       name: r'syncUpdates',
       type: IsarType.bool,
     ),
-    r'syncMode': PropertySchema(
-      id: 11,
-      name: r'syncMode',
-      type: IsarType.byte,
-      enumMap: _SyncPreferencesyncModeEnumValueMap,
+    r'syncYomiApiToken': PropertySchema(
+      id: 22,
+      name: r'syncYomiApiToken',
+      type: IsarType.string,
+    ),
+    r'syncYomiServer': PropertySchema(
+      id: 23,
+      name: r'syncYomiServer',
+      type: IsarType.string,
     ),
   },
 
@@ -96,6 +157,18 @@ int _syncPreferenceEstimateSize(
     }
   }
   {
+    final value = object.chimahonDeviceId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.chimahonMediaSelectionScopeToken;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.email;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -103,6 +176,18 @@ int _syncPreferenceEstimateSize(
   }
   {
     final value = object.server;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.syncYomiApiToken;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.syncYomiServer;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -118,16 +203,28 @@ void _syncPreferenceSerialize(
 ) {
   writer.writeString(offsets[0], object.authToken);
   writer.writeLong(offsets[1], object.autoSyncFrequency);
-  writer.writeString(offsets[2], object.email);
-  writer.writeLong(offsets[3], object.lastSyncHistory);
-  writer.writeLong(offsets[4], object.lastSyncManga);
-  writer.writeLong(offsets[5], object.lastSyncUpdate);
-  writer.writeString(offsets[6], object.server);
-  writer.writeBool(offsets[7], object.syncHistories);
-  writer.writeBool(offsets[8], object.syncOn);
-  writer.writeBool(offsets[9], object.syncSettings);
-  writer.writeBool(offsets[10], object.syncUpdates);
-  writer.writeByte(offsets[11], object.syncMode.index);
+  writer.writeString(offsets[2], object.chimahonDeviceId);
+  writer.writeLong(offsets[3], object.chimahonMediaSelectionGeneration);
+  writer.writeBool(offsets[4], object.chimahonMediaSelectionInitialized);
+  writer.writeString(offsets[5], object.chimahonMediaSelectionScopeToken);
+  writer.writeBool(offsets[6], object.chimahonMediaSelectionUserSelected);
+  writer.writeBool(offsets[7], object.chimahonSyncAnime);
+  writer.writeBool(offsets[8], object.chimahonSyncManga);
+  writer.writeBool(offsets[9], object.chimahonSyncNovels);
+  writer.writeByte(offsets[10], object.chimahonSyncProvider.index);
+  writer.writeString(offsets[11], object.email);
+  writer.writeBool(offsets[12], object.googleDriveConnected);
+  writer.writeLong(offsets[13], object.lastSyncHistory);
+  writer.writeLong(offsets[14], object.lastSyncManga);
+  writer.writeLong(offsets[15], object.lastSyncUpdate);
+  writer.writeString(offsets[16], object.server);
+  writer.writeBool(offsets[17], object.syncHistories);
+  writer.writeByte(offsets[18], object.syncMode.index);
+  writer.writeBool(offsets[19], object.syncOn);
+  writer.writeBool(offsets[20], object.syncSettings);
+  writer.writeBool(offsets[21], object.syncUpdates);
+  writer.writeString(offsets[22], object.syncYomiApiToken);
+  writer.writeString(offsets[23], object.syncYomiServer);
 }
 
 SyncPreference _syncPreferenceDeserialize(
@@ -139,22 +236,40 @@ SyncPreference _syncPreferenceDeserialize(
   final object = SyncPreference(
     authToken: reader.readStringOrNull(offsets[0]),
     autoSyncFrequency: reader.readLongOrNull(offsets[1]) ?? 0,
-    email: reader.readStringOrNull(offsets[2]),
-    lastSyncHistory: reader.readLongOrNull(offsets[3]),
-    lastSyncManga: reader.readLongOrNull(offsets[4]),
-    lastSyncUpdate: reader.readLongOrNull(offsets[5]),
-    server: reader.readStringOrNull(offsets[6]),
+    chimahonDeviceId: reader.readStringOrNull(offsets[2]),
+    chimahonMediaSelectionGeneration: reader.readLongOrNull(offsets[3]) ?? 0,
+    chimahonMediaSelectionInitialized:
+        reader.readBoolOrNull(offsets[4]) ?? false,
+    chimahonMediaSelectionScopeToken: reader.readStringOrNull(offsets[5]),
+    chimahonMediaSelectionUserSelected:
+        reader.readBoolOrNull(offsets[6]) ?? false,
+    chimahonSyncAnime: reader.readBoolOrNull(offsets[7]) ?? true,
+    chimahonSyncManga: reader.readBoolOrNull(offsets[8]) ?? true,
+    chimahonSyncNovels: reader.readBoolOrNull(offsets[9]) ?? true,
+    chimahonSyncProvider:
+        _SyncPreferencechimahonSyncProviderValueEnumMap[reader.readByteOrNull(
+          offsets[10],
+        )] ??
+        ChimahonSyncProvider.syncYomi,
+    email: reader.readStringOrNull(offsets[11]),
+    googleDriveConnected: reader.readBoolOrNull(offsets[12]) ?? false,
+    lastSyncHistory: reader.readLongOrNull(offsets[13]),
+    lastSyncManga: reader.readLongOrNull(offsets[14]),
+    lastSyncUpdate: reader.readLongOrNull(offsets[15]),
+    server: reader.readStringOrNull(offsets[16]),
     syncId: id,
     syncMode:
         _SyncPreferencesyncModeValueEnumMap[reader.readByteOrNull(
-          offsets[11],
+          offsets[18],
         )] ??
         SyncMode.native,
-    syncOn: reader.readBoolOrNull(offsets[8]) ?? false,
+    syncOn: reader.readBoolOrNull(offsets[19]) ?? false,
+    syncYomiApiToken: reader.readStringOrNull(offsets[22]),
+    syncYomiServer: reader.readStringOrNull(offsets[23]),
   );
-  object.syncHistories = reader.readBool(offsets[7]);
-  object.syncSettings = reader.readBool(offsets[9]);
-  object.syncUpdates = reader.readBool(offsets[10]);
+  object.syncHistories = reader.readBool(offsets[17]);
+  object.syncSettings = reader.readBool(offsets[20]);
+  object.syncUpdates = reader.readBool(offsets[21]);
   return object;
 }
 
@@ -172,36 +287,68 @@ P _syncPreferenceDeserializeProp<P>(
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset) ?? 0) as P;
     case 4:
-      return (reader.readLongOrNull(offset)) as P;
-    case 5:
-      return (reader.readLongOrNull(offset)) as P;
-    case 6:
-      return (reader.readStringOrNull(offset)) as P;
-    case 7:
-      return (reader.readBool(offset)) as P;
-    case 8:
       return (reader.readBoolOrNull(offset) ?? false) as P;
+    case 5:
+      return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readBoolOrNull(offset) ?? false) as P;
+    case 7:
+      return (reader.readBoolOrNull(offset) ?? true) as P;
+    case 8:
+      return (reader.readBoolOrNull(offset) ?? true) as P;
     case 9:
-      return (reader.readBool(offset)) as P;
+      return (reader.readBoolOrNull(offset) ?? true) as P;
     case 10:
-      return (reader.readBool(offset)) as P;
+      return (_SyncPreferencechimahonSyncProviderValueEnumMap[reader
+                  .readByteOrNull(offset)] ??
+              ChimahonSyncProvider.syncYomi)
+          as P;
     case 11:
+      return (reader.readStringOrNull(offset)) as P;
+    case 12:
+      return (reader.readBoolOrNull(offset) ?? false) as P;
+    case 13:
+      return (reader.readLongOrNull(offset)) as P;
+    case 14:
+      return (reader.readLongOrNull(offset)) as P;
+    case 15:
+      return (reader.readLongOrNull(offset)) as P;
+    case 16:
+      return (reader.readStringOrNull(offset)) as P;
+    case 17:
+      return (reader.readBool(offset)) as P;
+    case 18:
       return (_SyncPreferencesyncModeValueEnumMap[reader.readByteOrNull(
                 offset,
               )] ??
               SyncMode.native)
           as P;
+    case 19:
+      return (reader.readBoolOrNull(offset) ?? false) as P;
+    case 20:
+      return (reader.readBool(offset)) as P;
+    case 21:
+      return (reader.readBool(offset)) as P;
+    case 22:
+      return (reader.readStringOrNull(offset)) as P;
+    case 23:
+      return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
 }
 
-const _SyncPreferencesyncModeEnumValueMap = {
-  'native': 0,
-  'chimahon': 1,
+const _SyncPreferencechimahonSyncProviderEnumValueMap = {
+  'syncYomi': 0,
+  'googleDrive': 1,
 };
+const _SyncPreferencechimahonSyncProviderValueEnumMap = {
+  0: ChimahonSyncProvider.syncYomi,
+  1: ChimahonSyncProvider.googleDrive,
+};
+const _SyncPreferencesyncModeEnumValueMap = {'native': 0, 'chimahon': 1};
 const _SyncPreferencesyncModeValueEnumMap = {
   0: SyncMode.native,
   1: SyncMode.chimahon,
@@ -521,6 +668,525 @@ extension SyncPreferenceQueryFilter
   }
 
   QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'chimahonDeviceId'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'chimahonDeviceId'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chimahonDeviceId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'chimahonDeviceId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'chimahonDeviceId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'chimahonDeviceId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'chimahonDeviceId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'chimahonDeviceId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'chimahonDeviceId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'chimahonDeviceId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'chimahonDeviceId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonDeviceIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'chimahonDeviceId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionGenerationEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chimahonMediaSelectionGeneration',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionGenerationGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'chimahonMediaSelectionGeneration',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionGenerationLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'chimahonMediaSelectionGeneration',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionGenerationBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'chimahonMediaSelectionGeneration',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionInitializedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chimahonMediaSelectionInitialized',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(
+          property: r'chimahonMediaSelectionScopeToken',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(
+          property: r'chimahonMediaSelectionScopeToken',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chimahonMediaSelectionScopeToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'chimahonMediaSelectionScopeToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'chimahonMediaSelectionScopeToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'chimahonMediaSelectionScopeToken',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'chimahonMediaSelectionScopeToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'chimahonMediaSelectionScopeToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'chimahonMediaSelectionScopeToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'chimahonMediaSelectionScopeToken',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chimahonMediaSelectionScopeToken',
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionScopeTokenIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          property: r'chimahonMediaSelectionScopeToken',
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonMediaSelectionUserSelectedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chimahonMediaSelectionUserSelected',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonSyncAnimeEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'chimahonSyncAnime', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonSyncMangaEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'chimahonSyncManga', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonSyncNovelsEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'chimahonSyncNovels', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonSyncProviderEqualTo(ChimahonSyncProvider value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chimahonSyncProvider',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonSyncProviderGreaterThan(
+    ChimahonSyncProvider value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'chimahonSyncProvider',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonSyncProviderLessThan(
+    ChimahonSyncProvider value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'chimahonSyncProvider',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  chimahonSyncProviderBetween(
+    ChimahonSyncProvider lower,
+    ChimahonSyncProvider upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'chimahonSyncProvider',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
   emailIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -675,6 +1341,18 @@ extension SyncPreferenceQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'email', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  googleDriveConnectedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'googleDriveConnected',
+          value: value,
+        ),
       );
     });
   }
@@ -1140,6 +1818,61 @@ extension SyncPreferenceQueryFilter
   }
 
   QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncModeEqualTo(SyncMode value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'syncMode', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncModeGreaterThan(SyncMode value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'syncMode',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncModeLessThan(SyncMode value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'syncMode',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncModeBetween(
+    SyncMode lower,
+    SyncMode upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'syncMode',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
   syncOnEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1162,6 +1895,324 @@ extension SyncPreferenceQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.equalTo(property: r'syncUpdates', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'syncYomiApiToken'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'syncYomiApiToken'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'syncYomiApiToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'syncYomiApiToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'syncYomiApiToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'syncYomiApiToken',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'syncYomiApiToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'syncYomiApiToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'syncYomiApiToken',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'syncYomiApiToken',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'syncYomiApiToken', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiApiTokenIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'syncYomiApiToken', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'syncYomiServer'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'syncYomiServer'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'syncYomiServer',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'syncYomiServer',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'syncYomiServer',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'syncYomiServer',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'syncYomiServer',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'syncYomiServer',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'syncYomiServer',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'syncYomiServer',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'syncYomiServer', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  syncYomiServerIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'syncYomiServer', value: ''),
       );
     });
   }
@@ -1202,6 +2253,132 @@ extension SyncPreferenceQuerySortBy
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonDeviceId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonDeviceId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonDeviceIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonDeviceId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionGeneration() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionGeneration', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionGenerationDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionGeneration', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionInitialized() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionInitialized', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionInitializedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionInitialized', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionScopeToken() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionScopeToken', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionScopeTokenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionScopeToken', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionUserSelected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionUserSelected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonMediaSelectionUserSelectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionUserSelected', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncAnime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncAnime', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncAnimeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncAnime', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncManga() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncManga', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncMangaDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncManga', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncNovels() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncNovels', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncNovelsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncNovels', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncProvider() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncProvider', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByChimahonSyncProviderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncProvider', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> sortByEmail() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'email', Sort.asc);
@@ -1211,6 +2388,20 @@ extension SyncPreferenceQuerySortBy
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> sortByEmailDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'email', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByGoogleDriveConnected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'googleDriveConnected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByGoogleDriveConnectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'googleDriveConnected', Sort.desc);
     });
   }
 
@@ -1283,6 +2474,19 @@ extension SyncPreferenceQuerySortBy
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> sortBySyncMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortBySyncModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncMode', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> sortBySyncOn() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'syncOn', Sort.asc);
@@ -1323,6 +2527,34 @@ extension SyncPreferenceQuerySortBy
       return query.addSortBy(r'syncUpdates', Sort.desc);
     });
   }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortBySyncYomiApiToken() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiApiToken', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortBySyncYomiApiTokenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiApiToken', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortBySyncYomiServer() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiServer', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortBySyncYomiServerDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiServer', Sort.desc);
+    });
+  }
 }
 
 extension SyncPreferenceQuerySortThenBy
@@ -1354,6 +2586,132 @@ extension SyncPreferenceQuerySortThenBy
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonDeviceId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonDeviceId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonDeviceIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonDeviceId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionGeneration() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionGeneration', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionGenerationDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionGeneration', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionInitialized() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionInitialized', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionInitializedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionInitialized', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionScopeToken() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionScopeToken', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionScopeTokenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionScopeToken', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionUserSelected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionUserSelected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonMediaSelectionUserSelectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonMediaSelectionUserSelected', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncAnime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncAnime', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncAnimeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncAnime', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncManga() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncManga', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncMangaDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncManga', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncNovels() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncNovels', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncNovelsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncNovels', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncProvider() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncProvider', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByChimahonSyncProviderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chimahonSyncProvider', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> thenByEmail() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'email', Sort.asc);
@@ -1363,6 +2721,20 @@ extension SyncPreferenceQuerySortThenBy
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> thenByEmailDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'email', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByGoogleDriveConnected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'googleDriveConnected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByGoogleDriveConnectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'googleDriveConnected', Sort.desc);
     });
   }
 
@@ -1448,6 +2820,19 @@ extension SyncPreferenceQuerySortThenBy
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> thenBySyncMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenBySyncModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncMode', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> thenBySyncOn() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'syncOn', Sort.asc);
@@ -1488,6 +2873,34 @@ extension SyncPreferenceQuerySortThenBy
       return query.addSortBy(r'syncUpdates', Sort.desc);
     });
   }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenBySyncYomiApiToken() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiApiToken', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenBySyncYomiApiTokenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiApiToken', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenBySyncYomiServer() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiServer', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenBySyncYomiServerDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'syncYomiServer', Sort.desc);
+    });
+  }
 }
 
 extension SyncPreferenceQueryWhereDistinct
@@ -1507,11 +2920,87 @@ extension SyncPreferenceQueryWhereDistinct
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonDeviceId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'chimahonDeviceId',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonMediaSelectionGeneration() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chimahonMediaSelectionGeneration');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonMediaSelectionInitialized() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chimahonMediaSelectionInitialized');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonMediaSelectionScopeToken({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'chimahonMediaSelectionScopeToken',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonMediaSelectionUserSelected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chimahonMediaSelectionUserSelected');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonSyncAnime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chimahonSyncAnime');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonSyncManga() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chimahonSyncManga');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonSyncNovels() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chimahonSyncNovels');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByChimahonSyncProvider() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chimahonSyncProvider');
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QDistinct> distinctByEmail({
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'email', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByGoogleDriveConnected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'googleDriveConnected');
     });
   }
 
@@ -1551,6 +3040,12 @@ extension SyncPreferenceQueryWhereDistinct
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct> distinctBySyncMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'syncMode');
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QDistinct> distinctBySyncOn() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'syncOn');
@@ -1568,6 +3063,26 @@ extension SyncPreferenceQueryWhereDistinct
   distinctBySyncUpdates() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'syncUpdates');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctBySyncYomiApiToken({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'syncYomiApiToken',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctBySyncYomiServer({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'syncYomiServer',
+        caseSensitive: caseSensitive,
+      );
     });
   }
 }
@@ -1593,9 +3108,79 @@ extension SyncPreferenceQueryProperty
     });
   }
 
+  QueryBuilder<SyncPreference, String?, QQueryOperations>
+  chimahonDeviceIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonDeviceId');
+    });
+  }
+
+  QueryBuilder<SyncPreference, int, QQueryOperations>
+  chimahonMediaSelectionGenerationProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonMediaSelectionGeneration');
+    });
+  }
+
+  QueryBuilder<SyncPreference, bool, QQueryOperations>
+  chimahonMediaSelectionInitializedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonMediaSelectionInitialized');
+    });
+  }
+
+  QueryBuilder<SyncPreference, String?, QQueryOperations>
+  chimahonMediaSelectionScopeTokenProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonMediaSelectionScopeToken');
+    });
+  }
+
+  QueryBuilder<SyncPreference, bool, QQueryOperations>
+  chimahonMediaSelectionUserSelectedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonMediaSelectionUserSelected');
+    });
+  }
+
+  QueryBuilder<SyncPreference, bool, QQueryOperations>
+  chimahonSyncAnimeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonSyncAnime');
+    });
+  }
+
+  QueryBuilder<SyncPreference, bool, QQueryOperations>
+  chimahonSyncMangaProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonSyncManga');
+    });
+  }
+
+  QueryBuilder<SyncPreference, bool, QQueryOperations>
+  chimahonSyncNovelsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonSyncNovels');
+    });
+  }
+
+  QueryBuilder<SyncPreference, ChimahonSyncProvider, QQueryOperations>
+  chimahonSyncProviderProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chimahonSyncProvider');
+    });
+  }
+
   QueryBuilder<SyncPreference, String?, QQueryOperations> emailProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'email');
+    });
+  }
+
+  QueryBuilder<SyncPreference, bool, QQueryOperations>
+  googleDriveConnectedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'googleDriveConnected');
     });
   }
 
@@ -1631,6 +3216,12 @@ extension SyncPreferenceQueryProperty
     });
   }
 
+  QueryBuilder<SyncPreference, SyncMode, QQueryOperations> syncModeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'syncMode');
+    });
+  }
+
   QueryBuilder<SyncPreference, bool, QQueryOperations> syncOnProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'syncOn');
@@ -1646,6 +3237,20 @@ extension SyncPreferenceQueryProperty
   QueryBuilder<SyncPreference, bool, QQueryOperations> syncUpdatesProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'syncUpdates');
+    });
+  }
+
+  QueryBuilder<SyncPreference, String?, QQueryOperations>
+  syncYomiApiTokenProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'syncYomiApiToken');
+    });
+  }
+
+  QueryBuilder<SyncPreference, String?, QQueryOperations>
+  syncYomiServerProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'syncYomiServer');
     });
   }
 }

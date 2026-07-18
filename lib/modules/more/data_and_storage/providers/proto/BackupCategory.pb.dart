@@ -23,12 +23,14 @@ class BackupCategory extends $pb.GeneratedMessage {
     $fixnum.Int64? order,
     $fixnum.Int64? id,
     $fixnum.Int64? flags,
+    $core.bool? hidden,
   }) {
     final result = create();
     if (name != null) result.name = name;
     if (order != null) result.order = order;
     if (id != null) result.id = id;
     if (flags != null) result.flags = flags;
+    if (hidden != null) result.hidden = hidden;
     return result;
   }
 
@@ -48,6 +50,7 @@ class BackupCategory extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'order')
     ..aInt64(3, _omitFieldNames ? '' : 'id')
     ..aInt64(100, _omitFieldNames ? '' : 'flags')
+    ..aOB(900, _omitFieldNames ? '' : 'hidden')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -106,6 +109,15 @@ class BackupCategory extends $pb.GeneratedMessage {
   $core.bool hasFlags() => $_has(3);
   @$pb.TagNumber(100)
   void clearFlags() => $_clearField(100);
+
+  @$pb.TagNumber(900)
+  $core.bool get hidden => $_getBF(4);
+  @$pb.TagNumber(900)
+  set hidden($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(900)
+  $core.bool hasHidden() => $_has(4);
+  @$pb.TagNumber(900)
+  void clearHidden() => $_clearField(900);
 }
 
 const $core.bool _omitFieldNames =

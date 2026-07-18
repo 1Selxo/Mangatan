@@ -26,9 +26,9 @@ void showCategorySelectionDialog({
   );
   final l10n = l10nLocalizations(context)!;
   final bool isBulk = bulkMangas != null;
-  final bool isFavorite = !isBulk && (singleManga!.favorite ?? false);
+  final bool isLibraryVisible = !isBulk && singleManga!.isVisibleInLibrary;
   List<int> categoryIds = [];
-  if (!isBulk && isFavorite) {
+  if (!isBulk && isLibraryVisible) {
     categoryIds = List<int>.from(singleManga.categories ?? []);
   }
   showDialog(
@@ -136,7 +136,7 @@ void showCategorySelectionDialog({
                       }
                       var entries = (snapshot.data!
                         ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0)));
-                      if (isFavorite || isBulk) {
+                      if (isLibraryVisible || isBulk) {
                         // When item is in library, hide hidden categories in list
                         entries = entries
                             .where((e) => !(e.hide ?? false))
@@ -288,8 +288,8 @@ void showCategorySelectionDialog({
                                   isar.mangas.putSync(manga);
                                 }
                               } else {
-                                if (!isFavorite) {
-                                  singleManga!.favorite = true;
+                                if (!isLibraryVisible) {
+                                  singleManga!.updateFavorite(true);
                                   singleManga.dateAdded =
                                       DateTime.now().millisecondsSinceEpoch;
                                 }

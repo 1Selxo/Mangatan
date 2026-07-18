@@ -107,15 +107,6 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
       final profile = await DictionaryProfileResolver.resolveMiningContext(
         miningContext,
       );
-      if (!isProfileOcrAllowed(
-        sourceLanguage: miningContext.sourceLanguage,
-        profileLanguage: profile.languageCode,
-      )) {
-        throw StateError(
-          'OCR is disabled because the source and dictionary profile '
-          'languages do not match.',
-        );
-      }
       final language = profileOcrLanguage(profile.languageCode);
       final result = await recognizeVideoFrame(
         widget.imageBytes,
@@ -396,15 +387,6 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
       final profile = await DictionaryProfileResolver.resolveMiningContext(
         miningContext,
       );
-      if (!isProfileOcrAllowed(
-        sourceLanguage: miningContext.sourceLanguage,
-        profileLanguage: profile.languageCode,
-      )) {
-        throw StateError(
-          'Live OCR is disabled because the source and dictionary profile '
-          'languages do not match.',
-        );
-      }
       final bytes = await widget.imageBytesLoader();
       if (bytes == null || bytes.isEmpty) return;
       final result = await recognizeVideoFrame(

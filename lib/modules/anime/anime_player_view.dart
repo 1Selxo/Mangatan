@@ -878,7 +878,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   Future<void> _handleVideoOcrShortcut() async {
-    if (_videoOcrBytes != null || _liveVideoOcrEnabled) {
+    if (_videoOcrBytes != null) {
       _dismissVideoOcr();
       return;
     }
@@ -2564,8 +2564,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
                   chapterMarks: _chapterMarks,
                   subtitleMiningContextBuilder: _subtitleMiningContext,
-                  videoOcrActive:
-                      _videoOcrBytes != null || _liveVideoOcrEnabled,
+                  videoOcrActive: _videoOcrBytes != null,
                   onVideoOcrShortcut: _handleVideoOcrShortcut,
                 )
               : MobileControllerWidget(
@@ -2670,7 +2669,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             imageBytesLoader: _captureLiveVideoOcrFrame,
             fit: fit,
             miningContextBuilder: _subtitleMiningContext,
-            onDismiss: _dismissVideoOcr,
+            onDismiss: () {
+              DictionaryLookupPopup.dismissActive();
+              setState(() => _liveVideoOcrEnabled = false);
+              unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
+            },
           ),
       ],
     );

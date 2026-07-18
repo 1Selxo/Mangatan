@@ -27,6 +27,7 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
   final ValueNotifier<List<(String, int)>> chapterMarks;
   final Future<MiningContext> Function(String text)?
   subtitleMiningContextBuilder;
+  final bool videoOcrActive;
   final Future<void> Function()? onVideoOcrShortcut;
   const DesktopControllerWidget({
     super.key,
@@ -40,6 +41,7 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
     required this.desktopFullScreenPlayer,
     required this.chapterMarks,
     this.subtitleMiningContextBuilder,
+    this.videoOcrActive = false,
     this.onVideoOcrShortcut,
   });
 
@@ -189,12 +191,17 @@ class _DesktopControllerWidgetState
   static const _spaceDoublePressWindow = Duration(milliseconds: 360);
 
   void _handleSpaceShortcut() {
+    final onVideoOcrShortcut = widget.onVideoOcrShortcut;
+    if (widget.videoOcrActive && onVideoOcrShortcut != null) {
+      _lastSpaceShortcutAt = null;
+      unawaited(onVideoOcrShortcut());
+      return;
+    }
     final now = DateTime.now();
     final lastSpaceShortcutAt = _lastSpaceShortcutAt;
     if (lastSpaceShortcutAt != null &&
         now.difference(lastSpaceShortcutAt) <= _spaceDoublePressWindow) {
       _lastSpaceShortcutAt = null;
-      final onVideoOcrShortcut = widget.onVideoOcrShortcut;
       if (onVideoOcrShortcut != null) {
         unawaited(onVideoOcrShortcut());
         return;

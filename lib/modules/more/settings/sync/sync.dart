@@ -4,15 +4,46 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
+import 'package:mangayomi/modules/more/settings/sync/widgets/auto_sync_frequency_option.dart';
 import 'package:mangayomi/utils/date.dart';
 import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/modules/more/settings/sync/widgets/sync_listile.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/sync_server.dart';
+import 'package:mangayomi/services/sync/google_drive_oauth.dart';
+import 'package:mangayomi/services/sync/chimahon_media_sync_selection.dart';
+import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
+import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
+import 'package:mangayomi/services/sync/google_drive_platform_support.dart';
+import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
+import 'package:mangayomi/services/sync/google_drive_sync_storage.dart';
+import 'package:mangayomi/services/sync/sync_user_message.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+final _googleDriveConnectionSingleFlight = GoogleDriveConnectionSingleFlight();
+
+/// Deduplicates process-local Connect clicks while preserving synchronous
+/// setup before the operation's first asynchronous gap.
+@visibleForTesting
+class GoogleDriveConnectionSingleFlight {
+  Future<void>? _active;
+
+  Future<void> run(Future<void> Function() operation) {
+    final active = _active;
+    if (active != null) return active;
+
+    final started = Future<void>.sync(operation);
+    late final Future<void> tracked;
+    tracked = started.whenComplete(() {
+      if (identical(_active, tracked)) _active = null;
+    });
+    _active = tracked;
+    return tracked;
+  }
+}
 
 class SyncScreen extends ConsumerWidget {
   static const serverUrl = "https://github.com/Schnitzel5/mangayomi-server";
@@ -32,6 +63,8 @@ class SyncScreen extends ConsumerWidget {
       l10n.sync_auto_6_hours: 21600,
       l10n.sync_auto_12_hours: 43200,
     };
+    final googleDriveSupported =
+        supportsGoogleDriveChimahonSyncOnCurrentPlatform;
     return Scaffold(
       appBar: AppBar(title: Text(l10nLocalizations(context)!.syncing)),
       body: SingleChildScrollView(
@@ -43,7 +76,17 @@ class SyncScreen extends ConsumerWidget {
             SyncPreference syncPreference = snapshot.data?.isNotEmpty ?? false
                 ? snapshot.data?.first ?? SyncPreference()
                 : SyncPreference();
-            final bool isLogged = syncPreference.authToken?.isNotEmpty ?? false;
+            final isChimahon = syncPreference.syncMode == SyncMode.chimahon;
+            final isGoogleDrive =
+                isChimahon &&
+                syncPreference.chimahonSyncProvider ==
+                    ChimahonSyncProvider.googleDrive;
+            final bool isLogged = isGoogleDrive
+                ? syncPreference.googleDriveConnected
+                : isChimahon
+                ? (syncPreference.syncYomiApiToken?.isNotEmpty ?? false) &&
+                      (syncPreference.syncYomiServer?.isNotEmpty ?? false)
+                : syncPreference.authToken?.isNotEmpty ?? false;
             return Column(
               children: [
                 SwitchListTile(
@@ -63,8 +106,11 @@ class SyncScreen extends ConsumerWidget {
                 ListTile(
                   title: const Text('Sync mode'),
                   subtitle: Text(
-                    syncPreference.syncMode == SyncMode.chimahon
-                        ? 'Chimahon / SyncYomi compatible'
+                    isChimahon
+                        ? syncPreference.chimahonSyncProvider ==
+                                  ChimahonSyncProvider.googleDrive
+                              ? 'Chimahon compatible · Google Drive'
+                              : 'Chimahon compatible · SyncYomi'
                         : 'Mangayomi native',
                     style: TextStyle(
                       fontSize: 11,
@@ -109,6 +155,93 @@ class SyncScreen extends ConsumerWidget {
                     );
                   },
                 ),
+                if (isChimahon)
+                  ListTile(
+                    title: const Text('Chimahon sync service'),
+                    subtitle: Text(
+                      isGoogleDrive ? 'Google Drive' : 'SyncYomi',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.secondaryColor,
+                      ),
+                    ),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Chimahon sync service'),
+                          content: RadioGroup(
+                            groupValue: syncPreference.chimahonSyncProvider,
+                            onChanged: (value) {
+                              if (value == null) return;
+                              ref
+                                  .read(synchingProvider(syncId: 1).notifier)
+                                  .setChimahonSyncProvider(value);
+                              Navigator.pop(context);
+                            },
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                RadioListTile(
+                                  value: ChimahonSyncProvider.googleDrive,
+                                  enabled: googleDriveSupported,
+                                  title: Text('Google Drive'),
+                                  subtitle: Text(
+                                    googleDriveSupported
+                                        ? 'Uses Chimahon’s hidden Drive app-data file.'
+                                        : 'Available on macOS, Windows, and Linux.',
+                                  ),
+                                ),
+                                const RadioListTile(
+                                  value: ChimahonSyncProvider.syncYomi,
+                                  title: Text('SyncYomi'),
+                                  subtitle: Text(
+                                    'Uses a SyncYomi server and API token.',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                if (isChimahon) ...[
+                  const ListTile(
+                    title: Text('Media to sync'),
+                    subtitle: Text(
+                      'Controls what this device contributes; existing cloud '
+                      'items stay.',
+                    ),
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('chimahon-sync-manga'),
+                    dense: true,
+                    value: syncPreference.chimahonSyncManga,
+                    title: const Text('Manga'),
+                    onChanged: ref
+                        .read(synchingProvider(syncId: 1).notifier)
+                        .setChimahonSyncManga,
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('chimahon-sync-anime'),
+                    dense: true,
+                    value: syncPreference.chimahonSyncAnime,
+                    title: const Text('Anime'),
+                    onChanged: ref
+                        .read(synchingProvider(syncId: 1).notifier)
+                        .setChimahonSyncAnime,
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('chimahon-sync-novels'),
+                    dense: true,
+                    value: syncPreference.chimahonSyncNovels,
+                    title: const Text('Novels'),
+                    onChanged: ref
+                        .read(synchingProvider(syncId: 1).notifier)
+                        .setChimahonSyncNovels,
+                  ),
+                ],
                 ListTile(
                   enabled: syncPreference.syncOn,
                   onTap: () {
@@ -124,7 +257,9 @@ class SyncScreen extends ConsumerWidget {
                               onChanged: (value) {
                                 ref
                                     .read(synchingProvider(syncId: 1).notifier)
-                                    .setAutoSyncFrequency(value!);
+                                    .setAutoSyncFrequency(
+                                      autoSyncFrequencyFromRadioValue(value),
+                                    );
                                 Navigator.pop(context);
                               },
                               child: SuperListView.builder(
@@ -135,11 +270,9 @@ class SyncScreen extends ConsumerWidget {
                                       .elementAt(index);
                                   final optionValue = autoSyncOptions.values
                                       .elementAt(index);
-                                  return RadioListTile(
-                                    dense: true,
-                                    contentPadding: const EdgeInsets.all(0),
+                                  return AutoSyncFrequencyOption(
                                     value: optionValue,
-                                    title: Text(optionName),
+                                    title: optionName,
                                   );
                                 },
                               ),
@@ -205,67 +338,71 @@ class SyncScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                SwitchListTile(
-                  value: syncPreference.syncHistories,
-                  title: Text(context.l10n.sync_enable_histories),
-                  onChanged: syncPreference.syncOn
-                      ? (value) {
-                          ref
-                              .read(synchingProvider(syncId: 1).notifier)
-                              .setSyncHistories(value);
-                        }
-                      : null,
-                ),
-                SwitchListTile(
-                  value: syncPreference.syncUpdates,
-                  title: Text(context.l10n.sync_enable_updates),
-                  onChanged: syncPreference.syncOn
-                      ? (value) {
-                          ref
-                              .read(synchingProvider(syncId: 1).notifier)
-                              .setSyncUpdates(value);
-                        }
-                      : null,
-                ),
-                SwitchListTile(
-                  value: syncPreference.syncSettings,
-                  title: Text(context.l10n.sync_enable_settings),
-                  onChanged: syncPreference.syncOn
-                      ? (value) {
-                          ref
-                              .read(synchingProvider(syncId: 1).notifier)
-                              .setSyncSettings(value);
-                        }
-                      : null,
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: 15,
-                    right: 15,
-                    bottom: 10,
-                    top: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          if (!await launchUrl(
-                            Uri.parse(serverUrl),
-                            mode: LaunchMode.externalApplication,
-                          )) {
-                            AppLogger.log(
-                              'Could not launch $serverUrl',
-                              logLevel: LogLevel.error,
-                            );
-                            botToast('Could not launch $serverUrl');
+                if (!isChimahon)
+                  SwitchListTile(
+                    value: syncPreference.syncHistories,
+                    title: Text(context.l10n.sync_enable_histories),
+                    onChanged: syncPreference.syncOn
+                        ? (value) {
+                            ref
+                                .read(synchingProvider(syncId: 1).notifier)
+                                .setSyncHistories(value);
                           }
-                        },
-                        label: Text(l10n.get_sync_server),
-                        icon: const Icon(Icons.download_outlined),
-                      ),
-                    ],
+                        : null,
                   ),
-                ),
+                if (!isChimahon)
+                  SwitchListTile(
+                    value: syncPreference.syncUpdates,
+                    title: Text(context.l10n.sync_enable_updates),
+                    onChanged: syncPreference.syncOn
+                        ? (value) {
+                            ref
+                                .read(synchingProvider(syncId: 1).notifier)
+                                .setSyncUpdates(value);
+                          }
+                        : null,
+                  ),
+                if (!isChimahon)
+                  SwitchListTile(
+                    value: syncPreference.syncSettings,
+                    title: Text(context.l10n.sync_enable_settings),
+                    onChanged: syncPreference.syncOn
+                        ? (value) {
+                            ref
+                                .read(synchingProvider(syncId: 1).notifier)
+                                .setSyncSettings(value);
+                          }
+                        : null,
+                  ),
+                if (!isChimahon)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 15,
+                      right: 15,
+                      bottom: 10,
+                      top: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            if (!await launchUrl(
+                              Uri.parse(serverUrl),
+                              mode: LaunchMode.externalApplication,
+                            )) {
+                              AppLogger.log(
+                                'Could not launch $serverUrl',
+                                logLevel: LogLevel.error,
+                              );
+                              botToast('Could not launch $serverUrl');
+                            }
+                          },
+                          label: Text(l10n.get_sync_server),
+                          icon: const Icon(Icons.download_outlined),
+                        ),
+                      ],
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.only(
                     left: 15,
@@ -286,14 +423,33 @@ class SyncScreen extends ConsumerWidget {
                   ),
                 ),
                 SyncListile(
-                  enabled: syncPreference.syncOn,
+                  enabled:
+                      syncPreference.syncOn &&
+                      (!isGoogleDrive || googleDriveSupported),
                   onTap: () async {
-                    _showDialogLogin(context, ref, syncPreference);
+                    if (isGoogleDrive) {
+                      await _connectGoogleDrive(context);
+                    } else {
+                      _showDialogLogin(context, ref, syncPreference);
+                    }
                   },
                   id: 1,
                   preference: syncPreference,
-                  text: syncPreference.syncMode == SyncMode.chimahon
-                      ? 'SyncYomi'
+                  text: isChimahon
+                      ? isGoogleDrive
+                            ? 'Google Drive (Chimahon)'
+                            : 'SyncYomi'
+                      : null,
+                  loggedIn: isLogged,
+                  icon: isGoogleDrive
+                      ? Icons.cloud_outlined
+                      : Icons.dns_outlined,
+                  onLogout: isGoogleDrive
+                      ? () => _disconnectGoogleDrive(context)
+                      : isChimahon
+                      ? () => ref
+                            .read(synchingProvider(syncId: 1).notifier)
+                            .disconnectSyncYomi()
                       : null,
                 ),
                 ListTile(
@@ -483,7 +639,11 @@ class SyncScreen extends ConsumerWidget {
     SyncPreference syncPreference,
   ) {
     final isChimahonSync = syncPreference.syncMode == SyncMode.chimahon;
-    final serverController = TextEditingController(text: syncPreference.server);
+    final serverController = TextEditingController(
+      text: isChimahonSync
+          ? syncPreference.syncYomiServer
+          : syncPreference.server,
+    );
     final emailController = TextEditingController(text: syncPreference.email);
     final passwordController = TextEditingController();
     String server = serverController.text;
@@ -674,8 +834,220 @@ class SyncScreen extends ConsumerWidget {
     }
     ref
         .read(synchingProvider(syncId: 1).notifier)
-        .login(server.trim(), 'SyncYomi', token.trim());
+        .saveSyncYomiCredentials(server: server.trim(), apiToken: token.trim());
     botToast('SyncYomi token saved');
     return (true, '');
+  }
+
+  Future<void> _connectGoogleDrive(BuildContext context) async {
+    if (!supportsGoogleDriveChimahonSyncOnCurrentPlatform) {
+      botToast('Google Drive sync is available on macOS, Windows, and Linux.');
+      return;
+    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    await _googleDriveConnectionSingleFlight.run(() {
+      // Pause synchronously before waiting on the shared coordinator. This
+      // closes the window where a timer can begin while an existing sync is
+      // finishing, without stacking pause tokens for duplicate Connect clicks.
+      final pauseToken = container
+          .read(synchingProvider(syncId: 1).notifier)
+          .pauseAutoSyncForExternalOperation();
+      final connectionIntent = container
+          .read(synchingProvider(syncId: 1).notifier)
+          .captureGoogleDriveConnectionIntent();
+      var connectionSaved = false;
+      return ChimahonRestoreSyncCoordinator.shared
+          .duringSync(() async {
+            botToast('Opening Google Drive sign-in…');
+            final oauth = GoogleDriveOAuthClient();
+            try {
+              final tokens = await oauth.signIn();
+              final deviceId = container
+                  .read(synchingProvider(syncId: 1).notifier)
+                  .ensureChimahonDeviceId();
+              final storage = GoogleDriveSyncStorage(
+                accessToken: tokens.accessToken,
+                deviceId: deviceId,
+              );
+              try {
+                // Verify the stable Drive account identity used to isolate
+                // local merge baselines before persisting the credential.
+                final permissionId = await storage.currentUserPermissionId();
+                final activeMediaSelectionScopeToken =
+                    chimahonMediaSelectionScopeToken(
+                      'google-drive|${oauth.config.clientId}|$permissionId',
+                    );
+                final remote = await storage.download();
+                final currentPreference = container.read(
+                  synchingProvider(syncId: 1),
+                );
+                final currentSelectionState =
+                    ChimahonMediaSyncSelectionState.fromPreference(
+                      currentPreference,
+                    );
+                final remotePreferences = remote == null
+                    ? null
+                    : const ChimahonSyncCodec()
+                          .decode(remote.bytes)
+                          .backup
+                          .backupPreferences;
+                final bootstrappedSelection =
+                    chimahonMediaSelectionBootstrapForScope(
+                      current: currentSelectionState,
+                      activeScopeToken: activeMediaSelectionScopeToken,
+                      remotePreferences: remotePreferences,
+                    );
+                const tokenStore = SecureGoogleDriveRefreshTokenStore();
+                await persistGoogleDriveConnectionWithTokenRollback(
+                  tokenStore: tokenStore,
+                  newRefreshToken: tokens.refreshToken,
+                  persistConnection: () => container
+                      .read(synchingProvider(syncId: 1).notifier)
+                      .persistGoogleDriveConnectionIfIntentCurrent(
+                        intent: connectionIntent,
+                        mediaSelection: bootstrappedSelection,
+                        mediaSelectionInitialized: false,
+                        mediaSelectionUserSelected: false,
+                        mediaSelectionScopeToken:
+                            activeMediaSelectionScopeToken,
+                        expectedMediaSelectionState: currentSelectionState,
+                      ),
+                  markDisconnected: () => container
+                      .read(synchingProvider(syncId: 1).notifier)
+                      .setGoogleDriveConnected(false),
+                );
+                connectionSaved = true;
+                if (context.mounted) {
+                  final connectionMessage = remote == null
+                      ? 'Google Drive connected; no Chimahon sync file found'
+                      : 'Google Drive connected; Chimahon sync data found';
+                  botToast(
+                    '$connectionMessage'
+                    '${pauseToken.changedSchedule ? '; automatic sync was turned off for the first review' : ''}',
+                    second: 5,
+                  );
+                }
+              } catch (error) {
+                if (context.mounted) {
+                  botToast(
+                    safeSyncUserMessage(
+                      error,
+                      context: SyncUserMessageContext.googleDriveConnection,
+                    ),
+                    second: 8,
+                  );
+                }
+              } finally {
+                storage.close();
+              }
+            } catch (error) {
+              if (context.mounted) {
+                botToast(
+                  safeSyncUserMessage(
+                    error,
+                    context: SyncUserMessageContext.googleDriveConnection,
+                  ),
+                  second: 8,
+                );
+              }
+            } finally {
+              oauth.close();
+            }
+          })
+          .whenComplete(() {
+            if (!connectionSaved) {
+              container
+                  .read(synchingProvider(syncId: 1).notifier)
+                  .restoreAutoSyncAfterFailedExternalOperation(pauseToken);
+            }
+          });
+    });
+  }
+
+  Future<void> _disconnectGoogleDrive(BuildContext context) async {
+    final container = ProviderScope.containerOf(context, listen: false);
+    // Record the user's disconnect intent before waiting behind an OAuth flow.
+    container
+        .read(synchingProvider(syncId: 1).notifier)
+        .invalidateGoogleDriveConnectionIntent();
+    final failureMessage = await ChimahonRestoreSyncCoordinator.shared
+        .duringSync(
+          () => disconnectGoogleDriveCredentialSafely(
+            tokenStore: const SecureGoogleDriveRefreshTokenStore(),
+            markDisconnected: () => container
+                .read(synchingProvider(syncId: 1).notifier)
+                .setGoogleDriveConnected(false),
+          ),
+        );
+    if (failureMessage != null && context.mounted) {
+      botToast(failureMessage, second: 8);
+    }
+  }
+}
+
+/// Clears the secure credential before changing the visible connection state.
+/// Returns fixed user-facing text on failure and never renders the exception.
+@visibleForTesting
+Future<String?> disconnectGoogleDriveCredentialSafely({
+  required GoogleDriveRefreshTokenStore tokenStore,
+  required void Function() markDisconnected,
+}) async {
+  try {
+    await tokenStore.clearRefreshToken();
+    markDisconnected();
+    return null;
+  } catch (error) {
+    return safeSyncUserMessage(
+      error,
+      context: SyncUserMessageContext.googleDriveDisconnection,
+    );
+  }
+}
+
+/// Persists a new Drive credential and compensates if the local connection
+/// row cannot be committed. A known previous credential is restored; without
+/// one, the new token is removed and the UI is marked disconnected.
+@visibleForTesting
+Future<void> persistGoogleDriveConnectionWithTokenRollback({
+  required GoogleDriveRefreshTokenStore tokenStore,
+  required String newRefreshToken,
+  required void Function() persistConnection,
+  required void Function() markDisconnected,
+}) async {
+  String? previousRefreshToken;
+  var previousTokenKnown = false;
+  try {
+    previousRefreshToken = await tokenStore.readRefreshToken();
+    previousTokenKnown = true;
+  } catch (_) {
+    // An unreadable prior token cannot safely be restored.
+  }
+
+  await tokenStore.writeRefreshToken(newRefreshToken);
+  try {
+    persistConnection();
+  } catch (error, stackTrace) {
+    var priorRestored = false;
+    if (previousTokenKnown && previousRefreshToken != null) {
+      try {
+        await tokenStore.writeRefreshToken(previousRefreshToken);
+        priorRestored = true;
+      } catch (_) {
+        // Fall through to revoking the new credential below.
+      }
+    }
+    if (!priorRestored) {
+      try {
+        await tokenStore.clearRefreshToken();
+      } catch (_) {
+        // Preserve the original database failure for the caller.
+      }
+      try {
+        markDisconnected();
+      } catch (_) {
+        // Preserve the original database failure for the caller.
+      }
+    }
+    Error.throwWithStackTrace(error, stackTrace);
   }
 }

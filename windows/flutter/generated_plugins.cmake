@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   flutter_inappwebview_windows
   flutter_qjs
+  flutter_secure_storage_windows
   flutter_tts
   isar_community_flutter_libs
   local_auth_windows

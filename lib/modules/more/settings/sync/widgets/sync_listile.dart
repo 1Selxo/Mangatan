@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/sync_preference.dart';
@@ -11,6 +13,9 @@ class SyncListile extends ConsumerWidget {
   final SyncPreference preference;
   final String? text;
   final bool enabled;
+  final bool? loggedIn;
+  final FutureOr<void> Function()? onLogout;
+  final IconData icon;
   const SyncListile({
     super.key,
     required this.onTap,
@@ -18,11 +23,15 @@ class SyncListile extends ConsumerWidget {
     required this.preference,
     this.text,
     this.enabled = true,
+    this.loggedIn,
+    this.onLogout,
+    this.icon = Icons.dns_outlined,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bool isLogged = preference.authToken?.isNotEmpty ?? false;
+    final bool isLogged =
+        loggedIn ?? (preference.authToken?.isNotEmpty ?? false);
     final l10n = l10nLocalizations(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
@@ -35,7 +44,7 @@ class SyncListile extends ConsumerWidget {
           ),
           width: 60,
           height: 70,
-          child: const Icon(Icons.dns_outlined, size: 30, color: Colors.grey),
+          child: Icon(icon, size: 30, color: Colors.grey),
         ),
         trailing: (isLogged
             ? const Icon(Icons.check, size: 30, color: Colors.green)
@@ -79,11 +88,18 @@ class SyncListile extends ConsumerWidget {
                                   alpha: 0.7,
                                 ),
                               ),
-                              onPressed: () {
-                                ref
-                                    .read(synchingProvider(syncId: id).notifier)
-                                    .logout();
-                                Navigator.pop(context);
+                              onPressed: () async {
+                                final logout = onLogout;
+                                if (logout != null) {
+                                  await logout();
+                                } else {
+                                  ref
+                                      .read(
+                                        synchingProvider(syncId: id).notifier,
+                                      )
+                                      .logout();
+                                }
+                                if (context.mounted) Navigator.pop(context);
                               },
                               child: Text(
                                 l10n.log_out,

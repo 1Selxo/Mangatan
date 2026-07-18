@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:isar_community/isar.dart';
@@ -8,11 +7,9 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/update.dart';
@@ -28,19 +25,28 @@ import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.da
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
-import 'package:mangayomi/services/sync/chimahon_mining_settings_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_local_sync_projection_service.dart';
+import 'package:mangayomi/services/sync/chimahon_media_sync_selection.dart';
+import 'package:mangayomi/services/sync/chimahon_pre_upload_safety_gate.dart';
+import 'package:mangayomi/services/sync/chimahon_preference_three_way_merger.dart';
+import 'package:mangayomi/services/sync/chimahon_queued_sync_gate.dart';
+import 'package:mangayomi/services/sync/chimahon_remote_recovery_store.dart';
+import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
-import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_engine.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
-import 'package:mangayomi/services/sync/mihon_backup_exporter.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:mangayomi/services/sync/google_drive_oauth.dart';
+import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
+import 'package:mangayomi/services/sync/google_drive_sync_storage.dart';
+import 'package:mangayomi/services/sync/sync_user_message.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 part 'sync_server.g.dart';
 
 @riverpod
 class SyncServer extends _$SyncServer {
+  static final Set<int> _syncsInProgress = <int>{};
+
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
   final String _loginUrl = '/login';
   final String _syncMangaUrl = '/sync/manga';
@@ -80,37 +86,58 @@ class SyncServer extends _$SyncServer {
           .login(server, username, authToken);
       botToast(l10n.sync_logged);
       return (true, "");
-    } catch (e) {
-      return (false, e.toString());
+    } catch (error) {
+      return (
+        false,
+        safeSyncUserMessage(error, context: SyncUserMessageContext.signIn),
+      );
     }
   }
 
-  Future<void> startSync(
+  /// Returns false only when a sync was attempted and failed.
+  ///
+  /// Manual callers intentionally receive a result instead of an exception so
+  /// their existing toast-only behavior is preserved. A disabled automatic
+  /// sync or an already-running sync is a benign skip and returns true.
+  Future<bool> startSync(
     AppLocalizations l10n,
     bool silent, {
     bool upload = false,
     bool download = false,
   }) async {
-    if (!silent) {
-      botToast(l10n.sync_starting, second: 500);
+    if (!_syncsInProgress.add(syncId)) {
+      if (!silent) {
+        botToast('A sync is already in progress', second: 2);
+      }
+      return true;
     }
     try {
       final syncPreference = ref.read(synchingProvider(syncId: syncId));
-      final syncNotifier = ref.read(synchingProvider(syncId: syncId).notifier);
+      if (silent &&
+          (!syncPreference.syncOn || syncPreference.autoSyncFrequency == 0)) {
+        return true;
+      }
+      if (!silent && syncPreference.syncMode != SyncMode.chimahon) {
+        botToast(l10n.sync_starting, second: 500);
+      }
       if (syncPreference.syncMode == SyncMode.chimahon) {
-        await _startChimahonSync(
-          syncPreference,
-          syncNotifier,
+        final ran = await _startChimahonSync(
+          silent: silent,
+          onStarting: silent
+              ? null
+              : () => botToast(l10n.sync_starting, second: 500),
           upload: upload,
           download: download,
         );
+        if (!ran) return true;
         ref.invalidate(synchingProvider(syncId: syncId));
         if (!silent) {
           botToast(l10n.sync_finished, second: 2);
         }
-        return;
+        return true;
       }
 
+      final syncNotifier = ref.read(synchingProvider(syncId: syncId).notifier);
       final resultManga = await _syncManga(
         l10n,
         syncNotifier,
@@ -118,8 +145,8 @@ class SyncServer extends _$SyncServer {
         upload: upload,
       );
       if (!resultManga) {
-        botToast(l10n.sync_failed, second: 5);
-        return;
+        if (!silent) botToast(l10n.sync_failed, second: 5);
+        return false;
       }
       if (syncPreference.syncHistories) {
         final resultHistory = await _syncHistory(
@@ -129,8 +156,8 @@ class SyncServer extends _$SyncServer {
           upload: upload,
         );
         if (!resultHistory) {
-          botToast(l10n.sync_failed, second: 5);
-          return;
+          if (!silent) botToast(l10n.sync_failed, second: 5);
+          return false;
         }
       }
       if (syncPreference.syncUpdates) {
@@ -141,8 +168,8 @@ class SyncServer extends _$SyncServer {
           upload: upload,
         );
         if (!resultUpdate) {
-          botToast(l10n.sync_failed, second: 5);
-          return;
+          if (!silent) botToast(l10n.sync_failed, second: 5);
+          return false;
         }
       }
       if (syncPreference.syncSettings) {
@@ -152,8 +179,8 @@ class SyncServer extends _$SyncServer {
           upload: upload,
         );
         if (!resultSettings) {
-          botToast(l10n.sync_failed, second: 5);
-          return;
+          if (!silent) botToast(l10n.sync_failed, second: 5);
+          return false;
         }
       }
 
@@ -161,90 +188,380 @@ class SyncServer extends _$SyncServer {
       if (!silent) {
         botToast(l10n.sync_finished, second: 2);
       }
+      return true;
     } catch (error) {
-      botToast(error.toString(), second: 5);
+      if (!silent) botToast(safeSyncUserMessage(error), second: 5);
+      return false;
+    } finally {
+      _syncsInProgress.remove(syncId);
     }
   }
 
-  Future<void> _startChimahonSync(
-    SyncPreference syncPreference,
-    Synching syncNotifier, {
+  Future<bool> _startChimahonSync({
+    required bool silent,
+    required void Function()? onStarting,
+    bool upload = false,
+    bool download = false,
+  }) => runQueuedChimahonSync(
+    coordinator: ChimahonRestoreSyncCoordinator.shared,
+    readCurrentPreference: () => ref.read(synchingProvider(syncId: syncId)),
+    silent: silent,
+    synchronize: (currentPreference) {
+      onStarting?.call();
+      return _startChimahonSyncExclusive(
+        currentPreference,
+        upload: upload,
+        download: download,
+      );
+    },
+  );
+
+  Future<void> _startChimahonSyncExclusive(
+    SyncPreference syncPreference, {
     bool upload = false,
     bool download = false,
   }) async {
-    final server = _normalizeServer(syncPreference.server);
-    final token = syncPreference.authToken ?? '';
-    if (server.isEmpty || token.isEmpty) {
-      throw const SyncStorageException('SyncYomi server and API token required');
+    final pendingManualRestoreStore =
+        await defaultChimahonPendingManualRestoreStore();
+    await pendingManualRestoreStore.ensureReadyForSync();
+    final CrossDeviceSyncStorage storage;
+    late final String deferredPayloadScope;
+    final legacyDeferredPayloadScopes = <String>{};
+    String? rotatedGoogleRefreshToken;
+    switch (syncPreference.chimahonSyncProvider) {
+      case ChimahonSyncProvider.syncYomi:
+        final server = _normalizeServer(syncPreference.syncYomiServer);
+        final token = syncPreference.syncYomiApiToken ?? '';
+        if (server.isEmpty || token.isEmpty) {
+          throw const SyncStorageException(
+            'SyncYomi server and API token required',
+          );
+        }
+        storage = SyncYomiStorage(baseUrl: Uri.parse(server), apiToken: token);
+        deferredPayloadScope = 'syncyomi|$server|$token';
+        break;
+      case ChimahonSyncProvider.googleDrive:
+        const tokenStore = SecureGoogleDriveRefreshTokenStore();
+        final refreshToken = await tokenStore.readRefreshToken();
+        if (refreshToken == null) {
+          _currentSyncNotifier.setGoogleDriveConnected(false);
+          throw const SyncStorageException('Google Drive is not connected');
+        }
+        final deviceId = _currentSyncNotifier.ensureChimahonDeviceId();
+        final oauth = GoogleDriveOAuthClient();
+        final googleOAuthClientId = oauth.config.clientId;
+        late final GoogleDriveOAuthTokens tokens;
+        try {
+          tokens = await oauth.refresh(refreshToken);
+        } on GoogleDriveOAuthException catch (error) {
+          if (error.requiresReauthentication) {
+            await tokenStore.clearRefreshToken();
+            _currentSyncNotifier.setGoogleDriveConnected(false);
+            throw const SyncStorageException(
+              'Google Drive authorization expired; reconnect Google Drive',
+            );
+          }
+          rethrow;
+        } finally {
+          oauth.close();
+        }
+        if (tokens.refreshToken != refreshToken) {
+          rotatedGoogleRefreshToken = tokens.refreshToken;
+        }
+        final driveStorage = GoogleDriveSyncStorage(
+          accessToken: tokens.accessToken,
+          deviceId: deviceId,
+        );
+        storage = driveStorage;
+        late final String permissionId;
+        try {
+          permissionId = await driveStorage.currentUserPermissionId();
+        } catch (_) {
+          driveStorage.close();
+          rethrow;
+        }
+        // Drive's permission ID is a stable opaque account identity available
+        // through the existing app-data scope. Include the OAuth client so a
+        // build configured for another Google project cannot reuse Chimahon's
+        // account baseline. The store hashes this complete key before using
+        // it as a directory name.
+        deferredPayloadScope =
+            'google-drive|$googleOAuthClientId|$permissionId';
+        // Migrate sidecars made by early builds that incorrectly keyed them
+        // to a refresh token. Both values are known during token rotation.
+        legacyDeferredPayloadScopes
+          ..add('google-drive|$refreshToken')
+          ..add('google-drive|${tokens.refreshToken}');
+        _currentSyncNotifier.setGoogleDriveConnected(true);
+        break;
     }
-
-    final storage = SyncYomiStorage(baseUrl: Uri.parse(server), apiToken: token);
-    final codec = const ChimahonSyncCodec();
-    final deferredStore = await _chimahonDeferredStore();
-
-    if (download) {
-      final remote = await storage.download();
-      if (remote == null) {
-        throw const SyncStorageException('No remote Chimahon sync data found');
-      }
-      final backup = codec.decode(remote.bytes).backup;
-      await restoreTachiBkBackupData(
-        ref,
-        backup,
-        backup.writeToBuffer(),
-        BackupType.mihon,
+    try {
+      final activeMediaSelectionScopeToken = chimahonMediaSelectionScopeToken(
+        deferredPayloadScope,
       );
-      await deferredStore.save(backup);
-    } else if (upload) {
-      final local = await _exportChimahonBackup();
-      final deferred = await deferredStore.load();
-      final backup = deferred == null
-          ? local
-          : const ChimahonSyncMerger().merge(local: deferred, remote: local);
-      await storage.upload(codec.encode(backup, format: storage.wireFormat));
-      await deferredStore.save(backup);
-    } else {
-      await CrossDeviceSyncEngine(
-        storage: storage,
-        exportLocal: _exportChimahonBackup,
-        importMerged: (backup) => restoreTachiBkBackupData(
-          ref,
-          backup,
-          backup.writeToBuffer(),
-          BackupType.mihon,
+      final codec = const ChimahonSyncCodec();
+      final localProjectionService = ChimahonLocalSyncProjectionService(
+        database: isar,
+        activeMediaSelectionScopeToken: activeMediaSelectionScopeToken,
+        mediaSelectionStateProvider: () =>
+            ChimahonMediaSyncSelectionState.fromPreference(
+              isar.syncPreferences.getSync(syncId) ?? syncPreference,
+            ),
+      );
+      final accountDeferredStore = await defaultChimahonDeferredPayloadStore(
+        scopeKey: deferredPayloadScope,
+      );
+      await _migrateLegacyChimahonSidecars(
+        target: accountDeferredStore,
+        legacyScopeKeys: legacyDeferredPayloadScopes.where(
+          (scope) => scope != deferredPayloadScope,
         ),
-        deferredPayloadStore: deferredStore,
-      ).synchronize();
+      );
+      if (rotatedGoogleRefreshToken != null) {
+        await const SecureGoogleDriveRefreshTokenStore().writeRefreshToken(
+          rotatedGoogleRefreshToken,
+        );
+      }
+      final uploadDeferredStore = LayeredChimahonDeferredPayloadStore(
+        primary: accountDeferredStore,
+        pendingManualRestore: pendingManualRestoreStore,
+      );
+      final remoteRecoveryStore = await defaultChimahonRemoteRecoveryStore(
+        scopeKey: deferredPayloadScope,
+      );
+      final preUploadSafetyGate = ChimahonPreUploadSafetyGate(
+        recoveryStore: remoteRecoveryStore,
+      );
+      if (download) {
+        var localProjection = await localProjectionService.createSnapshot();
+        final localBeforeDownload = localProjection.backup;
+        final mediaSelectionBeforeDownload = localProjection.mediaSelection;
+        final mediaSelectionInitializedBeforeDownload =
+            localProjection.mediaSelectionInitialized;
+        final mediaSelectionStateBeforeDownload =
+            localProjection.persistedMediaSelectionState;
+        final remote = await storage.download();
+        if (remote == null) {
+          throw const SyncStorageException(
+            'No remote Chimahon sync data found',
+          );
+        }
+        final backup = codec.decode(remote.bytes).backup;
+        final downloadedSelection = chimahonMediaSelectionForExplicitRestore(
+          preferences: backup.backupPreferences,
+          current: mediaSelectionBeforeDownload,
+        );
+        final downloadedSelectionPresent =
+            ChimahonMediaSyncSelection.hasAnyPreference(
+              backup.backupPreferences,
+            );
+        final downloadedSelectionCanInitialize =
+            downloadedSelectionPresent &&
+            !ChimahonMediaSyncSelection.hasMalformedPreference(
+              backup.backupPreferences,
+            );
+        localProjection = await localProjectionService.createSnapshot();
+        if (!_sameChimahonBackup(localBeforeDownload, localProjection.backup) ||
+            localProjection.persistedMediaSelectionState !=
+                mediaSelectionStateBeforeDownload) {
+          throw const SyncStorageException(
+            'Local data changed while Chimahon data was downloading; '
+            'download again to avoid overwriting the newer local state',
+          );
+        }
+        await restoreChimahonSyncData(ref, backup);
+        // A download is not evidence that the pending manual restore reached
+        // the remote backend, so only update this account's cache here.
+        await accountDeferredStore.save(backup);
+        localProjection = await ChimahonLocalSyncProjectionService(
+          database: isar,
+          mediaSelection: downloadedSelection,
+          mediaSelectionInitialized: downloadedSelectionCanInitialize
+              ? true
+              : mediaSelectionInitializedBeforeDownload,
+          mediaSelectionUserSelected: downloadedSelectionCanInitialize
+              ? false
+              : mediaSelectionStateBeforeDownload.userSelected,
+          mediaSelectionGeneration:
+              mediaSelectionStateBeforeDownload.generation,
+          mediaSelectionScopeToken: downloadedSelectionCanInitialize
+              ? activeMediaSelectionScopeToken
+              : mediaSelectionStateBeforeDownload.scopeToken,
+        ).createSnapshot();
+        final localAfterImport = localProjection.backup;
+        await accountDeferredStore.saveLocalPreferenceBaseline(
+          const ChimahonPreferenceThreeWayMerger().baselineForProjection(
+            local: localAfterImport.backupPreferences,
+            raw: backup.backupPreferences,
+            locallyUnrepresentableKeys:
+                localProjection.unrepresentablePreferenceKeys,
+          ),
+        );
+        await accountDeferredStore.saveLocalSourcePreferenceBaseline(
+          localAfterImport.backupSourcePreferences,
+        );
+        if (downloadedSelectionCanInitialize) {
+          _currentSyncNotifier.setChimahonMediaSelectionIfUnchanged(
+            expected: mediaSelectionStateBeforeDownload,
+            updated: downloadedSelection,
+            updatedScopeToken: activeMediaSelectionScopeToken,
+          );
+        }
+      } else {
+        // Rebuild the engine and tombstone snapshot if a local edit lands
+        // during network I/O. This lets one automatic retry include a tracker
+        // deletion or chapter update that the first snapshot could not see.
+        for (var localAttempt = 0; ; localAttempt++) {
+          final initialProjection = await localProjectionService
+              .createSnapshot();
+          var currentProjection = initialProjection;
+          var initialProjectionPending = true;
+          Future<BackupMihon> exportLocal() async {
+            if (initialProjectionPending) {
+              initialProjectionPending = false;
+            } else {
+              currentProjection = await localProjectionService.createSnapshot();
+            }
+            return currentProjection.backup;
+          }
+
+          final engine = CrossDeviceSyncEngine(
+            storage: storage,
+            exportLocal: exportLocal,
+            importMerged: upload
+                ? (_) async {}
+                : (backup) => restoreChimahonSyncData(ref, backup),
+            deferredPayloadStore: uploadDeferredStore,
+            localTrackingDeletions: initialProjection.trackingDeletionKeys,
+            localMediaSelection: initialProjection.mediaSelection,
+            localMediaSelectionInitialized:
+                initialProjection.mediaSelectionInitialized,
+            localMediaSelectionUserSelected:
+                initialProjection.mediaSelectionUserSelected,
+            localMediaSelectionGeneration:
+                initialProjection.mediaSelectionGeneration,
+            localMediaSelectionState:
+                initialProjection.persistedMediaSelectionState,
+            localMediaSelectionProvider: () => currentProjection.mediaSelection,
+            localMediaSelectionInitializedProvider: () =>
+                currentProjection.mediaSelectionInitialized,
+            localMediaSelectionUserSelectedProvider: () =>
+                currentProjection.mediaSelectionUserSelected,
+            localMediaSelectionGenerationProvider: () =>
+                currentProjection.mediaSelectionGeneration,
+            localMediaSelectionStateProvider: () =>
+                currentProjection.persistedMediaSelectionState,
+            localUnrepresentablePreferenceKeys: () =>
+                currentProjection.unrepresentablePreferenceKeys,
+            preUpload: preUploadSafetyGate.check,
+          );
+          final result = upload
+              ? await engine.uploadPreservingRemote()
+              : await engine.synchronize();
+          final shouldStampExplicitScope =
+              result.initialMediaSelectionState.userSelected &&
+              result.initialMediaSelectionState.scopeToken !=
+                  activeMediaSelectionScopeToken;
+          if (result.mediaSelectionNeedsPersistence ||
+              shouldStampExplicitScope) {
+            final retainExplicitSelection =
+                result.initialMediaSelectionState.userSelected &&
+                result.mediaSelection ==
+                    result.initialMediaSelectionState.selection;
+            _currentSyncNotifier.setChimahonMediaSelectionIfUnchanged(
+              expected: result.initialMediaSelectionState,
+              updated: result.mediaSelection,
+              updatedUserSelected: retainExplicitSelection,
+              updatedScopeToken: activeMediaSelectionScopeToken,
+            );
+          }
+          final uploadedChangedPartIds = <int>{
+            for (final deletion in result.localTrackingDeletions)
+              ...?initialProjection
+                  .changedPartIdsByTrackingDeletionKey[deletion],
+          };
+          if (uploadedChangedPartIds.isNotEmpty) {
+            await isar.writeTxn(
+              () =>
+                  isar.changedParts.deleteAll(uploadedChangedPartIds.toList()),
+            );
+          }
+          if (!result.requiresRetry) break;
+          if (localAttempt >= 1) {
+            throw const SyncStorageException(
+              'Local data kept changing while Chimahon sync was uploading; '
+              'sync again to finish uploading the newest state',
+            );
+          }
+        }
+      }
+    } finally {
+      if (storage case ClosableSyncStorage closable) {
+        closable.close();
+      }
     }
 
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    syncNotifier.setLastSyncManga(timestamp);
-    syncNotifier.setLastSyncHistory(timestamp);
-    syncNotifier.setLastSyncUpdate(timestamp);
+    _currentSyncNotifier.setLastSyncManga(timestamp);
+    _currentSyncNotifier.setLastSyncHistory(timestamp);
+    _currentSyncNotifier.setLastSyncUpdate(timestamp);
   }
 
-  Future<FileChimahonDeferredPayloadStore> _chimahonDeferredStore() async {
-    final support = await getApplicationSupportDirectory();
-    return FileChimahonDeferredPayloadStore(
-      File(
-        '${support.path}${Platform.pathSeparator}sync'
-        '${Platform.pathSeparator}chimahon_deferred.tachibk',
-      ),
-    );
+  Synching get _currentSyncNotifier =>
+      ref.read(synchingProvider(syncId: syncId).notifier);
+
+  Future<void> _migrateLegacyChimahonSidecars({
+    required FileChimahonDeferredPayloadStore target,
+    required Iterable<String> legacyScopeKeys,
+  }) async {
+    var hasPayload = await target.load() != null;
+    var hasPreferenceBaseline =
+        await target.loadLocalPreferenceBaseline() != null;
+    var hasSourcePreferenceBaseline =
+        await target.loadLocalSourcePreferenceBaseline() != null;
+    if (hasPayload && hasPreferenceBaseline && hasSourcePreferenceBaseline) {
+      return;
+    }
+
+    for (final scopeKey in legacyScopeKeys.toSet()) {
+      final legacy = await defaultChimahonDeferredPayloadStore(
+        scopeKey: scopeKey,
+      );
+      if (!hasPayload) {
+        final payload = await legacy.load();
+        if (payload != null) {
+          await target.save(payload);
+          hasPayload = true;
+        }
+      }
+      if (!hasPreferenceBaseline) {
+        final baseline = await legacy.loadLocalPreferenceBaseline();
+        if (baseline != null) {
+          await target.saveLocalPreferenceBaseline(baseline);
+          hasPreferenceBaseline = true;
+        }
+      }
+      if (!hasSourcePreferenceBaseline) {
+        final baseline = await legacy.loadLocalSourcePreferenceBaseline();
+        if (baseline != null) {
+          await target.saveLocalSourcePreferenceBaseline(baseline);
+          hasSourcePreferenceBaseline = true;
+        }
+      }
+      if (hasPayload && hasPreferenceBaseline && hasSourcePreferenceBaseline) {
+        return;
+      }
+    }
   }
 
-  Future<BackupMihon> _exportChimahonBackup() async {
-    const settingsAdapter = ChimahonMiningSettingsAdapter();
-    final appPreferences = await settingsAdapter.export();
-    return const MihonBackupExporter().export(
-      mangas: isar.mangas.filter().idIsNotNull().findAllSync(),
-      categories: isar.categorys.filter().idIsNotNull().findAllSync(),
-      chapters: isar.chapters.filter().idIsNotNull().findAllSync(),
-      histories: isar.historys.filter().idIsNotNull().findAllSync(),
-      sources: isar.sources.filter().idIsNotNull().findAllSync(),
-      epubBookProgress: isar.epubBookProgress.where().findAllSync(),
-      appPreferences: appPreferences,
-    );
+  bool _sameChimahonBackup(BackupMihon first, BackupMihon second) {
+    final firstBytes = first.writeToBuffer();
+    final secondBytes = second.writeToBuffer();
+    if (firstBytes.length != secondBytes.length) return false;
+    for (var index = 0; index < firstBytes.length; index++) {
+      if (firstBytes[index] != secondBytes[index]) return false;
+    }
+    return true;
   }
 
   String _normalizeServer(String? server) {

@@ -18,6 +18,7 @@ import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.da
 import 'package:mangayomi/modules/widgets/loading_icon.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/modules/main_view/providers/migration.dart';
+import 'package:mangayomi/modules/main_view/auto_sync_timer_controller.dart';
 import 'package:mangayomi/modules/more/about/providers/check_for_update.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/auto_backup.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -41,11 +42,10 @@ class MainScreen extends ConsumerStatefulWidget {
 
 class _MainScreenState extends ConsumerState<MainScreen> {
   Timer? _backupTimer;
-  Timer? _syncTimer;
+  late final AutoSyncTimerController _autoSyncTimerController;
 
   late final String _defaultLocation;
   late final List<String> _navigationOrder;
-  late final int _autoSyncFrequency;
 
   static final Map<String, String> _hyphenatedLabelsCache = {};
 
@@ -82,9 +82,20 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     super.initState();
 
     _navigationOrder = ref.read(navigationOrderStateProvider);
-    _autoSyncFrequency = ref
-        .read(synchingProvider(syncId: 1))
-        .autoSyncFrequency;
+    _autoSyncTimerController = AutoSyncTimerController(
+      onTick: _runAutoSync,
+      onError: _onAutoSyncError,
+    );
+    ref.listenManual<AutoSyncTimerSettings>(
+      synchingProvider(syncId: 1).select(
+        (preference) => (
+          syncOn: preference.syncOn,
+          frequencySeconds: preference.autoSyncFrequency,
+        ),
+      ),
+      (_, settings) => _autoSyncTimerController.configure(settings),
+      fireImmediately: true,
+    );
     final hiddenItems = ref.read(hideItemsStateProvider);
 
     _defaultLocation = _navigationOrder
@@ -107,13 +118,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       const Duration(minutes: 5),
       _onBackupTimerTick,
     );
-
-    if (_autoSyncFrequency != 0) {
-      _syncTimer = Timer.periodic(
-        Duration(seconds: _autoSyncFrequency),
-        _onSyncTimerTick,
-      );
-    }
   }
 
   void _initializeProviders() {
@@ -140,27 +144,35 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     ref.read(checkAndBackupProvider);
   }
 
-  void _onSyncTimerTick(Timer timer) {
-    if (!mounted) {
-      timer.cancel();
+  Future<void> _runAutoSync() async {
+    if (!mounted) return;
+
+    // Keep this final guard at the write boundary as preference invalidation
+    // and a timer callback can be queued in the same event-loop turn.
+    final syncPreference = ref.read(synchingProvider(syncId: 1));
+    if (!syncPreference.syncOn || syncPreference.autoSyncFrequency == 0) {
       return;
     }
-    try {
-      final l10n = l10nLocalizations(context)!;
-      ref.read(syncServerProvider(syncId: 1).notifier).startSync(l10n, true);
-    } catch (e) {
-      botToast(
-        "Failed to sync! Maybe the sync server is down. "
-        "Restart the app to resume auto sync.",
-      );
-      timer.cancel();
-    }
+    final l10n = l10nLocalizations(context)!;
+    await runAutoSyncOrThrow(
+      () => ref
+          .read(syncServerProvider(syncId: 1).notifier)
+          .startSync(l10n, true),
+    );
+  }
+
+  void _onAutoSyncError(Object error, StackTrace stackTrace) {
+    if (!mounted) return;
+    botToast(
+      "Automatic sync failed and was paused. "
+      "Restart the app or change the interval to resume.",
+    );
   }
 
   @override
   void dispose() {
     _backupTimer?.cancel();
-    _syncTimer?.cancel();
+    _autoSyncTimerController.dispose();
     discordRpc?.disconnect();
     super.dispose();
   }

@@ -12,9 +12,11 @@ section: x11
 
 installed_size: 109400
 
-depencencies:
+dependencies:
   - libwebkit2gtk-4.1-0
   - libmpv2
+  - libsecret-1-0
+  - xdg-utils
 
 essential: false
 
@@ -36,3 +38,7 @@ categories:
   - AudioVideo
 
 startup_notify: true
+
+supported_mime_type:
+  - x-scheme-handler/mangayomi
+  - x-scheme-handler/app.chimahon.google.oauth

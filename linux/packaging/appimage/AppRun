@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+if [ -n "${APPDIR:-}" ]; then
+  app_dir=$APPDIR
+else
+  app_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+fi
+
+exec "$app_dir/usr/bin/mangayomi" "$@"

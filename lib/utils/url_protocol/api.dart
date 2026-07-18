@@ -1,15 +1,13 @@
-import 'windows_protocol.dart'
+import 'native_protocol.dart'
     if (dart.library.js_interop) 'web_url_protocol.dart';
 
-/// Registers a protocol by [scheme] to allow for links in the form `<scheme>://...`
-/// to be processed by this application. By default, opening a link will open
-/// the executable that was used to register the scheme with the URL as the first
-/// argument passed to the executable.
+/// Temporarily leases a previously unclaimed protocol [scheme].
 ///
-/// If a protocol is already registered for the given scheme, this function will
-/// attempt to overwrite the previous handler with the current executable information.
-/// However, note that depending on process permissions, this operation may be
-/// disallowed by the underlying platform.
+/// An existing handler is accepted when its command already matches this
+/// process. Mangatan may also repair an abandoned temporary lease bearing its
+/// explicit ownership marker; unrelated handlers are never overwritten or
+/// removed. This makes the function suitable for short-lived OAuth callbacks
+/// using a globally shared custom URI scheme.
 ///
 /// You may pass an [executable] to override the path to the executable to run
 /// when accessing the URL.
@@ -24,19 +22,37 @@ void registerProtocolHandler(
   String? executable,
   List<String>? arguments,
 }) {
-  WindowsProtocolHandler().register(
+  NativeProtocolHandler().register(
     scheme,
     executable: executable,
     arguments: arguments,
   );
 }
 
-/// Unregisters the protocol handler with the underlying platform. The provided
-/// [scheme] will no longer be used in links.
+/// Registers an application-owned protocol [scheme] persistently.
 ///
-/// Note that this will unregister a protocol by scheme regardless of which process
-/// had registered it. Unregistering a scheme that was not registered by this
-/// application is undefined and depends on platform-specific restrictions.
+/// Unlike [registerProtocolHandler], this may update a stale registration that
+/// can be identified as belonging to Mangatan. It still refuses to overwrite a
+/// handler owned by another application.
+void registerPersistentProtocolHandler(
+  String scheme, {
+  String? executable,
+  List<String>? arguments,
+}) {
+  NativeProtocolHandler().registerPersistent(
+    scheme,
+    executable: executable,
+    arguments: arguments,
+  );
+}
+
+/// Releases this process's temporary protocol lease.
+///
+/// Only a temporary registration created by this process is removed. Persistent
+/// registrations and pre-existing matching handlers are retained. Linux also
+/// retains Mangatan's owned per-user entry because freedesktop provides no
+/// atomic ownership-safe way to unset a default, and the entry is required for
+/// cold-started callbacks.
 void unregisterProtocolHandler(String scheme) {
-  WindowsProtocolHandler().unregister(scheme);
+  NativeProtocolHandler().unregister(scheme);
 }

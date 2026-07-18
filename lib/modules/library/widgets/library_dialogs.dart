@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
@@ -11,7 +10,6 @@ import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/changed.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
@@ -91,9 +89,7 @@ void showDeleteMangaDialog({
                                 } else {
                                   // Regular manga: just unfavourite so it disappears from the
                                   // library without losing chapter/history data.
-                                  manga.favorite = false;
-                                  manga.updatedAt =
-                                      DateTime.now().millisecondsSinceEpoch;
+                                  manga.updateFavorite(false);
                                   isar.mangas.putSync(manga);
                                 }
                               }
@@ -107,7 +103,7 @@ void showDeleteMangaDialog({
                                 // For local archives the archive file IS the chapter — there is
                                 // nothing to re-download. So we delete the physical files and
                                 // remove all Isar records, mirroring a full library removal.
-                                mangaDirectory = await _deleteImport(
+                                mangaDirectory = _deleteImport(
                                   manga,
                                   mangaDirectory,
                                 );
@@ -163,7 +159,7 @@ void showDeleteMangaDialog({
 void _removeImport(WidgetRef ref, Manga manga) {
   final provider = ref.read(synchingProvider(syncId: 1).notifier);
   final histories = isar.historys
-      .where()
+      .filter()
       .mangaIdEqualTo(manga.id)
       .findAllSync();
   for (var history in histories) {
@@ -171,13 +167,16 @@ void _removeImport(WidgetRef ref, Manga manga) {
     provider.addChangedPart(ActionType.removeHistory, history.id, "{}", false);
   }
 
-  final updates = isar.updates.where().mangaIdEqualTo(manga.id).findAllSync();
-  for (var update in updates) {
-    isar.updates.deleteSync(update.id!);
-    provider.addChangedPart(ActionType.removeUpdate, update.id, "{}", false);
-  }
-
   for (var chapter in manga.chapters) {
+    final updates = isar.updates
+        .filter()
+        .mangaIdEqualTo(chapter.mangaId)
+        .chapterNameEqualTo(chapter.name)
+        .findAllSync();
+    for (var update in updates) {
+      isar.updates.deleteSync(update.id!);
+      provider.addChangedPart(ActionType.removeUpdate, update.id, "{}", false);
+    }
     // Remove associated download record to prevent ghost entries
     isar.downloads.deleteSync(chapter.id!);
     isar.chapters.deleteSync(chapter.id!);
@@ -191,14 +190,13 @@ void _removeImport(WidgetRef ref, Manga manga) {
 /// Deletes the physical archive files (zip/cbz/mp4/epub) for a local-archive
 /// manga from disk. Returns the parent directory path so the caller can clean
 /// up the now-empty folder afterwards.
-Future<String> _deleteImport(Manga manga, String mangaDirectory) async {
+String _deleteImport(Manga manga, String mangaDirectory) {
   for (var chapter in manga.chapters) {
     final path = chapter.archivePath;
-    if (path == null) continue;
-    final resolvedPath = await resolveLocalArchivePath(path);
-    final chapterFile = File(resolvedPath);
+    if (path == null || path.trim().isEmpty) continue;
+    final chapterFile = File(path);
     if (mangaDirectory.isEmpty) {
-      mangaDirectory = p.dirname(resolvedPath);
+      mangaDirectory = p.dirname(path);
     }
     try {
       if (chapterFile.existsSync()) {
@@ -293,10 +291,9 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
                                           Text(
                                             "${l10n.import_files} ( $filesText )",
                                             style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall!
-                                                  .color,
+                                              color: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall!.color,
                                               fontSize: 10,
                                             ),
                                           ),
@@ -319,8 +316,9 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
                             child: Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(20),
-                                color: Theme.of(context)
-                                    .scaffoldBackgroundColor,
+                                color: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
                               ),
                               height: 50,
                               width: 50,

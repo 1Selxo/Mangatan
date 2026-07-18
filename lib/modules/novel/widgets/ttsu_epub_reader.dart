@@ -738,9 +738,10 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
               fallback: manga?.lang ?? '',
             ),
       novelId: isLocalNovel
-          ? const ChimahonNovelProgressAdapter().stableId(
-              title: progress?.title ?? widget.book.name,
-              author: progress?.author ?? widget.book.author,
+          ? const ChimahonNovelProgressAdapter().stableLocalIdOrNull(
+              progress,
+              fallbackTitle: widget.book.name,
+              fallbackAuthor: widget.book.author,
             )
           : null,
       sourceTitle: manga?.name ?? widget.book.name,

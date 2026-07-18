@@ -95,7 +95,12 @@ List<MassMigrationSourceGroup> buildMassMigrationSourceGroups({
 }) {
   final libraryItems = isar.mangas
       .filter()
-      .favoriteEqualTo(true)
+      .group(
+        (query) => query
+            .favoriteEqualTo(true)
+            .or()
+            .hasLocalChapterOverlayEqualTo(true),
+      )
       .itemTypeEqualTo(itemType)
       .findAllSync();
 

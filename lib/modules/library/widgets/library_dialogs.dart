@@ -89,9 +89,7 @@ void showDeleteMangaDialog({
                                 } else {
                                   // Regular manga: just unfavourite so it disappears from the
                                   // library without losing chapter/history data.
-                                  manga.favorite = false;
-                                  manga.updatedAt =
-                                      DateTime.now().millisecondsSinceEpoch;
+                                  manga.updateFavorite(false);
                                   isar.mangas.putSync(manga);
                                 }
                               }
@@ -195,7 +193,7 @@ void _removeImport(WidgetRef ref, Manga manga) {
 String _deleteImport(Manga manga, String mangaDirectory) {
   for (var chapter in manga.chapters) {
     final path = chapter.archivePath;
-    if (path == null) continue;
+    if (path == null || path.trim().isEmpty) continue;
     final chapterFile = File(path);
     if (mangaDirectory.isEmpty) {
       mangaDirectory = p.dirname(path);

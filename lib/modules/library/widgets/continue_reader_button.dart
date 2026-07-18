@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
+import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 
 class ContinueReaderButton extends ConsumerWidget {
   final Manga entry;
@@ -24,6 +28,26 @@ class ContinueReaderButton extends ConsumerWidget {
           .watch(fireImmediately: true),
       builder: (context, snapshot) => GestureDetector(
         onTap: () async {
+          final isMissingEpub =
+              entry.itemType == ItemType.novel &&
+              entry.isLocalArchive == true &&
+              isar.epubBookProgress
+                  .filter()
+                  .mangaIdEqualTo(entry.id!)
+                  .archivePathEqualTo('')
+                  .isNotEmptySync();
+          if (isMissingEpub) {
+            botToast(chimahonMissingEpubGuidance, second: 4);
+            await ref.read(
+              importArchivesFromFileProvider(
+                itemType: ItemType.novel,
+                entry,
+                init: false,
+                splitChapters: false,
+              ).future,
+            );
+            return;
+          }
           if (isLocalEpubManga(entry)) {
             await repairLocalEpubChapterMetadata(entry);
             final shortcuts = epubNavigationChaptersInSpineOrder(

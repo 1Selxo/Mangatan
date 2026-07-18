@@ -275,7 +275,7 @@ class _MangaGlobalImageCardState extends ConsumerState<MangaGlobalImageCard>
         stream: isar.mangas
             .filter()
             .langEqualTo(widget.source.lang)
-            .nameEqualTo(getMangaDetail.name)
+            .titleMatchesSourceIdentity(getMangaDetail.name)
             .sourceEqualTo(widget.source.name)
             .watch(fireImmediately: true),
         builder: (context, snapshot) {

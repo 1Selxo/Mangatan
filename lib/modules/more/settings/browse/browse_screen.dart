@@ -346,7 +346,9 @@ void _showCleanNonLibraryDialog(BuildContext context, dynamic l10n) {
                     final mangasList = isar.mangas
                         .filter()
                         .favoriteEqualTo(false)
-                        .findAllSync();
+                        .findAllSync()
+                        .where((manga) => !manga.isVisibleInLibrary)
+                        .toList(growable: false);
                     final provider = ref.read(
                       synchingProvider(syncId: 1).notifier,
                     );

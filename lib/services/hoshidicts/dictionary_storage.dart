@@ -81,6 +81,25 @@ class DictionaryStorage {
     return _applyProfileOrder(dictionaries, order);
   }
 
+  /// Lists dictionaries without creating the application-support directory.
+  ///
+  /// Diagnostics and other dry-run projections use this path so observing an
+  /// otherwise pristine profile cannot become a filesystem mutation. Normal
+  /// callers should continue using [installed], whose create-on-first-use
+  /// behavior is retained for imports and interactive dictionary features.
+  Future<List<InstalledDictionary>> installedReadOnly({
+    Directory? root,
+    List<String> order = const [],
+  }) async {
+    final directory =
+        root ??
+        Directory(
+          p.join((await getApplicationSupportDirectory()).path, 'dictionaries'),
+        );
+    final dictionaries = await _installedFromRoot(directory);
+    return _applyProfileOrder(dictionaries, order);
+  }
+
   Future<void> recordImport({
     required String name,
     required BigInt termCount,

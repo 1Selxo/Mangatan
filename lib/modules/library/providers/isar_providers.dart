@@ -15,14 +15,24 @@ Stream<List<Manga>> getAllMangaStream(
       ? isar.mangas
             .filter()
             .idIsNotNull()
-            .favoriteEqualTo(true)
+            .group(
+              (query) => query
+                  .favoriteEqualTo(true)
+                  .or()
+                  .hasLocalChapterOverlayEqualTo(true),
+            )
             .and()
             .itemTypeEqualTo(itemType)
             .watch(fireImmediately: true)
       : isar.mangas
             .filter()
             .idIsNotNull()
-            .favoriteEqualTo(true)
+            .group(
+              (query) => query
+                  .favoriteEqualTo(true)
+                  .or()
+                  .hasLocalChapterOverlayEqualTo(true),
+            )
             .categoriesIsNotEmpty()
             .categoriesElementEqualTo(categoryId)
             .and()
@@ -38,14 +48,24 @@ Stream<List<Manga>> getAllMangaWithoutCategoriesStream(
   yield* isar.mangas
       .filter()
       .idIsNotNull()
-      .favoriteEqualTo(true)
+      .group(
+        (query) => query
+            .favoriteEqualTo(true)
+            .or()
+            .hasLocalChapterOverlayEqualTo(true),
+      )
       .categoriesIsEmpty()
       .and()
       .itemTypeEqualTo(itemType)
       .or()
       .idIsNotNull()
       .categoriesIsNull()
-      .favoriteEqualTo(true)
+      .group(
+        (query) => query
+            .favoriteEqualTo(true)
+            .or()
+            .hasLocalChapterOverlayEqualTo(true),
+      )
       .and()
       .itemTypeEqualTo(itemType)
       .watch(fireImmediately: true);

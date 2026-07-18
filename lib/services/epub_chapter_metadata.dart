@@ -298,7 +298,7 @@ Future<void> repairLocalEpubChapterMetadata(Manga manga) async {
         .findFirst();
     final progress =
         existingProgress ??
-        EpubBookProgress(
+        EpubBookProgress.forImportedEpub(
           mangaId: mangaId,
           archivePath: entry.key,
           title: book.name,

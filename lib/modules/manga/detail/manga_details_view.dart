@@ -164,9 +164,8 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                   onPressed: () {
                     final model = widget.manga;
                     isar.writeTxnSync(() {
-                      model.favorite = false;
+                      model.updateFavorite(false);
                       model.dateAdded = 0;
-                      model.updatedAt = DateTime.now().millisecondsSinceEpoch;
                       isar.mangas.putSync(model);
                     });
                   },
@@ -205,9 +204,8 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                     );
                   } else {
                     isar.writeTxnSync(() {
-                      model.favorite = true;
+                      model.updateFavorite(true);
                       model.dateAdded = DateTime.now().millisecondsSinceEpoch;
-                      model.updatedAt = DateTime.now().millisecondsSinceEpoch;
                       isar.mangas.putSync(model);
                     });
                   }

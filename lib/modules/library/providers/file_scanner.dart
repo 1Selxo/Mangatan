@@ -8,6 +8,7 @@ import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:path/path.dart' as p; // For manipulating file system paths
 import 'package:bot_toast/bot_toast.dart'; // For Exceptions
@@ -16,6 +17,21 @@ import 'package:mangayomi/models/chapter.dart'; // Has Chapter model with archiv
 import 'package:mangayomi/providers/storage_provider.dart'; // Provides storage directory selection
 import 'package:riverpod_annotation/riverpod_annotation.dart'; // Annotations for code generation
 part 'file_scanner.g.dart';
+
+/// Folder scanning can safely infer one cloud placeholder only when there is
+/// exactly one EPUB. Multi-book folders retain their normal grouped-library
+/// behavior and leave every cloud placeholder for explicit reconciliation.
+bool canAutoLinkScannedCloudNovel(int epubFileCount) => epubFileCount == 1;
+
+/// Prevents a scanned EPUB from moving an empty progress row out of a second
+/// cloud parent. Only progress already owned by the selected folder parent is
+/// eligible for in-place adoption.
+List<EpubBookProgress> scannedNovelProgressCandidates(
+  Iterable<EpubBookProgress> progresses,
+  int parentId,
+) => progresses
+    .where((progress) => progress.mangaId == parentId)
+    .toList(growable: false);
 
 @riverpod
 class LocalFoldersState extends _$LocalFoldersState {
@@ -108,6 +124,10 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   final existingPaths = chaptersMap.values.expand((s) => s).toSet();
   List<Manga> processedMangas = <Manga>[];
   final List<List<dynamic>> newChapters = [];
+  // A matching cloud placeholder must keep its exact source/link markers
+  // until every EPUB in the folder has passed the full parser. Otherwise a
+  // malformed file could turn remote cache into apparent local sync intent.
+  final pendingCloudFolderByParentId = <int, String>{};
 
   // If newMangas > 0, save all collected Mangas in library first to get a Manga ID
   int newMangas = 0;
@@ -143,7 +163,8 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
         .isNotEmpty;
     final hasArchives = files.any((f) => _isArchive(f.path));
     final hasVideos = files.any((f) => _isVideo(f.path));
-    final hasEpubs = files.any((f) => _isEpub(f.path));
+    final epubFiles = files.where((file) => _isEpub(file.path)).toList();
+    final hasEpubs = epubFiles.isNotEmpty;
     late ItemType itemType;
     if (hasImagesFolders || hasArchives) {
       itemType = ItemType.manga;
@@ -162,25 +183,53 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
     if (existingManga) {
       manga = mangaMap[relativePath]!;
     } else {
-      manga = Manga(
-        favorite: false,
-        source: 'local',
-        author: '',
-        artist: '',
-        genre: [],
-        imageUrl: '',
-        lang: '',
-        link: folder.path,
-        name: title,
-        status: Status.unknown,
-        description: '',
-        isLocalArchive: true,
-        itemType: itemType,
-        dateAdded: dateNow,
-        lastUpdate: dateNow,
-        sourceId: null,
-      );
-      newMangas++;
+      Manga? matchingCloudParent;
+      if (itemType == ItemType.novel &&
+          canAutoLinkScannedCloudNovel(epubFiles.length)) {
+        try {
+          final firstEpub = epubFiles.single;
+          final book = await parseEpubFromPath(
+            epubPath: firstEpub.path,
+            fullData: false,
+          );
+          matchingCloudParent = const ChimahonNovelMaterializer()
+              .matchingCloudParent(
+                mangas: isar.mangas.where().findAllSync(),
+                progresses: isar.epubBookProgress.where().findAllSync(),
+                title: book.name,
+                author: book.author,
+              );
+        } catch (_) {
+          // Validation during the content pass below reports malformed EPUBs.
+        }
+      }
+      if (matchingCloudParent != null) {
+        manga = matchingCloudParent;
+        final parentId = manga.id;
+        if (parentId != null) {
+          pendingCloudFolderByParentId[parentId] = folder.path;
+        }
+      } else {
+        manga = Manga(
+          favorite: false,
+          source: 'local',
+          author: '',
+          artist: '',
+          genre: [],
+          imageUrl: '',
+          lang: '',
+          link: folder.path,
+          name: title,
+          status: Status.unknown,
+          description: '',
+          isLocalArchive: true,
+          itemType: itemType,
+          dateAdded: dateNow,
+          lastUpdate: dateNow,
+          sourceId: null,
+        );
+        newMangas++;
+      }
     }
 
     // Detect a single image in item's root and use it as custom cover
@@ -205,7 +254,7 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       try {
         final str = await File(jsonFiles.first.path).readAsString();
         final data = jsonDecode(str) as Map<String, dynamic>?;
-        manga.name = data?["name"];
+        manga.updateSourceTitle(data?["name"]);
         manga.description = data?["description"];
         manga.artist = data?["artist"];
         manga.author = data?["author"];
@@ -238,14 +287,14 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
     }
     if (hasEpubs) {
       // Each .epub
-      final epubs = files.where((f) => _isEpub(f.path)).toList();
-      addNewChapters(epubs, false);
+      addNewChapters(epubFiles, false);
     }
   }
 
   final changedMangas = <Manga>[];
   for (var manga in processedMangas) {
-    if (manga.lastUpdate == dateNow) {
+    if (manga.lastUpdate == dateNow &&
+        !pendingCloudFolderByParentId.containsKey(manga.id)) {
       // Filter out items that haven't been changed
       changedMangas.add(manga);
     }
@@ -261,8 +310,9 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
 
   // If new Mangas have been added (no Id to save Chapters)
   if (newMangas > 0) {
-    // Copy processedMangas
-    List<Manga> newAddedMangas = processedMangas;
+    final pendingCloudParents = processedMangas
+        .where((manga) => pendingCloudFolderByParentId.containsKey(manga.id))
+        .toList(growable: false);
     // Fetch all existing mangas in library that are in /local (or \local)
     final savedMangas = await isar.mangas
         .filter()
@@ -277,14 +327,15 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
         .linkContains("Mangayomi\\local")
         .findAll();
     // Save all retrieved Manga objects (now with id) matching the processedMangas list
-    newAddedMangas = savedMangas
-        .where(
-          (m) => processedMangas.any(
-            (newManga) =>
-                _getRelativePath(newManga.link) == _getRelativePath(m.link),
-          ),
-        )
-        .toList();
+    final newAddedMangas = [
+      ...savedMangas.where(
+        (m) => processedMangas.any(
+          (newManga) =>
+              _getRelativePath(newManga.link) == _getRelativePath(m.link),
+        ),
+      ),
+      ...pendingCloudParents,
+    ];
     processedMangas.clear();
     processedMangas = newAddedMangas;
   }
@@ -292,7 +343,10 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   final chaptersToSave = <Chapter>[];
   final epubProgressToSave = <EpubBookProgress>[];
   int saveManga = 0; // Just to update the lastUpdate value of not new Mangas
-  final mangaByName = {for (var m in processedMangas) p.basename(m.link!): m};
+  final mangaByName = {
+    for (var m in processedMangas)
+      p.basename(pendingCloudFolderByParentId[m.id] ?? m.link!): m,
+  };
 
   // iterate through newChapters elements, which are: ["full_path/to/chapter1", "true"]
   for (var pathBool in newChapters) {
@@ -303,11 +357,24 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
     final itemName = p.basename(p.dirname(chapterPath));
     final manga = mangaByName[itemName];
     if (manga != null) {
+      if (manga.isLocalArchive != true) manga.hasLocalChapterOverlay = true;
       if (manga.itemType == ItemType.novel) {
         final book = await parseEpubFromPath(
           epubPath: chapterPath,
           fullData: true,
         );
+
+        final pendingCloudFolder = pendingCloudFolderByParentId[manga.id];
+        if (pendingCloudFolder != null) {
+          manga
+            ..source = 'local'
+            ..link = pendingCloudFolder
+            ..lastUpdate = dateNow
+            ..description = manga.description == chimahonMissingEpubGuidance
+                ? ''
+                : manga.description;
+          saveManga++;
+        }
 
         if (book.cover != null) {
           manga.customCoverImage = book.cover!.getCoverImage;
@@ -321,24 +388,18 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
             archivePath: chapterPath,
           ),
         );
-        final existingProgress = await isar.epubBookProgress
-            .filter()
-            .mangaIdEqualTo(manga.id!)
-            .archivePathEqualTo(chapterPath)
-            .findFirst();
-        final progress =
-            existingProgress ??
-            EpubBookProgress(
+        final progress = const ChimahonNovelMaterializer()
+            .progressForImportedEpub(
+              progresses: scannedNovelProgressCandidates(
+                isar.epubBookProgress.where().findAllSync(),
+                manga.id!,
+              ),
               mangaId: manga.id!,
               archivePath: chapterPath,
               title: book.name,
               author: book.author,
               lang: book.language,
             );
-        progress
-          ..title = book.name
-          ..author = book.author;
-        progress.lang ??= book.language;
         epubProgressToSave.add(progress);
       } else {
         final chapterFile = File(chapterPath);

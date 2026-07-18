@@ -50,6 +50,9 @@ Future<dynamic> updateMangaDetail(
         [];
 
     final imgUrl = getManga.imageUrl.trimmedOrDefault(manga.imageUrl);
+    final refreshedSourceTitle = getManga.name.trimmedOrDefault(
+      manga.sourceTitle ?? manga.name,
+    );
     final now = DateTime.now().millisecondsSinceEpoch;
 
     manga
@@ -58,7 +61,7 @@ Future<dynamic> updateMangaDetail(
           : imgUrl.startsWith('http')
           ? imgUrl
           : '${source.baseUrl ?? ''}/${imgUrl.getUrlWithoutDomain}'
-      ..name = getManga.name.trimmedOrDefault(manga.name)
+      ..updateSourceTitle(refreshedSourceTitle)
       ..genre = (genre.isEmpty ? null : genre) ?? manga.genre ?? []
       ..author = getManga.author.trimmedOrDefault(manga.author) ?? ""
       ..artist = getManga.artist.trimmedOrDefault(manga.artist) ?? ""

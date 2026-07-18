@@ -69,28 +69,15 @@ build_macos() {
     
     mkdir -p ../macos/Frameworks
     
-    # Build ARM64
+    # Mangatan supports Apple Silicon macOS only. Write the ARM64 library
+    # directly so neither the build nor its output contains an x64 slice.
     log_info "Building macOS ARM64..."
-    CGO_ENABLED=1 GOARCH=arm64 go build -buildmode=c-shared -ldflags="-s -w" -trimpath -o libmtorrentserver_arm64.dylib ./binding/desktop
-    
-    # Build AMD64
-    log_info "Building macOS AMD64..."
-    CGO_ENABLED=1 GOARCH=amd64 go build -buildmode=c-shared -ldflags="-s -w" -trimpath -o libmtorrentserver_amd64.dylib ./binding/desktop
-    
-    # Create universal binary
-    if command -v lipo &> /dev/null; then
-        log_info "Creating universal binary..."
-        lipo -create -output ../macos/Frameworks/libmtorrentserver.dylib libmtorrentserver_arm64.dylib libmtorrentserver_amd64.dylib
-        
-        # Clean up intermediate binaries
-        log_info "Cleaning up intermediate binaries..."
-        rm -f libmtorrentserver_arm64.dylib libmtorrentserver_amd64.dylib
-        rm -f libmtorrentserver_arm64.h libmtorrentserver_amd64.h
-        
-        log_success "macOS build completed: ../macos/Frameworks/libmtorrentserver.dylib (universal)"
-    else
-        log_warning "lipo not available. Separate binaries are available."
-    fi
+    MACOSX_DEPLOYMENT_TARGET=10.15 CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
+        go build -buildmode=c-shared -ldflags="-s -w" -trimpath \
+        -o ../macos/Frameworks/libmtorrentserver.dylib ./binding/desktop
+    rm -f ../macos/Frameworks/libmtorrentserver.h
+
+    log_success "macOS ARM64 build completed: ../macos/Frameworks/libmtorrentserver.dylib"
 }
 
 # Build for Windows

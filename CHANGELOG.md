@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.0.7-beta+121 - 2026-07-18
+
+- Added Chimahon-compatible sync mode as a separate switchable sync path.
+- Added persistent Mokuro OCR support and moved reader OCR progress below the visible menu.
+- Added manga EPUB drag-and-drop import support.
+- Added a default reader page-mode setting and unified desktop back navigation across readers and detail pages.
+- Split dictionary settings into focused learning sections.
+- Kept filtered language sources available to the library and fixed Mihon source compatibility/reading progress handling.
+- Removed stale Kiwi plugin registrations after replacing Korean lookup with the Yomitan pipeline.
+- Refined Korean Yomitan deinflection for additional irregular, vocative, particle, and noun-shortening forms while hiding internal Hangul processor traces from popup chips.
+- Improved Escape/back handling to avoid duplicate navigation actions.
+
 ## 1.0.6-beta+120 - 2026-07-16
 
 - Removed the Kiwi Korean runtime/model dependency and routed Korean lookup through the existing Yomitan language pipeline, including extra Korean irregular and particle-shortening lookup variants.

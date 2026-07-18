@@ -48,6 +48,7 @@ class BackupManga extends $pb.GeneratedMessage {
     $fixnum.Int64? version,
     $core.String? notes,
     $core.bool? initialized,
+    $core.String? customTitle,
   }) {
     final result = create();
     if (source != null) result.source = source;
@@ -77,6 +78,7 @@ class BackupManga extends $pb.GeneratedMessage {
     if (version != null) result.version = version;
     if (notes != null) result.notes = notes;
     if (initialized != null) result.initialized = initialized;
+    if (customTitle != null) result.customTitle = customTitle;
     return result;
   }
 
@@ -125,6 +127,7 @@ class BackupManga extends $pb.GeneratedMessage {
     ..aInt64(109, _omitFieldNames ? '' : 'version')
     ..aOS(110, _omitFieldNames ? '' : 'notes')
     ..aOB(111, _omitFieldNames ? '' : 'initialized')
+    ..aOS(800, _omitFieldNames ? '' : 'customTitle', protoName: 'customTitle')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -335,6 +338,16 @@ class BackupManga extends $pb.GeneratedMessage {
   $core.bool hasInitialized() => $_has(24);
   @$pb.TagNumber(111)
   void clearInitialized() => $_clearField(111);
+
+  /// J2K/Chimahon custom manga info.
+  @$pb.TagNumber(800)
+  $core.String get customTitle => $_getSZ(25);
+  @$pb.TagNumber(800)
+  set customTitle($core.String value) => $_setString(25, value);
+  @$pb.TagNumber(800)
+  $core.bool hasCustomTitle() => $_has(25);
+  @$pb.TagNumber(800)
+  void clearCustomTitle() => $_clearField(800);
 }
 
 const $core.bool _omitFieldNames =

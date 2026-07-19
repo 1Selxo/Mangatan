@@ -12,12 +12,13 @@ import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_pr
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/category_service.dart';
 import 'package:mangayomi/utils/item_type_filters.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
-  final (bool, int) data;
+  final (bool, ItemType) data;
   const CategoriesScreen({required this.data, super.key});
 
   @override
@@ -36,7 +37,11 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen>
       length: _visibleTabTypes.length,
       vsync: this,
     );
-    _tabBarController.animateTo(widget.data.$2);
+    final initialItemType = widget.data.$2;
+    final initialIndex = _visibleTabTypes.indexOf(initialItemType);
+    if (initialIndex >= 0) {
+      _tabBarController.animateTo(initialIndex);
+    }
   }
 
   @override
@@ -130,17 +135,19 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
     }
 
     // Grab the two category objects involved in the swap
-    final a = _entries[index];
-    final b = _entries[newIndex];
+    final ordered = [..._entries];
+    final category = ordered.removeAt(index);
+    ordered.insert(newIndex, category);
     // Swap their positions inside the in‑memory list
-    _entries[newIndex] = a;
-    _entries[index] = b;
+    _entries = ordered;
     // Swap their persisted `pos` values so ordering is saved correctly
-    final temp = a.pos;
-    a.pos = b.pos;
-    b.pos = temp;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (var i = 0; i < ordered.length; i++) {
+      ordered[i].pos = i;
+      ordered[i].updatedAt = now;
+    }
     // Persist both updated objects in a single Isar transaction
-    await isar.writeTxn(() async => isar.categorys.putAll([a, b]));
+    await isar.writeTxn(() async => isar.categorys.putAll(ordered));
 
     if (mounted) {
       setState(() {
@@ -171,8 +178,7 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
               ),
             );
           }
-          data.sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
-          _entries = data;
+          _entries = CategoryService.ordered(data);
 
           return SuperListView.builder(
             itemCount: _entries.length,
@@ -265,28 +271,29 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
                             ),
                             const SizedBox(width: 15),
                             TextButton(
-                              onPressed: controller.text.isEmpty || isExist
+                              onPressed: controller.text.trim().isEmpty || isExist
                                   ? null
                                   : () async {
                                       final category = Category(
                                         forItemType: widget.itemType,
-                                        name: controller.text,
+                                        name: controller.text.trim(),
+                                        pos: _entries.isEmpty
+                                            ? 0
+                                            : (_entries
+                                                        .map((e) => e.pos ?? 0)
+                                                        .reduce(
+                                                          (a, b) => a > b
+                                                              ? a
+                                                              : b,
+                                                        ) +
+                                                    1),
+                                        hide: false,
+                                        shouldUpdate: true,
                                         updatedAt: DateTime.now()
                                             .millisecondsSinceEpoch,
                                       );
                                       isar.writeTxnSync(() {
-                                        isar.categorys.putSync(
-                                          category..pos = category.id,
-                                        );
-                                        final categories = isar.categorys
-                                            .filter()
-                                            .posIsNull()
-                                            .findAllSync();
-                                        for (var category in categories) {
-                                          isar.categorys.putSync(
-                                            category..pos = category.id,
-                                          );
-                                        }
+                                        isar.categorys.putSync(category);
                                       });
 
                                       if (context.mounted) {
@@ -296,7 +303,7 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
                               child: Text(
                                 l10n.add,
                                 style: TextStyle(
-                                  color: controller.text.isEmpty || isExist
+                                  color: controller.text.trim().isEmpty || isExist
                                       ? Theme.of(
                                           context,
                                         ).primaryColor.withValues(alpha: 0.2)
@@ -416,22 +423,24 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
                             : Icons.update_disabled_outlined,
                       ),
                     ),
-                    SizedBox(width: 10),
-                    IconButton(
-                      onPressed: () async {
-                        await isar.writeTxn(() async {
-                          category.hide = !(category.hide ?? false);
-                          category.updatedAt =
-                              DateTime.now().millisecondsSinceEpoch;
-                          isar.categorys.put(category);
-                        });
-                      },
-                      icon: Icon(
-                        !(category.hide ?? false)
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                    if (widget.itemType != ItemType.novel) ...[
+                      SizedBox(width: 10),
+                      IconButton(
+                        onPressed: () async {
+                          await isar.writeTxn(() async {
+                            category.hide = !(category.hide ?? false);
+                            category.updatedAt =
+                                DateTime.now().millisecondsSinceEpoch;
+                            isar.categorys.put(category);
+                          });
+                        },
+                        icon: Icon(
+                          !(category.hide ?? false)
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
                       ),
-                    ),
+                    ],
                     SizedBox(width: 10),
                     IconButton(
                       onPressed: () {
@@ -492,12 +501,12 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
       final allItems = await isar.mangas
           .filter()
           .categoriesElementEqualTo(category.id!)
+          .and()
+          .itemTypeEqualTo(widget.itemType)
           .findAll();
       // Remove the category ID from each item's category list
       final updatedItems = allItems.map((manga) {
-        final cats = List<int>.from(manga.categories ?? []);
-        cats.remove(category.id!);
-        manga.categories = cats;
+        CategoryService.removeMembership(manga, category.id!);
         return manga;
       }).toList();
 
@@ -506,6 +515,13 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
 
       // Delete category
       await isar.categorys.delete(category.id!);
+      final ordered = CategoryService.normalizePositions(
+        await isar.categorys
+            .filter()
+            .forItemTypeEqualTo(widget.itemType)
+            .findAll(),
+      );
+      await isar.categorys.putAll(ordered);
     });
 
     await ref
@@ -524,7 +540,8 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
   void _renameCategory(Category category) {
     bool isExist = false;
     final controller = TextEditingController(text: category.name);
-    bool isSameName = controller.text == category.name;
+    bool isSameName = CategoryService.normalizeName(controller.text) ==
+        CategoryService.normalizeName(category.name ?? '');
     showDialog(
       context: context,
       builder: (context) {
@@ -546,7 +563,8 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
                 name: category.name!,
                 val: (val) {
                   setState(() {
-                    isSameName = controller.text == category.name;
+                    isSameName = CategoryService.normalizeName(controller.text) ==
+                        CategoryService.normalizeName(category.name ?? '');
                   });
                 },
               ),
@@ -562,12 +580,12 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
                     ),
                     const SizedBox(width: 15),
                     TextButton(
-                      onPressed:
-                          controller.text.isEmpty || isExist || isSameName
+                          onPressed:
+                          controller.text.trim().isEmpty || isExist || isSameName
                           ? null
                           : () async {
                               await isar.writeTxn(() async {
-                                category.name = controller.text;
+                                category.name = controller.text.trim();
                                 category.updatedAt =
                                     DateTime.now().millisecondsSinceEpoch;
                                 await isar.categorys.put(category);
@@ -579,8 +597,10 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab>
                       child: Text(
                         l10n.ok,
                         style: TextStyle(
-                          color:
-                              controller.text.isEmpty || isExist || isSameName
+                              color:
+                              controller.text.trim().isEmpty ||
+                                      isExist ||
+                                      isSameName
                               ? Theme.of(
                                   context,
                                 ).primaryColor.withValues(alpha: 0.2)

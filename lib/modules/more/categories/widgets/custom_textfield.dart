@@ -29,14 +29,16 @@ class CustomTextFormField extends StatelessWidget {
       controller: controller,
       keyboardType: TextInputType.text,
       onChanged: (value) {
-        if (name != controller.text) {
-          exist(
-            entries
-                .where((element) => element.name == controller.text)
-                .toList()
-                .isNotEmpty,
-          );
-        }
+        final normalized = value.trim().toLowerCase();
+        final original = name.trim().toLowerCase();
+        exist(
+          normalized.isEmpty ||
+              (normalized != original &&
+                  entries.any(
+                    (element) =>
+                        element.name?.trim().toLowerCase() == normalized,
+                  )),
+        );
         val(value);
       },
       onFieldSubmitted: (s) {},

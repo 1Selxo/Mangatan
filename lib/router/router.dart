@@ -218,7 +218,7 @@ class RouterNotifier extends ChangeNotifier {
       name: "mangawebview",
       builder: (data) => MangaWebView(url: data["url"]!, title: data['title']!),
     ),
-    _genericRoute<(bool, int)>(
+    _genericRoute<(bool, ItemType)>(
       name: "categories",
       builder: (data) => CategoriesScreen(data: data),
     ),

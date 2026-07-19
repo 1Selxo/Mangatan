@@ -343,10 +343,12 @@ P _syncPreferenceDeserializeProp<P>(
 const _SyncPreferencechimahonSyncProviderEnumValueMap = {
   'syncYomi': 0,
   'googleDrive': 1,
+  'webDav': 2,
 };
 const _SyncPreferencechimahonSyncProviderValueEnumMap = {
   0: ChimahonSyncProvider.syncYomi,
   1: ChimahonSyncProvider.googleDrive,
+  2: ChimahonSyncProvider.webDav,
 };
 const _SyncPreferencesyncModeEnumValueMap = {'native': 0, 'chimahon': 1};
 const _SyncPreferencesyncModeValueEnumMap = {

@@ -8,6 +8,8 @@ enum SyncUserMessageContext {
   signIn,
   googleDriveConnection,
   googleDriveDisconnection,
+  webDavConnection,
+  webDavDisconnection,
 }
 
 /// Maps sync failures to fixed user-facing text without rendering exceptions.
@@ -21,6 +23,9 @@ String safeSyncUserMessage(
 }) {
   if (context == SyncUserMessageContext.googleDriveDisconnection) {
     return 'Could not disconnect Google Drive. The saved connection was kept.';
+  }
+  if (context == SyncUserMessageContext.webDavDisconnection) {
+    return 'Could not disconnect WebDAV. The saved connection was kept.';
   }
   if (error is GoogleDriveOAuthException) {
     return switch (error.code) {
@@ -47,6 +52,8 @@ String safeSyncUserMessage(
   if (error is SyncStorageException) {
     return context == SyncUserMessageContext.googleDriveConnection
         ? 'Google Drive could not verify the sync data. No connection was saved.'
+        : context == SyncUserMessageContext.webDavConnection
+        ? 'WebDAV could not verify safe conditional sync. No connection was saved.'
         : 'The sync service is unavailable. Check the connection and try again.';
   }
   return switch (context) {
@@ -56,6 +63,10 @@ String safeSyncUserMessage(
       'Google Drive connection failed. No connection was saved.',
     SyncUserMessageContext.googleDriveDisconnection =>
       'Could not disconnect Google Drive. The saved connection was kept.',
+    SyncUserMessageContext.webDavConnection =>
+      'WebDAV connection failed. No connection was saved.',
+    SyncUserMessageContext.webDavDisconnection =>
+      'Could not disconnect WebDAV. The saved connection was kept.',
     SyncUserMessageContext.synchronization => 'Sync failed safely. Try again.',
   };
 }

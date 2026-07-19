@@ -18,6 +18,8 @@ import 'package:mangayomi/services/sync/google_drive_platform_support.dart';
 import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
 import 'package:mangayomi/services/sync/google_drive_sync_storage.dart';
 import 'package:mangayomi/services/sync/sync_user_message.dart';
+import 'package:mangayomi/services/sync/webdav_credential_store.dart';
+import 'package:mangayomi/services/sync/webdav_sync_storage.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -81,8 +83,15 @@ class SyncScreen extends ConsumerWidget {
                 isChimahon &&
                 syncPreference.chimahonSyncProvider ==
                     ChimahonSyncProvider.googleDrive;
+            final isWebDav =
+                isChimahon &&
+                syncPreference.chimahonSyncProvider ==
+                    ChimahonSyncProvider.webDav;
             final bool isLogged = isGoogleDrive
                 ? syncPreference.googleDriveConnected
+                : isWebDav
+                ? syncPreference.googleDriveConnected &&
+                      (syncPreference.server?.isNotEmpty ?? false)
                 : isChimahon
                 ? (syncPreference.syncYomiApiToken?.isNotEmpty ?? false) &&
                       (syncPreference.syncYomiServer?.isNotEmpty ?? false)
@@ -110,6 +119,9 @@ class SyncScreen extends ConsumerWidget {
                         ? syncPreference.chimahonSyncProvider ==
                                   ChimahonSyncProvider.googleDrive
                               ? 'Chimahon compatible · Google Drive'
+                              : syncPreference.chimahonSyncProvider ==
+                                    ChimahonSyncProvider.webDav
+                              ? 'Chimahon compatible · WebDAV'
                               : 'Chimahon compatible · SyncYomi'
                         : 'Mangayomi native',
                     style: TextStyle(
@@ -159,7 +171,11 @@ class SyncScreen extends ConsumerWidget {
                   ListTile(
                     title: const Text('Chimahon sync service'),
                     subtitle: Text(
-                      isGoogleDrive ? 'Google Drive' : 'SyncYomi',
+                      isGoogleDrive
+                          ? 'Google Drive'
+                          : isWebDav
+                          ? 'WebDAV'
+                          : 'SyncYomi',
                       style: TextStyle(
                         fontSize: 11,
                         color: context.secondaryColor,
@@ -197,6 +213,16 @@ class SyncScreen extends ConsumerWidget {
                                   title: Text('SyncYomi'),
                                   subtitle: Text(
                                     'Uses a SyncYomi server and API token.',
+                                  ),
+                                ),
+                                RadioListTile(
+                                  value: ChimahonSyncProvider.webDav,
+                                  enabled: googleDriveSupported,
+                                  title: const Text('WebDAV'),
+                                  subtitle: Text(
+                                    googleDriveSupported
+                                        ? 'Uses a desktop WebDAV folder with strong ETags.'
+                                        : 'Available on macOS, Windows, and Linux.',
                                   ),
                                 ),
                               ],
@@ -241,6 +267,22 @@ class SyncScreen extends ConsumerWidget {
                         .read(synchingProvider(syncId: 1).notifier)
                         .setChimahonSyncNovels,
                   ),
+                  if (isGoogleDrive || isWebDav)
+                    ListTile(
+                      leading: const Icon(Icons.menu_book_outlined),
+                      title: const Text('EPUB file transfer'),
+                      subtitle: const Text(
+                        'Mangatan uploads EPUB blobs to a separate provider '
+                        'manifest. Missing cloud novels retry from the normal '
+                        'sync buttons; Chimahon clients ignore these files.',
+                      ),
+                      trailing: const Icon(Icons.refresh_outlined),
+                      onTap: !syncPreference.syncOn || !isLogged
+                          ? null
+                          : () => ref
+                                .read(syncServerProvider(syncId: 1).notifier)
+                                .startSync(l10n, false),
+                    ),
                 ],
                 ListTile(
                   enabled: syncPreference.syncOn,
@@ -425,7 +467,7 @@ class SyncScreen extends ConsumerWidget {
                 SyncListile(
                   enabled:
                       syncPreference.syncOn &&
-                      (!isGoogleDrive || googleDriveSupported),
+                      ((!isGoogleDrive && !isWebDav) || googleDriveSupported),
                   onTap: () async {
                     if (isGoogleDrive) {
                       await _connectGoogleDrive(context);
@@ -438,14 +480,20 @@ class SyncScreen extends ConsumerWidget {
                   text: isChimahon
                       ? isGoogleDrive
                             ? 'Google Drive (Chimahon)'
+                            : isWebDav
+                            ? 'WebDAV'
                             : 'SyncYomi'
                       : null,
                   loggedIn: isLogged,
                   icon: isGoogleDrive
                       ? Icons.cloud_outlined
+                      : isWebDav
+                      ? Icons.folder_shared_outlined
                       : Icons.dns_outlined,
                   onLogout: isGoogleDrive
                       ? () => _disconnectGoogleDrive(context)
+                      : isWebDav
+                      ? () => _disconnectWebDav(context, ref)
                       : isChimahon
                       ? () => ref
                             .read(synchingProvider(syncId: 1).notifier)
@@ -639,12 +687,19 @@ class SyncScreen extends ConsumerWidget {
     SyncPreference syncPreference,
   ) {
     final isChimahonSync = syncPreference.syncMode == SyncMode.chimahon;
+    final isWebDav =
+        isChimahonSync &&
+        syncPreference.chimahonSyncProvider == ChimahonSyncProvider.webDav;
     final serverController = TextEditingController(
-      text: isChimahonSync
+      text: isWebDav
+          ? syncPreference.server
+          : isChimahonSync
           ? syncPreference.syncYomiServer
           : syncPreference.server,
     );
-    final emailController = TextEditingController(text: syncPreference.email);
+    final emailController = TextEditingController(
+      text: isWebDav ? '' : syncPreference.email,
+    );
     final passwordController = TextEditingController();
     String server = serverController.text;
     String email = emailController.text;
@@ -659,13 +714,15 @@ class SyncScreen extends ConsumerWidget {
         builder: (context, setState) {
           return AlertDialog(
             title: Text(
-              isChimahonSync
+              isWebDav
+                  ? 'Connect WebDAV'
+                  : isChimahonSync
                   ? 'Connect SyncYomi'
                   : l10n.login_into("SyncServer"),
               style: const TextStyle(fontSize: 30),
             ),
             content: SizedBox(
-              height: isChimahonSync ? 300 : 400,
+              height: isChimahonSync && !isWebDav ? 300 : 400,
               width: MediaQuery.of(context).size.width,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,7 +737,9 @@ class SyncScreen extends ConsumerWidget {
                         server = value;
                       }),
                       decoration: InputDecoration(
-                        hintText: l10n.sync_server,
+                        hintText: isWebDav
+                            ? 'WebDAV collection URL'
+                            : l10n.sync_server,
                         filled: false,
                         contentPadding: const EdgeInsets.all(12),
                         enabledBorder: OutlineInputBorder(
@@ -698,7 +757,7 @@ class SyncScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  if (!isChimahonSync) ...[
+                  if (!isChimahonSync || isWebDav) ...[
                     const SizedBox(height: 10),
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -709,7 +768,9 @@ class SyncScreen extends ConsumerWidget {
                           email = value;
                         }),
                         decoration: InputDecoration(
-                          hintText: l10n.email_adress,
+                          hintText: isWebDav
+                              ? 'WebDAV username'
+                              : l10n.email_adress,
                           filled: false,
                           contentPadding: const EdgeInsets.all(12),
                           enabledBorder: OutlineInputBorder(
@@ -733,15 +794,17 @@ class SyncScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: TextFormField(
                       controller: passwordController,
-                      obscureText: !isChimahonSync && obscureText,
+                      obscureText: (!isChimahonSync || isWebDav) && obscureText,
                       onChanged: (value) => setState(() {
                         password = value;
                       }),
                       decoration: InputDecoration(
-                        hintText: isChimahonSync
+                        hintText: isWebDav
+                            ? 'WebDAV password or app token'
+                            : isChimahonSync
                             ? 'SyncYomi API token'
                             : l10n.sync_password,
-                        suffixIcon: isChimahonSync
+                        suffixIcon: isChimahonSync && !isWebDav
                             ? null
                             : IconButton(
                                 onPressed: () => setState(() {
@@ -785,7 +848,14 @@ class SyncScreen extends ConsumerWidget {
                                 setState(() {
                                   isLoading = true;
                                 });
-                                final res = isChimahonSync
+                                final res = isWebDav
+                                    ? await _saveWebDavCredentials(
+                                        ref,
+                                        server,
+                                        email,
+                                        password,
+                                      )
+                                    : isChimahonSync
                                     ? _saveSyncYomiCredentials(
                                         ref,
                                         server,
@@ -837,6 +907,47 @@ class SyncScreen extends ConsumerWidget {
         .saveSyncYomiCredentials(server: server.trim(), apiToken: token.trim());
     botToast('SyncYomi token saved');
     return (true, '');
+  }
+
+  Future<(bool, String)> _saveWebDavCredentials(
+    WidgetRef ref,
+    String server,
+    String username,
+    String password,
+  ) async {
+    final normalizedServer = server.trim();
+    final credentials = WebDavCredentials(
+      username: username.trim(),
+      password: password,
+    );
+    if (normalizedServer.isEmpty || !credentials.isUsable) {
+      return (false, 'WebDAV URL, username, and password required');
+    }
+    try {
+      final storage = WebDavSyncStorage(
+        collectionUrl: Uri.parse(normalizedServer),
+        credentials: credentials,
+      );
+      try {
+        await storage.testConnection();
+      } finally {
+        storage.close();
+      }
+      await const SecureWebDavCredentialStore().writeCredentials(credentials);
+      ref
+          .read(synchingProvider(syncId: 1).notifier)
+          .saveWebDavConnection(server: normalizedServer);
+      botToast('WebDAV connected');
+      return (true, '');
+    } catch (error) {
+      return (
+        false,
+        safeSyncUserMessage(
+          error,
+          context: SyncUserMessageContext.webDavConnection,
+        ),
+      );
+    }
   }
 
   Future<void> _connectGoogleDrive(BuildContext context) async {
@@ -981,6 +1092,24 @@ class SyncScreen extends ConsumerWidget {
         );
     if (failureMessage != null && context.mounted) {
       botToast(failureMessage, second: 8);
+    }
+  }
+
+  Future<void> _disconnectWebDav(BuildContext context, WidgetRef ref) async {
+    try {
+      await const SecureWebDavCredentialStore().clearCredentials();
+      ref.read(synchingProvider(syncId: 1).notifier).disconnectWebDav();
+      botToast('WebDAV disconnected');
+    } catch (error) {
+      if (context.mounted) {
+        botToast(
+          safeSyncUserMessage(
+            error,
+            context: SyncUserMessageContext.webDavDisconnection,
+          ),
+          second: 8,
+        );
+      }
     }
   }
 }

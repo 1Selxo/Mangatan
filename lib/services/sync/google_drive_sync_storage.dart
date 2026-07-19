@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:http/http.dart' as http;
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
+import 'package:mangayomi/services/sync/mangatan_epub_blob_storage.dart';
+import 'package:mangayomi/services/sync/mangatan_epub_sync_manifest.dart';
 
 /// Chimahon-compatible Google Drive transport.
 ///
@@ -14,7 +16,10 @@ import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
 /// discovery does not copy Chimahon's MIME filter because Chimahon writes
 /// `application/octet-stream` while querying for `application/x-gzip`.
 class GoogleDriveSyncStorage
-    implements CrossDeviceSyncStorage, ClosableSyncStorage {
+    implements
+        CrossDeviceSyncStorage,
+        MangatanEpubBlobStorage,
+        ClosableSyncStorage {
   GoogleDriveSyncStorage({
     required this.accessToken,
     required this.deviceId,
@@ -24,6 +29,8 @@ class GoogleDriveSyncStorage
        _ownsClient = client == null;
 
   static const chimahonRemoteFileName = 'Chimahon_sync.proto.gz';
+  static const epubManifestRemoteFileName = mangatanEpubManifestFileName;
+  static const _epubBlobNamePrefix = 'Mangatan_epub_blob_';
   static const _apiHost = 'www.googleapis.com';
   static const _v2MetadataFields =
       'id,title,mimeType,modifiedDate,version,etag,appDataContents,'
@@ -40,6 +47,127 @@ class GoogleDriveSyncStorage
 
   @override
   ChimahonSyncWireFormat get wireFormat => ChimahonSyncWireFormat.gzipProtobuf;
+
+  @override
+  Future<MangatanRemoteEpubManifest?> downloadEpubManifest() async {
+    final candidates = await _listRemoteFilesByName(epubManifestRemoteFileName);
+    if (candidates.isEmpty) return null;
+    if (candidates.length > 1) {
+      throw const SyncConflictException();
+    }
+    final candidate = candidates.single;
+    final before = await _readV2Metadata(
+      candidate,
+      expectedName: epubManifestRemoteFileName,
+    );
+    final response = await _client.get(
+      Uri.https(_apiHost, '/drive/v2/files/${candidate.id}', {'alt': 'media'}),
+      headers: _authorizationHeaders,
+    );
+    if (_isConflictStatus(response.statusCode)) {
+      throw const SyncConflictException();
+    }
+    _throwForResponse(response, 'download Mangatan EPUB manifest');
+    final after = await _readV2Metadata(
+      candidate,
+      expectedName: epubManifestRemoteFileName,
+    );
+    if (before.etag != after.etag) throw const SyncConflictException();
+    return MangatanRemoteEpubManifest(
+      manifest: MangatanEpubManifest.decode(response.bodyBytes),
+      revision: candidate.revision,
+    );
+  }
+
+  @override
+  Future<String?> uploadEpubManifest(
+    MangatanEpubManifest manifest, {
+    String? expectedRevision,
+    bool expectedAbsent = false,
+  }) async {
+    final bytes = Uint8List.fromList(manifest.encode());
+    final current = await _listRemoteFilesByName(epubManifestRemoteFileName);
+    if (expectedAbsent) {
+      if (expectedRevision != null || current.isNotEmpty) {
+        throw const SyncConflictException();
+      }
+      return _uploadNamedMultipart(
+        bytes,
+        fileName: epubManifestRemoteFileName,
+        mimeType: 'application/json',
+      ).then((file) => file.revision);
+    }
+    if (expectedRevision == null || current.length != 1) {
+      throw const SyncConflictException();
+    }
+    final target = current.single;
+    if (target.revision != expectedRevision) {
+      throw const SyncConflictException();
+    }
+    final metadata = await _readV2Metadata(
+      target,
+      expectedName: epubManifestRemoteFileName,
+    );
+    final updated = await _updateNamedMultipart(
+      bytes,
+      target: target,
+      fileName: epubManifestRemoteFileName,
+      mimeType: 'application/json',
+      expectedEtag: _requireStrongQuotedEtag(metadata.etag, target.id),
+    );
+    return updated.revision;
+  }
+
+  @override
+  Future<bool> hasEpubBlob(String sha256) async {
+    final files = await _listRemoteFilesByName(_epubBlobName(sha256));
+    return files.any((file) => file.name == _epubBlobName(sha256));
+  }
+
+  @override
+  Future<void> uploadEpubBlob({
+    required String sha256,
+    required int sizeBytes,
+    required Stream<List<int>> bytes,
+  }) async {
+    if (await hasEpubBlob(sha256)) return;
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in bytes) {
+      builder.add(chunk);
+    }
+    final payload = builder.takeBytes();
+    if (payload.length != sizeBytes ||
+        sha256 != crypto.sha256.convert(payload).toString()) {
+      throw SyncStorageException(
+        'Refusing to upload EPUB blob $sha256 because its content changed',
+      );
+    }
+    await _uploadNamedMultipart(
+      payload,
+      fileName: _epubBlobName(sha256),
+      mimeType: 'application/epub+zip',
+      appProperties: {'kind': 'mangatan-epub-blob', 'sha256': sha256},
+    );
+  }
+
+  @override
+  Future<Uint8List> downloadEpubBlob(String sha256) async {
+    final files = await _listRemoteFilesByName(_epubBlobName(sha256));
+    if (files.length != 1) throw const SyncConflictException();
+    final response = await _client.get(
+      Uri.https(_apiHost, '/drive/v2/files/${files.single.id}', {
+        'alt': 'media',
+      }),
+      headers: _authorizationHeaders,
+    );
+    if (_isConflictStatus(response.statusCode)) {
+      throw const SyncConflictException();
+    }
+    _throwForResponse(response, 'download Mangatan EPUB blob');
+    return Uint8List.fromList(response.bodyBytes);
+  }
+
+  String _epubBlobName(String sha256) => '$_epubBlobNamePrefix$sha256.epub';
 
   Map<String, String> get _authorizationHeaders => {
     'Authorization': 'Bearer $accessToken',
@@ -309,6 +437,42 @@ class GoogleDriveSyncStorage
     );
   }
 
+  Future<_DriveFile> _updateNamedMultipart(
+    Uint8List bytes, {
+    required _DriveFile target,
+    required String fileName,
+    required String mimeType,
+    required String expectedEtag,
+  }) async {
+    final response = await _sendMultipart(
+      method: 'PUT',
+      uri: Uri.https(_apiHost, '/upload/drive/v2/files/${target.id}', {
+        'uploadType': 'multipart',
+        'fields': _v2MetadataFields,
+      }),
+      metadata: {
+        'title': fileName,
+        'mimeType': mimeType,
+        'properties': [
+          {'key': 'deviceId', 'value': deviceId, 'visibility': 'PRIVATE'},
+        ],
+      },
+      bytes: bytes,
+      contentType: mimeType,
+      expectedEtag: expectedEtag,
+    );
+    if (_isConflictStatus(response.statusCode)) {
+      throw const SyncConflictException();
+    }
+    _throwForResponse(response, 'upload Mangatan EPUB manifest');
+    return _validatedV2Mutation(
+      response.body,
+      expectedId: target.id,
+      expectedTitle: fileName,
+      expectedPrivateDeviceId: deviceId,
+    );
+  }
+
   Future<_DriveFile> _uploadMultipart(Uint8List bytes) async {
     final metadata = <String, Object>{
       'name': remoteFileName,
@@ -338,11 +502,43 @@ class GoogleDriveSyncStorage
     return uploaded;
   }
 
+  Future<_DriveFile> _uploadNamedMultipart(
+    Uint8List bytes, {
+    required String fileName,
+    required String mimeType,
+    Map<String, String> appProperties = const {},
+  }) async {
+    final response = await _sendMultipart(
+      method: 'POST',
+      uri: Uri.https(_apiHost, '/upload/drive/v3/files', {
+        'uploadType': 'multipart',
+        'fields': 'id,name,mimeType,modifiedTime,version,appProperties',
+      }),
+      metadata: {
+        'name': fileName,
+        'mimeType': mimeType,
+        'appProperties': {'deviceId': deviceId, ...appProperties},
+        'parents': ['appDataFolder'],
+      },
+      bytes: bytes,
+      contentType: mimeType,
+    );
+    _throwForResponse(response, 'upload Mangatan EPUB data');
+    final uploaded = _DriveFile.fromJson(_decodeJsonObject(response.body));
+    if (uploaded.id.isEmpty || uploaded.name != fileName) {
+      throw const SyncStorageException(
+        'Google Drive returned incomplete EPUB sync metadata',
+      );
+    }
+    return uploaded;
+  }
+
   Future<http.Response> _sendMultipart({
     required String method,
     required Uri uri,
     required Map<String, Object> metadata,
     required Uint8List bytes,
+    String contentType = 'application/x-gzip',
     String? expectedEtag,
   }) async {
     final boundary = 'mangatan-drive-${DateTime.now().microsecondsSinceEpoch}';
@@ -353,7 +549,7 @@ class GoogleDriveSyncStorage
           'Content-Type: application/json; charset=UTF-8\r\n\r\n'
           '${jsonEncode(metadata)}\r\n'
           '--$boundary\r\n'
-          'Content-Type: application/x-gzip\r\n\r\n',
+          'Content-Type: $contentType\r\n\r\n',
         ),
       )
       ..add(bytes)
@@ -399,7 +595,10 @@ class GoogleDriveSyncStorage
     }
   }
 
-  Future<_V2DriveFileMetadata> _readV2Metadata(_DriveFile expected) async {
+  Future<_V2DriveFileMetadata> _readV2Metadata(
+    _DriveFile expected, {
+    String? expectedName,
+  }) async {
     final response = await _client.get(
       Uri.https(_apiHost, '/drive/v2/files/${expected.id}', {
         'fields': _v2MetadataFields,
@@ -414,7 +613,7 @@ class GoogleDriveSyncStorage
       _decodeJsonObject(response.body),
     );
     if (metadata.id != expected.id ||
-        metadata.title != expected.name ||
+        metadata.title != (expectedName ?? expected.name) ||
         metadata.version != expected.version ||
         metadata.appDataContents != true ||
         metadata.trashed != false) {
@@ -450,8 +649,11 @@ class GoogleDriveSyncStorage
     return metadata.toDriveFile();
   }
 
-  Future<List<_DriveFile>> _listRemoteFiles() async {
-    final escapedName = remoteFileName
+  Future<List<_DriveFile>> _listRemoteFiles() =>
+      _listRemoteFilesByName(remoteFileName);
+
+  Future<List<_DriveFile>> _listRemoteFilesByName(String fileName) async {
+    final escapedName = fileName
         .replaceAll(r'\', r'\\')
         .replaceAll("'", r"\'");
     final filesById = <String, _DriveFile>{};
@@ -477,7 +679,7 @@ class GoogleDriveSyncStorage
       if (values is List) {
         for (final value in values.whereType<Map>()) {
           final file = _DriveFile.fromJson(value.cast<String, dynamic>());
-          if (file.id.isEmpty || file.name != remoteFileName) continue;
+          if (file.id.isEmpty || file.name != fileName) continue;
           final existing = filesById[file.id];
           if (existing != null && existing.revision != file.revision) {
             throw const SyncConflictException();
@@ -505,7 +707,7 @@ class GoogleDriveSyncStorage
   ) {
     final revisions =
         candidates.map((candidate) => candidate.file.revision).toList()..sort();
-    final digest = sha256.convert(utf8.encode(revisions.join('\n')));
+    final digest = crypto.sha256.convert(utf8.encode(revisions.join('\n')));
     return '${canonical.revision}:$digest';
   }
 

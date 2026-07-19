@@ -38,7 +38,12 @@ import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
 import 'package:mangayomi/services/sync/google_drive_oauth.dart';
 import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
 import 'package:mangayomi/services/sync/google_drive_sync_storage.dart';
+import 'package:mangayomi/services/sync/mangatan_epub_blob_storage.dart';
+import 'package:mangayomi/services/sync/mangatan_epub_sync_service.dart';
 import 'package:mangayomi/services/sync/sync_user_message.dart';
+import 'package:mangayomi/services/sync/webdav_credential_store.dart';
+import 'package:mangayomi/services/sync/webdav_sync_storage.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 part 'sync_server.g.dart';
@@ -294,6 +299,32 @@ class SyncServer extends _$SyncServer {
           ..add('google-drive|${tokens.refreshToken}');
         _currentSyncNotifier.setGoogleDriveConnected(true);
         break;
+      case ChimahonSyncProvider.webDav:
+        final server = _normalizeServer(syncPreference.server);
+        if (server.isEmpty) {
+          throw const SyncStorageException('WebDAV server URL required');
+        }
+        final credentials = await const SecureWebDavCredentialStore()
+            .readCredentials();
+        if (credentials == null) {
+          _currentSyncNotifier.setGoogleDriveConnected(false);
+          throw const SyncStorageException('WebDAV credentials are not saved');
+        }
+        final webDavStorage = WebDavSyncStorage(
+          collectionUrl: Uri.parse(server),
+          credentials: credentials,
+        );
+        storage = webDavStorage;
+        final scopeHash = crypto.sha256
+            .convert(
+              utf8.encode(
+                'webdav|${Uri.parse(server).normalizePath()}|${credentials.username}',
+              ),
+            )
+            .toString();
+        deferredPayloadScope = 'webdav|$scopeHash';
+        _currentSyncNotifier.setGoogleDriveConnected(true);
+        break;
     }
     try {
       final activeMediaSelectionScopeToken = chimahonMediaSelectionScopeToken(
@@ -370,6 +401,19 @@ class SyncServer extends _$SyncServer {
           );
         }
         await restoreChimahonSyncData(ref, backup);
+        if (storage case MangatanEpubBlobStorage epubStorage) {
+          final epubResult = await MangatanEpubSyncService(
+            database: isar,
+            storage: epubStorage,
+            deviceId: _currentSyncNotifier.ensureChimahonDeviceId(),
+          ).materializeRemoteOnly();
+          if (!silent && epubResult.placeholdersMaterialized > 0) {
+            botToast(
+              'Downloaded ${epubResult.placeholdersMaterialized} EPUB file(s)',
+              second: 5,
+            );
+          }
+        }
         // A download is not evidence that the pending manual restore reached
         // the remote backend, so only update this account's cache here.
         await accountDeferredStore.save(backup);
@@ -491,6 +535,20 @@ class SyncServer extends _$SyncServer {
             throw const SyncStorageException(
               'Local data kept changing while Chimahon sync was uploading; '
               'sync again to finish uploading the newest state',
+            );
+          }
+        }
+        if (storage case MangatanEpubBlobStorage epubStorage) {
+          final epubResult = await MangatanEpubSyncService(
+            database: isar,
+            storage: epubStorage,
+            deviceId: _currentSyncNotifier.ensureChimahonDeviceId(),
+          ).synchronize();
+          if (!silent && epubResult.changedAnything) {
+            botToast(
+              'EPUB transfer: ${epubResult.blobsUploaded} uploaded, '
+              '${epubResult.placeholdersMaterialized} downloaded',
+              second: 5,
             );
           }
         }

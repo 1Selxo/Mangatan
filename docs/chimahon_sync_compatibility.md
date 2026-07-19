@@ -51,10 +51,13 @@ Mangatan therefore materializes a remote-only novel as a visible placeholder;
 Chimahon likewise shows a Mangatan-only novel as missing its EPUB. Importing a
 matching EPUB adopts the retained identity, categories, and progress.
 
-Full EPUB transfer requires a separate Drive blob/manifest protocol with file
-hashes, conditional updates, deletion/conflict rules, quota handling, and
-cross-platform storage. Adding book bytes to Chimahon's protobuf would break
-wire compatibility and is outside this implementation.
+Full EPUB transfer uses Mangatan's separate provider-neutral
+manifest/blob protocol, documented in
+[`docs/mangatan_epub_blob_protocol.md`](mangatan_epub_blob_protocol.md).
+Google Drive and WebDAV implement the first backends. They store immutable
+SHA-256-addressed EPUB blobs and `Mangatan_epub_manifest_v1.json` alongside,
+but separate from, `Chimahon_sync.proto.gz`. Adding book bytes to Chimahon's
+protobuf would break wire compatibility and remains forbidden.
 
 ## Mangatan-only state
 

@@ -265,6 +265,25 @@ class Synching extends _$Synching {
     ref.invalidateSelf();
   }
 
+  void saveWebDavConnection({required String server}) {
+    _updateCurrentPreference((current) {
+      current
+        ..server = server
+        ..googleDriveConnected = true
+        ..chimahonDeviceId ??= _newChimahonDeviceId();
+    });
+    ref.invalidateSelf();
+  }
+
+  void disconnectWebDav() {
+    _updateCurrentPreference((current) {
+      current
+        ..server = null
+        ..googleDriveConnected = false;
+    });
+    ref.invalidateSelf();
+  }
+
   String ensureChimahonDeviceId() {
     late String value;
     isar.writeTxnSync(() {

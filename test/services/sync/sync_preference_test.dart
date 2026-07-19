@@ -70,4 +70,19 @@ void main() {
     expect(native.server, 'https://native.example');
     expect(native.authToken, 'native-token');
   });
+
+  test('WebDAV provider persists no password in JSON preferences', () {
+    final preference = SyncPreference(
+      syncMode: SyncMode.chimahon,
+      chimahonSyncProvider: ChimahonSyncProvider.webDav,
+      server: 'https://dav.example/mangatan/',
+      googleDriveConnected: true,
+    );
+
+    final json = preference.toJson();
+
+    expect(json['chimahonSyncProvider'], ChimahonSyncProvider.webDav.index);
+    expect(json['server'], 'https://dav.example/mangatan/');
+    expect(json.values.join('|'), isNot(contains('password')));
+  });
 }

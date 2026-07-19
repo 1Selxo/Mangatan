@@ -3,7 +3,7 @@ part 'sync_preference.g.dart';
 
 enum SyncMode { native, chimahon }
 
-enum ChimahonSyncProvider { syncYomi, googleDrive }
+enum ChimahonSyncProvider { syncYomi, googleDrive, webDav }
 
 @collection
 @Name("Sync Preference")

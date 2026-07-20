@@ -216,7 +216,7 @@ void WriteUint8(uint8_t* target, size_t offset, uint8_t value) {
 
 extern "C" __declspec(dllexport) int ScreenAiRecognize(
     const wchar_t* component_dir,
-    const uint8_t* bgra_pixels,
+    const uint8_t* rgba_pixels,
     int32_t width,
     int32_t height,
     uint8_t** output,
@@ -231,7 +231,7 @@ extern "C" __declspec(dllexport) int ScreenAiRecognize(
   if (error) {
     *error = nullptr;
   }
-  if (!output || !output_length || !bgra_pixels || width <= 0 || height <= 0) {
+  if (!output || !output_length || !rgba_pixels || width <= 0 || height <= 0) {
     if (error) {
       *error = CopyCString("Invalid ScreenAI OCR input");
     }
@@ -245,7 +245,14 @@ extern "C" __declspec(dllexport) int ScreenAiRecognize(
   const uint64_t pixel_count =
       static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
   std::vector<uint8_t> pixels(pixel_count);
-  std::memcpy(pixels.data(), bgra_pixels, pixels.size());
+  
+  // Fast C++ byte swap from RGBA to BGRA
+  for (size_t i = 0; i < pixel_count; i += 4) {
+    pixels[i]     = rgba_pixels[i + 2]; // B
+    pixels[i + 1] = rgba_pixels[i + 1]; // G
+    pixels[i + 2] = rgba_pixels[i];     // R
+    pixels[i + 3] = rgba_pixels[i + 3]; // A
+  }
 
   uint8_t bitmap[56] = {};
   uint8_t pixel_ref[104] = {};

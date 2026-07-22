@@ -52,6 +52,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _screenAiAvailable = false;
   bool _loading = true;
   bool _importing = false;
+  bool _cropImageBeforeMining = false;
   late DictionaryPopupPreferences _popupPreferences;
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
   AnkiAudioPreferences _ankiAudioPreferences = AnkiAudioPreferences.defaults;
@@ -91,6 +92,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getDictionaryProfiles(),
       MiningPreferences.getActiveDictionaryProfile(),
       MiningPreferences.getMokuroWebsiteOcrEnabled(),
+      MiningPreferences.getCropImageBeforeMining(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -117,6 +119,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _lookupTrigger = values[14] as DictionaryLookupTrigger;
       _additionalLeftClick = values[15] as bool;
       _dictionaryLanguage = values[16] as String;
+      _cropImageBeforeMining = values[20] as bool;
       _loading = false;
     });
     if (widget.section == DictionarySettingsSection.anki) {
@@ -1587,6 +1590,16 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         _saveAnki(_ankiProfile.copyWith(checkAllModels: value)),
                   ),
                 ],
+                SwitchListTile(
+                  secondary: const Icon(Icons.crop_outlined),
+                  title: const Text('Crop manga image before mining'),
+                  subtitle: const Text('Manually crop the page before sending to Anki'),
+                  value: _cropImageBeforeMining,
+                  onChanged: (value) async {
+                    setState(() => _cropImageBeforeMining = value);
+                    await MiningPreferences.setCropImageBeforeMining(value);
+                  },
+                ),
                 SwitchListTile(
                   title: const Text('Sync after adding a note'),
                   value: _ankiProfile.syncOnCreate,

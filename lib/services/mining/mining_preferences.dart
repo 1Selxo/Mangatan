@@ -225,6 +225,9 @@ class MiningPreferences {
   static const _showPitchNumber = 'dictionary_pitch_number';
   static const _showPitchText = 'dictionary_pitch_text';
 
+  // NEW: Feature flag for cropping image before mining
+  static const _cropImageBeforeMining = 'crop_image_before_mining';
+
   static String? _storageDirectory;
   static int _snapshotSequence = 0;
 
@@ -376,6 +379,23 @@ class MiningPreferences {
     }
     final box = await _boxOrNull();
     return box == null ? null : _MiningPreferencesReader.box(box);
+  }
+
+  // NEW: Getter/Setter for crop before mining
+  static Future<bool> getCropImageBeforeMining({
+    bool readOnly = false,
+    MiningPreferencesSnapshot? snapshot,
+  }) async {
+    return (await _reader(
+              readOnly: readOnly,
+              snapshot: snapshot,
+            ))?.get(_cropImageBeforeMining, defaultValue: false)
+            as bool? ??
+        false;
+  }
+
+  static Future<void> setCropImageBeforeMining(bool value) async {
+    await (await _boxOrNull())?.put(_cropImageBeforeMining, value);
   }
 
   static Future<String> getJimakuApiKey({

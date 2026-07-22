@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
+import 'package:crop_image/crop_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -444,6 +446,36 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
         return false;
       }
+
+      MiningContext effectiveContext = miningContext;
+      final cropEnabled = await MiningPreferences.getCropImageBeforeMining();
+      
+      // NEW: Only trigger the crop dialog if the media type is explicitly Manga
+      final isManga = effectiveContext.mediaType == MiningMediaType.manga;
+
+      // Intercept image load to crop if preference is enabled AND we are reading manga
+      if (cropEnabled && isManga && effectiveContext.imageBytesLoader != null) {
+        final rawBytes = await effectiveContext.imageBytesLoader!();
+        if (rawBytes != null && rawBytes.isNotEmpty) {
+          if (!mounted) return false;
+
+          final croppedBytes = await _showCropDialog(
+            context: context,
+            imageBytes: rawBytes,
+          );
+
+          if (croppedBytes != null) {
+            // Override the image bytes loader for AnkiCardBuilder
+            effectiveContext = effectiveContext.copyWith(
+              imageBytesLoader: () => croppedBytes,
+            );
+          } else {
+            // User cancelled cropping, abort mining
+            return false;
+          }
+        }
+      }
+
       final dictionaryMedia = await _loadAnkiDictionaryMedia(
         content['dictionaryMedia'],
       );
@@ -456,7 +488,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       );
       final draft = await const AnkiCardBuilder().build(
         result: result,
-        context: miningContext,
+        context: effectiveContext, // Use the cropped effectiveContext
         profile: profile,
         renderedContent: content,
         dictionaryMedia: dictionaryMedia,
@@ -1232,4 +1264,358 @@ class _HoshiPopupData {
   const _HoshiPopupData({required this.html});
 
   final String html;
+}
+
+Future<Uint8List?> _showCropDialog({
+  required BuildContext context,
+  required Uint8List imageBytes,
+}) async {
+  final controller = CropController(
+    aspectRatio: null, // Free crop by default
+    defaultCrop: const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9),
+  );
+
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+  final screenSize = MediaQuery.sizeOf(context);
+
+  // Maximize vertical space for portrait manga pages while leaving a small screen margin
+  final double height = (screenSize.height - 48.0).clamp(320.0, 1200.0);
+  final double width = (screenSize.width - 64.0).clamp(320.0, 1100.0);
+
+  return showDialog<Uint8List>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      _CropAspectMode aspectMode = _CropAspectMode.free;
+      bool cropping = false;
+
+      return StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> handleCrop() async {
+            setState(() => cropping = true);
+            try {
+              final ui.Image bitmap = await controller.croppedBitmap();
+              final byteData =
+                  await bitmap.toByteData(format: ui.ImageByteFormat.png);
+              if (!context.mounted) return;
+              if (byteData != null) {
+                Navigator.pop(context, byteData.buffer.asUint8List());
+              } else {
+                botToast('Could not crop image: empty result', second: 4);
+                setState(() => cropping = false);
+              }
+            } catch (e) {
+              if (!context.mounted) return;
+              botToast('Could not crop image: $e', second: 4);
+              setState(() => cropping = false);
+            }
+          }
+
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: colorScheme.surface,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: width, maxHeight: height),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.crop, color: colorScheme.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Crop Screenshot', style: theme.textTheme.titleMedium),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: ColoredBox(
+                          color: colorScheme.surfaceContainerHighest,
+                          child: CropImage(
+                            controller: controller,
+                            image: Image.memory(imageBytes),
+                            paddingSize: 8.0,
+                            alwaysMove: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _CropToolGroup(
+                          colorScheme: colorScheme,
+                          children: [
+                            _CropToolButton(
+                              tooltip: 'Free aspect ratio',
+                              icon: Icons.aspect_ratio,
+                              colorScheme: colorScheme,
+                              selected: aspectMode == _CropAspectMode.free,
+                              onPressed: () {
+                                controller.aspectRatio = null;
+                                controller.crop =
+                                    const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+                                setState(() => aspectMode = _CropAspectMode.free);
+                              },
+                            ),
+                            _CropToolButton(
+                              tooltip: 'Square aspect ratio',
+                              icon: Icons.crop_square,
+                              colorScheme: colorScheme,
+                              selected: aspectMode == _CropAspectMode.square,
+                              onPressed: () {
+                                controller.aspectRatio = 1.0;
+                                controller.crop =
+                                    const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+                                setState(() => aspectMode = _CropAspectMode.square);
+                              },
+                            ),
+                          ],
+                        ),
+                        _CropToolGroup(
+                          colorScheme: colorScheme,
+                          children: [
+                            _CropToolButton(
+                              tooltip: 'Rotate left',
+                              icon: Icons.rotate_90_degrees_ccw_outlined,
+                              colorScheme: colorScheme,
+                              onPressed: () => controller.rotateLeft(),
+                            ),
+                            _CropToolButton(
+                              tooltip: 'Rotate right',
+                              icon: Icons.rotate_90_degrees_cw_outlined,
+                              colorScheme: colorScheme,
+                              onPressed: () => controller.rotateRight(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: cropping ? null : () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: cropping ? null : handleCrop,
+                          icon: cropping
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.check, size: 18),
+                          label: Text(cropping ? 'Cropping…' : 'Crop'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+enum _CropAspectMode { free, square }
+
+class _CropToolbar extends StatefulWidget {
+  const _CropToolbar({required this.controller, required this.colorScheme});
+
+  final CropController controller;
+  final ColorScheme colorScheme;
+
+  @override
+  State<_CropToolbar> createState() => _CropToolbarState();
+}
+
+class _CropToolbarState extends State<_CropToolbar> {
+  _CropAspectMode _mode = _CropAspectMode.free;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _CropToolGroup(
+          colorScheme: widget.colorScheme,
+          children: [
+            _CropToolButton(
+              tooltip: 'Free aspect ratio',
+              icon: Icons.aspect_ratio,
+              colorScheme: widget.colorScheme,
+              selected: _mode == _CropAspectMode.free,
+              onPressed: () {
+                widget.controller.aspectRatio = null;
+                widget.controller.crop = const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+                setState(() => _mode = _CropAspectMode.free);
+              },
+            ),
+            _CropToolButton(
+              tooltip: 'Square aspect ratio',
+              icon: Icons.crop_square,
+              colorScheme: widget.colorScheme,
+              selected: _mode == _CropAspectMode.square,
+              onPressed: () {
+                widget.controller.aspectRatio = 1.0;
+                widget.controller.crop = const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+                setState(() => _mode = _CropAspectMode.square);
+              },
+            ),
+          ],
+        ),
+        _CropToolGroup(
+          colorScheme: widget.colorScheme,
+          children: [
+            _CropToolButton(
+              tooltip: 'Rotate left',
+              icon: Icons.rotate_90_degrees_ccw_outlined,
+              colorScheme: widget.colorScheme,
+              onPressed: widget.controller.rotateLeft,
+            ),
+            _CropToolButton(
+              tooltip: 'Rotate right',
+              icon: Icons.rotate_90_degrees_cw_outlined,
+              colorScheme: widget.colorScheme,
+              onPressed: widget.controller.rotateRight,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CropActionsRow extends StatefulWidget {
+  const _CropActionsRow({required this.controller, required this.colorScheme});
+
+  final CropController controller;
+  final ColorScheme colorScheme;
+
+  @override
+  State<_CropActionsRow> createState() => _CropActionsRowState();
+}
+
+class _CropActionsRowState extends State<_CropActionsRow> {
+  bool _cropping = false;
+
+  Future<void> _handleCrop() async {
+    setState(() => _cropping = true);
+    try {
+      final ui.Image bitmap = await widget.controller.croppedBitmap();
+      final byteData = await bitmap.toByteData(format: ui.ImageByteFormat.png);
+      if (!mounted) return;
+      if (byteData != null) {
+        Navigator.pop(context, byteData.buffer.asUint8List());
+        return;
+      }
+      botToast('Could not crop image: empty result', second: 4);
+    } catch (e) {
+      if (!mounted) return;
+      botToast('Could not crop image: $e', second: 4);
+    } finally {
+      if (mounted) setState(() => _cropping = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        TextButton(
+          onPressed: _cropping ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        const SizedBox(width: 8),
+        FilledButton.icon(
+          onPressed: _cropping ? null : _handleCrop,
+          icon: _cropping
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.check, size: 18),
+          label: Text(_cropping ? 'Cropping…' : 'Crop'),
+        ),
+      ],
+    );
+  }
+}
+
+class _CropToolGroup extends StatelessWidget {
+  const _CropToolGroup({required this.colorScheme, required this.children});
+
+  final ColorScheme colorScheme;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(mainAxisSize: MainAxisSize.min, children: children),
+      ),
+    );
+  }
+}
+
+class _CropToolButton extends StatelessWidget {
+  const _CropToolButton({
+    required this.tooltip,
+    required this.icon,
+    required this.colorScheme,
+    required this.onPressed,
+    this.selected = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final ColorScheme colorScheme;
+  final VoidCallback onPressed;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: selected ? colorScheme.primaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(
+              icon,
+              size: 20,
+              color: selected
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

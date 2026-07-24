@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 
@@ -10,6 +11,7 @@ void showAndroidProxyServerDialog(
   final l10n = l10nLocalizations(context)!;
   final serverController = TextEditingController(text: proxyServer);
   String server = proxyServer;
+  String? validationError;
   showDialog(
     context: context,
     builder: (context) => StatefulBuilder(
@@ -33,9 +35,11 @@ void showAndroidProxyServerDialog(
                     autofocus: true,
                     onChanged: (value) => setState(() {
                       server = value;
+                      validationError = null;
                     }),
                     decoration: InputDecoration(
                       hintText: l10n.proxy_server_ip_hint,
+                      errorText: validationError,
                       filled: false,
                       contentPadding: const EdgeInsets.all(12),
                       enabledBorder: OutlineInputBorder(
@@ -60,12 +64,14 @@ void showAndroidProxyServerDialog(
                     width: context.width(1),
                     child: ElevatedButton(
                       onPressed: () {
-                        final segments = server.split('/');
-                        if (segments.isNotEmpty && segments.last.isEmpty) {
-                          segments.removeLast();
+                        try {
+                          onConfirm(normalizeMihonBridgeBaseUrl(server));
+                          Navigator.pop(context);
+                        } on FormatException catch (error) {
+                          setState(() {
+                            validationError = error.message.toString();
+                          });
                         }
-                        onConfirm(segments.join('/'));
-                        Navigator.pop(context);
                       },
                       child: Text(l10n.dialog_confirm),
                     ),

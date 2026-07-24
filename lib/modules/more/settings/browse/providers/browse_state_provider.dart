@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
@@ -13,29 +14,22 @@ part 'browse_state_provider.g.dart';
 class AndroidProxyServerState extends _$AndroidProxyServerState {
   @override
   String build() {
-    String proxyServer =
-        isar.settings.getSync(227)!.androidProxyServer ??
-        "http://127.0.0.1:8080";
-    if (!proxyServer.startsWith("http")) {
-      proxyServer = "http://$proxyServer";
-    }
-    if ((proxyServer.contains("localhost") ||
-            RegExp(
-              r'^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$',
-            ).hasMatch(proxyServer.replaceAll("://", ":").split(":")[1])) &&
-        proxyServer.split(":").length < 3) {
-      proxyServer = "$proxyServer:8080";
-    }
-    return proxyServer;
+    final savedAddress = isar.settings.getSync(227)!.androidProxyServer;
+    return normalizeMihonBridgeBaseUrl(
+      savedAddress == null || savedAddress.trim().isEmpty
+          ? "http://127.0.0.1:8080"
+          : savedAddress,
+    );
   }
 
   void set(String value) {
+    final proxyServer = normalizeMihonBridgeBaseUrl(value);
     final settings = isar.settings.getSync(227);
-    state = value;
+    state = proxyServer;
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
-          ..androidProxyServer = value
+          ..androidProxyServer = proxyServer
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );

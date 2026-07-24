@@ -7,15 +7,23 @@ void main() {
   group('Mihon bridge HTTP client', () {
     test('normalizes APKBridge base URLs', () {
       expect(
-        mihonBridgeDalvikUri('http://192.168.1.20:8080/').toString(),
+        normalizeMihonBridgeBaseUrl('192.168.1.20'),
+        'http://192.168.1.20:8080',
+      );
+      expect(
+        normalizeMihonBridgeBaseUrl('http://192.168.1.20:3710/dalvik/'),
+        'http://192.168.1.20:3710',
+      );
+      expect(
+        mihonBridgeDalvikUri('http://192.168.1.20/').toString(),
         'http://192.168.1.20:8080/dalvik',
       );
       expect(
         mihonBridgeDalvikUri('https://bridge.example/base///').toString(),
-        'https://bridge.example/base/dalvik',
+        'https://bridge.example:8080/dalvik',
       );
       expect(
-        () => mihonBridgeDalvikUri('192.168.1.20:8080'),
+        () => mihonBridgeDalvikUri('ftp://192.168.1.20'),
         throwsFormatException,
       );
     });
@@ -83,6 +91,36 @@ void main() {
         throwsA(isA<FormatException>()),
       );
       expect(applicationRequests, 1);
+    });
+
+    test('turns an HTML response into an actionable bridge error', () async {
+      final client = MockClient(
+        (request) async => http.Response(
+          '<html>not APKBridge</html>',
+          200,
+          headers: const {'content-type': 'text/html'},
+        ),
+      );
+
+      await expectLater(
+        postMihonBridge(
+          client,
+          Uri.parse('http://192.168.1.20:8080/dalvik'),
+        ),
+        throwsA(
+          isA<MihonBridgeResponseException>()
+              .having(
+                (error) => error.message,
+                'message',
+                contains('not APKBridge'),
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('port 8080'),
+              ),
+        ),
+      );
     });
   });
 }

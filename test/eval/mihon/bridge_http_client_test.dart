@@ -20,7 +20,17 @@ void main() {
       );
       expect(
         mihonBridgeDalvikUri('https://bridge.example/base///').toString(),
-        'https://bridge.example:8080/dalvik',
+        'https://bridge.example/dalvik',
+      );
+      expect(
+        normalizeMihonBridgeBaseUrl('https://bridge.mangayomi.30062022.xyz/'),
+        'https://bridge.mangayomi.30062022.xyz',
+      );
+      expect(
+        mihonBridgeDalvikUri(
+          'https://bridge.mangayomi.30062022.xyz/',
+        ).toString(),
+        'https://bridge.mangayomi.30062022.xyz/dalvik',
       );
       expect(
         () => mihonBridgeDalvikUri('ftp://192.168.1.20'),
@@ -103,10 +113,7 @@ void main() {
       );
 
       await expectLater(
-        postMihonBridge(
-          client,
-          Uri.parse('http://192.168.1.20:8080/dalvik'),
-        ),
+        postMihonBridge(client, Uri.parse('http://192.168.1.20:8080/dalvik')),
         throwsA(
           isA<MihonBridgeResponseException>()
               .having(
@@ -118,6 +125,11 @@ void main() {
                 (error) => error.message,
                 'message',
                 contains('port 8080'),
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('hosted HTTPS bridges'),
               ),
         ),
       );

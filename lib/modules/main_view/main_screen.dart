@@ -24,6 +24,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/sync_server.dart';
+import 'package:mangayomi/utils/app_font_fallback.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
@@ -592,6 +593,7 @@ class _DownloadedOnlyBar extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.white,
                   fontFamily: GoogleFonts.aBeeZee().fontFamily,
+                  fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),
             ),
@@ -631,6 +633,7 @@ class _IncognitoModeBar extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.white,
                   fontFamily: GoogleFonts.aBeeZee().fontFamily,
+                  fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),
             ),

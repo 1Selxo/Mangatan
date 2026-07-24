@@ -35,11 +35,18 @@ String normalizeMihonBridgeBaseUrl(String value) {
     throw FormatException('Invalid APKBridge address: $value');
   }
 
-  return Uri(
-    scheme: uri.scheme,
-    host: uri.host,
-    port: uri.hasPort ? uri.port : 8080,
-  ).toString();
+  final usesApkBridgeDefaultPort =
+      uri.host == 'localhost' ||
+      uri.host.endsWith('.local') ||
+      !uri.host.contains('.') ||
+      InternetAddress.tryParse(uri.host) != null;
+  final port = uri.hasPort
+      ? uri.port
+      : usesApkBridgeDefaultPort
+      ? 8080
+      : null;
+
+  return Uri(scheme: uri.scheme, host: uri.host, port: port).toString();
 }
 
 Uri mihonBridgeDalvikUri(String baseUrl) {
@@ -98,9 +105,10 @@ void _validateMihonBridgeResponse(http.Response response, Uri uri) {
         ? 'APKBridge failed while running the Mihon extension'
         : 'the configured server is not APKBridge';
     throw MihonBridgeResponseException(
-      '$reason (HTTP ${response.statusCode} at $uri). Start APKBridge on the '
-      'Android device, then use the address shown in APKBridge including '
-      'port 8080, for example http://192.168.1.20:8080.',
+      '$reason (HTTP ${response.statusCode} at $uri). Use the complete bridge '
+      'URL. Direct Android-device addresses normally use port 8080, for '
+      'example http://192.168.1.20:8080; hosted HTTPS bridges normally do not '
+      'need an explicit port.',
     );
   }
 

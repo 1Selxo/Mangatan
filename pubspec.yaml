@@ -149,6 +149,10 @@ flutter:
       platforms: [android]
     - assets/trackers_icons/
     - assets/app_icons/
+  fonts:
+    - family: MangatanCJK
+      fonts:
+        - asset: assets/fonts/subfont.ttf
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true

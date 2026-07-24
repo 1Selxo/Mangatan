@@ -52,7 +52,8 @@ jobs:
         run: |
           flutter test \
             test/eval/dart/m_manga_bridge_test.dart \
-            test/eval/mihon
+            test/eval/mihon \
+            test/utils/app_font_fallback_test.dart
 
       - name: Verify native dictionary source
         run: test -f third_party/hoshidicts/CMakeLists.txt

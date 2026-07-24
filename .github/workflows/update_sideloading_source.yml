@@ -4,6 +4,9 @@ on:
   workflow_call:
   workflow_dispatch: # Allow manual triggering of this workflow
 
+permissions:
+  contents: write
+
 jobs:
   update-source:
     runs-on: ubuntu-latest
@@ -14,12 +17,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-  
-      - name: Get Latest Release Tag
-        run: echo "RELEASE_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-        
+
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -39,6 +39,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes detected, skipping commit."
           else
-            git commit -m "source update: $RELEASE_TAG"
+            git commit -m "source update: ${{ github.ref_name }}"
             git push
           fi

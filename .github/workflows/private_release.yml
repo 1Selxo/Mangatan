@@ -17,6 +17,10 @@ env:
   FLUTTER_RUST_BRIDGE_VERSION: "2.12.0"
 
 jobs:
+  ios:
+    name: iOS IPA
+    uses: ./.github/workflows/ios-sideload.yml
+
   android:
     name: Android APKs
     runs-on: ubuntu-latest
@@ -130,7 +134,7 @@ jobs:
   release:
     name: Publish private release
     if: startsWith(github.ref, 'refs/tags/private-v')
-    needs: [android, windows]
+    needs: [android, windows, ios]
     runs-on: ubuntu-latest
     steps:
       - name: Download packages

@@ -9,9 +9,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
-env:
-  ZSIGN_VERSION: "0.7"
-
 jobs:
   build-and-release-android-apks:
     permissions:
@@ -88,78 +85,7 @@ jobs:
   build-and-release-ios-ipa:
     permissions:
       contents: write
-    runs-on: macos-15
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          architecture: x64
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios,x86_64-apple-ios
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
-          cache-on-failure: true
-
-      - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen
-
-      - name: Select latest Xcode
-        run: |
-          latest_xcode="$(find /Applications -maxdepth 1 -name 'Xcode*.app' | sort | tail -n 1)"
-          sudo xcode-select --switch "$latest_xcode"
-          echo "Selected $latest_xcode"
-
-      - name: Print Xcode version
-        run: xcodebuild -version
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      - name: Setup signing environment
-        env:
-          P12_BASE64: ${{ secrets.P12_CERTIFICATE }}
-          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE }}
-        run: |
-          echo "$P12_BASE64" | base64 -d > certificate.p12
-          echo "$PROVISIONING_PROFILE_BASE64" | base64 -d > profile.mobileprovision
-          curl -L -o zsign.zip "https://github.com/zhlynn/zsign/releases/download/v${{ env.ZSIGN_VERSION }}/zsign-v${{ env.ZSIGN_VERSION }}-macos-x64.zip"
-          unzip zsign.zip
-          chmod +x zsign || chmod +x zsign-*
-
-      - name: Build iOS
-        env:
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-        run: |
-          flutter build ios --release --no-codesign
-          mkdir -p build/ios/iphoneos/Payload
-          mv build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
-          ./zsign -f -k ./certificate.p12 -p "$P12_PASSWORD" -m ./profile.mobileprovision ./build/ios/iphoneos/Payload/Runner.app
-          cd build/ios/iphoneos
-          zip -r Mangatan-${{ github.ref_name }}-ios.ipa Payload
-
-      - name: Upload artifact iOS IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mangatan-${{ github.ref_name }}-ios
-          path: "build/ios/iphoneos/Mangatan-*.ipa"
-
-      - name: Release package iOS IPA
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "build/ios/iphoneos/Mangatan-*.ipa"
-          allowUpdates: true
+    uses: ./.github/workflows/ios-sideload.yml
 
   build-and-release-macos-dmg:
     permissions:
@@ -502,4 +428,6 @@ jobs:
 
   ios-source-build:
     needs: build-and-release-ios-ipa
+    permissions:
+      contents: write
     uses: ./.github/workflows/update_sideloading_source.yml

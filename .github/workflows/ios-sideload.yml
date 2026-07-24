@@ -82,7 +82,8 @@ jobs:
 
           safe_ref="${GITHUB_REF_NAME//\//-}"
           ipa_name="Mangatan-${safe_ref}-ios.ipa"
-          release_tag="ios-v${app_version}-build.${app_build}"
+          short_sha="${GITHUB_SHA:0:7}"
+          release_tag="ios-v${app_version}-build.${app_build}-${short_sha}"
           package_dir="$RUNNER_TEMP/mangatan-ipa"
           app_path="$GITHUB_WORKSPACE/build/ios/Build/Products/Release-iphoneos/Runner.app"
 

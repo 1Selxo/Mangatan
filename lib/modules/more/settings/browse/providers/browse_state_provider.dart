@@ -1,16 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http_interceptor/http_interceptor.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/services/extension_repository_catalog.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/services/http/m_client.dart';
-import 'package:mangayomi/services/extension_store_service.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'browse_state_provider.g.dart';
 
@@ -18,30 +13,43 @@ part 'browse_state_provider.g.dart';
 class AndroidProxyServerState extends _$AndroidProxyServerState {
   @override
   String build() {
-    String proxyServer =
-        isar.settings.getSync(227)!.androidProxyServer ??
-        "http://127.0.0.1:8080";
-    if (!proxyServer.startsWith("http")) {
-      proxyServer = "http://$proxyServer";
-    }
-    if ((proxyServer.contains("localhost") ||
-            RegExp(r'^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$')
-                .hasMatch(proxyServer.replaceAll("://", ":").split(":")[1])) &&
-        proxyServer.split(":").length < 3) {
-      proxyServer = "$proxyServer:8080";
-    }
-    return proxyServer;
+    // The embedded iOS bridge outlives any individual source provider.
+    ref.keepAlive();
+    final savedAddress = isar.settings.getSync(227)!.androidProxyServer;
+    return normalizeMihonBridgeBaseUrl(
+      savedAddress == null || savedAddress.trim().isEmpty
+          ? "http://127.0.0.1:8080"
+          : savedAddress,
+    );
   }
 
+  String get currentValue => state;
+
   void set(String value) {
+    final proxyServer = normalizeMihonBridgeBaseUrl(value);
     final settings = isar.settings.getSync(227);
-    state = value;
+    state = proxyServer;
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
-          ..androidProxyServer = value
+          ..androidProxyServer = proxyServer
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
+    );
+  }
+
+  /// Changes the address used by the running app without overwriting the
+  /// user's external bridge fallback in the database.
+  void setRuntime(String value) {
+    state = normalizeMihonBridgeBaseUrl(value);
+  }
+
+  void restoreSaved() {
+    final savedAddress = isar.settings.getSync(227)!.androidProxyServer;
+    state = normalizeMihonBridgeBaseUrl(
+      savedAddress == null || savedAddress.trim().isEmpty
+          ? "http://127.0.0.1:8080"
+          : savedAddress,
     );
   }
 }
@@ -189,24 +197,22 @@ class CheckForExtensionsUpdateState extends _$CheckForExtensionsUpdateState {
 Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
 
-  if (['/.min.json', '.pb'].any((suffix) => jsonUrl.endsWith(suffix))) {
-    final result = await ExtensionStoreService.fetchStore(jsonUrl, http);
-    if (result != null) {
-      return Repo(
-        name: result.name,
-        website: result.website,
-        jsonUrl: result.indexUrl,
-      );
-    }
-  }
-
   Map<String, dynamic> infos = {};
   final match = RegExp(r'^(.*)/[^/]+\.json$').firstMatch(jsonUrl);
-
-  final res = await http.get(Uri.parse(jsonUrl));
-  if (!_checkValidUrl(res)) {
-    return null;
-  }
+  final catalog = await loadExtensionRepositoryCatalog(Uri.parse(jsonUrl), (
+    uri,
+  ) async {
+    final response = await http.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'Extension repository returned HTTP ${response.statusCode}.',
+      );
+    }
+    return response.bodyBytes;
+  });
+  if (catalog.entries.isEmpty) return null;
+  if (catalog.name?.isNotEmpty == true) infos['name'] = catalog.name;
+  if (catalog.website?.isNotEmpty == true) infos['website'] = catalog.website;
 
   if (match != null) {
     String url = match.group(1)!;
@@ -219,38 +225,3 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   infos["jsonUrl"] = jsonUrl;
   return Repo.fromJson(infos);
 }
-
-bool _checkValidUrl(Response res) {
-  try {
-    final sourceList = (jsonDecode(res.body) as List).map(
-      (e) => Source.fromJson(e),
-    );
-    if (sourceList.firstOrNull?.name == null) {
-      return false;
-    }
-  } catch (err) {
-    return false;
-  }
-  return true;
-}
-
-final isExtensionServerInstalledStreamProvider = StreamProvider<bool>((
-  ref,
-) async* {
-  if (!isDesktop) {
-    yield true;
-    return;
-  }
-  await for (final settings in isar.settings.watchObject(
-    227,
-    fireImmediately: true,
-  )) {
-    final jrePath = settings?.jrePath ?? '';
-    final serverPath = settings?.extensionServerPath ?? '';
-    if (jrePath.isEmpty || serverPath.isEmpty) {
-      yield false;
-    } else {
-      yield File(jrePath).existsSync() && File(serverPath).existsSync();
-    }
-  }
-});

@@ -46,8 +46,25 @@ jobs:
       - name: Verify native dictionary source
         run: test -f third_party/hoshidicts/CMakeLists.txt
 
+      - name: Configure iOS release
+        run: flutter build ios --release --no-codesign --config-only
+
+      - name: Install CocoaPods
+        working-directory: ios
+        run: pod install
+
       - name: Build unsigned iOS app
-        run: flutter build ios --release --no-codesign
+        run: |
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$GITHUB_WORKSPACE/build/ios" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=
 
       - name: Package IPA
         id: package
@@ -58,7 +75,7 @@ jobs:
           safe_ref="${GITHUB_REF_NAME//\//-}"
           ipa_name="Mangatan-${safe_ref}-ios.ipa"
           package_dir="$RUNNER_TEMP/mangatan-ipa"
-          app_path="$GITHUB_WORKSPACE/build/ios/iphoneos/Runner.app"
+          app_path="$GITHUB_WORKSPACE/build/ios/Build/Products/Release-iphoneos/Runner.app"
 
           test -d "$app_path"
           rm -rf "$package_dir"

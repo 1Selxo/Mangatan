@@ -72,8 +72,17 @@ jobs:
         run: |
           set -euo pipefail
 
+          version_value=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -1)
+          app_version="${version_value%%+*}"
+          if [[ "$version_value" == *"+"* ]]; then
+            app_build="${version_value##*+}"
+          else
+            app_build="0"
+          fi
+
           safe_ref="${GITHUB_REF_NAME//\//-}"
           ipa_name="Mangatan-${safe_ref}-ios.ipa"
+          release_tag="ios-v${app_version}-build.${app_build}"
           package_dir="$RUNNER_TEMP/mangatan-ipa"
           app_path="$GITHUB_WORKSPACE/build/ios/Build/Products/Release-iphoneos/Runner.app"
 
@@ -95,6 +104,9 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/release-ios"
           mv "$package_dir/$ipa_name" "$GITHUB_WORKSPACE/release-ios/$ipa_name"
           echo "ipa_name=$ipa_name" >> "$GITHUB_OUTPUT"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+          echo "app_build=$app_build" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
@@ -111,3 +123,20 @@ jobs:
           files: release-ios/${{ steps.package.outputs.ipa_name }}
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Publish IPA to iOS release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.package.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          name: Mangatan iOS ${{ steps.package.outputs.app_version }} (${{ steps.package.outputs.app_build }})
+          body: |
+            Unsigned Mangatan IPA for sideloading.
+
+            Built from `${{ github.sha }}`. Sign the IPA with your preferred
+            sideloading tool before installation.
+          files: release-ios/${{ steps.package.outputs.ipa_name }}
+          fail_on_unmatched_files: true
+          prerelease: false
+          make_latest: true

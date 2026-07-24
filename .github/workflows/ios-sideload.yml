@@ -10,7 +10,7 @@ permissions:
 jobs:
   build-ios:
     name: iOS IPA
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Check out source and submodules
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          architecture: x64
+          architecture: arm64
           cache: true
 
       - name: Set up Rust

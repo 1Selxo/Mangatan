@@ -12,6 +12,11 @@ const mihonBridgeRetryDelays = [
   Duration(seconds: 8),
 ];
 
+const mihonBridgeGatewayRetryDelays = [
+  Duration(milliseconds: 500),
+  Duration(milliseconds: 1500),
+];
+
 bool isLoopbackMihonBridge(String baseUrl) {
   final host = Uri.tryParse(normalizeMihonBridgeBaseUrl(baseUrl))?.host;
   return host == InternetAddress.loopbackIPv4.address ||
@@ -35,11 +40,7 @@ String normalizeMihonBridgeBaseUrl(String value) {
     throw FormatException('Invalid APKBridge address: $value');
   }
 
-  final usesApkBridgeDefaultPort =
-      uri.host == 'localhost' ||
-      uri.host.endsWith('.local') ||
-      !uri.host.contains('.') ||
-      InternetAddress.tryParse(uri.host) != null;
+  final usesApkBridgeDefaultPort = _isDirectMihonBridgeHost(uri.host);
   final port = uri.hasPort
       ? uri.port
       : usesApkBridgeDefaultPort
@@ -61,35 +62,46 @@ Future<http.Response> postMihonBridge(
   Map<String, String>? headers,
   bool retryTransientFailures = false,
   List<Duration> retryDelays = mihonBridgeRetryDelays,
+  List<Duration> gatewayRetryDelays = mihonBridgeGatewayRetryDelays,
   Future<void> Function(Duration) delay = Future<void>.delayed,
 }) async {
-  Object? lastError;
-  StackTrace? lastStackTrace;
-
-  for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
+  var transportRetries = 0;
+  var gatewayRetries = 0;
+  while (true) {
     try {
-      final response = await client.post(uri, body: body, headers: headers);
+      final response = await client.post(
+        uri,
+        body: body,
+        headers: _bridgeRequestHeaders(headers),
+      );
       _validateMihonBridgeResponse(response, uri);
       return response;
-    } catch (error, stackTrace) {
-      if (!retryTransientFailures || !isTransientBridgeTransportError(error)) {
+    } catch (error) {
+      Duration? retryDelay;
+      if (retryTransientFailures &&
+          isTransientBridgeTransportError(error) &&
+          transportRetries < retryDelays.length) {
+        retryDelay = retryDelays[transportRetries++];
+      } else if (isTransientMihonBridgeGatewayError(error) &&
+          gatewayRetries < gatewayRetryDelays.length) {
+        retryDelay = gatewayRetryDelays[gatewayRetries++];
+      } else {
         rethrow;
       }
-      lastError = error;
-      lastStackTrace = stackTrace;
-      if (attempt < retryDelays.length) {
-        await delay(retryDelays[attempt]);
-      }
+      await delay(retryDelay);
     }
   }
-
-  Error.throwWithStackTrace(lastError!, lastStackTrace!);
 }
 
 bool isTransientBridgeTransportError(Object error) {
   return error is SocketException ||
       error is TimeoutException ||
       error is http.ClientException;
+}
+
+bool isTransientMihonBridgeGatewayError(Object error) {
+  return error is MihonBridgeResponseException &&
+      const {502, 503, 504}.contains(error.statusCode);
 }
 
 void _validateMihonBridgeResponse(http.Response response, Uri uri) {
@@ -100,6 +112,21 @@ void _validateMihonBridgeResponse(http.Response response, Uri uri) {
       bodyStart.startsWith('<html') ||
       bodyStart.startsWith('<!doctype html');
 
+  if (const {502, 503, 504}.contains(response.statusCode)) {
+    final hosted = !_isDirectMihonBridgeHost(uri.host);
+    throw MihonBridgeResponseException(
+      hosted
+          ? 'The hosted APKBridge gateway is unavailable (HTTP '
+                '${response.statusCode} at $uri). The URL is valid, but its '
+                'backend could not run the extension. Try again later, choose '
+                'another hosted bridge, or use APKBridge on an Android device.'
+          : 'APKBridge is temporarily unavailable (HTTP '
+                '${response.statusCode} at $uri). Check the Android device and '
+                'try again.',
+      statusCode: response.statusCode,
+    );
+  }
+
   if (returnedHtml) {
     final reason = response.statusCode >= 500
         ? 'APKBridge failed while running the Mihon extension'
@@ -109,6 +136,7 @@ void _validateMihonBridgeResponse(http.Response response, Uri uri) {
       'URL. Direct Android-device addresses normally use port 8080, for '
       'example http://192.168.1.20:8080; hosted HTTPS bridges normally do not '
       'need an explicit port.',
+      statusCode: response.statusCode,
     );
   }
 
@@ -117,14 +145,36 @@ void _validateMihonBridgeResponse(http.Response response, Uri uri) {
       'APKBridge rejected the extension request (HTTP '
       '${response.statusCode} at $uri). Check the APKBridge log and update '
       'both APKBridge and the Mihon extension.',
+      statusCode: response.statusCode,
     );
   }
 }
 
+bool _isDirectMihonBridgeHost(String host) {
+  return host == 'localhost' ||
+      host.endsWith('.local') ||
+      host.endsWith('.lan') ||
+      !host.contains('.') ||
+      InternetAddress.tryParse(host) != null;
+}
+
+Map<String, String> _bridgeRequestHeaders(Map<String, String>? headers) {
+  final result = <String, String>{...?headers};
+  final normalizedNames = result.keys.map((key) => key.toLowerCase()).toSet();
+  if (!normalizedNames.contains('content-type')) {
+    result['content-type'] = 'application/json; charset=utf-8';
+  }
+  if (!normalizedNames.contains('accept')) {
+    result['accept'] = 'application/json';
+  }
+  return result;
+}
+
 class MihonBridgeResponseException implements Exception {
-  const MihonBridgeResponseException(this.message);
+  const MihonBridgeResponseException(this.message, {this.statusCode});
 
   final String message;
+  final int? statusCode;
 
   @override
   String toString() => message;

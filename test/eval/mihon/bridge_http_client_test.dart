@@ -71,6 +71,35 @@ void main() {
       },
     );
 
+    test('sends JSON headers and retries transient hosted gateways', () async {
+      var requests = 0;
+      final delays = <Duration>[];
+      final client = MockClient((request) async {
+        requests++;
+        expect(request.headers['content-type'], contains('application/json'));
+        expect(request.headers['accept'], 'application/json');
+        if (requests < 3) {
+          return http.Response(
+            '<html>gateway unavailable</html>',
+            requests == 1 ? 502 : 503,
+            headers: const {'content-type': 'text/html'},
+          );
+        }
+        return http.Response('ok', 200);
+      });
+
+      final response = await postMihonBridge(
+        client,
+        Uri.parse('https://bridge.example/dalvik'),
+        body: '{}',
+        delay: (duration) async => delays.add(duration),
+      );
+
+      expect(response.body, 'ok');
+      expect(requests, 3);
+      expect(delays, mihonBridgeGatewayRetryDelays);
+    });
+
     test('does not retry a remote bridge or application error', () async {
       var remoteRequests = 0;
       final remoteClient = MockClient((request) async {
@@ -130,6 +159,38 @@ void main() {
                 (error) => error.message,
                 'message',
                 contains('hosted HTTPS bridges'),
+              ),
+        ),
+      );
+    });
+
+    test('explains a persistent hosted gateway failure', () async {
+      final client = MockClient(
+        (request) async => http.Response(
+          '<html>bad gateway</html>',
+          502,
+          headers: const {'content-type': 'text/html'},
+        ),
+      );
+
+      await expectLater(
+        postMihonBridge(
+          client,
+          Uri.parse('https://bridge.example/dalvik'),
+          gatewayRetryDelays: const [],
+        ),
+        throwsA(
+          isA<MihonBridgeResponseException>()
+              .having((error) => error.statusCode, 'status', 502)
+              .having(
+                (error) => error.message,
+                'message',
+                contains('URL is valid'),
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('another hosted bridge'),
               ),
         ),
       );

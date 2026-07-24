@@ -756,8 +756,8 @@ class _MobileBottomNavigation extends StatelessWidget {
       height: _getBottomNavigationHeight(isLongPressed, location),
       child: NavigationBarTheme(
         data: NavigationBarThemeData(
-          labelTextStyle: const WidgetStatePropertyAll(
-            TextStyle(overflow: TextOverflow.ellipsis),
+          labelTextStyle: WidgetStatePropertyAll(
+            appBottomNavigationLabelStyle(Theme.of(context), dest.length),
           ),
           indicatorShape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),

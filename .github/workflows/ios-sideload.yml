@@ -38,7 +38,7 @@ jobs:
       - name: Set up CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: "3.22.1"
+          cmake-version: "3.31.6"
 
       - name: Resolve Flutter dependencies
         run: flutter pub get

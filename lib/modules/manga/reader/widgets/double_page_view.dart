@@ -1,8 +1,11 @@
 import 'package:extended_image/extended_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_paged.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_colors.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_paged.dart';
@@ -39,6 +42,9 @@ class DoublePageView extends StatefulWidget {
   /// Whether to add top padding for the first page (vertical mode only).
   final bool addTopPadding;
 
+  /// Controls the left-to-right order of pages within a spread.
+  final ReadingDirection readingDirection;
+
   const DoublePageView({
     super.key,
     required this.pages,
@@ -47,6 +53,7 @@ class DoublePageView extends StatefulWidget {
     this.onFailedToLoadImage,
     this.isPagedMode = true,
     this.addTopPadding = true,
+    this.readingDirection = ReadingDirection.leftToRight,
   });
 
   /// Creates a paged mode double page view.
@@ -56,6 +63,7 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
+    this.readingDirection = ReadingDirection.leftToRight,
   }) : isPagedMode = true,
        addTopPadding = false;
 
@@ -67,13 +75,14 @@ class DoublePageView extends StatefulWidget {
     this.onLongPressData,
     this.onFailedToLoadImage,
     this.addTopPadding = true,
+    this.readingDirection = ReadingDirection.leftToRight,
   }) : isPagedMode = false;
 
   @override
-  State<DoublePageView> createState() => _DoublePageViewState();
+  State<DoublePageView> createState() => DoublePageViewState();
 }
 
-class _DoublePageViewState extends State<DoublePageView>
+class DoublePageViewState extends State<DoublePageView>
     with TickerProviderStateMixin {
   // Controllers for paged mode zoom
   late AnimationController _scaleAnimationController;
@@ -94,16 +103,6 @@ class _DoublePageViewState extends State<DoublePageView>
     };
   }
 
-  void _onScaleEnd(
-    BuildContext context,
-    ScaleEndDetails details,
-    PhotoViewControllerValue controllerValue,
-  ) {
-    if (controllerValue.scale! < 1) {
-      _photoViewScaleStateController.reset();
-    }
-  }
-
   double get pixelRatio => View.of(context).devicePixelRatio;
   Size get size => View.of(context).physicalSize / pixelRatio;
 
@@ -118,10 +117,7 @@ class _DoublePageViewState extends State<DoublePageView>
   void initState() {
     super.initState();
     if (widget.isPagedMode) {
-      _scaleAnimationController = AnimationController(
-        duration: _doubleTapAnimationDuration(),
-        vsync: this,
-      );
+      _scaleAnimationController = AnimationController(vsync: this);
       _animation = Tween(begin: 1.0, end: 2.0).animate(
         CurvedAnimation(curve: Curves.ease, parent: _scaleAnimationController),
       );
@@ -148,6 +144,7 @@ class _DoublePageViewState extends State<DoublePageView>
 
     setState(() {
       if (_scaleAnimationController.isAnimating) return;
+      _scaleAnimationController.duration = _doubleTapAnimationDuration();
 
       if (_photoViewController.scale == 1.0) {
         _scalePosition = _computeAlignmentByTapOffset(tapPosition);
@@ -200,23 +197,43 @@ class _DoublePageViewState extends State<DoublePageView>
   }
 
   Widget _buildPagedMode() {
-    return PhotoViewGallery.builder(
-      backgroundDecoration: const BoxDecoration(color: Colors.transparent),
-      itemCount: 1,
-      builder: (context, _) {
-        return PhotoViewGalleryPageOptions.customChild(
-          controller: _photoViewController,
-          scaleStateController: _photoViewScaleStateController,
-          basePosition: _scalePosition,
-          onScaleEnd: _onScaleEnd,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onDoubleTapDown: (details) => _toggleScale(details.globalPosition),
-            onDoubleTap: () {},
-            child: _buildPageRow(),
-          ),
-        );
-      },
+    return LayoutBuilder(
+      builder: (zoomContext, _) => PhotoViewGallery.builder(
+        backgroundDecoration: const BoxDecoration(color: Colors.transparent),
+        itemCount: 1,
+        builder: (context, _) {
+          return PhotoViewGalleryPageOptions.customChild(
+            controller: _photoViewController,
+            scaleStateController: _photoViewScaleStateController,
+            basePosition: _scalePosition,
+            minScale: readerMinimumZoomScale,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerSignal: (event) =>
+                  registerModifierWheelZoom(event, zoomContext: zoomContext),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onDoubleTapDown: (details) =>
+                    _toggleScale(details.globalPosition),
+                onDoubleTap: () {},
+                child: _buildPageRow(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  bool registerModifierWheelZoom(
+    PointerSignalEvent event, {
+    BuildContext? zoomContext,
+  }) {
+    return registerReaderModifierWheelZoom(
+      event,
+      zoomContext: zoomContext ?? context,
+      photoViewController: _photoViewController,
+      basePosition: _scalePosition,
     );
   }
 
@@ -233,13 +250,14 @@ class _DoublePageViewState extends State<DoublePageView>
   }
 
   Widget _buildPageRow() {
+    final pages = widget.readingDirection.isRtl
+        ? widget.pages.reversed
+        : widget.pages;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (widget.pages.isNotEmpty && widget.pages[0] != null)
-          Flexible(child: _buildPageImage(widget.pages[0]!)),
-        if (widget.pages.length > 1 && widget.pages[1] != null)
-          Flexible(child: _buildPageImage(widget.pages[1]!)),
+        for (final page in pages)
+          if (page != null) Flexible(child: _buildPageImage(page)),
       ],
     );
   }
@@ -250,6 +268,8 @@ class _DoublePageViewState extends State<DoublePageView>
 
     return ImageViewPaged(
       data: pageData,
+      enableGestures: false,
+      normalizeOcrPaintCoordinates: true,
       loadStateChanged: (state) {
         switch (state.extendedImageLoadState) {
           case LoadState.loading:
@@ -285,16 +305,21 @@ class _DoublePageViewState extends State<DoublePageView>
 
   Widget _buildFailedState(ExtendedImageState state, dynamic l10n) {
     widget.onFailedToLoadImage?.call(true);
+    final backgroundColor =
+        getBackgroundColor(widget.backgroundColor) ??
+        Theme.of(context).scaffoldBackgroundColor;
 
     return Container(
-      color: getBackgroundColor(widget.backgroundColor),
+      color: backgroundColor,
       height: context.height(0.8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             l10n.image_loading_error,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            style: TextStyle(
+              color: readerErrorForegroundColor(backgroundColor),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -321,7 +346,10 @@ class _DoublePageViewState extends State<DoublePageView>
           borderRadius: BorderRadius.circular(30),
         ),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Text(l10n.retry),
+        child: Text(
+          l10n.retry,
+          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+        ),
       ),
     );
   }

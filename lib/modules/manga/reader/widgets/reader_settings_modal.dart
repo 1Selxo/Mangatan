@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_popup_menu_button.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
@@ -47,10 +49,14 @@ class ReaderSettingsModal {
     required BuildContext context,
     required TickerProvider vsync,
     required ProviderListenable<ReaderMode?> currentReaderModeProvider,
+    required ProviderListenable<ReadingDirection?>
+    currentReadingDirectionProvider,
     required ValueNotifier<bool> autoScrollPage,
     required ValueNotifier<bool> autoScroll,
     required ValueNotifier<double> pageOffset,
     required void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged,
+    required void Function(ReadingDirection direction, WidgetRef ref)
+    onReadingDirectionChanged,
     required void Function(bool enabled, double offset) onAutoScrollSave,
     required VoidCallback onFullScreenToggle,
     required VoidCallback onAutoPageScroll,
@@ -62,6 +68,7 @@ class ReaderSettingsModal {
     }
 
     final l10n = l10nLocalizations(context)!;
+    unawaited(ReaderOcrState.initialize());
 
     await customDraggableTabBar(
       tabs: [
@@ -73,9 +80,11 @@ class ReaderSettingsModal {
         // Reading Mode Tab
         _ReadingModeTab(
           currentReaderModeProvider: currentReaderModeProvider,
+          currentReadingDirectionProvider: currentReadingDirectionProvider,
           autoScrollPage: autoScrollPage,
           pageOffset: pageOffset,
           onReaderModeChanged: onReaderModeChanged,
+          onReadingDirectionChanged: onReadingDirectionChanged,
           onAutoScrollSave: onAutoScrollSave,
           onAutoScroll: (val) {
             autoScroll.value = val;
@@ -106,17 +115,22 @@ class ReaderSettingsModal {
 /// Reading Mode Tab with Consumer for reactive updates.
 class _ReadingModeTab extends ConsumerWidget {
   final ProviderListenable<ReaderMode?> currentReaderModeProvider;
+  final ProviderListenable<ReadingDirection?> currentReadingDirectionProvider;
   final ValueNotifier<bool> autoScrollPage;
   final ValueNotifier<double> pageOffset;
   final void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged;
+  final void Function(ReadingDirection direction, WidgetRef ref)
+  onReadingDirectionChanged;
   final void Function(bool enabled, double offset) onAutoScrollSave;
   final void Function(bool val) onAutoScroll;
 
   const _ReadingModeTab({
     required this.currentReaderModeProvider,
+    required this.currentReadingDirectionProvider,
     required this.autoScrollPage,
     required this.pageOffset,
     required this.onReaderModeChanged,
+    required this.onReadingDirectionChanged,
     required this.onAutoScrollSave,
     required this.onAutoScroll,
   });
@@ -125,6 +139,7 @@ class _ReadingModeTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = l10nLocalizations(context)!;
     final readerMode = ref.watch(currentReaderModeProvider);
+    final readingDirection = ref.watch(currentReadingDirectionProvider);
     final usePageTapZones = ref.watch(usePageTapZonesStateProvider);
     final cropBorders = ref.watch(cropBordersStateProvider);
     final keepScreenOn = ref.watch(keepScreenOnReaderStateProvider);
@@ -144,8 +159,20 @@ class _ReadingModeTab extends ConsumerWidget {
                 onReaderModeChanged(value, ref);
               },
               value: readerMode,
-              list: ReaderMode.values,
+              list: ReaderModeExtension.selectableValues,
               itemText: (mode) => getReaderModeName(mode, context),
+            ),
+
+            CustomPopupMenuButton<ReadingDirection>(
+              label: l10n.reading_direction,
+              title: getReadingDirectionName(readingDirection!, context),
+              onSelected: (value) {
+                onReadingDirectionChanged(value, ref);
+              },
+              value: readingDirection,
+              list: ReadingDirection.values,
+              itemText: (direction) =>
+                  getReadingDirectionName(direction, context),
             ),
 
             // Crop Borders
@@ -430,6 +457,48 @@ class _GeneralTab extends ConsumerWidget {
               ),
               onChanged: (value) {
                 ref.read(showPagesNumberStateProvider.notifier).set(value);
+              },
+            ),
+
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderOcrState.outlineVisible,
+              builder: (context, outlineVisible, _) {
+                return SwitchListTile(
+                  value: outlineVisible,
+                  title: Text(
+                    'Show OCR box outlines',
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    unawaited(ReaderOcrState.setOutlineVisible(value));
+                  },
+                );
+              },
+            ),
+
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderOcrState.lookupOnHover,
+              builder: (context, lookupOnHover, _) {
+                return SwitchListTile(
+                  value: lookupOnHover,
+                  title: Text(
+                    'Lookup OCR text on hover',
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    unawaited(ReaderOcrState.setLookupOnHover(value));
+                  },
+                );
               },
             ),
 

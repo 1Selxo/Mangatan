@@ -45,13 +45,19 @@ Future<void> customDraggableTabBar({
   required TickerProvider vsync,
   bool fullWidth = false,
   Widget? moreWidget,
+  int initialIndex = 0,
 }) async {
   final controller = DraggableMenuController();
+  final selectedIndex = initialIndex.clamp(0, tabs.length - 1).toInt();
   late TabController tabBarController;
-  tabBarController = TabController(length: tabs.length, vsync: vsync);
+  tabBarController = TabController(
+    length: tabs.length,
+    initialIndex: selectedIndex,
+    vsync: vsync,
+  );
   final maxHeight = context.height(0.8);
 
-  int index = 0;
+  int index = selectedIndex;
   List<Map<String, dynamic>> widgetsHeight = [];
 
   void refresh() {

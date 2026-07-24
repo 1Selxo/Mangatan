@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Go build script for Mangayomi
+# Go build script for Mangatan
 # It supports Linux, macOS, Windows, Android, and iOS builds.
 # to build, run:
 # ./build_go.sh [linux|macos|windows|android|ios] [--all]
@@ -46,7 +46,7 @@ check_prerequisites() {
     
     # Check if we're in the go directory
     if [ ! -f "go.mod" ]; then
-        log_error "go.mod not found. Run this script from the 'go' directory of the Mangayomi project."
+        log_error "go.mod not found. Run this script from the 'go' directory of the Mangatan project."
         exit 1
     fi
 }
@@ -286,7 +286,7 @@ done
 
 # Main
 main() {
-    log_info "Starting Go build for Mangayomi"
+    log_info "Starting Go build for Mangatan"
     
     check_prerequisites
     

@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 
 class DictionaryGlossary extends StatefulWidget {
   const DictionaryGlossary({
     super.key,
     required this.rawGlossary,
     required this.dictionaryName,
+    required this.profile,
     this.dictionaryCss = '',
     this.customCss = '',
     this.fontSize = 14,
@@ -16,6 +18,7 @@ class DictionaryGlossary extends StatefulWidget {
 
   final String rawGlossary;
   final String dictionaryName;
+  final DictionaryProfile profile;
   final String dictionaryCss;
   final String customCss;
   final double fontSize;
@@ -26,6 +29,7 @@ class DictionaryGlossary extends StatefulWidget {
 
 class _DictionaryGlossaryState extends State<DictionaryGlossary> {
   Map<String, String> _media = const {};
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -37,13 +41,15 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
   void didUpdateWidget(covariant DictionaryGlossary oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.rawGlossary != widget.rawGlossary ||
-        oldWidget.dictionaryName != widget.dictionaryName) {
+        oldWidget.dictionaryName != widget.dictionaryName ||
+        oldWidget.profile != widget.profile) {
       _media = const {};
       _loadMedia();
     }
   }
 
   Future<void> _loadMedia() async {
+    final generation = ++_loadGeneration;
     final paths = yomitanGlossaryMediaPaths(widget.rawGlossary);
     if (paths.isEmpty) return;
     final loaded = <String, String>{};
@@ -51,12 +57,21 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
       final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
         dictName: widget.dictionaryName,
         mediaPath: path,
+        profile: widget.profile,
       );
       if (bytes != null) {
         loaded[path] = 'data:${_mimeType(path)};base64,${base64Encode(bytes)}';
       }
     }
-    if (mounted) setState(() => _media = loaded);
+    if (mounted && generation == _loadGeneration) {
+      setState(() => _media = loaded);
+    }
+  }
+
+  @override
+  void dispose() {
+    _loadGeneration++;
+    super.dispose();
   }
 
   @override
@@ -138,6 +153,57 @@ String yomitanGlossaryToHtml(
   padding-left: var(--list-padding1);
 }
 .dictionary-glossary li { margin: .08em 0; }
+.dictionary-glossary [data-sc-moedict="first-row-parent"] {
+  display: block;
+  margin-bottom: .4em;
+}
+.dictionary-glossary [data-sc-moedict="terms-parent"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .33em;
+  align-items: center;
+  margin-bottom: .25em;
+}
+.dictionary-glossary [data-sc-moedict="traditional-term"],
+.dictionary-glossary [data-sc-moedict="simplified-term"] {
+  display: inline-block;
+  padding: .13em .33em;
+  border: 1px solid rgba(128, 128, 128, .42);
+  border-radius: .27em;
+  background: rgba(128, 128, 128, .12);
+  line-height: 1.25;
+}
+.dictionary-glossary [data-sc-moedict="simplified-term"] {
+  color: var(--accent-color, #0b57d0);
+}
+.dictionary-glossary [data-sc-moedict="meaning-parent"],
+.dictionary-glossary [data-sc-moedict="meanings-parent"] {
+  display: block;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry"] {
+  display: block;
+  margin: .4em 0;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-content"] {
+  display: inline;
+  line-height: 1.45;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-example-parent"] {
+  display: inline;
+  color: var(--text-color-light1);
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-example-label"] {
+  display: inline-block;
+  margin: 0 .2em;
+  padding: 0 .27em;
+  border-radius: .27em;
+  background: var(--danger-color-lightest, rgba(160, 48, 48, .22));
+  color: var(--danger-color, var(--text-color));
+  line-height: 1.3;
+}
+.dictionary-glossary [data-sc-moedict="definition-entry-example-content"] {
+  color: var(--text-color-light1);
+}
 .gloss-image-link, .gloss-image-container {
   display: inline-block;
   max-width: 100%;
@@ -191,7 +257,18 @@ Object? _decodeGlossary(String raw) {
   }
 }
 
+Object? _unwrapYomitanContent(Object? value) {
+  if (value is Map && value['value'] is List) {
+    final keys = value.keys.map((key) => key.toString()).toSet();
+    if (keys.length == 1 || keys.contains('Count')) {
+      return value['value'];
+    }
+  }
+  return value;
+}
+
 String _renderGlossaryValue(Object? value, Map<String, String> media) {
+  value = _unwrapYomitanContent(value);
   if (value is List) {
     return value
         .map(
@@ -204,6 +281,7 @@ String _renderGlossaryValue(Object? value, Map<String, String> media) {
 }
 
 String _renderDefinition(Object? value, Map<String, String> media) {
+  value = _unwrapYomitanContent(value);
   if (value is String) return _renderText(value);
   if (value is List) {
     return '<ul class="glossary-list">${value.map((item) => '<li>${_renderDefinition(item, media)}</li>').join()}</ul>';
@@ -221,6 +299,7 @@ String _renderDefinition(Object? value, Map<String, String> media) {
 }
 
 String _renderNode(Object? value, Map<String, String> media) {
+  value = _unwrapYomitanContent(value);
   if (value is String) return _renderText(value);
   if (value is List) {
     final strings = value.every((item) => item is String);

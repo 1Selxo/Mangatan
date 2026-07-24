@@ -8,7 +8,7 @@ import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/adapters.dart';
@@ -24,12 +24,15 @@ import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/storage_usage.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/general_state_provider.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/services/http/m_client.dart';
@@ -174,8 +177,12 @@ class _StartupErrorApp extends StatelessWidget {
 Future<void> _postLaunchInit(StorageProvider storage) async {
   await AppLogger.init();
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
-  final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
-  await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
+  if (isApple || Platform.isAndroid) {
+    await Hive.initFlutter(isApple ? "databases" : "");
+  } else {
+    final databaseDirectory = await storage.getDatabaseDirectory();
+    Hive.init(databaseDirectory!.path);
+  }
   Hive.registerAdapter(TrackSearchAdapter());
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");
@@ -193,14 +200,19 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp>
-    with WidgetsBindingObserver, WindowListener {
+    with
+        WidgetsBindingObserver,
+        WindowListener,
+        SingleTickerProviderStateMixin {
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
   Uri? lastUri;
+  late final AnimationController _disabledProgressController;
 
   @override
   void initState() {
     super.initState();
+    _disabledProgressController = AnimationController(vsync: this, value: 0.5);
     WidgetsBinding.instance.addObserver(this);
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
@@ -211,7 +223,7 @@ class _MyAppState extends ConsumerState<MyApp>
     unawaited(ref.read(scanLocalLibraryProvider.future));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      MExtensionServerPlatform(ref).startServer();
+      MExtensionServerPlatform(ref, persistent: true).startServer();
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
         ref.watch(totalChapterCacheSizeStateProvider);
@@ -240,6 +252,14 @@ class _MyAppState extends ConsumerState<MyApp>
 
   @override
   Widget build(BuildContext context) {
+    final animationDurationScale = isMobile
+        ? defaultAnimationDurationScale
+        : ref.watch(animationDurationScaleProvider);
+    if (!isMobile) {
+      final dilation = animationTimeDilation(animationDurationScale);
+      if (timeDilation != dilation) timeDilation = dilation;
+    }
+
     final followSystem = ref.watch(followSystemThemeStateProvider);
     final forcedDark = ref.watch(themeModeStateProvider);
     final themeMode = followSystem
@@ -258,22 +278,41 @@ class _MyAppState extends ConsumerState<MyApp>
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) {
         final base = BotToastInit()(context, child);
-        final withBackHandler = !isMobile
-            ? _MouseBackButtonHandler(router: router, child: base)
+        Widget content = !isMobile
+            ? DesktopBackNavigationHandler(
+                canGoBack: router.canPop,
+                onBack: router.pop,
+                dismissTransientUi: DictionaryLookupPopup.dismissActive,
+                child: base,
+              )
             : base;
 
         if (!Platform.isLinux) {
           final isUnlocked = ref.watch(appUnlockedStateProvider);
           final lockEnabled = ref.watch(appLockEnabledStateProvider);
           if (lockEnabled && !isUnlocked) {
-            return Stack(
+            content = Stack(
               fit: StackFit.expand,
-              children: [withBackHandler, const AppLockScreen()],
+              children: [content, const AppLockScreen()],
             );
           }
         }
 
-        return withBackHandler;
+        if (!isMobile &&
+            animationDurationScale == minimumAnimationDurationScale) {
+          content = ProgressIndicatorTheme(
+            data: Theme.of(context).progressIndicatorTheme.copyWith(
+              controller: _disabledProgressController,
+            ),
+            child: content,
+          );
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: content,
+          );
+        }
+
+        return content;
       },
       routeInformationParser: router.routeInformationParser,
       routerDelegate: router.routerDelegate,
@@ -285,6 +324,8 @@ class _MyAppState extends ConsumerState<MyApp>
 
   @override
   void dispose() {
+    if (!isMobile) timeDilation = defaultAnimationDurationScale;
+    _disabledProgressController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     if (!isMobile) {
       windowManager.removeListener(this);
@@ -523,25 +564,6 @@ class _MyAppState extends ConsumerState<MyApp>
           )
           .checkRefresh();
     }
-  }
-}
-
-class _MouseBackButtonHandler extends StatelessWidget {
-  final GoRouter router;
-  final Widget child;
-
-  const _MouseBackButtonHandler({required this.router, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: (event) {
-        if (event.buttons & kBackMouseButton != 0) {
-          if (router.canPop()) router.pop();
-        }
-      },
-      child: child,
-    );
   }
 }
 

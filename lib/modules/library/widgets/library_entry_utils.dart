@@ -11,6 +11,7 @@ import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/headers.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 
 /// Resolves the correct [ImageProvider] for a manga entry, preferring a custom
 /// local cover over the remote URL. Remote covers are wrapped in
@@ -127,9 +128,9 @@ class DownloadCountBadge extends ConsumerWidget {
     final downloadedIds =
         ref.watch(downloadedChapterIdsProvider).asData?.value ?? const <int>{};
 
-    final count = entry.chapters
-        .where((c) => c.id != null && downloadedIds.contains(c.id))
-        .length;
+    final count = userFacingChapters(
+      entry,
+    ).where((c) => c.id != null && downloadedIds.contains(c.id)).length;
 
     if (count == 0) return const SizedBox.shrink();
 

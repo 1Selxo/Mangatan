@@ -1,6 +1,7 @@
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/utils/constant.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 part 'settings.g.dart';
 
 @collection
@@ -45,6 +46,8 @@ class Settings {
 
   double? flexColorSchemeBlendLevel;
 
+  double? animationDurationScale;
+
   String? dateFormat;
 
   int? relativeTimesTamps;
@@ -69,6 +72,12 @@ class Settings {
 
   @enumerated
   late ReaderMode defaultReaderMode;
+
+  /// Persisted enum index. Nullable so legacy combined RTL modes can migrate.
+  int? defaultReadingDirectionIndex;
+
+  @enumerated
+  late PageMode defaultPageMode;
 
   List<PersonalReaderMode>? personalReaderModeList;
 
@@ -266,11 +275,17 @@ class Settings {
 
   double? novelReaderLineHeight;
 
+  double? novelReaderParagraphSpacing;
+
   bool? novelShowScrollPercentage;
 
   bool? novelRemoveExtraParagraphSpacing;
 
   bool? novelTapToScroll;
+
+  int? novelEpubReadingLayout;
+
+  bool? novelShowReturnToSavedPositionButton;
 
   List<String>? navigationOrder;
 
@@ -379,6 +394,7 @@ class Settings {
     this.sortChapterList,
     this.chapterFilterDownloadedList,
     this.flexColorSchemeBlendLevel = 10.0,
+    this.animationDurationScale = 1.0,
     this.dateFormat = "M/d/y",
     this.relativeTimesTamps = 2,
     this.flexSchemeColorIndex = 2,
@@ -390,7 +406,9 @@ class Settings {
     this.chapterPageIndexList,
     this.userAgent = defaultUserAgent,
     this.cookiesList,
-    this.defaultReaderMode = ReaderMode.vertical,
+    this.defaultReaderMode = ReaderMode.verticalPaged,
+    this.defaultReadingDirectionIndex = 0,
+    this.defaultPageMode = PageMode.onePage,
     this.personalReaderModeList,
     this.animatePageTransitions = true,
     this.doubleTapAnimationSpeed = 1,
@@ -427,7 +445,7 @@ class Settings {
     this.backupListOptions,
     this.autoBackupLocation,
     this.startDatebackup,
-    this.usePageTapZones = true,
+    this.usePageTapZones,
     this.autoScrollPages,
     this.markEpisodeAsSeenType = 85,
     this.defaultSkipIntroLength = 85,
@@ -473,11 +491,14 @@ class Settings {
     this.novelTextAlign = NovelTextAlign.left,
     this.novelReaderTheme = '#292832',
     this.novelReaderTextColor = '#CCCCCC',
-    this.novelReaderPadding = 16,
+    this.novelReaderPadding = 12,
     this.novelReaderLineHeight = 1.5,
+    this.novelReaderParagraphSpacing = 0.0,
     this.novelShowScrollPercentage = true,
     this.novelRemoveExtraParagraphSpacing = false,
     this.novelTapToScroll = false,
+    this.novelEpubReadingLayout = 0,
+    this.novelShowReturnToSavedPositionButton = true,
     this.navigationOrder,
     this.hideItems,
     this.clearChapterCacheOnAppLaunch = false,
@@ -528,11 +549,14 @@ class Settings {
     this.ttsPitch = 1.0,
     this.ttsLanguage,
     this.ttsVoice,
-  });
+  }) {
+    usePageTapZones ??= !isDesktop;
+  }
 
   Settings.fromJson(Map<String, dynamic> json) {
     updatedAt = json["updatedAt"];
     animatePageTransitions = json['animatePageTransitions'];
+    animationDurationScale = json['animationDurationScale']?.toDouble() ?? 1.0;
     animeDisplayType = DisplayType
         .values[json['animeDisplayType'] ?? DisplayType.compactGrid.index];
     animeLibraryDownloadedChapters = json['animeLibraryDownloadedChapters'];
@@ -582,8 +606,21 @@ class Settings {
     }
     cropBorders = json['cropBorders'];
     dateFormat = json['dateFormat'];
-    defaultReaderMode = ReaderMode
-        .values[json['defaultReaderMode'] ?? ReaderMode.vertical.index];
+    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
+      json['defaultReaderMode'],
+    );
+    defaultReaderMode = restoredReaderMode.normalized;
+    defaultReadingDirectionIndex =
+        (json['defaultReadingDirection'] == null
+                ? restoredReaderMode.legacyReadingDirection ??
+                      ReadingDirection.leftToRight
+                : ReadingDirectionExtension.fromPersistedIndex(
+                    json['defaultReadingDirection'],
+                  ))
+            .index;
+    defaultPageMode = PageModeExtension.fromPersistedIndex(
+      json['defaultPageMode'],
+    );
     displayType = DisplayType.values[json['displayType']];
     doubleTapAnimationSpeed = json['doubleTapAnimationSpeed'];
     downloadLocation = json['downloadLocation'];
@@ -733,9 +770,15 @@ class Settings {
     if (json['novelReaderLineHeight'] != null) {
       novelReaderLineHeight = json['novelReaderLineHeight'];
     }
+    novelReaderParagraphSpacing =
+        json['novelReaderParagraphSpacing']?.toDouble() ??
+        (json['novelRemoveExtraParagraphSpacing'] == true ? 0.25 : 0.0);
     novelShowScrollPercentage = json['novelShowScrollPercentage'];
     novelRemoveExtraParagraphSpacing = json['novelRemoveExtraParagraphSpacing'];
     novelTapToScroll = json['novelTapToScroll'];
+    novelEpubReadingLayout = json['novelEpubReadingLayout'];
+    novelShowReturnToSavedPositionButton =
+        json['novelShowReturnToSavedPositionButton'];
     if (json['navigationOrder'] != null) {
       navigationOrder = (json['navigationOrder'] as List).cast<String>();
     }
@@ -817,6 +860,7 @@ class Settings {
   Map<String, dynamic> toJson() => {
     'updatedAt': updatedAt,
     'animatePageTransitions': animatePageTransitions,
+    'animationDurationScale': animationDurationScale,
     'animeDisplayType': animeDisplayType.index,
     'animeLibraryDownloadedChapters': animeLibraryDownloadedChapters,
     'animeLibraryLocalSource': animeLibraryLocalSource,
@@ -846,7 +890,9 @@ class Settings {
     'cookiesList': cookiesList,
     'cropBorders': cropBorders,
     'dateFormat': dateFormat,
-    'defaultReaderMode': defaultReaderMode.index,
+    'defaultReaderMode': effectiveDefaultReaderMode.index,
+    'defaultReadingDirection': effectiveDefaultReadingDirection.index,
+    'defaultPageMode': defaultPageMode.index,
     'displayType': displayType.index,
     'doubleTapAnimationSpeed': doubleTapAnimationSpeed,
     'downloadLocation': downloadLocation,
@@ -948,9 +994,13 @@ class Settings {
     'novelReaderTextColor': novelReaderTextColor,
     'novelReaderPadding': novelReaderPadding,
     'novelReaderLineHeight': novelReaderLineHeight,
+    'novelReaderParagraphSpacing': novelReaderParagraphSpacing,
     'novelShowScrollPercentage': novelShowScrollPercentage,
     'novelRemoveExtraParagraphSpacing': novelRemoveExtraParagraphSpacing,
     'novelTapToScroll': novelTapToScroll,
+    'novelEpubReadingLayout': novelEpubReadingLayout,
+    'novelShowReturnToSavedPositionButton':
+        novelShowReturnToSavedPositionButton,
     'navigationOrder': navigationOrder,
     'hideItems': hideItems,
     'clearChapterCacheOnAppLaunch': clearChapterCacheOnAppLaunch,
@@ -1159,17 +1209,37 @@ class PersonalReaderMode {
   int? mangaId;
 
   @enumerated
-  ReaderMode readerMode = ReaderMode.vertical;
-  PersonalReaderMode({this.mangaId, this.readerMode = ReaderMode.vertical});
+  ReaderMode readerMode = ReaderMode.verticalPaged;
+
+  /// Persisted enum index. Nullable for reader preferences saved before the
+  /// reading-direction setting was split from [readerMode].
+  int? readingDirectionIndex;
+
+  PersonalReaderMode({
+    this.mangaId,
+    this.readerMode = ReaderMode.verticalPaged,
+    this.readingDirectionIndex,
+  });
 
   PersonalReaderMode.fromJson(Map<String, dynamic> json) {
     mangaId = json['mangaId'];
-    readerMode = ReaderMode.values[json['readerMode']];
+    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
+      json['readerMode'],
+    );
+    readerMode = restoredReaderMode.normalized;
+    readingDirectionIndex =
+        (json['readingDirection'] == null
+                ? restoredReaderMode.legacyReadingDirection
+                : ReadingDirectionExtension.fromPersistedIndex(
+                    json['readingDirection'],
+                  ))
+            ?.index;
   }
 
   Map<String, dynamic> toJson() => {
     'mangaId': mangaId,
-    'readerMode': readerMode.index,
+    'readerMode': readerMode.normalized.index,
+    'readingDirection': readingDirectionIndex,
   };
 }
 
@@ -1252,43 +1322,108 @@ class PersonalPageMode {
 }
 
 enum ReaderMode {
-  vertical,
-  ltr,
-  rtl,
+  // Keep these persisted positions stable. The legacy entries are hidden from
+  // selectors and normalized when settings are read.
+  verticalPaged,
+  horizontalPaged,
+  legacyHorizontalPagedRtl,
   verticalContinuous,
   webtoon,
   horizontalContinuous,
-  horizontalContinuousRTL,
+  legacyHorizontalContinuousRtl,
 }
 
 extension ReaderModeExtension on ReaderMode {
-  /// Vertical continuous || Webtoon || Horizontal continuous || Horizontal continuous (RTL)
+  static const selectableValues = [
+    ReaderMode.horizontalPaged,
+    ReaderMode.verticalPaged,
+    ReaderMode.horizontalContinuous,
+    ReaderMode.verticalContinuous,
+    ReaderMode.webtoon,
+  ];
+
+  static ReaderMode fromPersistedIndex(Object? value) {
+    final index = value is int ? value : null;
+    if (index == null || index < 0 || index >= ReaderMode.values.length) {
+      return ReaderMode.verticalPaged;
+    }
+    return ReaderMode.values[index];
+  }
+
+  ReaderMode get normalized => switch (this) {
+    ReaderMode.legacyHorizontalPagedRtl => ReaderMode.horizontalPaged,
+    ReaderMode.legacyHorizontalContinuousRtl => ReaderMode.horizontalContinuous,
+    _ => this,
+  };
+
+  ReadingDirection? get legacyReadingDirection => switch (this) {
+    ReaderMode.horizontalPaged => ReadingDirection.leftToRight,
+    ReaderMode.legacyHorizontalPagedRtl => ReadingDirection.rightToLeft,
+    ReaderMode.horizontalContinuous => ReadingDirection.leftToRight,
+    ReaderMode.legacyHorizontalContinuousRtl => ReadingDirection.rightToLeft,
+    _ => null,
+  };
+
+  /// Vertical continuous || Webtoon || Horizontal continuous
   bool get isContinuous => isVerticalContinuous || isHorizontalContinuous;
 
-  /// Vertical || Vertical continuous || Webtoon
-  bool get isVertical => this == ReaderMode.vertical || isVerticalContinuous;
+  /// Vertical paged || Vertical continuous || Webtoon
+  bool get isVertical =>
+      this == ReaderMode.verticalPaged || isVerticalContinuous;
 
   /// Vertical continuous || Webtoon
   bool get isVerticalContinuous =>
       this == ReaderMode.verticalContinuous || this == ReaderMode.webtoon;
 
-  /// Horizontal continuous || Horizontal continuous (RTL)
+  /// Horizontal continuous
   bool get isHorizontalContinuous =>
-      this == ReaderMode.horizontalContinuous ||
-      this == ReaderMode.horizontalContinuousRTL;
+      normalized == ReaderMode.horizontalContinuous;
 
-  /// Right to Left || Horizontal continuous (RTL)
-  bool get isRTL =>
-      this == ReaderMode.rtl || this == ReaderMode.horizontalContinuousRTL;
+  /// Horizontal paged
+  bool get isHorizontalPaged => normalized == ReaderMode.horizontalPaged;
+}
 
-  /// Left to Right || Right to Left
-  bool get isHorizontalPaged =>
-      this == ReaderMode.ltr || this == ReaderMode.rtl;
+enum ReadingDirection { leftToRight, rightToLeft }
+
+extension ReadingDirectionExtension on ReadingDirection {
+  static ReadingDirection fromPersistedIndex(Object? value) {
+    return value == ReadingDirection.rightToLeft.index
+        ? ReadingDirection.rightToLeft
+        : ReadingDirection.leftToRight;
+  }
+
+  bool get isRtl => this == ReadingDirection.rightToLeft;
+}
+
+extension ReaderSettingsDirectionExtension on Settings {
+  ReaderMode get effectiveDefaultReaderMode => defaultReaderMode.normalized;
+
+  ReadingDirection get effectiveDefaultReadingDirection =>
+      defaultReadingDirectionIndex == null
+      ? defaultReaderMode.legacyReadingDirection ?? ReadingDirection.leftToRight
+      : ReadingDirectionExtension.fromPersistedIndex(
+          defaultReadingDirectionIndex,
+        );
 }
 
 enum NovelTextAlign { left, center, right, block }
 
-enum PageMode { onePage, doublePage }
+enum PageMode { onePage, doublePage, doublePageCover }
+
+extension PageModeExtension on PageMode {
+  static PageMode fromPersistedIndex(Object? value) {
+    final index = value is int ? value : null;
+    if (index == null || index < 0 || index >= PageMode.values.length) {
+      return PageMode.onePage;
+    }
+    return PageMode.values[index];
+  }
+
+  bool get isDoublePage =>
+      this == PageMode.doublePage || this == PageMode.doublePageCover;
+
+  bool get usesCoverOffset => this == PageMode.doublePageCover;
+}
 
 @embedded
 class FilterScanlator {
@@ -1344,6 +1479,7 @@ class CustomColorFilter {
 @embedded
 class PlayerSubtitleSettings {
   int? fontSize;
+  int? position;
   bool? useBold;
   bool? useItalic;
   int? textColorA;
@@ -1360,6 +1496,7 @@ class PlayerSubtitleSettings {
   int? backgroundColorB;
   PlayerSubtitleSettings({
     this.fontSize = 45,
+    this.position = 0,
     this.useBold = true,
     this.useItalic = false,
     this.textColorA = 255,
@@ -1377,6 +1514,7 @@ class PlayerSubtitleSettings {
   });
   PlayerSubtitleSettings.fromJson(Map<String, dynamic> json) {
     fontSize = json['fontSize'];
+    position = json['position'] ?? 0;
     useBold = json['useBold'];
     useItalic = json['useItalic'];
     textColorA = json['textColorA'];
@@ -1395,6 +1533,7 @@ class PlayerSubtitleSettings {
 
   Map<String, dynamic> toJson() => {
     'fontSize': fontSize,
+    'position': position,
     'useBold': useBold,
     'useItalic': useItalic,
     'textColorA': textColorA,

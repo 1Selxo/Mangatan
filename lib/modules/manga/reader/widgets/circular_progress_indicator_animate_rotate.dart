@@ -24,7 +24,19 @@ class _CircularProgressIndicatorAnimateRotateState
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 10),
-    )..repeat();
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller
+        ..stop()
+        ..value = 0;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
   }
 
   @override
@@ -47,7 +59,9 @@ class _CircularProgressIndicatorAnimateRotateState
                 );
               },
               child: TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 500),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 500),
                 curve: Curves.easeInOut,
                 tween: Tween<double>(begin: 0, end: widget.progress),
                 builder: (context, value, _) {

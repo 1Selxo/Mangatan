@@ -1,17 +1,27 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/chrome_lens_ocr.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/mokuro_extension_ocr.dart';
 import 'package:mangayomi/services/mining/mokuro_parser.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:mangayomi/services/mining/ocr_block_merger.dart';
+import 'package:mangayomi/services/mining/profile_ocr_language.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 
@@ -19,24 +29,67 @@ class ReaderOcrState {
   ReaderOcrState._();
 
   static final enabled = ValueNotifier<bool>(true);
+  static final backgroundOpacity = ValueNotifier<double>(
+    MiningPreferences.defaultOcrBackgroundOpacity,
+  );
+  static final textOpacity = ValueNotifier<double>(
+    MiningPreferences.defaultOcrTextOpacity,
+  );
+  static final outlineVisible = ValueNotifier<bool>(false);
+  static final lookupOnHover = ValueNotifier<bool>(false);
   static bool _initialized = false;
+  static Future<void>? _initializing;
   static final Set<ReaderOcrController> _controllers = {};
   static final progress = ValueNotifier<ReaderOcrProgress?>(null);
+  static DictionaryPopupHandle? _hoverPopup;
+  static Timer? _hoverDismissTimer;
+  static String? _hoverLookupKey;
+  static bool _hoveringPopup = false;
+  static int _hoverGeneration = 0;
   static int _scanGeneration = 0;
+  static int _mokuroWebsiteLoads = 0;
+  static bool _usingMokuroWebsiteData = false;
+  static int _paintGeneration = 0;
+  static bool _popupWasVisibleOnPointerDown = false;
+  static Offset? _lastPointerPosition;
+  static bool _middleLookupActive = false;
   static List<UChapDataPreload> _lastScanPages = const [];
   static int _lastStartIndex = 0;
   static Future<void> Function(UChapDataPreload)? _lastPreparePage;
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    _initialized = true;
-    enabled.value = await MiningPreferences.getOcrOverlayEnabled();
+    if (_initializing != null) return _initializing;
+    _initializing = _loadPreferences();
+    return _initializing;
+  }
+
+  static Future<void> _loadPreferences() async {
+    try {
+      final values = await Future.wait<dynamic>([
+        MiningPreferences.getOcrOverlayEnabled(),
+        MiningPreferences.getOcrBackgroundOpacity(),
+        MiningPreferences.getOcrTextOpacity(),
+        MiningPreferences.getOcrOutlineVisible(),
+        MiningPreferences.getOcrLookupOnHover(),
+        ReaderLookupTriggerState.initialize(),
+      ]);
+      enabled.value = values[0] as bool;
+      backgroundOpacity.value = values[1] as double;
+      textOpacity.value = values[2] as double;
+      outlineVisible.value = values[3] as bool;
+      lookupOnHover.value = values[4] as bool;
+      _initialized = true;
+    } finally {
+      _initializing = null;
+    }
   }
 
   static Future<void> setEnabled(bool value) async {
     enabled.value = value;
     await MiningPreferences.setOcrOverlayEnabled(value);
     if (!value) {
+      _dismissHoverPopup();
       cancelScan(clearLast: false);
     } else if (_lastScanPages.isNotEmpty) {
       unawaited(
@@ -51,13 +104,268 @@ class ReaderOcrState {
 
   static Future<void> toggle() => setEnabled(!enabled.value);
 
-  static Future<bool> handleTap(Offset globalPosition) async {
+  static Future<void> setBackgroundOpacity(double value) async {
+    await initialize();
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    backgroundOpacity.value = clamped;
+    await MiningPreferences.setOcrBackgroundOpacity(clamped);
+  }
+
+  static Future<void> setTextOpacity(double value) async {
+    await initialize();
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    textOpacity.value = clamped;
+    await MiningPreferences.setOcrTextOpacity(clamped);
+  }
+
+  static Future<void> setOutlineVisible(bool value) async {
+    await initialize();
+    outlineVisible.value = value;
+    await MiningPreferences.setOcrOutlineVisible(value);
+  }
+
+  static Future<void> setLookupOnHover(bool value) async {
+    await initialize();
+    lookupOnHover.value = value;
+    await MiningPreferences.setOcrLookupOnHover(value);
+    if (!value) _dismissHoverPopup();
+  }
+
+  static bool handlePointerUp(Offset globalPosition) {
+    final popupWasVisible = _popupWasVisibleOnPointerDown;
+    _popupWasVisibleOnPointerDown = false;
     if (!enabled.value) return false;
-    for (final controller in _controllers.toList().reversed) {
-      if (await controller.handleGlobalTap(globalPosition)) return true;
+    if (dismissActiveLookupAt(globalPosition)) return true;
+    if (!lookupOnHover.value && _heldLookupActive) {
+      unawaited(handleHover(globalPosition));
+      return true;
     }
+    if (lookupOnHover.value) {
+      if (!popupWasVisible) return false;
+      _dismissHoverPopup();
+      clearActive();
+      return true;
+    }
+    final hit = _bestGlobalHit(globalPosition);
+    if (hit == null) {
+      clearActive();
+      final dismissedPopup = DictionaryLookupPopup.dismissActive();
+      return readerOcrShouldConsumeMissedTap(
+        popupWasVisibleOnPointerDown: popupWasVisible,
+        dismissedPopup: dismissedPopup,
+      );
+    }
+    _activateGlobalHit(hit);
+    unawaited(hit.controller._activateHit(hit.context, hit.tapHit));
+    return true;
+  }
+
+  /// Dismisses the popup only when [globalPosition] is the active OCR hit.
+  static bool dismissActiveLookupAt(Offset globalPosition) {
+    if (!enabled.value) return false;
+    final hit = _bestGlobalHit(globalPosition);
+    if (hit == null ||
+        !readerOcrShouldDismissRepeatedLookup(
+          popupVisible: DictionaryLookupPopup.isActive,
+          triggeredByHover: false,
+          sameBlock: identical(hit.controller._activeBlock, hit.tapHit.block),
+          activeOffset: hit.controller._activeOffset,
+          hitOffset: hit.tapHit.rawOffset,
+        )) {
+      return false;
+    }
+    return dismissActiveLookup();
+  }
+
+  /// Dismisses the active reader lookup without changing the scan trigger.
+  static bool dismissActiveLookup() {
+    if (!DictionaryLookupPopup.isActive) return false;
+    _dismissHoverPopup();
     clearActive();
-    return false;
+    return true;
+  }
+
+  static void handlePointerDown(Offset globalPosition) {
+    _lastPointerPosition = globalPosition;
+    _popupWasVisibleOnPointerDown = DictionaryLookupPopup.isActive;
+  }
+
+  static void handlePointerCancel() {
+    _popupWasVisibleOnPointerDown = false;
+    _middleLookupActive = false;
+  }
+
+  static bool handleMiddleLookupStart(Offset globalPosition, int buttons) {
+    if (!enabled.value ||
+        buttons != kMiddleMouseButton ||
+        lookupOnHover.value ||
+        ReaderLookupTriggerState.trigger.value !=
+            DictionaryLookupTrigger.middleClick) {
+      return false;
+    }
+    _middleLookupActive = true;
+    _lastPointerPosition = globalPosition;
+    unawaited(handleHover(globalPosition));
+    return true;
+  }
+
+  static void handleMiddleLookupMove(Offset globalPosition) {
+    if (!_middleLookupActive) return;
+    unawaited(handleHover(globalPosition));
+  }
+
+  static void handleMiddleLookupEnd() {
+    _middleLookupActive = false;
+  }
+
+  static Future<bool> handleHover(Offset globalPosition) async {
+    _lastPointerPosition = globalPosition;
+    if (!enabled.value) return false;
+    final hoverLookupActive = _hoverLookupActive;
+    final hit = _bestGlobalHit(globalPosition);
+    if (hit == null) {
+      if (_heldLookupActive) {
+        _dismissHoverPopup();
+        clearActive();
+      } else if (hoverLookupActive) {
+        _scheduleHoverDismiss();
+      } else {
+        clearActive();
+      }
+      return false;
+    }
+    _activateGlobalHit(hit);
+    if (!hoverLookupActive) {
+      hit.controller._revealHit(hit.tapHit);
+      hit.controller._prefetchHit(hit.tapHit);
+      return true;
+    }
+    _hoverDismissTimer?.cancel();
+    return hit.controller._activateHit(
+      hit.context,
+      hit.tapHit,
+      triggeredByHover: true,
+    );
+  }
+
+  static void handleHoverExit() {
+    _lastPointerPosition = null;
+    if (_hoverLookupActive) {
+      _scheduleHoverDismiss();
+    } else {
+      clearActive();
+    }
+  }
+
+  static bool handleLookupTriggerKey(KeyEvent event) {
+    if (!readerLookupTriggerMatchesKey(
+      ReaderLookupTriggerState.trigger.value,
+      event,
+    )) {
+      return false;
+    }
+    if (event is KeyUpEvent) {
+      return true;
+    }
+    if (!enabled.value || lookupOnHover.value) return false;
+    final position = _lastPointerPosition;
+    if (position != null) {
+      unawaited(handleHover(position));
+    } else {
+      _dismissHoverPopup();
+      clearActive();
+    }
+    return true;
+  }
+
+  static bool get _heldLookupActive {
+    return _middleLookupActive ||
+        (ReaderLookupTriggerState.trigger.value ==
+                DictionaryLookupTrigger.shift &&
+            HardwareKeyboard.instance.isShiftPressed);
+  }
+
+  static bool get _hoverLookupActive {
+    return lookupOnHover.value || _heldLookupActive;
+  }
+
+  static _GlobalOcrHit? _bestGlobalHit(Offset globalPosition) {
+    final hits = <_GlobalOcrHit>[];
+    for (final controller in _controllers.toList()) {
+      final hit = controller._hitTestGlobal(globalPosition);
+      if (hit != null) hits.add(hit);
+    }
+    if (hits.isEmpty) return null;
+    hits.sort((a, b) {
+      final areaCompare = a.globalBlockRectArea.compareTo(
+        b.globalBlockRectArea,
+      );
+      if (areaCompare != 0) return areaCompare;
+      return b.controller._paintOrder.compareTo(a.controller._paintOrder);
+    });
+    return hits.first;
+  }
+
+  static void _activateGlobalHit(_GlobalOcrHit hit) {
+    for (final controller in _controllers.toList()) {
+      if (!identical(controller, hit.controller)) {
+        controller._clearActive();
+      }
+    }
+  }
+
+  static int? _beginHoverLookup(String key) {
+    if (_hoverLookupKey == key) return null;
+    _hoverLookupKey = key;
+    _hoverDismissTimer?.cancel();
+    return ++_hoverGeneration;
+  }
+
+  static bool _isCurrentHoverLookup(int generation, String key) {
+    return _hoverGeneration == generation && _hoverLookupKey == key;
+  }
+
+  static void _setHoverPopup(
+    DictionaryPopupHandle? handle,
+    int generation,
+    String key,
+  ) {
+    if (!_isCurrentHoverLookup(generation, key)) {
+      handle?.dismiss();
+      return;
+    }
+    _hoverPopup = handle;
+  }
+
+  static void _setHoveringPopup(bool value) {
+    _hoveringPopup = value;
+    if (value) {
+      _hoverDismissTimer?.cancel();
+    } else {
+      _scheduleHoverDismiss();
+    }
+  }
+
+  static void _scheduleHoverDismiss() {
+    _hoverDismissTimer?.cancel();
+    _hoverDismissTimer = Timer(const Duration(milliseconds: 250), () {
+      if (_hoveringPopup) return;
+      _dismissHoverPopup();
+      clearActive();
+    });
+  }
+
+  static void _dismissHoverPopup() {
+    _hoverDismissTimer?.cancel();
+    _hoverDismissTimer = null;
+    _hoverLookupKey = null;
+    _hoverGeneration++;
+    _hoveringPopup = false;
+    _hoverPopup?.dismiss();
+    _hoverPopup = null;
+    // The stored handle can be stale or not assigned yet while lookup results
+    // are loading. Dismiss the shared host as well to cancel those requests.
+    DictionaryLookupPopup.dismissActive();
   }
 
   static void clearActive() {
@@ -79,13 +387,14 @@ class ReaderOcrState {
     final scanPages = pages.where((page) => !page.isTransitionPage).toList();
     if (scanPages.isEmpty) return;
     final generation = ++_scanGeneration;
+    _usingMokuroWebsiteData = false;
     final start = startIndex.clamp(0, scanPages.length - 1);
     final ordered = [
       ...scanPages.sublist(start),
       ...scanPages.sublist(0, start),
     ];
     var completed = 0;
-    progress.value = ReaderOcrProgress(completed: 0, total: ordered.length);
+    progress.value = _scanProgress(completed: 0, total: ordered.length);
     for (var index = 0; index < ordered.length; index += 2) {
       if (generation != _scanGeneration || !enabled.value) return;
       final end = math.min(index + 2, ordered.length);
@@ -101,7 +410,7 @@ class ReaderOcrState {
       );
       completed = end;
       if (generation == _scanGeneration) {
-        progress.value = ReaderOcrProgress(
+        progress.value = _scanProgress(
           completed: completed,
           total: ordered.length,
         );
@@ -119,16 +428,66 @@ class ReaderOcrState {
       _lastPreparePage = null;
     }
   }
+
+  static ReaderOcrProgress _scanProgress({
+    required int completed,
+    required int total,
+  }) => ReaderOcrProgress(
+    completed: completed,
+    total: total,
+    stage: _progressStage,
+  );
+
+  static ReaderOcrProgressStage get _progressStage {
+    if (_mokuroWebsiteLoads > 0) {
+      return ReaderOcrProgressStage.loadingMokuro;
+    }
+    if (_usingMokuroWebsiteData) return ReaderOcrProgressStage.mokuro;
+    return ReaderOcrProgressStage.recognizing;
+  }
+
+  static void _setMokuroWebsiteLoading(bool loading) {
+    _mokuroWebsiteLoads = math.max(0, _mokuroWebsiteLoads + (loading ? 1 : -1));
+    final current = progress.value;
+    if (current == null) return;
+    _refreshProgressStage();
+  }
+
+  static void _setUsingMokuroWebsiteData() {
+    _usingMokuroWebsiteData = true;
+    _refreshProgressStage();
+  }
+
+  static void _refreshProgressStage() {
+    final stage = _progressStage;
+    final current = progress.value;
+    if (current == null) return;
+    if (current.stage == stage) return;
+    progress.value = ReaderOcrProgress(
+      completed: current.completed,
+      total: current.total,
+      stage: stage,
+    );
+  }
 }
 
+enum ReaderOcrProgressStage { recognizing, loadingMokuro, mokuro }
+
 class ReaderOcrProgress {
-  const ReaderOcrProgress({required this.completed, required this.total});
+  const ReaderOcrProgress({
+    required this.completed,
+    required this.total,
+    this.stage = ReaderOcrProgressStage.recognizing,
+  });
   final int completed;
   final int total;
+  final ReaderOcrProgressStage stage;
 }
 
 class ReaderOcrProgressHud extends StatelessWidget {
-  const ReaderOcrProgressHud({super.key});
+  const ReaderOcrProgressHud({super.key, this.top = 12});
+
+  final double top;
 
   @override
   Widget build(BuildContext context) {
@@ -136,9 +495,11 @@ class ReaderOcrProgressHud extends StatelessWidget {
       valueListenable: ReaderOcrState.progress,
       builder: (context, progress, _) {
         if (progress == null) return const SizedBox.shrink();
-        return Positioned(
-          top: 12,
+        return AnimatedPositioned(
+          top: top,
           right: 12,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.ease,
           child: Material(
             color: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
             borderRadius: BorderRadius.circular(6),
@@ -152,7 +513,13 @@ class ReaderOcrProgressHud extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   const SizedBox(width: 8),
-                  Text('OCR ${progress.completed}/${progress.total}'),
+                  Text(switch (progress.stage) {
+                    ReaderOcrProgressStage.loadingMokuro => 'Loading Mokuro',
+                    ReaderOcrProgressStage.mokuro =>
+                      'Mokuro ${progress.completed}/${progress.total}',
+                    ReaderOcrProgressStage.recognizing =>
+                      'OCR ${progress.completed}/${progress.total}',
+                  }),
                 ],
               ),
             ),
@@ -166,8 +533,11 @@ class ReaderOcrProgressHud extends StatelessWidget {
 class ReaderOcrController extends ChangeNotifier {
   ReaderOcrController(this.data, {required this.imageKey}) {
     ReaderOcrState.enabled.addListener(_enabledChanged);
+    ReaderOcrState.backgroundOpacity.addListener(_appearanceChanged);
+    ReaderOcrState.textOpacity.addListener(_appearanceChanged);
+    ReaderOcrState.outlineVisible.addListener(_appearanceChanged);
     ReaderOcrState._controllers.add(this);
-    ReaderOcrState.initialize();
+    unawaited(ReaderOcrState.initialize());
   }
 
   static final Map<String, Future<_ReaderOcrPage>> _cache = {};
@@ -176,13 +546,16 @@ class ReaderOcrController extends ChangeNotifier {
   final GlobalKey imageKey;
   _ReaderOcrPage? _page;
   Rect? _imageRect;
+  List<_PaintedOcrBlock> _paintedBlocks = const [];
   OcrTextBlock? _activeBlock;
   int _activeOffset = -1;
   int _matchLength = 0;
+  int _paintOrder = 0;
   Color _highlightColor = const Color(0xff8ab4f8);
   Color _outlineColor = const Color(0xff8ab4f8);
   bool _loading = false;
   bool _disposed = false;
+  String? _prefetchedLookupKey;
 
   bool get enabled => ReaderOcrState.enabled.value;
 
@@ -212,37 +585,102 @@ class ReaderOcrController extends ChangeNotifier {
   }
 
   static Future<_ReaderOcrPage> _preload(UChapDataPreload data) async {
-    final engine = await MiningPreferences.getOcrEngine();
-    final language = await MiningPreferences.getOcrLanguage();
+    final manga = data.chapter?.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
+    final sourceLanguage = DictionaryProfileResolver.sourceLanguageForSource(
+      source,
+      fallback: manga?.lang ?? '',
+    );
+    final values = await Future.wait<dynamic>([
+      MiningPreferences.getOcrEngine(),
+      MiningPreferences.getMokuroWebsiteOcrEnabled(),
+      DictionaryProfileResolver.resolve(
+        mangaId: manga?.id,
+        sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+        sourceLanguage: sourceLanguage,
+      ),
+    ]);
+    final engine = values[0] as OcrEnginePreference;
+    final useMokuroWebsiteOcr = values[1] as bool;
+    final profile = values[2] as DictionaryProfile;
+    final sourceName = source?.name ?? manga?.source ?? '';
+    final language = profileOcrLanguage(profile.languageCode);
+    final ocrAllowed = isProfileOcrAllowed(
+      sourceLanguage: sourceLanguage,
+      profileLanguage: profile.languageCode,
+    );
     final key =
         '${data.pageUrl?.url ?? data.directory?.path ?? ''}:'
         '${data.chapter?.id}:${data.index}:${data.pageIndex}:'
-        '${engine.name}:$language';
+        '${engine.name}:$useMokuroWebsiteOcr:$sourceName:'
+        '$language:$ocrAllowed';
     try {
-      return await _cache.putIfAbsent(
+      final page = await _cache.putIfAbsent(
         key,
-        () => _recognize(data, engine: engine, language: language),
+        () => _recognize(
+          data,
+          engine: engine,
+          sourceName: sourceName,
+          useMokuroWebsiteOcr: useMokuroWebsiteOcr,
+          language: language,
+          ocrAllowed: ocrAllowed,
+        ),
       );
+      if (page.usesMokuroWebsiteData) {
+        ReaderOcrState._setUsingMokuroWebsiteData();
+      }
+      return page;
     } catch (_) {
       _cache.remove(key);
       rethrow;
     }
   }
 
-  void paint(Canvas canvas, Rect imageRect, ui.Image image, Paint paint) {
-    _imageRect = imageRect;
+  void paint(
+    Canvas canvas,
+    Rect imageRect,
+    ui.Image image,
+    Paint paint, {
+    Rect? hitTestImageRect,
+  }) {
+    final hitImageRect = hitTestImageRect ?? imageRect;
+    _imageRect = hitImageRect;
+    _paintOrder = ++ReaderOcrState._paintGeneration;
     final page = _page;
-    if (!enabled) return;
-    if (page == null) return;
+    if (!enabled || page == null) {
+      _paintedBlocks = const [];
+      return;
+    }
+    final paintedBlocks = <_PaintedOcrBlock>[];
+    final backgroundOpacity = ReaderOcrState.backgroundOpacity.value;
+    final textOpacity = ReaderOcrState.textOpacity.value;
+    final outlineVisible = ReaderOcrState.outlineVisible.value;
     for (final block in page.blocks) {
       final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
       if (rect.isEmpty) continue;
+      final hitRect = _blockRect(
+        block,
+        hitImageRect,
+        page.boxScaleX,
+        page.boxScaleY,
+      );
       final active = identical(block, _activeBlock);
       final lineBoxes = _lineBoxes(
         block,
         imageRect,
         page.boxScaleX,
         page.boxScaleY,
+      );
+      final hitLineBoxes = _lineBoxes(
+        block,
+        hitImageRect,
+        page.boxScaleX,
+        page.boxScaleY,
+      );
+      paintedBlocks.add(
+        _PaintedOcrBlock(block: block, rect: hitRect, lineBoxes: hitLineBoxes),
       );
       if (lineBoxes.isEmpty) {
         _paintOcrBox(
@@ -251,8 +689,8 @@ class ReaderOcrController extends ChangeNotifier {
           text: _orderedBlock(block),
           vertical: block.vertical,
           active: active,
-          opacity: page.opacity,
-          outlineVisible: page.outlineVisible,
+          backgroundOpacity: backgroundOpacity,
+          textOpacity: textOpacity,
           highlight: active
               ? _lineHighlightFor(
                   lineStart: 0,
@@ -262,6 +700,9 @@ class ReaderOcrController extends ChangeNotifier {
                 )
               : null,
         );
+        if (outlineVisible) {
+          _paintOcrOutline(canvas, rect, active: active);
+        }
         continue;
       }
 
@@ -274,8 +715,8 @@ class ReaderOcrController extends ChangeNotifier {
           text: lineBox.text,
           vertical: lineBox.vertical,
           active: active,
-          opacity: page.opacity,
-          outlineVisible: page.outlineVisible,
+          backgroundOpacity: backgroundOpacity,
+          textOpacity: textOpacity,
           rotation: lineBox.rotation,
           highlight: active
               ? _lineHighlightFor(
@@ -288,86 +729,323 @@ class ReaderOcrController extends ChangeNotifier {
         );
         lineStart += lineLength;
       }
+      if (outlineVisible) {
+        _paintOcrOutline(canvas, rect, active: active);
+      }
     }
+    _paintedBlocks = paintedBlocks;
   }
 
   Future<bool> handleTap(BuildContext context, Offset localPosition) async {
-    final page = _page;
+    final hit = _hitTestLocal(localPosition);
+    if (hit == null) return false;
+    return _activateHit(context, hit);
+  }
+
+  Future<bool> handleGlobalTap(Offset globalPosition) async {
+    final hit = _hitTestGlobal(globalPosition);
+    if (hit == null) return false;
+    return _activateHit(hit.context, hit.tapHit);
+  }
+
+  _OcrTapHit? _hitTestLocal(Offset localPosition) {
     final imageRect = _imageRect;
-    if (!enabled || page == null || imageRect == null) return false;
-    for (final block in page.blocks.reversed) {
-      final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
-      final hit = _hitTestBlock(
-        block,
+    if (!enabled || imageRect == null || imageRect.isEmpty) return null;
+    final hitSlop = _hitSlopFor(imageRect);
+    if (!imageRect.inflate(hitSlop).contains(localPosition)) return null;
+    for (final painted in _paintedBlocks.reversed) {
+      final hit = _hitTestPaintedBlock(
+        painted,
         localPosition,
-        imageRect,
-        page.boxScaleX,
-        page.boxScaleY,
+        blockRect: painted.rect,
+        hitSlop: 0,
       );
-      if (hit == null && !rect.contains(localPosition)) continue;
-      final rawOffset =
-          hit?.rawOffset ??
-          _characterOffset(block, localPosition - rect.topLeft, rect.size);
-      final ordered = _orderedBlock(block);
-      if (ordered.isEmpty) return true;
-      final orderedOffset = _toOrderedOffset(
-        block,
-        rawOffset,
-      ).clamp(0, ordered.length - 1);
-      if (!_isLookupStartChar(ordered[orderedOffset])) {
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
+  _GlobalOcrHit? _hitTestGlobal(Offset globalPosition) {
+    final context = imageKey.currentContext;
+    final box = context?.findRenderObject() as RenderBox?;
+    final imageRect = _imageRect;
+    if (!enabled ||
+        context == null ||
+        box == null ||
+        !box.attached ||
+        !box.hasSize ||
+        imageRect == null ||
+        imageRect.isEmpty) {
+      return null;
+    }
+
+    final imageGlobalRect = _localRectToGlobal(box, imageRect);
+    final hitSlop = _hitSlopFor(imageGlobalRect);
+    if (!imageGlobalRect.inflate(hitSlop).contains(globalPosition)) {
+      return null;
+    }
+
+    // Route taps through the same painted rectangles users see. In double-page
+    // and zoomed layouts, recomputing a separate local hit region can drift.
+    for (final painted in _paintedBlocks.reversed) {
+      final blockGlobalRect = _localRectToGlobal(box, painted.rect);
+      final hit = _hitTestPaintedBlock(
+        painted,
+        globalPosition,
+        blockRect: blockGlobalRect,
+        blockRectIsGlobal: true,
+        lineRectMapper: (rect) => _localRectToGlobal(box, rect),
+        hitSlop: 0,
+      );
+      if (hit != null) {
+        return _GlobalOcrHit(
+          controller: this,
+          context: context,
+          tapHit: hit,
+          globalBlockRect: blockGlobalRect,
+        );
+      }
+    }
+    return null;
+  }
+
+  _OcrTapHit? _hitTestPaintedBlock(
+    _PaintedOcrBlock painted,
+    Offset position, {
+    required Rect blockRect,
+    bool blockRectIsGlobal = false,
+    Rect Function(Rect rect)? lineRectMapper,
+    required double hitSlop,
+  }) {
+    var lineStart = 0;
+    for (final lineBox in painted.lineBoxes) {
+      final lineRect = lineRectMapper?.call(lineBox.rect) ?? lineBox.rect;
+      if (lineRect.inflate(hitSlop).contains(position)) {
+        final rawOffset = _characterOffsetForLine(
+          lineBox,
+          position - lineRect.topLeft,
+          lineRect.size,
+          lineStart,
+        );
+        return _OcrTapHit(
+          block: painted.block,
+          rawOffset: rawOffset,
+          blockRect: blockRect,
+          blockRectIsGlobal: blockRectIsGlobal,
+          vertical: lineBox.vertical,
+        );
+      }
+      lineStart += lineBox.text.length;
+    }
+
+    if (!blockRect.inflate(hitSlop).contains(position)) return null;
+    return _OcrTapHit(
+      block: painted.block,
+      rawOffset: _characterOffset(
+        painted.block,
+        position - blockRect.topLeft,
+        blockRect.size,
+      ),
+      blockRect: blockRect,
+      blockRectIsGlobal: blockRectIsGlobal,
+      vertical: painted.block.vertical,
+    );
+  }
+
+  void _revealHit(_OcrTapHit hit) {
+    if (identical(_activeBlock, hit.block)) return;
+    _activeBlock = hit.block;
+    _activeOffset = -1;
+    _matchLength = 0;
+    notifyListeners();
+  }
+
+  void _prefetchHit(_OcrTapHit hit) {
+    final ordered = _orderedBlock(hit.block);
+    if (ordered.isEmpty) return;
+    final orderedOffset = _toOrderedOffset(
+      hit.block,
+      hit.rawOffset,
+    ).clamp(0, ordered.length - 1);
+    if (!_isLookupStartChar(ordered[orderedOffset])) return;
+    final lookup = _extractOcrLookupString(ordered, orderedOffset);
+    if (lookup.isEmpty) return;
+    final key = '${identityHashCode(hit.block)}:$orderedOffset:$lookup';
+    if (_prefetchedLookupKey == key) return;
+    _prefetchedLookupKey = key;
+    unawaited(
+      DictionaryLookupPopup.lookup(
+        lookup,
+        miningContext: Future.value(_miningContext(ordered)),
+      ).then<void>(
+        (_) {},
+        onError: (_) {
+          if (_prefetchedLookupKey == key) _prefetchedLookupKey = null;
+        },
+      ),
+    );
+  }
+
+  MiningContext _miningContext(String sentence) {
+    final manga = data.chapter?.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
+    return MiningContext(
+      mediaType: MiningMediaType.manga,
+      mangaId: manga?.id,
+      sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+      sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+        source,
+        fallback: manga?.lang ?? '',
+      ),
+      sourceTitle: manga?.name ?? data.mangaName ?? '',
+      chapterTitle: data.chapter?.name ?? '',
+      sentence: sentence,
+      pageIndex: data.pageIndex,
+      sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
+      imageBytesLoader: () async => data.cropImage ?? await data.getImageBytes,
+    );
+  }
+
+  int _characterOffsetForLine(
+    _OcrLineBox lineBox,
+    Offset local,
+    Size size,
+    int lineStart,
+  ) {
+    final line = lineBox.text;
+    final char = lineBox.vertical
+        ? (local.dy / math.max(1, size.height / math.max(1, line.length)))
+              .floor()
+              .clamp(0, math.max(0, line.length - 1))
+        : (local.dx / math.max(1, size.width / math.max(1, line.length)))
+              .floor()
+              .clamp(0, math.max(0, line.length - 1));
+    return lineStart + char.toInt();
+  }
+
+  Future<bool> _activateHit(
+    BuildContext context,
+    _OcrTapHit hit, {
+    bool triggeredByHover = false,
+  }) async {
+    final block = hit.block;
+    final rawOffset = hit.rawOffset;
+    if (readerOcrShouldDismissRepeatedLookup(
+      popupVisible: DictionaryLookupPopup.isActive,
+      triggeredByHover: triggeredByHover,
+      sameBlock: identical(_activeBlock, block),
+      activeOffset: _activeOffset,
+      hitOffset: rawOffset,
+    )) {
+      _clearActive();
+      DictionaryLookupPopup.dismissActive();
+      return true;
+    }
+    final ordered = _orderedBlock(block);
+    if (ordered.isEmpty) return true;
+    final orderedOffset = _toOrderedOffset(
+      block,
+      rawOffset,
+    ).clamp(0, ordered.length - 1);
+    if (!_isLookupStartChar(ordered[orderedOffset])) {
+      if (triggeredByHover) {
+        ReaderOcrState._dismissHoverPopup();
+      } else if (!ReaderOcrState.dismissActiveLookup()) {
         _activeBlock = block;
         _activeOffset = rawOffset;
         _matchLength = 0;
         notifyListeners();
-        return true;
       }
-      final lookup = _extractOcrLookupString(ordered, orderedOffset);
-      _activeBlock = block;
-      _activeOffset = rawOffset;
-      _matchLength = 0;
-      notifyListeners();
-      if (lookup.isEmpty || !context.mounted) return true;
-
-      final box = context.findRenderObject() as RenderBox?;
-      final topLeft = box?.localToGlobal(rect.topLeft) ?? rect.topLeft;
-      final bottomRight =
-          box?.localToGlobal(rect.bottomRight) ?? rect.bottomRight;
-      final bytes = data.cropImage ?? await data.getImageBytes;
-      if (!context.mounted) return true;
-      await DictionaryLookupPopup.show(
-        context: context,
-        anchor: Rect.fromPoints(topLeft, bottomRight),
-        text: lookup,
-        miningContext: MiningContext(
-          mediaType: MiningMediaType.manga,
-          sourceTitle: data.chapter?.manga.value?.name ?? data.mangaName ?? '',
-          chapterTitle: data.chapter?.name ?? '',
-          sentence: ordered,
-          pageIndex: data.pageIndex,
-          sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
-          imageBytesLoader: () async => bytes,
-        ),
-        onMatchChanged: (length) {
-          _matchLength = math.max(0, length);
-          if (!_disposed) notifyListeners();
-        },
-      );
       return true;
     }
-    return false;
+    final lookup = _extractOcrLookupString(ordered, orderedOffset);
+    if (lookup.isEmpty) {
+      if (triggeredByHover) {
+        ReaderOcrState._dismissHoverPopup();
+      } else {
+        ReaderOcrState.dismissActiveLookup();
+      }
+      return true;
+    }
+    final hoverKey = triggeredByHover
+        ? '${identityHashCode(this)}:${identityHashCode(block)}:'
+              '$orderedOffset:$lookup'
+        : null;
+    final hoverGeneration = hoverKey == null
+        ? null
+        : ReaderOcrState._beginHoverLookup(hoverKey);
+    if (triggeredByHover && hoverGeneration == null) return true;
+    _activeBlock = block;
+    _activeOffset = rawOffset;
+    _matchLength = 0;
+    notifyListeners();
+    if (!context.mounted) {
+      if (triggeredByHover) ReaderOcrState._dismissHoverPopup();
+      return true;
+    }
+
+    final anchor = hit.blockRectIsGlobal
+        ? hit.blockRect
+        : _localAnchorFor(context, hit.blockRect);
+    if (triggeredByHover &&
+        !ReaderOcrState._isCurrentHoverLookup(hoverGeneration!, hoverKey!)) {
+      return true;
+    }
+    final handle = await DictionaryLookupPopup.show(
+      context: context,
+      anchor: anchor,
+      text: lookup,
+      miningContext: _miningContext(ordered),
+      placement: hit.vertical
+          ? DictionaryPopupPlacement.leftOrRight
+          : DictionaryPopupPlacement.aboveOrBelow,
+      onMatchChanged: (length) {
+        _matchLength = math.max(0, length);
+        if (!_disposed) notifyListeners();
+      },
+      dismissOnOutsideTap: !triggeredByHover,
+      onHoverChanged: triggeredByHover
+          ? ReaderOcrState._setHoveringPopup
+          : null,
+    );
+    if (triggeredByHover) {
+      ReaderOcrState._setHoverPopup(handle, hoverGeneration!, hoverKey!);
+    }
+    return true;
   }
 
-  Future<bool> handleGlobalTap(Offset globalPosition) async {
-    final imageContext = imageKey.currentContext;
-    final box = imageContext?.findRenderObject() as RenderBox?;
-    if (box == null || !box.attached || !box.hasSize) return false;
-    final localPosition = box.globalToLocal(globalPosition);
-    if (!(Offset.zero & box.size).contains(localPosition)) return false;
-    return handleTap(imageContext!, localPosition);
+  Rect _localRectToGlobal(RenderBox box, Rect rect) {
+    final points = [
+      box.localToGlobal(rect.topLeft),
+      box.localToGlobal(rect.topRight),
+      box.localToGlobal(rect.bottomLeft),
+      box.localToGlobal(rect.bottomRight),
+    ];
+    return Rect.fromLTRB(
+      points.map((point) => point.dx).reduce(math.min),
+      points.map((point) => point.dy).reduce(math.min),
+      points.map((point) => point.dx).reduce(math.max),
+      points.map((point) => point.dy).reduce(math.max),
+    );
+  }
+
+  double _hitSlopFor(Rect rect) =>
+      math.max(8.0, math.max(rect.width, rect.height) * 0.002);
+
+  Rect _localAnchorFor(BuildContext context, Rect rect) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return rect;
+    return _localRectToGlobal(box, rect);
   }
 
   void _enabledChanged() {
     if (enabled) load();
+    if (!_disposed) notifyListeners();
+  }
+
+  void _appearanceChanged() {
     if (!_disposed) notifyListeners();
   }
 
@@ -385,29 +1063,65 @@ class ReaderOcrController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     ReaderOcrState.enabled.removeListener(_enabledChanged);
+    ReaderOcrState.backgroundOpacity.removeListener(_appearanceChanged);
+    ReaderOcrState.textOpacity.removeListener(_appearanceChanged);
+    ReaderOcrState.outlineVisible.removeListener(_appearanceChanged);
     ReaderOcrState._controllers.remove(this);
     super.dispose();
+  }
+
+  static Future<void> _backfillMokuroSidecar(
+    UChapDataPreload data, {
+    required String sourceName,
+  }) async {
+    final path = data.localArtifactPath;
+    if (path == null || path.trim().isEmpty) return;
+    final type = await FileSystemEntity.type(path);
+    final FileSystemEntity? artifact = switch (type) {
+      FileSystemEntityType.file => File(path),
+      FileSystemEntityType.directory => Directory(path),
+      _ => null,
+    };
+    if (artifact == null) return;
+
+    final store = MokuroSidecarStore();
+    try {
+      await store.ensureDownloaded(
+        sourceName: sourceName,
+        chapterUrl: data.chapter?.url ?? '',
+        artifact: artifact,
+      );
+    } finally {
+      store.close();
+    }
   }
 
   static Future<_ReaderOcrPage> _recognize(
     UChapDataPreload data, {
     required OcrEnginePreference engine,
+    required String sourceName,
+    required bool useMokuroWebsiteOcr,
     required String language,
+    required bool ocrAllowed,
   }) async {
     final values = await Future.wait<dynamic>([
-      MiningPreferences.getOcrOverlayOpacity(),
       MiningPreferences.getOcrBoxScaleX(),
       MiningPreferences.getOcrBoxScaleY(),
-      MiningPreferences.getOcrOutlineVisible(),
     ]);
-    final opacity = values[0] as double;
-    final boxScaleX = values[1] as double;
-    final boxScaleY = values[2] as double;
-    final outlineVisible = values[3] as bool;
+    final boxScaleX = values[0] as double;
+    final boxScaleY = values[1] as double;
 
+    if (!ocrAllowed) {
+      return _ReaderOcrPage(
+        blocks: const [],
+        boxScaleX: boxScaleX,
+        boxScaleY: boxScaleY,
+      );
+    }
+
+    const parser = MokuroParser();
     if (engine != OcrEnginePreference.googleLens &&
         engine != OcrEnginePreference.screenAi) {
-      const parser = MokuroParser();
       final volume = await parser.findForReaderPage(data);
       final mokuroPage = volume == null
           ? null
@@ -417,22 +1131,46 @@ class ReaderOcrController extends ChangeNotifier {
         if (blocks.isNotEmpty || engine == OcrEnginePreference.mokuroOnly) {
           return _ReaderOcrPage(
             blocks: blocks,
-            opacity: opacity,
             boxScaleX: boxScaleX,
             boxScaleY: boxScaleY,
-            outlineVisible: outlineVisible,
           );
         }
       }
-      if (engine == OcrEnginePreference.mokuroOnly) {
-        return _ReaderOcrPage(
-          blocks: const [],
-          opacity: opacity,
-          boxScaleX: boxScaleX,
-          boxScaleY: boxScaleY,
-          outlineVisible: outlineVisible,
+    }
+
+    if (useMokuroWebsiteOcr) {
+      final client = MokuroExtensionOcrClient();
+      try {
+        final volume = await client.fetchVolume(
+          sourceName: sourceName,
+          chapterUrl: data.chapter?.url ?? '',
+          onLoadingChanged: ReaderOcrState._setMokuroWebsiteLoading,
         );
+        if (volume != null) {
+          await _backfillMokuroSidecar(data, sourceName: sourceName);
+        }
+        final mokuroPage = volume == null
+            ? null
+            : parser.resolvePage(volume, data: data);
+        if (mokuroPage != null) {
+          return _ReaderOcrPage(
+            blocks: parser.convertPage(mokuroPage),
+            boxScaleX: boxScaleX,
+            boxScaleY: boxScaleY,
+            usesMokuroWebsiteData: true,
+          );
+        }
+      } finally {
+        client.close();
       }
+    }
+
+    if (engine == OcrEnginePreference.mokuroOnly) {
+      return _ReaderOcrPage(
+        blocks: const [],
+        boxScaleX: boxScaleX,
+        boxScaleY: boxScaleY,
+      );
     }
 
     Uint8List? bytes = data.cropImage ?? await data.getImageBytes;
@@ -454,10 +1192,8 @@ class ReaderOcrController extends ChangeNotifier {
               engine == OcrEnginePreference.screenAi) {
             return _ReaderOcrPage(
               blocks: mergeOcrBlocks(result.blocks, language: language),
-              opacity: opacity,
               boxScaleX: boxScaleX,
               boxScaleY: boxScaleY,
-              outlineVisible: outlineVisible,
             );
           }
         } finally {
@@ -473,10 +1209,8 @@ class ReaderOcrController extends ChangeNotifier {
       final result = await client.recognize(bytes, language: language);
       return _ReaderOcrPage(
         blocks: mergeOcrBlocks(result.blocks, language: language),
-        opacity: opacity,
         boxScaleX: boxScaleX,
         boxScaleY: boxScaleY,
-        outlineVisible: outlineVisible,
       );
     } finally {
       client.close();
@@ -510,49 +1244,56 @@ class ReaderOcrController extends ChangeNotifier {
     required String text,
     required bool vertical,
     required bool active,
-    required double opacity,
-    required bool outlineVisible,
+    required double backgroundOpacity,
+    required double textOpacity,
     Rect? highlight,
     double rotation = 0,
   }) {
     if (text.isEmpty) return;
-    final backgroundAlpha = active ? math.max(0.70, opacity) : opacity;
-    final textAlpha = active ? 1.0 : opacity;
+    final contentOpacity = readerOcrContentOpacities(
+      backgroundOpacity: backgroundOpacity,
+      textOpacity: textOpacity,
+      active: active,
+    );
     canvas.save();
     if (rotation.abs() > 0.01) {
       canvas.translate(rect.center.dx, rect.center.dy);
       canvas.rotate(rotation * math.pi / 180);
       canvas.translate(-rect.center.dx, -rect.center.dy);
     }
-    if (backgroundAlpha > 0.01) {
+    if (contentOpacity.background > 0) {
       canvas.drawRect(
         rect,
-        Paint()..color = Colors.white.withValues(alpha: backgroundAlpha),
+        Paint()
+          ..color = Colors.white.withValues(alpha: contentOpacity.background),
       );
     }
+    // Lookup highlighting stays independent so 0% resembles native selection
+    // drawn directly over the source image.
     if (highlight != null && !highlight.isEmpty) {
       canvas.drawRect(
         highlight.intersect(rect),
         Paint()..color = _highlightColor.withValues(alpha: 0.45),
       );
     }
-    if (outlineVisible && active) {
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = active ? 2 : 1
-          ..color = active ? _outlineColor : Colors.transparent,
-      );
-    }
-    if (textAlpha > 0.01) {
+    if (contentOpacity.text > 0) {
       if (vertical) {
-        _paintVerticalText(canvas, rect, text, textAlpha);
+        _paintVerticalText(canvas, rect, text, contentOpacity.text);
       } else {
-        _paintHorizontalText(canvas, rect, text, textAlpha);
+        _paintHorizontalText(canvas, rect, text, contentOpacity.text);
       }
     }
     canvas.restore();
+  }
+
+  void _paintOcrOutline(Canvas canvas, Rect rect, {required bool active}) {
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = active ? 2 : 1.5
+        ..color = _outlineColor.withValues(alpha: active ? 1.0 : 0.70),
+    );
   }
 
   void _paintHorizontalText(
@@ -709,51 +1450,20 @@ class ReaderOcrController extends ChangeNotifier {
       height: size.height,
     ).intersect(imageRect);
   }
-
-  _OcrHit? _hitTestBlock(
-    OcrTextBlock block,
-    Offset localPosition,
-    Rect imageRect,
-    double scaleX,
-    double scaleY,
-  ) {
-    final boxes = _lineBoxes(block, imageRect, scaleX, scaleY);
-    var lineStart = 0;
-    for (final box in boxes) {
-      final line = box.text;
-      if (box.rect.contains(localPosition)) {
-        final local = localPosition - box.rect.topLeft;
-        final char = box.vertical
-            ? (local.dy /
-                      math.max(1, box.rect.height / math.max(1, line.length)))
-                  .floor()
-                  .clamp(0, math.max(0, line.length - 1))
-            : (local.dx /
-                      math.max(1, box.rect.width / math.max(1, line.length)))
-                  .floor()
-                  .clamp(0, math.max(0, line.length - 1));
-        return _OcrHit(lineStart + char.toInt());
-      }
-      lineStart += line.length;
-    }
-    return null;
-  }
 }
 
 class _ReaderOcrPage {
   const _ReaderOcrPage({
     required this.blocks,
-    required this.opacity,
     required this.boxScaleX,
     required this.boxScaleY,
-    required this.outlineVisible,
+    this.usesMokuroWebsiteData = false,
   });
 
   final List<OcrTextBlock> blocks;
-  final double opacity;
   final double boxScaleX;
   final double boxScaleY;
-  final bool outlineVisible;
+  final bool usesMokuroWebsiteData;
 }
 
 List<int> _orderedLineIndices(OcrTextBlock block) {
@@ -877,6 +1587,47 @@ bool _looksVertical(OcrLineGeometry geo) {
   return (geo.ymax - geo.ymin) / width > 1.2;
 }
 
+Rect readerOcrHitTestImageRect({
+  required Rect paintedImageRect,
+  required Size renderBoxSize,
+  required bool normalizePaintCoordinates,
+}) {
+  if (!normalizePaintCoordinates) return paintedImageRect;
+  return Alignment.center.inscribe(
+    paintedImageRect.size,
+    Offset.zero & renderBoxSize,
+  );
+}
+
+@visibleForTesting
+bool readerOcrShouldConsumeMissedTap({
+  required bool popupWasVisibleOnPointerDown,
+  required bool dismissedPopup,
+}) => popupWasVisibleOnPointerDown || dismissedPopup;
+
+@visibleForTesting
+bool readerOcrShouldDismissRepeatedLookup({
+  required bool popupVisible,
+  required bool triggeredByHover,
+  required bool sameBlock,
+  required int activeOffset,
+  required int hitOffset,
+}) =>
+    popupVisible && !triggeredByHover && sameBlock && activeOffset == hitOffset;
+
+@visibleForTesting
+({double background, double text}) readerOcrContentOpacities({
+  required double backgroundOpacity,
+  required double textOpacity,
+  required bool active,
+}) {
+  if (!active) return (background: 0.0, text: 0.0);
+  return (
+    background: backgroundOpacity.clamp(0.0, 1.0).toDouble(),
+    text: textOpacity.clamp(0.0, 1.0).toDouble(),
+  );
+}
+
 class _OcrLineBox {
   const _OcrLineBox({
     required this.text,
@@ -891,8 +1642,47 @@ class _OcrLineBox {
   final double rotation;
 }
 
-class _OcrHit {
-  const _OcrHit(this.rawOffset);
+class _PaintedOcrBlock {
+  const _PaintedOcrBlock({
+    required this.block,
+    required this.rect,
+    required this.lineBoxes,
+  });
 
+  final OcrTextBlock block;
+  final Rect rect;
+  final List<_OcrLineBox> lineBoxes;
+}
+
+class _OcrTapHit {
+  const _OcrTapHit({
+    required this.block,
+    required this.rawOffset,
+    required this.blockRect,
+    required this.vertical,
+    this.blockRectIsGlobal = false,
+  });
+
+  final OcrTextBlock block;
   final int rawOffset;
+  final Rect blockRect;
+  final bool vertical;
+  final bool blockRectIsGlobal;
+}
+
+class _GlobalOcrHit {
+  const _GlobalOcrHit({
+    required this.controller,
+    required this.context,
+    required this.tapHit,
+    required this.globalBlockRect,
+  });
+
+  final ReaderOcrController controller;
+  final BuildContext context;
+  final _OcrTapHit tapHit;
+  final Rect globalBlockRect;
+
+  double get globalBlockRectArea =>
+      globalBlockRect.width.abs() * globalBlockRect.height.abs();
 }

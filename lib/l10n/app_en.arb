@@ -286,6 +286,16 @@
   "default_subtitle_language": "Default subtitle language",
   "appearance": "Appearance",
   "appearance_subtitle": "Theme, date & time format",
+  "animation_speed": "Animation speed",
+  "animation_speed_description": "Lower values play animations faster.",
+  "animation_duration_percentage": "{percentage}% duration",
+  "@animation_duration_percentage": {
+    "placeholders": {
+      "percentage": {
+        "type": "int"
+      }
+    }
+  },
   "theme": "Theme",
   "dark_mode": "Dark mode",
   "follow_system_theme": "Follow system theme",
@@ -305,8 +315,16 @@
   "reading_mode_horizontal": "Horizontal",
   "reading_mode_left_to_right": "Left to Right",
   "reading_mode_right_to_left": "Right to Left",
+  "reading_direction": "Reading direction",
+  "reading_mode_horizontal_paged": "Horizontal paged",
+  "reading_mode_vertical_paged": "Vertical paged",
+  "reading_mode_horizontal_continuous": "Horizontal continuous",
   "reading_mode_vertical_continuous": "Vertical continuous",
   "reading_mode_webtoon": "Webtoon",
+  "default_page_mode": "Default page mode",
+  "page_mode_single": "Single page",
+  "page_mode_double": "Double page",
+  "page_mode_double_cover": "Double page with cover offset",
   "double_tap_animation_speed": "Double tap animation speed",
   "normal": "Normal",
   "fast": "Fast",
@@ -590,6 +608,7 @@
   "font": "Font",
   "color": "Color",
   "font_size": "Font size",
+  "subtitle_position": "Subtitle position",
   "text": "Text",
   "border": "Border",
   "background": "Background",
@@ -853,5 +872,34 @@
     }
   },
   "tts_settings": "TTS Settings",
-  "tts_default": "Default"
+  "tts_default": "Default",
+  "dictionary_lookup": "Dictionary",
+  "dictionary_settings": "Dictionary settings",
+  "dictionary_search_label": "Search",
+  "dictionary_search_hint": "Word, reading, or phrase",
+  "clear_search": "Clear search",
+  "dictionary_count": "{count} dictionaries",
+  "@dictionary_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dictionary_anki_deck": "Anki deck: {name}",
+  "@dictionary_anki_deck": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dictionary_load_failed": "Dictionary data could not be loaded",
+  "no_dictionaries_title": "No dictionaries installed",
+  "no_dictionaries_description": "Import a Yomitan dictionary to start looking up words.",
+  "manage_dictionaries": "Set up dictionaries",
+  "dictionary_empty_title": "Look up a word or phrase",
+  "dictionary_empty_description": "Search a term, expression, sentence, or block of text.",
+  "previous_lookup": "Previous lookup",
+  "next_lookup": "Next lookup"
 }

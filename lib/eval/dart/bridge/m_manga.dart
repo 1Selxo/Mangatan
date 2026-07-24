@@ -1,6 +1,22 @@
 import 'package:d4rt/d4rt.dart';
+import 'package:mangayomi/eval/model/m_chapter.dart';
 import 'package:mangayomi/eval/model/m_manga.dart';
 import 'package:mangayomi/models/manga.dart';
+
+List<T> unwrapBridgedList<T extends Object>(List? values) {
+  if (values == null) return [];
+
+  return values.map((value) {
+    final nativeValue = value is BridgedInstance
+        ? value.nativeObject
+        : value;
+    if (nativeValue is T) return nativeValue;
+    throw StateError(
+      'Expected $T from the Dart extension bridge, '
+      'but received ${nativeValue.runtimeType}.',
+    );
+  }).toList();
+}
 
 class MMangaBridge {
   final mMangaBridgedClass = BridgedClass(
@@ -12,11 +28,13 @@ class MMangaBridge {
           artist: namedArgs.get<String?>('artist'),
           author: namedArgs.get<String?>('author'),
           description: namedArgs.get<String?>('description'),
-          genre: namedArgs.get<List?>('genre')?.cast(),
+          genre: unwrapBridgedList<String>(namedArgs.get<List?>('genre')),
           status: namedArgs.get<Status?>('status') ?? Status.unknown,
           imageUrl: namedArgs.get<String?>('imageUrl'),
           link: namedArgs.get<String?>('link'),
-          chapters: namedArgs.get<List?>('chapters')?.cast() ?? [],
+          chapters: unwrapBridgedList<MChapter>(
+            namedArgs.get<List?>('chapters'),
+          ),
           name: namedArgs.get<String?>('name'),
         );
       },
@@ -42,7 +60,7 @@ class MMangaBridge {
       'description': (visitor, target, value) =>
           (target as MManga).description = value as String?,
       'genre': (visitor, target, value) =>
-          (target as MManga).genre = (value as List?)?.cast(),
+          (target as MManga).genre = unwrapBridgedList<String>(value as List?),
       'status': (visitor, target, value) =>
           (target as MManga).status = value as Status?,
       'imageUrl': (visitor, target, value) =>
@@ -50,7 +68,9 @@ class MMangaBridge {
       'link': (visitor, target, value) =>
           (target as MManga).link = value as String,
       'chapters': (visitor, target, value) =>
-          (target as MManga).chapters = (value as List?)?.cast(),
+          (target as MManga).chapters = unwrapBridgedList<MChapter>(
+            value as List?,
+          ),
     },
   );
   void registerBridgedClasses(D4rt interpreter) {

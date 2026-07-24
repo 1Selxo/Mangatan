@@ -8,6 +8,7 @@ class ChapterTransitionPage extends StatelessWidget {
   final Chapter? nextChapter;
   final String mangaName;
   final ReaderMode readerMode;
+  final ReadingDirection readingDirection;
 
   const ChapterTransitionPage({
     super.key,
@@ -15,6 +16,7 @@ class ChapterTransitionPage extends StatelessWidget {
     required this.nextChapter,
     required this.mangaName,
     required this.readerMode,
+    required this.readingDirection,
   });
 
   @override
@@ -165,7 +167,7 @@ class ChapterTransitionPage extends StatelessWidget {
 
     final Widget arrowIcon = Icon(
       nextChapter != null
-          ? (readerMode.isRTL
+          ? (readingDirection.isRtl
                 ? Icons.keyboard_arrow_left
                 : Icons.keyboard_arrow_right)
           : Icons.check_circle_outline,
@@ -207,7 +209,7 @@ class ChapterTransitionPage extends StatelessWidget {
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: readerMode.isRTL
+                children: readingDirection.isRtl
                     ? [
                         Expanded(child: nextCard),
                         const SizedBox(width: 12),
@@ -311,7 +313,7 @@ class ChapterTransitionPage extends StatelessWidget {
           RotatedBox(
             quarterTurns: readerMode.isVertical
                 ? 1 // turn 90° clockwise, so Icon is pointing down
-                : readerMode.isRTL
+                : readingDirection.isRtl
                 ? 2 // turn 180°, so Icon is pointing left
                 : 0, // no rotation, Icon points to the right.
             child: Icon(

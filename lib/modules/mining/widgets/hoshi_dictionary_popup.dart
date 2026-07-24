@@ -6,126 +6,418 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// Each result already contains every matching dictionary glossary. Keeping the
+// headword count bounded avoids copying a very large nested payload through
+// C++, Rust, Dart, and the WebView for every hover.
+const hoshiPopupMaxResults = 3;
+
+// Hoshidicts checks every prefix up to this length. Japanese words fit well
+// within 24 characters, while an 80-character subtitle run multiplies queries.
+const hoshiPopupScanLength = 24;
+
+class HoshiDictionaryNavigationState {
+  const HoshiDictionaryNavigationState({
+    required this.canGoBack,
+    required this.canGoForward,
+  });
+
+  static const empty = HoshiDictionaryNavigationState(
+    canGoBack: false,
+    canGoForward: false,
+  );
+
+  final bool canGoBack;
+  final bool canGoForward;
+}
+
+class HoshiDictionaryTextSelection {
+  const HoshiDictionaryTextSelection({
+    required this.text,
+    required this.sentence,
+    required this.rect,
+  });
+
+  final String text;
+  final String sentence;
+  final Rect rect;
+}
+
+class HoshiDictionaryPopupController {
+  _HoshiDictionaryPopupState? _state;
+
+  Future<void> goBack() => _state?._navigateBack() ?? Future.value();
+
+  Future<void> goForward() => _state?._navigateForward() ?? Future.value();
+
+  Future<void> clearSelection() => _state?._clearSelection() ?? Future.value();
+
+  void _attach(_HoshiDictionaryPopupState state) => _state = state;
+
+  void _detach(_HoshiDictionaryPopupState state) {
+    if (identical(_state, state)) _state = null;
+  }
+}
+
 class HoshiDictionaryPopup extends StatefulWidget {
   const HoshiDictionaryPopup({
     super.key,
     required this.text,
+    this.profile,
     this.miningContext,
+    this.initialResults,
+    this.controller,
     required this.preferences,
     required this.onMatchChanged,
+    required this.onDismiss,
+    this.onLoadingChanged,
+    this.onLookupError,
+    this.onNavigationChanged,
+    this.onTextSelected,
+    this.onTapOutside,
   });
 
   final String text;
-  final MiningContext? miningContext;
+  final DictionaryProfile? profile;
+  final FutureOr<MiningContext?> miningContext;
+  final Future<List<HoshiLookupResult>>? initialResults;
+  final HoshiDictionaryPopupController? controller;
   final DictionaryPopupPreferences preferences;
   final ValueChanged<int> onMatchChanged;
+  final VoidCallback onDismiss;
+  final ValueChanged<bool>? onLoadingChanged;
+  final ValueChanged<Object>? onLookupError;
+  final ValueChanged<HoshiDictionaryNavigationState>? onNavigationChanged;
+  final FutureOr<int> Function(HoshiDictionaryTextSelection selection)?
+  onTextSelected;
+  final VoidCallback? onTapOutside;
 
   @override
   State<HoshiDictionaryPopup> createState() => _HoshiDictionaryPopupState();
 }
 
 class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
-  late final Future<_HoshiPopupData> _shellFuture = _loadShell();
+  Future<_HoshiPopupData>? _shellFuture;
+  late Future<Map<String, String>> _stylesFuture;
   InAppWebViewController? _controller;
   List<HoshiLookupResult> _results = const [];
   List<Map<String, dynamic>> _entries = const [];
+  Map<String, Map<String, String>> _dictionaryMediaData = const {};
   bool _exporting = false;
   bool _webReady = false;
   int _lookupGeneration = 0;
+  int _cachedMatchNotificationGeneration = 0;
   Future<void> _javascriptQueue = Future<void>.value();
+  Player? _audioPlayer;
+  String? _requestedQuery;
+  String? _resultQuery;
+  String? _renderedQuery;
+  String _emptyMessage = 'No dictionary results found.';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller?._attach(this);
+    if (widget.text.trim().isNotEmpty) {
+      unawaited(
+        _lookupAndRender(
+          widget.text,
+          notifyMatch: true,
+          initialResults: widget.initialResults,
+        ),
+      );
+    }
+    _stylesFuture = _loadStyles();
+  }
 
   @override
   void didUpdateWidget(covariant HoshiDictionaryPopup oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text && _webReady) {
-      unawaited(_lookupAndRender(widget.text, notifyMatch: true));
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
+    final profileChanged =
+        _profileRevision(oldWidget.profile) != _profileRevision(widget.profile);
+    if (profileChanged) {
+      _shellFuture = null;
+      _stylesFuture = _loadStyles();
+    }
+    if (oldWidget.text != widget.text || profileChanged) {
+      unawaited(
+        _lookupAndRender(
+          widget.text,
+          notifyMatch: true,
+          initialResults: widget.initialResults,
+        ),
+      );
+    } else if (oldWidget.initialResults != widget.initialResults) {
+      if (_resultQuery == widget.text.trim() && _results.isNotEmpty) {
+        _notifyCachedMatchAfterBuild();
+      } else {
+        // Retry an empty or stale result even when the spelling is unchanged
+        // (for example after a failed lookup or dictionary reload).
+        unawaited(
+          _lookupAndRender(
+            widget.text,
+            notifyMatch: true,
+            initialResults: widget.initialResults,
+          ),
+        );
+      }
+    } else if (oldWidget.onMatchChanged != widget.onMatchChanged &&
+        _resultQuery == widget.text.trim() &&
+        _renderedQuery == widget.text.trim() &&
+        _results.isNotEmpty) {
+      // A warm popup can be presented for the same spelling at a different
+      // reader position. Replay the match only after the new frame is built.
+      _notifyCachedMatchAfterBuild();
     }
   }
 
-  Future<_HoshiPopupData> _loadShell() async {
-    final theme = Theme.of(context);
-    final dark = _isDarkPopup(context, widget.preferences.theme);
+  void _notifyCachedMatchAfterBuild() {
+    // didUpdateWidget runs while the popup subtree is building. Its listener
+    // may belong to another overlay tree, so only notify once the frame ends.
+    final generation = ++_cachedMatchNotificationGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _cachedMatchNotificationGeneration ||
+          _resultQuery != widget.text.trim() ||
+          _results.isEmpty) {
+        return;
+      }
+      widget.onMatchChanged(_results.first.matched.length);
+    });
+  }
+
+  Future<_HoshiPopupData> _loadShell({
+    required ThemeData theme,
+    required bool dark,
+  }) async {
     final values = await Future.wait<dynamic>([
       rootBundle.loadString('assets/hoshi_popup/popup.css'),
       rootBundle.loadString('assets/hoshi_popup/popup.js'),
       rootBundle.loadString('assets/hoshi_popup/selection.js'),
-      HoshidictsLookupBackend.instance.getStyles().catchError(
-        (_) => <HoshiDictionaryStyle>[],
-      ),
+      MiningPreferences.getAnkiAudioPreferences(),
+      _resolvedProfile(),
     ]);
-    final styles = values[3] as List<HoshiDictionaryStyle>;
+    final profile = values[4] as DictionaryProfile;
     return _HoshiPopupData(
       html: buildHoshiPopupHtml(
         popupCss: values[0] as String,
         popupJs: values[1] as String,
         selectionJs: values[2] as String,
+        audioPreferences: values[3] as AnkiAudioPreferences,
+        allowDuplicates: profile.duplicateAction == 'allow',
+        profile: profile,
         preferences: widget.preferences,
         theme: theme,
         dark: dark,
       ),
-      styles: {for (final style in styles) style.dictName: style.styles},
     );
   }
 
-  void _setResults(List<HoshiLookupResult> results) {
+  Future<Map<String, String>> _loadStyles() async {
+    final styles = await HoshidictsLookupBackend.instance
+        .getStyles(profile: widget.profile)
+        .catchError((_) => <HoshiDictionaryStyle>[]);
+    return {for (final style in styles) style.dictName: style.styles};
+  }
+
+  void _setResults(
+    List<HoshiLookupResult> results, {
+    required Map<String, Map<String, String>> dictionaryMediaData,
+  }) {
     _results = results;
     _entries = hoshiPopupEntries(results);
+    _dictionaryMediaData = dictionaryMediaData;
+  }
+
+  Future<Map<String, Map<String, String>>> _loadPopupMedia(
+    List<HoshiLookupResult> results,
+  ) {
+    if (_usesStableCustomSchemes) return Future.value(const {});
+    return hoshiPopupMediaDataUris(
+      results,
+      (dictionary, path) => HoshidictsLookupBackend.instance.getMediaFile(
+        dictName: dictionary,
+        mediaPath: path,
+        profile: widget.profile,
+      ),
+      existing: _dictionaryMediaData,
+    );
   }
 
   Future<void> _lookupAndRender(
     String text, {
     required bool notifyMatch,
+    Future<List<HoshiLookupResult>>? initialResults,
   }) async {
     final generation = ++_lookupGeneration;
+    _cachedMatchNotificationGeneration++;
     final query = text.trim();
-    final results = query.isEmpty
-        ? <HoshiLookupResult>[]
-        : await HoshidictsLookupBackend.instance.lookup(
-            query,
-            maxResults: 20,
-            scanLength: 80,
-          );
-    if (!mounted || generation != _lookupGeneration) return;
-    _setResults(results);
-    if (notifyMatch && results.isNotEmpty) {
-      widget.onMatchChanged(results.first.matched.length);
+    _requestedQuery = query;
+    _notifyLoadingChanged(query.isNotEmpty);
+    try {
+      final results = query.isEmpty
+          ? <HoshiLookupResult>[]
+          : await (initialResults ??
+                HoshidictsLookupBackend.instance.lookup(
+                  query,
+                  maxResults: hoshiPopupMaxResults,
+                  scanLength: hoshiPopupScanLength,
+                  profile: widget.profile,
+                ));
+      if (!mounted || generation != _lookupGeneration) return;
+      final unchanged = query == _resultQuery && identical(results, _results);
+      _setResults(
+        results,
+        dictionaryMediaData: unchanged
+            ? _dictionaryMediaData
+            : const <String, Map<String, String>>{},
+      );
+      _resultQuery = query;
+      _emptyMessage = 'No dictionary results found.';
+      if (!unchanged) await _replaceRender();
+      if (!mounted || generation != _lookupGeneration) return;
+      if (_webReady) _renderedQuery = query;
+      if (notifyMatch && _webReady && results.isNotEmpty) {
+        // Notify the reader only after the warm WebView has accepted the new
+        // render request. A prefetched hidden render can therefore complete
+        // before presentation without moving the reader highlight early.
+        widget.onMatchChanged(results.first.matched.length);
+      }
+      if (!unchanged && !_usesStableCustomSchemes && results.isNotEmpty) {
+        unawaited(_hydratePopupMedia(generation, results));
+      }
+    } catch (error) {
+      if (!mounted || generation != _lookupGeneration) return;
+      _setResults(const [], dictionaryMediaData: const {});
+      _resultQuery = query;
+      _emptyMessage = 'Dictionary lookup failed. Search again to retry.';
+      widget.onLookupError?.call(error);
+      await _replaceRender();
+      if (mounted && generation == _lookupGeneration && _webReady) {
+        _renderedQuery = query;
+      }
+    } finally {
+      if (mounted && generation == _lookupGeneration) {
+        _notifyLoadingChanged(false);
+      }
     }
-    await _replaceRender();
+  }
+
+  Future<void> _hydratePopupMedia(
+    int generation,
+    List<HoshiLookupResult> results,
+  ) async {
+    try {
+      final dictionaryMediaData = await _loadPopupMedia(results);
+      if (!mounted || generation != _lookupGeneration) return;
+      _dictionaryMediaData = dictionaryMediaData;
+      await _replaceRender();
+    } catch (_) {
+      // The text definitions are already rendered. Missing optional media
+      // must not delay or invalidate the lookup/highlight interaction.
+    }
+  }
+
+  void _notifyLoadingChanged(bool loading) {
+    if (widget.onLoadingChanged == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onLoadingChanged?.call(loading);
+    });
   }
 
   Future<int> _lookupRedirect(String query) async {
+    final generation = ++_lookupGeneration;
+    final normalized = query.trim();
+    _requestedQuery = normalized;
     final results = await HoshidictsLookupBackend.instance.lookup(
-      query,
-      maxResults: 20,
-      scanLength: 80,
+      normalized,
+      maxResults: hoshiPopupMaxResults,
+      scanLength: hoshiPopupScanLength,
+      profile: widget.profile,
     );
-    _setResults(results);
+    if (!mounted || generation != _lookupGeneration) return 0;
+    final dictionaryMediaData = await _loadPopupMedia(results);
+    if (!mounted || generation != _lookupGeneration) return 0;
+    _setResults(results, dictionaryMediaData: dictionaryMediaData);
+    _resultQuery = normalized;
+    _renderedQuery = normalized;
     return _entries.length;
   }
 
   Future<bool> _isDuplicate(String expression) async {
     try {
-      final profile = await MiningPreferences.getAnkiProfile();
+      final dictionaryProfile = await _resolvedProfile();
+      final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled || !profile.duplicateCheck) return false;
       final service = AnkiConnectService(
         endpoint: await MiningPreferences.getAnkiEndpoint(),
       );
-      final notes = await service.findDuplicateExpressions(
+      final status = await service.checkDuplicateExpression(
         deckName: profile.deckName,
+        modelName: profile.modelName,
         expression: expression,
+        duplicateScope: profile.duplicateScope,
+        checkAllModels: profile.checkAllModels,
       );
-      return notes.isNotEmpty;
+      return status.isDuplicate;
     } catch (_) {
+      return false;
+    }
+  }
+
+  Future<List<int>> _duplicateNoteIds(String expression) async {
+    try {
+      final dictionaryProfile = await _resolvedProfile();
+      final profile = dictionaryProfile.anki;
+      if (!profile.ankiEnabled) return const [];
+      return AnkiConnectService(
+        endpoint: await MiningPreferences.getAnkiEndpoint(),
+      ).findDuplicateNoteIds(
+        deckName: profile.deckName,
+        modelName: profile.modelName,
+        expression: expression,
+        duplicateScope: profile.duplicateScope,
+      );
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<bool> _browseDuplicateNotes(Object? rawIds) async {
+    final ids = rawIds is Iterable
+        ? rawIds
+              .map(
+                (value) =>
+                    value is num ? value.toInt() : int.tryParse('$value'),
+              )
+              .whereType<int>()
+              .toList(growable: false)
+        : const <int>[];
+    if (ids.isEmpty) return false;
+    try {
+      await AnkiConnectService(
+        endpoint: await MiningPreferences.getAnkiEndpoint(),
+      ).browseNotes(ids);
+      return true;
+    } catch (error) {
+      botToast('Could not open Anki browser: $error', second: 5);
       return false;
     }
   }
@@ -142,11 +434,12 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
     }
     if (result == null || _exporting) return false;
-    final miningContext = widget.miningContext;
-    if (miningContext == null) return false;
     setState(() => _exporting = true);
     try {
-      final profile = await MiningPreferences.getAnkiProfile();
+      final miningContext = await widget.miningContext;
+      if (miningContext == null) return false;
+      final dictionaryProfile = await _resolvedProfile();
+      final profile = dictionaryProfile.anki;
       if (!profile.ankiEnabled) {
         botToast('Anki export is disabled in Dictionary settings', second: 4);
         return false;
@@ -154,12 +447,20 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       final dictionaryMedia = await _loadAnkiDictionaryMedia(
         content['dictionaryMedia'],
       );
+      final audioPreferences =
+          await MiningPreferences.getAnkiAudioPreferences();
+      final wordAudio = await AnkiAudioService().fetchTermAudio(
+        term: result.term.expression,
+        reading: result.term.reading,
+        preferences: audioPreferences,
+      );
       final draft = await const AnkiCardBuilder().build(
         result: result,
         context: miningContext,
         profile: profile,
         renderedContent: content,
         dictionaryMedia: dictionaryMedia,
+        wordAudio: wordAudio,
       );
       final noteId =
           await AnkiConnectService(
@@ -167,10 +468,18 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           ).exportDraft(
             draft,
             duplicateCheck: profile.duplicateCheck,
+            allowDuplicate:
+                content['allowDuplicate'] == true ||
+                dictionaryProfile.duplicateAction == 'allow',
+            duplicateScope: profile.duplicateScope,
+            checkAllModels: profile.checkAllModels,
             syncOnCreate: profile.syncOnCreate,
           );
       botToast('Added to Anki (#$noteId)', second: 3);
       return true;
+    } on AnkiDuplicateException {
+      botToast('Already in Anki', second: 3);
+      return false;
     } catch (error) {
       botToast('Anki export failed: $error', second: 5);
       return false;
@@ -199,6 +508,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
         dictName: dictionary,
         mediaPath: path,
+        profile: widget.profile,
       );
       if (bytes == null || bytes.isEmpty) continue;
       files.add(
@@ -231,13 +541,62 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     controller.addJavaScriptHandler(
       handlerName: 'textSelected',
       callback: (arguments) async {
-        final text = _argumentMap(arguments)['text']?.toString() ?? '';
+        final body = _argumentMap(arguments);
+        final text = body['text']?.toString() ?? '';
         if (text.trim().isEmpty) return 0;
+        final onTextSelected = widget.onTextSelected;
+        if (onTextSelected != null) {
+          final rawRect = body['rect'];
+          final rect = rawRect is Map
+              ? Rect.fromLTWH(
+                  (rawRect['x'] as num?)?.toDouble() ?? 0,
+                  (rawRect['y'] as num?)?.toDouble() ?? 0,
+                  (rawRect['width'] as num?)?.toDouble() ?? 1,
+                  (rawRect['height'] as num?)?.toDouble() ?? 1,
+                )
+              : const Rect.fromLTWH(0, 0, 1, 1);
+          final count = await onTextSelected(
+            HoshiDictionaryTextSelection(
+              text: text,
+              sentence: body['sentence']?.toString() ?? '',
+              rect: rect,
+            ),
+          );
+          if (count > 0) {
+            await _evaluateJavascript(
+              'window.hoshiSelection?.highlightSelection?.($count);',
+            );
+          }
+          return count;
+        }
         final count = await _lookupRedirect(text);
         if (count > 0) {
-          await controller.evaluateJavascript(source: 'redirect($count);');
+          await _evaluateJavascript('redirect($count);');
         }
         return count;
+      },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'dictionaryMedia',
+      callback: (arguments) async {
+        final body = _argumentMap(arguments);
+        final dictionary = body['dictionary']?.toString() ?? '';
+        final path = body['path']?.toString() ?? '';
+        if (dictionary.isEmpty || path.isEmpty) return null;
+        final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
+          dictName: dictionary,
+          mediaPath: path,
+          profile: widget.profile,
+        );
+        if (bytes == null || bytes.isEmpty) return null;
+        return 'data:${_mediaMimeType(path)};base64,${base64Encode(bytes)}';
+      },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'dismissPopup',
+      callback: (_) {
+        widget.onDismiss();
+        return true;
       },
     );
     controller.addJavaScriptHandler(
@@ -246,8 +605,27 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           _isDuplicate(arguments.isEmpty ? '' : arguments.first.toString()),
     );
     controller.addJavaScriptHandler(
+      handlerName: 'duplicateNotes',
+      callback: (arguments) => _duplicateNoteIds(
+        arguments.isEmpty ? '' : arguments.first.toString(),
+      ),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'browseNotes',
+      callback: (arguments) =>
+          _browseDuplicateNotes(arguments.isEmpty ? null : arguments.first),
+    );
+    controller.addJavaScriptHandler(
       handlerName: 'mineEntry',
       callback: (arguments) => _mine(_argumentMap(arguments)),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'getTermAudioSources',
+      callback: (arguments) => _getTermAudioSources(_argumentMap(arguments)),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'playWordAudio',
+      callback: (arguments) => _playWordAudio(_argumentMap(arguments)),
     );
     controller.addJavaScriptHandler(
       handlerName: 'openLink',
@@ -257,13 +635,58 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         return uri != null && await launchUrl(uri);
       },
     );
-    for (final name in const [
-      'tapOutside',
-      'swipeDismiss',
-      'buttonRects',
-      'playWordAudio',
-    ]) {
+    controller.addJavaScriptHandler(
+      handlerName: 'navigationChanged',
+      callback: (arguments) {
+        final state = _argumentMap(arguments);
+        widget.onNavigationChanged?.call(
+          HoshiDictionaryNavigationState(
+            canGoBack: state['canGoBack'] == true,
+            canGoForward: state['canGoForward'] == true,
+          ),
+        );
+        return true;
+      },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'tapOutside',
+      callback: (_) {
+        widget.onTapOutside?.call();
+        return true;
+      },
+    );
+    for (final name in const ['swipeDismiss', 'buttonRects']) {
       controller.addJavaScriptHandler(handlerName: name, callback: (_) => null);
+    }
+  }
+
+  Future<List<Map<String, String>>> _getTermAudioSources(
+    Map<String, dynamic> content,
+  ) async {
+    final expression = content['expression']?.toString() ?? '';
+    if (expression.trim().isEmpty) return const [];
+    final reading = content['reading']?.toString() ?? expression;
+    final preferences = await MiningPreferences.getAnkiAudioPreferences();
+    final sources = await AnkiAudioService().resolveTermAudioSources(
+      term: expression,
+      reading: reading,
+      preferences: preferences,
+    );
+    return [for (final source in sources) source.toJson()];
+  }
+
+  Future<bool> _playWordAudio(Map<String, dynamic> content) async {
+    final url = content['url']?.toString() ?? '';
+    if (url.trim().isEmpty) return false;
+    try {
+      final player = _audioPlayer ??= Player();
+      if (content['mode']?.toString() == 'interrupt') {
+        await player.stop();
+      }
+      await player.open(Media(url));
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -277,6 +700,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
       dictName: dictionary,
       mediaPath: path,
+      profile: widget.profile,
     );
     if (bytes == null) return null;
     return CustomSchemeResponse(
@@ -286,16 +710,22 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     );
   }
 
-  Future<void> _render(_HoshiPopupData data) async {
+  Future<void> _render(Map<String, String> styles) async {
     await _evaluateJavascript(
-      'window.dictionaryStyles = ${jsonEncode(data.styles)};'
-      '${hoshiReplaceRenderScriptForEntries(_entries)}',
+      'window.dictionaryStyles = ${jsonEncode(styles)};'
+      '${hoshiReplaceRenderScriptForEntries(_entries, mediaDataUris: _dictionaryMediaData, emptyMessage: _emptyMessage)}',
     );
   }
 
   Future<void> _replaceRender() async {
     if (!_webReady) return;
-    await _evaluateJavascript(hoshiReplaceRenderScriptForEntries(_entries));
+    await _evaluateJavascript(
+      hoshiReplaceRenderScriptForEntries(
+        _entries,
+        mediaDataUris: _dictionaryMediaData,
+        emptyMessage: _emptyMessage,
+      ),
+    );
   }
 
   Future<void> _evaluateJavascript(String source) {
@@ -309,6 +739,23 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return current;
   }
 
+  Future<void> _navigateBack() =>
+      _evaluateJavascript('window.navigateBack?.();');
+
+  Future<void> _navigateForward() =>
+      _evaluateJavascript('window.navigateForward?.();');
+
+  Future<void> _clearSelection() => _evaluateJavascript(
+    'window.hoshiSelection?.clearSelection?.();'
+    'window.getSelection?.()?.removeAllRanges?.();',
+  );
+
+  Future<DictionaryProfile> _resolvedProfile() async =>
+      widget.profile ?? await MiningPreferences.getActiveDictionaryProfile();
+
+  String _profileRevision(DictionaryProfile? profile) =>
+      profile == null ? '' : jsonEncode(profile.toJson());
+
   void _scrollPopupBy(Offset delta) {
     if (!_webReady || delta == Offset.zero) return;
     unawaited(
@@ -320,15 +767,40 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   @override
+  void dispose() {
+    widget.controller?._detach(this);
+    _audioPlayer?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (!_webReady) _shellFuture = null;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final shellFuture = _shellFuture ??= _loadShell(
+      theme: theme,
+      dark: _isDarkPopup(theme.brightness, widget.preferences.theme),
+    );
     return FutureBuilder<_HoshiPopupData>(
-      future: _shellFuture,
+      future: shellFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Lookup failed: ${snapshot.error}'));
+          return Center(
+            child: TextButton(
+              onPressed: () => setState(() => _shellFuture = null),
+              child: const Text(
+                'Dictionary popup failed to load. Tap to retry.',
+              ),
+            ),
+          );
         }
         final data = snapshot.data!;
         return Listener(
@@ -361,8 +833,18 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             },
             onLoadStop: (_, _) async {
               _webReady = true;
-              await _render(data);
-              await _lookupAndRender(widget.text, notifyMatch: true);
+              await _render(await _stylesFuture);
+              _renderedQuery = _resultQuery;
+              if (_resultQuery == widget.text.trim() && _results.isNotEmpty) {
+                widget.onMatchChanged(_results.first.matched.length);
+              }
+              if (_requestedQuery != widget.text.trim()) {
+                await _lookupAndRender(
+                  widget.text,
+                  notifyMatch: true,
+                  initialResults: widget.initialResults,
+                );
+              }
             },
             onLoadResourceWithCustomScheme: _usesStableCustomSchemes
                 ? (_, request) => _loadDictionaryMedia(request)
@@ -381,23 +863,42 @@ Map<String, dynamic> _argumentMap(List<dynamic> arguments) {
 
 @visibleForTesting
 String hoshiReplaceRenderScript(int entryCount) =>
+    'window.resetHoshiAudioCaches?.();'
+    'window.resetHoshiNavigation?.();'
+    'window.resetHoshiDictionaryStyles?.();'
+    'window.getSelection?.()?.removeAllRanges?.();'
+    'window.scrollTo(0, 0);'
     'window.lookupEntries = undefined;'
     'window.entryCount = $entryCount;'
     'document.getElementById("entries-container").innerHTML = "";'
     'window.renderPopup();';
 
 @visibleForTesting
-String hoshiReplaceRenderScriptForEntries(List<Map<String, dynamic>> entries) =>
+String hoshiReplaceRenderScriptForEntries(
+  List<Map<String, dynamic>> entries, {
+  Map<String, Map<String, String>> mediaDataUris = const {},
+  String emptyMessage = 'No dictionary results found.',
+}) =>
     '(function(){'
     'window.__mangayomiHoshiRenderToken = '
     '(window.__mangayomiHoshiRenderToken || 0) + 1;'
+    'window.resetHoshiAudioCaches?.();'
+    'window.resetHoshiNavigation?.();'
+    'window.resetHoshiDictionaryStyles?.();'
+    'window.getSelection?.()?.removeAllRanges?.();'
+    'window.scrollTo(0, 0);'
+    'window.hoshiDictionaryMedia = ${jsonEncode(mediaDataUris)};'
     'window.lookupEntries = ${jsonEncode(entries)};'
     'window.entryCount = window.lookupEntries.length;'
     'const container = document.getElementById("entries-container");'
     'if (container) container.textContent = "";'
     'if (window.entryCount === 0) {'
-    'if (container) container.innerHTML = '
-    '"<div class=\\"popup-empty\\">No dictionary results found.</div>";'
+    'if (container) {'
+    'const empty = document.createElement("div");'
+    'empty.className = "popup-empty";'
+    'empty.textContent = ${jsonEncode(emptyMessage)};'
+    'container.replaceChildren(empty);'
+    '}'
     'return;'
     '}'
     'window.renderPopup();'
@@ -405,6 +906,40 @@ String hoshiReplaceRenderScriptForEntries(List<Map<String, dynamic>> entries) =>
 
 List<Map<String, dynamic>> hoshiPopupEntries(List<HoshiLookupResult> results) =>
     [for (final result in results) hoshiPopupEntry(result)];
+
+typedef HoshiPopupMediaLoader =
+    Future<Uint8List?> Function(String dictionary, String path);
+
+@visibleForTesting
+Future<Map<String, Map<String, String>>> hoshiPopupMediaDataUris(
+  List<HoshiLookupResult> results,
+  HoshiPopupMediaLoader load, {
+  Map<String, Map<String, String>> existing = const {},
+}) async {
+  final requested = <(String, String)>{};
+  for (final result in results) {
+    for (final glossary in result.term.glossaries) {
+      for (final path in yomitanGlossaryMediaPaths(glossary.glossary)) {
+        requested.add((glossary.dictName, path));
+      }
+    }
+  }
+
+  final media = <String, Map<String, String>>{};
+  for (final (dictionary, path) in requested) {
+    final cached = existing[dictionary]?[path];
+    if (cached != null) {
+      (media[dictionary] ??= {})[path] = cached;
+      continue;
+    }
+    final bytes = await load(dictionary, path);
+    if (bytes == null || bytes.isEmpty) continue;
+    final dataUri =
+        'data:${_mediaMimeType(path)};base64,${base64Encode(bytes)}';
+    (media[dictionary] ??= {})[path] = dataUri;
+  }
+  return media;
+}
 
 Map<String, dynamic> hoshiPopupEntry(HoshiLookupResult result) {
   final term = result.term;
@@ -451,6 +986,12 @@ String buildHoshiPopupHtml({
   required String popupCss,
   required String popupJs,
   required String selectionJs,
+  required AnkiAudioPreferences audioPreferences,
+  required bool allowDuplicates,
+  DictionaryProfile profile = const DictionaryProfile(
+    id: 'mangatan-default',
+    name: 'Default',
+  ),
   required DictionaryPopupPreferences preferences,
   required ThemeData theme,
   required bool dark,
@@ -458,6 +999,10 @@ String buildHoshiPopupHtml({
   final scale = preferences.fontSize / 15;
   final customCss = jsonEncode(preferences.customCss);
   final colorScheme = dark ? 'dark' : 'light';
+  final language = const HtmlEscape(
+    HtmlEscapeMode.attribute,
+  ).convert(profile.languageCode);
+  final languageAttribute = language.isEmpty ? '' : ' lang="$language"';
   final scheme = theme.colorScheme;
   final background = _cssColor(
     preferences.theme == DictionaryThemePreference.black
@@ -483,16 +1028,27 @@ String buildHoshiPopupHtml({
   final primary = _cssColor(scheme.primary);
   final primaryContainer = _cssColor(scheme.primaryContainer);
   final onPrimaryContainer = _cssColor(scheme.onPrimaryContainer);
+  final audioSources =
+      audioPreferences.enabled && audioPreferences.url.trim().isNotEmpty
+      ? [audioPreferences.url.trim()]
+      : const <String>[];
   const nativeHandlers = [
     'getEntries',
     'lookupRedirect',
     'textSelected',
+    'dismissPopup',
     'mineEntry',
+    'duplicateCheck',
+    'duplicateNotes',
+    'browseNotes',
     'openLink',
+    'getTermAudioSources',
+    'playWordAudio',
+    'navigationChanged',
   ];
   final html =
       '''<!DOCTYPE html>
-<html style="color-scheme: $colorScheme">
+<html$languageAttribute style="color-scheme: $colorScheme">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>$popupCss</style>
@@ -516,49 +1072,89 @@ String buildHoshiPopupHtml({
     }
     html { overflow-x: hidden; overflow-y: auto; }
     body { min-height: 101%; }
-    .entry, .entry * { color: var(--text-color); }
-    .dict-label, .deinflection-tag, .glossary-tag { color: var(--text-color-light1); }
-    .glossary-group {
-      background-color: $elevated;
-      color: var(--text-color);
-      box-shadow: none;
-    }
-    .glossary-content, .glossary-content * { color: var(--text-color); }
-    .tag-row, .tag-row * { color: var(--text-color-light1); }
-    .popup-empty {
-      min-height: calc(140px * var(--popup-scale));
-      display: grid;
-      place-items: center;
-      color: var(--text-color-light2);
-      font-size: calc(14px * var(--popup-scale));
-    }
-    .button-slot { cursor: pointer; display: grid; place-items: center; color: var(--text-color-light2); }
-    .button-slot::before { content: '+'; font: 500 calc(25px * var(--popup-scale))/1 sans-serif; }
-    .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }
-    .button-slot[data-enabled="false"] { opacity: .45; pointer-events: none; }
-  </style>
+	    .entry, .entry * { color: var(--text-color); }
+	    .dict-label, .deinflection-tag, .glossary-tag { color: var(--text-color-light1); }
+	    .glossary-group {
+	      background-color: $elevated;
+	      color: var(--text-color);
+	      box-shadow: none;
+	    }
+	    .glossary-content, .glossary-content * { color: var(--text-color); }
+	    .tag-row, .tag-row * { color: var(--text-color-light1); }
+	    .frequency-dict-label, .pitch-dict-label { color: #fff; }
+	    .overlay {
+	      background: var(--background-color-dark1);
+	      color: var(--text-color);
+	    }
+	    .overlay-content, .overlay-close { color: var(--text-color); }
+		    .popup-empty {
+	      min-height: calc(140px * var(--popup-scale));
+	      display: grid;
+	      place-items: center;
+	      color: var(--text-color-light2);
+	      font-size: calc(14px * var(--popup-scale));
+	    }
+		    .button-slot { cursor: pointer; display: grid; place-items: center; color: var(--text-color-light2); }
+		    .button-slot[hidden] { display: none; }
+		    .button-slot::before { content: none; }
+		    .button-slot[data-state="loading"] .slot-icon,
+		    .button-slot[data-state="error"] .slot-icon,
+		    .button-slot[data-state="duplicate"] .slot-icon { display: none; }
+		    .slot-icon {
+		      display: block;
+		      width: calc(23px * var(--popup-scale));
+		      height: calc(23px * var(--popup-scale));
+		      color: inherit;
+		      overflow: visible;
+		    }
+		    .plus-line {
+		      fill: currentColor;
+		      shape-rendering: crispEdges;
+		    }
+		    .audio-icon { transform: translate(calc(1px * var(--popup-scale)), calc(1px * var(--popup-scale))); }
+		    .audio-speaker-body { fill: currentColor; }
+		    .browse-line {
+		      fill: none;
+		      stroke: currentColor;
+		      stroke-width: 1.8;
+		      stroke-linejoin: round;
+		    }
+			    .audio-wave {
+			      fill: none;
+			      stroke: currentColor;
+		      stroke-width: 2;
+		      stroke-linecap: round;
+		      stroke-linejoin: round;
+		    }
+		    .button-slot[data-state="loading"]::before { content: '…'; font-size: calc(18px * var(--popup-scale)); }
+		    .button-slot[data-state="error"]::before { content: '!'; font-size: calc(18px * var(--popup-scale)); }
+		    .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }
+	    .button-slot[data-enabled="false"] { opacity: .45; pointer-events: none; }
+	  </style>
   <script>
-    window.collapseMode = 'Expand All';
-    window.expandFirstDictionary = true;
-    window.collapsedDictionaries = [];
+    window.dictionaryCollapseMode = ${jsonEncode(profile.dictionaryCollapseMode)};
+    window.dictionaryDisplayModes = ${jsonEncode(profile.dictionaryDisplayModes)};
+    window.dictionaryOrder = ${jsonEncode(profile.dictionaryOrder)};
     window.twoColumnLayout = false;
     window.compactGlossaries = false;
     window.showExpressionTags = false;
     window.harmonicFrequency = ${preferences.showFrequencyHarmonic};
     window.deduplicatePitchAccents = true;
     window.compactPitchAccents = false;
-    window.audioSources = [];
-    window.audioEnableAutoplay = false;
-    window.audioPlaybackMode = 'interrupt';
-    window.needsAudio = false;
-    window.allowDupes = false;
+	    window.audioSources = ${jsonEncode(audioSources)};
+	    window.audioSourceType = ${jsonEncode(audioPreferences.sourceType.name)};
+	    window.audioSourceLanguage = ${jsonEncode(audioPreferences.language)};
+	    window.audioEnableAutoplay = false;
+	    window.audioPlaybackMode = 'interrupt';
+	    window.needsAudio = ${audioSources.isNotEmpty};
+    window.allowDupes = $allowDuplicates;
     window.useAnkiConnect = true;
     window.enableBackgroundDuplicateChecks = false;
     window.embedMedia = false;
     window.compactGlossariesAnki = false;
     window.customCSS = $customCss;
     window.scanNonJapaneseText = true;
-    window.scanLength = 80;
+    window.scanLength = $hoshiPopupScanLength;
     window.swipeThreshold = 0;
     window.webkit = {messageHandlers: new Proxy({}, {get: (_, name) => ({
       postMessage: (payload) => ${jsonEncode(nativeHandlers)}.includes(String(name))
@@ -567,14 +1163,22 @@ String buildHoshiPopupHtml({
     })})};
     document.addEventListener('click', (event) => {
       const slot = event.target.closest?.('.button-slot');
-      if (!slot || slot.dataset.enabled === 'false') return;
-      event.preventDefault();
-      event.stopPropagation();
-      const index = Number(slot.dataset.entryIndex);
-      if (slot.dataset.kind === 'mine') mineEntryAtIndex(index);
-      if (slot.dataset.kind === 'audio') playEntryAudio(index);
-    }, true);
-  </script>
+	      if (!slot || slot.dataset.enabled === 'false') return;
+	      event.preventDefault();
+	      event.stopPropagation();
+	      const index = Number(slot.dataset.entryIndex);
+	      if (slot.dataset.kind === 'mine') mineEntryAtIndex(index);
+	      if (slot.dataset.kind === 'audio') playEntryAudio(index);
+	      if (slot.dataset.kind === 'browse') browseEntryNotes(index);
+	    }, true);
+	    document.addEventListener('contextmenu', (event) => {
+	      const slot = event.target.closest?.('.button-slot[data-kind="audio"]');
+	      if (!slot || slot.dataset.enabled === 'false') return;
+	      event.preventDefault();
+	      event.stopPropagation();
+	      showAudioSourceMenu(Number(slot.dataset.entryIndex), event.clientX, event.clientY);
+	    }, true);
+	  </script>
   <script>$selectionJs</script>
   <script>$popupJs</script>
 </head>
@@ -586,7 +1190,7 @@ String buildHoshiPopupHtml({
   return html
       .replaceFirst(
         RegExp(r'\.button-slot\[data-state="duplicate"\]::before \{[^}]*\}'),
-        '.button-slot[data-state="duplicate"]::before { content: "\\2713"; font-size: calc(19px * var(--popup-scale)); }',
+        '.button-slot[data-state="duplicate"]::before { content: "\\229E"; font-size: calc(19px * var(--popup-scale)); }',
       )
       .replaceFirst(
         RegExp(
@@ -596,13 +1200,14 @@ String buildHoshiPopupHtml({
       );
 }
 
-bool _isDarkPopup(BuildContext context, DictionaryThemePreference preference) =>
-    switch (preference) {
-      DictionaryThemePreference.light => false,
-      DictionaryThemePreference.dark || DictionaryThemePreference.black => true,
-      DictionaryThemePreference.system =>
-        Theme.of(context).brightness == Brightness.dark,
-    };
+bool _isDarkPopup(
+  Brightness brightness,
+  DictionaryThemePreference preference,
+) => switch (preference) {
+  DictionaryThemePreference.light => false,
+  DictionaryThemePreference.dark || DictionaryThemePreference.black => true,
+  DictionaryThemePreference.system => brightness == Brightness.dark,
+};
 
 String _cssColor(Color color) {
   final rgb = color.toARGB32() & 0x00ffffff;
@@ -624,8 +1229,7 @@ bool get _usesStableCustomSchemes =>
     kIsWeb || defaultTargetPlatform != TargetPlatform.windows;
 
 class _HoshiPopupData {
-  const _HoshiPopupData({required this.html, required this.styles});
+  const _HoshiPopupData({required this.html});
 
   final String html;
-  final Map<String, String> styles;
 }

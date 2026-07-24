@@ -12,8 +12,9 @@ part of 'restore.dart';
 @ProviderFor(doRestore)
 final doRestoreProvider = DoRestoreFamily._();
 
-final class DoRestoreProvider extends $FunctionalProvider<void, void, void>
-    with $Provider<void> {
+final class DoRestoreProvider
+    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
+    with $FutureModifier<void>, $FutureProvider<void> {
   DoRestoreProvider._({
     required DoRestoreFamily super.from,
     required ({String path, BuildContext context}) super.argument,
@@ -37,21 +38,13 @@ final class DoRestoreProvider extends $FunctionalProvider<void, void, void>
 
   @$internal
   @override
-  $ProviderElement<void> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
 
   @override
-  void create(Ref ref) {
+  FutureOr<void> create(Ref ref) {
     final argument = this.argument as ({String path, BuildContext context});
     return doRestore(ref, path: argument.path, context: argument.context);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(void value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<void>(value),
-    );
   }
 
   @override
@@ -65,11 +58,14 @@ final class DoRestoreProvider extends $FunctionalProvider<void, void, void>
   }
 }
 
-String _$doRestoreHash() => r'4e556ae822d1f48ef3519fd65393c178de14b73d';
+String _$doRestoreHash() => r'761ccc04281403fc217e9b98da9939dd0845e1a7';
 
 final class DoRestoreFamily extends $Family
     with
-        $FunctionalFamilyOverride<void, ({String path, BuildContext context})> {
+        $FunctionalFamilyOverride<
+          FutureOr<void>,
+          ({String path, BuildContext context})
+        > {
   DoRestoreFamily._()
     : super(
         retry: null,
@@ -247,8 +243,8 @@ final class RestoreKotatsuBackupFamily extends $Family
 final restoreTachiBkBackupProvider = RestoreTachiBkBackupFamily._();
 
 final class RestoreTachiBkBackupProvider
-    extends $FunctionalProvider<void, void, void>
-    with $Provider<void> {
+    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
+    with $FutureModifier<void>, $FutureProvider<void> {
   RestoreTachiBkBackupProvider._({
     required RestoreTachiBkBackupFamily super.from,
     required (String, BackupType) super.argument,
@@ -272,21 +268,13 @@ final class RestoreTachiBkBackupProvider
 
   @$internal
   @override
-  $ProviderElement<void> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
 
   @override
-  void create(Ref ref) {
+  FutureOr<void> create(Ref ref) {
     final argument = this.argument as (String, BackupType);
     return restoreTachiBkBackup(ref, argument.$1, argument.$2);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(void value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<void>(value),
-    );
   }
 
   @override
@@ -301,10 +289,10 @@ final class RestoreTachiBkBackupProvider
 }
 
 String _$restoreTachiBkBackupHash() =>
-    r'0f121d94021eb9a56d0689240dbcefd49f5a2a79';
+    r'572d919431e421500f7a438c0b18dbc8db77980c';
 
 final class RestoreTachiBkBackupFamily extends $Family
-    with $FunctionalFamilyOverride<void, (String, BackupType)> {
+    with $FunctionalFamilyOverride<FutureOr<void>, (String, BackupType)> {
   RestoreTachiBkBackupFamily._()
     : super(
         retry: null,

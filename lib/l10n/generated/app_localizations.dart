@@ -1007,6 +1007,24 @@ abstract class AppLocalizations {
   /// **'Theme, date & time format'**
   String get appearance_subtitle;
 
+  /// No description provided for @animation_speed.
+  ///
+  /// In en, this message translates to:
+  /// **'Animation speed'**
+  String get animation_speed;
+
+  /// No description provided for @animation_speed_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower values play animations faster.'**
+  String get animation_speed_description;
+
+  /// No description provided for @animation_duration_percentage.
+  ///
+  /// In en, this message translates to:
+  /// **'{percentage}% duration'**
+  String animation_duration_percentage(int percentage);
+
   /// No description provided for @theme.
   ///
   /// In en, this message translates to:
@@ -1121,6 +1139,30 @@ abstract class AppLocalizations {
   /// **'Right to Left'**
   String get reading_mode_right_to_left;
 
+  /// No description provided for @reading_direction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading direction'**
+  String get reading_direction;
+
+  /// No description provided for @reading_mode_horizontal_paged.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal paged'**
+  String get reading_mode_horizontal_paged;
+
+  /// No description provided for @reading_mode_vertical_paged.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical paged'**
+  String get reading_mode_vertical_paged;
+
+  /// No description provided for @reading_mode_horizontal_continuous.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal continuous'**
+  String get reading_mode_horizontal_continuous;
+
   /// No description provided for @reading_mode_vertical_continuous.
   ///
   /// In en, this message translates to:
@@ -1132,6 +1174,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Webtoon'**
   String get reading_mode_webtoon;
+
+  /// No description provided for @default_page_mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Default page mode'**
+  String get default_page_mode;
+
+  /// No description provided for @page_mode_single.
+  ///
+  /// In en, this message translates to:
+  /// **'Single page'**
+  String get page_mode_single;
+
+  /// No description provided for @page_mode_double.
+  ///
+  /// In en, this message translates to:
+  /// **'Double page'**
+  String get page_mode_double;
+
+  /// No description provided for @page_mode_double_cover.
+  ///
+  /// In en, this message translates to:
+  /// **'Double page with cover offset'**
+  String get page_mode_double_cover;
 
   /// No description provided for @double_tap_animation_speed.
   ///
@@ -2831,6 +2897,12 @@ abstract class AppLocalizations {
   /// **'Font size'**
   String get font_size;
 
+  /// No description provided for @subtitle_position.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle position'**
+  String get subtitle_position;
+
   /// No description provided for @text.
   ///
   /// In en, this message translates to:
@@ -4342,6 +4414,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Default'**
   String get tts_default;
+
+  /// No description provided for @dictionary_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary'**
+  String get dictionary_lookup;
+
+  /// No description provided for @dictionary_settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary settings'**
+  String get dictionary_settings;
+
+  /// No description provided for @dictionary_search_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get dictionary_search_label;
+
+  /// No description provided for @dictionary_search_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Word, reading, or phrase'**
+  String get dictionary_search_hint;
+
+  /// No description provided for @clear_search.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clear_search;
+
+  /// No description provided for @dictionary_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} dictionaries'**
+  String dictionary_count(int count);
+
+  /// No description provided for @dictionary_anki_deck.
+  ///
+  /// In en, this message translates to:
+  /// **'Anki deck: {name}'**
+  String dictionary_anki_deck(String name);
+
+  /// No description provided for @dictionary_load_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary data could not be loaded'**
+  String get dictionary_load_failed;
+
+  /// No description provided for @no_dictionaries_title.
+  ///
+  /// In en, this message translates to:
+  /// **'No dictionaries installed'**
+  String get no_dictionaries_title;
+
+  /// No description provided for @no_dictionaries_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a Yomitan dictionary to start looking up words.'**
+  String get no_dictionaries_description;
+
+  /// No description provided for @manage_dictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up dictionaries'**
+  String get manage_dictionaries;
+
+  /// No description provided for @dictionary_empty_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Look up a word or phrase'**
+  String get dictionary_empty_title;
+
+  /// No description provided for @dictionary_empty_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Search a term, expression, sentence, or block of text.'**
+  String get dictionary_empty_description;
+
+  /// No description provided for @previous_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous lookup'**
+  String get previous_lookup;
+
+  /// No description provided for @next_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Next lookup'**
+  String get next_lookup;
 }
 
 class _AppLocalizationsDelegate

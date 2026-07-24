@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/video.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/torrent_server.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
@@ -71,7 +71,7 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
       episode.manga.value!.source!,
       episode.manga.value!.sourceId,
     );
-    final proxyServer = ref.read(androidProxyServerStateProvider);
+    final proxyServer = await prepareMihonBridge(ref, source);
 
     final isMihonTorrent =
         source?.sourceCodeLanguage == SourceCodeLanguage.mihon &&

@@ -4,13 +4,11 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
-import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/indicator_builder.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
-import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
-import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:screen_brightness/screen_brightness.dart';
@@ -20,20 +18,19 @@ import 'package:media_kit_video/media_kit_video_controls/src/controls/extensions
 
 class MobileControllerWidget extends ConsumerStatefulWidget {
   final Function(bool?) doubleSpeed;
-  final AnimeStreamController streamController;
   final VideoController videoController;
   final Widget topButtonBarWidget;
-  final GlobalKey<VideoState> videoStatekey;
+  final Widget primaryButtonBarWidget;
   final Widget bottomButtonBarWidget;
   final ValueNotifier<List<(String, int)>> chapterMarks;
-  final MiningContext Function(String text)? subtitleMiningContextBuilder;
+  final Future<MiningContext> Function(String text)?
+  subtitleMiningContextBuilder;
   const MobileControllerWidget({
     super.key,
     required this.videoController,
     required this.topButtonBarWidget,
+    required this.primaryButtonBarWidget,
     required this.bottomButtonBarWidget,
-    required this.streamController,
-    required this.videoStatekey,
     required this.doubleSpeed,
     required this.chapterMarks,
     this.subtitleMiningContextBuilder,
@@ -49,7 +46,6 @@ class _MobileControllerWidgetState
   bool mount = true;
   bool visible = true;
   Duration controlsTransitionDuration = const Duration(milliseconds: 300);
-  Color backdropColor = const Color(0x66000000);
   Timer? _timer;
   late final skipDuration = ref.watch(
     defaultDoubleTapToSkipLengthStateProvider,
@@ -79,6 +75,10 @@ class _MobileControllerWidgetState
   bool _hideSeekForwardButton = false;
   double buttonBarHeight = 100;
   final bottomButtonBarMargin = const EdgeInsets.only(left: 16.0, right: 8.0);
+  final GlobalKey _subtitleOverlayKey = GlobalKey();
+  final GlobalKey _seekBarKey = GlobalKey();
+  double _subtitleBottomInset = 24;
+  bool _subtitleAnchorUpdateScheduled = false;
 
   Duration? _seekBarDeltaValueNotifier;
 
@@ -296,9 +296,35 @@ class _MobileControllerWidgetState
     });
   }
 
+  void _scheduleSubtitleAnchorUpdate() {
+    if (_subtitleAnchorUpdateScheduled) return;
+    _subtitleAnchorUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _subtitleAnchorUpdateScheduled = false;
+      if (!mounted) return;
+      final overlay =
+          _subtitleOverlayKey.currentContext?.findRenderObject() as RenderBox?;
+      final seekBar =
+          _seekBarKey.currentContext?.findRenderObject() as RenderBox?;
+      if (overlay == null || seekBar == null) return;
+      final seekBarTop = overlay
+          .globalToLocal(seekBar.localToGlobal(Offset.zero))
+          .dy;
+      final inset = subtitleBottomInsetForSeekBar(
+        playerHeight: overlay.size.height,
+        seekBarTop: seekBarTop,
+      );
+      if ((inset - _subtitleBottomInset).abs() > 0.5) {
+        setState(() => _subtitleBottomInset = inset);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _scheduleSubtitleAnchorUpdate();
     return Stack(
+      key: _subtitleOverlayKey,
       children: [
         Focus(
           autofocus: true,
@@ -322,7 +348,23 @@ class _MobileControllerWidgetState
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    Positioned.fill(child: Container(color: backdropColor)),
+                    const Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: [0.0, 0.2, 0.7, 1.0],
+                            colors: [
+                              Color(0xCC000000),
+                              Color(0x00000000),
+                              Color(0x00000000),
+                              Color(0xCC000000),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                     // We are adding 16.0 boundary around the actual controls (which contain the vertical drag gesture detectors).
                     // This will make the hit-test on edges (e.g. swiping to: show status-bar, show navigation-bar, go back in navigation) not activate the swipe gesture annoyingly.
                     Positioned.fill(
@@ -406,7 +448,9 @@ class _MobileControllerWidgetState
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                          // Give the controls the full viewport width on wide
+                          // layouts instead of shrink-wrapping at the edge.
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             widget.topButtonBarWidget,
                             // Only display [primaryButtonBar] if [buffering] is false.
@@ -420,49 +464,40 @@ class _MobileControllerWidgetState
                                     : 1.0,
                                 duration: controlsTransitionDuration,
                                 child: Center(
-                                  child: Row(
-                                    children: mobilePrimaryButtonBar(
-                                      context,
-                                      widget.videoStatekey,
-                                      widget.streamController,
-                                      widget.videoController,
-                                    ),
-                                  ),
+                                  child: widget.primaryButtonBarWidget,
                                 ),
                               ),
                             ),
-                            Stack(
-                              alignment: Alignment.bottomCenter,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: CustomSeekBar(
-                                    onSeekStart: (value) {
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                              ),
+                              child: CustomSeekBar(
+                                key: _seekBarKey,
+                                onSeekStart: (value) {
+                                  setState(() {
+                                    swipeDuration = value.inSeconds;
+                                    showSwipeDuration = true;
+                                  });
+                                  _timer?.cancel();
+                                },
+                                onSeekEnd: (value) {
+                                  _timer = Timer(controlsHoverDuration, () {
+                                    if (mounted) {
                                       setState(() {
-                                        swipeDuration = value.inSeconds;
-                                        showSwipeDuration = true;
+                                        visible = false;
                                       });
-                                      _timer?.cancel();
-                                    },
-                                    onSeekEnd: (value) {
-                                      _timer = Timer(controlsHoverDuration, () {
-                                        if (mounted) {
-                                          setState(() {
-                                            visible = false;
-                                          });
-                                        }
-                                      });
-                                      setState(() {
-                                        showSwipeDuration = false;
-                                      });
-                                    },
-                                    player: widget.videoController.player,
-                                    chapterMarks: widget.chapterMarks,
-                                  ),
-                                ),
-                                widget.bottomButtonBarWidget,
-                              ],
+                                    }
+                                  });
+                                  setState(() {
+                                    showSwipeDuration = false;
+                                  });
+                                },
+                                player: widget.videoController.player,
+                                chapterMarks: widget.chapterMarks,
+                              ),
                             ),
+                            widget.bottomButtonBarWidget,
                           ],
                         ),
                       ),
@@ -703,16 +738,21 @@ class _MobileControllerWidgetState
           ),
         ),
         Consumer(
-          builder: (context, ref, _) => Positioned(
-            child: CustomSubtitleView(
-              controller: widget.videoController,
-              configuration: SubtitleViewConfiguration(
-                style: subtileTextStyle(ref),
+          builder: (context, ref, _) {
+            final subtitleSettings = ref.watch(subtitleSettingsStateProvider);
+            return Positioned(
+              child: CustomSubtitleView(
+                controller: widget.videoController,
+                configuration: SubtitleViewConfiguration(
+                  style: subtileTextStyle(ref),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, _subtitleBottomInset),
+                ),
+                paintSubtitle: true,
+                verticalOffset: (subtitleSettings.position ?? 0).toDouble(),
+                miningContextBuilder: widget.subtitleMiningContextBuilder,
               ),
-              paintSubtitle: true,
-              miningContextBuilder: widget.subtitleMiningContextBuilder,
-            ),
-          ),
+            );
+          },
         ),
       ],
     );
@@ -887,60 +927,4 @@ class _ForwardSeekIndicatorState extends State<_ForwardSeekIndicator> {
       ),
     );
   }
-}
-
-List<Widget> mobilePrimaryButtonBar(
-  BuildContext context,
-  GlobalKey<VideoState> key,
-  AnimeStreamController streamController,
-  VideoController controller,
-) {
-  bool hasPrevEpisode =
-      streamController.getEpisodeIndex().$1 + 1 !=
-      streamController.getEpisodesLength(streamController.getEpisodeIndex().$2);
-  bool hasNextEpisode = streamController.getEpisodeIndex().$1 != 0;
-  final isFullScreen = isFullscreen(context);
-  return [
-    const Spacer(flex: 3),
-    IconButton(
-      onPressed: hasPrevEpisode
-          ? () {
-              if (isFullScreen) {
-                key.currentState?.exitFullscreen();
-              }
-              pushReplacementMangaReaderView(
-                context: context,
-                chapter: streamController.getPrevEpisode(),
-              );
-            }
-          : null,
-      icon: Icon(
-        Icons.skip_previous,
-        size: 35,
-        color: hasPrevEpisode ? Colors.white : Colors.grey,
-      ),
-    ),
-    const Spacer(),
-    CustomPlayOrPauseButton(controller: controller),
-    const Spacer(),
-    IconButton(
-      onPressed: hasNextEpisode
-          ? () {
-              if (isFullScreen) {
-                key.currentState?.exitFullscreen();
-              }
-              pushReplacementMangaReaderView(
-                context: context,
-                chapter: streamController.getNextEpisode(),
-              );
-            }
-          : null,
-      icon: Icon(
-        Icons.skip_next,
-        size: 35,
-        color: hasPrevEpisode ? Colors.white : Colors.grey,
-      ),
-    ),
-    const Spacer(flex: 3),
-  ];
 }

@@ -20,9 +20,11 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/services/get_video_list.dart';
 import 'package:mangayomi/services/get_chapter_pages.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
 import 'package:mangayomi/services/download_manager/m3u8/m3u8_downloader.dart';
 import 'package:mangayomi/services/download_manager/m3u8/models/download.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
@@ -87,8 +89,9 @@ Future<void> downloadChapter(
     List<Track>? subtitles;
     bool isOk = false;
     final manga = chapter.manga.value!;
-    final chapterName = chapter.name!.replaceForbiddenCharacters(' ');
+    final chapterName = downloadedMangaChapterBaseName(chapter);
     final itemType = chapter.manga.value!.itemType;
+    final saveAsCbz = ref.read(saveAsCBZArchiveStateProvider);
     final chapterDirectory = (await storageProvider.getMangaChapterDirectory(
       chapter,
       mangaMainDirectory: mangaMainDirectory,
@@ -105,12 +108,22 @@ Future<void> downloadChapter(
     M3u8Downloader? m3u8Downloader;
 
     Future<void> processConvert() async {
-      if (!ref.read(saveAsCBZArchiveStateProvider)) return;
+      if (!saveAsCbz) return;
       try {
+        final pageFiles = await chapterDirectory
+            .list()
+            .where(
+              (entity) =>
+                  entity is File && entity.path.toLowerCase().endsWith('.jpg'),
+            )
+            .map((entity) => entity.path)
+            .toList();
+
         // Extract chapter number from name (e.g., "Chapter 5" → "5")
-        final chapterNumber = ChapterRecognition().parseChapterNumber(
+        final chapterNumber = ChapterRecognition().resolveChapterNumber(
           chapter.manga.value!.name!,
           chapter.name!,
+          sourceChapterNumber: chapter.chapterNumber,
         );
 
         final comicInfo = ComicInfoData(
@@ -130,7 +143,7 @@ Future<void> downloadChapter(
             chapterDirectory.path,
             mangaMainDirectory!.path,
             chapterName,
-            pages.map((e) => e.fileName!).toList(),
+            pageFiles,
             comicInfo: comicInfo,
           ).future,
         );
@@ -139,10 +152,27 @@ Future<void> downloadChapter(
       }
     }
 
-    Future<void> setProgress(DownloadProgress progress) async {
-      if (progress.isCompleted && itemType == ItemType.manga) {
-        await processConvert();
+    Future<void> persistMokuroSidecar() async {
+      final source = getSource(manga.lang!, manga.source!, manga.sourceId);
+      final sourceName = source?.name ?? manga.source ?? '';
+      final artifact = saveAsCbz
+          ? downloadedMangaChapterCbz(mangaMainDirectory!, chapter)
+          : chapterDirectory;
+      if (!await artifact.exists()) return;
+
+      final store = MokuroSidecarStore();
+      try {
+        await store.ensureDownloaded(
+          sourceName: sourceName,
+          chapterUrl: chapter.url ?? '',
+          artifact: artifact,
+        );
+      } finally {
+        store.close();
       }
+    }
+
+    Future<void> setProgress(DownloadProgress progress) async {
       final download = isar.downloads.getSync(chapter.id!);
       if (download == null) {
         final download = Download(
@@ -176,7 +206,15 @@ Future<void> downloadChapter(
       }
     }
 
-    setProgress(DownloadProgress(0, 0, itemType));
+    Future<void> finalizeDownload() async {
+      if (itemType == ItemType.manga) {
+        await processConvert();
+        await persistMokuroSidecar();
+      }
+      await setProgress(DownloadProgress(1, 1, itemType, isCompleted: true));
+    }
+
+    await setProgress(DownloadProgress(0, 0, itemType));
     void savePageUrls() {
       final settings = isar.settings.getSync(227)!;
       List<ChapterPageurls>? chapterPageUrls = [];
@@ -188,10 +226,11 @@ Future<void> downloadChapter(
       final chapterPageHeaders = pageUrls
           .map((e) => e.headers == null ? null : jsonEncode(e.headers))
           .toList();
+      final urls = pageUrls.map((e) => e.url).toList();
       chapterPageUrls.add(
         ChapterPageurls()
           ..chapterId = chapter.id
-          ..urls = pageUrls.map((e) => e.url).toList()
+          ..urls = urls
           ..chapterUrl = chapter.url
           ..headers = chapterPageHeaders.first != null
               ? chapterPageHeaders.map((e) => e.toString()).toList()
@@ -278,10 +317,11 @@ Future<void> downloadChapter(
 
     if (pageUrls.isNotEmpty) {
       bool cbzFileExist =
-          await File(
-            p.join(mangaMainDirectory!.path, "${chapter.name}.cbz"),
+          await downloadedMangaChapterCbz(
+            mangaMainDirectory!,
+            chapter,
           ).exists() &&
-          ref.read(saveAsCBZArchiveStateProvider);
+          saveAsCbz;
       bool mp4FileExist = await File(
         p.join(mangaMainDirectory.path, "$chapterName.mp4"),
       ).exists();
@@ -356,9 +396,8 @@ Future<void> downloadChapter(
       }
 
       if (pages.isEmpty && pageUrls.isNotEmpty) {
-        await processConvert();
         savePageUrls();
-        await setProgress(DownloadProgress(1, 1, itemType, isCompleted: true));
+        await finalizeDownload();
       } else {
         savePageUrls();
         await MDownloader(
@@ -367,8 +406,9 @@ Future<void> downloadChapter(
           subtitles: subtitles,
           subDownloadDir: chapterDirectory.path,
         ).download((progress) {
-          setProgress(progress);
+          if (!progress.isCompleted) setProgress(progress);
         });
+        await finalizeDownload();
       }
     } else if (itemType == ItemType.novel) {
       final file = File(p.join(chapterDirectory.path, "$chapterName.html"));

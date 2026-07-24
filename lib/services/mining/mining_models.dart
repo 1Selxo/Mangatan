@@ -3,8 +3,23 @@ import 'dart:typed_data';
 
 enum MiningMediaType { manga, anime, novel, unknown }
 
+enum AnkiSentenceAudioFormat { mp3, opus }
+
 class MiningContext {
   final MiningMediaType mediaType;
+
+  /// Local content ID used by Chimahon's per-entry profile override key.
+  final int? mangaId;
+
+  /// Source identity used by Chimahon's source override key. Mihon sources
+  /// must provide their native Long ID rather than Mangatan's hashed Isar ID.
+  final String? sourceId;
+
+  /// BCP-47-style language declared by the source (for example `ja`).
+  final String sourceLanguage;
+
+  /// Chimahon's stable string identity for a locally imported novel.
+  final String? novelId;
   final String sourceTitle;
   final String chapterTitle;
   final String sentence;
@@ -12,9 +27,15 @@ class MiningContext {
   final Duration? position;
   final Uri? sourceUri;
   final FutureOr<Uint8List?> Function()? imageBytesLoader;
+  final FutureOr<AnkiMediaFile?> Function(AnkiSentenceAudioFormat format)?
+  sentenceAudioLoader;
 
   const MiningContext({
     this.mediaType = MiningMediaType.unknown,
+    this.mangaId,
+    this.sourceId,
+    this.sourceLanguage = '',
+    this.novelId,
     this.sourceTitle = '',
     this.chapterTitle = '',
     this.sentence = '',
@@ -22,10 +43,15 @@ class MiningContext {
     this.position,
     this.sourceUri,
     this.imageBytesLoader,
+    this.sentenceAudioLoader,
   });
 
   MiningContext copyWith({
     MiningMediaType? mediaType,
+    int? mangaId,
+    String? sourceId,
+    String? sourceLanguage,
+    String? novelId,
     String? sourceTitle,
     String? chapterTitle,
     String? sentence,
@@ -33,9 +59,15 @@ class MiningContext {
     Duration? position,
     Uri? sourceUri,
     FutureOr<Uint8List?> Function()? imageBytesLoader,
+    FutureOr<AnkiMediaFile?> Function(AnkiSentenceAudioFormat format)?
+    sentenceAudioLoader,
   }) {
     return MiningContext(
       mediaType: mediaType ?? this.mediaType,
+      mangaId: mangaId ?? this.mangaId,
+      sourceId: sourceId ?? this.sourceId,
+      sourceLanguage: sourceLanguage ?? this.sourceLanguage,
+      novelId: novelId ?? this.novelId,
       sourceTitle: sourceTitle ?? this.sourceTitle,
       chapterTitle: chapterTitle ?? this.chapterTitle,
       sentence: sentence ?? this.sentence,
@@ -43,6 +75,7 @@ class MiningContext {
       position: position ?? this.position,
       sourceUri: sourceUri ?? this.sourceUri,
       imageBytesLoader: imageBytesLoader ?? this.imageBytesLoader,
+      sentenceAudioLoader: sentenceAudioLoader ?? this.sentenceAudioLoader,
     );
   }
 

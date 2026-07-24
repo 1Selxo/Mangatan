@@ -8,16 +8,58 @@ part 'reader_state_provider.g.dart';
 class DefaultReadingModeState extends _$DefaultReadingModeState {
   @override
   ReaderMode build() {
-    return isar.settings.getSync(227)!.defaultReaderMode;
+    return isar.settings.getSync(227)!.effectiveDefaultReaderMode;
   }
 
   void set(ReaderMode value) {
+    final settings = isar.settings.getSync(227);
+    final readingDirection = settings!.effectiveDefaultReadingDirection;
+    state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings
+          ..defaultReaderMode = value.normalized
+          ..defaultReadingDirectionIndex ??= readingDirection.index
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
+@riverpod
+class DefaultReadingDirectionState extends _$DefaultReadingDirectionState {
+  @override
+  ReadingDirection build() {
+    return isar.settings.getSync(227)!.effectiveDefaultReadingDirection;
+  }
+
+  void set(ReadingDirection value) {
     final settings = isar.settings.getSync(227);
     state = value;
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
-          ..defaultReaderMode = value
+          ..defaultReadingDirectionIndex = value.index
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
+@riverpod
+class DefaultPageModeState extends _$DefaultPageModeState {
+  @override
+  PageMode build() {
+    return isar.settings.getSync(227)!.defaultPageMode;
+  }
+
+  void set(PageMode value) {
+    final settings = isar.settings.getSync(227);
+    state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..defaultPageMode = value
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );
@@ -148,7 +190,7 @@ class BackgroundColorState extends _$BackgroundColorState {
 class UsePageTapZonesState extends _$UsePageTapZonesState {
   @override
   bool build() {
-    return isar.settings.getSync(227)!.usePageTapZones ?? true;
+    return isar.settings.getSync(227)!.usePageTapZones ?? !isDesktop;
   }
 
   void set(bool value) {
@@ -193,6 +235,7 @@ class NavigationOrderState extends _$NavigationOrderState {
     '/updates',
     '/history',
     '/browse',
+    '/dictionaryLookup',
     '/more',
     '/trackerLibrary',
   ];
@@ -348,16 +391,17 @@ class NovelReaderTextColorState extends _$NovelReaderTextColorState {
 class NovelReaderPaddingState extends _$NovelReaderPaddingState {
   @override
   int build() {
-    return isar.settings.getSync(227)!.novelReaderPadding ?? 16;
+    return (isar.settings.getSync(227)!.novelReaderPadding ?? 12).clamp(0, 25);
   }
 
   void set(int value) {
+    final safeValue = value.clamp(0, 25);
     final settings = isar.settings.getSync(227);
-    state = value;
+    state = safeValue;
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
-          ..novelReaderPadding = value
+          ..novelReaderPadding = safeValue
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );
@@ -405,21 +449,24 @@ class NovelShowScrollPercentageState extends _$NovelShowScrollPercentageState {
 }
 
 @riverpod
-class NovelRemoveExtraParagraphSpacingState
-    extends _$NovelRemoveExtraParagraphSpacingState {
+class NovelReaderParagraphSpacingState
+    extends _$NovelReaderParagraphSpacingState {
   @override
-  bool build() {
-    return isar.settings.getSync(227)!.novelRemoveExtraParagraphSpacing ??
-        false;
+  double build() {
+    final settings = isar.settings.getSync(227)!;
+    return (settings.novelReaderParagraphSpacing ??
+            (settings.novelRemoveExtraParagraphSpacing == true ? 0.25 : 0.0))
+        .clamp(0.0, 2.0);
   }
 
-  void set(bool value) {
+  void set(double value) {
+    final safeValue = value.clamp(0.0, 2.0);
     final settings = isar.settings.getSync(227);
-    state = value;
+    state = safeValue;
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
-          ..novelRemoveExtraParagraphSpacing = value
+          ..novelReaderParagraphSpacing = safeValue
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );
@@ -440,6 +487,50 @@ class NovelTapToScrollState extends _$NovelTapToScrollState {
       () => isar.settings.putSync(
         settings!
           ..novelTapToScroll = value
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
+@riverpod
+class NovelShowReturnToSavedPositionButtonState
+    extends _$NovelShowReturnToSavedPositionButtonState {
+  @override
+  bool build() {
+    return isar.settings.getSync(227)!.novelShowReturnToSavedPositionButton ??
+        true;
+  }
+
+  void set(bool value) {
+    final settings = isar.settings.getSync(227);
+    state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..novelShowReturnToSavedPositionButton = value
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
+@riverpod
+class NovelEpubReadingLayoutState extends _$NovelEpubReadingLayoutState {
+  @override
+  int build() {
+    final value = isar.settings.getSync(227)!.novelEpubReadingLayout ?? 0;
+    return value.clamp(0, 3);
+  }
+
+  void set(int value) {
+    final safeValue = value.clamp(0, 3);
+    final settings = isar.settings.getSync(227);
+    state = safeValue;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..novelEpubReadingLayout = safeValue
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),
     );

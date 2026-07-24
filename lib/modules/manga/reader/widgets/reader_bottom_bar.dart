@@ -7,9 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_value_indicator_shape.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
+import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/global_style.dart';
 
@@ -51,6 +53,10 @@ class ReaderBottomBar extends ConsumerWidget {
   /// Callback when reader mode is changed
   final void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged;
 
+  /// Callback when reading direction is changed.
+  final void Function(ReadingDirection direction, WidgetRef ref)
+  onReadingDirectionChanged;
+
   /// Callback when page mode toggle button is pressed
   final VoidCallback? onPageModeToggle;
 
@@ -61,6 +67,9 @@ class ReaderBottomBar extends ConsumerWidget {
   /// Accepts any ProviderListenable that returns ReaderMode?
   /// (StateProvider, NotifierProvider, etc.)
   final ProviderListenable<ReaderMode?> currentReaderModeProvider;
+
+  /// Provider for watching the current reading direction.
+  final ProviderListenable<ReadingDirection?> currentReadingDirectionProvider;
 
   /// Session-local current page index for the visible reader state.
   final ValueListenable<int> currentPageListenable;
@@ -91,9 +100,11 @@ class ReaderBottomBar extends ConsumerWidget {
     required this.onSliderChanged,
     required this.onSliderChangeEnd,
     required this.onReaderModeChanged,
+    required this.onReadingDirectionChanged,
     this.onPageModeToggle,
     required this.onSettingsPressed,
     required this.currentReaderModeProvider,
+    required this.currentReadingDirectionProvider,
     required this.currentPageListenable,
     required this.currentPageMode,
     required this.isReverseHorizontal,
@@ -102,12 +113,46 @@ class ReaderBottomBar extends ConsumerWidget {
     required this.backgroundColor,
   });
 
-  bool get _isDoublePageMode => currentPageMode == PageMode.doublePage;
+  bool get _isDoublePageMode => currentPageMode?.isDoublePage ?? false;
+
+  String get _pageModeTooltip {
+    return switch (currentPageMode) {
+      PageMode.doublePage => 'Double page',
+      PageMode.doublePageCover => 'Double page with cover offset',
+      _ => 'Single page',
+    };
+  }
+
+  Widget get _pageModeIcon {
+    if (currentPageMode == PageMode.doublePageCover) {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(CupertinoIcons.book_solid),
+          Positioned(
+            right: -3,
+            bottom: -3,
+            child: Icon(
+              Icons.filter_1,
+              size: 13,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
+      );
+    }
+    return Icon(
+      _isDoublePageMode ? CupertinoIcons.book_solid : CupertinoIcons.book,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final readerMode = ref.watch(currentReaderModeProvider);
-    if (readerMode == null) return const SizedBox.shrink();
+    final readingDirection = ref.watch(currentReadingDirectionProvider);
+    if (readerMode == null || readingDirection == null) {
+      return const SizedBox.shrink();
+    }
     final isHorizontalContinuous = readerMode.isHorizontalContinuous;
 
     return Positioned(
@@ -130,6 +175,7 @@ class ReaderBottomBar extends ConsumerWidget {
                 context,
                 ref,
                 readerMode,
+                readingDirection,
                 isHorizontalContinuous,
               ),
             ),
@@ -317,6 +363,7 @@ class ReaderBottomBar extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     ReaderMode? readerMode,
+    ReadingDirection readingDirection,
     bool isHorizontalContinuous,
   ) {
     return Container(
@@ -333,7 +380,7 @@ class ReaderBottomBar extends ConsumerWidget {
               onReaderModeChanged(value, ref);
             },
             itemBuilder: (context) => [
-              for (var mode in ReaderMode.values)
+              for (var mode in ReaderModeExtension.selectableValues)
                 PopupMenuItem(
                   value: mode,
                   child: Row(
@@ -357,6 +404,44 @@ class ReaderBottomBar extends ConsumerWidget {
                 ),
             ],
             child: const Icon(Icons.app_settings_alt_outlined),
+          ),
+
+          PopupMenuButton<ReadingDirection>(
+            popUpAnimationStyle: popupAnimationStyle,
+            color: Colors.black,
+            tooltip: context.l10n.reading_direction,
+            onSelected: (value) {
+              onReadingDirectionChanged(value, ref);
+            },
+            itemBuilder: (context) => [
+              for (final direction in ReadingDirection.values)
+                PopupMenuItem(
+                  value: direction,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check,
+                        color: readingDirection == direction
+                            ? Colors.white
+                            : Colors.transparent,
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        getReadingDirectionName(direction, context),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            child: Icon(
+              readingDirection.isRtl
+                  ? Icons.format_textdirection_r_to_l
+                  : Icons.format_textdirection_l_to_r,
+            ),
           ),
 
           // Crop borders button
@@ -392,11 +477,8 @@ class ReaderBottomBar extends ConsumerWidget {
           // Double page mode button
           IconButton(
             onPressed: !isHorizontalContinuous ? onPageModeToggle : null,
-            icon: Icon(
-              _isDoublePageMode
-                  ? CupertinoIcons.book_solid
-                  : CupertinoIcons.book,
-            ),
+            tooltip: _pageModeTooltip,
+            icon: _pageModeIcon,
           ),
 
           // Settings button
@@ -433,8 +515,8 @@ class PageNumberOverlay extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final label = pageMode == PageMode.doublePage && currentIndex > 0
-        ? _getDoublePageLabel()
+    final label = pageMode.isDoublePage
+        ? doublePageIndexLabel(currentIndex, totalPages, pageMode)
         : '${currentIndex + 1}';
 
     return Align(
@@ -457,16 +539,5 @@ class PageNumberOverlay extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _getDoublePageLabel() {
-    final index1 = currentIndex * 2;
-    final index2 = index1 + 1;
-
-    if (index1 >= totalPages) {
-      return '$totalPages';
-    }
-
-    return index2 >= totalPages ? '$totalPages' : '$index1-$index2';
   }
 }

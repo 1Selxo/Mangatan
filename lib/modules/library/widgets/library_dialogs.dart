@@ -6,6 +6,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/history.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/changed.dart';
@@ -183,6 +184,7 @@ void _removeImport(WidgetRef ref, Manga manga) {
     isar.chapters.deleteSync(chapter.id!);
     provider.addChangedPart(ActionType.removeChapter, chapter.id, "{}", false);
   }
+  isar.epubBookProgress.filter().mangaIdEqualTo(manga.id!).deleteAllSync();
   isar.mangas.deleteSync(manga.id!);
   provider.addChangedPart(ActionType.removeItem, manga.id, "{}", false);
 }
@@ -234,12 +236,11 @@ Future<String> _deleteDownload(Manga manga, String mangaDirectory) async {
 void showImportLocalDialog(BuildContext context, ItemType itemType) {
   final l10n = l10nLocalizations(context)!;
   final filesText = switch (itemType) {
-    ItemType.manga => ".zip, .cbz",
+    ItemType.manga => ".zip, .cbz, .epub",
     ItemType.anime => ".mp4, .mkv, .avi, and more",
     ItemType.novel => ".epub",
   };
   bool isLoading = false;
-  bool splitChapters = true;
   showDialog(
     context: context,
     barrierDismissible: !isLoading,
@@ -251,27 +252,11 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
             return Consumer(
               builder: (context, ref, child) {
                 return SizedBox(
-                  height: itemType == ItemType.novel ? 150 : 100,
+                  height: 100,
                   child: Stack(
                     children: [
                       Column(
                         children: [
-                          if (itemType == ItemType.novel)
-                            SwitchListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                l10n.split_epub_chapters,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              subtitle: Text(
-                                l10n.split_epub_chapters_description,
-                                style: const TextStyle(fontSize: 10),
-                              ),
-                              value: splitChapters,
-                              onChanged: (v) =>
-                                  setState(() => splitChapters = v),
-                            ),
                           Expanded(
                             child: Row(
                               children: [
@@ -293,7 +278,7 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
                                             itemType: itemType,
                                             null,
                                             init: true,
-                                            splitChapters: splitChapters,
+                                            splitChapters: false,
                                           ).future,
                                         );
                                         setState(() => isLoading = false);

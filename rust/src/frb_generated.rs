@@ -1142,10 +1142,18 @@ impl SseDecode for crate::api::epub::EpubChapter {
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_content = <String>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
+        let mut var_href = <String>::sse_decode(deserializer);
+        let mut var_spineIndex = <u32>::sse_decode(deserializer);
+        let mut var_isLinear = <bool>::sse_decode(deserializer);
+        let mut var_isNavigationEntry = <bool>::sse_decode(deserializer);
         return crate::api::epub::EpubChapter {
             name: var_name,
             content: var_content,
             path: var_path,
+            href: var_href,
+            spine_index: var_spineIndex,
+            is_linear: var_isLinear,
+            is_navigation_entry: var_isNavigationEntry,
         };
     }
 }
@@ -1157,6 +1165,7 @@ impl SseDecode for crate::api::epub::EpubNovel {
         let mut var_cover = <Option<Vec<u8>>>::sse_decode(deserializer);
         let mut var_summary = <Option<String>>::sse_decode(deserializer);
         let mut var_author = <Option<String>>::sse_decode(deserializer);
+        let mut var_language = <Option<String>>::sse_decode(deserializer);
         let mut var_artist = <Option<String>>::sse_decode(deserializer);
         let mut var_chapters = <Vec<crate::api::epub::EpubChapter>>::sse_decode(deserializer);
         let mut var_images = <Vec<crate::api::epub::EpubResource>>::sse_decode(deserializer);
@@ -1166,6 +1175,7 @@ impl SseDecode for crate::api::epub::EpubNovel {
             cover: var_cover,
             summary: var_summary,
             author: var_author,
+            language: var_language,
             artist: var_artist,
             chapters: var_chapters,
             images: var_images,
@@ -2010,6 +2020,13 @@ impl SseDecode for u16 {
     }
 }
 
+impl SseDecode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u32::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for u64 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2265,6 +2282,10 @@ impl flutter_rust_bridge::IntoDart for crate::api::epub::EpubChapter {
             self.name.into_into_dart().into_dart(),
             self.content.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
+            self.href.into_into_dart().into_dart(),
+            self.spine_index.into_into_dart().into_dart(),
+            self.is_linear.into_into_dart().into_dart(),
+            self.is_navigation_entry.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2285,6 +2306,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::epub::EpubNovel {
             self.cover.into_into_dart().into_dart(),
             self.summary.into_into_dart().into_dart(),
             self.author.into_into_dart().into_dart(),
+            self.language.into_into_dart().into_dart(),
             self.artist.into_into_dart().into_dart(),
             self.chapters.into_into_dart().into_dart(),
             self.images.into_into_dart().into_dart(),
@@ -3042,6 +3064,10 @@ impl SseEncode for crate::api::epub::EpubChapter {
         <String>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.content, serializer);
         <String>::sse_encode(self.path, serializer);
+        <String>::sse_encode(self.href, serializer);
+        <u32>::sse_encode(self.spine_index, serializer);
+        <bool>::sse_encode(self.is_linear, serializer);
+        <bool>::sse_encode(self.is_navigation_entry, serializer);
     }
 }
 
@@ -3052,6 +3078,7 @@ impl SseEncode for crate::api::epub::EpubNovel {
         <Option<Vec<u8>>>::sse_encode(self.cover, serializer);
         <Option<String>>::sse_encode(self.summary, serializer);
         <Option<String>>::sse_encode(self.author, serializer);
+        <Option<String>>::sse_encode(self.language, serializer);
         <Option<String>>::sse_encode(self.artist, serializer);
         <Vec<crate::api::epub::EpubChapter>>::sse_encode(self.chapters, serializer);
         <Vec<crate::api::epub::EpubResource>>::sse_encode(self.images, serializer);
@@ -3741,6 +3768,13 @@ impl SseEncode for u16 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u16::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
     }
 }
 

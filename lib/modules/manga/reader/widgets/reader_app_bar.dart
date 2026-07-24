@@ -7,8 +7,8 @@ import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.d
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/webview_url.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
-import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/utils.dart';
 
@@ -24,6 +24,12 @@ import 'package:mangayomi/utils/utils.dart';
 /// This widget is designed to be used directly in reader_view.dart
 /// as a drop-in replacement for the _appBar() method.
 class ReaderAppBar extends ConsumerWidget {
+  static double visibleHeight({required bool fullScreenReader}) {
+    if (Platform.isIOS) return 120.0;
+    if (!fullScreenReader && !isDesktop) return 55.0;
+    return 80.0;
+  }
+
   /// The chapter being read
   final Chapter chapter;
 
@@ -51,6 +57,9 @@ class ReaderAppBar extends ConsumerWidget {
   /// Callback that opens the OCR overlay for the visible page.
   final VoidCallback? onOcrPressed;
 
+  /// Overrides route replacement when a reader can navigate chapters in place.
+  final ValueChanged<Chapter>? onChapterSelected;
+
   /// Background color getter
   final Color Function(BuildContext) backgroundColor;
 
@@ -65,6 +74,7 @@ class ReaderAppBar extends ConsumerWidget {
     required this.onBookmarkPressed,
     this.onWebViewPressed,
     this.onOcrPressed,
+    this.onChapterSelected,
     required this.backgroundColor,
   });
 
@@ -73,12 +83,8 @@ class ReaderAppBar extends ConsumerWidget {
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
     final isLocalArchive = chapter.manga.value?.isLocalArchive ?? false;
 
-    double height = isVisible
-        ? Platform.isIOS
-              ? 120.0
-              : !fullScreenReader && !isDesktop
-              ? 55.0
-              : 80.0
+    final height = isVisible
+        ? visibleHeight(fullScreenReader: fullScreenReader)
         : 0.0;
 
     return Positioned(
@@ -143,7 +149,12 @@ class ReaderAppBar extends ConsumerWidget {
         ),
 
       // Chapter list button
-      btnToShowChapterListDialog(context, context.l10n.chapters, chapter),
+      btnToShowChapterListDialog(
+        context,
+        context.l10n.chapters,
+        chapter,
+        onChapterSelected: onChapterSelected,
+      ),
 
       // Bookmark button
       IconButton(
@@ -161,14 +172,17 @@ class ReaderAppBar extends ConsumerWidget {
 }
 
 /// Builds the web view navigation data.
-Map<String, dynamic>? buildWebViewData(Chapter chapter) {
+Future<Map<String, dynamic>?> buildWebViewData(
+  WidgetRef ref,
+  Chapter chapter,
+) async {
   final manga = chapter.manga.value;
   if (manga == null) return null;
 
   final source = getSource(manga.lang!, manga.source!, manga.sourceId);
   if (source == null) return null;
 
-  final url = "${source.baseUrl}${chapter.url!.getUrlWithoutDomain}";
+  final url = await getChapterWebViewUrl(ref, source: source, chapter: chapter);
 
   return {'url': url, 'sourceId': source.id.toString(), 'title': chapter.name!};
 }

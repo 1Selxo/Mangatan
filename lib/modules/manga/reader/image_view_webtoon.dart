@@ -1,5 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/continuous_reader_zoom_viewport.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_vertical.dart';
@@ -23,12 +27,13 @@ class ImageViewWebtoon extends StatelessWidget {
   final Function(bool) onFailedToLoadImage;
   final BackgroundColor backgroundColor;
   final bool isDoublePageMode;
+  final PageMode pageMode;
   final bool isHorizontalContinuous;
   final ReaderMode readerMode;
+  final ReadingDirection readingDirection;
   final PhotoViewController photoViewController;
   final PhotoViewScaleStateController photoViewScaleStateController;
   final Alignment scalePosition;
-  final Function(ScaleEndDetails) onScaleEnd;
   final Function(Offset) onDoubleTapDown;
   final VoidCallback onDoubleTap;
   final int webtoonSidePadding;
@@ -50,12 +55,13 @@ class ImageViewWebtoon extends StatelessWidget {
     required this.onFailedToLoadImage,
     required this.backgroundColor,
     required this.isDoublePageMode,
+    required this.pageMode,
     required this.isHorizontalContinuous,
     required this.readerMode,
+    required this.readingDirection,
     required this.photoViewController,
     required this.photoViewScaleStateController,
     required this.scalePosition,
-    required this.onScaleEnd,
     required this.onDoubleTapDown,
     required this.onDoubleTap,
     required this.isScrolling,
@@ -64,45 +70,82 @@ class ImageViewWebtoon extends StatelessWidget {
     this.reverse = false,
   });
 
+  List<List<int?>> get _doublePageSpreadIndices =>
+      transitionAwareDoublePageSpreadIndices(
+        pages.length,
+        pageMode,
+        isTransitionPage: (index) => pages[index].isTransitionPage,
+      );
+
   @override
   Widget build(BuildContext context) {
-    return PhotoViewGallery.builder(
-      itemCount: 1,
-      builder: (_, _) => PhotoViewGalleryPageOptions.customChild(
+    return LayoutBuilder(
+      builder: (zoomContext, constraints) => ContinuousReaderZoomViewport(
         controller: photoViewController,
-        scaleStateController: photoViewScaleStateController,
-        basePosition: scalePosition,
-        onScaleEnd: (context, details, controllerValue) => onScaleEnd(details),
-        child: ScrollablePositionedList.separated(
-          scrollDirection: scrollDirection,
-          reverse: reverse,
-          minCacheExtent: minCacheExtent,
-          initialScrollIndex: initialScrollIndex,
-          itemCount: isDoublePageMode && !isHorizontalContinuous
-              ? (pages.length / 2).ceil()
-              : pages.length,
-          physics: physics,
-          itemScrollController: itemScrollController,
-          scrollOffsetController: scrollOffsetController,
-          itemPositionsListener: itemPositionsListener,
-          itemBuilder: (context, index) => _buildItem(context, index),
-          separatorBuilder: _buildSeparator,
+        scrollDirection: scrollDirection,
+        alignment: scalePosition,
+        child: PhotoViewGallery.builder(
+          itemCount: 1,
+          builder: (_, _) => PhotoViewGalleryPageOptions.customChild(
+            controller: photoViewController,
+            scaleStateController: photoViewScaleStateController,
+            basePosition: scalePosition,
+            minScale: readerMinimumZoomScale,
+            child: _wrapPointerSignalHandler(
+              zoomContext: zoomContext,
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(
+                  context,
+                ).copyWith(scrollbars: false),
+                child: ScrollablePositionedList.separated(
+                  scrollDirection: scrollDirection,
+                  reverse: reverse,
+                  minCacheExtent: minCacheExtent,
+                  initialScrollIndex: initialScrollIndex,
+                  itemCount: isDoublePageMode && !isHorizontalContinuous
+                      ? _doublePageSpreadIndices.length
+                      : pages.length,
+                  physics: ContinuousReaderZoomScrollPhysics(
+                    controller: photoViewController,
+                    alignment: scalePosition,
+                    baseViewportDimension: scrollDirection == Axis.vertical
+                        ? constraints.maxHeight
+                        : constraints.maxWidth,
+                    parent: physics,
+                  ),
+                  itemScrollController: itemScrollController,
+                  scrollOffsetController: scrollOffsetController,
+                  itemPositionsListener: itemPositionsListener,
+                  itemBuilder: (context, index) =>
+                      _buildItem(context, index, zoomContext),
+                  separatorBuilder: (context, index) =>
+                      _buildSeparator(context, index, zoomContext),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildItem(BuildContext context, int index) {
-    final currentPage = pages[index];
+  Widget _buildItem(BuildContext context, int index, BuildContext zoomContext) {
+    final currentActualIndex = isDoublePageMode && !isHorizontalContinuous
+        ? _doublePageSpreadIndices[index].first!
+        : index;
+    final currentPage = pages[currentActualIndex];
     final uniqueKey = ValueKey(
-      '${currentPage.chapter?.id ?? "trans"}-${currentPage.index ?? index}',
+      '${currentPage.chapter?.id ?? "trans"}-${currentPage.index ?? currentActualIndex}',
     );
 
-    return KeyedSubtree(
-      key: uniqueKey,
-      child: (isDoublePageMode && !isHorizontalContinuous)
-          ? _buildDoublePageItem(context, index)
-          : _buildSinglePageItem(context, index),
+    return _wrapPointerSignalHandler(
+      zoomContext: zoomContext,
+      child: KeyedSubtree(
+        key: uniqueKey,
+        child: (isDoublePageMode && !isHorizontalContinuous)
+            ? _buildDoublePageItem(context, index)
+            : _buildSinglePageItem(context, index),
+      ),
     );
   }
 
@@ -146,13 +189,9 @@ class ImageViewWebtoon extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final int index1 = index * 2;
-    final int index2 = index1 + 1;
-
-    final List<UChapDataPreload?> datas = [
-      index1 < pageLength ? pages[index1] : null,
-      index2 < pageLength ? pages[index2] : null,
-    ];
+    final datas = _doublePageSpreadIndices[index]
+        .map((actualIndex) => actualIndex == null ? null : pages[actualIndex])
+        .toList();
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -160,6 +199,7 @@ class ImageViewWebtoon extends StatelessWidget {
       onDoubleTap: onDoubleTap,
       child: DoublePageView.vertical(
         pages: datas,
+        readingDirection: readingDirection,
         backgroundColor: backgroundColor,
         onFailedToLoadImage: onFailedToLoadImage,
         onLongPressData: onLongPressData,
@@ -167,18 +207,67 @@ class ImageViewWebtoon extends StatelessWidget {
     );
   }
 
-  Widget _buildSeparator(BuildContext context, int index) {
+  Widget _buildSeparator(
+    BuildContext context,
+    int index,
+    BuildContext zoomContext,
+  ) {
     if (!showPageGaps || readerMode == ReaderMode.webtoon) {
       return const SizedBox.shrink();
     }
 
     if (isHorizontalContinuous) {
-      return VerticalDivider(
-        color: getBackgroundColor(backgroundColor),
-        width: 6,
+      return _wrapPointerSignalHandler(
+        zoomContext: zoomContext,
+        child: VerticalDivider(
+          color: getBackgroundColor(backgroundColor),
+          width: 6,
+        ),
       );
     } else {
-      return Divider(color: getBackgroundColor(backgroundColor), height: 6);
+      return _wrapPointerSignalHandler(
+        zoomContext: zoomContext,
+        child: Divider(color: getBackgroundColor(backgroundColor), height: 6),
+      );
     }
+  }
+
+  Widget _wrapPointerSignalHandler({
+    required BuildContext zoomContext,
+    required Widget child,
+  }) {
+    return Builder(
+      builder: (scrollContext) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerSignal: (event) => _handlePointerSignal(
+          event,
+          zoomContext: zoomContext,
+          scrollContext: scrollContext,
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  void _handlePointerSignal(
+    PointerSignalEvent event, {
+    required BuildContext zoomContext,
+    required BuildContext scrollContext,
+  }) {
+    if (registerReaderModifierWheelZoom(
+      event,
+      zoomContext: zoomContext,
+      photoViewController: photoViewController,
+      basePosition: scalePosition,
+    )) {
+      return;
+    }
+
+    registerHorizontalContinuousWheelScroll(
+      event,
+      isHorizontalContinuous: isHorizontalContinuous,
+      scrollContext: scrollContext,
+      scrollOffsetController: scrollOffsetController,
+    );
   }
 }

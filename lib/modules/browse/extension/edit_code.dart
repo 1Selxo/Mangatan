@@ -12,6 +12,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/home/widget/filter_widget.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_font_family.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/get_filter_list.dart';
 import 'package:mangayomi/services/isolate_service.dart';
@@ -184,13 +185,22 @@ class _CodeEditorPageState extends ConsumerState<CodeEditorPage> {
     super.dispose();
   }
 
+  void _goBack(BuildContext context) {
+    isar.writeTxnSync(() {
+      isar.sources.putSync(
+        source!..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      );
+    });
+    Navigator.pop(context, source);
+  }
+
   @override
   Widget build(BuildContext context) {
     List<dynamic> filterList = source != null
         ? getFilterList(source: source!)
         : [];
     final appFontFamily = ref.watch(appFontFamilyProvider);
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         elevation: 0,
         title: Row(
@@ -223,14 +233,7 @@ class _CodeEditorPageState extends ConsumerState<CodeEditorPage> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () {
-            isar.writeTxnSync(() {
-              isar.sources.putSync(
-                source!..updatedAt = DateTime.now().millisecondsSinceEpoch,
-              );
-            });
-            Navigator.pop(context, source);
-          },
+          onPressed: () => _goBack(context),
         ),
       ),
       body: Column(
@@ -960,6 +963,10 @@ class _CodeEditorPageState extends ConsumerState<CodeEditorPage> {
             ),
         ],
       ),
+    );
+    return DesktopBackNavigationScope(
+      onBack: () => _goBack(context),
+      child: Focus(autofocus: true, child: page),
     );
   }
 }

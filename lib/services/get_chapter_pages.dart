@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:path/path.dart' as p;
 import 'package:mangayomi/eval/javascript/http.dart';
 import 'package:mangayomi/main.dart';
@@ -12,6 +13,7 @@ import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/reg_exp_matcher.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
@@ -65,7 +67,7 @@ Future<GetChapterPagesModel> getChapterPages(
         chapter.manga.value!.source!,
         chapter.manga.value!.sourceId,
       )!;
-      if ((isarPageUrls?.urls?.isNotEmpty ?? false) &&
+      if (canReuseCachedMihonPageUrls(isarPageUrls?.urls) &&
           (isarPageUrls?.chapterUrl ?? chapter.url) == chapter.url) {
         for (var i = 0; i < isarPageUrls!.urls!.length; i++) {
           Map<String, String>? headers;
@@ -76,11 +78,12 @@ Future<GetChapterPagesModel> getChapterPages(
           pageUrls.add(PageUrl(isarPageUrls.urls![i], headers: headers));
         }
       } else {
+        final proxyServer = await prepareMihonBridge(ref, source);
         pageUrls = await getIsolateService.get<List<PageUrl>>(
           url: chapter.url!,
           source: source,
           serviceType: 'getPageList',
-          proxyServer: ref.read(androidProxyServerStateProvider),
+          proxyServer: proxyServer,
         );
       }
     }
@@ -94,13 +97,15 @@ Future<GetChapterPagesModel> getChapterPages(
     );
 
     if (pageUrls.isNotEmpty || isLocalArchive) {
-      if (await File(
-            p.join(mangaDirectory!.path, "${chapter.name}.cbz"),
-          ).exists() ||
-          isLocalArchive) {
-        final path = isLocalArchive
-            ? chapter.archivePath
-            : p.join(mangaDirectory.path, "${chapter.name}.cbz");
+      final downloadedCbz = downloadedMangaChapterCbz(mangaDirectory!, chapter);
+      final hasDownloadedCbz = await downloadedCbz.exists();
+      final localArtifactPath = isLocalArchive
+          ? chapter.archivePath
+          : hasDownloadedCbz
+          ? downloadedCbz.path
+          : path?.path;
+      if (hasDownloadedCbz || isLocalArchive) {
+        final path = isLocalArchive ? chapter.archivePath : downloadedCbz.path;
         final local = await ref.read(
           getArchiveDataFromFileProvider(path!).future,
         );
@@ -133,10 +138,13 @@ Future<GetChapterPagesModel> getChapterPages(
         final chapterPageHeaders = pageUrls
             .map((e) => e.headers == null ? null : jsonEncode(e.headers))
             .toList();
+        final urls = pageUrls.map((e) => e.url).toList();
+        // Proxy URLs are transient and must be refreshed on the next open, but
+        // their count is still needed while reading to persist page progress.
         chapterPageUrls.add(
           ChapterPageurls()
             ..chapterId = chapter.id
-            ..urls = pageUrls.map((e) => e.url).toList()
+            ..urls = urls
             ..chapterUrl = chapter.url
             ..headers = chapterPageHeaders.first != null
                 ? chapterPageHeaders.map((e) => e.toString()).toList()
@@ -161,6 +169,7 @@ Future<GetChapterPagesModel> getChapterPages(
             i,
             chapterModel,
             i,
+            localArtifactPath: localArtifactPath,
           ),
         );
       }

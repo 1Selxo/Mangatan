@@ -4,8 +4,10 @@ import 'dart:typed_data';
 import 'package:isar_community/isar.dart'; // Isar database package for local storage
 import 'package:mangayomi/main.dart'; // Exposes the global `isar` instance
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:path/path.dart' as p; // For manipulating file system paths
 import 'package:bot_toast/bot_toast.dart'; // For Exceptions
@@ -35,15 +37,15 @@ class LocalFoldersState extends _$LocalFoldersState {
   }
 }
 
-/// Scans `Mangayomi/local` folder (if exists) for Mangas/Animes and imports in library.
+/// Scans `Mangatan/local` folder (if exists) for Mangas/Animes and imports in library.
 ///
 /// **Folder structure:**
 /// ```
-/// Mangayomi/local/MangaName/CustomCover.jpg (optional)
-/// Mangayomi/local/MangaName/Chapter1/Page1.jpg
-/// Mangayomi/local/MangaName/Chapter2.cbz
-/// Mangayomi/local/AnimeName/Episode1.mp4
-/// Mangayomi/local/NovelName/NovelName.epub
+/// Mangatan/local/MangaName/CustomCover.jpg (optional)
+/// Mangatan/local/MangaName/Chapter1/Page1.jpg
+/// Mangatan/local/MangaName/Chapter2.cbz
+/// Mangatan/local/AnimeName/Episode1.mp4
+/// Mangatan/local/NovelName/NovelName.epub
 /// ```
 /// **Supported filetypes:** (taken from lib/modules/library/providers/local_archive.dart, line 98)
 /// ```
@@ -73,6 +75,10 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   final List<Manga> existingMangas = await isar.mangas
       .filter()
       .sourceEqualTo("local")
+      .or()
+      .linkContains("Mangatan/local")
+      .or()
+      .linkContains("Mangatan\\local")
       .or()
       .linkContains("Mangayomi/local")
       .or()
@@ -262,6 +268,10 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
         .filter()
         .sourceEqualTo("local")
         .or()
+        .linkContains("Mangatan/local")
+        .or()
+        .linkContains("Mangatan\\local")
+        .or()
         .linkContains("Mangayomi/local")
         .or()
         .linkContains("Mangayomi\\local")
@@ -280,6 +290,7 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   }
 
   final chaptersToSave = <Chapter>[];
+  final epubProgressToSave = <EpubBookProgress>[];
   int saveManga = 0; // Just to update the lastUpdate value of not new Mangas
   final mangaByName = {for (var m in processedMangas) p.basename(m.link!): m};
 
@@ -302,30 +313,33 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
           manga.customCoverImage = book.cover!.getCoverImage;
           saveManga++;
         }
-        final chaps = book.chapters;
-        if (chaps.isNotEmpty) {
-          for (int i = 0; i < chaps.length; i++) {
-            final epubChapter = chaps[i];
-            chaptersToSave.add(
-              Chapter(
-                mangaId: manga.id,
-                name: epubChapter.name,
-                archivePath: chapterPath,
-                url: epubChapter.path,
-                downloadSize: null,
-              )..manga.value = manga,
-            );
-          }
-        } else {
-          chaptersToSave.add(
-            Chapter(
-              mangaId: manga.id,
-              name: book.name,
+        chaptersToSave.addAll(
+          epubShortcutChapters(
+            book: book,
+            manga: manga,
+            mangaId: manga.id!,
+            archivePath: chapterPath,
+          ),
+        );
+        final existingProgress = await isar.epubBookProgress
+            .filter()
+            .mangaIdEqualTo(manga.id!)
+            .archivePathEqualTo(chapterPath)
+            .findFirst();
+        final progress =
+            existingProgress ??
+            EpubBookProgress(
+              mangaId: manga.id!,
               archivePath: chapterPath,
-              downloadSize: null,
-            )..manga.value = manga,
-          );
-        }
+              title: book.name,
+              author: book.author,
+              lang: book.language,
+            );
+        progress
+          ..title = book.name
+          ..author = book.author;
+        progress.lang ??= book.language;
+        epubProgressToSave.add(progress);
       } else {
         final chapterFile = File(chapterPath);
         final chap = Chapter(
@@ -363,6 +377,9 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       await isar.writeTxn(() async {
         // insert chapters
         await isar.chapters.putAll(chaptersToSave);
+        if (epubProgressToSave.isNotEmpty) {
+          await isar.epubBookProgress.putAll(epubProgressToSave);
+        }
 
         // for each one, set its link and save it
         for (final chap in chaptersToSave) {
@@ -391,9 +408,9 @@ Future<Directory?> getLocalLibrary() async {
   }
 }
 
-/// Finds the String 'Mangayomi/local' and extract path after
+/// Finds the app's `local` directory marker and extracts the path after it.
 /// ```
-/// "C:\Users\user\Documents\Mangayomi\local\Manga 1\chapter1.zip"
+/// "C:\Users\user\Documents\Mangatan\local\Manga 1\chapter1.zip"
 /// becomes:
 /// "Manga 1/chapter1.zip"
 /// ```
@@ -410,12 +427,13 @@ String _getRelativePath(dynamic dir) {
 
   // Normalize path separators
   relativePath = relativePath.replaceAll("\\", "/");
-  int index = relativePath.indexOf("Mangayomi/local");
-  if (index != -1) {
-    return relativePath.substring(index + "Mangayomi/local/".length);
-  } else {
-    return relativePath;
+  for (final marker in const ['Mangatan/local/', 'Mangayomi/local/']) {
+    final index = relativePath.indexOf(marker);
+    if (index != -1) {
+      return relativePath.substring(index + marker.length);
+    }
   }
+  return relativePath;
 }
 
 /// Returns if file is a json

@@ -18,9 +18,129 @@ const NUMERIC_TAG = /^\d+$/;
 // this might not cover every tag
 const POS_TAGS = new Set(['n', 'adj-i', 'adj-na', 'adj-no', 'v1', 'vk', 'vs', 'vs-i', 'vs-s', 'vz', 'vi', 'vt']);
 let audioUrls = {};
+let audioSourceResults = {};
 let lastSelection = '';
 let currentDictionaryMedia = null;
 let selectedDictionaries = {};
+let nextDictionaryStyleScope = 0;
+const dictionaryStyleElements = new Set();
+
+function hasPopupTextSelection() {
+    const selection = window.getSelection?.();
+    return !!selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+}
+
+function rememberPopupTextSelection() {
+    const selection = window.getSelection?.();
+    const selectedText = !selection || selection.isCollapsed ? '' : selection.toString();
+    if (selectedText.trim().length === 0) {
+        return '';
+    }
+    lastSelection = selectedText;
+    return selectedText;
+}
+
+// Hoshi scopes dictionary styles with CSS nesting. Some Windows installations
+// still use a WebView2 runtime old enough to reject the entire nested block,
+// leaving gaiji at their 100em fallback size and native details markers visible.
+// Scope selectors through the long-established CSSOM instead, which keeps broad
+// dictionary rules isolated without requiring CSS nesting support.
+function splitCssSelectorList(selectorText) {
+    const selectors = [];
+    let start = 0;
+    let quote = '';
+    let escaped = false;
+    let parentheses = 0;
+    let brackets = 0;
+
+    for (let index = 0; index < selectorText.length; index++) {
+        const character = selectorText[index];
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (character === '\\') {
+            escaped = true;
+            continue;
+        }
+        if (quote) {
+            if (character === quote) quote = '';
+            continue;
+        }
+        if (character === '"' || character === "'") {
+            quote = character;
+            continue;
+        }
+        if (character === '(') parentheses++;
+        else if (character === ')') parentheses--;
+        else if (character === '[') brackets++;
+        else if (character === ']') brackets--;
+        else if (character === ',' && parentheses === 0 && brackets === 0) {
+            selectors.push(selectorText.slice(start, index).trim());
+            start = index + 1;
+        }
+    }
+    selectors.push(selectorText.slice(start).trim());
+    return selectors.filter(Boolean);
+}
+
+function scopedCssSelector(selector, scopeSelector) {
+    if (selector === ':root' || selector === 'html' || selector === 'body') {
+        return scopeSelector;
+    }
+    if (selector.startsWith('&')) {
+        return `${scopeSelector}${selector.slice(1)}`;
+    }
+    return `${scopeSelector} ${selector}`;
+}
+
+function scopeDictionaryStyleRules(rules, scopeSelector) {
+    for (const rule of [...rules]) {
+        if (rule.type === 1 && typeof rule.selectorText === 'string') { // CSSRule.STYLE_RULE
+            const selectors = splitCssSelectorList(rule.selectorText);
+            try {
+                rule.selectorText = selectors
+                    .map(selector => scopedCssSelector(selector, scopeSelector))
+                    .join(', ');
+            } catch {
+                // A selector the current engine can parse but not rewrite must
+                // not affect definitions from other dictionaries.
+                rule.style.cssText = '';
+            }
+        } else if (rule.cssRules) {
+            // Recurse through grouping rules such as @media and @supports, but
+            // not through style rules containing native CSS nesting.
+            scopeDictionaryStyleRules(rule.cssRules, scopeSelector);
+        }
+    }
+}
+
+function installScopedDictionaryStyle(dictWrapper, css) {
+    if (!css.trim()) return;
+
+    const scope = String(++nextDictionaryStyleScope);
+    const scopeSelector = `[data-hoshi-dictionary-scope="${scope}"]`;
+    dictWrapper.setAttribute('data-hoshi-dictionary-scope', scope);
+
+    const style = el('style', {
+        'data-hoshi-dictionary-style': '',
+        textContent: css,
+    });
+    // A style element must be connected before older WebViews expose its
+    // CSSStyleSheet. Keep it in <head>; resetDictionaryStyles removes it when
+    // Flutter replaces the popup results.
+    document.head.appendChild(style);
+    dictionaryStyleElements.add(style);
+    if (style.sheet) {
+        scopeDictionaryStyleRules(style.sheet.cssRules, scopeSelector);
+    }
+}
+
+function resetDictionaryStyles() {
+    dictionaryStyleElements.forEach(style => style.remove());
+    dictionaryStyleElements.clear();
+    nextDictionaryStyleScope = 0;
+}
 
 function el(tag, props = {}, children = []) {
     const element = document.createElement(tag);
@@ -37,6 +157,55 @@ function el(tag, props = {}, children = []) {
     }
     
     return element;
+}
+
+function svgEl(tag, props = {}, children = []) {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(props)) {
+        element.setAttribute(key, value);
+    }
+    if (children.length) {
+        element.append(...children);
+    }
+    return element;
+}
+
+function createAudioIcon() {
+    return svgEl('svg', {
+        class: 'slot-icon audio-icon',
+        viewBox: '0 0 24 24',
+        'aria-hidden': 'true',
+        focusable: 'false'
+    }, [
+        svgEl('path', { class: 'audio-speaker-body', d: 'M3 9v6h4l5 4V5L7 9H3z' }),
+        svgEl('path', { class: 'audio-wave', d: 'M16 8.5a5 5 0 0 1 0 7' }),
+        svgEl('path', { class: 'audio-wave', d: 'M19 5a9 9 0 0 1 0 14' })
+    ]);
+}
+
+function createPlusIcon() {
+    return svgEl('svg', {
+        class: 'slot-icon plus-icon',
+        viewBox: '0 0 23 23',
+        'aria-hidden': 'true',
+        focusable: 'false'
+    }, [
+        svgEl('path', { class: 'plus-line', d: 'M10 3h3v17h-3zM3 10h17v3H3z' })
+    ]);
+}
+
+function createBrowseIcon() {
+    return svgEl('svg', {
+        class: 'slot-icon browse-icon',
+        viewBox: '0 0 24 24',
+        'aria-hidden': 'true',
+        focusable: 'false'
+    }, [
+        svgEl('path', {
+            class: 'browse-line',
+            d: 'M3 5h18v14H3zM3 9h18M8 9v10'
+        })
+    ]);
 }
 
 function toHiragana(text) {
@@ -642,11 +811,29 @@ function createDefinitionImage(data, dictionary, exporting = false) {
     }
     
     if (!exporting) {
-        const imageUrl = `image://?dictionary=${encodeURIComponent(dictionary)}&path=${encodeURIComponent(path)}`;
+        const embeddedImage = window.hoshiDictionaryMedia?.[dictionary]?.[path];
+        const fallbackUrl = `image://?dictionary=${encodeURIComponent(dictionary)}&path=${encodeURIComponent(path)}`;
+        const resolveImageUrl = async () => {
+            if (typeof embeddedImage === 'string' && embeddedImage.length > 0) {
+                return embeddedImage;
+            }
+            try {
+                const dataUri = await webkit.messageHandlers.dictionaryMedia.postMessage({dictionary, path});
+                if (typeof dataUri === 'string' && dataUri.length > 0) {
+                    window.hoshiDictionaryMedia ??= {};
+                    window.hoshiDictionaryMedia[dictionary] ??= {};
+                    window.hoshiDictionaryMedia[dictionary][path] = dataUri;
+                    return dataUri;
+                }
+            } catch (_) {}
+            return fallbackUrl;
+        };
         if (shouldRenderDefinitionImageToCanvas(path, appearance, usedWidth, invAspectRatio)) {
-            imageContainer.appendChild(createDefinitionImageCanvas(imageUrl, nodeData?.alt || title || '', (canvas, sourceImage) => {
-                renderDefinitionImageToCanvas(canvas, sourceImage, usedWidth, invAspectRatio, appearance);
-            }));
+            resolveImageUrl().then((imageUrl) => {
+                imageContainer.appendChild(createDefinitionImageCanvas(imageUrl, nodeData?.alt || title || '', (canvas, sourceImage) => {
+                    renderDefinitionImageToCanvas(canvas, sourceImage, usedWidth, invAspectRatio, appearance);
+                }));
+            });
         } else {
             const img = document.createElement('img');
             img.classList.add('gloss-image');
@@ -664,8 +851,8 @@ function createDefinitionImage(data, dictionary, exporting = false) {
                     aspectRatioSizer.style.paddingTop = `${aspectRatio * 100}%`;
                 }, {once: true});
             }
-            img.src = imageUrl;
             imageContainer.appendChild(img);
+            resolveImageUrl().then((imageUrl) => { img.src = imageUrl; });
         }
     } else {
         const alt = nodeData?.alt || title || '';
@@ -793,7 +980,7 @@ function getFrequencyHarmonicRank(frequencies) {
     return String(Math.floor(values.length / sumOfReciprocals));
 }
 
-async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText) {
+async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText, allowDuplicate = false) {
     const idx = entryIndex || 0;
     const furiganaPlain = constructFuriganaPlain(expression, reading);
     currentDictionaryMedia = new Map();
@@ -807,11 +994,12 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
     const pitchPositions = constructPitchPositionHtml(pitches);
     const pitchCategories = constructPitchCategories(pitches, reading, rules);
     
-    if (!audioUrls[idx] && window.audioSources?.length && window.needsAudio) {
-        audioUrls[idx] = await fetchAudioUrl(expression, reading || expression);
+    const audioKey = audioCacheKey({ expression, reading: reading || expression });
+    if (!audioUrls[audioKey] && window.audioSources?.length && window.needsAudio) {
+        audioUrls[audioKey] = await fetchAudioUrl(expression, reading || expression);
     }
     
-    const audio = audioUrls[idx] || '';
+    const audio = audioUrls[audioKey] || '';
     
     return await webkit.messageHandlers.mineEntry.postMessage({
         expression,
@@ -826,6 +1014,7 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
         pitchPositions,
         pitchCategories,
         popupSelectionText,
+        allowDuplicate,
         audio,
         selectedDictionary: selectedDictionaries[idx]?.name || '',
         dictionaryMedia: JSON.stringify([...dictionaryMedia.values()])
@@ -889,6 +1078,11 @@ function renderStructuredContent(parent, node, language = null, dictName = null,
     if (!node || typeof node !== 'object') {
         return;
     }
+
+    if (!Array.isArray(node) && Array.isArray(node.value) && ('Count' in node || Object.keys(node).length === 1)) {
+        renderStructuredContent(parent, node.value, language, dictName, exporting);
+        return;
+    }
     
     if (node.type === 'structured-content') {
         const container = document.createElement('span');
@@ -898,7 +1092,7 @@ function renderStructuredContent(parent, node, language = null, dictName = null,
         return;
     }
     
-    if (node.tag === 'img') {
+    if (node.type === 'image' || node.tag === 'img') {
         parent.appendChild(createDefinitionImage(node, dictName, exporting));
         return;
     }
@@ -914,6 +1108,10 @@ function renderStructuredContent(parent, node, language = null, dictName = null,
         element.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (hasPopupTextSelection()) {
+                return;
+            }
+            lastSelection = '';
             if (isExternal) {
                 openExternalLink(node.href);
             } else {
@@ -1179,39 +1377,122 @@ function createTags(entry) {
 }
 
 async function fetchAudioUrl(expression, reading) {
-    const templates = window.audioSources;
-    if (!templates?.length) return null;
-    
-    for (const template of templates) {
-        const url = template
-        .replace('{term}', encodeURIComponent(expression))
-        .replace('{reading}', encodeURIComponent(reading));
-        try {
-            const response = await fetch(`audio://?url=${encodeURIComponent(url)}`);
-            const data = await response.json();
-            if (data.type === 'audioSourceList' && data.audioSources?.[0]?.url) {
-                return data.audioSources[0].url;
-            }
-        } catch {}
-    }
-    return null;
+    const sources = await resolveEntryAudioSources({ expression, reading });
+    return sources[0]?.url || null;
 }
 
-function playWordAudio(audioUrl) {
+async function playWordAudio(audioUrl) {
     const playHandler = window.webkit?.messageHandlers?.playWordAudio;
     if (!playHandler) {
         return false;
     }
     
     try {
-        playHandler.postMessage({
+        return await playHandler.postMessage({
             url: audioUrl,
             mode: window.audioPlaybackMode || 'interrupt'
         });
-        return true;
     } catch {
         return false;
     }
+}
+
+function resetAudioCaches() {
+    audioUrls = {};
+    audioSourceResults = {};
+    hideAudioSourceMenu();
+}
+window.resetHoshiAudioCaches = resetAudioCaches;
+window.resetHoshiDictionaryStyles = resetDictionaryStyles;
+
+function audioCacheKey(entry) {
+    const expression = entry?.expression || '';
+    return `${expression}\u0000${entry?.reading || expression}`;
+}
+
+async function resolveEntryAudioSources(entry) {
+    if (!entry || !window.audioSources?.length) { return []; }
+    const key = audioCacheKey(entry);
+    if (audioSourceResults[key]) { return audioSourceResults[key]; }
+    let sources = [];
+    try {
+        sources = await webkit.messageHandlers.getTermAudioSources.postMessage({
+            expression: entry.expression || '',
+            reading: entry.reading || entry.expression || ''
+        });
+    } catch {}
+    audioSourceResults[key] = Array.isArray(sources) ? sources.filter(source => source?.url) : [];
+    return audioSourceResults[key];
+}
+
+function hideAudioSourceMenu() {
+    document.querySelector('.audio-source-menu')?.remove();
+}
+
+function positionAudioSourceMenu(menu, x, y) {
+    const margin = 6;
+    const rect = menu.getBoundingClientRect();
+    const left = Math.min(Math.max(margin, x), window.innerWidth - rect.width - margin);
+    const top = Math.min(Math.max(margin, y), window.innerHeight - rect.height - margin);
+    menu.style.left = `${Math.max(margin, left)}px`;
+    menu.style.top = `${Math.max(margin, top)}px`;
+}
+
+function audioSourceMenuRow(label, onClick, disabled = false) {
+    const row = el('button', {
+        type: 'button',
+        className: 'audio-source-menu-row',
+        disabled
+    });
+    row.textContent = label;
+    if (!disabled) {
+        row.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            await onClick();
+        });
+    }
+    return row;
+}
+
+async function playResolvedAudioSource(entryIndex, url) {
+    const audioSlot = getButtonSlot('audio', entryIndex);
+    updateButtonSlot(audioSlot, { state: 'loading' });
+    const played = await playWordAudio(url);
+    updateButtonSlot(audioSlot, { state: played ? 'default' : 'error' });
+    if (!played) {
+        setTimeout(() => updateButtonSlot(audioSlot, { state: 'default' }), 1500);
+    }
+    return played;
+}
+
+async function showAudioSourceMenu(entryIndex, x, y) {
+    const entry = window.lookupEntries?.[entryIndex];
+    if (!entry) { return; }
+    hideAudioSourceMenu();
+
+    const menu = el('div', { className: 'audio-source-menu' }, [
+        audioSourceMenuRow('Loading...', async () => {}, true)
+    ]);
+    document.body.appendChild(menu);
+    positionAudioSourceMenu(menu, x, y);
+
+    const sources = await resolveEntryAudioSources(entry);
+    if (!menu.isConnected) { return; }
+    menu.textContent = '';
+
+    if (!sources.length) {
+        menu.appendChild(audioSourceMenuRow('No audio found', async () => {}, true));
+    } else {
+        sources.forEach((source, index) => {
+            const label = source.name || source.url || `Audio ${index + 1}`;
+            menu.appendChild(audioSourceMenuRow(label, async () => {
+                await playResolvedAudioSource(entryIndex, source.url);
+                hideAudioSourceMenu();
+            }));
+        });
+    }
+    positionAudioSourceMenu(menu, x, y);
 }
 
 function reportButtonRects() {
@@ -1232,12 +1513,20 @@ function reportButtonRects() {
 }
 
 function createButtonSlot(kind, entryIndex, enabled = true) {
-    return el('span', {
+    const slot = el('span', {
         className: 'button-slot',
         'data-kind': kind,
         'data-entry-index': entryIndex,
         'data-enabled': String(enabled)
     });
+    if (kind === 'audio') {
+        slot.appendChild(createAudioIcon());
+    } else if (kind === 'mine') {
+        slot.appendChild(createPlusIcon());
+    } else if (kind === 'browse') {
+        slot.appendChild(createBrowseIcon());
+    }
+    return slot;
 }
 
 function getButtonSlot(kind, entryIndex) {
@@ -1255,11 +1544,17 @@ async function playEntryAudio(entryIndex) {
     const entry = window.lookupEntries?.[entryIndex];
     if (!entry) { return; }
     const audioSlot = getButtonSlot('audio', entryIndex);
+    const audioKey = audioCacheKey(entry);
     
-    if (!audioUrls[entryIndex]) {
-        audioUrls[entryIndex] = await fetchAudioUrl(entry.expression, entry.reading);
+    updateButtonSlot(audioSlot, { state: 'loading' });
+    if (!audioUrls[audioKey]) {
+        const sources = await resolveEntryAudioSources(entry);
+        audioUrls[audioKey] = sources[0]?.url || '';
     }
-    if (!audioUrls[entryIndex] || !playWordAudio(audioUrls[entryIndex])) {
+    const played = audioUrls[audioKey] ? await playWordAudio(audioUrls[audioKey]) : false;
+    if (played) {
+        updateButtonSlot(audioSlot, { state: 'default' });
+    } else {
         updateButtonSlot(audioSlot, { state: 'error' });
         setTimeout(() => updateButtonSlot(audioSlot, { state: 'default' }), 1500);
     }
@@ -1271,15 +1566,17 @@ async function mineEntryAtIndex(entryIndex) {
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
     const mineSlot = getButtonSlot('mine', entryIndex);
     
-    lastSelection = window.getSelection()?.toString() || '';
+    const selectedText = rememberPopupTextSelection() || lastSelection;
     updateButtonSlot(mineSlot, { enabled: false });
     
-    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
+    const allowDuplicate = mineSlot.dataset.state === 'duplicate';
+    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, selectedText, allowDuplicate);
+    lastSelection = '';
     const checkDuplicate = async () => {
         const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
         updateButtonSlot(mineSlot, {
             state: wasAdded ? 'duplicate' : 'default',
-            enabled: !(wasAdded && !window.allowDupes)
+            enabled: true
         });
     };
     
@@ -1287,6 +1584,21 @@ async function mineEntryAtIndex(entryIndex) {
         await checkDuplicate();
     } else {
         setTimeout(checkDuplicate, 1000);
+    }
+}
+
+async function browseEntryNotes(entryIndex) {
+    const slot = getButtonSlot('browse', entryIndex);
+    const noteIds = String(slot?.dataset.noteIds || '')
+        .split(' ')
+        .map(Number)
+        .filter(Number.isFinite);
+    if (!noteIds.length) { return; }
+    updateButtonSlot(slot, { enabled: false, state: 'loading' });
+    const opened = await webkit.messageHandlers.browseNotes.postMessage(noteIds);
+    updateButtonSlot(slot, { enabled: true, state: opened ? 'default' : 'error' });
+    if (!opened) {
+        setTimeout(() => updateButtonSlot(slot, { state: 'default' }), 1500);
     }
 }
 
@@ -1310,19 +1622,31 @@ function createEntryHeader(entry, idx) {
     }
     
     const buttonsContainer = el('div', { className: 'header-buttons' });
-    
+    const mineSlot = createButtonSlot('mine', idx, false);
+    mineSlot.title = 'Add card';
+    buttonsContainer.appendChild(mineSlot);
+    const browseSlot = createButtonSlot('browse', idx, false);
+    browseSlot.hidden = true;
+    browseSlot.title = 'View existing card(s) in Anki';
+    buttonsContainer.appendChild(browseSlot);
+    Promise.all([
+        webkit.messageHandlers.duplicateCheck.postMessage(expression),
+        webkit.messageHandlers.duplicateNotes.postMessage(expression)
+    ]).then(([isDuplicate, noteIds]) => {
+        const ids = Array.isArray(noteIds) ? noteIds : [];
+        updateButtonSlot(mineSlot, {
+            state: isDuplicate ? 'duplicate' : 'default',
+            enabled: true
+        });
+        mineSlot.title = isDuplicate ? 'Add duplicate card' : 'Add card';
+        browseSlot.dataset.noteIds = ids.join(' ');
+        browseSlot.hidden = ids.length === 0;
+        updateButtonSlot(browseSlot, { enabled: ids.length > 0 });
+    });
+
     if (window.audioSources?.length) {
         buttonsContainer.appendChild(createButtonSlot('audio', idx));
     }
-    
-    const mineSlot = createButtonSlot('mine', idx, false);
-    buttonsContainer.appendChild(mineSlot);
-    webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
-        updateButtonSlot(mineSlot, {
-            state: isDuplicate ? 'duplicate' : 'default',
-            enabled: !(isDuplicate && !window.allowDupes)
-        });
-    });
     
     header.appendChild(buttonsContainer);
     requestAnimationFrame(reportButtonRects);
@@ -1330,11 +1654,42 @@ function createEntryHeader(entry, idx) {
     return header;
 }
 
-function createGlossarySection(dictName, contents, isFirst, entryIdx) {
+function initialOpenDictionaries(dictNames) {
+    const configuredOrder = Array.isArray(window.dictionaryOrder) ? window.dictionaryOrder : [];
+    const available = new Set(dictNames);
+    const ordered = [];
+    for (const name of configuredOrder) {
+        if (available.has(name) && !ordered.includes(name)) ordered.push(name);
+    }
+    for (const name of dictNames) {
+        if (!ordered.includes(name)) ordered.push(name);
+    }
+
+    const mode = window.dictionaryCollapseMode || 'expand_all';
+    if (mode === 'collapse_all') return new Set();
+    if (mode === 'expand_first_available') {
+        return new Set(ordered.length ? [ordered[0]] : []);
+    }
+    if (mode === 'custom') {
+        const displayModes = window.dictionaryDisplayModes || {};
+        const open = new Set();
+        let contentOpened = false;
+        for (const name of ordered) {
+            const displayMode = displayModes[name] || 'fallback';
+            if (displayMode === 'always_collapsed') continue;
+            if (displayMode === 'always_expanded' || !contentOpened) {
+                open.add(name);
+                contentOpened = true;
+            }
+        }
+        return open;
+    }
+    return new Set(ordered);
+}
+
+function createGlossarySection(dictName, contents, initiallyOpen, entryIdx) {
     const details = el('details', { className: 'glossary-group' });
-    const collapsed = window.collapseMode === 'Collapse All'
-    || (window.collapseMode === 'Custom' && window.collapsedDictionaries.includes(dictName));
-    details.open = !collapsed || (window.expandFirstDictionary && isFirst);
+    details.open = initiallyOpen;
     
     const summary = el('summary', { className: 'dict-label' });
     summary.appendChild(el('span', { className: 'dict-name', textContent: dictName }));
@@ -1362,17 +1717,10 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     
     const dictWrapper = document.createElement('div');
     dictWrapper.setAttribute('data-dictionary', dictName);
+    dictWrapper.style.color = 'var(--text-color)';
     
     const dictStyle = window.dictionaryStyles?.[dictName] ?? '';
-    dictWrapper.appendChild(el('style', {
-        textContent: `
-            [data-dictionary="${dictName}"] {
-                @media (prefers-color-scheme: light) { color: #000; }
-                @media (prefers-color-scheme: dark) { color: #fff; }
-                ${dictStyle}
-            }
-        `.trim()
-    }));
+    installScopedDictionaryStyle(dictWrapper, dictStyle);
     
     const termTags = [...new Set(parseTags(contents[0]?.termTags))];
     const renderContent = (parent, content) => {
@@ -1429,12 +1777,20 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
 const backStack = [];
 const forwardStack = [];
 
+function reportNavigationState() {
+    webkit.messageHandlers.navigationChanged.postMessage({
+        canGoBack: backStack.length > 0,
+        canGoForward: forwardStack.length > 0,
+    });
+}
+
 function redirect(count) {
     backStack.push(snapshot());
     forwardStack.length = 0;
+    reportNavigationState();
     window.lookupEntries = undefined;
     window.entryCount = count;
-    audioUrls = {};
+    resetAudioCaches();
     selectedDictionaries = {};
     document.getElementById('entries-container').innerHTML = '';
     reportButtonRects();
@@ -1462,7 +1818,7 @@ function restore(s) {
     container.replaceChildren(...s.nodes);
     window.lookupEntries = s.lookupEntries;
     window.entryCount = s.entryCount;
-    audioUrls = {};
+    resetAudioCaches();
     selectedDictionaries = {};
     requestAnimationFrame(reportButtonRects);
     requestAnimationFrame(() => {
@@ -1476,9 +1832,15 @@ function navigate(org, to) {
     }
     to.push(snapshot());
     restore(org.pop());
+    reportNavigationState();
 }
 window.navigateBack = () => navigate(backStack, forwardStack);
 window.navigateForward = () => navigate(forwardStack, backStack);
+window.resetHoshiNavigation = () => {
+    backStack.length = 0;
+    forwardStack.length = 0;
+    reportNavigationState();
+};
 
 const MASONRY_GAP = 5;
 const HAS_NATIVE_MASONRY = CSS.supports('display', 'grid-lanes');
@@ -1527,8 +1889,15 @@ function observeMasonry(root) {
 }
 
 window.addEventListener('resize', () => {
+    hideAudioSourceMenu();
     requestAnimationFrame(reportButtonRects);
     scheduleMasonry();
+});
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest?.('.audio-source-menu')) {
+        hideAudioSourceMenu();
+    }
 });
 
 document.addEventListener('toggle', () => requestAnimationFrame(reportButtonRects), true);
@@ -1589,9 +1958,11 @@ window.renderPopup = function() {
             });
             
             const dictNames = Object.keys(grouped);
+            const openDictionaries = initialOpenDictionaries(dictNames);
             glossarySections.classList.toggle('single-section', dictNames.length === 1);
             for (let dictIdx = 0; dictIdx < dictNames.length; dictIdx++) {
-                glossarySections.appendChild(createGlossarySection(dictNames[dictIdx], grouped[dictNames[dictIdx]], dictIdx === 0, idx));
+                const dictName = dictNames[dictIdx];
+                glossarySections.appendChild(createGlossarySection(dictName, grouped[dictName], openDictionaries.has(dictName), idx));
                 if (idx === 0) {
                     scheduleMasonry();
                     await new Promise(r => requestAnimationFrame(r));
@@ -1697,6 +2068,10 @@ window.renderPopup = function() {
     container.clickAttached = true;
     container.addEventListener('click', (e) => {
         const target = e.target?.nodeType === Node.TEXT_NODE ? e.target.parentElement : e.target;
+        if (hasPopupTextSelection()) {
+            return;
+        }
+        lastSelection = '';
         if (target?.closest('summary')) {
             return;
         }
@@ -1711,3 +2086,17 @@ window.renderPopup = function() {
         }
     });
 };
+
+document.addEventListener('selectionchange', rememberPopupTextSelection);
+
+// The embedded WebView owns keyboard focus while the popup is open, so these
+// keys need to cross the JavaScript bridge instead of relying solely on the
+// Flutter focus tree.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' && event.key !== 'Backspace' && event.key !== 'BrowserBack') {
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    webkit.messageHandlers.dismissPopup.postMessage(null);
+}, true);

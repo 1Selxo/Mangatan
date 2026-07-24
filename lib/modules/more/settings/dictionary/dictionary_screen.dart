@@ -3,16 +3,28 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dialog.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
+import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class DictionaryScreen extends StatefulWidget {
-  const DictionaryScreen({super.key});
+  const DictionaryScreen({
+    super.key,
+    this.section = DictionarySettingsSection.dictionariesAndAudio,
+  });
+
+  final DictionarySettingsSection section;
 
   @override
   State<DictionaryScreen> createState() => _DictionaryScreenState();
@@ -20,18 +32,29 @@ class DictionaryScreen extends StatefulWidget {
 
 class _DictionaryScreenState extends State<DictionaryScreen> {
   List<InstalledDictionary> _dictionaries = const [];
+  List<DictionaryProfile> _profiles = const [];
+  DictionaryProfile _activeProfile = const DictionaryProfile(
+    id: 'mangatan-default',
+    name: 'Default',
+  );
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
-  String _language = 'ja';
-  double _opacity = 0.0;
+  bool _mokuroWebsiteOcrEnabled = true;
+  String _dictionaryLanguage = 'ja';
+  double _backgroundOpacity = MiningPreferences.defaultOcrBackgroundOpacity;
+  double _textOpacity = MiningPreferences.defaultOcrTextOpacity;
   double _boxScale = 1;
   double _boxScaleY = 1;
   bool _outlineVisible = true;
+  bool _lookupOnHover = false;
+  DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
+  bool _additionalLeftClick = false;
   bool _overlayEnabled = true;
   bool _screenAiAvailable = false;
   bool _loading = true;
   bool _importing = false;
   late DictionaryPopupPreferences _popupPreferences;
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
+  AnkiAudioPreferences _ankiAudioPreferences = AnkiAudioPreferences.defaults;
   Uri _ankiEndpoint = Uri.parse('http://127.0.0.1:8765');
   int? _ankiVersion;
   List<String> _ankiDecks = const [];
@@ -50,34 +73,55 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     final values = await Future.wait<dynamic>([
       DictionaryStorage.instance.installed(),
       MiningPreferences.getOcrEngine(),
-      MiningPreferences.getOcrLanguage(),
-      MiningPreferences.getOcrOverlayOpacity(),
+      MiningPreferences.getOcrBackgroundOpacity(),
+      MiningPreferences.getOcrTextOpacity(),
       MiningPreferences.getOcrBoxScaleX(),
       MiningPreferences.getOcrBoxScaleY(),
       MiningPreferences.getOcrOutlineVisible(),
+      MiningPreferences.getOcrLookupOnHover(),
       MiningPreferences.getOcrOverlayEnabled(),
       MiningPreferences.getDictionaryPopupPreferences(),
       MiningPreferences.getAnkiProfile(),
+      MiningPreferences.getAnkiAudioPreferences(),
       MiningPreferences.getAnkiEndpoint(),
       ScreenAiOcrClient.isAvailable(),
+      MiningPreferences.getDictionaryLookupTrigger(),
+      MiningPreferences.getDictionaryAdditionalLeftClick(),
+      MiningPreferences.getDictionaryLanguage(),
+      MiningPreferences.getDictionaryProfiles(),
+      MiningPreferences.getActiveDictionaryProfile(),
+      MiningPreferences.getMokuroWebsiteOcrEnabled(),
     ]);
     if (!mounted) return;
     setState(() {
-      _dictionaries = values[0] as List<InstalledDictionary>;
+      _profiles = values[17] as List<DictionaryProfile>;
+      _activeProfile = values[18] as DictionaryProfile;
+      _mokuroWebsiteOcrEnabled = values[19] as bool;
+      _dictionaries = _orderDictionaries(
+        values[0] as List<InstalledDictionary>,
+        _activeProfile.dictionaryOrder,
+      );
       _engine = values[1] as OcrEnginePreference;
-      _language = values[2] as String;
-      _opacity = values[3] as double;
+      _backgroundOpacity = values[2] as double;
+      _textOpacity = values[3] as double;
       _boxScale = values[4] as double;
       _boxScaleY = values[5] as double;
       _outlineVisible = values[6] as bool;
-      _overlayEnabled = values[7] as bool;
-      _popupPreferences = values[8] as DictionaryPopupPreferences;
-      _ankiProfile = values[9] as AnkiMiningProfile;
-      _ankiEndpoint = values[10] as Uri;
-      _screenAiAvailable = values[11] as bool;
+      _lookupOnHover = values[7] as bool;
+      _overlayEnabled = values[8] as bool;
+      _popupPreferences = values[9] as DictionaryPopupPreferences;
+      _ankiProfile = values[10] as AnkiMiningProfile;
+      _ankiAudioPreferences = values[11] as AnkiAudioPreferences;
+      _ankiEndpoint = values[12] as Uri;
+      _screenAiAvailable = values[13] as bool;
+      _lookupTrigger = values[14] as DictionaryLookupTrigger;
+      _additionalLeftClick = values[15] as bool;
+      _dictionaryLanguage = values[16] as String;
       _loading = false;
     });
-    unawaited(_refreshAnki(silent: true));
+    if (widget.section == DictionarySettingsSection.anki) {
+      unawaited(_refreshAnki(silent: true));
+    }
   }
 
   Future<void> _importDictionary() async {
@@ -106,6 +150,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
           pitchCount: imported.pitchCount,
         );
         importedNames.add(imported.title);
+      }
+      var updatedProfile = _activeProfile;
+      for (final name in importedNames) {
+        updatedProfile = updatedProfile.withInstalledDictionary(name);
+      }
+      if (!identical(updatedProfile, _activeProfile)) {
+        await _updateActiveProfile(updatedProfile);
       }
       await HoshidictsLookupBackend.instance.reloadFromStorage();
       await _load();
@@ -137,8 +188,51 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     );
     if (confirmed != true) return;
     await DictionaryStorage.instance.delete(dictionary.name);
+    await _updateActiveProfile(
+      _activeProfile.withoutDictionary(dictionary.name),
+    );
     await HoshidictsLookupBackend.instance.reloadFromStorage();
     await _load();
+  }
+
+  Future<void> _saveDictionaryOrder(
+    List<InstalledDictionary> dictionaries,
+  ) async {
+    final previous = _dictionaries;
+    setState(() => _dictionaries = dictionaries);
+    try {
+      await _updateActiveProfile(
+        _activeProfile.copyWith(
+          dictionaryOrder: dictionaries
+              .map((dictionary) => dictionary.name)
+              .toList(),
+        ),
+      );
+      await HoshidictsLookupBackend.instance.reloadFromStorage();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _dictionaries = previous);
+      botToast('Could not reorder dictionaries: $error', second: 5);
+    }
+  }
+
+  void _reorderDictionaries(int oldIndex, int newIndex) {
+    if (oldIndex == newIndex) return;
+    final dictionaries = [..._dictionaries];
+    final moved = dictionaries.removeAt(oldIndex);
+    dictionaries.insert(newIndex, moved);
+    unawaited(_saveDictionaryOrder(dictionaries));
+  }
+
+  Future<void> _moveDictionary(int index, int offset) async {
+    final target = index + offset;
+    if (target < 0 || target >= _dictionaries.length || target == index) {
+      return;
+    }
+    final dictionaries = [..._dictionaries];
+    final moved = dictionaries.removeAt(index);
+    dictionaries.insert(target, moved);
+    await _saveDictionaryOrder(dictionaries);
   }
 
   Future<String?> _editText({
@@ -146,40 +240,119 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     required String value,
     String? hint,
     int maxLines = 1,
-  }) async {
-    final controller = TextEditingController(text: value);
-    final result = await showDialog<String>(
+  }) {
+    return showEditTextDialog(
+      context: context,
+      title: title,
+      initialValue: value,
+      hint: hint,
+      maxLines: maxLines,
+    );
+  }
+
+  Future<void> _saveAnki(AnkiMiningProfile profile) async {
+    setState(() {
+      _ankiProfile = profile;
+      _activeProfile = _activeProfile.copyWith(anki: profile);
+    });
+    await MiningPreferences.setAnkiProfile(profile);
+  }
+
+  List<InstalledDictionary> _orderDictionaries(
+    List<InstalledDictionary> dictionaries,
+    List<String> order,
+  ) {
+    if (order.isEmpty) return dictionaries;
+    final byName = {
+      for (final dictionary in dictionaries) dictionary.name: dictionary,
+    };
+    return [for (final name in order) ?byName.remove(name), ...byName.values];
+  }
+
+  Future<void> _updateActiveProfile(DictionaryProfile profile) async {
+    await MiningPreferences.updateDictionaryProfile(profile);
+    if (!mounted) return;
+    setState(() {
+      _activeProfile = profile;
+      _profiles = [
+        for (final item in _profiles) item.id == profile.id ? profile : item,
+      ];
+    });
+  }
+
+  Future<void> _activateProfile(DictionaryProfile profile) async {
+    if (profile.id == _activeProfile.id) return;
+    await MiningPreferences.setActiveDictionaryProfile(profile.id);
+    HoshidictsLookupBackend.instance.clearSession();
+    await _load();
+  }
+
+  Future<void> _createProfile() async {
+    final name = await _editText(
+      title: 'New profile',
+      value: '${_activeProfile.name} copy',
+      hint: 'Profile name',
+    );
+    if (name == null || name.trim().isEmpty) return;
+    final profile = _activeProfile.copyWith(
+      id: 'profile-${DateTime.now().microsecondsSinceEpoch}',
+      name: name.trim(),
+    );
+    await MiningPreferences.addDictionaryProfile(profile);
+    HoshidictsLookupBackend.instance.clearSession();
+    await _load();
+  }
+
+  Future<void> _renameActiveProfile() async {
+    final name = await _editText(
+      title: 'Rename profile',
+      value: _activeProfile.name,
+      hint: 'Profile name',
+    );
+    if (name == null || name.trim().isEmpty) return;
+    await _updateActiveProfile(_activeProfile.copyWith(name: name.trim()));
+  }
+
+  Future<void> _deleteActiveProfile() async {
+    if (_profiles.length <= 1) return;
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          maxLines: maxLines,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: hint,
-            border: const OutlineInputBorder(),
-          ),
-        ),
+        title: const Text('Delete profile?'),
+        content: Text(_activeProfile.name),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
-    controller.dispose();
-    return result;
+    if (confirmed != true) return;
+    await MiningPreferences.deleteDictionaryProfile(_activeProfile.id);
+    HoshidictsLookupBackend.instance.clearSession();
+    await _load();
   }
 
-  Future<void> _saveAnki(AnkiMiningProfile profile) async {
-    setState(() => _ankiProfile = profile);
-    await MiningPreferences.setAnkiProfile(profile);
+  Future<void> _toggleDictionary(String name, bool enabled) async {
+    var enabledNames = _activeProfile.enabledDictionaries.isEmpty
+        ? _dictionaries.map((dictionary) => dictionary.name).toSet()
+        : {..._activeProfile.enabledDictionaries};
+    enabled ? enabledNames.add(name) : enabledNames.remove(name);
+    if (enabledNames.length == _dictionaries.length) enabledNames = {};
+    await _updateActiveProfile(
+      _activeProfile.copyWith(enabledDictionaries: enabledNames),
+    );
+    await HoshidictsLookupBackend.instance.reloadFromStorage();
+  }
+
+  Future<void> _saveAnkiAudio(AnkiAudioPreferences preferences) async {
+    setState(() => _ankiAudioPreferences = preferences);
+    await MiningPreferences.setAnkiAudioPreferences(preferences);
   }
 
   Future<void> _refreshAnki({bool silent = false}) async {
@@ -208,6 +381,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               fieldMap: _autoMapFields(
                 fields,
                 needsLapisMigration ? const {} : _ankiProfile.fieldMap,
+                isLapis: isLapis,
               ),
             )
           : _ankiProfile;
@@ -247,11 +421,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     } catch (error) {
       botToast('Could not fetch fields: $error', second: 5);
     }
+    final isLapis = _isLapisLike(modelName, fields);
     final profile = _ankiProfile.copyWith(
       modelName: modelName,
       fieldMap: _autoMapFields(
         fields,
-        _isLapisLike(modelName, fields) ? const {} : _ankiProfile.fieldMap,
+        isLapis ? const {} : _ankiProfile.fieldMap,
+        isLapis: isLapis,
       ),
     );
     if (!mounted) return;
@@ -261,14 +437,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   Map<String, String> _autoMapFields(
     List<String> fields,
-    Map<String, String> current,
-  ) {
+    Map<String, String> current, {
+    bool isLapis = false,
+  }) {
     if (fields.isEmpty) return current;
     return {
       for (final indexed in fields.indexed)
         indexed.$2:
             current[indexed.$2] ??
-            AnkiMarker.autoDetectTemplate(indexed.$2, indexed.$1) ??
+            AnkiMarker.autoDetectTemplate(
+              indexed.$2,
+              indexed.$1,
+              isLapis: isLapis,
+            ) ??
             '',
     };
   }
@@ -299,7 +480,14 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       botToast('Connect to Anki first to fetch note fields', second: 4);
       return;
     }
-    var map = _autoMapFields(fields, _ankiProfile.fieldMap);
+    final dictionaryTemplates =
+        AnkiMarker.singleGlossaryTemplatesForDictionaries(
+          _dictionaries
+              .where((dictionary) => dictionary.hasTerms)
+              .map((dictionary) => dictionary.name),
+        );
+    final isLapis = _isLapisLike(_ankiProfile.modelName, fields);
+    var map = _autoMapFields(fields, _ankiProfile.fieldMap, isLapis: isLapis);
     final saved = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) {
@@ -319,6 +507,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     return _AnkiFieldTemplatePicker(
                       fieldName: field,
                       value: value,
+                      dynamicTemplates: dictionaryTemplates,
                       onChanged: (next) {
                         setDialogState(() => map = {...map, field: next});
                       },
@@ -344,7 +533,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 TextButton(
                   onPressed: () {
                     setDialogState(
-                      () => map = _autoMapFields(fields, const {}),
+                      () => map = _autoMapFields(
+                        fields,
+                        const {},
+                        isLapis: isLapis,
+                      ),
                     );
                   },
                   child: const Text('Auto map'),
@@ -363,14 +556,161 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     await _saveAnki(_ankiProfile.copyWith(fieldMap: saved));
   }
 
+  List<Widget> _childrenForSection(List<Widget> children) {
+    // Keep one source of truth for the existing controls while presenting
+    // Chimahon's Dictionary, Popup, and Anki pages as separate routes.
+    final visibleGroups = switch (widget.section) {
+      DictionarySettingsSection.dictionariesAndAudio => {
+        _DictionarySettingsGroup.profiles,
+        _DictionarySettingsGroup.dictionaries,
+      },
+      DictionarySettingsSection.dictionaryPopup => {
+        _DictionarySettingsGroup.popup,
+      },
+      DictionarySettingsSection.anki => {
+        _DictionarySettingsGroup.profiles,
+        _DictionarySettingsGroup.anki,
+      },
+    };
+    var currentGroup = _DictionarySettingsGroup.profiles;
+    final visibleChildren = <Widget>[];
+    for (final child in children) {
+      if (child is _DictionarySettingsGroupMarker) {
+        currentGroup = child.group;
+      } else if (visibleGroups.contains(currentGroup)) {
+        visibleChildren.add(child);
+      }
+    }
+    if (visibleChildren.isNotEmpty && visibleChildren.first is Divider) {
+      visibleChildren.removeAt(0);
+    }
+    return visibleChildren;
+  }
+
+  Widget _dictionaryLanguagePreference() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: DropdownButtonFormField<String>(
+        initialValue: _dictionaryLanguage,
+        decoration: const InputDecoration(
+          labelText: 'Dictionary language',
+          helperText: 'Controls word parsing and deinflection during lookup',
+          prefixIcon: Icon(Icons.translate),
+        ),
+        items: [
+          const DropdownMenuItem(
+            value: '',
+            child: Text('Any (not matched automatically)'),
+          ),
+          if (_dictionaryLanguage.isNotEmpty &&
+              !dictionaryLanguages.any(
+                (language) => language.code == _dictionaryLanguage,
+              ))
+            DropdownMenuItem(
+              value: _dictionaryLanguage,
+              child: Text(_dictionaryLanguage),
+            ),
+          for (final language in dictionaryLanguages)
+            DropdownMenuItem(value: language.code, child: Text(language.name)),
+        ],
+        onChanged: (value) async {
+          if (value == null) return;
+          setState(() => _dictionaryLanguage = value);
+          await _updateActiveProfile(
+            _activeProfile.copyWith(languageCode: value),
+          );
+          HoshidictsLookupBackend.instance.invalidateLookups();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final collapseMode =
+        const {
+          'expand_all',
+          'expand_first_available',
+          'collapse_all',
+          'custom',
+        }.contains(_activeProfile.dictionaryCollapseMode)
+        ? _activeProfile.dictionaryCollapseMode
+        : 'expand_all';
     return Scaffold(
-      appBar: AppBar(title: const Text('Dictionary & OCR')),
+      appBar: AppBar(title: Text(widget.section.title)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              children: [
+              children: _childrenForSection([
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.profiles,
+                ),
+                const _SectionHeader('Profiles'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final profile in _profiles) ...[
+                                ChoiceChip(
+                                  label: Text(profile.name),
+                                  selected: profile.id == _activeProfile.id,
+                                  onSelected: (_) => _activateProfile(profile),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              ActionChip(
+                                avatar: const Icon(Icons.add, size: 18),
+                                label: const Text('Clone'),
+                                onPressed: _createProfile,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Profile actions',
+                        onSelected: (action) {
+                          if (action == 'rename') _renameActiveProfile();
+                          if (action == 'delete') _deleteActiveProfile();
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'rename',
+                            child: ListTile(
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Rename'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            enabled: _profiles.length > 1,
+                            child: const ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Delete'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text('Active: ${_activeProfile.name}'),
+                  subtitle: const Text(
+                    'Language, dictionary priority, enabled dictionaries, and Anki settings are saved per profile.',
+                  ),
+                ),
+                _dictionaryLanguagePreference(),
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.dictionaries,
+                ),
+                const Divider(height: 24),
                 const _SectionHeader('Dictionaries'),
                 ListTile(
                   leading: const Icon(Icons.archive_outlined),
@@ -384,6 +724,37 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       : const Icon(Icons.add),
                   onTap: _importing ? null : _importDictionary,
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: collapseMode,
+                    decoration: const InputDecoration(
+                      labelText: 'Dictionary collapse mode',
+                      prefixIcon: Icon(Icons.unfold_less),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'expand_all',
+                        child: Text('Expand all dictionaries'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'expand_first_available',
+                        child: Text('Expand first available dictionary'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'collapse_all',
+                        child: Text('Collapse all dictionaries'),
+                      ),
+                      DropdownMenuItem(value: 'custom', child: Text('Custom')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _updateActiveProfile(
+                        _activeProfile.copyWith(dictionaryCollapseMode: value),
+                      );
+                    },
+                  ),
+                ),
                 if (_dictionaries.isEmpty)
                   const ListTile(
                     leading: Icon(Icons.menu_book_outlined),
@@ -393,25 +764,49 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ),
                   )
                 else
-                  for (final dictionary in _dictionaries)
-                    ListTile(
-                      leading: const Icon(Icons.menu_book_outlined),
-                      title: Text(dictionary.name),
-                      subtitle: Text(
-                        [
-                          if (dictionary.hasTerms) 'Terms',
-                          if (dictionary.hasFrequencies) 'Frequency',
-                          if (dictionary.hasPitch) 'Pitch',
-                        ].join(' • '),
-                      ),
-                      trailing: IconButton(
-                        tooltip: 'Remove dictionary',
-                        onPressed: () => _deleteDictionary(dictionary),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    ),
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: _dictionaries.length,
+                    onReorderItem: _reorderDictionaries,
+                    itemBuilder: (context, index) {
+                      final dictionary = _dictionaries[index];
+                      return _DictionaryListTile(
+                        key: ValueKey(dictionary.name),
+                        dictionary: dictionary,
+                        index: index,
+                        canMoveUp: index > 0,
+                        canMoveDown: index < _dictionaries.length - 1,
+                        enabled: _activeProfile.isDictionaryEnabled(
+                          dictionary.name,
+                        ),
+                        displayMode: collapseMode == 'custom'
+                            ? _activeProfile.dictionaryDisplayModes[dictionary
+                                      .name] ??
+                                  'fallback'
+                            : null,
+                        onEnabledChanged: (enabled) =>
+                            _toggleDictionary(dictionary.name, enabled),
+                        onDisplayModeChanged: (mode) => _updateActiveProfile(
+                          _activeProfile.copyWith(
+                            dictionaryDisplayModes: {
+                              ..._activeProfile.dictionaryDisplayModes,
+                              dictionary.name: mode,
+                            },
+                          ),
+                        ),
+                        onMoveUp: () => _moveDictionary(index, -1),
+                        onMoveDown: () => _moveDictionary(index, 1),
+                        onDelete: () => _deleteDictionary(dictionary),
+                      );
+                    },
+                  ),
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.popup,
+                ),
                 const Divider(height: 24),
-                const _SectionHeader('Popup appearance'),
+                const _SectionHeader('Layout'),
                 _SliderSetting(
                   title: 'Popup width',
                   value: _popupPreferences.width,
@@ -444,6 +839,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     MiningPreferences.setDictionaryPopupHeight(value);
                   },
                 ),
+                const Divider(height: 24),
+                const _SectionHeader('Typography'),
                 _SliderSetting(
                   title: 'Dictionary font size',
                   value: _popupPreferences.fontSize,
@@ -460,6 +857,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     MiningPreferences.setDictionaryFontSize(value);
                   },
                 ),
+                const Divider(height: 24),
+                const _SectionHeader('Theme'),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: DropdownButtonFormField<DictionaryThemePreference>(
@@ -552,7 +951,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   },
                 ),
                 const Divider(height: 24),
-                const _SectionHeader('Dictionary display'),
+                const _SectionHeader('Content'),
                 SwitchListTile(
                   title: const Text('Show harmonic frequency'),
                   value: _popupPreferences.showFrequencyHarmonic,
@@ -601,8 +1000,64 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     MiningPreferences.setShowPitchText(value);
                   },
                 ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<DictionaryLookupTrigger>(
+                    initialValue: _lookupTrigger,
+                    decoration: const InputDecoration(
+                      labelText: 'Lookup trigger',
+                      helperText:
+                          'Used in manga and EPUB readers when hover lookup is off',
+                      prefixIcon: Icon(Icons.mouse_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: DictionaryLookupTrigger.leftClick,
+                        child: Text('Left click'),
+                      ),
+                      DropdownMenuItem(
+                        value: DictionaryLookupTrigger.shift,
+                        child: Text('Hold Shift'),
+                      ),
+                      DropdownMenuItem(
+                        value: DictionaryLookupTrigger.middleClick,
+                        child: Text('Hold middle click'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _lookupTrigger = value);
+                      unawaited(ReaderLookupTriggerState.setTrigger(value));
+                    },
+                  ),
+                ),
+                if (isDesktop)
+                  SwitchListTile(
+                    secondary: const Icon(Icons.ads_click_outlined),
+                    title: const Text('Also allow left click'),
+                    subtitle: Text(
+                      _lookupTrigger == DictionaryLookupTrigger.leftClick
+                          ? 'Left click is already the selected lookup trigger'
+                          : 'Use left click in addition to the selected trigger',
+                    ),
+                    value:
+                        _lookupTrigger == DictionaryLookupTrigger.leftClick ||
+                        _additionalLeftClick,
+                    onChanged:
+                        _lookupTrigger == DictionaryLookupTrigger.leftClick
+                        ? null
+                        : (value) {
+                            setState(() => _additionalLeftClick = value);
+                            unawaited(
+                              ReaderLookupTriggerState.setAdditionalLeftClick(
+                                value,
+                              ),
+                            );
+                          },
+                  ),
                 const Divider(height: 24),
-                const _SectionHeader('OCR overlay'),
+                const _SectionHeader('OCR'),
                 SwitchListTile(
                   secondary: const Icon(Icons.document_scanner_outlined),
                   title: const Text('Show OCR in reader'),
@@ -650,7 +1105,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
+                SwitchListTile(
+                  secondary: const Icon(Icons.cloud_download_outlined),
+                  title: const Text('Use Mokuro website OCR'),
+                  subtitle: const Text(
+                    'For the Mokuro extension, prefer the website\'s saved '
+                    'OCR instead of generating it on the fly',
+                  ),
+                  value: _mokuroWebsiteOcrEnabled,
+                  onChanged: (value) async {
+                    setState(() => _mokuroWebsiteOcrEnabled = value);
+                    await MiningPreferences.setMokuroWebsiteOcrEnabled(value);
+                  },
+                ),
                 ListTile(
                   leading: Icon(
                     _screenAiAvailable
@@ -664,38 +1131,37 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         : 'Local Chrome ScreenAI component was not detected.',
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _language,
-                    decoration: const InputDecoration(
-                      labelText: 'OCR language',
-                      prefixIcon: Icon(Icons.translate),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'ja', child: Text('Japanese')),
-                      DropdownMenuItem(value: 'en', child: Text('English')),
-                      DropdownMenuItem(value: 'zh', child: Text('Chinese')),
-                      DropdownMenuItem(value: 'ko', child: Text('Korean')),
-                    ],
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      setState(() => _language = value);
-                      await MiningPreferences.setOcrLanguage(value);
-                    },
+                const ListTile(
+                  leading: Icon(Icons.translate),
+                  title: Text('OCR language follows the dictionary profile'),
+                  subtitle: Text(
+                    'The profile resolved for the current entry or source '
+                    'selects the OCR language.',
                   ),
                 ),
                 const SizedBox(height: 8),
                 _SliderSetting(
-                  title: 'Text overlay opacity',
-                  value: _opacity,
+                  title: 'Hovered OCR background opacity',
+                  value: _backgroundOpacity,
                   min: 0,
                   max: 1,
                   divisions: 20,
-                  label: '${(_opacity * 100).round()}%',
+                  label: '${(_backgroundOpacity * 100).round()}%',
                   onChanged: (value) {
-                    setState(() => _opacity = value);
-                    MiningPreferences.setOcrOverlayOpacity(value);
+                    setState(() => _backgroundOpacity = value);
+                    unawaited(ReaderOcrState.setBackgroundOpacity(value));
+                  },
+                ),
+                _SliderSetting(
+                  title: 'Hovered OCR text opacity',
+                  value: _textOpacity,
+                  min: 0,
+                  max: 1,
+                  divisions: 20,
+                  label: '${(_textOpacity * 100).round()}%',
+                  onChanged: (value) {
+                    setState(() => _textOpacity = value);
+                    unawaited(ReaderOcrState.setTextOpacity(value));
                   },
                 ),
                 _SliderSetting(
@@ -728,7 +1194,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   value: _outlineVisible,
                   onChanged: (value) {
                     setState(() => _outlineVisible = value);
-                    MiningPreferences.setOcrOutlineVisible(value);
+                    unawaited(ReaderOcrState.setOutlineVisible(value));
+                  },
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.mouse),
+                  title: const Text('Lookup OCR text on hover'),
+                  subtitle: const Text(
+                    'Open dictionary popups by hovering OCR text instead of tapping it',
+                  ),
+                  value: _lookupOnHover,
+                  onChanged: (value) {
+                    setState(() => _lookupOnHover = value);
+                    unawaited(ReaderOcrState.setLookupOnHover(value));
                   },
                 ),
                 const ListTile(
@@ -737,6 +1215,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   subtitle: Text(
                     'Uses Chromium’s Lens endpoint. Page images are sent to Google when this engine runs.',
                   ),
+                ),
+                const _DictionarySettingsGroupMarker(
+                  _DictionarySettingsGroup.anki,
                 ),
                 const Divider(height: 24),
                 const _SectionHeader('AnkiConnect'),
@@ -747,6 +1228,133 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   onChanged: (value) =>
                       _saveAnki(_ankiProfile.copyWith(ankiEnabled: value)),
                 ),
+                const _SectionHeader('Anki audio'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.volume_up_outlined),
+                  title: const Text('Add word audio'),
+                  subtitle: const Text(
+                    'Fills {word-audio} with the first audio source match',
+                  ),
+                  value: _ankiAudioPreferences.enabled,
+                  onChanged: (value) => _saveAnkiAudio(
+                    _ankiAudioPreferences.copyWith(enabled: value),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<AnkiSentenceAudioFormat>(
+                    initialValue: _ankiProfile.sentenceAudioFormat,
+                    decoration: const InputDecoration(
+                      labelText: 'Sentence audio format',
+                      prefixIcon: Icon(Icons.record_voice_over_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: AnkiSentenceAudioFormat.mp3,
+                        child: Text('MP3'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiSentenceAudioFormat.opus,
+                        child: Text('Opus'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _saveAnki(
+                        _ankiProfile.copyWith(sentenceAudioFormat: value),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<AnkiAudioSourceType>(
+                    initialValue: _ankiAudioPreferences.sourceType,
+                    decoration: const InputDecoration(
+                      labelText: 'Audio source type',
+                      prefixIcon: Icon(Icons.graphic_eq_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: AnkiAudioSourceType.customJson,
+                        child: Text('Custom URL (JSON)'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiAudioSourceType.customUrl,
+                        child: Text('Custom URL'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _saveAnkiAudio(
+                        _ankiAudioPreferences.copyWith(sourceType: value),
+                      );
+                    },
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.link_outlined),
+                  title: const Text('Audio source URL'),
+                  subtitle: Text(
+                    _ankiAudioPreferences.url,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.edit_outlined),
+                  onTap: () async {
+                    final value = await _editText(
+                      title: 'Audio source URL',
+                      value: _ankiAudioPreferences.url,
+                      hint: AnkiAudioPreferences.defaultUrl,
+                      maxLines: 3,
+                    );
+                    if (value == null || value.trim().isEmpty) return;
+                    await _saveAnkiAudio(
+                      _ankiAudioPreferences.copyWith(url: value.trim()),
+                    );
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _ankiAudioPreferences.language,
+                    decoration: const InputDecoration(
+                      labelText: 'Audio language',
+                      prefixIcon: Icon(Icons.language_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ja', child: Text('Japanese')),
+                      DropdownMenuItem(value: 'en', child: Text('English')),
+                      DropdownMenuItem(value: 'zh', child: Text('Chinese')),
+                      DropdownMenuItem(value: 'ko', child: Text('Korean')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _saveAnkiAudio(
+                        _ankiAudioPreferences.copyWith(language: value),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _SliderSetting(
+                  title: 'Audio timeout',
+                  value: _ankiAudioPreferences.timeout.inMilliseconds
+                      .toDouble(),
+                  min: 1000,
+                  max: 15000,
+                  divisions: 14,
+                  label:
+                      '${(_ankiAudioPreferences.timeout.inMilliseconds / 1000).round()} s',
+                  onChanged: (value) {
+                    _saveAnkiAudio(
+                      _ankiAudioPreferences.copyWith(
+                        timeout: Duration(milliseconds: value.round()),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 24),
                 ListTile(
                   leading: const Icon(Icons.link),
                   title: const Text('AnkiConnect address'),
@@ -886,7 +1494,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     final value = await _editText(
                       title: 'Default tags',
                       value: _ankiProfile.tags.join(' '),
-                      hint: 'mangayomi manga',
+                      hint: 'mangatan manga',
                     );
                     if (value == null) return;
                     await _saveAnki(
@@ -912,10 +1520,73 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 SwitchListTile(
                   title: const Text('Check for duplicates'),
+                  subtitle: const Text(
+                    'Use Anki\'s note-model duplicate rules before adding',
+                  ),
                   value: _ankiProfile.duplicateCheck,
                   onChanged: (value) =>
                       _saveAnki(_ankiProfile.copyWith(duplicateCheck: value)),
                 ),
+                if (_ankiProfile.duplicateCheck) ...[
+                  SwitchListTile(
+                    title: const Text('Allow duplicates'),
+                    subtitle: const Text(
+                      'Show duplicate state but keep the add button enabled',
+                    ),
+                    value: _activeProfile.duplicateAction == 'allow',
+                    onChanged: (value) => _updateActiveProfile(
+                      _activeProfile.copyWith(
+                        duplicateAction: value ? 'allow' : 'prevent',
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.filter_alt_outlined),
+                    title: const Text('Duplicate scope'),
+                    subtitle: Text(switch (_ankiProfile.duplicateScope) {
+                      'collection' => 'Entire collection',
+                      'deckroot' => 'Deck root and child decks',
+                      _ => 'Selected deck',
+                    }),
+                    trailing: DropdownButton<String>(
+                      value:
+                          const {
+                            'collection',
+                            'deck',
+                            'deckroot',
+                          }.contains(_ankiProfile.duplicateScope)
+                          ? _ankiProfile.duplicateScope
+                          : 'deck',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'collection',
+                          child: Text('Collection'),
+                        ),
+                        DropdownMenuItem(value: 'deck', child: Text('Deck')),
+                        DropdownMenuItem(
+                          value: 'deckroot',
+                          child: Text('Deck root'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          _saveAnki(
+                            _ankiProfile.copyWith(duplicateScope: value),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  SwitchListTile(
+                    title: const Text('Check all note types'),
+                    subtitle: const Text(
+                      'Match the first field across every Anki model',
+                    ),
+                    value: _ankiProfile.checkAllModels,
+                    onChanged: (value) =>
+                        _saveAnki(_ankiProfile.copyWith(checkAllModels: value)),
+                  ),
+                ],
                 SwitchListTile(
                   title: const Text('Sync after adding a note'),
                   value: _ankiProfile.syncOnCreate,
@@ -923,8 +1594,126 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       _saveAnki(_ankiProfile.copyWith(syncOnCreate: value)),
                 ),
                 const SizedBox(height: 24),
-              ],
+              ]),
             ),
+    );
+  }
+}
+
+enum _DictionarySettingsGroup { profiles, dictionaries, popup, anki }
+
+class _DictionarySettingsGroupMarker extends StatelessWidget {
+  const _DictionarySettingsGroupMarker(this.group);
+
+  final _DictionarySettingsGroup group;
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
+class _DictionaryListTile extends StatelessWidget {
+  const _DictionaryListTile({
+    super.key,
+    required this.dictionary,
+    required this.index,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.enabled,
+    required this.displayMode,
+    required this.onEnabledChanged,
+    required this.onDisplayModeChanged,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onDelete,
+  });
+
+  final InstalledDictionary dictionary;
+  final int index;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final bool enabled;
+  final String? displayMode;
+  final ValueChanged<bool> onEnabledChanged;
+  final ValueChanged<String> onDisplayModeChanged;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final capabilities = [
+      if (dictionary.hasTerms) 'Terms',
+      if (dictionary.hasFrequencies) 'Frequency',
+      if (dictionary.hasPitch) 'Pitch',
+    ];
+    return ListTile(
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ReorderableDragStartListener(
+            index: index,
+            child: const Tooltip(
+              message: 'Drag to reorder dictionary',
+              child: Icon(Icons.drag_indicator),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Icon(Icons.menu_book_outlined),
+        ],
+      ),
+      title: Text(
+        dictionary.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        capabilities.isEmpty ? 'No lookup data' : capabilities.join(' • '),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (displayMode != null)
+            PopupMenuButton<String>(
+              tooltip: 'Dictionary display mode',
+              initialValue: displayMode,
+              onSelected: onDisplayModeChanged,
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'always_expanded',
+                  child: Text('Always expanded'),
+                ),
+                PopupMenuItem(value: 'fallback', child: Text('Fallback')),
+                PopupMenuItem(
+                  value: 'always_collapsed',
+                  child: Text('Always collapsed'),
+                ),
+              ],
+              icon: Icon(
+                displayMode == 'always_expanded'
+                    ? Icons.unfold_more
+                    : displayMode == 'always_collapsed'
+                    ? Icons.unfold_less
+                    : Icons.low_priority,
+              ),
+            ),
+          Switch(value: enabled, onChanged: onEnabledChanged),
+          IconButton(
+            tooltip: 'Move dictionary up',
+            onPressed: canMoveUp ? onMoveUp : null,
+            icon: const Icon(Icons.keyboard_arrow_up),
+          ),
+          IconButton(
+            tooltip: 'Move dictionary down',
+            onPressed: canMoveDown ? onMoveDown : null,
+            icon: const Icon(Icons.keyboard_arrow_down),
+          ),
+          IconButton(
+            tooltip: 'Remove dictionary',
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -933,12 +1722,14 @@ class _AnkiFieldTemplatePicker extends StatelessWidget {
   const _AnkiFieldTemplatePicker({
     required this.fieldName,
     required this.value,
+    required this.dynamicTemplates,
     required this.onChanged,
     required this.onEditCustom,
   });
 
   final String fieldName;
   final String value;
+  final Map<String, String> dynamicTemplates;
   final ValueChanged<String> onChanged;
   final VoidCallback onEditCustom;
 
@@ -947,6 +1738,7 @@ class _AnkiFieldTemplatePicker extends StatelessWidget {
     final templates = <String, String>{
       'Leave empty': '',
       ...AnkiMarker.standardTemplates,
+      ...dynamicTemplates,
     };
     final isStandard = templates.containsValue(value);
     final items = <DropdownMenuItem<String>>[

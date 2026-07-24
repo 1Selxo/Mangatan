@@ -31,7 +31,9 @@ Future<UpdateInfo?> _getUpdateIfAvailable() async {
     log(info.data.toString());
   }
   final latest = await _fetchLatestRelease();
-  return compareVersions(info.version, latest.$1) < 0 ? latest : null;
+  return compareVersions(_numericVersion(info.version), latest.$1) < 0
+      ? latest
+      : null;
 }
 
 @riverpod
@@ -46,32 +48,29 @@ Future<UpdateInfo> _fetchLatestRelease() async {
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
   final res = await http.get(
     Uri.parse(
-      'https://api.github.com/repos/1Selxo/Mangatan/releases?per_page=20',
+      'https://api.github.com/repos/1Selxo/Mangatan/releases?per_page=10',
     ),
   );
-  if (res.statusCode != 200) {
-    throw StateError('GitHub release check failed (${res.statusCode})');
-  }
-
-  final releases = jsonDecode(res.body) as List<dynamic>;
-  final release = releases.cast<Map<String, dynamic>>().firstWhere(
-    (entry) => entry['draft'] != true,
-    orElse: () => throw StateError('No Mangatan release is available'),
+  final releases = (jsonDecode(res.body) as List<dynamic>)
+      .cast<Map<String, dynamic>>();
+  final release = releases.firstWhere(
+    (release) => release['draft'] != true,
+    orElse: () => throw StateError('Mangatan has no published releases'),
   );
-  final tag = release['tag_name']?.toString() ?? '';
-  final version = RegExp(r'\d+\.\d+\.\d+').firstMatch(tag)?.group(0);
-  if (version == null) {
-    throw StateError('Mangatan release has an invalid tag: $tag');
-  }
-
   return (
-    version,
-    release['body']?.toString() ?? '',
-    release['html_url']?.toString() ??
-        'https://github.com/1Selxo/Mangatan/releases',
-    (release['assets'] as List<dynamic>? ?? const [])
-        .map((asset) => (asset as Map<String, dynamic>)['browser_download_url'])
-        .whereType<String>()
+    _numericVersion(release['tag_name'].toString()),
+    release['body'].toString(),
+    release['html_url'].toString(),
+    (release['assets'] as List)
+        .map((asset) => asset['browser_download_url'])
         .toList(),
   );
+}
+
+String _numericVersion(String value) {
+  final match = RegExp(r'\d+(?:\.\d+)*').firstMatch(value);
+  if (match == null) {
+    throw FormatException('Release does not contain a numeric version', value);
+  }
+  return match.group(0)!;
 }

@@ -1,3 +1,5 @@
+import 'package:mangayomi/services/mining/mining_models.dart';
+
 class AnkiMarker {
   static const expression = '{expression}';
   static const reading = '{reading}';
@@ -41,7 +43,6 @@ class AnkiMarker {
   static const source = '{source}';
   static const documentTitle = '{document-title}';
   static const selectionText = '{selection-text}';
-  static const popupSelectionText = '{popup-selection-text}';
 
   static const standardTemplates = <String, String>{
     'Expression': expression,
@@ -73,12 +74,49 @@ class AnkiMarker {
     'Media': media,
     'URL': url,
     'Document title': documentTitle,
-    'Selection text': popupSelectionText,
+    'Selection text': selectionText,
   };
 
-  static String? autoDetectTemplate(String fieldName, int fieldIndex) {
-    final lapis = _lapisFieldMap[fieldName.toLowerCase()];
-    if (lapis != null) return lapis;
+  static Map<String, String> singleGlossaryTemplatesForDictionaries(
+    Iterable<String> dictionaries,
+  ) {
+    final templates = <String, String>{};
+    final usedMarkers = <String>{};
+    for (final dictionary in dictionaries) {
+      final marker = singleGlossaryMarkerForDictionary(dictionary);
+      if (marker == null || !usedMarkers.add(marker)) continue;
+      templates['Single glossary: $dictionary'] = marker;
+    }
+    return templates;
+  }
+
+  static String? singleGlossaryMarkerForDictionary(
+    String dictionary, {
+    String suffix = '',
+  }) {
+    final name = kebabCase(dictionary);
+    if (name.isEmpty) return null;
+    return '{single-glossary-$name$suffix}';
+  }
+
+  static String kebabCase(String value) {
+    return value
+        .replaceAll(RegExp(r'[\s_\u3000]'), '-')
+        .replaceAll(RegExp(r'[^\p{L}\p{N}-]', unicode: true), '')
+        .replaceAll(RegExp(r'--+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '')
+        .toLowerCase();
+  }
+
+  static String? autoDetectTemplate(
+    String fieldName,
+    int fieldIndex, {
+    bool isLapis = false,
+  }) {
+    if (isLapis) {
+      final lapis = _lapisFieldMap[fieldName.toLowerCase()];
+      if (lapis != null) return lapis;
+    }
     if (fieldIndex == 0) return expression;
     final normalized = _normalizeFieldName(fieldName);
     for (final entry in _autoDetectAliases.entries) {
@@ -130,7 +168,7 @@ class AnkiMarker {
     chapter: ['chapter', 'episode'],
     media: ['media', 'source', 'context'],
     documentTitle: ['miscinfo', 'document-title', 'documenttitle'],
-    popupSelectionText: ['selection', 'selection-text', 'popup-selection-text'],
+    selectionText: ['selection', 'selection-text', 'popup-selection-text'],
   };
 
   static const _lapisFieldMap = <String, String>{
@@ -138,10 +176,10 @@ class AnkiMarker {
     'expressionfurigana': furiganaPlain,
     'expressionreading': reading,
     'expressionaudio': audio,
-    'selectiontext': popupSelectionText,
+    'selectiontext': selectionText,
     'maindefinition': selectedGlossary,
     'definitionpicture': '',
-    'sentence': sentence,
+    'sentence': sentenceBold,
     'sentencefurigana': '',
     'sentenceaudio': sentenceAudio,
     'picture': screenshot,
@@ -158,9 +196,13 @@ class AnkiMarker {
     'miscinfo': documentTitle,
   };
 
-  static Map<String, String> defaultsForFields(List<String> fields) => {
+  static Map<String, String> defaultsForFields(
+    List<String> fields, {
+    bool isLapis = false,
+  }) => {
     for (final indexed in fields.indexed)
-      indexed.$2: autoDetectTemplate(indexed.$2, indexed.$1) ?? '',
+      indexed.$2:
+          autoDetectTemplate(indexed.$2, indexed.$1, isLapis: isLapis) ?? '',
   };
 }
 
@@ -171,17 +213,21 @@ class AnkiMiningProfile {
   final List<String> tags;
   final bool duplicateCheck;
   final String duplicateScope;
+  final bool checkAllModels;
   final bool syncOnCreate;
+  final AnkiSentenceAudioFormat sentenceAudioFormat;
   final Map<String, String> fieldMap;
 
   const AnkiMiningProfile({
     this.ankiEnabled = true,
     this.deckName = 'Mining',
     this.modelName = 'Basic',
-    this.tags = const ['mangayomi'],
+    this.tags = const ['mangatan'],
     this.duplicateCheck = true,
     this.duplicateScope = 'deck',
+    this.checkAllModels = false,
     this.syncOnCreate = false,
+    this.sentenceAudioFormat = AnkiSentenceAudioFormat.mp3,
     this.fieldMap = defaultFieldMap,
   });
 
@@ -194,10 +240,15 @@ class AnkiMiningProfile {
       modelName: json['modelName'] as String? ?? 'Basic',
       tags:
           (json['tags'] as List?)?.map((tag) => tag.toString()).toList() ??
-          const ['mangayomi'],
+          const ['mangatan'],
       duplicateCheck: json['duplicateCheck'] as bool? ?? true,
       duplicateScope: json['duplicateScope'] as String? ?? 'deck',
+      checkAllModels: json['checkAllModels'] as bool? ?? false,
       syncOnCreate: json['syncOnCreate'] as bool? ?? false,
+      sentenceAudioFormat: AnkiSentenceAudioFormat.values.firstWhere(
+        (format) => format.name == json['sentenceAudioFormat'],
+        orElse: () => AnkiSentenceAudioFormat.mp3,
+      ),
       fieldMap: rawFieldMap is Map
           ? rawFieldMap.map(
               (key, value) => MapEntry(key.toString(), value.toString()),
@@ -213,7 +264,9 @@ class AnkiMiningProfile {
     List<String>? tags,
     bool? duplicateCheck,
     String? duplicateScope,
+    bool? checkAllModels,
     bool? syncOnCreate,
+    AnkiSentenceAudioFormat? sentenceAudioFormat,
     Map<String, String>? fieldMap,
   }) {
     return AnkiMiningProfile(
@@ -223,7 +276,9 @@ class AnkiMiningProfile {
       tags: tags ?? this.tags,
       duplicateCheck: duplicateCheck ?? this.duplicateCheck,
       duplicateScope: duplicateScope ?? this.duplicateScope,
+      checkAllModels: checkAllModels ?? this.checkAllModels,
       syncOnCreate: syncOnCreate ?? this.syncOnCreate,
+      sentenceAudioFormat: sentenceAudioFormat ?? this.sentenceAudioFormat,
       fieldMap: fieldMap ?? this.fieldMap,
     );
   }
@@ -236,7 +291,9 @@ class AnkiMiningProfile {
       'tags': tags,
       'duplicateCheck': duplicateCheck,
       'duplicateScope': duplicateScope,
+      'checkAllModels': checkAllModels,
       'syncOnCreate': syncOnCreate,
+      'sentenceAudioFormat': sentenceAudioFormat.name,
       'fieldMap': fieldMap,
     };
   }

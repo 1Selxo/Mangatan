@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'dart:collection';
 import 'dart:io';
+import 'package:html/dom.dart' as dom;
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:path/path.dart' as p;
 import 'package:html/parser.dart';
@@ -9,6 +12,90 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'get_html_content.g.dart';
+
+typedef EpubBookLoader = Future<EpubNovel> Function(String path);
+typedef EpubFingerprintLoader = Future<String> Function(String path);
+
+class CachedEpubDocument {
+  const CachedEpubDocument({required this.book, required this.html});
+
+  final EpubNovel book;
+  final String html;
+}
+
+/// Shares the expensive full-book parse across every TOC shortcut belonging
+/// to the same EPUB. A file fingerprint prevents stale content reuse, while
+/// the small LRU bound limits retained media.
+class EpubDocumentCache {
+  EpubDocumentCache({
+    EpubBookLoader? loader,
+    EpubFingerprintLoader? fingerprintLoader,
+    this.maximumEntries = 2,
+  }) : _loader = loader ?? _parseBook,
+       _fingerprintLoader = fingerprintLoader ?? _fileFingerprint;
+
+  final EpubBookLoader _loader;
+  final EpubFingerprintLoader _fingerprintLoader;
+  final int maximumEntries;
+  final LinkedHashMap<String, Future<CachedEpubDocument>> _entries =
+      LinkedHashMap<String, Future<CachedEpubDocument>>();
+
+  Future<CachedEpubDocument> load(String path) async {
+    final normalizedPath = _normalizedCachePath(path);
+    final fingerprint = await _fingerprintLoader(path);
+    final key = '$normalizedPath\u0000$fingerprint';
+
+    _entries.removeWhere(
+      (candidate, _) =>
+          candidate.startsWith('$normalizedPath\u0000') && candidate != key,
+    );
+    final cached = _entries.remove(key);
+    if (cached != null) {
+      _entries[key] = cached;
+      return cached;
+    }
+
+    final pending = _load(path);
+    _entries[key] = pending;
+    while (_entries.length > maximumEntries && _entries.isNotEmpty) {
+      _entries.remove(_entries.keys.first);
+    }
+    try {
+      return await pending;
+    } catch (_) {
+      if (identical(_entries[key], pending)) _entries.remove(key);
+      rethrow;
+    }
+  }
+
+  void clear() => _entries.clear();
+
+  Future<CachedEpubDocument> _load(String path) async {
+    final book = await _loader(path);
+    final html = selectEpubChapterContent(book, null);
+    if (!readerHtmlHasRenderableContent(html)) {
+      throw const FormatException(
+        'The EPUB contains no readable chapter content.',
+      );
+    }
+    return CachedEpubDocument(book: book, html: html);
+  }
+
+  static Future<EpubNovel> _parseBook(String path) =>
+      parseEpubFromPath(epubPath: path, fullData: true);
+
+  static Future<String> _fileFingerprint(String path) async {
+    final stat = await File(path).stat();
+    return '${stat.size}:${stat.modified.millisecondsSinceEpoch}';
+  }
+
+  static String _normalizedCachePath(String path) {
+    final normalized = p.normalize(p.absolute(path));
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
+  }
+}
+
+final epubDocumentCache = EpubDocumentCache();
 
 @riverpod
 Future<(String, EpubNovel?)> getHtmlContent(
@@ -23,33 +110,26 @@ Future<(String, EpubNovel?)> getHtmlContent(
     }
     if (chapter.archivePath != null && chapter.archivePath!.isNotEmpty) {
       try {
-        final book = await parseEpubFromPath(
-          epubPath: chapter.archivePath!,
-          fullData: true,
+        final document = await epubDocumentCache.load(chapter.archivePath!);
+        // A local EPUB is always one continuous reader document. `Chapter`
+        // rows are TOC shortcuts only and must never select a physical XHTML
+        // file as the reader's state owner.
+        // Keep the original EPUB XHTML for the browser reader. It needs the
+        // document head and relative URLs to resolve publisher CSS, images,
+        // footnotes, and SVG resources from the materialized EPUB session.
+        // The compatibility Flutter renderer still sanitizes this through
+        // buildReaderHtml when it is used as a fallback.
+        result = (document.html, document.book);
+      } catch (error) {
+        final message = const HtmlEscape().convert(error.toString());
+        result = (
+          buildReaderHtml(
+            '<p><strong>Unable to open this EPUB chapter.</strong></p>'
+            '<p>$message</p>',
+          ),
+          null,
         );
-        String htmlContent = "";
-        if (chapter.url != null && chapter.url!.isNotEmpty) {
-          // Load specific chapter by its spine idref
-          final matches = book.chapters.where((c) => c.path == chapter.url);
-          if (matches.isNotEmpty) {
-            htmlContent = matches.first.content;
-          } else {
-            // Fallback: try via Rust direct access
-            htmlContent = await getChapterContent(
-              epubPath: chapter.archivePath!,
-              chapterPath: chapter.url!,
-            );
-          }
-        } else {
-          // Legacy: no chapter url, concatenate all (old single-chapter imports)
-          for (var subChapter in book.chapters) {
-            htmlContent += "\n<hr/>\n${subChapter.content}";
-          }
-        }
-        result = (_buildHtml(htmlContent), book);
-      } catch (_) {}
-
-      result ??= (_buildHtml("Local epub file not found!"), null);
+      }
     }
     if (result == null) {
       final storageProvider = StorageProvider();
@@ -86,7 +166,7 @@ Future<(String, EpubNovel?)> getHtmlContent(
           );
         }
       });
-      result = (_buildHtml(html.substring(1, html.length - 1)), null);
+      result = (buildReaderHtml(html.substring(1, html.length - 1)), null);
     }
 
     keepAlive.close();
@@ -97,7 +177,258 @@ Future<(String, EpubNovel?)> getHtmlContent(
   }
 }
 
-String _buildHtml(String input) {
+String selectEpubChapterContent(EpubNovel book, String? chapterPath) {
+  if (chapterPath != null && chapterPath.isNotEmpty) {
+    for (final subChapter in book.chapters) {
+      if (subChapter.path == chapterPath ||
+          _normalizedEpubReference(subChapter.href) ==
+              _normalizedEpubReference(chapterPath)) {
+        return subChapter.content;
+      }
+    }
+    return '';
+  }
+
+  return buildContinuousEpubContent(book);
+}
+
+String epubSpineMarkerId(int spineIndex) => 'mangatan-spine-$spineIndex';
+
+String buildContinuousEpubContent(EpubNovel book) {
+  final byHref = <String, EpubChapter>{
+    for (final chapter in book.chapters)
+      _normalizedEpubReference(chapter.href): chapter,
+  };
+  final stylesheetLinks = <String>{};
+  final logicalSections = <String>[];
+  final physicalSections = <String>[];
+  int? logicalNavigationSpine;
+  var hasPhysicalSection = false;
+  var characterStart = 0;
+  var linearChapterIndex = 0;
+
+  void finishLogicalSection() {
+    if (physicalSections.isEmpty) return;
+    logicalSections.add(
+      '<article class="mangatan-logical-section" '
+      'data-mangatan-navigation-spine="${logicalNavigationSpine ?? -1}">'
+      '<i class="mangatan-logical-marker" aria-hidden="true"></i>'
+      '${physicalSections.join()}'
+      '</article>',
+    );
+    physicalSections.clear();
+  }
+
+  for (final chapter in book.chapters) {
+    if (!readerHtmlHasRenderableContent(chapter.content) && !chapter.isLinear) {
+      continue;
+    }
+    if (chapter.isNavigationEntry && physicalSections.isNotEmpty) {
+      finishLogicalSection();
+      logicalNavigationSpine = null;
+    }
+    if (chapter.isNavigationEntry) {
+      logicalNavigationSpine = chapter.spineIndex;
+    }
+    final document = parse(chapter.content);
+    final idPrefix = 'mangatan-s${chapter.spineIndex}-';
+
+    for (final element in document.querySelectorAll('[id], [name]')) {
+      final id = element.id;
+      if (id.isNotEmpty) element.id = '$idPrefix$id';
+      final name = element.attributes['name'];
+      if (name != null && name.isNotEmpty) {
+        element.attributes['name'] = '$idPrefix$name';
+      }
+    }
+
+    for (final element in document.querySelectorAll('[src], [poster], image')) {
+      for (final attribute in const ['src', 'poster', 'href']) {
+        final value = element.attributes[attribute];
+        if (value == null || _isExternalEpubReference(value)) continue;
+        element.attributes[attribute] = _resolveEpubReference(
+          chapter.href,
+          value,
+        );
+      }
+      for (final attribute
+          in element.attributes.keys
+              .whereType<dom.AttributeName>()
+              .where((attribute) => attribute.name == 'href')
+              .toList(growable: false)) {
+        final value = element.attributes[attribute];
+        if (value == null || _isExternalEpubReference(value)) continue;
+        element.attributes[attribute] = _resolveEpubReference(
+          chapter.href,
+          value,
+        );
+      }
+    }
+
+    for (final link in document.querySelectorAll('link[rel][href]')) {
+      final rel = link.attributes['rel']?.toLowerCase() ?? '';
+      final href = link.attributes['href'];
+      if (!rel.contains('stylesheet') || href == null) continue;
+      link.attributes['href'] = _resolveEpubReference(chapter.href, href);
+      stylesheetLinks.add(link.outerHtml);
+    }
+
+    for (final anchor in document.querySelectorAll('a[href]')) {
+      final href = anchor.attributes['href'];
+      if (href == null || href.isEmpty || _isExternalEpubReference(href)) {
+        continue;
+      }
+      final parts = href.split('#');
+      final targetPath = parts.first.isEmpty
+          ? _normalizedEpubReference(chapter.href)
+          : _normalizedEpubReference(
+              _resolveEpubReference(chapter.href, parts.first),
+            );
+      final target = byHref[targetPath];
+      if (target == null) continue;
+      final fragment = parts.length > 1 && parts[1].isNotEmpty
+          ? '-${parts.sublist(1).join('#')}'
+          : '';
+      anchor.attributes['href'] = fragment.isEmpty
+          ? '#${epubSpineMarkerId(target.spineIndex)}'
+          : '#mangatan-s${target.spineIndex}$fragment';
+    }
+
+    final body = document.body;
+    final textLength = chapter.isLinear
+        ? chimahonChapterCharacterCount(chapter.content)
+        : 0;
+    final chapterIndexAttribute = chapter.isLinear
+        ? 'data-mangatan-chapter-index="$linearChapterIndex" '
+        : '';
+    physicalSections.add(
+      '${hasPhysicalSection ? '<hr data-mangatan-spine-separator>' : ''}'
+      '<section id="${epubSpineMarkerId(chapter.spineIndex)}" '
+      'data-mangatan-spine-index="${chapter.spineIndex}" '
+      '$chapterIndexAttribute'
+      'data-mangatan-navigation="${chapter.isNavigationEntry}" '
+      'data-mangatan-character-start="$characterStart" '
+      'data-mangatan-character-count="$textLength">'
+      '${body?.innerHtml ?? chapter.content}'
+      '</section>',
+    );
+    hasPhysicalSection = true;
+    if (chapter.isLinear) {
+      characterStart += textLength;
+      linearChapterIndex++;
+    }
+  }
+  finishLogicalSection();
+
+  return '<!doctype html><html><head>${stylesheetLinks.join()}</head>'
+      '<body>${logicalSections.join()}</body></html>';
+}
+
+/// Counts EPUB chapter characters exactly like Chimahon's
+/// `NovelReaderCharacterCountPolicy` so its bookmark `characterCount` can be
+/// restored or synced without conversion.
+int chimahonChapterCharacterCount(String? content) {
+  if (content == null) return 0;
+  final body = RegExp(
+    r'<body.*?</body>',
+    dotAll: true,
+  ).firstMatch(content)?.group(0);
+  var text = body ?? content;
+  text = text.replaceAll(RegExp(r'<rt>.*?</rt>', dotAll: true), '');
+  text = text.replaceAll(
+    RegExp(r'<(script|style)[^>]*>.*?</\1>', dotAll: true),
+    '',
+  );
+  text = text.replaceAll(RegExp(r'<[^>]+>'), '');
+  text = text
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>');
+
+  var count = 0;
+  for (final codePoint in text.runes) {
+    if (_isChimahonCountedCharacter(codePoint)) count++;
+  }
+  return count;
+}
+
+bool _isChimahonCountedCharacter(int codePoint) {
+  bool between(int first, int last) => codePoint >= first && codePoint <= last;
+  return between(0x30, 0x39) ||
+      between(0x41, 0x5a) ||
+      between(0x61, 0x7a) ||
+      codePoint == 0x25cb ||
+      codePoint == 0x25ef ||
+      between(0x3005, 0x3007) ||
+      codePoint == 0x303b ||
+      between(0x3041, 0x3096) ||
+      between(0x309d, 0x309e) ||
+      between(0x30a1, 0x30fa) ||
+      codePoint == 0x30fc ||
+      between(0xff10, 0xff19) ||
+      between(0xff21, 0xff3a) ||
+      between(0xff41, 0xff5a) ||
+      between(0xff66, 0xff9d) ||
+      between(0x3400, 0x4dbf) ||
+      between(0x4e00, 0x9fff) ||
+      between(0xf900, 0xfaff) ||
+      between(0x20000, 0x2a6df) ||
+      between(0x2a700, 0x2b73f) ||
+      between(0x2b740, 0x2b81f) ||
+      between(0x2b820, 0x2ceaf) ||
+      between(0x2ceb0, 0x2ebef) ||
+      between(0x30000, 0x3134f) ||
+      between(0x31350, 0x323af) ||
+      between(0x1100, 0x11ff) ||
+      between(0x3130, 0x318f) ||
+      between(0xa960, 0xa97f) ||
+      between(0xac00, 0xd7af) ||
+      between(0xd7b0, 0xd7ff);
+}
+
+bool _isExternalEpubReference(String value) {
+  final lower = value.trimLeft().toLowerCase();
+  return lower.startsWith('http:') ||
+      lower.startsWith('https:') ||
+      lower.startsWith('data:') ||
+      lower.startsWith('javascript:') ||
+      lower.startsWith('//');
+}
+
+String _resolveEpubReference(String baseHref, String reference) {
+  if (reference.startsWith('#')) return reference;
+  final withoutSuffix = reference.split('#').first.split('?').first;
+  return p.posix.normalize(
+    p.posix.join(
+      p.posix.dirname(baseHref),
+      withoutSuffix.replaceAll('\\', '/'),
+    ),
+  );
+}
+
+String _normalizedEpubReference(String value) {
+  final withoutFragment = value.split('#').first.split('?').first;
+  try {
+    return p.posix
+        .normalize(Uri.decodeComponent(withoutFragment).replaceAll('\\', '/'))
+        .replaceFirst(RegExp(r'^\./'), '');
+  } catch (_) {
+    return p.posix
+        .normalize(withoutFragment.replaceAll('\\', '/'))
+        .replaceFirst(RegExp(r'^\./'), '');
+  }
+}
+
+bool readerHtmlHasRenderableContent(String input) {
+  if (input.trim().isEmpty) return false;
+  final document = parse(input);
+  final text = document.body?.text.trim() ?? '';
+  return text.isNotEmpty ||
+      document.querySelector('img, svg, image, video, audio') != null;
+}
+
+String buildReaderHtml(String input) {
   // Decode basic escapes
   String cleaned = input
       .replaceAll("\\n", "")
@@ -132,48 +463,10 @@ String _buildHtml(String input) {
         '${quote.attributes['style'] ?? ''} border-left: 4px solid #ccc; padding-left: 15px; margin: 10px 0; font-style: italic;';
   });
 
-  // Get cleaned HTML
-  String htmlContent = document.body?.innerHtml ?? cleaned;
-
-  // Decode HTML entities while keeping HTML tags
-  htmlContent = _decodeHtmlEntities(htmlContent);
+  // Keep entities encoded here. flutter_html parses this fragment again and
+  // performs the correct entity decode; decoding `<` at this point would turn
+  // literal book text into markup and make it disappear.
+  final htmlContent = document.body?.innerHtml ?? cleaned;
 
   return '''<div id="readerViewContent">$htmlContent</div>''';
-}
-
-String _decodeHtmlEntities(String html) {
-  // Decode numeric HTML entities (&#8220;, &#8217;, etc.)
-  String decoded = html.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
-    final charCode = int.tryParse(match.group(1)!);
-    return charCode != null ? String.fromCharCode(charCode) : match.group(0)!;
-  });
-
-  // Decode hexadecimal HTML entities (&#x2019;, etc.)
-  decoded = decoded.replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (match) {
-    final charCode = int.tryParse(match.group(1)!, radix: 16);
-    return charCode != null ? String.fromCharCode(charCode) : match.group(0)!;
-  });
-
-  // Decode common named HTML entities
-  final entities = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&nbsp;': ' ',
-    '&quot;': '"',
-    '&apos;': "'",
-    '&ldquo;': '"',
-    '&rdquo;': '"',
-    '&lsquo;': ''',
-    '&rsquo;': ''',
-    '&mdash;': '—',
-    '&ndash;': '–',
-    '&hellip;': '…',
-  };
-
-  entities.forEach((entity, replacement) {
-    decoded = decoded.replaceAll(entity, replacement);
-  });
-
-  return decoded;
 }

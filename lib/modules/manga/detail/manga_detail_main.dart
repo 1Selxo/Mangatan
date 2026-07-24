@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/detail/manga_details_view.dart';
+import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
+import 'package:mangayomi/modules/manga/detail/widgets/manga_chapter_file_drop_target.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 
@@ -18,6 +23,16 @@ class MangaReaderDetail extends ConsumerStatefulWidget {
 }
 
 class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
+  bool _backNavigationInProgress = false;
+
+  void _goBack() {
+    if (_backNavigationInProgress) return;
+    _backNavigationInProgress = true;
+    ref.read(isLongPressedStateProvider.notifier).update(false);
+    ref.read(chaptersListStateProvider.notifier).clear();
+    Navigator.of(context).pop();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +61,9 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
     return Scaffold(
       body: manga.when(
         data: (manga) {
-          return StreamBuilder(
+          // Language filters only hide Browse rows. Installed sources remain
+          // available to refresh items already in the library.
+          final detail = StreamBuilder(
             stream: isar.sources
                 .filter()
                 .langContains(manga!.lang!, caseSensitive: false)
@@ -54,8 +71,6 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                 .nameContains(manga.source!, caseSensitive: false)
                 .and()
                 .idIsNotNull()
-                .and()
-                .isActiveEqualTo(true)
                 .and()
                 .isAddedEqualTo(true)
                 .watch(fireImmediately: true),
@@ -112,6 +127,25 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                 ),
               );
             },
+          );
+          final mediaDetail = manga.itemType == ItemType.manga
+              ? MangaChapterFileDropTarget(
+                  manga: manga,
+                  onImport: (filePaths) => ref.read(
+                    importArchivesFromPathsProvider(
+                      itemType: ItemType.manga,
+                      manga,
+                      filePaths: filePaths,
+                      init: false,
+                      splitChapters: false,
+                    ).future,
+                  ),
+                  child: detail,
+                )
+              : detail;
+          return DesktopBackNavigationScope(
+            onBack: _goBack,
+            child: Focus(autofocus: true, child: mediaDetail),
           );
         },
         error: (Object error, StackTrace stackTrace) {

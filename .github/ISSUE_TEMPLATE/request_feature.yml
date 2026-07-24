@@ -1,12 +1,12 @@
 name: ⭐ Feature request
-description: Suggest a feature to improve Mangayomi
+description: Suggest a feature to improve Mangatan
 labels: [Feature request]
 body:
   - type: textarea
     id: feature-description
     attributes:
       label: Describe your suggested feature
-      description: How can Mangayomi be improved?
+      description: How can Mangatan be improved?
       placeholder: |
         Example:
           "It should work like this..."

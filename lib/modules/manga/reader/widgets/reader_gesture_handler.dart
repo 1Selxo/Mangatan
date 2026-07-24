@@ -1,6 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 /// Navigation layout variants matching Mihon.
 ///
@@ -79,7 +84,7 @@ class ReaderGestureHandler extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (navigationLayout) {
+    final zones = switch (navigationLayout) {
       1 => _buildLShaped(context),
       2 => _buildKindle(context),
       3 => _buildEdge(context),
@@ -87,6 +92,19 @@ class ReaderGestureHandler extends StatelessWidget {
       5 => _buildDisabled(context),
       _ => _buildDefault(context),
     };
+    return Listener(
+      onPointerMove: (event) {
+        ReaderOcrState.handleMiddleLookupMove(event.position);
+      },
+      child: MouseRegion(
+        opaque: false,
+        onHover: (event) {
+          unawaited(ReaderOcrState.handleHover(event.position));
+        },
+        onExit: (_) => ReaderOcrState.handleHoverExit(),
+        child: zones,
+      ),
+    );
   }
 
   // ── helpers ──
@@ -253,7 +271,7 @@ class ReaderGestureHandler extends StatelessWidget {
 }
 
 /// Individual gesture detector for a zone.
-class _ZoneGestureDetector extends StatelessWidget {
+class _ZoneGestureDetector extends StatefulWidget {
   final VoidCallback onTap;
   final void Function(Offset position)? onDoubleTapDown;
   final VoidCallback? onDoubleTap;
@@ -269,21 +287,86 @@ class _ZoneGestureDetector extends StatelessWidget {
   });
 
   @override
+  State<_ZoneGestureDetector> createState() => _ZoneGestureDetectorState();
+}
+
+class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
+  bool _pointerHandledByOcr = false;
+  bool _lookupPointer = false;
+  bool _lookupPointerUsesPrimaryButton = false;
+  bool _popupDismissPointer = false;
+  bool _middleHoverPointer = false;
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onTapUp: (details) async {
-        final handled = await ReaderOcrState.handleTap(details.globalPosition);
-        if (!handled) onTap();
+      onTapUp: (_) {
+        final handled = _pointerHandledByOcr;
+        _pointerHandledByOcr = false;
+        if (!handled) widget.onTap();
       },
-      onDoubleTapDown: onDoubleTapDown != null
-          ? (details) => onDoubleTapDown!(details.globalPosition)
+      onTapCancel: () => _pointerHandledByOcr = false,
+      onDoubleTapDown: widget.onDoubleTapDown != null
+          ? (details) => widget.onDoubleTapDown!(details.globalPosition)
           : null,
-      onDoubleTap: onDoubleTap,
-      onSecondaryTapDown: onSecondaryTapDown != null
-          ? (details) => onSecondaryTapDown!(details.globalPosition)
+      onDoubleTap: widget.onDoubleTap,
+      onSecondaryTapDown: widget.onSecondaryTapDown != null
+          ? (details) => widget.onSecondaryTapDown!(details.globalPosition)
           : null,
-      onSecondaryTap: onSecondaryTap,
+      onSecondaryTap: widget.onSecondaryTap,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (event) {
+          _lookupPointerUsesPrimaryButton = event.buttons == kPrimaryButton;
+          _popupDismissPointer =
+              isDesktop &&
+              event.kind == PointerDeviceKind.mouse &&
+              _lookupPointerUsesPrimaryButton;
+          _middleHoverPointer = ReaderOcrState.handleMiddleLookupStart(
+            event.position,
+            event.buttons,
+          );
+          final additionalLeftClick =
+              isDesktop &&
+              event.kind == PointerDeviceKind.mouse &&
+              ReaderLookupTriggerState.additionalLeftClick.value;
+          _lookupPointer = ReaderOcrState.lookupOnHover.value
+              ? _lookupPointerUsesPrimaryButton
+              : _middleHoverPointer ||
+                    readerLookupTriggerMatchesPointer(
+                      ReaderLookupTriggerState.trigger.value,
+                      event.buttons,
+                      additionalLeftClick: additionalLeftClick,
+                    );
+          if (_lookupPointer && !_middleHoverPointer) {
+            ReaderOcrState.handlePointerDown(event.position);
+          }
+        },
+        onPointerUp: (event) {
+          if (_middleHoverPointer) {
+            ReaderOcrState.handleMiddleLookupEnd();
+          } else {
+            final handled = _lookupPointer
+                ? ReaderOcrState.handlePointerUp(event.position)
+                : _popupDismissPointer && ReaderOcrState.dismissActiveLookup();
+            _pointerHandledByOcr = _lookupPointerUsesPrimaryButton && handled;
+          }
+          _lookupPointer = false;
+          _lookupPointerUsesPrimaryButton = false;
+          _popupDismissPointer = false;
+          _middleHoverPointer = false;
+        },
+        onPointerCancel: (_) {
+          if (_lookupPointer) ReaderOcrState.handlePointerCancel();
+          if (_middleHoverPointer) ReaderOcrState.handleMiddleLookupEnd();
+          _lookupPointer = false;
+          _lookupPointerUsesPrimaryButton = false;
+          _popupDismissPointer = false;
+          _middleHoverPointer = false;
+        },
+        child: const SizedBox.expand(),
+      ),
     );
   }
 }

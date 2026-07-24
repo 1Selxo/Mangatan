@@ -15,6 +15,7 @@ import 'package:mangayomi/modules/browse/extension/extension_detail.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/create_extension.dart';
 import 'package:mangayomi/modules/browse/sources/sources_filter_screen.dart';
 import 'package:mangayomi/modules/calendar/calendar_screen.dart';
+import 'package:mangayomi/modules/dictionary/dictionary_lookup_screen.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/migrate_screen.dart';
 import 'package:mangayomi/modules/mass_migration/mass_migration_source_selection_screen.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/recommendation_screen.dart';
@@ -29,6 +30,7 @@ import 'package:mangayomi/modules/more/settings/player/player_audio_screen.dart'
 import 'package:mangayomi/modules/more/settings/player/player_decoder_screen.dart';
 import 'package:mangayomi/modules/more/settings/player/player_overview_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/statistics/statistics_screen.dart';
 import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/modules/tracker_library/tracker_library_screen.dart';
@@ -58,6 +60,7 @@ import 'package:mangayomi/modules/more/settings/browse/browse_screen.dart';
 import 'package:mangayomi/modules/more/settings/browse/extension_server_screen.dart';
 import 'package:mangayomi/modules/more/settings/general/general_screen.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_screen.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
 import 'package:mangayomi/modules/more/settings/player/player_subtitle_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
@@ -77,7 +80,10 @@ GoRouter router(Ref ref) {
       .first;
 
   return GoRouter(
-    observers: [BotToastNavigatorObserver()],
+    observers: [
+      BotToastNavigatorObserver(),
+      DictionaryPopupDismissNavigatorObserver(),
+    ],
     initialLocation: initLocation,
     debugLogDiagnostics: kDebugMode,
     refreshListenable: router,
@@ -151,6 +157,10 @@ class RouterNotifier extends ChangeNotifier {
         _genericRoute(name: "history", child: const HistoryScreen()),
         _genericRoute(name: "updates", child: const UpdatesScreen()),
         _genericRoute(name: "browse", child: const BrowseScreen()),
+        _genericRoute(
+          name: "dictionaryLookup",
+          child: const DictionaryLookupScreen(),
+        ),
         _genericRoute(name: "more", child: const MoreScreen()),
       ],
     ),
@@ -170,9 +180,17 @@ class RouterNotifier extends ChangeNotifier {
       name: "animePlayerView",
       builder: (id) => AnimePlayerView(episodeId: id),
     ),
-    _genericRoute<int>(
+    _genericRoute<Object>(
       name: "novelReaderView",
-      builder: (id) => NovelReaderView(chapterId: id),
+      builder: (extra) => switch (extra) {
+        NovelReaderRouteArgs args => NovelReaderView(
+          chapterId: args.chapterId,
+          initialProgress: args.initialProgress,
+          initialEpubSpineIndex: args.initialEpubSpineIndex,
+        ),
+        int id => NovelReaderView(chapterId: id),
+        _ => throw ArgumentError.value(extra, 'extra', 'Invalid novel route'),
+      },
     ),
     _genericRoute<ItemType>(
       name: "ExtensionLang",
@@ -208,6 +226,16 @@ class RouterNotifier extends ChangeNotifier {
     _genericRoute(name: "general", child: const GeneralScreen()),
     _genericRoute(name: "readerMode", child: const ReaderScreen()),
     _genericRoute(name: "dictionary", child: const DictionaryScreen()),
+    _genericRoute(
+      name: "dictionaryPopup",
+      child: const DictionaryScreen(
+        section: DictionarySettingsSection.dictionaryPopup,
+      ),
+    ),
+    _genericRoute(
+      name: "ankiSettings",
+      child: const DictionaryScreen(section: DictionarySettingsSection.anki),
+    ),
     _genericRoute(name: "browseS", child: const BrowseSScreen()),
     _genericRoute(
       name: "extensionServer",

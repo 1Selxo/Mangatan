@@ -62,7 +62,11 @@ class ExtensionsLang extends ConsumerWidget {
             .watch(fireImmediately: true),
         builder: (context, snapshot) {
           List<Source>? entries = snapshot.hasData ? snapshot.data : [];
-          final languages = entries!.map((e) => e.lang!).toSet().toList();
+          final languages = entries!
+              .map((source) => source.lang ?? '')
+              .where((lang) => lang.isNotEmpty)
+              .toSet()
+              .toList();
 
           languages.sort((a, b) => a.compareTo(b));
           return SuperListView.builder(
@@ -73,8 +77,9 @@ class ExtensionsLang extends ConsumerWidget {
                 lang: lang,
                 onChanged: (val) {
                   isar.writeTxnSync(() {
-                    for (var source in entries) {
-                      if (source.lang!.toLowerCase() == lang.toLowerCase()) {
+                    for (final source in entries) {
+                      if ((source.lang ?? '').toLowerCase() ==
+                          lang.toLowerCase()) {
                         isar.sources.putSync(
                           source
                             ..isActive = val
@@ -84,13 +89,11 @@ class ExtensionsLang extends ConsumerWidget {
                     }
                   });
                 },
-                value: entries
-                    .where(
-                      (element) =>
-                          element.lang!.toLowerCase() == lang.toLowerCase() &&
-                          element.isActive!,
-                    )
-                    .isNotEmpty,
+                value: entries.any(
+                  (source) =>
+                      (source.lang ?? '').toLowerCase() == lang.toLowerCase() &&
+                      (source.isActive ?? false),
+                ),
               );
             },
           );

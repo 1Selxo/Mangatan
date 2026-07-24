@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+message BackupTracking {
+    int32 syncId = 1;
+    int64 libraryId = 2;
+    int32 mediaIdInt = 3;
+    string trackingUrl = 4;
+    string title = 5;
+    float lastChapterRead = 6;
+    int32 totalChapters = 7;
+    float score = 8;
+    int32 status = 9;
+    int64 startedReadingDate = 10;
+    int64 finishedReadingDate = 11;
+    bool private = 12;
+    int64 mediaId = 100;
+}

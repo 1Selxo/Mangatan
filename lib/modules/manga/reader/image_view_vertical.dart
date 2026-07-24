@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/manga/reader/providers/reader_controller_provider.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_colors.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
@@ -72,6 +73,17 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
   Widget build(BuildContext context) {
     _ocr.updateTheme(Theme.of(context).colorScheme.primary);
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);
+
+    Rect? ocrHitTestImageRect(Rect paintedRect) {
+      final box = _imageKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return null;
+      return readerOcrHitTestImageRect(
+        paintedImageRect: paintedRect,
+        renderBoxSize: box.size,
+        normalizePaintCoordinates: true,
+      );
+    }
+
     final imageWidget = ValueListenableBuilder<bool>(
       valueListenable: widget.isScrolling,
       builder: (context, scrolling, _) => ExtendedImage(
@@ -127,7 +139,7 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
                   Text(
                     context.l10n.image_loading_error,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: readerErrorForegroundColor(Colors.black),
                     ),
                   ),
                   Padding(
@@ -151,7 +163,12 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
                             vertical: 8,
                             horizontal: 16,
                           ),
-                          child: Text(context.l10n.retry),
+                          child: Text(
+                            context.l10n.retry,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -162,7 +179,15 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
           }
           return null;
         },
-        afterPaintImage: _ocr.paint,
+        afterPaintImage: (canvas, rect, image, paint) {
+          _ocr.paint(
+            canvas,
+            rect,
+            image,
+            paint,
+            hitTestImageRect: ocrHitTestImageRect(rect),
+          );
+        },
       ),
     );
     return applyReaderColorFilter(

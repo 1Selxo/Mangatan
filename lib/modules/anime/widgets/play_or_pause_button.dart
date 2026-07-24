@@ -8,8 +8,13 @@ import 'package:media_kit_video/media_kit_video.dart';
 /// A material design play/pause button.
 class CustomPlayOrPauseButton extends StatefulWidget {
   final VideoController controller;
+  final double? iconSize;
 
-  const CustomPlayOrPauseButton({super.key, required this.controller});
+  const CustomPlayOrPauseButton({
+    super.key,
+    required this.controller,
+    this.iconSize,
+  });
 
   @override
   CustomPlayOrPauseButtonState createState() => CustomPlayOrPauseButtonState();
@@ -25,7 +30,7 @@ class CustomPlayOrPauseButtonState extends State<CustomPlayOrPauseButton>
 
   StreamSubscription<bool>? subscription;
 
-  double get iconSize => isDesktop ? 25 : 65;
+  double get iconSize => widget.iconSize ?? (isDesktop ? 25 : 65);
 
   @override
   void setState(VoidCallback fn) {

@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
+import 'package:image/image.dart' as image;
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
@@ -15,8 +16,22 @@ class AnkiCardBuilder {
     AnkiMiningProfile profile = const AnkiMiningProfile(),
     Map<String, dynamic> renderedContent = const {},
     List<AnkiMediaFile> dictionaryMedia = const [],
+    AnkiMediaFile? wordAudio,
   }) async {
-    final screenshot = await _loadScreenshot(context);
+    final sentenceAudioFuture =
+        _usesMarker(profile.fieldMap, AnkiMarker.sentenceAudio)
+        ? Future<AnkiMediaFile?>.sync(
+            () =>
+                context.sentenceAudioLoader?.call(profile.sentenceAudioFormat),
+          )
+        : Future<AnkiMediaFile?>.value();
+    final screenshotFuture = _loadScreenshot(context);
+    final media = await Future.wait<Object?>([
+      sentenceAudioFuture,
+      screenshotFuture,
+    ]);
+    final sentenceAudio = media[0] as AnkiMediaFile?;
+    final screenshot = media[1] as _ScreenshotPayload?;
     final screenshotName = screenshot == null
         ? null
         : _safeMediaName(
@@ -35,18 +50,41 @@ class AnkiCardBuilder {
       return value is String && value.isNotEmpty ? value : fallback;
     }
 
+    final renderedSingleGlossaries = _renderedSingleGlossaries(
+      renderedContent['singleGlossaries'],
+    );
+    final selectedText = _escape(
+      renderedContent['popupSelectionText']?.toString() ?? '',
+    );
     final glossary = rendered('glossary', _glossary(result.term.glossaries));
     final glossaryPlain = _glossaryPlain(result.term.glossaries);
-    final selectedGlossaryHtml = rendered(
-      'glossaryFirst',
-      _glossary(selectedGlossary),
-    );
-    final selectedGlossaryPlain = _glossaryPlain(selectedGlossary);
+    final selectedDictionary =
+        renderedContent['selectedDictionary']?.toString().trim() ?? '';
+    final selectedGlossaryEntries = selectedDictionary.isEmpty
+        ? selectedGlossary
+        : _filterGlossaries(result.term.glossaries, selectedDictionary);
+    final effectiveSelectedGlossary = selectedGlossaryEntries.isEmpty
+        ? selectedGlossary
+        : selectedGlossaryEntries;
+    final selectedGlossaryHtml = selectedDictionary.isEmpty
+        ? rendered('glossaryFirst', _glossary(selectedGlossary))
+        : _renderedGlossaryForSingleDictionary(
+                effectiveSelectedGlossary,
+                renderedSingleGlossaries,
+              ) ??
+              _glossary(effectiveSelectedGlossary);
+    final selectedGlossaryPlain = _glossaryPlain(effectiveSelectedGlossary);
     final frequencySummary = rendered(
       'freqHarmonicRank',
       _frequencySummary(result.term.frequencies),
     );
     final cloze = _cloze(context.sentence, result.matched);
+    final wordAudioTag = wordAudio == null
+        ? ''
+        : '[sound:${_soundFilename(wordAudio.filename)}]';
+    final sentenceAudioTag = sentenceAudio == null
+        ? ''
+        : '[sound:${_soundFilename(sentenceAudio.filename)}]';
     final replacements = <String, String>{
       AnkiMarker.expression: _escape(result.term.expression),
       AnkiMarker.reading: _escape(result.term.reading),
@@ -58,7 +96,7 @@ class AnkiCardBuilder {
         'furiganaPlain',
         _furiganaPlain(result.term.expression, result.term.reading),
       ),
-      AnkiMarker.audio: '',
+      AnkiMarker.audio: wordAudioTag,
       AnkiMarker.glossary: glossary,
       AnkiMarker.glossaryBrief: selectedGlossaryHtml,
       AnkiMarker.glossaryPlain: glossaryPlain,
@@ -119,19 +157,16 @@ class AnkiCardBuilder {
       AnkiMarker.screenshot: screenshotName == null
           ? ''
           : '<img src="$screenshotName">',
-      AnkiMarker.wordAudio: '',
-      AnkiMarker.sentenceAudio: '',
+      AnkiMarker.wordAudio: wordAudioTag,
+      AnkiMarker.sentenceAudio: sentenceAudioTag,
       AnkiMarker.url: _escape(context.sourceUri?.toString() ?? ''),
       AnkiMarker.book: _escape(context.sourceTitle),
       AnkiMarker.chapter: _escape(context.chapterTitle),
       AnkiMarker.media: _escape(context.locationLabel),
       AnkiMarker.source: _escape(context.locationLabel),
       AnkiMarker.documentTitle: _escape(context.sourceTitle),
-      AnkiMarker.selectionText: _escape(result.matched),
-      AnkiMarker.popupSelectionText: rendered(
-        'popupSelectionText',
-        _escape(result.matched),
-      ),
+      AnkiMarker.selectionText: selectedText,
+      _legacyPopupSelectionTextMarker: selectedText,
     };
 
     final fields = profile.fieldMap.map((field, template) {
@@ -142,6 +177,11 @@ class AnkiCardBuilder {
       for (final replacement in replacements.entries) {
         value = value.replaceAll(replacement.key, replacement.value);
       }
+      value = _replaceDynamicMarkers(
+        value,
+        result.term.glossaries,
+        renderedSingleGlossaries,
+      );
       return MapEntry(field, value);
     });
 
@@ -153,9 +193,12 @@ class AnkiCardBuilder {
       tags: profile.tags,
       screenshotBytes: screenshot?.bytes,
       screenshotFileName: screenshotName,
-      mediaFiles: dictionaryMedia,
+      mediaFiles: [...dictionaryMedia, ?wordAudio, ?sentenceAudio],
     );
   }
+
+  bool _usesMarker(Map<String, String> fieldMap, String marker) =>
+      fieldMap.values.any((template) => template.contains(marker));
 
   Future<_ScreenshotPayload?> _loadScreenshot(MiningContext context) async {
     final loader = context.imageBytesLoader;
@@ -163,12 +206,9 @@ class AnkiCardBuilder {
     final bytes = await loader();
     if (bytes == null || bytes.isEmpty) return null;
     final original = Uint8List.fromList(bytes);
-    if (original.length <= _maxScreenshotUploadBytes) {
-      return _ScreenshotPayload(original, _extensionForImage(original));
-    }
-    final resized = await _resizeScreenshot(original);
-    if (resized != null && resized.length < original.length) {
-      return _ScreenshotPayload(resized, 'png');
+    final compressed = await Isolate.run(() => _compressScreenshot(original));
+    if (compressed != null && compressed.length < original.length) {
+      return _ScreenshotPayload(compressed, 'jpg');
     }
     if (original.length <= _absoluteScreenshotUploadBytes) {
       return _ScreenshotPayload(original, _extensionForImage(original));
@@ -188,10 +228,15 @@ class AnkiCardBuilder {
     return '$expression[$reading]';
   }
 
-  static String _glossary(Iterable<HoshiGlossaryEntry> entries) {
+  static String _glossary(
+    Iterable<HoshiGlossaryEntry> entries, {
+    bool includeDictionary = true,
+    bool brief = false,
+  }) {
     final rows = entries.where((entry) => entry.glossary.trim().isNotEmpty).map(
       (entry) {
-        final dict = entry.dictName.trim().isEmpty
+        final dict =
+            brief || !includeDictionary || entry.dictName.trim().isEmpty
             ? ''
             : '<span class="dict">${_escape(entry.dictName)}</span> ';
         return '<li>$dict${_escape(entry.glossary)}</li>';
@@ -200,12 +245,149 @@ class AnkiCardBuilder {
     return rows.isEmpty ? '' : '<ol>$rows</ol>';
   }
 
-  static String _glossaryPlain(Iterable<HoshiGlossaryEntry> entries) {
+  static String _glossaryPlain(
+    Iterable<HoshiGlossaryEntry> entries, {
+    bool includeDictionary = false,
+  }) {
     return entries
-        .map((entry) => entry.glossary.trim())
-        .where((entry) => entry.isNotEmpty)
-        .map(_escape)
+        .where((entry) => entry.glossary.trim().isNotEmpty)
+        .map((entry) {
+          final glossary = _escape(entry.glossary.trim());
+          final dictionary = entry.dictName.trim();
+          if (!includeDictionary || dictionary.isEmpty) return glossary;
+          return '(${_escape(dictionary)})<br>$glossary';
+        })
         .join('<br>');
+  }
+
+  static Map<String, String> _renderedSingleGlossaries(Object? value) {
+    Object? decoded = value;
+    if (value is String) {
+      if (value.trim().isEmpty) return const {};
+      try {
+        decoded = jsonDecode(value);
+      } on FormatException {
+        return const {};
+      }
+    }
+    if (decoded is! Map) return const {};
+    final glossaries = <String, String>{};
+    decoded.forEach((key, value) {
+      if (value is String && value.trim().isNotEmpty) {
+        glossaries[key.toString()] = value;
+      }
+    });
+    return glossaries;
+  }
+
+  static String _replaceDynamicMarkers(
+    String value,
+    Iterable<HoshiGlossaryEntry> entries,
+    Map<String, String> renderedSingleGlossaries,
+  ) {
+    return value.replaceAllMapped(_markerPattern, (match) {
+      final marker = match.group(1);
+      if (marker == null) return match.group(0) ?? '';
+      final dynamicValue = _parseSingleGlossaryMarker(
+        marker,
+        entries,
+        renderedSingleGlossaries,
+      );
+      return dynamicValue ?? match.group(0) ?? '';
+    });
+  }
+
+  static String? _parseSingleGlossaryMarker(
+    String marker,
+    Iterable<HoshiGlossaryEntry> entries,
+    Map<String, String> renderedSingleGlossaries,
+  ) {
+    const prefix = 'single-glossary-';
+    if (!marker.startsWith(prefix)) return null;
+
+    final rest = marker.substring(prefix.length);
+    if (rest.trim().isEmpty) return '';
+
+    final tokens = rest.split('-').where((token) => token.isNotEmpty).toList();
+    var brief = false;
+    var firstOnly = false;
+    var plain = false;
+    var noDictionary = false;
+    while (tokens.isNotEmpty) {
+      final suffix = tokens.last.toLowerCase();
+      if (suffix == 'brief') {
+        brief = true;
+        tokens.removeLast();
+      } else if (suffix == 'first') {
+        firstOnly = true;
+        tokens.removeLast();
+      } else if (suffix == 'plain') {
+        plain = true;
+        tokens.removeLast();
+      } else if (tokens.length >= 2 &&
+          tokens[tokens.length - 2].toLowerCase() == 'no' &&
+          suffix == 'dictionary') {
+        noDictionary = true;
+        tokens.removeLast();
+        tokens.removeLast();
+      } else {
+        break;
+      }
+    }
+
+    final dictionaryKey = tokens.join('-').trim();
+    if (dictionaryKey.isEmpty) return '';
+
+    final filtered = dictionaryKey.toLowerCase() == 'all'
+        ? entries.where((entry) => entry.glossary.trim().isNotEmpty).toList()
+        : _filterGlossaries(entries, dictionaryKey);
+    final selected = firstOnly ? filtered.take(1).toList() : filtered;
+    if (selected.isEmpty) return '';
+
+    if (plain) {
+      return _glossaryPlain(selected, includeDictionary: !noDictionary);
+    }
+
+    if (!brief && !noDictionary && !firstOnly) {
+      final rendered = _renderedGlossaryForSingleDictionary(
+        selected,
+        renderedSingleGlossaries,
+      );
+      if (rendered != null) return rendered;
+    }
+
+    return _glossary(selected, includeDictionary: !noDictionary, brief: brief);
+  }
+
+  static List<HoshiGlossaryEntry> _filterGlossaries(
+    Iterable<HoshiGlossaryEntry> entries,
+    String dictionaryFilter,
+  ) {
+    final filter = dictionaryFilter.trim().toLowerCase();
+    if (filter.isEmpty) return const [];
+    return entries.where((entry) {
+      if (entry.glossary.trim().isEmpty) return false;
+      final dictionary = entry.dictName.trim();
+      if (dictionary.isEmpty) return false;
+      final dictionaryLower = dictionary.toLowerCase();
+      final dictionaryKebab = AnkiMarker.kebabCase(dictionary);
+      return dictionaryLower.contains(filter) ||
+          dictionaryKebab == filter ||
+          dictionaryKebab.contains(filter);
+    }).toList();
+  }
+
+  static String? _renderedGlossaryForSingleDictionary(
+    Iterable<HoshiGlossaryEntry> entries,
+    Map<String, String> renderedSingleGlossaries,
+  ) {
+    final dictionaries = entries
+        .map((entry) => entry.dictName.trim())
+        .where((dictionary) => dictionary.isNotEmpty)
+        .toSet();
+    if (dictionaries.length != 1) return null;
+    final rendered = renderedSingleGlossaries[dictionaries.first];
+    return rendered != null && rendered.trim().isNotEmpty ? rendered : null;
   }
 
   static String _frequencies(List<HoshiFrequencyEntry> entries) {
@@ -279,7 +461,11 @@ class AnkiCardBuilder {
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    return '${safe.isEmpty ? 'mangayomi-mining' : safe}.$extension';
+    return '${safe.isEmpty ? 'mangatan-mining' : safe}.$extension';
+  }
+
+  static String _soundFilename(String value) {
+    return value.replaceAll(']', '_');
   }
 
   static String _escape(String value) {
@@ -289,40 +475,11 @@ class AnkiCardBuilder {
   static String _normalizeFieldName(String value) =>
       value.trim().toLowerCase().replaceAll(RegExp(r'[\s_\-]+'), '');
 
-  static const _maxScreenshotUploadBytes = 4 * 1024 * 1024;
+  static final _markerPattern = RegExp(r'\{([^{}]+)\}');
+
+  static const _legacyPopupSelectionTextMarker = '{popup-selection-text}';
   static const _absoluteScreenshotUploadBytes = 8 * 1024 * 1024;
   static const _maxScreenshotDimension = 1280;
-
-  static Future<Uint8List?> _resizeScreenshot(Uint8List bytes) async {
-    ui.ImmutableBuffer? buffer;
-    ui.ImageDescriptor? descriptor;
-    ui.Codec? codec;
-    ui.Image? image;
-    try {
-      buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-      descriptor = await ui.ImageDescriptor.encoded(buffer);
-      final width = descriptor.width;
-      final height = descriptor.height;
-      final longest = width > height ? width : height;
-      if (longest <= _maxScreenshotDimension) return null;
-      final scale = _maxScreenshotDimension / longest;
-      codec = await descriptor.instantiateCodec(
-        targetWidth: (width * scale).round().clamp(1, width),
-        targetHeight: (height * scale).round().clamp(1, height),
-      );
-      final frame = await codec.getNextFrame();
-      image = frame.image;
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      return data?.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    } finally {
-      image?.dispose();
-      codec?.dispose();
-      descriptor?.dispose();
-      buffer?.dispose();
-    }
-  }
 
   static String _extensionForImage(Uint8List bytes) {
     if (bytes.length >= 8 &&
@@ -350,6 +507,31 @@ class AnkiCardBuilder {
       return 'webp';
     }
     return 'png';
+  }
+}
+
+Uint8List? _compressScreenshot(Uint8List bytes) {
+  try {
+    final decoded = image.decodeImage(bytes);
+    if (decoded == null) return null;
+    final longest = decoded.width > decoded.height
+        ? decoded.width
+        : decoded.height;
+    final resized = longest > AnkiCardBuilder._maxScreenshotDimension
+        ? image.copyResize(
+            decoded,
+            width: decoded.width >= decoded.height
+                ? AnkiCardBuilder._maxScreenshotDimension
+                : null,
+            height: decoded.height > decoded.width
+                ? AnkiCardBuilder._maxScreenshotDimension
+                : null,
+            interpolation: image.Interpolation.average,
+          )
+        : decoded;
+    return Uint8List.fromList(image.encodeJpg(resized, quality: 82));
+  } catch (_) {
+    return null;
   }
 }
 

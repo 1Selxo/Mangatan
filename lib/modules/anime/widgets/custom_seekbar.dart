@@ -63,30 +63,32 @@ class CustomSeekBarState extends State<CustomSeekBar> {
 
   @override
   Widget build(BuildContext context) {
+    final timerWidth = MediaQuery.sizeOf(context).shortestSide < 600
+        ? 68.0
+        : 92.0;
     final maxValue = max(duration.inMilliseconds.toDouble(), 0).toDouble();
     final rawValue = (widget.delta ?? tempPosition ?? position).inMilliseconds
         .toDouble();
     final clampedValue = rawValue.clamp(0, maxValue).toDouble();
     return SizedBox(
-      height: 20,
+      height: 48,
       child: Row(
         children: [
-          if (!isDesktop)
-            SizedBox(
-              width: 70,
-              child: Center(
-                child: Text(
-                  (widget.delta ?? tempPosition ?? position).label(
-                    reference: duration,
-                  ),
-                  style: const TextStyle(
-                    height: 1.0,
-                    fontSize: 12.0,
-                    color: Colors.white,
-                  ),
+          SizedBox(
+            width: timerWidth,
+            child: Center(
+              child: Text(
+                (widget.delta ?? tempPosition ?? position).label(
+                  reference: duration,
+                ),
+                style: const TextStyle(
+                  height: 1.0,
+                  fontSize: 12.0,
+                  color: Colors.white,
                 ),
               ),
             ),
+          ),
           Expanded(
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
@@ -129,20 +131,19 @@ class CustomSeekBarState extends State<CustomSeekBar> {
               ),
             ),
           ),
-          if (!isDesktop)
-            SizedBox(
-              width: 70,
-              child: Center(
-                child: Text(
-                  duration.label(reference: duration),
-                  style: const TextStyle(
-                    height: 1.0,
-                    fontSize: 12.0,
-                    color: Colors.white,
-                  ),
+          SizedBox(
+            width: timerWidth,
+            child: Center(
+              child: Text(
+                duration.label(reference: duration),
+                style: const TextStyle(
+                  height: 1.0,
+                  fontSize: 12.0,
+                  color: Colors.white,
                 ),
               ),
             ),
+          ),
         ],
       ),
     );

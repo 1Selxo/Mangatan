@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+// kotlinx.serialization represents sealed preference values as a polymorphic
+// envelope containing the concrete serial name and its encoded message bytes.
+message BackupPreferenceValue {
+    string type = 1;
+    bytes value = 2;
+}
+
+message BackupPreference {
+    string key = 1;
+    BackupPreferenceValue value = 2;
+}
+
+message BackupSourcePreferences {
+    string sourceKey = 1;
+    repeated BackupPreference prefs = 2;
+}
+
+message IntPreferenceValue { int32 value = 1; }
+message LongPreferenceValue { int64 value = 1; }
+message FloatPreferenceValue { float value = 1; }
+message StringPreferenceValue { string value = 1; }
+message BooleanPreferenceValue { bool value = 1; }
+message StringSetPreferenceValue { repeated string value = 1; }

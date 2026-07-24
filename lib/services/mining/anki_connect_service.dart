@@ -12,6 +12,24 @@ class AnkiConnectException implements Exception {
   String toString() => message;
 }
 
+class AnkiDuplicateException extends AnkiConnectException {
+  AnkiDuplicateException(String expression, [String? detail])
+    : super(
+        detail == null || detail.isEmpty
+            ? 'A card for "$expression" already exists.'
+            : detail,
+      );
+}
+
+class AnkiCanAddResult {
+  const AnkiCanAddResult({required this.canAdd, this.error});
+
+  final bool canAdd;
+  final String? error;
+
+  bool get isDuplicate => !canAdd;
+}
+
 class AnkiConnectService {
   final Uri endpoint;
   final http.Client? _injectedClient;
@@ -93,6 +111,36 @@ class AnkiConnectService {
     return (result as List).map((item) => item as int).toList();
   }
 
+  Future<List<int>> findDuplicateNoteIds({
+    required String deckName,
+    required String modelName,
+    required String expression,
+    String duplicateScope = 'deck',
+  }) async {
+    final fields = await modelFieldNames(modelName);
+    if (fields.isEmpty || expression.trim().isEmpty) return const [];
+    final escapedDeck = _escapeSearch(deckName);
+    final rootDeck = _escapeSearch(deckName.split('::').first);
+    final escapedExpression = _escapeSearch(expression);
+    final scope = switch (duplicateScope) {
+      'collection' => '',
+      'deckroot' => '"deck:$rootDeck" ',
+      _ => '"deck:$escapedDeck" ',
+    };
+    return findNotes(
+      '$scope"${fields.first.toLowerCase()}:$escapedExpression"',
+    );
+  }
+
+  Future<List<int>> browseNotes(List<int> noteIds) async {
+    if (noteIds.isEmpty) return const [];
+    final result = await invoke(
+      'guiBrowse',
+      params: {'query': 'nid:${noteIds.join(',')}'},
+    );
+    return (result as List).map((item) => item as int).toList();
+  }
+
   Future<String?> storeMediaFile({
     required String filename,
     required Uint8List data,
@@ -107,6 +155,8 @@ class AnkiConnectService {
   Future<int> addNote(
     AnkiCardDraft draft, {
     bool allowDuplicate = false,
+    String duplicateScope = 'deck',
+    bool checkAllModels = false,
   }) async {
     final result = await invoke(
       'addNote',
@@ -116,15 +166,12 @@ class AnkiConnectService {
           'modelName': draft.modelName,
           'fields': draft.fields,
           'tags': draft.tags,
-          'options': {
-            'allowDuplicate': allowDuplicate,
-            'duplicateScope': 'deck',
-            'duplicateScopeOptions': {
-              'deckName': draft.deckName,
-              'checkChildren': false,
-              'checkAllModels': false,
-            },
-          },
+          'options': _duplicateOptions(
+            deckName: draft.deckName,
+            allowDuplicate: allowDuplicate,
+            duplicateScope: duplicateScope,
+            checkAllModels: checkAllModels,
+          ),
         },
       },
     );
@@ -147,12 +194,65 @@ class AnkiConnectService {
     return findNotes('deck:"$escapedDeck" "$escapedExpression"');
   }
 
+  /// Uses Anki's own duplicate validator, matching Hoshi Reader and Yomitan.
+  /// This is more accurate than a text search because Anki evaluates the
+  /// actual model's first field and configured duplicate scope.
+  Future<AnkiCanAddResult> canAddDraft(
+    AnkiCardDraft draft, {
+    String duplicateScope = 'deck',
+    bool checkAllModels = false,
+  }) async {
+    final normalized = await _normalizeFieldsForModel(draft);
+    return _canAddNormalizedDraft(
+      normalized,
+      duplicateScope: duplicateScope,
+      checkAllModels: checkAllModels,
+    );
+  }
+
+  Future<AnkiCanAddResult> checkDuplicateExpression({
+    required String deckName,
+    required String modelName,
+    required String expression,
+    String duplicateScope = 'deck',
+    bool checkAllModels = false,
+  }) async {
+    final fields = await modelFieldNames(modelName);
+    if (fields.isEmpty) return const AnkiCanAddResult(canAdd: true);
+    return _canAddNormalizedDraft(
+      AnkiCardDraft(
+        deckName: deckName,
+        modelName: modelName,
+        expression: expression,
+        fields: {
+          for (final field in fields)
+            field: field == fields.first ? expression : '',
+        },
+      ),
+      duplicateScope: duplicateScope,
+      checkAllModels: checkAllModels,
+    );
+  }
+
   Future<int> exportDraft(
     AnkiCardDraft draft, {
     bool duplicateCheck = true,
+    bool allowDuplicate = false,
+    String duplicateScope = 'deck',
+    bool checkAllModels = false,
     bool syncOnCreate = false,
   }) async {
     final normalized = await _normalizeFieldsForModel(draft);
+    if (duplicateCheck) {
+      final status = await _canAddNormalizedDraft(
+        normalized,
+        duplicateScope: duplicateScope,
+        checkAllModels: checkAllModels,
+      );
+      if (!status.canAdd && !allowDuplicate) {
+        throw AnkiDuplicateException(normalized.expression, status.error);
+      }
+    }
     for (final media in normalized.mediaFiles) {
       await storeMediaFile(filename: media.filename, data: media.bytes);
     }
@@ -163,21 +263,82 @@ class AnkiConnectService {
         data: normalized.screenshotBytes!,
       );
     }
-    if (duplicateCheck) {
-      final existing = await findDuplicateExpressions(
-        deckName: normalized.deckName,
-        expression: normalized.expression,
-      );
-      if (existing.isNotEmpty) {
-        throw AnkiConnectException(
-          'A card for "${normalized.expression}" already exists.',
-        );
-      }
-    }
-    final noteId = await addNote(normalized);
+    final noteId = await addNote(
+      normalized,
+      allowDuplicate: allowDuplicate || !duplicateCheck,
+      duplicateScope: duplicateScope,
+      checkAllModels: checkAllModels,
+    );
     if (syncOnCreate) await sync();
     return noteId;
   }
+
+  Future<AnkiCanAddResult> _canAddNormalizedDraft(
+    AnkiCardDraft draft, {
+    required String duplicateScope,
+    required bool checkAllModels,
+  }) async {
+    final result = await invoke(
+      'canAddNotesWithErrorDetail',
+      params: {
+        'notes': [
+          {
+            'deckName': draft.deckName,
+            'modelName': draft.modelName,
+            'fields': draft.fields,
+            'tags': draft.tags,
+            'options': _duplicateOptions(
+              deckName: draft.deckName,
+              allowDuplicate: false,
+              duplicateScope: duplicateScope,
+              checkAllModels: checkAllModels,
+            ),
+          },
+        ],
+      },
+    );
+    if (result is! List || result.isEmpty || result.first is! Map) {
+      throw const AnkiConnectException(
+        'AnkiConnect returned an invalid duplicate-check response.',
+      );
+    }
+    final first = result.first as Map;
+    return AnkiCanAddResult(
+      canAdd: first['canAdd'] == true,
+      error: first['error']?.toString(),
+    );
+  }
+
+  static Map<String, dynamic> _duplicateOptions({
+    required String deckName,
+    required bool allowDuplicate,
+    required String duplicateScope,
+    required bool checkAllModels,
+  }) {
+    final normalizedScope = switch (duplicateScope) {
+      'collection' => 'collection',
+      'deckroot' => 'deckroot',
+      _ => 'deck',
+    };
+    final options = <String, dynamic>{
+      'allowDuplicate': allowDuplicate,
+      'duplicateScope': normalizedScope == 'collection' ? 'collection' : 'deck',
+    };
+    if (normalizedScope != 'collection' || checkAllModels) {
+      options['duplicateScopeOptions'] = <String, dynamic>{
+        if (normalizedScope != 'collection')
+          'deckName': normalizedScope == 'deckroot'
+              ? deckName.split('::').first
+              : deckName,
+        if (normalizedScope != 'collection')
+          'checkChildren': normalizedScope == 'deckroot',
+        'checkAllModels': checkAllModels,
+      };
+    }
+    return options;
+  }
+
+  static String _escapeSearch(String value) => value.replaceAll('"', '');
 
   Future<AnkiCardDraft> _normalizeFieldsForModel(AnkiCardDraft draft) async {
     final modelFields = await modelFieldNames(draft.modelName);

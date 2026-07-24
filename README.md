@@ -8,10 +8,10 @@
 
  [![GitHub downloads](https://img.shields.io/github/downloads/1Selxo/Mangatan/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/1Selxo/Mangatan/releases)
 ![star](https://img.shields.io/github/stars/1Selxo/Mangatan)
- [![Discord server](https://img.shields.io/discord/1157628512077893666.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.com/invite/EjfBuYahsP)
+  [![Discord server](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/Ak2sW9Nvr9)
 
 
-Mangatan is a Mangayomi fork focused on Yomitan-style dictionary lookup, OCR overlays, subtitle mining, and Anki export.
+ Mangatan is an open-source desktop app for reading manga and novels, watching anime, and learning languages through dictionary lookup, OCR, subtitle mining, and Anki export.
 </div>
 
 ## Features
@@ -30,16 +30,16 @@ Features include:
 </div>
 
 ## Download
-Get desktop builds and sideloadable iOS IPAs from the [Mangatan releases page](https://github.com/1Selxo/Mangatan/releases).
+Get desktop builds and sideloadable iOS IPAs from the [Mangatan releases page](https://github.com/ippo-michi/Mangatan/releases).
 
 ## iOS Sideloading Sources
-<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
 &nbsp;
-<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="Feather Source" src="repo/images/buttons/feather_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="Feather Source" src="repo/images/buttons/feather_button.png" width="150"></a>
 &nbsp;
-<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="Sidestore Source" src="repo/images/buttons/sidestore_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="Sidestore Source" src="repo/images/buttons/sidestore_button.png" width="150"></a>
 &nbsp;
-<a href="https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="Direct URL Source" src="repo/images/buttons/url_button.png" width="150"></a>
+<a href="https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="Direct URL Source" src="repo/images/buttons/url_button.png" width="150"></a>
 
 Release IPAs are intentionally unsigned. AltStore, SideStore, Feather, Sideloadly, and similar tools sign the app with your Apple ID during installation.
 
@@ -49,7 +49,7 @@ To build an IPA without publishing a release, open **Actions → Build iOS sidel
 
 Contributions are welcome!
 
-To get started with extension development, see [CONTRIBUTING-DART.md](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-DART.md) for create sources in Dart or [CONTRIBUTING-JS.md](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-JS.md) for create sources in JavaScript.
+To get started with extension development, see the archived upstream [Dart extension guide](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-DART.md) or [JavaScript extension guide](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-JS.md).
 
 ## Using flutter_rust_bridge
 
@@ -83,6 +83,21 @@ Now you can run and build this app just like any other Flutter projects.
 flutter run
 ```
 
+### macOS quick build
+
+On macOS, use the helper script to build the desktop app and open it:
+
+```bash
+./scripts/build_macos.sh
+```
+
+Useful options:
+
+```bash
+./scripts/build_macos.sh --release
+./scripts/build_macos.sh --clean --no-open
+```
+
 
 
 ## License
@@ -101,4 +116,4 @@ flutter run
 
 ## Disclaimer
 
-Mangatan does not host any content, and its developers are not affiliated with the content providers available through third-party extensions.
+ Mangatan does not host any content, and the developers of this application are not affiliated with content providers available on the internet.

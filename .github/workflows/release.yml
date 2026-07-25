@@ -107,6 +107,8 @@ jobs:
     runs-on: windows-2022
     env:
       PUB_CACHE: 'C:\pub-cache'
+      WINDOWS_SIGNING_CERT_BASE64: ${{ secrets.WINDOWS_SIGNING_CERT_BASE64 }}
+      WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
     steps:
       - name: checkout branch
         uses: actions/checkout@v7
@@ -138,10 +140,90 @@ jobs:
         working-directory: C:\m
         run: flutter pub get
 
-      - name: build windows exe
+      - name: Require Windows code-signing certificate
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PASSWORD)) {
+            throw 'Windows releases require WINDOWS_SIGNING_CERT_BASE64 and WINDOWS_SIGNING_CERT_PASSWORD.'
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'mangatan-release-signing.pfx'
+          [IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERT_BASE64)
+          )
+
+      - name: build windows app
         working-directory: C:\m
         run: |
-          dart run inno_bundle:build --release
+          dart run inno_bundle:build --release --no-installer
+
+      - name: sign Windows application binaries
+        working-directory: C:\m
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'mangatan-release-signing.pfx'
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -Filter signtool.exe -File -Recurse |
+            Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signTool) {
+            throw 'Could not locate the Windows SDK signing tool.'
+          }
+
+          $bundle = 'build/windows/x64/runner/Release'
+          $unsigned = Get-ChildItem $bundle -File -Recurse |
+            Where-Object { $_.Extension -in '.exe', '.dll' } |
+            Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -eq 'NotSigned' }
+          foreach ($binary in $unsigned) {
+            & $signTool sign /fd SHA256 /td SHA256 `
+              /tr http://timestamp.digicert.com `
+              /f $certificatePath /p $env:WINDOWS_SIGNING_CERT_PASSWORD `
+              $binary.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Signing failed for $($binary.Name)."
+            }
+          }
+
+          foreach ($requiredBinary in 'mangayomi.exe', 'screen_ai_bridge.dll') {
+            $path = Join-Path $bundle $requiredBinary
+            & $signTool verify /pa /all $path
+            if ($LASTEXITCODE -ne 0) {
+              throw "Signature verification failed for $requiredBinary."
+            }
+          }
+
+      - name: build and sign Windows installer
+        working-directory: C:\m
+        shell: pwsh
+        run: |
+          dart run inno_bundle:build --release --no-app
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'mangatan-release-signing.pfx'
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -Filter signtool.exe -File -Recurse |
+            Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          $installers = @(Get-ChildItem 'build/windows/x64/installer/Release/*-Installer.exe')
+          if ($installers.Count -ne 1) {
+            throw "Expected one Windows installer, found $($installers.Count)."
+          }
+          & $signTool sign /fd SHA256 /td SHA256 `
+            /tr http://timestamp.digicert.com `
+            /f $certificatePath /p $env:WINDOWS_SIGNING_CERT_PASSWORD `
+            $installers[0].FullName
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Signing the Windows installer failed.'
+          }
+          & $signTool verify /pa /all $installers[0].FullName
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Windows installer signature verification failed.'
+          }
 
       - name: build windows zip
         working-directory: C:\m
@@ -157,6 +239,10 @@ jobs:
           Copy-Item -LiteralPath $installers[0].FullName -Destination (Join-Path $releaseDir "Mangatan-$env:RELEASE_TAG-windows.exe")
 
           Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath (Join-Path $releaseDir "Mangatan-$env:RELEASE_TAG-windows.zip")
+          Get-ChildItem $releaseDir -File |
+            Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))" } |
+            Set-Content -Encoding ascii (Join-Path $releaseDir 'SHA256SUMS.txt')
 
       - name: upload artifact windows exe_zip
         uses: actions/upload-artifact@v7
@@ -165,6 +251,7 @@ jobs:
           path: |
             release-windows/Mangatan-*.exe
             release-windows/Mangatan-*.zip
+            release-windows/SHA256SUMS.txt
           if-no-files-found: error
 
   release:

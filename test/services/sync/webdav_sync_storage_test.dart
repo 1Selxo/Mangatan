@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
@@ -11,8 +12,6 @@ import 'package:mangayomi/services/sync/webdav_credential_store.dart';
 import 'package:mangayomi/services/sync/webdav_sync_storage.dart';
 
 void main() {
-  String repeat(String value, int count) => List.filled(count, value).join();
-
   late _FakeWebDavServer server;
   late WebDavSyncStorage storage;
 
@@ -32,24 +31,27 @@ void main() {
     await server.close();
   });
 
-  test('uploads gzip-protobuf with If-None-Match then updates with If-Match', () async {
-    final bytes = const ChimahonSyncCodec().encode(
-      BackupMihon(),
-      format: storage.wireFormat,
-    );
+  test(
+    'uploads gzip-protobuf with If-None-Match then updates with If-Match',
+    () async {
+      final bytes = const ChimahonSyncCodec().encode(
+        BackupMihon(),
+        format: storage.wireFormat,
+      );
 
-    final revision = await storage.upload(bytes, expectedAbsent: true);
-    final snapshot = await storage.download();
-    expect(snapshot, isNotNull);
-    expect(snapshot!.revision, revision);
+      final revision = await storage.upload(bytes, expectedAbsent: true);
+      final snapshot = await storage.download();
+      expect(snapshot, isNotNull);
+      expect(snapshot!.revision, revision);
 
-    final next = await storage.upload(bytes, expectedRevision: revision);
-    expect(next, isNot(revision));
-    expect(
-      server.requests.map((request) => request.path),
-      contains('/dav/Chimahon_sync.proto.gz'),
-    );
-  });
+      final next = await storage.upload(bytes, expectedRevision: revision);
+      expect(next, isNot(revision));
+      expect(
+        server.requests.map((request) => request.path),
+        contains('/dav/Chimahon_sync.proto.gz'),
+      );
+    },
+  );
 
   test('create and update conflicts map to shared sync conflict', () async {
     final bytes = const ChimahonSyncCodec().encode(
@@ -82,7 +84,8 @@ void main() {
   });
 
   test('uses encoded WebDAV paths for EPUB manifest and blobs', () async {
-    final hash = repeat('0', 64);
+    final blobBytes = [1, 2, 3];
+    final hash = crypto.sha256.convert(blobBytes).toString();
     final manifest = MangatanEpubManifest(
       generatedAtUtc: DateTime.utc(2026),
       deviceId: 'device',
@@ -91,8 +94,8 @@ void main() {
     await storage.uploadEpubManifest(manifest, expectedAbsent: true);
     await storage.uploadEpubBlob(
       sha256: hash,
-      sizeBytes: 3,
-      bytes: Stream.value([1, 2, 3]),
+      sizeBytes: blobBytes.length,
+      bytes: Stream.value(blobBytes),
     );
 
     expect(await storage.hasEpubBlob(hash), isTrue);

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';

@@ -31,17 +31,17 @@ class _OcrLock {
   static Future<void> _last = Future.value();
 
   static Future<T> synchronized<T>(FutureOr<T> Function() action) {
-    final completer = Completer<T>();
-    _last.then((_) async {
+    final previous = _last;
+    final released = Completer<void>();
+    _last = released.future;
+    return () async {
+      await previous;
       try {
-        final result = await action();
-        completer.complete(result);
-      } catch (error, stackTrace) {
-        completer.completeError(error, stackTrace);
+        return await action();
+      } finally {
+        released.complete();
       }
-    });
-    _last = completer.future.catchError((_) {});
-    return completer.future;
+    }();
   }
 }
 

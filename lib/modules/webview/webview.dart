@@ -14,6 +14,7 @@ import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/utils/global_style.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class MangaWebView extends ConsumerStatefulWidget {
   final String url;
@@ -45,8 +46,12 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
 
   @override
   void dispose() {
+    // Always stop the cookie poll, even if the route is popped externally
+    // (e.g. router/back) without going through _popWebviewRoute — otherwise the
+    // periodic timer keeps hitting a closed WebView and pins this State.
+    _cookieTimer?.cancel();
     if (Platform.isLinux) {
-      _desktopWebview?.close();
+      _closeDesktopWebview();
     } else {
       if (browser != null) {
         if (browser!.isOpened()) browser!.close();
@@ -57,6 +62,32 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
   }
 
   Webview? _desktopWebview;
+  Timer? _cookieTimer;
+  bool _webviewClosed = false;
+  bool _routePopped = false;
+
+  /// Closes the native desktop WebView window at most once. On Linux the close
+  /// can be triggered from three places for a single teardown (the in-app
+  /// button, the `onClose` callback after the user closes the window, and
+  /// `dispose()`). Closing more than once removes the WebView's FlView and then
+  /// the GTK embedder paints the now-invalid view on the next frame → SIGSEGV.
+  /// Guarding it keeps the app from aggravating that. See #752.
+  void _closeDesktopWebview() {
+    if (_webviewClosed) return;
+    _webviewClosed = true;
+    _desktopWebview?.close();
+  }
+
+  /// Pops this route at most once and stops the cookie poll.
+  void _popWebviewRoute() {
+    if (_routePopped) return;
+    _routePopped = true;
+    _cookieTimer?.cancel();
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
   Future<void> _runWebViewDesktop() async {
     String? ua = ref.watch(userAgentStateProvider);
     if (ua == defaultUserAgent) {
@@ -65,7 +96,7 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
     if (Platform.isLinux) {
       _desktopWebview = await WebviewWindow.create();
 
-      final timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      _cookieTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
         try {
           final cookieList = await _desktopWebview!.getAllCookies();
           final ua =
@@ -83,10 +114,10 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
         ..setBrightness(Brightness.dark)
         ..launch(widget.url)
         ..onClose.whenComplete(() {
-          timer.cancel();
-          if (mounted) {
-            Navigator.pop(context);
-          }
+          // The native window has already closed itself; mark it so dispose()
+          // doesn't try to close it again, then pop this route once.
+          _webviewClosed = true;
+          _popWebviewRoute();
         });
     } else {
       browser = MyInAppBrowser(
@@ -146,9 +177,8 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
               ),
               leading: IconButton(
                 onPressed: () {
-                  if (_desktopWebview != null) _desktopWebview!.close();
-
-                  Navigator.pop(context);
+                  _closeDesktopWebview();
+                  _popWebviewRoute();
                 },
                 icon: const Icon(Icons.close),
               ),
@@ -279,76 +309,87 @@ class _MangaWebViewState extends ConsumerState<MangaWebView> {
                         : Container(),
                     if (!Platform.isWindows)
                       Expanded(
-                        child: InAppWebView(
-                          webViewEnvironment: webViewEnvironment,
-                          onWebViewCreated: (controller) async {
-                            _webViewController = controller;
-                          },
-                          onLoadStart: (controller, url) async {
-                            setState(() {
-                              _url = url.toString();
-                            });
-                          },
-                          shouldOverrideUrlLoading:
-                              (controller, navigationAction) async {
-                                var uri = navigationAction.request.url!;
-                                if (![
-                                  "http",
-                                  "https",
-                                  "file",
-                                  "chrome",
-                                  "data",
-                                  "javascript",
-                                  "about",
-                                ].contains(uri.scheme)) {
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri);
-                                    return NavigationActionPolicy.CANCEL;
-                                  }
-                                }
-                                return NavigationActionPolicy.ALLOW;
-                              },
-                          onLoadStop: (controller, url) async {
-                            if (mounted) {
+                        // Android's WebView drives its own d-pad focus once it
+                        // has focus, but nothing here ever gave it any, so on a
+                        // TV the remote could not reach into the page at all.
+                        // That matters most for a Cloudflare challenge, which
+                        // is the whole reason this screen exists. Autofocus it
+                        // on TV so the keys land in the page rather than the
+                        // toolbar.
+                        child: Focus(
+                          autofocus: isTv,
+                          child: InAppWebView(
+                            webViewEnvironment: webViewEnvironment,
+                            onWebViewCreated: (controller) async {
+                              _webViewController = controller;
+                            },
+                            onLoadStart: (controller, url) async {
                               setState(() {
                                 _url = url.toString();
                               });
-                            }
-                          },
-                          onProgressChanged: (controller, progress) async {
-                            if (mounted) {
-                              setState(() {
-                                _progress = progress / 100;
-                              });
-                            }
-                          },
-                          onUpdateVisitedHistory:
-                              (controller, url, isReload) async {
-                                final ua =
-                                    await controller.evaluateJavascript(
-                                      source: "navigator.userAgent",
-                                    ) ??
-                                    "";
-                                await MClient.setCookie(
-                                  url.toString(),
-                                  ua,
-                                  controller,
-                                );
-                                final canGoback = await controller.canGoBack();
-                                final canGoForward = await controller
-                                    .canGoForward();
-                                final title = await controller.getTitle();
-                                if (mounted) {
-                                  setState(() {
-                                    _url = url.toString();
-                                    _title = title!;
-                                    _canGoback = canGoback;
-                                    _canGoForward = canGoForward;
-                                  });
-                                }
-                              },
-                          initialUrlRequest: URLRequest(
-                            url: WebUri(widget.url),
+                            },
+                            shouldOverrideUrlLoading:
+                                (controller, navigationAction) async {
+                                  var uri = navigationAction.request.url!;
+                                  if (![
+                                    "http",
+                                    "https",
+                                    "file",
+                                    "chrome",
+                                    "data",
+                                    "javascript",
+                                    "about",
+                                  ].contains(uri.scheme)) {
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri);
+                                      return NavigationActionPolicy.CANCEL;
+                                    }
+                                  }
+                                  return NavigationActionPolicy.ALLOW;
+                                },
+                            onLoadStop: (controller, url) async {
+                              if (mounted) {
+                                setState(() {
+                                  _url = url.toString();
+                                });
+                              }
+                            },
+                            onProgressChanged: (controller, progress) async {
+                              if (mounted) {
+                                setState(() {
+                                  _progress = progress / 100;
+                                });
+                              }
+                            },
+                            onUpdateVisitedHistory:
+                                (controller, url, isReload) async {
+                                  final ua =
+                                      await controller.evaluateJavascript(
+                                        source: "navigator.userAgent",
+                                      ) ??
+                                      "";
+                                  await MClient.setCookie(
+                                    url.toString(),
+                                    ua,
+                                    controller,
+                                  );
+                                  final canGoback = await controller
+                                      .canGoBack();
+                                  final canGoForward = await controller
+                                      .canGoForward();
+                                  final title = await controller.getTitle();
+                                  if (mounted) {
+                                    setState(() {
+                                      _url = url.toString();
+                                      _title = title!;
+                                      _canGoback = canGoback;
+                                      _canGoForward = canGoForward;
+                                    });
+                                  }
+                                },
+                            initialUrlRequest: URLRequest(
+                              url: WebUri(widget.url),
+                            ),
                           ),
                         ),
                       ),

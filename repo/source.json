@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.kodjodevf.mangayomi",
       "developerName": "Moustapha Kodjo Amadou",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "0.7.80",
-      "versionDate": "2026-06-07T17:17:02Z",
+      "version": "0.8.0",
+      "versionDate": "2026-07-24T09:52:20Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/kodjodevf/mangayomi/releases/download/v0.7.80/Mangayomi-v0.7.80-ios.ipa",
+      "downloadURL": "https://github.com/kodjodevf/mangayomi/releases/download/v0.8.0/Mangayomi-v0.8.0-ios.ipa",
       "localizedDescription": "Mangayomi is an open-source Flutter app for reading manga, novels, and watching anime across multiple platforms.",
       "iconURL": "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 47981955,
+      "size": 47726662,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "0.8.0",
+          "date": "2026-07-24T09:52:20Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/kodjodevf/mangayomi/releases/download/v0.8.0/Mangayomi-v0.8.0-ios.ipa",
+          "size": 47726662
+        },
+        {
           "version": "0.7.80",
           "date": "2026-06-07T17:17:02Z",
-          "localizedDescription": "",
+          "localizedDescription": "What's Changed\r\n* Add startup error screen by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/731\r\n* Refactor evaluateJavascriptViaWebviewto use HTTP post request and remove deprecated method\r\n* fix(m3u8): add missing / separator in segment and key URI construction by @Mallyd11 in https://github.com/kodjodevf/mangayomi/pull/735\r\n* Fix: reader no longer jumps to duplicate scanlator chapters by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/738\r\n* Recognize \"S\" as a season prefix by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/741\r\n* fix bug by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/742\r\n* chore: update dependencies by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/743\r\n* reset the selection state when going back to the library by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/745\r\n* Fix Flutter Framework Warning by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/744\r\n* fix: delete downloaded chapters from detail view & fix library dialog bugs by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/746\r\n* Remove unnecessary outer Consumer wrapper by @NBA2K1 in https://github.com/kodjodevf/mangayomi/pull/747\r\n\r\nNew Contributors\r\n* @Mallyd11 made their first contribution in https://github.com/kodjodevf/mangayomi/pull/735\r\n\r\n**Full Changelog**: https://github.com/kodjodevf/mangayomi/compare/v0.7.75...v0.7.80",
           "downloadURL": "https://github.com/kodjodevf/mangayomi/releases/download/v0.7.80/Mangayomi-v0.7.80-ios.ipa",
           "size": 47981955
         },
@@ -231,13 +238,6 @@
           "localizedDescription": "What's Changed\r\n* added deep links for repo urls by @Schnitzel5 in https://github.com/kodjodevf/mangayomi/pull/379\r\n* enhanced sync feature by @Schnitzel5 in https://github.com/kodjodevf/mangayomi/pull/380\r\n* optimized sync and bug fixes by @Schnitzel5 in https://github.com/kodjodevf/mangayomi/pull/381\r\n\r\n\r\n**Full Changelog**: https://github.com/kodjodevf/mangayomi/compare/v0.5.0...v0.5.1",
           "downloadURL": "https://github.com/kodjodevf/mangayomi/releases/download/v0.5.1/Mangayomi-v0.5.1-ios.ipa",
           "size": 56754892
-        },
-        {
-          "version": "0.5.0",
-          "date": "2025-02-12T11:16:16Z",
-          "localizedDescription": "\u2022 improve chapter download\r\n\u2022 improve custom navigation settings\r\n\u2022 remove embedded URLs from extensions\r\n\u2022 co\u2022written with @Schnitzel5 : update source fetching methods to utilize the given repositories",
-          "downloadURL": "https://github.com/kodjodevf/mangayomi/releases/download/v0.5.0/Mangayomi-v0.5.0-ios.ipa",
-          "size": 56707308
         }
       ],
       "appPermissions": {
@@ -556,6 +556,17 @@
       "imageURL": "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/kodjodevf/mangayomi/releases/tag/v0.7.80"
+    },
+    {
+      "appID": "com.kodjodevf.mangayomi",
+      "title": "0.8.0 - 24 Jul",
+      "identifier": "release-0.8.0",
+      "caption": "Update for Mangayomi now available!",
+      "date": "2026-07-24T09:52:20Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/kodjodevf/mangayomi/releases/tag/v0.8.0"
     }
   ]
 }

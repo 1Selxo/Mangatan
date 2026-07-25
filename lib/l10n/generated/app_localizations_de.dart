@@ -551,18 +551,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get appearance_subtitle => 'Thema, Datum- & Zeitformat';
 
   @override
-  String get animation_speed => 'Animation speed';
-
-  @override
-  String get animation_speed_description =>
-      'Lower values play animations faster.';
-
-  @override
-  String animation_duration_percentage(int percentage) {
-    return '$percentage% duration';
-  }
-
-  @override
   String get theme => 'Thema';
 
   @override
@@ -620,34 +608,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get reading_mode_right_to_left => 'Rechts nach Links';
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get reading_mode_vertical_continuous => 'Vertikal kontinuierlich';
 
   @override
   String get reading_mode_webtoon => 'Webtoon';
-
-  @override
-  String get default_page_mode => 'Default page mode';
-
-  @override
-  String get page_mode_single => 'Single page';
-
-  @override
-  String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed =>
@@ -1556,9 +1520,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get font_size => 'Schriftgröße';
 
   @override
-  String get subtitle_position => 'Subtitle position';
-
-  @override
   String get text => 'Text';
 
   @override
@@ -2401,6 +2362,154 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get tts_default => 'Default';
+
+  @override
+  String get webtoon_disable_zoom_out => 'Webtoon-Herauszoomen deaktivieren';
+
+  @override
+  String get webtoon_double_tap_zoom_enabled =>
+      'Webtoon-Doppeltippen zum Zoomen';
+
+  @override
+  String get navigate_to_pan => 'Navigieren zum Schwenken';
+
+  @override
+  String get navigate_to_pan_subtitle =>
+      'Gezoomtes Bild vor dem Umblättern verschieben';
+
+  @override
+  String get split_wide_pages => 'Doppelseiten aufteilen';
+
+  @override
+  String get dual_page_invert => 'Geschnittene Seitenhälften umkehren';
+
+  @override
+  String get dual_page_rotate_to_fit => 'Zum Einpassen drehen';
+
+  @override
+  String get dual_page_rotate_to_fit_invert => 'Drehrichtung umkehren';
+
+  @override
+  String get landscape_zoom => 'Automatischer Querformat-Zoom';
+
+  @override
+  String get zoom_start_position => 'Zoom-Startposition';
+
+  @override
+  String get zoom_start_left => 'Links';
+
+  @override
+  String get zoom_start_right => 'Rechts';
+
+  @override
+  String get zoom_start_center => 'Mitte';
+
+  @override
+  String get automatic_background => 'Automatischer Hintergrund';
+
+  @override
+  String get tapping_inversion => 'Tipp-Invertierung';
+
+  @override
+  String get tapping_inversion_none => 'Keine';
+
+  @override
+  String get tapping_inversion_horizontal => 'Horizontal';
+
+  @override
+  String get tapping_inversion_vertical => 'Vertikal';
+
+  @override
+  String get tapping_inversion_both => 'Beide';
+
+  @override
+  String get flash_on_page_change => 'Blinken bei Seitenwechsel';
+
+  @override
+  String get flash_on_page_change_subtitle => 'AMOLED-Einbrennschutz-Assistent';
+
+  @override
+  String get flash_color => 'Blinkfarbe';
+
+  @override
+  String get flash_color_black => 'Schwarz';
+
+  @override
+  String get flash_color_white => 'Weiß';
+
+  @override
+  String get flash_color_white_black => 'Weiß & Schwarz';
+
+  @override
+  String flash_interval(String n) {
+    return 'Blinkintervall: $n Seiten';
+  }
+
+  @override
+  String flash_duration(String n) {
+    return 'Blinkdauer: $n ms';
+  }
+
+  @override
+  String get show_navigation_overlay_on_start =>
+      'Navigations-Overlay beim Start anzeigen';
+
+  @override
+  String get reader_hide_threshold => 'Schwellenwert zum Ausblenden des Lesers';
+
+  @override
+  String get reader_hide_threshold_highest => 'Am höchsten (5 px)';
+
+  @override
+  String get reader_hide_threshold_high => 'Hoch (13 px)';
+
+  @override
+  String get reader_hide_threshold_low => 'Niedrig (31 px)';
+
+  @override
+  String get reader_hide_threshold_lowest => 'Am niedrigsten (47 px)';
+
+  @override
+  String get error_no_pages_available => 'Fehler: Keine Seiten verfügbar';
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
 
   @override
   String get dictionary_lookup => 'Dictionary';

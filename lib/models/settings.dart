@@ -70,6 +70,9 @@ class Settings {
 
   List<MCookie>? cookiesList;
 
+  /// The last library update's failures, kept so they can be reviewed later.
+  List<UpdateError>? updateErrorsList;
+
   @enumerated
   late ReaderMode defaultReaderMode;
 
@@ -189,6 +192,10 @@ class Settings {
   bool? doHEnabled;
 
   int? doHProviderId;
+
+  String? customDohUrl;
+
+  String? cfProxyUrl;
 
   String? btServerAddress;
 
@@ -377,6 +384,32 @@ class Settings {
 
   String? ttsVoice;
 
+  bool? splitWidePages;
+
+  bool? dualPageInvert;
+  bool? dualPageRotateToFit;
+  bool? dualPageRotateToFitInvert;
+  bool? landscapeZoom;
+  int? zoomStartPosition;
+  bool? automaticBackground;
+  bool? navigateToPan;
+  int? tappingInversion;
+  bool? flashOnPageChange;
+  int? flashDuration;
+  int? flashInterval;
+  int? flashColor;
+  bool? showNavigationOverlayOnStart;
+  bool? webtoonDisableZoomOut;
+  bool? webtoonDoubleTapZoomEnabled;
+  int? readerHideThreshold;
+
+  // Android TV preferences (null = follow the default). See #729.
+  bool? autoPlayNextEpisode;
+  bool? tvAnimeOnlyOverride;
+  bool? tvPlayerStyle;
+  bool? tvHomeStyle;
+  bool? tvHomeGenreRows;
+
   Settings({
     this.id = 227,
     this.updatedAt = 0,
@@ -409,6 +442,7 @@ class Settings {
     this.defaultReaderMode = ReaderMode.verticalPaged,
     this.defaultReadingDirectionIndex = 0,
     this.defaultPageMode = PageMode.onePage,
+    this.updateErrorsList,
     this.personalReaderModeList,
     this.animatePageTransitions = true,
     this.doubleTapAnimationSpeed = 1,
@@ -460,6 +494,8 @@ class Settings {
     this.customDns = "",
     this.doHEnabled = false,
     this.doHProviderId = 0,
+    this.customDohUrl = "",
+    this.cfProxyUrl = "",
     this.btServerAddress = "127.0.0.1",
     this.btServerPort,
     this.fullScreenReader = false,
@@ -549,6 +585,28 @@ class Settings {
     this.ttsPitch = 1.0,
     this.ttsLanguage,
     this.ttsVoice,
+    this.splitWidePages = false,
+    this.dualPageInvert = false,
+    this.dualPageRotateToFit = false,
+    this.dualPageRotateToFitInvert = false,
+    this.landscapeZoom = false,
+    this.zoomStartPosition = 1,
+    this.automaticBackground = false,
+    this.navigateToPan = true,
+    this.tappingInversion = 0,
+    this.flashOnPageChange = false,
+    this.flashDuration = 100,
+    this.flashInterval = 1,
+    this.flashColor = 0,
+    this.showNavigationOverlayOnStart = false,
+    this.webtoonDisableZoomOut = false,
+    this.webtoonDoubleTapZoomEnabled = true,
+    this.readerHideThreshold = 1,
+    this.autoPlayNextEpisode,
+    this.tvAnimeOnlyOverride,
+    this.tvPlayerStyle,
+    this.tvHomeStyle,
+    this.tvHomeGenreRows,
   }) {
     usePageTapZones ??= !isDesktop;
   }
@@ -602,6 +660,11 @@ class Settings {
     if (json['cookiesList'] != null) {
       cookiesList = (json['cookiesList'] as List)
           .map((e) => MCookie.fromJson(e))
+          .toList();
+    }
+    if (json['updateErrorsList'] != null) {
+      updateErrorsList = (json['updateErrorsList'] as List)
+          .map((e) => UpdateError.fromJson(e))
           .toList();
     }
     cropBorders = json['cropBorders'];
@@ -714,6 +777,8 @@ class Settings {
     customDns = json['customDns'];
     doHEnabled = json['doHEnabled'];
     doHProviderId = json['doHProviderId'];
+    customDohUrl = json['customDohUrl'];
+    cfProxyUrl = json['cfProxyUrl'];
     btServerAddress = json['btServerAddress'];
     btServerPort = json['btServerPort'];
     customColorFilter = json['customColorFilter'] != null
@@ -855,6 +920,28 @@ class Settings {
     ttsPitch = json['ttsPitch']?.toDouble();
     ttsLanguage = json['ttsLanguage'];
     ttsVoice = json['ttsVoice'];
+    splitWidePages = json['splitWidePages'];
+    dualPageInvert = json['dualPageInvert'];
+    dualPageRotateToFit = json['dualPageRotateToFit'];
+    dualPageRotateToFitInvert = json['dualPageRotateToFitInvert'];
+    landscapeZoom = json['landscapeZoom'];
+    zoomStartPosition = json['zoomStartPosition'];
+    automaticBackground = json['automaticBackground'];
+    navigateToPan = json['navigateToPan'];
+    tappingInversion = json['tappingInversion'];
+    flashOnPageChange = json['flashOnPageChange'];
+    flashDuration = json['flashDuration'];
+    flashInterval = json['flashInterval'];
+    flashColor = json['flashColor'];
+    showNavigationOverlayOnStart = json['showNavigationOverlayOnStart'];
+    webtoonDisableZoomOut = json['webtoonDisableZoomOut'];
+    webtoonDoubleTapZoomEnabled = json['webtoonDoubleTapZoomEnabled'];
+    readerHideThreshold = json['readerHideThreshold'];
+    autoPlayNextEpisode = json['autoPlayNextEpisode'];
+    tvAnimeOnlyOverride = json['tvAnimeOnlyOverride'];
+    tvPlayerStyle = json['tvPlayerStyle'];
+    tvHomeStyle = json['tvHomeStyle'];
+    tvHomeGenreRows = json['tvHomeGenreRows'];
   }
 
   Map<String, dynamic> toJson() => {
@@ -888,6 +975,7 @@ class Settings {
     'checkForAppUpdates': checkForAppUpdates,
     'checkForExtensionUpdates': checkForExtensionUpdates,
     'cookiesList': cookiesList,
+    'updateErrorsList': updateErrorsList,
     'cropBorders': cropBorders,
     'dateFormat': dateFormat,
     'defaultReaderMode': effectiveDefaultReaderMode.index,
@@ -958,6 +1046,8 @@ class Settings {
     'customDns': customDns,
     'doHEnabled': doHEnabled,
     'doHProviderId': doHProviderId,
+    'customDohUrl': customDohUrl,
+    'cfProxyUrl': cfProxyUrl,
     'btServerAddress': btServerAddress,
     'btServerPort': btServerPort,
     'fullScreenReader': fullScreenReader,
@@ -1052,6 +1142,28 @@ class Settings {
     'ttsPitch': ttsPitch,
     'ttsLanguage': ttsLanguage,
     'ttsVoice': ttsVoice,
+    'splitWidePages': splitWidePages,
+    'dualPageInvert': dualPageInvert,
+    'dualPageRotateToFit': dualPageRotateToFit,
+    'dualPageRotateToFitInvert': dualPageRotateToFitInvert,
+    'landscapeZoom': landscapeZoom,
+    'zoomStartPosition': zoomStartPosition,
+    'automaticBackground': automaticBackground,
+    'navigateToPan': navigateToPan,
+    'tappingInversion': tappingInversion,
+    'flashOnPageChange': flashOnPageChange,
+    'flashDuration': flashDuration,
+    'flashInterval': flashInterval,
+    'flashColor': flashColor,
+    'showNavigationOverlayOnStart': showNavigationOverlayOnStart,
+    'webtoonDisableZoomOut': webtoonDisableZoomOut,
+    'webtoonDoubleTapZoomEnabled': webtoonDoubleTapZoomEnabled,
+    'readerHideThreshold': readerHideThreshold,
+    'autoPlayNextEpisode': autoPlayNextEpisode,
+    'tvAnimeOnlyOverride': tvAnimeOnlyOverride,
+    'tvPlayerStyle': tvPlayerStyle,
+    'tvHomeStyle': tvHomeStyle,
+    'tvHomeGenreRows': tvHomeGenreRows,
   };
 }
 
@@ -1083,6 +1195,23 @@ enum ScaleType {
 }
 
 enum BackgroundColor { black, grey, white, automatic }
+
+@embedded
+class UpdateError {
+  int mangaId;
+  String name;
+  String error;
+  UpdateError({this.mangaId = 0, this.name = '', this.error = ''});
+  UpdateError.fromJson(Map<String, dynamic> json)
+    : mangaId = json['mangaId'] ?? 0,
+      name = json['name'] ?? '',
+      error = json['error'] ?? '';
+  Map<String, dynamic> toJson() => {
+    'mangaId': mangaId,
+    'name': name,
+    'error': error,
+  };
+}
 
 @embedded
 class MCookie {

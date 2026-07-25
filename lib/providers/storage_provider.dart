@@ -22,6 +22,7 @@ import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class StorageProvider {
   static const _defaultDirectoryName = 'Mangatan';
@@ -68,8 +69,15 @@ class StorageProvider {
   Future<Directory?> getMpvDirectory() async {
     final defaultDirectory = await getDefaultDirectory();
     String dbDir = path.join(defaultDirectory!.path, 'mpv');
-    await Directory(dbDir).create(recursive: true);
-    return Directory(dbDir);
+    // Was a raw create() that threw a PathAccessException (permission denied) at
+    // the user when playing on a fresh install with no all-files access.
+    // createDirectorySafely requests the permission on failure (so the user is
+    // asked at play time instead of hitting a cryptic error) and never throws;
+    // return null if the dir still couldn't be made so playback proceeds with
+    // mpv defaults instead of erroring. See #740.
+    await createDirectorySafely(dbDir);
+    final dir = Directory(dbDir);
+    return await dir.exists() ? dir : null;
   }
 
   Future<Directory?> getExtensionServerDirectory() async {
@@ -342,7 +350,11 @@ class StorageProvider {
     try {
       final settings = await isar.settings.filter().idEqualTo(227).findFirst();
       if (settings == null) {
-        await isar.writeTxn(() async => isar.settings.put(Settings()));
+        await isar.writeTxn(
+          // TV defaults to dark on first run (a fresh library). Only the
+          // initial Settings row is seeded, so switching to light later sticks.
+          () async => isar.settings.put(Settings()..themeIsDark = isTv),
+        );
       }
     } catch (_) {
       if (await requestPermission()) {
@@ -352,7 +364,11 @@ class StorageProvider {
               .idEqualTo(227)
               .findFirst();
           if (settings == null) {
-            await isar.writeTxn(() async => isar.settings.put(Settings()));
+            await isar.writeTxn(
+              // TV defaults to dark on first run (a fresh library). Only the
+              // initial Settings row is seeded, so switching to light later sticks.
+              () async => isar.settings.put(Settings()..themeIsDark = isTv),
+            );
           }
         } catch (e) {
           if (kDebugMode) {

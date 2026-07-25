@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:isar_community/isar.dart';
+import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
@@ -30,9 +31,7 @@ class MangatanEpubSyncResult {
   final int entriesRetained;
 
   bool get changedAnything =>
-      blobsUploaded > 0 ||
-      blobsDownloaded > 0 ||
-      placeholdersMaterialized > 0;
+      blobsUploaded > 0 || blobsDownloaded > 0 || placeholdersMaterialized > 0;
 }
 
 class MangatanEpubSyncService {
@@ -75,7 +74,10 @@ class MangatanEpubSyncService {
     final retained = remoteManifest.entries.keys
         .where((key) => !localEntries.containsKey(key))
         .length;
-    final entriesChanged = !_sameEntryMaps(remoteManifest.entries, mergedEntries);
+    final entriesChanged = !_sameEntryMaps(
+      remoteManifest.entries,
+      mergedEntries,
+    );
     final proposed = remoteManifest.mergeLocalEntries(
       generatedAtUtc: DateTime.now().toUtc(),
       deviceId: deviceId,

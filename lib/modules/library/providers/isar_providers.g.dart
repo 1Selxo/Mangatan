@@ -68,7 +68,7 @@ final class GetAllMangaStreamProvider
   }
 }
 
-String _$getAllMangaStreamHash() => r'5e86a22a68ca1a52aefa9c0bc675d284369beac5';
+String _$getAllMangaStreamHash() => r'245e968614894d0e346ac76bfa8000584ea54f70';
 
 final class GetAllMangaStreamFamily extends $Family
     with
@@ -156,7 +156,7 @@ final class GetAllMangaWithoutCategoriesStreamProvider
 }
 
 String _$getAllMangaWithoutCategoriesStreamHash() =>
-    r'61ea54070c7e87a45aeabce5fd21366faaf4ae6d';
+    r'eda35eda52985b3d529266b4169527a974f8de29';
 
 final class GetAllMangaWithoutCategoriesStreamFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<Manga>>, ItemType> {

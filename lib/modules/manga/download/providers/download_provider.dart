@@ -88,6 +88,9 @@ Future<void> downloadChapter(
     );
     List<Track>? subtitles;
     bool isOk = false;
+    // Reason the download couldn't be prepared, if any — used to fail loudly
+    // instead of hanging in the wait-loop below.
+    String? startFailure;
     final manga = chapter.manga.value!;
     final chapterName = downloadedMangaChapterBaseName(chapter);
     final itemType = chapter.manga.value!.itemType;
@@ -246,47 +249,67 @@ Future<void> downloadChapter(
     }
 
     if (itemType == ItemType.manga) {
-      ref.read(getChapterPagesProvider(chapter: chapter).future).then((value) {
-        if (value.pageUrls.isNotEmpty) {
-          pageUrls = value.pageUrls;
-          isOk = true;
-        }
-      });
+      ref
+          .read(getChapterPagesProvider(chapter: chapter).future)
+          .then((value) {
+            if (value.pageUrls.isNotEmpty) {
+              pageUrls = value.pageUrls;
+              isOk = true;
+            } else {
+              startFailure = "No pages returned by the source";
+            }
+          })
+          .catchError((Object e) {
+            startFailure = "Failed to load chapter pages: $e";
+          });
     } else if (itemType == ItemType.anime) {
-      ref.read(getVideoListProvider(episode: chapter).future).then((
-        value,
-      ) async {
-        final m3u8Urls = value.$1
-            .where(
-              (element) =>
-                  element.originalUrl.endsWith(".m3u8") ||
-                  element.originalUrl.endsWith(".m3u"),
-            )
-            .toList();
-        final nonM3u8Urls = value.$1
-            .where((element) => element.originalUrl.isMediaVideo())
-            .toList();
-        nonM3U8File = nonM3u8Urls.isNotEmpty;
-        hasM3U8File = nonM3U8File ? false : m3u8Urls.isNotEmpty;
-        final videosUrls = nonM3U8File ? nonM3u8Urls : m3u8Urls;
-        if (videosUrls.isNotEmpty) {
-          subtitles = videosUrls.first.subtitles;
-          if (hasM3U8File) {
-            m3u8Downloader = M3u8Downloader(
-              m3u8Url: videosUrls.first.url,
-              downloadDir: chapterDirectory.path,
-              headers: videosUrls.first.headers ?? {},
-              subtitles: subtitles,
-              fileName: p.join(mangaMainDirectory!.path, "$chapterName.mp4"),
-              chapter: chapter,
-            );
-          } else {
-            pageUrls = [PageUrl(videosUrls.first.url)];
-          }
-          videoHeader.addAll(videosUrls.first.headers ?? {});
-          isOk = true;
-        }
-      });
+      ref
+          .read(getVideoListProvider(episode: chapter).future)
+          .then((value) async {
+            final m3u8Urls = value.$1
+                .where(
+                  (element) =>
+                      element.originalUrl.endsWith(".m3u8") ||
+                      element.originalUrl.endsWith(".m3u"),
+                )
+                .toList();
+            final nonM3u8Urls = value.$1
+                .where((element) => element.originalUrl.isMediaVideo())
+                .toList();
+            nonM3U8File = nonM3u8Urls.isNotEmpty;
+            hasM3U8File = nonM3U8File ? false : m3u8Urls.isNotEmpty;
+            final videosUrls = nonM3U8File ? nonM3u8Urls : m3u8Urls;
+            if (videosUrls.isNotEmpty) {
+              subtitles = videosUrls.first.subtitles;
+              if (hasM3U8File) {
+                m3u8Downloader = M3u8Downloader(
+                  m3u8Url: videosUrls.first.url,
+                  downloadDir: chapterDirectory.path,
+                  headers: videosUrls.first.headers ?? {},
+                  subtitles: subtitles,
+                  fileName: p.join(
+                    mangaMainDirectory!.path,
+                    "$chapterName.mp4",
+                  ),
+                  chapter: chapter,
+                );
+              } else {
+                pageUrls = [PageUrl(videosUrls.first.url)];
+              }
+              videoHeader.addAll(videosUrls.first.headers ?? {});
+              isOk = true;
+            } else {
+              // Got a video list but nothing matched .m3u8/.m3u or a known video
+              // extension — record why instead of spinning forever below.
+              startFailure = value.$1.isEmpty
+                  ? "No videos returned by the source"
+                  : "No downloadable URL among ${value.$1.length} video(s) "
+                        "(none matched .m3u8/.m3u or a known extension)";
+            }
+          })
+          .catchError((Object e) {
+            startFailure = "Failed to load the video list: $e";
+          });
     } else if (itemType == ItemType.novel && chapter.url != null) {
       final manga = chapter.manga.value!;
       final source = getSource(manga.lang!, manga.source!, manga.sourceId)!;
@@ -307,13 +330,28 @@ Future<void> downloadChapter(
       isOk = true;
     }
 
+    // Wait for the source to resolve pages/video — but never forever. Bail on
+    // a recorded failure or after a timeout so a bad/unmatched URL surfaces an
+    // error instead of a silent, endless stall.
+    final startDeadline = DateTime.now().add(const Duration(seconds: 45));
     await Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
-      if (isOk == true) {
+      if (isOk == true || startFailure != null) {
+        return false;
+      }
+      if (DateTime.now().isAfter(startDeadline)) {
+        startFailure = "Timed out preparing the download";
         return false;
       }
       return true;
     });
+
+    if (!isOk) {
+      botToast(startFailure ?? "Couldn't start the download");
+      if (callback != null) callback();
+      keepAlive.close();
+      return;
+    }
 
     if (pageUrls.isNotEmpty) {
       bool cbzFileExist =
@@ -439,7 +477,11 @@ Future<void> downloadChapter(
       callback();
     }
     keepAlive.close();
-  } catch (_) {
+  } catch (e) {
+    // Surface the failure instead of swallowing it — a silent catch here is
+    // exactly how "downloads just don't start" stays invisible.
+    botToast("Download failed to start: $e");
+    if (callback != null) callback();
     keepAlive.close();
   }
 }

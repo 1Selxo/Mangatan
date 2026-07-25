@@ -534,18 +534,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearance_subtitle => '主题，日期和时间格式';
 
   @override
-  String get animation_speed => 'Animation speed';
-
-  @override
-  String get animation_speed_description =>
-      'Lower values play animations faster.';
-
-  @override
-  String animation_duration_percentage(int percentage) {
-    return '$percentage% duration';
-  }
-
-  @override
   String get theme => '主题';
 
   @override
@@ -603,34 +591,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reading_mode_right_to_left => '从右到左';
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get reading_mode_vertical_continuous => '垂直连续';
 
   @override
   String get reading_mode_webtoon => '网络漫画';
-
-  @override
-  String get default_page_mode => 'Default page mode';
-
-  @override
-  String get page_mode_single => 'Single page';
-
-  @override
-  String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => '双击动画速度';
@@ -1515,9 +1479,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get font_size => '字号';
 
   @override
-  String get subtitle_position => 'Subtitle position';
-
-  @override
   String get text => '文本';
 
   @override
@@ -2313,6 +2274,151 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tts_default => 'Default';
+
+  @override
+  String get webtoon_disable_zoom_out => 'Webtoon禁用缩小';
+
+  @override
+  String get webtoon_double_tap_zoom_enabled => 'Webtoon双击缩放';
+
+  @override
+  String get navigate_to_pan => '导航前移动已放大图像';
+
+  @override
+  String get navigate_to_pan_subtitle => '翻页前先移动放大的图像';
+
+  @override
+  String get split_wide_pages => '拆分双页';
+
+  @override
+  String get dual_page_invert => '反转拆分的半页';
+
+  @override
+  String get dual_page_rotate_to_fit => '旋转以适应';
+
+  @override
+  String get dual_page_rotate_to_fit_invert => '反转旋转方向';
+
+  @override
+  String get landscape_zoom => '横屏自动缩放';
+
+  @override
+  String get zoom_start_position => '缩放起始位置';
+
+  @override
+  String get zoom_start_left => '左';
+
+  @override
+  String get zoom_start_right => '右';
+
+  @override
+  String get zoom_start_center => '中';
+
+  @override
+  String get automatic_background => '自动背景';
+
+  @override
+  String get tapping_inversion => '点击反转';
+
+  @override
+  String get tapping_inversion_none => '无';
+
+  @override
+  String get tapping_inversion_horizontal => '水平';
+
+  @override
+  String get tapping_inversion_vertical => '垂直';
+
+  @override
+  String get tapping_inversion_both => '两者';
+
+  @override
+  String get flash_on_page_change => '翻页时闪烁';
+
+  @override
+  String get flash_on_page_change_subtitle => 'AMOLED 防烧屏辅助';
+
+  @override
+  String get flash_color => '闪烁颜色';
+
+  @override
+  String get flash_color_black => '黑色';
+
+  @override
+  String get flash_color_white => '白色';
+
+  @override
+  String get flash_color_white_black => '白与黑';
+
+  @override
+  String flash_interval(String n) {
+    return '闪烁间隔：$n页';
+  }
+
+  @override
+  String flash_duration(String n) {
+    return '闪烁持续时间：$n毫秒';
+  }
+
+  @override
+  String get show_navigation_overlay_on_start => '启动时显示导航浮层';
+
+  @override
+  String get reader_hide_threshold => '隐藏阅读器界面的阈值';
+
+  @override
+  String get reader_hide_threshold_highest => '最高 (5 px)';
+
+  @override
+  String get reader_hide_threshold_high => '高 (13 px)';
+
+  @override
+  String get reader_hide_threshold_low => '低 (31 px)';
+
+  @override
+  String get reader_hide_threshold_lowest => '最低 (47 px)';
+
+  @override
+  String get error_no_pages_available => '错误：无可用页面';
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
 
   @override
   String get dictionary_lookup => 'Dictionary';

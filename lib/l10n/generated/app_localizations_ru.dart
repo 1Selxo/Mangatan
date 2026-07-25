@@ -563,18 +563,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appearance_subtitle => 'Тема, формат даты и времени';
 
   @override
-  String get animation_speed => 'Animation speed';
-
-  @override
-  String get animation_speed_description =>
-      'Lower values play animations faster.';
-
-  @override
-  String animation_duration_percentage(int percentage) {
-    return '$percentage% duration';
-  }
-
-  @override
   String get theme => 'Тема';
 
   @override
@@ -632,34 +620,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get reading_mode_right_to_left => 'Справа налево';
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get reading_mode_vertical_continuous => 'Вертикальный непрерывный';
 
   @override
   String get reading_mode_webtoon => 'Вебтун';
-
-  @override
-  String get default_page_mode => 'Default page mode';
-
-  @override
-  String get page_mode_single => 'Single page';
-
-  @override
-  String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => 'Скорость анимации двойного касания';
@@ -1571,9 +1535,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get font_size => 'Размер шрифта';
 
   @override
-  String get subtitle_position => 'Subtitle position';
-
-  @override
   String get text => 'Текст';
 
   @override
@@ -2419,6 +2380,156 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tts_default => 'Default';
+
+  @override
+  String get webtoon_disable_zoom_out =>
+      'Отключить уменьшение масштаба Webtoon';
+
+  @override
+  String get webtoon_double_tap_zoom_enabled =>
+      'Двойное касание для масштабирования Webtoon';
+
+  @override
+  String get navigate_to_pan => 'Навигация перетаскиванием';
+
+  @override
+  String get navigate_to_pan_subtitle =>
+      'Сначала сдвигать увеличенное изображение перед сменой страницы';
+
+  @override
+  String get split_wide_pages => 'Разделять двойные страницы';
+
+  @override
+  String get dual_page_invert => 'Инвертировать разделенные половины страниц';
+
+  @override
+  String get dual_page_rotate_to_fit => 'Поворачивать для соответствия';
+
+  @override
+  String get dual_page_rotate_to_fit_invert => 'Обратное направление вращения';
+
+  @override
+  String get landscape_zoom => 'Автоматическое масштабирование в альбоме';
+
+  @override
+  String get zoom_start_position => 'Начальная позиция масштабирования';
+
+  @override
+  String get zoom_start_left => 'Слева';
+
+  @override
+  String get zoom_start_right => 'Справа';
+
+  @override
+  String get zoom_start_center => 'По центру';
+
+  @override
+  String get automatic_background => 'Автоматический фон';
+
+  @override
+  String get tapping_inversion => 'Инверсия касаний';
+
+  @override
+  String get tapping_inversion_none => 'Нет';
+
+  @override
+  String get tapping_inversion_horizontal => 'По горизонтали';
+
+  @override
+  String get tapping_inversion_vertical => 'По вертикали';
+
+  @override
+  String get tapping_inversion_both => 'Оба';
+
+  @override
+  String get flash_on_page_change => 'Вспышка при смене страницы';
+
+  @override
+  String get flash_on_page_change_subtitle =>
+      'Помощник против выгорания AMOLED';
+
+  @override
+  String get flash_color => 'Цвет вспышки';
+
+  @override
+  String get flash_color_black => 'Черный';
+
+  @override
+  String get flash_color_white => 'Белый';
+
+  @override
+  String get flash_color_white_black => 'Белый и Черный';
+
+  @override
+  String flash_interval(String n) {
+    return 'Интервал вспышки: $n страниц';
+  }
+
+  @override
+  String flash_duration(String n) {
+    return 'Длительность вспышки: $n мс';
+  }
+
+  @override
+  String get show_navigation_overlay_on_start =>
+      'Показывать навигационную панель при запуске';
+
+  @override
+  String get reader_hide_threshold => 'Порог скрытия интерфейса';
+
+  @override
+  String get reader_hide_threshold_highest => 'Самый высокий (5 px)';
+
+  @override
+  String get reader_hide_threshold_high => 'Высокий (13 px)';
+
+  @override
+  String get reader_hide_threshold_low => 'Низкий (31 px)';
+
+  @override
+  String get reader_hide_threshold_lowest => 'Самый низкий (47 px)';
+
+  @override
+  String get error_no_pages_available => 'Ошибка: нет доступных страниц';
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
 
   @override
   String get dictionary_lookup => 'Dictionary';

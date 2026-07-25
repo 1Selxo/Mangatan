@@ -215,6 +215,7 @@ class SyncServer extends _$SyncServer {
       onStarting?.call();
       return _startChimahonSyncExclusive(
         currentPreference,
+        silent: silent,
         upload: upload,
         download: download,
       );
@@ -223,6 +224,7 @@ class SyncServer extends _$SyncServer {
 
   Future<void> _startChimahonSyncExclusive(
     SyncPreference syncPreference, {
+    required bool silent,
     bool upload = false,
     bool download = false,
   }) async {

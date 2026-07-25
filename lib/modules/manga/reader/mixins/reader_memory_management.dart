@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/modules/manga/reader/managers/chapter_preload_manager.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
@@ -95,7 +97,7 @@ mixin ReaderMemoryManagement {
     return _preloadManager.addLastChapterTransition(chapter);
   }
 
-  /// Updates the cropImage for a page at the given index.
+  /// Updates the cropped image cached for a page.
   void updatePageCropImage(int index, Uint8List? cropImage) {
     _preloadManager.updatePageCropImage(index, cropImage);
   }

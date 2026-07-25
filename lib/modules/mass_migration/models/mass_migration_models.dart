@@ -155,6 +155,7 @@ List<MassMigrationSourceGroup> buildMassMigrationSourceGroups({
 
 List<Source> buildMassMigrationDestinationSources({
   required MassMigrationSourceGroup sourceGroup,
+  required bool showNSFW,
 }) {
   final sources = isar.sources
       .filter()
@@ -164,6 +165,7 @@ List<Source> buildMassMigrationDestinationSources({
       .where(
         (source) =>
             source.sourceCode != null &&
+            (showNSFW || !(source.isNsfw ?? false)) &&
             !(source.name == sourceGroup.sourceName &&
                 source.lang == sourceGroup.lang),
       )

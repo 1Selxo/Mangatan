@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
@@ -25,10 +26,11 @@ void showCategorySelectionDialog({
   );
   final l10n = l10nLocalizations(context)!;
   final bool isBulk = bulkMangas != null;
-  final bool isLibraryVisible = !isBulk && singleManga!.isVisibleInLibrary;
+  final bool isLibraryVisible =
+      singleManga != null && singleManga.isVisibleInLibrary;
   List<int> categoryIds = [];
   if (!isBulk) {
-    categoryIds = List<int>.from(singleManga.categories ?? []);
+    categoryIds = List<int>.from(singleManga!.categories ?? []);
   }
   final bulkOverrides = <int, bool>{};
   showDialog(
@@ -165,11 +167,11 @@ void showCategorySelectionDialog({
                           final category = entries[index];
                           final state = isBulk
                               ? (bulkOverrides.containsKey(category.id)
-                                  ? (bulkOverrides[category.id]! ? 1 : 0)
-                                  : CategoryService.membershipState(
-                                      bulkMangas!,
-                                      category.id!,
-                                    ))
+                                    ? (bulkOverrides[category.id]! ? 1 : 0)
+                                    : CategoryService.membershipState(
+                                        bulkMangas!,
+                                        category.id!,
+                                      ))
                               : (categoryIds.contains(category.id) ? 1 : 0);
                           if (!isBulk) {
                             return Padding(
@@ -230,13 +232,7 @@ void showCategorySelectionDialog({
                         ),
                       ),
                       onPressed: () {
-                        context.push(
-                          "/categories",
-                          extra: (
-                            true,
-                            itemType,
-                          ),
-                        );
+                        context.push("/categories", extra: (true, itemType));
                         Navigator.pop(context);
                       },
                     ),

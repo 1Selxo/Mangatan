@@ -286,16 +286,6 @@
   "default_subtitle_language": "Default subtitle language",
   "appearance": "Appearance",
   "appearance_subtitle": "Theme, date & time format",
-  "animation_speed": "Animation speed",
-  "animation_speed_description": "Lower values play animations faster.",
-  "animation_duration_percentage": "{percentage}% duration",
-  "@animation_duration_percentage": {
-    "placeholders": {
-      "percentage": {
-        "type": "int"
-      }
-    }
-  },
   "theme": "Theme",
   "dark_mode": "Dark mode",
   "follow_system_theme": "Follow system theme",
@@ -315,16 +305,8 @@
   "reading_mode_horizontal": "Horizontal",
   "reading_mode_left_to_right": "Left to Right",
   "reading_mode_right_to_left": "Right to Left",
-  "reading_direction": "Reading direction",
-  "reading_mode_horizontal_paged": "Horizontal paged",
-  "reading_mode_vertical_paged": "Vertical paged",
-  "reading_mode_horizontal_continuous": "Horizontal continuous",
   "reading_mode_vertical_continuous": "Vertical continuous",
   "reading_mode_webtoon": "Webtoon",
-  "default_page_mode": "Default page mode",
-  "page_mode_single": "Single page",
-  "page_mode_double": "Double page",
-  "page_mode_double_cover": "Double page with cover offset",
   "double_tap_animation_speed": "Double tap animation speed",
   "normal": "Normal",
   "fast": "Fast",
@@ -608,7 +590,6 @@
   "font": "Font",
   "color": "Color",
   "font_size": "Font size",
-  "subtitle_position": "Subtitle position",
   "text": "Text",
   "border": "Border",
   "background": "Background",
@@ -754,7 +735,6 @@
   "clear_library_input": "Type 'manga', 'anime' and/or 'novel' (separated by a comma) to remove all related entries",
   "watch_order": "Watch order",
   "sequels": "Sequels",
-  "recommendations": "Recommendations",
   "recommendations_similarity": "Similarity:",
   "local_folder_structure": "Structure of a local folder",
   "local_folder": "Local folders",
@@ -873,6 +853,73 @@
   },
   "tts_settings": "TTS Settings",
   "tts_default": "Default",
+  "webtoon_disable_zoom_out": "Webtoon disable zoom out",
+  "webtoon_double_tap_zoom_enabled": "Webtoon double tap zoom",
+  "navigate_to_pan": "Navigate to pan",
+  "navigate_to_pan_subtitle": "Move zoomed image before turning page",
+  "split_wide_pages": "Split wide pages",
+  "dual_page_invert": "Invert cut half pages",
+  "dual_page_rotate_to_fit": "Rotate to fit",
+  "dual_page_rotate_to_fit_invert": "Invert rotation direction",
+  "landscape_zoom": "Automatic landscape zoom",
+  "zoom_start_position": "Zoom start position",
+  "zoom_start_left": "Left",
+  "zoom_start_right": "Right",
+  "zoom_start_center": "Center",
+  "automatic_background": "Automatic background",
+  "tapping_inversion": "Tapping Inversion",
+  "tapping_inversion_none": "None",
+  "tapping_inversion_horizontal": "Horizontal",
+  "tapping_inversion_vertical": "Vertical",
+  "tapping_inversion_both": "Both",
+  "flash_on_page_change": "Flash on page change",
+  "flash_on_page_change_subtitle": "AMOLED anti-retention helper",
+  "flash_color": "Flash Color",
+  "flash_color_black": "Black",
+  "flash_color_white": "White",
+  "flash_color_white_black": "White & Black",
+  "flash_interval": "Flash Interval: {n} pages",
+  "@flash_interval": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "flash_duration": "Flash Duration: {n} ms",
+  "@flash_duration": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "show_navigation_overlay_on_start": "Show Navigation Overlay on startup",
+  "reader_hide_threshold": "Reader Hide Threshold",
+  "reader_hide_threshold_highest": "Highest (5 px)",
+  "reader_hide_threshold_high": "High (13 px)",
+  "reader_hide_threshold_low": "Low (31 px)",
+  "reader_hide_threshold_lowest": "Lowest (47 px)",
+  "error_no_pages_available": "Error: no pages available",
+  "animation_speed": "Animation speed",
+  "animation_speed_description": "Lower values play animations faster.",
+  "animation_duration_percentage": "{percentage}% duration",
+  "@animation_duration_percentage": {
+    "placeholders": {
+      "percentage": {
+        "type": "int"
+      }
+    }
+  },
+  "reading_direction": "Reading direction",
+  "reading_mode_horizontal_paged": "Horizontal paged",
+  "reading_mode_vertical_paged": "Vertical paged",
+  "reading_mode_horizontal_continuous": "Horizontal continuous",
+  "default_page_mode": "Default page mode",
+  "page_mode_single": "Single page",
+  "page_mode_double": "Double page",
+  "page_mode_double_cover": "Double page with cover offset",
+  "subtitle_position": "Subtitle position",
   "dictionary_lookup": "Dictionary",
   "dictionary_settings": "Dictionary settings",
   "dictionary_search_label": "Search",

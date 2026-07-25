@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:ffi/ffi.dart';
+import 'package:mangayomi/services/mining/ocr_image_tiling.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:path/path.dart' as p;
 
@@ -85,24 +86,34 @@ class ScreenAiOcrClient {
     // 2. Offload FFI native execution to a background Isolate
     final result = await _OcrLock.synchronized(() {
       return Isolate.run(() {
-        final image = _ScreenAiImage(
-          pixels: decodeResult.rgbaBytes, // Pass raw RGBA bytes directly
+        final tiles = planVerticalOcrTiles(
           width: decodeResult.width,
           height: decodeResult.height,
-          originalWidth: decodeResult.width,
-          originalHeight: decodeResult.height,
         );
-
-        final annotation = _ScreenAiBridge.instance.recognize(
-          componentDirectory: component,
-          image: image,
-        );
-
-        final blocks = _parseVisualAnnotation(
-          annotation,
-          imageWidth: decodeResult.width,
-          imageHeight: decodeResult.height,
-        );
+        final blocks = <OcrTextBlock>[];
+        for (final tile in tiles) {
+          final image = _ScreenAiImage(
+            pixels: _rgbaTile(
+              decodeResult.rgbaBytes,
+              width: decodeResult.width,
+              tile: tile,
+            ),
+            width: decodeResult.width,
+            height: tile.height,
+            originalWidth: decodeResult.width,
+            originalHeight: decodeResult.height,
+          );
+          final annotation = _ScreenAiBridge.instance.recognize(
+            componentDirectory: component,
+            image: image,
+          );
+          final tileBlocks = _parseVisualAnnotation(
+            annotation,
+            imageWidth: decodeResult.width,
+            imageHeight: tile.height,
+          );
+          blocks.addAll(remapOcrBlocksFromTile(tileBlocks, tile));
+        }
 
         return (
           blocks: blocks,
@@ -362,6 +373,18 @@ _NormalizedRect? _readRect(
     top: (y / imageHeight).clamp(0, 1).toDouble(),
     right: ((x + width) / imageWidth).clamp(0, 1).toDouble(),
     bottom: ((y + height) / imageHeight).clamp(0, 1).toDouble(),
+  );
+}
+
+Uint8List _rgbaTile(
+  Uint8List pixels, {
+  required int width,
+  required OcrVerticalTile tile,
+}) {
+  if (tile.top == 0 && tile.height == tile.fullHeight) return pixels;
+  final rowBytes = width * 4;
+  return Uint8List.fromList(
+    Uint8List.sublistView(pixels, tile.top * rowBytes, tile.bottom * rowBytes),
   );
 }
 

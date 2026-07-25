@@ -47,6 +47,10 @@ class MihonExtensionService implements ExtensionService {
 
   bool get _usesLoopbackBridge => isLoopbackMihonBridge(androidProxyServer);
 
+  String? _resolveBridgeImageUrl(String? imageUrl) => imageUrl == null
+      ? null
+      : resolveMihonImageUrl(androidProxyServer, imageUrl);
+
   http.Client _createClient() {
     final httpClient = HttpClient();
     httpClient.findProxy = (_) => 'DIRECT';
@@ -110,7 +114,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: e.thumbnailUrl,
+              imageUrl: _resolveBridgeImageUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -146,7 +150,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: e.thumbnailUrl,
+              imageUrl: _resolveBridgeImageUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -183,7 +187,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: e.thumbnailUrl,
+              imageUrl: _resolveBridgeImageUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -223,7 +227,7 @@ class MihonExtensionService implements ExtensionService {
         6 => Status.onHiatus,
         _ => Status.unknown,
       },
-      imageUrl: data['thumbnail_url'],
+      imageUrl: _resolveBridgeImageUrl(data['thumbnail_url'] as String?),
       chapters: chapters,
     );
   }

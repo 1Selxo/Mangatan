@@ -18,9 +18,25 @@ bool isTransientMihonImageUrl(String url) {
 /// `http://127.0.0.1:<port>/image/<token>`. That URL is correct when the app
 /// and bridge share a host, but on iOS it otherwise points back to the phone.
 String resolveMihonImageUrl(String bridgeBaseUrl, String imageUrl) {
-  final imageUri = Uri.tryParse(imageUrl);
-  if (imageUri == null || !_isLoopbackMihonImageProxyUri(imageUri)) {
-    return imageUrl;
+  return _resolveMihonProxyUrl(bridgeBaseUrl, imageUrl, const {'image'});
+}
+
+/// Resolves any loopback media proxy URL returned by the JVM bridge.
+String resolveMihonMediaUrl(String bridgeBaseUrl, String mediaUrl) {
+  return _resolveMihonProxyUrl(bridgeBaseUrl, mediaUrl, const {
+    'image',
+    'video',
+  });
+}
+
+String _resolveMihonProxyUrl(
+  String bridgeBaseUrl,
+  String mediaUrl,
+  Set<String> routeNames,
+) {
+  final mediaUri = Uri.tryParse(mediaUrl);
+  if (mediaUri == null || !_isLoopbackMihonProxyUri(mediaUri, routeNames)) {
+    return mediaUrl;
   }
 
   var normalizedBridge = bridgeBaseUrl.trim();
@@ -31,14 +47,14 @@ String resolveMihonImageUrl(String bridgeBaseUrl, String imageUrl) {
   if (bridgeUri == null ||
       (bridgeUri.scheme != 'http' && bridgeUri.scheme != 'https') ||
       bridgeUri.host.isEmpty) {
-    return imageUrl;
+    return mediaUrl;
   }
 
   return bridgeUri
       .replace(
-        path: imageUri.path,
-        query: imageUri.hasQuery ? imageUri.query : null,
-        fragment: imageUri.hasFragment ? imageUri.fragment : null,
+        path: mediaUri.path,
+        query: mediaUri.hasQuery ? mediaUri.query : null,
+        fragment: mediaUri.hasFragment ? mediaUri.fragment : null,
       )
       .toString();
 }
@@ -53,11 +69,15 @@ bool canReuseCachedMihonPageUrls(Iterable<String>? urls) {
 }
 
 bool _isLoopbackMihonImageProxyUri(Uri uri) {
+  return _isLoopbackMihonProxyUri(uri, const {'image'});
+}
+
+bool _isLoopbackMihonProxyUri(Uri uri, Set<String> routeNames) {
   if (uri.scheme != 'http') return false;
   final isLoopback =
       uri.host == '127.0.0.1' || uri.host == '::1' || uri.host == 'localhost';
   return isLoopback &&
       uri.pathSegments.length == 2 &&
-      uri.pathSegments.first == 'image' &&
+      routeNames.contains(uri.pathSegments.first) &&
       uri.pathSegments.last.isNotEmpty;
 }

@@ -47,9 +47,9 @@ class MihonExtensionService implements ExtensionService {
 
   bool get _usesLoopbackBridge => isLoopbackMihonBridge(androidProxyServer);
 
-  String? _resolveBridgeImageUrl(String? imageUrl) => imageUrl == null
+  String? _resolveBridgeMediaUrl(String? mediaUrl) => mediaUrl == null
       ? null
-      : resolveMihonImageUrl(androidProxyServer, imageUrl);
+      : resolveMihonMediaUrl(androidProxyServer, mediaUrl);
 
   http.Client _createClient() {
     final httpClient = HttpClient();
@@ -114,7 +114,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: _resolveBridgeImageUrl(e.thumbnailUrl),
+              imageUrl: _resolveBridgeMediaUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -150,7 +150,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: _resolveBridgeImageUrl(e.thumbnailUrl),
+              imageUrl: _resolveBridgeMediaUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -187,7 +187,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: _resolveBridgeImageUrl(e.thumbnailUrl),
+              imageUrl: _resolveBridgeMediaUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -227,7 +227,7 @@ class MihonExtensionService implements ExtensionService {
         6 => Status.onHiatus,
         _ => Status.unknown,
       },
-      imageUrl: _resolveBridgeImageUrl(data['thumbnail_url'] as String?),
+      imageUrl: _resolveBridgeMediaUrl(data['thumbnail_url'] as String?),
       chapters: chapters,
     );
   }
@@ -362,7 +362,7 @@ class MihonExtensionService implements ExtensionService {
         }
       }
       return Video(
-        e['videoUrl'],
+        _resolveBridgeMediaUrl(e['videoUrl']?.toString()) ?? '',
         e['quality'],
         e['url'],
         headers: headers,
@@ -370,7 +370,9 @@ class MihonExtensionService implements ExtensionService {
             (e['audioTracks'] as List?)
                 ?.map(
                   (e) => Track(
-                    file: e['file'] ?? e['url'],
+                    file: _resolveBridgeMediaUrl(
+                      (e['file'] ?? e['url'])?.toString(),
+                    ),
                     label: e['label'] ?? e['lang'],
                   ),
                 )
@@ -380,7 +382,9 @@ class MihonExtensionService implements ExtensionService {
             (e['subtitleTracks'] as List?)
                 ?.map(
                   (e) => Track(
-                    file: e['file'] ?? e['url'],
+                    file: _resolveBridgeMediaUrl(
+                      (e['file'] ?? e['url'])?.toString(),
+                    ),
                     label: e['label'] ?? e['lang'],
                   ),
                 )

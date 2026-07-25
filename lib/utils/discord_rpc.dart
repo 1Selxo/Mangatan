@@ -29,10 +29,7 @@ class DiscordRPC {
         label: "Get Mangatan",
         url: "https://github.com/1Selxo/Mangatan",
       ),
-      const RPCButton(
-        label: "Join us",
-        url: "https://discord.com/invite/Ak2sW9Nvr9",
-      ),
+      const RPCButton(label: "Join us", url: "https://discord.gg/SqwE6b7Bb"),
     ],
     details: "Idle",
     state: "-----",

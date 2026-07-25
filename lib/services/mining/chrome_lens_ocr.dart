@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:http/http.dart' as http;
+import 'package:mangayomi/services/mining/ocr_image_tiling.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 
 class ChromeLensOcrResult {
@@ -39,30 +40,40 @@ class ChromeLensOcrClient {
     Uint8List imageBytes, {
     String language = 'ja',
   }) async {
-    final image = await _prepareImage(imageBytes);
-    final request = _buildRequest(image, language);
-    final response = await _client
-        .post(
-          _endpoint,
-          headers: const {
-            'Content-Type': 'application/x-protobuf',
-            'X-Goog-Api-Key': _apiKey,
-            'User-Agent': _userAgent,
-          },
-          body: request,
-        )
-        .timeout(const Duration(seconds: 60));
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        'Google Lens OCR failed (${response.statusCode}): '
-        '${utf8.decode(response.bodyBytes, allowMalformed: true)}',
+    final images = await _prepareImages(imageBytes);
+    final blocks = <OcrTextBlock>[];
+    for (final prepared in images) {
+      final request = _buildRequest(prepared.image, language);
+      final response = await _client
+          .post(
+            _endpoint,
+            headers: const {
+              'Content-Type': 'application/x-protobuf',
+              'X-Goog-Api-Key': _apiKey,
+              'User-Agent': _userAgent,
+            },
+            body: request,
+          )
+          .timeout(const Duration(seconds: 60));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError(
+          'Google Lens OCR failed (${response.statusCode}): '
+          '${utf8.decode(response.bodyBytes, allowMalformed: true)}',
+        );
+      }
+      final result = decodeResponse(
+        response.bodyBytes,
+        imageWidth: prepared.image.originalWidth,
+        imageHeight: prepared.image.originalHeight,
+        language: language,
       );
+      blocks.addAll(remapOcrBlocksFromTile(result.blocks, prepared.tile));
     }
-    return decodeResponse(
-      response.bodyBytes,
-      imageWidth: image.originalWidth,
-      imageHeight: image.originalHeight,
-      language: language,
+    final first = images.first;
+    return ChromeLensOcrResult(
+      imageWidth: first.image.originalWidth,
+      imageHeight: first.image.originalHeight,
+      blocks: blocks,
     );
   }
 
@@ -138,51 +149,81 @@ class ChromeLensOcrClient {
 
   void close() => _client.close();
 
-  Future<_PreparedImage> _prepareImage(Uint8List bytes) async {
+  Future<List<_PreparedImageTile>> _prepareImages(Uint8List bytes) async {
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     final originalWidth = frame.image.width;
     final originalHeight = frame.image.height;
     codec.dispose();
+    final tiles = planVerticalOcrTiles(
+      width: originalWidth,
+      height: originalHeight,
+    );
 
     final largest = math.max(originalWidth, originalHeight);
-    if (largest <= _maxDimension) {
+    if (tiles.length == 1 && largest <= _maxDimension) {
       final png = await frame.image.toByteData(format: ui.ImageByteFormat.png);
       frame.image.dispose();
       if (png == null) throw StateError('Could not encode image for OCR');
-      return _PreparedImage(
-        bytes: png.buffer.asUint8List(),
-        width: originalWidth,
-        height: originalHeight,
-        originalWidth: originalWidth,
-        originalHeight: originalHeight,
-      );
+      return [
+        _PreparedImageTile(
+          image: _PreparedImage(
+            bytes: png.buffer.asUint8List(),
+            width: originalWidth,
+            height: originalHeight,
+            originalWidth: originalWidth,
+            originalHeight: originalHeight,
+          ),
+          tile: tiles.single,
+        ),
+      ];
     }
-    frame.image.dispose();
 
-    final scale = _maxDimension / largest;
-    final width = math.max(1, (originalWidth * scale).round());
-    final height = math.max(1, (originalHeight * scale).round());
-    final resizedCodec = await ui.instantiateImageCodec(
-      bytes,
-      targetWidth: width,
-      targetHeight: height,
-      allowUpscaling: false,
-    );
-    final resizedFrame = await resizedCodec.getNextFrame();
-    final png = await resizedFrame.image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
-    resizedFrame.image.dispose();
-    resizedCodec.dispose();
-    if (png == null) throw StateError('Could not encode image for OCR');
-    return _PreparedImage(
-      bytes: png.buffer.asUint8List(),
-      width: width,
-      height: height,
-      originalWidth: originalWidth,
-      originalHeight: originalHeight,
-    );
+    final prepared = <_PreparedImageTile>[];
+    try {
+      for (final tile in tiles) {
+        final scale = math.min(
+          1.0,
+          _maxDimension / math.max(originalWidth, tile.height),
+        );
+        final width = math.max(1, (originalWidth * scale).round());
+        final height = math.max(1, (tile.height * scale).round());
+        final recorder = ui.PictureRecorder();
+        final canvas = ui.Canvas(recorder);
+        canvas.drawImageRect(
+          frame.image,
+          ui.Rect.fromLTWH(
+            0,
+            tile.top.toDouble(),
+            originalWidth.toDouble(),
+            tile.height.toDouble(),
+          ),
+          ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+          ui.Paint()..filterQuality = ui.FilterQuality.medium,
+        );
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(width, height);
+        picture.dispose();
+        final png = await image.toByteData(format: ui.ImageByteFormat.png);
+        image.dispose();
+        if (png == null) throw StateError('Could not encode OCR image tile');
+        prepared.add(
+          _PreparedImageTile(
+            image: _PreparedImage(
+              bytes: png.buffer.asUint8List(),
+              width: width,
+              height: height,
+              originalWidth: originalWidth,
+              originalHeight: originalHeight,
+            ),
+            tile: tile,
+          ),
+        );
+      }
+      return prepared;
+    } finally {
+      frame.image.dispose();
+    }
   }
 
   Uint8List _buildRequest(_PreparedImage image, String language) {
@@ -279,6 +320,13 @@ class _PreparedImage {
     required this.originalWidth,
     required this.originalHeight,
   });
+}
+
+class _PreparedImageTile {
+  final _PreparedImage image;
+  final OcrVerticalTile tile;
+
+  const _PreparedImageTile({required this.image, required this.tile});
 }
 
 class _LensGeometry {

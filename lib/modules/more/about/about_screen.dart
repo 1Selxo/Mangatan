@@ -168,9 +168,7 @@ class AboutScreen extends ConsumerWidget {
                           IconButton(
                             onPressed: () {
                               _launchInBrowser(
-                                Uri.parse(
-                                  'https://discord.com/invite/Ak2sW9Nvr9',
-                                ),
+                                Uri.parse('https://discord.gg/SqwE6b7Bb'),
                               );
                             },
                             icon: const Padding(

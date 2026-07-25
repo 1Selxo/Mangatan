@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:image/image.dart' as image;
 import 'package:mangayomi/services/mining/chrome_lens_ocr.dart';
 
 void main() {
@@ -46,6 +49,26 @@ void main() {
     expect(result.blocks.single.xmin, closeTo(0.65, 0.001));
     expect(result.blocks.single.ymax, closeTo(0.7, 0.001));
     expect(result.blocks.single.lineGeometries, hasLength(1));
+  });
+
+  test('sends extremely tall pages as multiple OCR requests', () async {
+    var requestCount = 0;
+    final client = ChromeLensOcrClient(
+      client: MockClient((_) async {
+        requestCount++;
+        return http.Response.bytes(const [], 200);
+      }),
+    );
+    addTearDown(client.close);
+    final source = image.Image(width: 100, height: 4000);
+    final bytes = Uint8List.fromList(image.encodePng(source));
+
+    final result = await client.recognize(bytes);
+
+    expect(requestCount, greaterThan(1));
+    expect(result.imageWidth, 100);
+    expect(result.imageHeight, 4000);
+    expect(result.blocks, isEmpty);
   });
 }
 

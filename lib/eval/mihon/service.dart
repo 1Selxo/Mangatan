@@ -10,6 +10,7 @@ import 'package:mangayomi/eval/model/m_pages.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/page.dart';
@@ -322,7 +323,16 @@ class MihonExtensionService implements ExtensionService {
     );
     hasError(res);
     final data = jsonDecode(res.body) as List;
-    return data.map((e) => PageUrl(e['imageUrl'])).toList();
+    return data
+        .map(
+          (e) => PageUrl(
+            resolveMihonImageUrl(
+              androidProxyServer,
+              e['imageUrl']?.toString() ?? '',
+            ),
+          ),
+        )
+        .toList();
   }
 
   @override

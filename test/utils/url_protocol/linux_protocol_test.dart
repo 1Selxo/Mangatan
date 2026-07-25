@@ -220,6 +220,7 @@ MimeType=x-scheme-handler/mangayomi;x-scheme-handler/app.chimahon.google.oauth;
       expect(content, contains('Exec="${appImage.path}" %u'));
       expect(content, isNot(contains('/tmp/.mount_mangatan/mangayomi')));
     },
+    skip: Platform.isWindows ? 'requires POSIX executable permissions' : false,
   );
 
   test('diagnostic Linux launcher passes the link as argv without a shell', () {

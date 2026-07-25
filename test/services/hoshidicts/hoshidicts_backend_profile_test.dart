@@ -119,32 +119,34 @@ void main() {
     expect(rustApi.lookupCalls, 2);
   });
 
-  test('isolates lookup caches and sessions when profile language changes', () async {
-    final backend = HoshidictsLookupBackend.instance;
+  test(
+    'isolates lookup caches and sessions when profile language changes',
+    () async {
+      final backend = HoshidictsLookupBackend.instance;
 
-    final mandarin = await backend.lookup(
-      'same text',
-      profile: mandarinProfile,
-    );
-    final japanese = await backend.lookup(
-      'same text',
-      profile: japaneseProfile,
-    );
-    final mandarinAgain = await backend.lookup(
-      'same text',
-      profile: mandarinProfile,
-    );
+      final mandarin = await backend.lookup(
+        'same text',
+        profile: mandarinProfile,
+      );
+      final japanese = await backend.lookup(
+        'same text',
+        profile: japaneseProfile,
+      );
+      final mandarinAgain = await backend.lookup(
+        'same text',
+        profile: mandarinProfile,
+      );
 
-    expect(mandarin.single.matched, 'Alpha');
-    expect(japanese.single.matched, 'Beta');
-    expect(mandarinAgain.single.matched, 'Alpha');
-    expect(rustApi.lookupCalls, 3);
-    expect(rustApi.rebuildHistory, [
-      ['Alpha'],
-      ['Beta'],
-      ['Alpha'],
-    ]);
-  });
+      expect(mandarin.single.matched, 'Alpha');
+      expect(japanese.single.matched, 'Beta');
+      expect(mandarinAgain.single.matched, 'Alpha');
+      expect(rustApi.lookupCalls, 2);
+      expect(rustApi.rebuildHistory, [
+        ['Alpha'],
+        ['Beta'],
+      ]);
+    },
+  );
 
   test('isolates style caches by structural profile configuration', () async {
     final backend = HoshidictsLookupBackend.instance;

@@ -295,6 +295,7 @@ jobs:
     needs:
       - build-and-release-macos-dmg
       - build-and-release-windows-exe_zip
+      - build-and-release-linux
     runs-on: ubuntu-latest
     steps:
       - name: download release packages

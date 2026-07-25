@@ -14,10 +14,7 @@ class WebDavCredentials {
   final String username;
   final String password;
 
-  Map<String, Object?> toJson() => {
-    'username': username,
-    'password': password,
-  };
+  Map<String, Object?> toJson() => {'username': username, 'password': password};
 
   bool get isUsable => username.trim().isNotEmpty && password.isNotEmpty;
 }
@@ -52,7 +49,7 @@ class SecureWebDavCredentialStore implements WebDavCredentialStore {
   }
 
   @override
-  Future<void> writeCredentials(WebDavCredentials credentials) {
+  Future<void> writeCredentials(WebDavCredentials credentials) async {
     if (!credentials.isUsable) {
       throw ArgumentError.value(
         credentials.username,
@@ -60,7 +57,7 @@ class SecureWebDavCredentialStore implements WebDavCredentialStore {
         'WebDAV username and password must not be blank',
       );
     }
-    return backend.write(
+    await backend.write(
       key: storageKey,
       value: jsonEncode(credentials.toJson()),
     );

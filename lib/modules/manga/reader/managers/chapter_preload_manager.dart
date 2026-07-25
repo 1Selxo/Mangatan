@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
@@ -296,6 +295,14 @@ class ChapterPreloadManager {
     }
 
     return true;
+  }
+
+  /// Updates the cropped image cached for a page.
+  void updatePageCropImage(int index, Uint8List? cropImage) {
+    if (index >= 0 && index < _pages.length) {
+      _pages[index].cropImage = cropImage;
+      onPagesUpdated?.call();
+    }
   }
 
   /// Gets a unique identifier for a chapter.

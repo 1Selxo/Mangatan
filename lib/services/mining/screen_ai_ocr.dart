@@ -127,11 +127,13 @@ class ScreenAiOcrClient {
     final frame = await codec.getNextFrame();
     final width = frame.image.width;
     final height = frame.image.height;
-    final rgba = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final rgba = await frame.image.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
     frame.image.dispose();
     codec.dispose();
     if (rgba == null) throw StateError('Could not decode image for ScreenAI');
-    
+
     return _ImageDecodeResult(
       rgbaBytes: rgba.buffer.asUint8List(),
       width: width,

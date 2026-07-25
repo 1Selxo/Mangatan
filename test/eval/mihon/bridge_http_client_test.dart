@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -195,5 +197,98 @@ void main() {
         ),
       );
     });
+
+    test(
+      'reuses the server-issued extension handle after the first APK upload',
+      () async {
+        const extensionId =
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+        final uri = Uri.parse('https://handle-cache.example/dalvik');
+        final payloads = <Map<String, dynamic>>[];
+        final client = MockClient((request) async {
+          payloads.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return http.Response(
+            '{}',
+            200,
+            headers: const {'x-mangatan-extension-id': extensionId},
+          );
+        });
+        final body = {'method': 'getPopularAnime', 'data': 'base64-apk-data'};
+
+        await postMihonBridge(client, uri, body: body);
+        await postMihonBridge(client, uri, body: body);
+
+        expect(payloads.first['data'], 'base64-apk-data');
+        expect(payloads.first, isNot(contains('extensionId')));
+        expect(payloads.last, isNot(contains('data')));
+        expect(payloads.last['extensionId'], extensionId);
+      },
+    );
+
+    test('resends the APK when a cached extension handle expired', () async {
+      const firstId =
+          'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+      const secondId =
+          'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+      final uri = Uri.parse('https://stale-handle.example/dalvik');
+      final payloads = <Map<String, dynamic>>[];
+      final client = MockClient((request) async {
+        final payload = jsonDecode(request.body) as Map<String, dynamic>;
+        payloads.add(payload);
+        if (payloads.length == 1) {
+          return http.Response(
+            '{}',
+            200,
+            headers: const {'x-mangatan-extension-id': firstId},
+          );
+        }
+        if (payloads.length == 2) {
+          return http.Response(
+            '{"error":"extension expired","code":409}',
+            409,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          '{}',
+          200,
+          headers: const {'x-mangatan-extension-id': secondId},
+        );
+      });
+      final body = {'method': 'getPopularAnime', 'data': 'another-apk'};
+
+      await postMihonBridge(client, uri, body: body);
+      await postMihonBridge(client, uri, body: body);
+
+      expect(payloads, hasLength(3));
+      expect(payloads[1]['extensionId'], firstId);
+      expect(payloads[1], isNot(contains('data')));
+      expect(payloads[2]['data'], 'another-apk');
+      expect(payloads[2], isNot(contains('extensionId')));
+    });
+
+    test(
+      'includes the bridge JSON error in rejected-request messages',
+      () async {
+        final client = MockClient(
+          (request) async => http.Response(
+            '{"error":"SAnime.background_url is missing","code":500}',
+            500,
+            headers: const {'content-type': 'application/json'},
+          ),
+        );
+
+        await expectLater(
+          postMihonBridge(client, Uri.parse('http://192.168.1.20:8080/dalvik')),
+          throwsA(
+            isA<MihonBridgeResponseException>().having(
+              (error) => error.message,
+              'message',
+              contains('SAnime.background_url is missing'),
+            ),
+          ),
+        );
+      },
+    );
   });
 }

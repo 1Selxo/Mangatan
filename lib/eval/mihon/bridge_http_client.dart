@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -67,16 +68,24 @@ Future<http.Response> postMihonBridge(
 }) async {
   var transportRetries = 0;
   var gatewayRetries = 0;
+  final preparedBody = _PreparedBridgeBody.from(uri, body);
   while (true) {
     try {
       final response = await client.post(
         uri,
-        body: body,
+        body: preparedBody.body,
         headers: _bridgeRequestHeaders(headers),
       );
       _validateMihonBridgeResponse(response, uri);
+      preparedBody.rememberExtensionId(response);
       return response;
     } catch (error) {
+      if (error is MihonBridgeResponseException &&
+          error.statusCode == 409 &&
+          preparedBody.retryWithApk()) {
+        continue;
+      }
+
       Duration? retryDelay;
       if (retryTransientFailures &&
           isTransientBridgeTransportError(error) &&
@@ -91,6 +100,107 @@ Future<http.Response> postMihonBridge(
       await delay(retryDelay);
     }
   }
+}
+
+const _extensionIdHeader = 'x-mangatan-extension-id';
+const _maximumRememberedExtensions = 128;
+final _extensionIds = <String, String>{};
+
+class _PreparedBridgeBody {
+  _PreparedBridgeBody({
+    required this.body,
+    this.fullBody,
+    this.cacheKey,
+    this.usingExtensionId = false,
+  });
+
+  factory _PreparedBridgeBody.from(Uri uri, Object? originalBody) {
+    final payload = _jsonObject(originalBody);
+    if (payload == null) {
+      return _PreparedBridgeBody(body: originalBody);
+    }
+
+    final fullBody = originalBody is String
+        ? originalBody
+        : jsonEncode(payload);
+    final apkData = payload['data'];
+    if (apkData is! String || apkData.isEmpty) {
+      return _PreparedBridgeBody(body: fullBody);
+    }
+
+    final cacheKey = _extensionCacheKey(uri, apkData);
+    final extensionId = _extensionIds[cacheKey];
+    if (extensionId == null) {
+      return _PreparedBridgeBody(
+        body: fullBody,
+        fullBody: fullBody,
+        cacheKey: cacheKey,
+      );
+    }
+
+    payload
+      ..remove('data')
+      ..['extensionId'] = extensionId;
+    return _PreparedBridgeBody(
+      body: jsonEncode(payload),
+      fullBody: fullBody,
+      cacheKey: cacheKey,
+      usingExtensionId: true,
+    );
+  }
+
+  Object? body;
+  final Object? fullBody;
+  final String? cacheKey;
+  bool usingExtensionId;
+
+  void rememberExtensionId(http.Response response) {
+    final key = cacheKey;
+    final extensionId = response.headers[_extensionIdHeader]?.trim();
+    if (key == null ||
+        extensionId == null ||
+        !RegExp(r'^[0-9a-f]{64}$').hasMatch(extensionId)) {
+      return;
+    }
+    _extensionIds.remove(key);
+    _extensionIds[key] = extensionId;
+    while (_extensionIds.length > _maximumRememberedExtensions) {
+      _extensionIds.remove(_extensionIds.keys.first);
+    }
+  }
+
+  bool retryWithApk() {
+    if (!usingExtensionId || fullBody == null || cacheKey == null) {
+      return false;
+    }
+    _extensionIds.remove(cacheKey);
+    body = fullBody;
+    usingExtensionId = false;
+    return true;
+  }
+}
+
+Map<String, dynamic>? _jsonObject(Object? body) {
+  if (body is Map) {
+    return body.map((key, value) => MapEntry(key.toString(), value));
+  }
+  if (body is! String) return null;
+  try {
+    final decoded = jsonDecode(body);
+    if (decoded is Map) {
+      return decoded.map((key, value) => MapEntry(key.toString(), value));
+    }
+  } on FormatException {
+    return null;
+  }
+  return null;
+}
+
+String _extensionCacheKey(Uri uri, String apkData) {
+  final prefixLength = apkData.length < 32 ? apkData.length : 32;
+  final suffixStart = apkData.length < 32 ? 0 : apkData.length - 32;
+  return '$uri|${apkData.length}|${apkData.hashCode}|'
+      '${apkData.substring(0, prefixLength)}|${apkData.substring(suffixStart)}';
 }
 
 bool isTransientBridgeTransportError(Object error) {
@@ -141,12 +251,29 @@ void _validateMihonBridgeResponse(http.Response response, Uri uri) {
   }
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
+    final serverError = _bridgeServerError(response.body);
     throw MihonBridgeResponseException(
       'APKBridge rejected the extension request (HTTP '
-      '${response.statusCode} at $uri). Check the APKBridge log and update '
-      'both APKBridge and the Mihon extension.',
+      '${response.statusCode} at $uri).${serverError == null ? ' Check the '
+                'APKBridge log and update both APKBridge and the Mihon extension.' : ' $serverError'}',
       statusCode: response.statusCode,
     );
+  }
+}
+
+String? _bridgeServerError(String responseBody) {
+  try {
+    final decoded = jsonDecode(responseBody);
+    if (decoded is! Map || decoded['error'] is! String) return null;
+    final normalized = (decoded['error'] as String)
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (normalized.isEmpty) return null;
+    return normalized.length <= 300
+        ? normalized
+        : '${normalized.substring(0, 297)}...';
+  } on FormatException {
+    return null;
   }
 }
 

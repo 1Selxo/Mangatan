@@ -91,13 +91,13 @@ class MihonExtensionService implements ExtensionService {
   Future<MPages> getPopular(int page) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         "method": "getPopular$name",
         "page": mihonCataloguePage(page),
         "search": "",
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -127,13 +127,13 @@ class MihonExtensionService implements ExtensionService {
   Future<MPages> getLatestUpdates(int page) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         "method": "getLatest$name",
         "page": mihonCataloguePage(page),
         "search": "",
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -163,14 +163,14 @@ class MihonExtensionService implements ExtensionService {
   Future<MPages> search(String query, int page, List<dynamic> filters) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         "method": "getSearch$name",
         "page": mihonCataloguePage(page),
         "search": query,
         "filterList": _convertFilters(filters),
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -200,13 +200,13 @@ class MihonExtensionService implements ExtensionService {
   Future<MManga> getDetail(String url) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         "method": "getDetails$name",
         if (source.itemType == ItemType.manga) "mangaData": {"url": url},
         if (source.itemType == ItemType.anime) "animeData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -234,7 +234,7 @@ class MihonExtensionService implements ExtensionService {
 
   Future<List<MChapter>> getChapterList(String url) async {
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         "method": source.itemType == ItemType.anime
             ? "getEpisodeList"
             : "getChapterList",
@@ -242,7 +242,7 @@ class MihonExtensionService implements ExtensionService {
         if (source.itemType == ItemType.anime) "animeData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -280,12 +280,12 @@ class MihonExtensionService implements ExtensionService {
       'initialized': true,
     };
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         'method': isAnime ? 'getAnimeUrl' : 'getMangaUrl',
         isAnime ? 'animeData' : 'mangaData': mediaData,
         'preferences': mihonPreferencePayload(source, getSourcePreferences()),
         'data': source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -302,12 +302,12 @@ class MihonExtensionService implements ExtensionService {
       'scanlator': chapter.scanlator,
     };
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         'method': isAnime ? 'getEpisodeUrl' : 'getChapterUrl',
         isAnime ? 'episodeData' : 'chapterData': chapterData,
         'preferences': mihonPreferencePayload(source, getSourcePreferences()),
         'data': source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -317,12 +317,12 @@ class MihonExtensionService implements ExtensionService {
   @override
   Future<List<PageUrl>> getPageList(String url) async {
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         "method": "getPageList",
         "chapterData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -342,12 +342,12 @@ class MihonExtensionService implements ExtensionService {
   @override
   Future<List<Video>> getVideoList(String url) async {
     final res = await _postDalvik(
-      body: jsonEncode({
+      body: {
         "method": "getVideoList",
         "episodeData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);

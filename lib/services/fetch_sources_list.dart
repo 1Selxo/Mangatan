@@ -535,11 +535,11 @@ Future<Map<String, String>> fetchHeadersDalvik(
     final res = await postMihonBridge(
       client,
       mihonBridgeDalvikUri(androidProxyServer),
-      body: jsonEncode({
+      body: {
         "method": "headers$name",
         "data": source.sourceCode,
         "preferences": mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
     final Map<String, String> headers = {};
@@ -563,11 +563,11 @@ Future<bool> fetchSupportLatestDalvik(
     final res = await postMihonBridge(
       client,
       mihonBridgeDalvikUri(androidProxyServer),
-      body: jsonEncode({
+      body: {
         "method": "supportLatest$name",
         "data": source.sourceCode,
         "preferences": mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     return res.body.trim() == "true";
   } catch (_) {
@@ -586,11 +586,11 @@ Future<FilterList?> fetchFilterListDalvik(
     final res = await postMihonBridge(
       client,
       mihonBridgeDalvikUri(androidProxyServer),
-      body: jsonEncode({
+      body: {
         "method": "filters$name",
         "data": source.sourceCode,
         "preferences": mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
 
@@ -686,7 +686,7 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
     final res = await postMihonBridge(
       client,
       mihonBridgeDalvikUri(androidProxyServer),
-      body: jsonEncode({
+      body: {
         "method": changedPreferenceKey == null
             ? "preferences$name"
             : "setPreference$name",
@@ -696,7 +696,7 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
           preferences,
           changedPreferenceKey: changedPreferenceKey,
         ),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
     return data
@@ -722,11 +722,11 @@ Future<List<MihonSourceDescriptor>?> fetchMihonSourceDescriptors(
     final res = await postMihonBridge(
       client,
       mihonBridgeDalvikUri(androidProxyServer),
-      body: jsonEncode({
+      body: {
         'method': 'sources$name',
         'data': source.sourceCode,
         'preferences': mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
     return data

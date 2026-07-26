@@ -61,6 +61,18 @@ NSError *EmbeddedMihonError(NSInteger code, NSString *message) {
                          userInfo:@{NSLocalizedDescriptionKey : message}];
 }
 
+NSString *OpenJDKRuntimePath() {
+  NSString *relativePath =
+      [NSString stringWithUTF8String:kOpenJDKFrameworkRelativePath];
+  return [NSBundle.mainBundle.bundlePath
+      stringByAppendingPathComponent:relativePath];
+}
+
+NSString *OpenJDKRuntimeHome() {
+  return [[OpenJDKRuntimePath() stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"lib"];
+}
+
 bool LoadOpenJDKRuntime(NSError **error) {
   if (gOpenJDKHandle != nullptr &&
       gLoadFunctions != nullptr &&
@@ -68,10 +80,7 @@ bool LoadOpenJDKRuntime(NSError **error) {
     return true;
   }
 
-  NSString *relativePath =
-      [NSString stringWithUTF8String:kOpenJDKFrameworkRelativePath];
-  NSString *runtimePath =
-      [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:relativePath];
+  NSString *runtimePath = OpenJDKRuntimePath();
   dlerror();
   void *handle = dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_LOCAL);
   if (handle == nullptr) {
@@ -148,9 +157,11 @@ NSString *JavaExceptionMessage(JNIEnv *env, NSString *fallback) {
   return message;
 }
 
-bool VerifyRuntimeFiles(NSString *resourcePath, NSError **error) {
+bool VerifyRuntimeFiles(
+    NSString *resourcePath,
+    NSString *runtimeHome,
+    NSError **error) {
   NSArray<NSString *> *requiredFiles = @[
-    @"lib/modules",
     @"lib/security/cacerts",
     @"MExtensionServer.jar",
     @"java-logging-shim.jar",
@@ -168,6 +179,17 @@ bool VerifyRuntimeFiles(NSString *resourcePath, NSError **error) {
       }
       return false;
     }
+  }
+  NSString *bootModules =
+      [runtimeHome stringByAppendingPathComponent:@"lib/modules"];
+  if (![fileManager fileExistsAtPath:bootModules]) {
+    if (error != nullptr) {
+      *error = EmbeddedMihonError(
+          1,
+          @"The embedded Mihon runtime is incomplete: the framework-local "
+          @"OpenJDK module image is missing.");
+    }
+    return false;
   }
   return true;
 }
@@ -263,7 +285,8 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
   }
 
   NSString *resourcePath = NSBundle.mainBundle.resourcePath;
-  if (!VerifyRuntimeFiles(resourcePath, error)) {
+  NSString *runtimeHome = OpenJDKRuntimeHome();
+  if (!VerifyRuntimeFiles(resourcePath, runtimeHome, error)) {
     return false;
   }
   if (!LoadOpenJDKRuntime(error)) {
@@ -294,7 +317,7 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
   std::vector<std::string> optionStrings = {
       std::string("-Djava.class.path=") + serverJar.UTF8String,
       std::string("-Xbootclasspath/a:") + loggingShim.UTF8String,
-      std::string("-Djava.home=") + resourcePath.UTF8String,
+      std::string("-Djava.home=") + runtimeHome.UTF8String,
       std::string("-Djava.io.tmpdir=") + temporaryDirectory.UTF8String,
       std::string("-Duser.home=") + applicationDirectory.UTF8String,
       std::string("-Djavax.net.ssl.trustStore=") + trustStore.UTF8String,

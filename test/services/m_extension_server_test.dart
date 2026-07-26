@@ -44,8 +44,14 @@ void main() {
 
   test('keeps the iOS VM outside the app launch image and UI thread', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
+    final mainScreenSource = File(
+      'lib/modules/main_view/main_screen.dart',
+    ).readAsStringSync();
     final nativeSource = File(
       'ios/Runner/MihonEmbeddedBridge.mm',
+    ).readAsStringSync();
+    final runtimeBuilder = File(
+      'tool/build_lazy_openjdk_ios.sh',
     ).readAsStringSync();
     final xcodeProject = File(
       'ios/Runner.xcodeproj/project.pbxproj',
@@ -66,14 +72,28 @@ void main() {
       nativeSource,
       contains('dlsym(handle, "MangatanOpenJDKLoadFunctions")'),
     );
+    expect(nativeSource, contains('dispatch_async(EmbeddedMihonQueue(), ^{'));
+    expect(
+      mainScreenSource,
+      contains(
+        'void _initializeProviders() {\n'
+        '    // Mihon sources start the embedded OpenJDK runtime.',
+      ),
+    );
+    expect(mainScreenSource, contains('if (Platform.isIOS) return;'));
     expect(
       nativeSource,
-      contains('dispatch_async(EmbeddedMihonQueue(), ^{'),
+      contains('stringByAppendingPathComponent:@"lib/modules"'),
     );
     expect(
-      xcodeProject,
-      isNot(contains('OpenJDK.xcframework in Frameworks')),
+      nativeSource,
+      contains('std::string("-Djava.home=") + runtimeHome.UTF8String'),
     );
+    expect(
+      runtimeBuilder,
+      contains(r'cp "$runtime_modules" "$output_framework/lib/lib/modules"'),
+    );
+    expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
     expect(
       xcodeProject,
       contains('OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime'),

@@ -76,4 +76,20 @@ void main() {
       throwsA(isA<ChimahonSyncFormatException>()),
     );
   });
+
+  test('rejects gzip expansion before it exceeds the decoded limit', () {
+    final encoded = codec.encode(
+      BackupMihon(
+        backupNovels: [
+          BackupNovel(id: 'large', title: List.filled(2048, 'x').join()),
+        ],
+      ),
+      format: ChimahonSyncWireFormat.gzipProtobuf,
+    );
+
+    expect(
+      () => codec.decode(encoded, sizeLimit: 128),
+      throwsA(isA<ChimahonSyncFormatException>()),
+    );
+  });
 }

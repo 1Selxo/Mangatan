@@ -138,10 +138,19 @@ jobs:
         working-directory: C:\m
         run: flutter pub get
 
-      - name: build windows exe
+      - name: build windows app
         working-directory: C:\m
         run: |
-          dart run inno_bundle:build --release
+          dart run inno_bundle:build --release --no-installer
+
+      - name: build Windows installer
+        working-directory: C:\m
+        shell: pwsh
+        run: |
+          dart run inno_bundle:build --release --no-app
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - name: build windows zip
         working-directory: C:\m
@@ -157,6 +166,10 @@ jobs:
           Copy-Item -LiteralPath $installers[0].FullName -Destination (Join-Path $releaseDir "Mangatan-$env:RELEASE_TAG-windows.exe")
 
           Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath (Join-Path $releaseDir "Mangatan-$env:RELEASE_TAG-windows.zip")
+          Get-ChildItem $releaseDir -File |
+            Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))" } |
+            Set-Content -Encoding ascii (Join-Path $releaseDir 'SHA256SUMS.txt')
 
       - name: upload artifact windows exe_zip
         uses: actions/upload-artifact@v7
@@ -165,6 +178,7 @@ jobs:
           path: |
             release-windows/Mangatan-*.exe
             release-windows/Mangatan-*.zip
+            release-windows/SHA256SUMS.txt
           if-no-files-found: error
 
   release:

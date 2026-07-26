@@ -40,7 +40,12 @@ Future<void> doBackUp(
       final res = isar.mangas
           .filter()
           .idIsNotNull()
-          .favoriteEqualTo(true)
+          .group(
+            (query) => query
+                .favoriteEqualTo(true)
+                .or()
+                .hasLocalChapterOverlayEqualTo(true),
+          )
           .isLocalArchiveEqualTo(false)
           .findAllSync()
           .map((e) => e.toJson())

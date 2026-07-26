@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:ffi/ffi.dart';
+import 'package:mangayomi/services/mining/ocr_image_tiling.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:path/path.dart' as p;
 
@@ -22,6 +24,38 @@ class ScreenAiOcrResult {
   final int imageHeight;
   final List<OcrTextBlock> blocks;
   final String componentPath;
+}
+
+/// A sequential lock to ensure only one Isolate accesses the native
+/// ScreenAI DLL at any given time.
+class _OcrLock {
+  static Future<void> _last = Future.value();
+
+  static Future<T> synchronized<T>(FutureOr<T> Function() action) {
+    final previous = _last;
+    final released = Completer<void>();
+    _last = released.future;
+    return () async {
+      await previous;
+      try {
+        return await action();
+      } finally {
+        released.complete();
+      }
+    }();
+  }
+}
+
+class _ImageDecodeResult {
+  final Uint8List rgbaBytes;
+  final int width;
+  final int height;
+
+  const _ImageDecodeResult({
+    required this.rgbaBytes,
+    required this.width,
+    required this.height,
+  });
 }
 
 class ScreenAiOcrClient {
@@ -45,24 +79,78 @@ class ScreenAiOcrClient {
         'ScreenAI is not installed. Open Chrome once or select Google Lens.',
       );
     }
-    final image = await _prepareImage(imageBytes);
-    final annotation = _ScreenAiBridge.instance.recognize(
-      componentDirectory: component,
-      image: image,
-    );
+
+    // 1. Decode image to RGBA async on the main thread (uses native engine threads)
+    final decodeResult = await _decodeImageRgba(imageBytes);
+
+    // 2. Offload FFI native execution to a background Isolate
+    final result = await _OcrLock.synchronized(() {
+      return Isolate.run(() {
+        final tiles = planVerticalOcrTiles(
+          width: decodeResult.width,
+          height: decodeResult.height,
+        );
+        final blocks = <OcrTextBlock>[];
+        for (final tile in tiles) {
+          final image = _ScreenAiImage(
+            pixels: _rgbaTile(
+              decodeResult.rgbaBytes,
+              width: decodeResult.width,
+              tile: tile,
+            ),
+            width: decodeResult.width,
+            height: tile.height,
+            originalWidth: decodeResult.width,
+            originalHeight: decodeResult.height,
+          );
+          final annotation = _ScreenAiBridge.instance.recognize(
+            componentDirectory: component,
+            image: image,
+          );
+          final tileBlocks = _parseVisualAnnotation(
+            annotation,
+            imageWidth: decodeResult.width,
+            imageHeight: tile.height,
+          );
+          blocks.addAll(remapOcrBlocksFromTile(tileBlocks, tile));
+        }
+
+        return (
+          blocks: blocks,
+          imageWidth: decodeResult.width,
+          imageHeight: decodeResult.height,
+        );
+      });
+    });
+
     return ScreenAiOcrResult(
-      imageWidth: image.originalWidth,
-      imageHeight: image.originalHeight,
-      blocks: _parseVisualAnnotation(
-        annotation,
-        imageWidth: image.width,
-        imageHeight: image.height,
-      ),
+      imageWidth: result.imageWidth,
+      imageHeight: result.imageHeight,
+      blocks: result.blocks,
       componentPath: component.path,
     );
   }
 
   void close() {}
+
+  Future<_ImageDecodeResult> _decodeImageRgba(Uint8List bytes) async {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final width = frame.image.width;
+    final height = frame.image.height;
+    final rgba = await frame.image.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
+    frame.image.dispose();
+    codec.dispose();
+    if (rgba == null) throw StateError('Could not decode image for ScreenAI');
+
+    return _ImageDecodeResult(
+      rgbaBytes: rgba.buffer.asUint8List(),
+      width: width,
+      height: height,
+    );
+  }
 
   static Directory? _findComponentDirectory() {
     final roots = <Directory>[
@@ -165,12 +253,12 @@ class _ScreenAiBridge {
     required _ScreenAiImage image,
   }) {
     final componentPath = componentDirectory.path.toNativeUtf16();
-    final pixels = calloc<Uint8>(image.bgra.length);
+    final pixels = calloc<Uint8>(image.pixels.length);
     final output = calloc<Pointer<Uint8>>();
     final outputLength = calloc<Uint32>();
     final error = calloc<Pointer<Utf8>>();
     try {
-      pixels.asTypedList(image.bgra.length).setAll(0, image.bgra);
+      pixels.asTypedList(image.pixels.length).setAll(0, image.pixels);
       final status = _recognize(
         componentPath,
         pixels,
@@ -207,32 +295,6 @@ class _ScreenAiBridge {
     if (besideExe.existsSync()) return besideExe.path;
     return p.join(Directory.current.path, 'screen_ai_bridge.dll');
   }
-}
-
-Future<_ScreenAiImage> _prepareImage(Uint8List bytes) async {
-  final codec = await ui.instantiateImageCodec(bytes);
-  final frame = await codec.getNextFrame();
-  final width = frame.image.width;
-  final height = frame.image.height;
-  final rgba = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
-  frame.image.dispose();
-  codec.dispose();
-  if (rgba == null) throw StateError('Could not decode image for ScreenAI');
-  final source = rgba.buffer.asUint8List();
-  final bgra = Uint8List(source.length);
-  for (var i = 0; i < source.length; i += 4) {
-    bgra[i] = source[i + 2];
-    bgra[i + 1] = source[i + 1];
-    bgra[i + 2] = source[i];
-    bgra[i + 3] = source[i + 3];
-  }
-  return _ScreenAiImage(
-    bgra: bgra,
-    width: width,
-    height: height,
-    originalWidth: width,
-    originalHeight: height,
-  );
 }
 
 List<OcrTextBlock> _parseVisualAnnotation(
@@ -314,16 +376,28 @@ _NormalizedRect? _readRect(
   );
 }
 
+Uint8List _rgbaTile(
+  Uint8List pixels, {
+  required int width,
+  required OcrVerticalTile tile,
+}) {
+  if (tile.top == 0 && tile.height == tile.fullHeight) return pixels;
+  final rowBytes = width * 4;
+  return Uint8List.fromList(
+    Uint8List.sublistView(pixels, tile.top * rowBytes, tile.bottom * rowBytes),
+  );
+}
+
 class _ScreenAiImage {
   const _ScreenAiImage({
-    required this.bgra,
+    required this.pixels,
     required this.width,
     required this.height,
     required this.originalWidth,
     required this.originalHeight,
   });
 
-  final Uint8List bgra;
+  final Uint8List pixels;
   final int width;
   final int height;
   final int originalWidth;

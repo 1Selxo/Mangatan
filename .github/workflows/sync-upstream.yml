@@ -1,0 +1,77 @@
+name: Sync upstream release
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: Upstream release tag (leave empty for latest stable)
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge upstream into main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Fetch upstream release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.upstream_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git remote add upstream https://github.com/1Selxo/Mangatan.git
+          git fetch upstream main --tags --prune
+
+          upstream_tag="$REQUESTED_TAG"
+          if [[ -z "$upstream_tag" ]]; then
+            upstream_tag="$(gh api repos/1Selxo/Mangatan/releases/latest --jq .tag_name)"
+          fi
+
+          if [[ "$upstream_tag" == -* || ! "$upstream_tag" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Invalid upstream tag: $upstream_tag" >&2
+            exit 1
+          fi
+
+          target_commit="$(git rev-parse --verify "refs/tags/${upstream_tag}^{commit}")"
+          echo "tag=$upstream_tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$target_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Merge and push
+        env:
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+          UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git merge-base --is-ancestor "$UPSTREAM_COMMIT" HEAD; then
+            echo "main already contains $UPSTREAM_TAG."
+            exit 0
+          fi
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          if ! git merge --no-ff --no-edit "$UPSTREAM_COMMIT"; then
+            git status --short
+            echo "::error::Upstream $UPSTREAM_TAG conflicts with fork changes; nothing was pushed."
+            exit 1
+          fi
+
+          git push origin HEAD:main

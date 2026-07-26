@@ -2,7 +2,10 @@
 Type=Application
 Name=Mangatan
 Icon=mangayomi
-Exec=/usr/bin/mangayomi
+Exec=/usr/bin/mangayomi %u
+MimeType=x-scheme-handler/mangayomi;x-scheme-handler/app.chimahon.google.oauth;
+X-Mangatan-Protocol-Owner=com.kodjodevf.mangayomi/persistent/v1
+X-Mangatan-Protocol-Schemes=mangayomi;app.chimahon.google.oauth;
 Categories=AudioVideo;
 Keywords=Manga;Anime;BitTorrent;
 StartupNotify=true

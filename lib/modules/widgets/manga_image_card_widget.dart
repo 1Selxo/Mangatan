@@ -23,6 +23,7 @@ class MangaImageCardWidget extends ConsumerWidget {
   final bool isComfortableGrid;
   final MManga? getMangaDetail;
   final Manga? libraryManga;
+  final bool autofocus;
 
   const MangaImageCardWidget({
     required this.source,
@@ -31,12 +32,14 @@ class MangaImageCardWidget extends ConsumerWidget {
     required this.isComfortableGrid,
     required this.itemType,
     this.libraryManga,
+    this.autofocus = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasData = libraryManga != null;
     return CoverViewWidget(
+      autofocus: autofocus,
       bottomTextWidget: BottomTextWidget(
         maxLines: 1,
         text: getMangaDetail!.name!,
@@ -296,7 +299,7 @@ Future<void> pushToMangaReaderDetail({
       final empty = await isar.mangas
           .filter()
           .langEqualTo(lang)
-          .nameEqualTo(manga.name)
+          .titleMatchesSourceIdentity(manga.sourceTitle ?? manga.name)
           .sourceEqualTo(manga.source)
           .isEmpty();
       if (empty) {
@@ -310,7 +313,7 @@ Future<void> pushToMangaReaderDetail({
       final foundMangas = await isar.mangas
           .filter()
           .langEqualTo(lang)
-          .nameEqualTo(manga.name)
+          .titleMatchesSourceIdentity(manga.sourceTitle ?? manga.name)
           .sourceEqualTo(manga.source)
           .findAll();
       Manga? matchedManga;
@@ -382,9 +385,7 @@ Future<void> pushToMangaReaderDetail({
     final getManga = await isar.mangas.get(mangaId);
     await isar.writeTxn(() async {
       await isar.mangas.put(
-        getManga!
-          ..favorite = !getManga.favorite!
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+        getManga!..updateFavorite(!(getManga.favorite ?? false)),
       );
     });
   }

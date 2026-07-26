@@ -1,9 +1,9 @@
 {
   "name": "Mangatan",
   "identifier": "com.selxo.mangatan",
-  "headerURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/headers/source_header_default.webp",
-  "website": "https://github.com/1Selxo/Mangatan",
-  "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
+  "headerURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/headers/source_header_default.webp",
+  "website": "https://github.com/ippo-michi/Mangatan",
+  "iconURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
   "subtitle": "Read, look up, and mine.",
   "description": "The official sideloading source for Mangatan, a Mangayomi fork focused on dictionary lookup, OCR, subtitle mining, and Anki export.",
   "tintColor": "EF4444",
@@ -12,16 +12,16 @@
       "beta": true,
       "name": "Mangatan",
       "bundleIdentifier": "com.selxo.mangatan",
-      "developerName": "1Selxo",
+      "developerName": "ippo-michi",
       "subtitle": "Read, look up, and mine",
       "localizedDescription": "Mangatan is a Mangayomi fork focused on Yomitan-style dictionary lookup, OCR overlays, subtitle mining, and Anki export.",
-      "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
+      "iconURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
-        "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
-        "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_2_default.webp"
+        "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
+        "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
+        "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/screenshots/image_2_default.webp"
       ],
       "versions": [],
       "appPermissions": {

@@ -28,7 +28,6 @@
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		A07E74432B653D6F0083CA88 /* libmtorrentserver.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A07E74422B653D6F0083CA88 /* libmtorrentserver.dylib */; settings = {ATTRIBUTES = (Weak, ); }; };
-		A07E74442B653D810083CA88 /* libmtorrentserver.dylib in Resources */ = {isa = PBXBuildFile; fileRef = A07E74422B653D6F0083CA88 /* libmtorrentserver.dylib */; };
 		A07E74452B653D890083CA88 /* libmtorrentserver.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = A07E74422B653D6F0083CA88 /* libmtorrentserver.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		A3EC4C8D2B62A0FF0084CCA1 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 651E463B44A88B78870FC85D /* Pods_Runner.framework */; settings = {ATTRIBUTES = (Required, ); }; };
 		CB47DC68E2E47298E3839491 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 22E7A2E0F43D9FD3D9D7FCBC /* Pods_RunnerTests.framework */; };
@@ -322,7 +321,6 @@
 			files = (
 				33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
 				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
-				A07E74442B653D810083CA88 /* libmtorrentserver.dylib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

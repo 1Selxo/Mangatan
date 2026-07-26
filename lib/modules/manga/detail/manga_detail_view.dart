@@ -39,6 +39,8 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/sync/chimahon_local_chapter_overlay_service.dart';
+import 'package:mangayomi/services/sync/chimahon_local_chapter_policy.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 import 'package:mangayomi/services/webview_url.dart';
 import 'package:mangayomi/utils/riverpod.dart';
@@ -135,11 +137,8 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
       final localNovel = await _selectLocalNovel(localNovels);
       if (localNovel == null) return;
       const adapter = ChimahonNovelProgressAdapter();
-      final novelId = adapter.stableId(
-        title: localNovel.title,
-        author: localNovel.author,
-      );
-      if (!mounted) return;
+      final novelId = adapter.stableLocalIdOrNull(localNovel);
+      if (novelId == null || !mounted) return;
       await showDictionaryProfileOverrideDialog(
         context: context,
         overrideKey: DictionaryProfileResolver.novelOverrideKey(novelId),
@@ -590,13 +589,13 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                     value: 0,
                                     child: Text(l10n.refresh),
                                   ),
-                                if (widget.manga!.favorite! &&
+                                if (widget.manga!.isVisibleInLibrary &&
                                     checkCategoryList)
                                   PopupMenuItem<int>(
                                     value: 1,
                                     child: Text(l10n.set_categories),
                                   ),
-                                if (widget.manga!.favorite! ||
+                                if (widget.manga!.isVisibleInLibrary ||
                                     _localNovelProgresses().isNotEmpty)
                                   const PopupMenuItem<int>(
                                     value: 7,
@@ -909,6 +908,10 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
               final isDownloaded = chap
                   .where((c) => downloadedIds.contains(c.id))
                   .toSet();
+              const localChapterPolicy = ChimahonLocalChapterPolicy();
+              final selectedLocalOverlayChapters = isLocalArchive
+                  ? const <Chapter>{}
+                  : chap.where(localChapterPolicy.isDeviceLocal).toSet();
               return BottomSelectBar(
                 isVisible: isLongPressed,
                 actions: [
@@ -1023,7 +1026,9 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                       },
                     ),
                   // If not local archive and not downloaded, show download button
-                  if (!isLocalArchive && isDownloaded.isEmpty)
+                  if (!isLocalArchive &&
+                      isDownloaded.isEmpty &&
+                      selectedLocalOverlayChapters.isEmpty)
                     BottomSelectButton(
                       icon: Icon(Icons.download_outlined, color: color),
                       onPressed: () {
@@ -1048,8 +1053,11 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                         ref.read(chaptersListStateProvider.notifier).clear();
                       },
                     ),
-                  // show delete button if local archive or downloaded
-                  if (isLocalArchive || isDownloaded.isNotEmpty)
+                  // Device-local overlay rows are files, not downloads, but
+                  // must still be explicitly removable from a source title.
+                  if (isLocalArchive ||
+                      isDownloaded.isNotEmpty ||
+                      selectedLocalOverlayChapters.isNotEmpty)
                     BottomSelectButton(
                       icon: Icon(Icons.delete_outline_outlined, color: color),
                       onPressed: () {
@@ -1118,8 +1126,31 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                               idsToDelete,
                                             );
                                           });
+                                        } else if (selectedLocalOverlayChapters
+                                            .isNotEmpty) {
+                                          final result =
+                                              await const ChimahonLocalChapterOverlayService()
+                                                  .deleteSelected(
+                                                    database: isar,
+                                                    manga: widget.manga!,
+                                                    selectedChapters:
+                                                        selectedLocalOverlayChapters,
+                                                  );
+                                          if (result.failed.isNotEmpty) {
+                                            botToast(
+                                              'Could not delete ${result.failed.length} local chapter file(s).',
+                                            );
+                                          }
                                         }
-                                        for (final chapter in isDownloaded) {
+                                        final localOverlayIds =
+                                            selectedLocalOverlayChapters
+                                                .map((chapter) => chapter.id)
+                                                .toSet();
+                                        for (final chapter
+                                            in isDownloaded.where(
+                                              (chapter) => !localOverlayIds
+                                                  .contains(chapter.id),
+                                            )) {
                                           await chapter.deleteDownloadedFiles();
                                         }
                                         if (!mounted) return;
@@ -2439,7 +2470,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                     isar.writeTxnSync(() {
                       final manga = widget.manga!;
                       manga.description = description.text;
-                      manga.name = name.text;
+                      manga.updateDisplayTitle(name.text);
                       manga.updatedAt = DateTime.now().millisecondsSinceEpoch;
                       isar.mangas.putSync(manga);
                     });

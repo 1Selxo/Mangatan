@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## 1.0.8+123 - 2026-07-26
+
+- Promoted Mangatan 1.0.8 from beta to the stable release channel.
+- Fixed missing or inaccurate OCR on extremely tall webtoon pages by scanning
+  overlapping vertical tiles, remapping results to full-page coordinates, and
+  discarding duplicate detections at tile seams.
+- Applied tall-page tiling to both local ScreenAI and Google Lens OCR while
+  leaving ordinary manga pages on the existing single-request path.
+- Updated the in-app, Rich Presence, README, issue-support, and GitHub
+  repository links to the new Mangatan Discord server.
+
+## 1.0.8-beta+122 - 2026-07-25
+
+- Updated Mangatan to the latest Mangayomi base while preserving its reader,
+  dictionary, OCR, EPUB, mining, and Chimahon-compatible sync features.
+- Added Android TV discovery, navigation, player controls, packaging assets,
+  update-error reporting, custom DNS-over-HTTPS, and Cloudflare proxy support.
+- Added optimized tiled/subsampled manga image rendering and restored
+  Mangatan's crop-border and OCR cache integration.
+- Merged PR #61 to move local ScreenAI OCR work off the UI thread and serialize
+  native OCR access.
+- Merged PR #62 to optionally crop manga screenshots before exporting Anki
+  cards.
+- Published SHA-256 checksums for the unsigned Windows installer and portable
+  archive.
+- Fixed WebDAV credential validation, EPUB blob verification tests, TV settings
+  isolation, and cross-platform protocol tests.
+
 ## 1.0.7-beta+121 - 2026-07-18
 
 - Added Chimahon-compatible sync mode as a separate switchable sync path.

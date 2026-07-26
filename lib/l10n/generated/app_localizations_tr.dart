@@ -548,18 +548,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get appearance_subtitle => 'Tema, tarih ve saat formatı';
 
   @override
-  String get animation_speed => 'Animation speed';
-
-  @override
-  String get animation_speed_description =>
-      'Lower values play animations faster.';
-
-  @override
-  String animation_duration_percentage(int percentage) {
-    return '$percentage% duration';
-  }
-
-  @override
   String get theme => 'Tema';
 
   @override
@@ -617,34 +605,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get reading_mode_right_to_left => 'Sağdan Sola';
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get reading_mode_vertical_continuous => 'Sürekli Dikey';
 
   @override
   String get reading_mode_webtoon => 'Webtoon';
-
-  @override
-  String get default_page_mode => 'Default page mode';
-
-  @override
-  String get page_mode_single => 'Single page';
-
-  @override
-  String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => 'Çift Dokunma Animasyon Hızı';
@@ -1551,9 +1515,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get font_size => 'Yazı Boyutu';
 
   @override
-  String get subtitle_position => 'Subtitle position';
-
-  @override
   String get text => 'Metin';
 
   @override
@@ -2392,6 +2353,155 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get tts_default => 'Default';
+
+  @override
+  String get webtoon_disable_zoom_out =>
+      'Webtoon uzaklaştırmayı devre dışı bırak';
+
+  @override
+  String get webtoon_double_tap_zoom_enabled =>
+      'Webtoon yakınlaştırma için çift dokun';
+
+  @override
+  String get navigate_to_pan => 'Kaydırmak için gezin';
+
+  @override
+  String get navigate_to_pan_subtitle =>
+      'Sayfa çevirmeden önce yakınlaştırılmış resmi hareket ettir';
+
+  @override
+  String get split_wide_pages => 'Geniş sayfaları böl';
+
+  @override
+  String get dual_page_invert => 'Bölünen yarım sayfaları ters çevir';
+
+  @override
+  String get dual_page_rotate_to_fit => 'Sığdırmak için döndür';
+
+  @override
+  String get dual_page_rotate_to_fit_invert => 'Döndürme yönünü tersine çevir';
+
+  @override
+  String get landscape_zoom => 'Otomatik yatay yakınlaştırma';
+
+  @override
+  String get zoom_start_position => 'Yakınlaştırma başlangıç konumu';
+
+  @override
+  String get zoom_start_left => 'Sol';
+
+  @override
+  String get zoom_start_right => 'Sağ';
+
+  @override
+  String get zoom_start_center => 'Orta';
+
+  @override
+  String get automatic_background => 'Otomatik arka plan';
+
+  @override
+  String get tapping_inversion => 'Dokunma tersine çevirme';
+
+  @override
+  String get tapping_inversion_none => 'Hiçbiri';
+
+  @override
+  String get tapping_inversion_horizontal => 'Yatay';
+
+  @override
+  String get tapping_inversion_vertical => 'Dikey';
+
+  @override
+  String get tapping_inversion_both => 'Her ikisi';
+
+  @override
+  String get flash_on_page_change => 'Sayfa geçişinde flaş';
+
+  @override
+  String get flash_on_page_change_subtitle => 'AMOLED iz önleme yardımcısı';
+
+  @override
+  String get flash_color => 'Flaş Rengi';
+
+  @override
+  String get flash_color_black => 'Siyah';
+
+  @override
+  String get flash_color_white => 'Beyaz';
+
+  @override
+  String get flash_color_white_black => 'Beyaz & Siyah';
+
+  @override
+  String flash_interval(String n) {
+    return 'Flaş Aralığı: $n sayfa';
+  }
+
+  @override
+  String flash_duration(String n) {
+    return 'Flaş Süresi: $n ms';
+  }
+
+  @override
+  String get show_navigation_overlay_on_start =>
+      'Başlangıçta gezinme panelini göster';
+
+  @override
+  String get reader_hide_threshold => 'Okuyucu Gizleme Eşiği';
+
+  @override
+  String get reader_hide_threshold_highest => 'En yüksek (5 px)';
+
+  @override
+  String get reader_hide_threshold_high => 'Yüksek (13 px)';
+
+  @override
+  String get reader_hide_threshold_low => 'Düşük (31 px)';
+
+  @override
+  String get reader_hide_threshold_lowest => 'En düşük (47 px)';
+
+  @override
+  String get error_no_pages_available => 'Hata: kullanılabilir sayfa yok';
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
 
   @override
   String get dictionary_lookup => 'Dictionary';

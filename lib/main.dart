@@ -23,7 +23,6 @@ import 'package:mangayomi/models/track.dart' as track;
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
-import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/storage_usage.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
@@ -36,9 +35,14 @@ import 'package:mangayomi/modules/more/settings/appearance/providers/animation_d
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
+import 'package:mangayomi/services/sync/google_drive_app_diagnostic.dart';
+import 'package:mangayomi/services/sync/google_drive_chimahon_preview_runner.dart';
+import 'package:mangayomi/services/sync/google_drive_platform_support.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
 import 'package:mangayomi/utils/discord_rpc.dart';
 import 'package:mangayomi/utils/log/logger.dart';
@@ -54,11 +58,35 @@ import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:mangayomi/utils/window_geometry.dart';
+import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart';
 
 late Isar isar;
 DiscordRPC? discordRpc;
 WebViewEnvironment? webViewEnvironment;
 String? customDns;
+
+/// Captures a supported cold-start URI supplied directly to a desktop runner.
+///
+/// Linux depends on this because GTK's command-line signal can precede the
+/// Dart app-links listener. Windows can also supply the initial URI in argv;
+/// duplicate native delivery is harmless because [_MyAppState.lastUri]
+/// de-duplicates it. The normal stream handles links sent to a running app.
+@visibleForTesting
+Uri? initialDesktopAppLinkFromArguments(
+  List<String> arguments, {
+  required TargetPlatform platform,
+}) {
+  if (!supportsGoogleDriveChimahonSync(platform)) return null;
+  const supportedSchemes = {'mangayomi', 'app.chimahon.google.oauth'};
+  for (final argument in arguments) {
+    final uri = Uri.tryParse(argument);
+    if (uri != null && supportedSchemes.contains(uri.scheme.toLowerCase())) {
+      return uri;
+    }
+  }
+  return null;
+}
+
 void main(List<String> args) async {
   // Zone-level catch-all for anything that slips through both layers
   runZonedGuarded(
@@ -95,14 +123,28 @@ void main(List<String> args) async {
 
       MediaKit.ensureInitialized();
       await RustLib.init();
-      await imgCropIsolate.start();
+      // Detect Android TV / leanback so the UI can branch on form factor.
+      // No-op on other platforms. See #729.
+      await initIsTv();
       await getIsolateService.start();
+      await ffiImageDecoder.start();
       if (!isMobile) {
         await windowManager.ensureInitialized();
         await WindowGeometry.restore();
       }
-      if (Platform.isWindows) {
-        registerProtocolHandler("mangayomi");
+      if (Platform.isWindows || Platform.isLinux) {
+        try {
+          registerPersistentProtocolHandler("mangayomi");
+        } catch (error, stackTrace) {
+          // A protocol collision must not prevent Mangatan itself from opening.
+          // The conflicting handler is deliberately left untouched.
+          debugPrint('Could not register the mangayomi URL protocol: $error');
+          AppLogger.log(
+            'Could not register the desktop mangayomi URL protocol: '
+            '$error\n$stackTrace',
+            logLevel: LogLevel.warning,
+          );
+        }
       }
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
         final availableVersion = await WebViewEnvironment.getAvailableVersion();
@@ -116,7 +158,11 @@ void main(List<String> args) async {
         }
       }
       final storage = StorageProvider();
-      await storage.requestPermission();
+      // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
+      // prompt at launch. The database lives in scoped app storage, so the app
+      // can start, browse and read online without it. The permission is still
+      // requested lazily by `createDirectorySafely` / `initDB` the first time a
+      // public path actually needs to be written (e.g. a download). See #740.
       Object? startupError;
       try {
         isar = await storage.initDB(null, inspector: kDebugMode);
@@ -127,7 +173,15 @@ void main(List<String> args) async {
       runApp(
         startupError != null
             ? _StartupErrorApp(error: startupError.toString())
-            : ProviderScope(child: MyApp(), retry: (retryCount, error) => null),
+            : ProviderScope(
+                child: MyApp(
+                  initialAppLink: initialDesktopAppLinkFromArguments(
+                    args,
+                    platform: defaultTargetPlatform,
+                  ),
+                ),
+                retry: (retryCount, error) => null,
+              ),
       );
       if (startupError == null) unawaited(_postLaunchInit(storage));
     },
@@ -179,9 +233,16 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   if (isApple || Platform.isAndroid) {
     await Hive.initFlutter(isApple ? "databases" : "");
+    if (Platform.isMacOS) {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      MiningPreferences.configureStorageDirectory(
+        p.join(documentsDirectory.path, 'databases'),
+      );
+    }
   } else {
     final databaseDirectory = await storage.getDatabaseDirectory();
     Hive.init(databaseDirectory!.path);
+    MiningPreferences.configureStorageDirectory(databaseDirectory.path);
   }
   Hive.registerAdapter(TrackSearchAdapter());
   if (isDesktop && !kDebugMode) {
@@ -193,7 +254,9 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
 }
 
 class MyApp extends ConsumerStatefulWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.initialAppLink});
+
+  final Uri? initialAppLink;
 
   @override
   ConsumerState<MyApp> createState() => _MyAppState();
@@ -206,6 +269,7 @@ class _MyAppState extends ConsumerState<MyApp>
         SingleTickerProviderStateMixin {
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
+  GoogleDriveDebugDiagnosticHandler? _googleDriveDiagnosticHandler;
   Uri? lastUri;
   late final AnimationController _disabledProgressController;
 
@@ -217,6 +281,17 @@ class _MyAppState extends ConsumerState<MyApp>
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
     customDns = ref.read(customDnsStateProvider);
+    if (kDebugMode && supportsGoogleDriveChimahonSyncOnCurrentPlatform) {
+      final previewRunner = GoogleDriveChimahonPreviewRunner.forDatabase(isar);
+      _googleDriveDiagnosticHandler = GoogleDriveDebugDiagnosticHandler(
+        syncPreview: (referenceBackupBytes) =>
+            ChimahonRestoreSyncCoordinator.shared.duringReadOnlyPreview(
+              () async => (await previewRunner.run(
+                referenceBackupBytes: referenceBackupBytes,
+              )).toSafeJson(),
+            ),
+      );
+    }
     _checkTrackerRefresh();
     _initDeepLinks();
     _setupMpvConfig();
@@ -333,6 +408,7 @@ class _MyAppState extends ConsumerState<MyApp>
     }
     MExtensionServerPlatform(ref).stopServer();
     _linkSubscription?.cancel();
+    _googleDriveDiagnosticHandler?.close();
     discordRpc?.destroy();
     stopwebviewServer();
     AppLogger.dispose();
@@ -352,146 +428,156 @@ class _MyAppState extends ConsumerState<MyApp>
     if (Platform.isLinux) exit(0);
   }
 
-  Future<void> _initDeepLinks() async {
+  void _initDeepLinks() {
     _appLinks = AppLinks();
-    _linkSubscription = _appLinks.uriLinkStream.listen((uri) async {
-      if (uri == lastUri) return; // Debouncing Deep Links
-      lastUri = uri;
-      switch (uri.host) {
-        case "add-repo":
-          final repoName = uri.queryParameters["repo_name"];
-          final repoUrl = uri.queryParameters["repo_url"];
-          final mangaRepoUrls = uri.queryParametersAll["manga_url"];
-          final animeRepoUrls = uri.queryParametersAll["anime_url"];
-          final novelRepoUrls = uri.queryParametersAll["novel_url"];
-          final context = navigatorKey.currentContext;
-          if (context == null || !context.mounted) return;
-          final l10n = context.l10n;
-          showDialog(
-            context: navigatorKey.currentContext!,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: Text(l10n.add_repo),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("${l10n.name}: ${repoName ?? 'Unknown'}"),
-                    const SizedBox(height: 8),
-                    Text("URL: ${repoUrl ?? 'Unknown'}"),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    child: Text(l10n.cancel),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  FilledButton(
-                    child: Text(l10n.add),
-                    onPressed: () async {
-                      if (context.mounted) Navigator.of(context).pop();
+    _linkSubscription = _appLinks.uriLinkStream.listen(_handleDeepLink);
+    final initialAppLink = widget.initialAppLink;
+    if (initialAppLink != null) {
+      unawaited(_handleDeepLink(initialAppLink));
+    }
+  }
 
-                      final validUrls = await _checkValidUrls([
-                        ...mangaRepoUrls ?? [],
-                        ...animeRepoUrls ?? [],
-                        ...novelRepoUrls ?? [],
-                      ]);
-
-                      if (!validUrls) {
-                        botToast(l10n.unsupported_repo);
-                        return;
-                      }
-
-                      void addRepos(ItemType type, List<String>? urls) {
-                        if (urls == null) return;
-                        final current = ref.read(
-                          extensionsRepoStateProvider(type),
-                        );
-                        final updated = [
-                          ...current,
-                          ...urls.map(
-                            (e) => Repo(
-                              name: repoName,
-                              jsonUrl: e,
-                              website: repoUrl,
-                            ),
-                          ),
-                        ];
-                        ref
-                            .read(extensionsRepoStateProvider(type).notifier)
-                            .set(updated);
-                      }
-
-                      addRepos(ItemType.manga, mangaRepoUrls);
-                      addRepos(ItemType.anime, animeRepoUrls);
-                      addRepos(ItemType.novel, novelRepoUrls);
-                      botToast(l10n.repo_added);
-                    },
-                  ),
+  Future<void> _handleDeepLink(Uri uri) async {
+    if (uri == lastUri) return; // Debouncing Deep Links
+    lastUri = uri;
+    final googleDriveDiagnosticHandler = _googleDriveDiagnosticHandler;
+    if (googleDriveDiagnosticHandler != null &&
+        await googleDriveDiagnosticHandler.handle(uri)) {
+      // AppLinks exposes a broadcast stream. Returning here only stops normal
+      // app routing; it cannot consume the callback from an active OAuth
+      // listener subscribed to the same URI event.
+      return;
+    }
+    switch (uri.host) {
+      case "add-repo":
+        final repoName = uri.queryParameters["repo_name"];
+        final repoUrl = uri.queryParameters["repo_url"];
+        final mangaRepoUrls = uri.queryParametersAll["manga_url"];
+        final animeRepoUrls = uri.queryParametersAll["anime_url"];
+        final novelRepoUrls = uri.queryParametersAll["novel_url"];
+        final context = navigatorKey.currentContext;
+        if (context == null || !context.mounted) return;
+        final l10n = context.l10n;
+        showDialog(
+          context: navigatorKey.currentContext!,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(l10n.add_repo),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("${l10n.name}: ${repoName ?? 'Unknown'}"),
+                  const SizedBox(height: 8),
+                  Text("URL: ${repoUrl ?? 'Unknown'}"),
                 ],
-              );
-            },
-          );
-          break;
-        case "add-button":
-          final buttonDataRaw = uri.queryParametersAll["button"];
-          final context = navigatorKey.currentContext;
-          if (context == null || !context.mounted || buttonDataRaw == null) {
-            return;
-          }
-          final l10n = context.l10n;
-          for (final buttonRaw in buttonDataRaw) {
-            final buttonData = jsonDecode(
-              utf8.decode(base64.decode(buttonRaw)),
-            );
-            if (buttonData is Map<String, dynamic>) {
-              final customButton = CustomButton.fromJson(buttonData);
-              await showDialog(
-                context: navigatorKey.currentContext!,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: Text(l10n.custom_buttons_add),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "${l10n.name}: ${customButton.title ?? 'Unknown'}",
+              ),
+              actions: [
+                TextButton(
+                  child: Text(l10n.cancel),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                FilledButton(
+                  child: Text(l10n.add),
+                  onPressed: () async {
+                    if (context.mounted) Navigator.of(context).pop();
+
+                    final validUrls = await _checkValidUrls([
+                      ...mangaRepoUrls ?? [],
+                      ...animeRepoUrls ?? [],
+                      ...novelRepoUrls ?? [],
+                    ]);
+
+                    if (!validUrls) {
+                      botToast(l10n.unsupported_repo);
+                      return;
+                    }
+
+                    void addRepos(ItemType type, List<String>? urls) {
+                      if (urls == null) return;
+                      final current = ref.read(
+                        extensionsRepoStateProvider(type),
+                      );
+                      final updated = [
+                        ...current,
+                        ...urls.map(
+                          (e) => Repo(
+                            name: repoName,
+                            jsonUrl: e,
+                            website: repoUrl,
+                          ),
                         ),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        child: Text(l10n.cancel),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      FilledButton(
-                        child: Text(l10n.add),
-                        onPressed: () async {
-                          if (context.mounted) Navigator.of(context).pop();
-                          await isar.writeTxn(() async {
-                            await isar.customButtons.put(
-                              customButton
-                                ..pos = await isar.customButtons.count()
-                                ..isFavourite = false
-                                ..id = null
-                                ..updatedAt =
-                                    DateTime.now().millisecondsSinceEpoch,
-                            );
-                          });
-                          botToast(l10n.custom_buttons_added);
-                        },
-                      ),
+                      ];
+                      ref
+                          .read(extensionsRepoStateProvider(type).notifier)
+                          .set(updated);
+                    }
+
+                    addRepos(ItemType.manga, mangaRepoUrls);
+                    addRepos(ItemType.anime, animeRepoUrls);
+                    addRepos(ItemType.novel, novelRepoUrls);
+                    botToast(l10n.repo_added);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+        break;
+      case "add-button":
+        final buttonDataRaw = uri.queryParametersAll["button"];
+        final context = navigatorKey.currentContext;
+        if (context == null || !context.mounted || buttonDataRaw == null) {
+          return;
+        }
+        final l10n = context.l10n;
+        for (final buttonRaw in buttonDataRaw) {
+          final buttonData = jsonDecode(utf8.decode(base64.decode(buttonRaw)));
+          if (buttonData is Map<String, dynamic>) {
+            final customButton = CustomButton.fromJson(buttonData);
+            await showDialog(
+              context: navigatorKey.currentContext!,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text(l10n.custom_buttons_add),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("${l10n.name}: ${customButton.title ?? 'Unknown'}"),
                     ],
-                  );
-                },
-              );
-            }
+                  ),
+                  actions: [
+                    TextButton(
+                      child: Text(l10n.cancel),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    FilledButton(
+                      child: Text(l10n.add),
+                      onPressed: () async {
+                        if (context.mounted) Navigator.of(context).pop();
+                        await isar.writeTxn(() async {
+                          await isar.customButtons.put(
+                            customButton
+                              ..pos = await isar.customButtons.count()
+                              ..isFavourite = false
+                              ..id = null
+                              ..updatedAt =
+                                  DateTime.now().millisecondsSinceEpoch,
+                          );
+                        });
+                        botToast(l10n.custom_buttons_added);
+                      },
+                    ),
+                  ],
+                );
+              },
+            );
           }
-          break;
-        default:
-      }
-    });
+        }
+        break;
+      default:
+    }
   }
 
   Future<bool> _checkValidUrls(List<String> urls) async {
@@ -513,34 +599,42 @@ class _MyAppState extends ConsumerState<MyApp>
   }
 
   Future<void> _setupMpvConfig() async {
-    final provider = StorageProvider();
-    final dir = await provider.getMpvDirectory();
-    final mpvFile = File('${dir!.path}/mpv.conf');
-    final inputFile = File('${dir.path}/input.conf');
-    final filesMissing =
-        !(await mpvFile.exists()) && !(await inputFile.exists());
-    if (filesMissing) {
-      final bytes = await rootBundle.load("assets/mangayomi_mpv.zip");
-      final archive = ZipDecoder().decodeBytes(bytes.buffer.asUint8List());
-      String shadersDir = p.join(dir.path, 'shaders');
-      await Directory(shadersDir).create(recursive: true);
-      String scriptsDir = p.join(dir.path, 'scripts');
-      await Directory(scriptsDir).create(recursive: true);
-      for (final file in archive.files) {
-        if (file.name == "mpv.conf") {
-          await mpvFile.writeAsBytes(file.content);
-        } else if (file.name == "input.conf") {
-          await inputFile.writeAsBytes(file.content);
-        } else if (file.name.startsWith("shaders/") &&
-            file.name.endsWith(".glsl")) {
-          final shaderFile = File('$shadersDir/${file.name.split("/").last}');
-          await shaderFile.writeAsBytes(file.content);
-        } else if (file.name.startsWith("scripts/") &&
-            (file.name.endsWith(".js") || file.name.endsWith(".lua"))) {
-          final scriptFile = File('$scriptsDir/${file.name.split("/").last}');
-          await scriptFile.writeAsBytes(file.content);
+    try {
+      final provider = StorageProvider();
+      final dir = await provider.getMpvDirectory();
+      final mpvFile = File('${dir!.path}/mpv.conf');
+      final inputFile = File('${dir.path}/input.conf');
+      final filesMissing =
+          !(await mpvFile.exists()) && !(await inputFile.exists());
+      if (filesMissing) {
+        final bytes = await rootBundle.load("assets/mangayomi_mpv.zip");
+        final archive = ZipDecoder().decodeBytes(bytes.buffer.asUint8List());
+        String shadersDir = p.join(dir.path, 'shaders');
+        await Directory(shadersDir).create(recursive: true);
+        String scriptsDir = p.join(dir.path, 'scripts');
+        await Directory(scriptsDir).create(recursive: true);
+        for (final file in archive.files) {
+          if (file.name == "mpv.conf") {
+            await mpvFile.writeAsBytes(file.content);
+          } else if (file.name == "input.conf") {
+            await inputFile.writeAsBytes(file.content);
+          } else if (file.name.startsWith("shaders/") &&
+              file.name.endsWith(".glsl")) {
+            final shaderFile = File('$shadersDir/${file.name.split("/").last}');
+            await shaderFile.writeAsBytes(file.content);
+          } else if (file.name.startsWith("scripts/") &&
+              (file.name.endsWith(".js") || file.name.endsWith(".lua"))) {
+            final scriptFile = File('$scriptsDir/${file.name.split("/").last}');
+            await scriptFile.writeAsBytes(file.content);
+          }
         }
       }
+    } catch (e) {
+      // Best-effort: on Android the mpv config dir is in shared storage, which
+      // may not be writable until the all-files permission is granted (now
+      // requested lazily, not forced at launch). Skip setup rather than throw;
+      // it's retried on a later launch once the directory is writable. See #740.
+      if (kDebugMode) debugPrint('mpv config setup skipped: $e');
     }
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
+import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
 
@@ -22,10 +24,15 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: SettingsScreen(),
+      ProviderScope(
+        overrides: [
+          animeOnlyTvModeProvider.overrideWith(_TestAnimeOnlyTvMode.new),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SettingsScreen(),
+        ),
       ),
     );
 
@@ -38,4 +45,9 @@ void main() {
     }
     expect(find.text('Dictionary & OCR'), findsNothing);
   });
+}
+
+class _TestAnimeOnlyTvMode extends AnimeOnlyTvMode {
+  @override
+  bool build() => false;
 }

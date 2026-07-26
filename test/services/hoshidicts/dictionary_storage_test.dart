@@ -5,6 +5,19 @@ import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
+  test('read-only listing does not create a missing root', () async {
+    final parent = await Directory.systemTemp.createTemp('dictionary-storage-');
+    addTearDown(() => parent.delete(recursive: true));
+    final missingRoot = Directory(p.join(parent.path, 'dictionaries'));
+
+    final installed = await DictionaryStorage.instance.installedReadOnly(
+      root: missingRoot,
+    );
+
+    expect(installed, isEmpty);
+    expect(await missingRoot.exists(), isFalse);
+  });
+
   test(
     'finds existing Hoshidicts imports in the flat output directory',
     () async {

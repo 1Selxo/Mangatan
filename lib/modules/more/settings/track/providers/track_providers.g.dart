@@ -57,7 +57,7 @@ final class TracksProvider extends $NotifierProvider<Tracks, TrackPreference?> {
   }
 }
 
-String _$tracksHash() => r'05f1531a3200b0ad9f1e4bf74cd9eb44301f9f21';
+String _$tracksHash() => r'ac33c1b4cc11f22f4ab26435848f3162132aa31d';
 
 final class TracksFamily extends $Family
     with

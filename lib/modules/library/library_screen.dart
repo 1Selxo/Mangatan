@@ -57,6 +57,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   final _textEditingController = TextEditingController();
   TabController? tabBarController;
   int _tabIndex = 0;
+  String? _selectedTabKey;
   Timer? _searchDebounce;
 
   @override
@@ -328,7 +329,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }) {
     data.sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
     final entr = data.where((e) => !(e.hide ?? false)).toList();
-    int tabCount = withoutCategory.isNotEmpty ? entr.length + 1 : entr.length;
+    final tabKeys = <String>[
+      if (withoutCategory.isNotEmpty) 'default',
+      ...entr.map((e) => 'category:${e.id}'),
+    ];
+    if (_selectedTabKey == null || !tabKeys.contains(_selectedTabKey)) {
+      _selectedTabKey = tabKeys.isEmpty ? null : tabKeys.first;
+    }
+    var selectedIndex = _selectedTabKey == null
+        ? 0
+        : tabKeys.indexOf(_selectedTabKey!);
+    if (selectedIndex < 0) selectedIndex = 0;
+    final tabCount = tabKeys.length;
 
     if (tabCount <= 0) {
       return bodyForCategory();
@@ -337,7 +349,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     // Manage TabController
     if (tabCount > 0 &&
         (tabBarController == null || tabBarController!.length != tabCount)) {
-      int newTabIndex = _tabIndex;
+      int newTabIndex = selectedIndex;
       if (newTabIndex >= tabCount) newTabIndex = tabCount - 1;
       tabBarController?.dispose();
       tabBarController = TabController(
@@ -347,12 +359,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       );
       _tabIndex = newTabIndex;
       tabBarController!.addListener(() {
+        if (tabBarController!.index < tabKeys.length) {
+          _selectedTabKey = tabKeys[tabBarController!.index];
+        }
         setState(() => _tabIndex = tabBarController!.index);
+      });
+    }
+    if (tabBarController != null &&
+        tabBarController!.length == tabCount &&
+        tabBarController!.index != selectedIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            tabBarController == null ||
+            tabBarController!.length != tabCount ||
+            tabBarController!.index == selectedIndex) {
+          return;
+        }
+        tabBarController!.animateTo(selectedIndex);
       });
     }
 
     return DefaultTabController(
-      length: entr.length,
+      length: tabCount,
       child: Scaffold(
         appBar: LibraryAppBar(
           itemType: widget.itemType,
@@ -361,10 +389,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           numberOfItems: numberOfItems,
           entries: _entries,
           isCategory: true,
-          categoryId: withoutCategory.isNotEmpty && _tabIndex == 0
+          categoryId: _selectedTabKey == 'default'
               ? null
-              : entr[withoutCategory.isNotEmpty ? _tabIndex - 1 : _tabIndex]
-                    .id!,
+              : (_selectedTabKey?.startsWith('category:') ?? false)
+                  ? int.tryParse(_selectedTabKey!.substring(9))
+                  : null,
           settings: settings,
           isSearch: _isSearch,
           ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
@@ -388,6 +417,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               withoutCategory: withoutCategory,
               showNumbersOfItems: showNumbersOfItems,
               badgeForCategory: badgeForCategory,
+              tabKeys: tabKeys,
             ),
             Flexible(
               child: TabBarView(
@@ -410,11 +440,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     required List<Manga> withoutCategory,
     required bool showNumbersOfItems,
     required Widget Function(int categoryId) badgeForCategory,
+    required List<String> tabKeys,
   }) {
     final l10n = l10nLocalizations(context)!;
     return TabBar(
       isScrollable: true,
       controller: tabBarController,
+      onTap: (index) {
+        if (index < tabKeys.length) {
+          setState(() => _selectedTabKey = tabKeys[index]);
+        }
+      },
       tabs: [
         if (withoutCategory.isNotEmpty)
           Row(

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/page.dart';
@@ -20,10 +21,17 @@ class UChapDataPreload {
   Chapter? nextChapter;
   String? mangaName;
   bool? isLastChapter;
+  Rect? srcRect;
 
   /// Cached rendered dimensions (set after image first loads)
   double? loadedHeight;
   double? loadedWidth;
+
+  /// Cached decoded image for tiled rendering.
+  Image? decodedImage;
+
+  /// Cached local file path for the subsampling image view.
+  String? resolvedFilePath;
 
   UChapDataPreload(
     this.chapter,
@@ -40,6 +48,7 @@ class UChapDataPreload {
     this.nextChapter,
     this.mangaName,
     this.isLastChapter = false,
+    this.srcRect,
   });
 
   UChapDataPreload.transition({
@@ -57,5 +66,6 @@ class UChapDataPreload {
        index = null,
        chapterUrlModel = null,
        localArtifactPath = null,
-       cropImage = null;
+       cropImage = null,
+       srcRect = null;
 }

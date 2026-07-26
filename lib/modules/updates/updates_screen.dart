@@ -10,6 +10,8 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/updates/widgets/update_chapter_list_tile_widget.dart';
+import 'package:mangayomi/modules/updates/update_errors_screen.dart';
+import 'package:mangayomi/services/update_errors_provider.dart';
 import 'package:mangayomi/modules/history/providers/isar_providers.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/library_updater.dart';
@@ -60,6 +62,19 @@ class _UpdatesScreenState extends BaseLibraryTabScreenState<UpdatesScreen> {
     final l10n = l10nLocalizations(context)!;
 
     return [
+      if (ref.watch(updateErrorsProvider).isNotEmpty)
+        IconButton(
+          splashRadius: 20,
+          tooltip: 'Update errors',
+          icon: Icon(
+            Icons.error_outline,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const UpdateErrorsScreen()),
+          ),
+        ),
       IconButton(
         splashRadius: 20,
         icon: Icon(Icons.refresh_outlined, color: Theme.of(context).hintColor),
@@ -121,19 +136,18 @@ class _UpdatesScreenState extends BaseLibraryTabScreenState<UpdatesScreen> {
   }
 
   Future<void> _clearUpdates() async {
-    List<Update> updates = await isar.updates
+    final List<Id> idsToDelete = await isar.updates
         .filter()
         .idIsNotNull()
         .chapter((q) => q.manga((q) => q.itemTypeEqualTo(getCurrentItemType())))
+        .idProperty()
         .findAll();
-    if (updates.isEmpty) return;
-    final idsToDelete = <Id>[];
+    if (idsToDelete.isEmpty) return;
     isar.writeTxnSync(() {
-      for (var update in updates) {
-        idsToDelete.add(update.id!);
+      for (var id in idsToDelete) {
         ref
             .read(synchingProvider(syncId: 1).notifier)
-            .addChangedPart(ActionType.removeUpdate, update.id, "{}", false);
+            .addChangedPart(ActionType.removeUpdate, id, "{}", false);
       }
     });
     await isar.writeTxn(() async => await isar.updates.deleteAll(idsToDelete));

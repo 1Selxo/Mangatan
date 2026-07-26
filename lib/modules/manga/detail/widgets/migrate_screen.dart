@@ -276,7 +276,7 @@ class _MigrationMangaGlobalImageCardState
         stream: isar.mangas
             .filter()
             .langEqualTo(widget.source.lang)
-            .nameEqualTo(getMangaDetail.name)
+            .titleMatchesSourceIdentity(getMangaDetail.name)
             .sourceEqualTo(widget.source.name)
             .watch(fireImmediately: true),
         builder: (context, snapshot) {
@@ -543,11 +543,7 @@ class _MigrationMangaGlobalImageCardState
                           "/categories",
                           extra: (
                             true,
-                            widget.oldManga.itemType == ItemType.manga
-                                ? 0
-                                : widget.oldManga.itemType == ItemType.anime
-                                ? 1
-                                : 2,
+                            widget.oldManga.itemType,
                           ),
                         );
                         Navigator.pop(context);
@@ -566,24 +562,31 @@ class _MigrationMangaGlobalImageCardState
                         TextButton(
                           onPressed: () async {
                             final model = widget.manga;
-                            final manga = Manga(
-                              name: model.name,
-                              artist: model.artist,
-                              author: model.author,
-                              description: model.description,
-                              imageUrl: model.imageUrl,
-                              link: model.link,
-                              genre: model.genre,
-                              status: model.status ?? Status.unknown,
-                              source: widget.source.name,
-                              lang: widget.source.lang,
-                              itemType: widget.oldManga.itemType,
-                              favorite: true,
-                              categories: categoryIds,
-                              dateAdded: DateTime.now().millisecondsSinceEpoch,
-                              updatedAt: DateTime.now().millisecondsSinceEpoch,
-                              sourceId: widget.source.id,
-                            );
+                            final favoriteModifiedAt = DateTime.now();
+                            final manga =
+                                Manga(
+                                  name: model.name,
+                                  artist: model.artist,
+                                  author: model.author,
+                                  description: model.description,
+                                  imageUrl: model.imageUrl,
+                                  link: model.link,
+                                  genre: model.genre,
+                                  status: model.status ?? Status.unknown,
+                                  source: widget.source.name,
+                                  lang: widget.source.lang,
+                                  itemType: widget.oldManga.itemType,
+                                  favorite: true,
+                                  categories: categoryIds,
+                                  dateAdded:
+                                      favoriteModifiedAt.millisecondsSinceEpoch,
+                                  updatedAt:
+                                      favoriteModifiedAt.millisecondsSinceEpoch,
+                                  sourceId: widget.source.id,
+                                )..updateFavorite(
+                                  true,
+                                  modifiedAt: favoriteModifiedAt,
+                                );
                             int mangaId = -1;
                             isar.writeTxnSync(() {
                               mangaId = isar.mangas.putSync(manga);

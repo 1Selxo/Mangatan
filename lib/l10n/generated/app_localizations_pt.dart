@@ -554,18 +554,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get appearance_subtitle => 'Tema, formato de data e hora';
 
   @override
-  String get animation_speed => 'Animation speed';
-
-  @override
-  String get animation_speed_description =>
-      'Lower values play animations faster.';
-
-  @override
-  String animation_duration_percentage(int percentage) {
-    return '$percentage% duration';
-  }
-
-  @override
   String get theme => 'Tema';
 
   @override
@@ -623,34 +611,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get reading_mode_right_to_left => 'Da direita para a esquerda';
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get reading_mode_vertical_continuous => 'Vertical contínuo';
 
   @override
   String get reading_mode_webtoon => 'Webtoon';
-
-  @override
-  String get default_page_mode => 'Default page mode';
-
-  @override
-  String get page_mode_single => 'Single page';
-
-  @override
-  String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed =>
@@ -1558,9 +1522,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get font_size => 'Tamanho da fonte';
 
   @override
-  String get subtitle_position => 'Subtitle position';
-
-  @override
   String get text => 'Texto';
 
   @override
@@ -2406,6 +2367,154 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get tts_default => 'Default';
+
+  @override
+  String get webtoon_disable_zoom_out => 'Desativar zoom out do Webtoon';
+
+  @override
+  String get webtoon_double_tap_zoom_enabled =>
+      'Toque duplo para zoom no Webtoon';
+
+  @override
+  String get navigate_to_pan => 'Navegar para arrastar';
+
+  @override
+  String get navigate_to_pan_subtitle =>
+      'Mover a imagem ampliada antes de mudar de página';
+
+  @override
+  String get split_wide_pages => 'Dividir páginas duplas';
+
+  @override
+  String get dual_page_invert => 'Inverter metades de páginas cortadas';
+
+  @override
+  String get dual_page_rotate_to_fit => 'Rotacionar para caber';
+
+  @override
+  String get dual_page_rotate_to_fit_invert => 'Inverter direção de rotação';
+
+  @override
+  String get landscape_zoom => 'Zoom automático em modo paisagem';
+
+  @override
+  String get zoom_start_position => 'Posição inicial do zoom';
+
+  @override
+  String get zoom_start_left => 'Esquerda';
+
+  @override
+  String get zoom_start_right => 'Direita';
+
+  @override
+  String get zoom_start_center => 'Centro';
+
+  @override
+  String get automatic_background => 'Fundo automático';
+
+  @override
+  String get tapping_inversion => 'Inversão de toque';
+
+  @override
+  String get tapping_inversion_none => 'Nenhum';
+
+  @override
+  String get tapping_inversion_horizontal => 'Horizontal';
+
+  @override
+  String get tapping_inversion_vertical => 'Vertical';
+
+  @override
+  String get tapping_inversion_both => 'Ambos';
+
+  @override
+  String get flash_on_page_change => 'Piscar ao mudar de página';
+
+  @override
+  String get flash_on_page_change_subtitle => 'Assistente anti-retenção AMOLED';
+
+  @override
+  String get flash_color => 'Cor do flash';
+
+  @override
+  String get flash_color_black => 'Preto';
+
+  @override
+  String get flash_color_white => 'Branco';
+
+  @override
+  String get flash_color_white_black => 'Branco e Preto';
+
+  @override
+  String flash_interval(String n) {
+    return 'Intervalo do flash: $n páginas';
+  }
+
+  @override
+  String flash_duration(String n) {
+    return 'Duração do flash: $n ms';
+  }
+
+  @override
+  String get show_navigation_overlay_on_start =>
+      'Mostrar sobreposição de navegação ao iniciar';
+
+  @override
+  String get reader_hide_threshold => 'Limite de ocultação do leitor';
+
+  @override
+  String get reader_hide_threshold_highest => 'Mais alto (5 px)';
+
+  @override
+  String get reader_hide_threshold_high => 'Alto (13 px)';
+
+  @override
+  String get reader_hide_threshold_low => 'Baixo (31 px)';
+
+  @override
+  String get reader_hide_threshold_lowest => 'Mais baixo (47 px)';
+
+  @override
+  String get error_no_pages_available => 'Erro: nenhuma página disponível';
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
 
   @override
   String get dictionary_lookup => 'Dictionary';
@@ -4778,4 +4887,113 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get webview => 'Webview';
+
+  @override
+  String get webtoon_disable_zoom_out => 'Desativar zoom out do Webtoon';
+
+  @override
+  String get webtoon_double_tap_zoom_enabled =>
+      'Toque duplo para zoom no Webtoon';
+
+  @override
+  String get navigate_to_pan => 'Navegar para arrastar';
+
+  @override
+  String get navigate_to_pan_subtitle =>
+      'Mover a imagem ampliada antes de mudar de página';
+
+  @override
+  String get split_wide_pages => 'Dividir páginas duplas';
+
+  @override
+  String get dual_page_invert => 'Inverter metades de páginas cortadas';
+
+  @override
+  String get dual_page_rotate_to_fit => 'Rotacionar para caber';
+
+  @override
+  String get dual_page_rotate_to_fit_invert => 'Inverter direção de rotação';
+
+  @override
+  String get landscape_zoom => 'Zoom automático em modo paisagem';
+
+  @override
+  String get zoom_start_position => 'Posição inicial do zoom';
+
+  @override
+  String get zoom_start_left => 'Esquerda';
+
+  @override
+  String get zoom_start_right => 'Direita';
+
+  @override
+  String get zoom_start_center => 'Centro';
+
+  @override
+  String get automatic_background => 'Fundo automático';
+
+  @override
+  String get tapping_inversion => 'Inversão de toque';
+
+  @override
+  String get tapping_inversion_none => 'Nenhum';
+
+  @override
+  String get tapping_inversion_horizontal => 'Horizontal';
+
+  @override
+  String get tapping_inversion_vertical => 'Vertical';
+
+  @override
+  String get tapping_inversion_both => 'Ambos';
+
+  @override
+  String get flash_on_page_change => 'Piscar ao mudar de página';
+
+  @override
+  String get flash_on_page_change_subtitle => 'Assistente anti-retenção AMOLED';
+
+  @override
+  String get flash_color => 'Cor do flash';
+
+  @override
+  String get flash_color_black => 'Preto';
+
+  @override
+  String get flash_color_white => 'Branco';
+
+  @override
+  String get flash_color_white_black => 'Branco e Preto';
+
+  @override
+  String flash_interval(String n) {
+    return 'Intervalo do flash: $n páginas';
+  }
+
+  @override
+  String flash_duration(String n) {
+    return 'Duração do flash: $n ms';
+  }
+
+  @override
+  String get show_navigation_overlay_on_start =>
+      'Mostrar sobreposição de navegação ao iniciar';
+
+  @override
+  String get reader_hide_threshold => 'Limite de ocultação do leitor';
+
+  @override
+  String get reader_hide_threshold_highest => 'Mais alto (5 px)';
+
+  @override
+  String get reader_hide_threshold_high => 'Alto (13 px)';
+
+  @override
+  String get reader_hide_threshold_low => 'Baixo (31 px)';
+
+  @override
+  String get reader_hide_threshold_lowest => 'Mais baixo (47 px)';
+
+  @override
+  String get error_no_pages_available => 'Erro: nenhuma página disponível';
 }

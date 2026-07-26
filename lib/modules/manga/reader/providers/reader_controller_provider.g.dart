@@ -147,7 +147,7 @@ final class ReaderControllerProvider
   }
 }
 
-String _$readerControllerHash() => r'7d3790a9f130bc0e1a36df0b49ed4c06b44d3c80';
+String _$readerControllerHash() => r'20d2c8940d084aa6fb467c3e1ee1aefa3cfbb08e';
 
 final class ReaderControllerFamily extends $Family
     with

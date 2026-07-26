@@ -7,8 +7,13 @@ import 'package:mangayomi/modules/more/providers/algorithm_weights_state_provide
 import 'package:mangayomi/modules/more/settings/general/providers/general_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/doh_provider_notifier.dart';
+import 'package:mangayomi/services/http/doh/doh_custom_store.dart';
+import 'package:mangayomi/services/http/cf_proxy_store.dart';
+import 'package:mangayomi/services/http/doh/doh_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:mangayomi/modules/widgets/tv_escapable_slider.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class GeneralScreen extends ConsumerStatefulWidget {
   const GeneralScreen({super.key});
@@ -67,14 +72,22 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
                 ListTile(
                   title: Text(l10n.dns_provider),
                   subtitle: Text(
-                    availableProviders[doHState.providerId ?? 1].name,
+                    doHState.providerId == DoHProviders.customId
+                        ? (DohCustomStore.url.trim().isEmpty
+                              ? 'Custom'
+                              : 'Custom · ${DohCustomStore.url.trim()}')
+                        : (DoHProviders.byId[doHState.providerId ?? 0]?.name ??
+                              DoHProviders.cloudflare.name),
                     style: TextStyle(
                       fontSize: 11,
                       color: context.secondaryColor,
                     ),
                   ),
                   onTap: () {
-                    final providerId = doHState.providerId ?? 1;
+                    // Default to Cloudflare (id 0) to match the subtitle, so the
+                    // dialog doesn't preselect a different provider than shown.
+                    final providerId = doHState.providerId ?? 0;
+                    final rootContext = context;
                     showDialog(
                       context: context,
                       builder: (context) {
@@ -85,17 +98,32 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
                             child: RadioGroup(
                               groupValue: providerId,
                               onChanged: (value) {
-                                ref
-                                    .read(doHProviderStateProvider.notifier)
-                                    .setDoHProvider(value!);
-                                if (context.mounted) {
-                                  Navigator.pop(context);
+                                Navigator.pop(context);
+                                if (value == DoHProviders.customId) {
+                                  _showCustomDohDialog(
+                                    rootContext,
+                                    ref,
+                                    DohCustomStore.url,
+                                  );
+                                } else {
+                                  ref
+                                      .read(doHProviderStateProvider.notifier)
+                                      .setDoHProvider(value!);
                                 }
                               },
                               child: SuperListView.builder(
                                 shrinkWrap: true,
-                                itemCount: availableProviders.length,
+                                itemCount: availableProviders.length + 1,
                                 itemBuilder: (context, index) {
+                                  // Last row: the user-supplied custom endpoint.
+                                  if (index == availableProviders.length) {
+                                    return const RadioListTile(
+                                      dense: true,
+                                      contentPadding: EdgeInsets.all(0),
+                                      value: DoHProviders.customId,
+                                      title: Text('Custom'),
+                                    );
+                                  }
                                   final provider = availableProviders[index];
                                   return RadioListTile(
                                     dense: true,
@@ -149,6 +177,16 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
                 style: TextStyle(fontSize: 11, color: context.secondaryColor),
               ),
             ),
+            ListTile(
+              onTap: () => _showCfProxyDialog(context),
+              title: const Text('Cloudflare bypass proxy'),
+              subtitle: Text(
+                CfProxyStore.url.isEmpty
+                    ? 'Optional FlareSolverr / Byparr URL'
+                    : CfProxyStore.url,
+                style: TextStyle(fontSize: 11, color: context.secondaryColor),
+              ),
+            ),
             Container(
               margin: const EdgeInsets.all(20.0),
               padding: const EdgeInsets.all(10.0),
@@ -198,25 +236,40 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 5.0,
-                            ),
-                          ),
-                          child: Slider.adaptive(
-                            min: 0,
-                            max: 100,
-                            value: _genre.toDouble(),
-                            onChanged: (value) {
-                              HapticFeedback.vibrate();
-                              setState(() {
-                                _genre = value.toInt();
-                              });
-                            },
-                            onChangeEnd: (value) => ref
+                        TvEscapableSlider(
+                          enabled: isTv,
+                          onDecrease: () {
+                            setState(() => _genre = (_genre - 1).clamp(0, 100));
+                            ref
                                 .read(algorithmWeightsStateProvider.notifier)
-                                .setWeights(genre: _genre),
+                                .setWeights(genre: _genre);
+                          },
+                          onIncrease: () {
+                            setState(() => _genre = (_genre + 1).clamp(0, 100));
+                            ref
+                                .read(algorithmWeightsStateProvider.notifier)
+                                .setWeights(genre: _genre);
+                          },
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 5.0,
+                              ),
+                            ),
+                            child: Slider.adaptive(
+                              min: 0,
+                              max: 100,
+                              value: _genre.toDouble(),
+                              onChanged: (value) {
+                                HapticFeedback.vibrate();
+                                setState(() {
+                                  _genre = value.toInt();
+                                });
+                              },
+                              onChangeEnd: (value) => ref
+                                  .read(algorithmWeightsStateProvider.notifier)
+                                  .setWeights(genre: _genre),
+                            ),
                           ),
                         ),
                       ],
@@ -237,25 +290,44 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 5.0,
-                            ),
-                          ),
-                          child: Slider.adaptive(
-                            min: 0,
-                            max: 100,
-                            value: _setting.toDouble(),
-                            onChanged: (value) {
-                              HapticFeedback.vibrate();
-                              setState(() {
-                                _setting = value.toInt();
-                              });
-                            },
-                            onChangeEnd: (value) => ref
+                        TvEscapableSlider(
+                          enabled: isTv,
+                          onDecrease: () {
+                            setState(
+                              () => _setting = (_setting - 1).clamp(0, 100),
+                            );
+                            ref
                                 .read(algorithmWeightsStateProvider.notifier)
-                                .setWeights(setting: _setting),
+                                .setWeights(setting: _setting);
+                          },
+                          onIncrease: () {
+                            setState(
+                              () => _setting = (_setting + 1).clamp(0, 100),
+                            );
+                            ref
+                                .read(algorithmWeightsStateProvider.notifier)
+                                .setWeights(setting: _setting);
+                          },
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 5.0,
+                              ),
+                            ),
+                            child: Slider.adaptive(
+                              min: 0,
+                              max: 100,
+                              value: _setting.toDouble(),
+                              onChanged: (value) {
+                                HapticFeedback.vibrate();
+                                setState(() {
+                                  _setting = value.toInt();
+                                });
+                              },
+                              onChangeEnd: (value) => ref
+                                  .read(algorithmWeightsStateProvider.notifier)
+                                  .setWeights(setting: _setting),
+                            ),
                           ),
                         ),
                       ],
@@ -276,25 +348,44 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 5.0,
-                            ),
-                          ),
-                          child: Slider.adaptive(
-                            min: 0,
-                            max: 100,
-                            value: _synopsis.toDouble(),
-                            onChanged: (value) {
-                              HapticFeedback.vibrate();
-                              setState(() {
-                                _synopsis = value.toInt();
-                              });
-                            },
-                            onChangeEnd: (value) => ref
+                        TvEscapableSlider(
+                          enabled: isTv,
+                          onDecrease: () {
+                            setState(
+                              () => _synopsis = (_synopsis - 1).clamp(0, 100),
+                            );
+                            ref
                                 .read(algorithmWeightsStateProvider.notifier)
-                                .setWeights(synopsis: _synopsis),
+                                .setWeights(synopsis: _synopsis);
+                          },
+                          onIncrease: () {
+                            setState(
+                              () => _synopsis = (_synopsis + 1).clamp(0, 100),
+                            );
+                            ref
+                                .read(algorithmWeightsStateProvider.notifier)
+                                .setWeights(synopsis: _synopsis);
+                          },
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 5.0,
+                              ),
+                            ),
+                            child: Slider.adaptive(
+                              min: 0,
+                              max: 100,
+                              value: _synopsis.toDouble(),
+                              onChanged: (value) {
+                                HapticFeedback.vibrate();
+                                setState(() {
+                                  _synopsis = value.toInt();
+                                });
+                              },
+                              onChangeEnd: (value) => ref
+                                  .read(algorithmWeightsStateProvider.notifier)
+                                  .setWeights(synopsis: _synopsis),
+                            ),
                           ),
                         ),
                       ],
@@ -315,25 +406,40 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 5.0,
-                            ),
-                          ),
-                          child: Slider.adaptive(
-                            min: 0,
-                            max: 100,
-                            value: _theme.toDouble(),
-                            onChanged: (value) {
-                              HapticFeedback.vibrate();
-                              setState(() {
-                                _theme = value.toInt();
-                              });
-                            },
-                            onChangeEnd: (value) => ref
+                        TvEscapableSlider(
+                          enabled: isTv,
+                          onDecrease: () {
+                            setState(() => _theme = (_theme - 1).clamp(0, 100));
+                            ref
                                 .read(algorithmWeightsStateProvider.notifier)
-                                .setWeights(theme: _theme),
+                                .setWeights(theme: _theme);
+                          },
+                          onIncrease: () {
+                            setState(() => _theme = (_theme + 1).clamp(0, 100));
+                            ref
+                                .read(algorithmWeightsStateProvider.notifier)
+                                .setWeights(theme: _theme);
+                          },
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 5.0,
+                              ),
+                            ),
+                            child: Slider.adaptive(
+                              min: 0,
+                              max: 100,
+                              value: _theme.toDouble(),
+                              onChanged: (value) {
+                                HapticFeedback.vibrate();
+                                setState(() {
+                                  _theme = value.toInt();
+                                });
+                              },
+                              onChangeEnd: (value) => ref
+                                  .read(algorithmWeightsStateProvider.notifier)
+                                  .setWeights(theme: _theme),
+                            ),
                           ),
                         ),
                       ],
@@ -388,6 +494,158 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCustomDohDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String customDohUrl,
+  ) {
+    final controller = TextEditingController(text: customDohUrl);
+    String url = customDohUrl;
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final parsed = Uri.tryParse(url.trim());
+          final isValid =
+              parsed != null &&
+              parsed.scheme == 'https' &&
+              parsed.host.isNotEmpty;
+          return AlertDialog(
+            title: const Text('Custom DoH URL', style: TextStyle(fontSize: 24)),
+            content: SizedBox(
+              width: context.width(0.8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: TextFormField(
+                      controller: controller,
+                      autofocus: true,
+                      keyboardType: TextInputType.url,
+                      onChanged: (value) => setState(() => url = value),
+                      decoration: InputDecoration(
+                        hintText: 'https://example.com/dns-query',
+                        helperText: 'Must be an https DoH (JSON) endpoint',
+                        filled: false,
+                        contentPadding: const EdgeInsets.all(12),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(width: 0.4),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                          borderSide: const BorderSide(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: context.width(1),
+                    child: ElevatedButton(
+                      onPressed: isValid
+                          ? () {
+                              ref
+                                  .read(doHProviderStateProvider.notifier)
+                                  .setCustomDoH(url.trim());
+                              Navigator.pop(context);
+                            }
+                          : null,
+                      child: Text(context.l10n.dialog_confirm),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showCfProxyDialog(BuildContext context) {
+    final controller = TextEditingController(text: CfProxyStore.url);
+    String url = CfProxyStore.url;
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setLocalState) {
+          final trimmed = url.trim();
+          final isValid =
+              trimmed.isEmpty || trimmed.startsWith('http://') ||
+              trimmed.startsWith('https://');
+          return AlertDialog(
+            title: const Text(
+              'Cloudflare bypass proxy',
+              style: TextStyle(fontSize: 24),
+            ),
+            content: SizedBox(
+              width: context.width(0.8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: TextFormField(
+                      controller: controller,
+                      autofocus: true,
+                      keyboardType: TextInputType.url,
+                      onChanged: (value) => setLocalState(() => url = value),
+                      decoration: InputDecoration(
+                        hintText: 'http://localhost:8191/v1',
+                        helperText:
+                            'FlareSolverr / Byparr endpoint. Leave empty to '
+                            'disable.',
+                        helperMaxLines: 2,
+                        filled: false,
+                        contentPadding: const EdgeInsets.all(12),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(width: 0.4),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                          borderSide: const BorderSide(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: context.width(1),
+                    child: ElevatedButton(
+                      onPressed: isValid
+                          ? () {
+                              CfProxyStore.setUrl(trimmed);
+                              Navigator.pop(dialogContext);
+                              if (mounted) setState(() {});
+                            }
+                          : null,
+                      child: Text(context.l10n.dialog_confirm),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

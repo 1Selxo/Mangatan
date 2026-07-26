@@ -1,10 +1,15 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/eval/model/m_bridge.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/widgets/manga_image_card_widget.dart';
 import 'package:mangayomi/utils/cached_network.dart';
@@ -12,6 +17,7 @@ import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/headers.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 
 /// Resolves the correct [ImageProvider] for a manga entry, preferring a custom
 /// local cover over the remote URL. Remote covers are wrapped in
@@ -61,6 +67,27 @@ Future<void> onTapEntry({
     return;
   }
 
+  if (isMissingCloudNovelEntry(entry)) {
+    botToast(chimahonMissingEpubGuidance, second: 4);
+    await ref.read(
+      importArchivesFromFileProvider(
+        itemType: ItemType.novel,
+        entry,
+        init: false,
+        splitChapters: false,
+      ).future,
+    );
+    if (context.mounted) {
+      ref.invalidate(
+        getAllMangaWithoutCategoriesStreamProvider(itemType: ItemType.novel),
+      );
+      ref.invalidate(
+        getAllMangaStreamProvider(categoryId: null, itemType: ItemType.novel),
+      );
+    }
+    return;
+  }
+
   final isLocalArchive = entry.isLocalArchive ?? false;
   await pushToMangaReaderDetail(
     ref: ref,
@@ -80,6 +107,26 @@ Future<void> onTapEntry({
       getAllMangaStreamProvider(categoryId: null, itemType: entry.itemType),
     );
   }
+}
+
+Set<int> missingCloudNovelParentIds() =>
+    const ChimahonNovelMaterializer().missingEpubParentIds(
+      isar.epubBookProgress.filter().archivePathEqualTo('').findAllSync(),
+    );
+
+bool isMissingCloudNovelEntry(Manga entry, {Set<int>? missingParentIds}) {
+  final mangaId = entry.id;
+  if (mangaId == null ||
+      entry.itemType != ItemType.novel ||
+      entry.isLocalArchive != true) {
+    return false;
+  }
+  if (missingParentIds != null) return missingParentIds.contains(mangaId);
+  return isar.epubBookProgress
+      .filter()
+      .mangaIdEqualTo(mangaId)
+      .archivePathEqualTo('')
+      .isNotEmptySync();
 }
 
 /// A small rounded chip using the theme's hint colour as its background.

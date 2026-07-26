@@ -8,7 +8,7 @@
 
  [![GitHub downloads](https://img.shields.io/github/downloads/1Selxo/Mangatan/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/1Selxo/Mangatan/releases)
 ![star](https://img.shields.io/github/stars/1Selxo/Mangatan)
-  [![Discord server](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/Ak2sW9Nvr9)
+ [![Discord server](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/SqwE6b7Bb)
 
 
  Mangatan is an open-source desktop app for reading manga and novels, watching anime, and learning languages through dictionary lookup, OCR, subtitle mining, and Anki export.
@@ -44,6 +44,18 @@ Get desktop builds and sideloadable iOS IPAs from the [Mangatan releases page](h
 Release IPAs are intentionally unsigned. AltStore, SideStore, Feather, Sideloadly, and similar tools sign the app with your Apple ID during installation.
 
 To build an IPA without publishing a release, open **Actions → Build iOS sideload IPA → Run workflow**. Download the IPA from the completed run's artifacts. Pushing a `v*` tag also attaches the IPA to that GitHub release and refreshes the sideloading source.
+
+## Updating This Fork
+
+Open **Actions → Sync upstream release → Run workflow**. Leave the tag empty
+to merge the latest stable `1Selxo/Mangatan` release into `main`, or enter a
+specific upstream tag. A successful sync push automatically starts the iOS IPA
+release workflow.
+
+The sync uses a merge commit, so fork-only fixes remain in history and later
+updates only need to consider changes since the last merge. If upstream and the
+fork edit the same lines, the workflow stops without pushing so the conflict can
+be reviewed safely.
 
 # Contributing
 

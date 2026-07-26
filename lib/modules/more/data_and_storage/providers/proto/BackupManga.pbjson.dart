@@ -102,6 +102,15 @@ const BackupManga$json = {
     {'1': 'version', '3': 109, '4': 1, '5': 3, '10': 'version'},
     {'1': 'notes', '3': 110, '4': 1, '5': 9, '10': 'notes'},
     {'1': 'initialized', '3': 111, '4': 1, '5': 8, '10': 'initialized'},
+    {
+      '1': 'customTitle',
+      '3': 800,
+      '4': 1,
+      '5': 9,
+      '9': 6,
+      '10': 'customTitle',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_artist'},
@@ -110,6 +119,7 @@ const BackupManga$json = {
     {'1': '_thumbnailUrl'},
     {'1': '_viewer_flags'},
     {'1': '_favoriteModifiedAt'},
+    {'1': '_customTitle'},
   ],
 };
 
@@ -130,5 +140,6 @@ final $typed_data.Uint8List backupMangaDescriptor = $convert.base64Decode(
     'ZmF2b3JpdGVNb2RpZmllZEF0GGsgASgDSAVSEmZhdm9yaXRlTW9kaWZpZWRBdIgBARIuChJleG'
     'NsdWRlZFNjYW5sYXRvcnMYbCADKAlSEmV4Y2x1ZGVkU2NhbmxhdG9ycxIYCgd2ZXJzaW9uGG0g'
     'ASgDUgd2ZXJzaW9uEhQKBW5vdGVzGG4gASgJUgVub3RlcxIgCgtpbml0aWFsaXplZBhvIAEoCF'
-    'ILaW5pdGlhbGl6ZWRCCQoHX2FydGlzdEIJCgdfYXV0aG9yQg4KDF9kZXNjcmlwdGlvbkIPCg1f'
-    'dGh1bWJuYWlsVXJsQg8KDV92aWV3ZXJfZmxhZ3NCFQoTX2Zhdm9yaXRlTW9kaWZpZWRBdA==');
+    'ILaW5pdGlhbGl6ZWQSJgoLY3VzdG9tVGl0bGUYoAYgASgJSAZSC2N1c3RvbVRpdGxliAEBQgkK'
+    'B19hcnRpc3RCCQoHX2F1dGhvckIOCgxfZGVzY3JpcHRpb25CDwoNX3RodW1ibmFpbFVybEIPCg'
+    '1fdmlld2VyX2ZsYWdzQhUKE19mYXZvcml0ZU1vZGlmaWVkQXRCDgoMX2N1c3RvbVRpdGxl');

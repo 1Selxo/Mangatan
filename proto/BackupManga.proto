@@ -30,4 +30,14 @@ message BackupManga {
     int64 version = 109;
     string notes = 110;
     bool initialized = 111;
+
+    // J2K/Chimahon custom manga info represented by Mangatan.
+    optional string customTitle = 800;
+
+    // Chimahon also defines SY metadata at 600-603 and custom artist,
+    // author, description, and genre at 801, 802, 804, and 805. Mangatan has
+    // no lossless local model for those values, so they intentionally remain
+    // protobuf unknown fields. The sync merger carries their original wire
+    // values forward. Do not make them known here without also adding explicit
+    // import/export and winner-preservation rules.
 }

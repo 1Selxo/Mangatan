@@ -69,12 +69,9 @@ class _NovelDictionarySelectionState extends State<NovelDictionarySelection> {
                 source,
                 fallback: manga?.lang ?? '',
               ),
-        novelId: progress == null
-            ? null
-            : const ChimahonNovelProgressAdapter().stableId(
-                title: progress.title,
-                author: progress.author,
-              ),
+        novelId: const ChimahonNovelProgressAdapter().stableLocalIdOrNull(
+          progress,
+        ),
         sourceTitle: manga?.name ?? '',
         chapterTitle: widget.chapter.name ?? '',
         sentence: query,

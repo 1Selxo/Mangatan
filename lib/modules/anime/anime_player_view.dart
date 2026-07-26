@@ -865,6 +865,26 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
   }
 
+  void _dismissVideoOcr() {
+    DictionaryLookupPopup.dismissActive();
+    final wasLiveOcrEnabled = _liveVideoOcrEnabled;
+    setState(() {
+      _videoOcrBytes = null;
+      _liveVideoOcrEnabled = false;
+    });
+    if (wasLiveOcrEnabled) {
+      unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
+    }
+  }
+
+  Future<void> _handleVideoOcrShortcut() async {
+    if (_videoOcrBytes != null) {
+      _dismissVideoOcr();
+      return;
+    }
+    await _showVideoOcr();
+  }
+
   Future<void> _toggleLiveVideoOcr() async {
     final enabled = !_liveVideoOcrEnabled;
     DictionaryLookupPopup.dismissActive();
@@ -2544,7 +2564,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
                   chapterMarks: _chapterMarks,
                   subtitleMiningContextBuilder: _subtitleMiningContext,
-                  onVideoOcrShortcut: _showVideoOcr,
+                  videoOcrActive: _videoOcrBytes != null,
+                  onVideoOcrShortcut: _handleVideoOcrShortcut,
                 )
               : MobileControllerWidget(
                   videoController: _controller,
@@ -2641,10 +2662,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             imageBytes: imageBytes,
             fit: fit,
             miningContextBuilder: _subtitleMiningContext,
-            onDismiss: () {
-              DictionaryLookupPopup.dismissActive();
-              setState(() => _videoOcrBytes = null);
-            },
+            onDismiss: _dismissVideoOcr,
           ),
         if (_liveVideoOcrEnabled && _videoOcrBytes == null)
           LiveVideoOcrOverlay(

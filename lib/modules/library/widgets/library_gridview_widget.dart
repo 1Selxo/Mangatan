@@ -10,6 +10,7 @@ import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:mangayomi/modules/widgets/gridview_widget.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 
 class LibraryGridViewWidget extends StatefulWidget {
   final bool isCoverOnlyGrid;
@@ -47,6 +48,9 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
         final gridSize = ref.watch(
           libraryGridSizeStateProvider(itemType: widget.itemType),
         );
+        final missingEpubParentIds = widget.itemType == ItemType.novel
+            ? missingCloudNovelParentIds()
+            : const <int>{};
         return GridViewWidget(
           gridSize: gridSize,
           childAspectRatio: widget.isComfortableGrid ? 0.642 : 0.69,
@@ -54,6 +58,10 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
           itemBuilder: (context, index) {
             final entry = widget.entriesManga[index];
             final isLocalArchive = entry.isLocalArchive ?? false;
+            final isMissingEpub = isMissingCloudNovelEntry(
+              entry,
+              missingParentIds: missingEpubParentIds,
+            );
 
             return Padding(
               padding: const EdgeInsets.all(2),
@@ -92,6 +100,10 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
                             ),
                             child: Row(
                               children: [
+                                if (isMissingEpub)
+                                  const EntryBadgeChip(
+                                    label: chimahonMissingEpubBadge,
+                                  ),
                                 if (widget.localSource && isLocalArchive)
                                   const EntryBadgeChip(label: 'Local'),
                                 Padding(

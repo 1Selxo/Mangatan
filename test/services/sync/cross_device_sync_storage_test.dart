@@ -34,6 +34,8 @@ void main() {
     expect(requests.first.url.path, '/api/sync/content');
     expect(requests.first.headers['X-API-Token'], 'secret');
     expect(requests.last.headers['If-Match'], 'revision-1');
+    expect(downloaded.isCompleteRecovery, isTrue);
+    expect(downloaded.uploadRetainsAllRemoteByteBlobs, isFalse);
     expect(revision, 'revision-2');
   });
 
@@ -49,4 +51,65 @@ void main() {
       throwsA(isA<SyncConflictException>()),
     );
   });
+
+  for (final etagCase in <String, String?>{
+    'missing': null,
+    'blank': '   ',
+  }.entries) {
+    test(
+      'SyncYomi rejects successful downloads with a ${etagCase.key} ETag',
+      () async {
+        final storage = SyncYomiStorage(
+          baseUrl: Uri.parse('https://sync.example'),
+          apiToken: 'secret',
+          client: MockClient(
+            (_) async => http.Response.bytes(
+              [1, 2, 3],
+              200,
+              headers: {if (etagCase.value != null) 'etag': etagCase.value!},
+            ),
+          ),
+        );
+
+        expect(
+          storage.download(),
+          throwsA(
+            isA<SyncStorageException>().having(
+              (error) => error.message,
+              'message',
+              contains('did not provide an ETag'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'SyncYomi rejects successful uploads with a ${etagCase.key} ETag',
+      () async {
+        final storage = SyncYomiStorage(
+          baseUrl: Uri.parse('https://sync.example'),
+          apiToken: 'secret',
+          client: MockClient(
+            (_) async => http.Response(
+              '',
+              200,
+              headers: {if (etagCase.value != null) 'etag': etagCase.value!},
+            ),
+          ),
+        );
+
+        expect(
+          storage.upload(Uint8List(0), expectedRevision: 'revision-1'),
+          throwsA(
+            isA<SyncStorageException>().having(
+              (error) => error.message,
+              'message',
+              contains('did not provide an ETag'),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

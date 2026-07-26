@@ -9,6 +9,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/manga/archive_reader/models/models.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'local_archive.g.dart';
@@ -23,8 +24,19 @@ Future importArchivesFromFile(
 }) async {
   final keepAlive = ref.keepAlive();
   try {
+    final requestedParentId = mManga?.id;
+    final currentParent = requestedParentId == null
+        ? mManga
+        : isar.mangas.getSync(requestedParentId);
+    final currentParentId = currentParent?.id;
+    final progress = itemType == ItemType.novel && currentParentId != null
+        ? isar.epubBookProgress
+              .filter()
+              .mangaIdEqualTo(currentParentId)
+              .findAllSync()
+        : const <EpubBookProgress>[];
     final result = await FilePicker.pickFiles(
-      allowMultiple: true,
+      allowMultiple: allowMultipleArchiveImport(currentParent, progress),
       type: FileType.custom,
       allowedExtensions: supportedLocalArchiveExtensions(itemType),
     );
@@ -36,7 +48,9 @@ Future importArchivesFromFile(
         .toList();
     await _importArchivesFromPaths(
       ref,
-      mManga,
+      requestedParentId == null
+          ? currentParent
+          : isar.mangas.getSync(requestedParentId),
       filePaths: filePaths,
       itemType: itemType,
       init: init,
@@ -45,6 +59,32 @@ Future importArchivesFromFile(
   } finally {
     keepAlive.close();
   }
+}
+
+bool allowMultipleArchiveImport(
+  Manga? parent,
+  Iterable<EpubBookProgress> progress,
+) =>
+    parent == null ||
+    !const ChimahonNovelMaterializer().isMissingEpubParent(parent, progress);
+
+/// Chooses an already-persisted parent for one parsed EPUB.
+///
+/// A matching ghost wins over an unrelated supplied normal parent so its
+/// bookmark is reconciled in place. A supplied ghost wins only when the
+/// parsed identity matches that exact parent; mismatch never consumes it.
+Manga? resolveExistingNovelImportParent({
+  required Manga? requestedParent,
+  required Manga? matchingCloudParent,
+  required EpubBookProgress? matchingRequestedProgress,
+  required bool requestedParentWasMissing,
+}) {
+  if (requestedParent != null &&
+      matchingRequestedProgress?.mangaId == requestedParent.id) {
+    return requestedParent;
+  }
+  if (requestedParentWasMissing) return matchingCloudParent;
+  return matchingCloudParent ?? requestedParent;
 }
 
 /// Imports paths supplied by a non-picker source, such as desktop drag-and-drop.
@@ -86,26 +126,34 @@ Future<void> _importArchivesFromPaths(
   // Novel chapters are always persisted now. Keep honoring the legacy flag
   // in the shared import API so older callers remain source-compatible.
   final persistEpubChapters = itemType == ItemType.novel || splitChapters;
-  final manga =
-      mManga ??
-      Manga(
-        favorite: true,
-        source: 'archive',
-        author: '',
-        itemType: itemType,
-        genre: [],
-        imageUrl: '',
-        lang: '',
-        link: '',
-        name: localArchiveName(filePaths.first),
-        dateAdded: dateNow,
-        lastUpdate: dateNow,
-        status: Status.unknown,
-        description: '',
-        isLocalArchive: true,
-        artist: '',
-        updatedAt: dateNow,
-        sourceId: null,
+  Manga? currentRequestedParent() {
+    final requestedId = mManga?.id;
+    if (requestedId == null || requestedId == Isar.autoIncrement) {
+      return mManga;
+    }
+    return isar.mangas.getSync(requestedId);
+  }
+
+  final initialRequestedParent = currentRequestedParent();
+  final sharedParent = itemType == ItemType.novel
+      ? null
+      : initialRequestedParent ??
+            _newLocalArchiveParent(
+              itemType: itemType,
+              name: localArchiveName(filePaths.first),
+              dateNow: dateNow,
+            );
+  Manga? novelSharedParent;
+  if (sharedParent?.isLocalArchive != true && sharedParent != null) {
+    sharedParent.hasLocalChapterOverlay = true;
+  }
+  const materializer = ChimahonNovelMaterializer();
+  final suppliedParentWasMissing =
+      itemType == ItemType.novel &&
+      initialRequestedParent != null &&
+      materializer.isMissingEpubParent(
+        initialRequestedParent,
+        isar.epubBookProgress.where().findAllSync(),
       );
 
   for (final filePath in filePaths.reversed) {
@@ -114,6 +162,71 @@ Future<void> _importArchivesFromPaths(
         ? await ref.watch(getArchivesDataFromFileProvider(filePath).future)
         : null;
     final name = localArchiveName(filePath);
+    final book = itemType == ItemType.novel
+        ? await parseEpubFromPath(
+            epubPath: filePath,
+            fullData: persistEpubChapters,
+          )
+        : null;
+    final progressBeforeImport = itemType == ItemType.novel
+        ? isar.epubBookProgress.where().findAllSync()
+        : const <EpubBookProgress>[];
+    final mangasBeforeImport = itemType == ItemType.novel
+        ? isar.mangas.where().findAllSync()
+        : const <Manga>[];
+    final requestedParent = itemType == ItemType.novel
+        ? currentRequestedParent()
+        : initialRequestedParent;
+    final matchingSuppliedProgress = suppliedParentWasMissing
+        ? materializer.matchingCloudProgress(
+            progresses: progressBeforeImport,
+            title: book!.name,
+            author: book.author,
+            preferredMangaId: requestedParent?.id,
+            allowUnidentifiablePreferredParent: true,
+          )
+        : null;
+    final matchingCloudParent = itemType == ItemType.novel
+        ? materializer.matchingCloudParent(
+            mangas: mangasBeforeImport,
+            progresses: progressBeforeImport,
+            title: book!.name,
+            author: book.author,
+          )
+        : null;
+    final existingNovelParent = itemType == ItemType.novel
+        ? resolveExistingNovelImportParent(
+            requestedParent: requestedParent,
+            matchingCloudParent: matchingCloudParent,
+            matchingRequestedProgress: matchingSuppliedProgress,
+            requestedParentWasMissing: suppliedParentWasMissing,
+          )
+        : null;
+    final Manga manga;
+    if (itemType != ItemType.novel) {
+      manga = sharedParent!;
+    } else if (existingNovelParent != null) {
+      manga = existingNovelParent;
+    } else {
+      // A mismatched EPUB must not consume the selected ghost's bookmark.
+      // Generic Chimahon import semantics create a separate normal book.
+      manga = novelSharedParent ??= _newLocalArchiveParent(
+        itemType: itemType,
+        name: book!.name.trim().isEmpty ? name : book.name,
+        dateNow: dateNow,
+      );
+      if (suppliedParentWasMissing) {
+        botToast(
+          'This EPUB does not match the selected cloud novel; imported separately.',
+          second: 4,
+        );
+      }
+    }
+    final wasMissingEpub = materializer.isMissingEpubParent(
+      manga,
+      progressBeforeImport,
+    );
+    if (manga.isLocalArchive != true) manga.hasLocalChapterOverlay = true;
 
     if (init && itemType == ItemType.manga) {
       manga.customCoverImage = data!.$3.getCoverImage;
@@ -122,12 +235,7 @@ Future<void> _importArchivesFromPaths(
       final mangaId = await isar.mangas.put(manga);
       final List<Chapter> chapters = [];
       if (itemType == ItemType.novel) {
-        final book = await parseEpubFromPath(
-          epubPath: filePath,
-          fullData: persistEpubChapters,
-        );
-
-        if (book.cover != null) {
+        if (book!.cover != null) {
           await isar.mangas.put(
             manga..customCoverImage = book.cover!.getCoverImage,
           );
@@ -140,25 +248,30 @@ Future<void> _importArchivesFromPaths(
             archivePath: filePath,
           ),
         );
-        final existingProgress = await isar.epubBookProgress
-            .filter()
-            .mangaIdEqualTo(mangaId)
-            .archivePathEqualTo(filePath)
-            .findFirst();
-        final progress =
-            existingProgress ??
-            EpubBookProgress(
-              mangaId: mangaId,
-              archivePath: filePath,
-              title: book.name,
-              author: book.author,
-              lang: book.language,
-            );
-        progress
-          ..title = book.name
-          ..author = book.author;
-        progress.lang ??= book.language;
+        final progress = materializer.progressForImportedEpub(
+          progresses: progressBeforeImport,
+          mangaId: mangaId,
+          archivePath: filePath,
+          title: book.name,
+          author: book.author,
+          lang: book.language,
+          allowUnidentifiablePreferredParent:
+              wasMissingEpub && manga.id == requestedParent?.id,
+        );
         await isar.epubBookProgress.put(progress);
+        if (wasMissingEpub && progress.id != Isar.autoIncrement) {
+          manga
+            ..source = 'archive'
+            ..link = filePath
+            ..description = manga.description == chimahonMissingEpubGuidance
+                ? ''
+                : manga.description
+            ..name = book.name.trim().isEmpty ? manga.name : book.name
+            ..sourceTitle = book.name
+            ..author = book.author
+            ..lang = book.language ?? manga.lang;
+          await isar.mangas.put(manga);
+        }
       } else {
         chapters.add(
           Chapter(
@@ -176,6 +289,30 @@ Future<void> _importArchivesFromPaths(
     });
   }
 }
+
+Manga _newLocalArchiveParent({
+  required ItemType itemType,
+  required String name,
+  required int dateNow,
+}) => Manga(
+  favorite: true,
+  source: 'archive',
+  author: '',
+  itemType: itemType,
+  genre: const [],
+  imageUrl: '',
+  lang: '',
+  link: '',
+  name: name,
+  dateAdded: dateNow,
+  lastUpdate: dateNow,
+  status: Status.unknown,
+  description: '',
+  isLocalArchive: true,
+  artist: '',
+  updatedAt: dateNow,
+  sourceId: null,
+);
 
 List<String> supportedLocalArchiveExtensions(ItemType itemType) {
   return switch (itemType) {

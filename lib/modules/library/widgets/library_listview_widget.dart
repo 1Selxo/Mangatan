@@ -7,6 +7,7 @@ import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/widgets/listview_widget.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 
 class LibraryListViewWidget extends StatelessWidget {
   final List<Manga> entriesManga;
@@ -27,11 +28,19 @@ class LibraryListViewWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final missingEpubParentIds =
+        entriesManga.firstOrNull?.itemType == ItemType.novel
+        ? missingCloudNovelParentIds()
+        : const <int>{};
     return SuperListViewWidget(
       itemCount: entriesManga.length,
       itemBuilder: (context, index) {
         final entry = entriesManga[index];
         final isLocalArchive = entry.isLocalArchive ?? false;
+        final isMissingEpub = isMissingCloudNovelEntry(
+          entry,
+          missingParentIds: missingEpubParentIds,
+        );
         return Consumer(
           builder: (context, ref, child) {
             final isLongPressed = ref.watch(isLongPressedStateProvider);
@@ -112,6 +121,10 @@ class LibraryListViewWidget extends StatelessWidget {
                                 height: 22,
                                 child: Row(
                                   children: [
+                                    if (isMissingEpub)
+                                      const EntryBadgeChip(
+                                        label: chimahonMissingEpubBadge,
+                                      ),
                                     if (localSource && isLocalArchive)
                                       const EntryBadgeChip(label: 'Local'),
                                     if (downloadedChapter)

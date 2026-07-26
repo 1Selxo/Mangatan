@@ -92,10 +92,7 @@ fn parse_epub_with_doc<R: Read + Seek>(
     full_data: bool,
 ) -> Result<EpubNovel, String> {
     // Extract metadata
-    let name = doc
-        .mdata("title")
-        .map(|m| m.value.clone())
-        .unwrap_or_else(|| "Untitled".to_string());
+    let name = chimahon_epub_title(doc.mdata("title").map(|m| m.value.clone()));
 
     let author = doc.mdata("creator").map(|m| m.value.clone());
     let language = doc.mdata("language").map(|m| m.value.clone());
@@ -211,6 +208,13 @@ fn parse_epub_with_doc<R: Read + Seek>(
         images,
         stylesheets,
     })
+}
+
+fn chimahon_epub_title(title: Option<String>) -> String {
+    // Chimahon's BookImporter uses this exact fallback before deriving the
+    // stable title|author ID. Matching it lets a metadata-free EPUB reconnect
+    // to a cloud-restored ghost instead of becoming a duplicate.
+    title.unwrap_or_else(|| "Unknown".to_string())
 }
 
 /// Extract reader assets and images with their binary content from EPUB (file path version).
@@ -870,12 +874,18 @@ fn declared_encoding(declaration: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::{
-        declared_encoding, decode_text_resource, epub_content_is_renderable, epub_paths_match,
-        is_epub_reader_auxiliary_asset, mark_repeated_numeric_subsection_markers,
+        chimahon_epub_title, declared_encoding, decode_text_resource, epub_content_is_renderable,
+        epub_paths_match, is_epub_reader_auxiliary_asset, mark_repeated_numeric_subsection_markers,
         normalize_epub_path, parse_epub3_navigation, parse_epub_from_bytes, parse_ncx_navigation,
     };
     use std::io::{Cursor, Write};
     use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+    #[test]
+    fn missing_title_matches_chimahon_import_identity_fallback() {
+        assert_eq!(chimahon_epub_title(None), "Unknown");
+        assert_eq!(chimahon_epub_title(Some(String::new())), "");
+    }
 
     #[test]
     fn canonicalizes_epub_paths_without_matching_partial_names() {

@@ -51,9 +51,23 @@ class ChimahonSyncCodec {
         : ChimahonSyncWireFormat.protobuf;
 
     try {
-      final protobufBytes = format == ChimahonSyncWireFormat.gzipProtobuf
-          ? const GZipDecoder().decodeBytes(bytes, verify: true)
-          : Uint8List.fromList(bytes);
+      late final Uint8List protobufBytes;
+      if (format == ChimahonSyncWireFormat.gzipProtobuf) {
+        final output = _SizeLimitedOutputStream(sizeLimit);
+        const GZipDecoder().decodeStream(
+          InputMemoryStream(bytes),
+          output,
+          verify: true,
+        );
+        protobufBytes = output.getBytes();
+      } else {
+        if (bytes.length > sizeLimit) {
+          throw FormatException(
+            'Payload exceeds the $sizeLimit-byte decoded size limit',
+          );
+        }
+        protobufBytes = Uint8List.fromList(bytes);
+      }
       final backup = BackupMihon.create()
         ..mergeFromCodedBufferReader(
           CodedBufferReader(protobufBytes, sizeLimit: sizeLimit),
@@ -86,4 +100,63 @@ class ChimahonSyncCodec {
 
   bool _isGzip(List<int> bytes) =>
       bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
+}
+
+/// Bounds gzip expansion before the protobuf reader receives the payload.
+/// This avoids allocating an attacker-controlled decompressed buffer first.
+class _SizeLimitedOutputStream extends OutputStream {
+  _SizeLimitedOutputStream(this.limit)
+    : super(byteOrder: ByteOrder.littleEndian);
+
+  final int limit;
+  final BytesBuilder _bytes = BytesBuilder(copy: false);
+
+  @override
+  int get length => _bytes.length;
+
+  void _reserve(int count) {
+    if (count < 0 || length + count > limit) {
+      throw FormatException(
+        'Payload exceeds the $limit-byte decoded size limit',
+      );
+    }
+  }
+
+  @override
+  void clear() => _bytes.clear();
+
+  @override
+  void flush() {}
+
+  @override
+  void writeByte(int value) {
+    _reserve(1);
+    _bytes.addByte(value);
+  }
+
+  @override
+  void writeBytes(List<int> bytes, {int? length}) {
+    final count = length ?? bytes.length;
+    if (count > bytes.length) {
+      throw RangeError.range(count, 0, bytes.length, 'length');
+    }
+    _reserve(count);
+    _bytes.add(count == bytes.length ? bytes : bytes.sublist(0, count));
+  }
+
+  @override
+  void writeStream(InputStream stream) {
+    final count = stream.length;
+    _reserve(count);
+    _bytes.add(stream.readBytes(count).toUint8List());
+  }
+
+  @override
+  Uint8List getBytes() => _bytes.toBytes();
+
+  @override
+  Uint8List subset(int start, [int? end]) {
+    final bytes = _bytes.toBytes();
+    return Uint8List.sublistView(bytes, start, end);
+  }
 }

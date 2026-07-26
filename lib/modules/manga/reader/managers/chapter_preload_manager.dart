@@ -297,7 +297,7 @@ class ChapterPreloadManager {
     return true;
   }
 
-  /// Updates the cropImage for a page at the given index.
+  /// Updates the cropped image cached for a page.
   void updatePageCropImage(int index, Uint8List? cropImage) {
     if (index >= 0 && index < _pages.length) {
       _pages[index].cropImage = cropImage;
@@ -325,10 +325,11 @@ class ChapterPreloadManager {
     if (currentId == null) return [];
 
     final loadedIdsInOrder = <String>[];
+    final seen = <String>{};
     for (final page in _pages) {
       if (page.isTransitionPage || page.chapter == null) continue;
       final id = _getChapterIdentifier(page.chapter);
-      if (id != null && !loadedIdsInOrder.contains(id)) {
+      if (id != null && seen.add(id)) {
         loadedIdsInOrder.add(id);
       }
     }
@@ -346,22 +347,28 @@ class ChapterPreloadManager {
 
     final evictedIndices = <int>[];
     final idsToEvict = _loadedChapterIds.difference(idsToKeep);
-    for (final id in idsToEvict) {
-      if (kDebugMode) {
-        debugPrint('[ChapterPreload] Evicting chapter data for $id');
-      }
-      for (int i = 0; i < _pages.length; i++) {
-        final page = _pages[i];
-        if (page.isTransitionPage || page.chapter == null) continue;
-        if (_getChapterIdentifier(page.chapter) == id) {
-          page.archiveImage = null;
-          page.cropImage = null;
-          evictedIndices.add(i);
+    if (idsToEvict.isEmpty) return [];
+
+    // Single linear pass over pages to evict old chapters in O(N)
+    for (int i = 0; i < _pages.length; i++) {
+      final page = _pages[i];
+      if (page.isTransitionPage || page.chapter == null) continue;
+      final id = _getChapterIdentifier(page.chapter);
+      if (id != null && idsToEvict.contains(id)) {
+        if (kDebugMode) {
+          debugPrint('[ChapterPreload] Evicting chapter page index $i for $id');
         }
+        page.archiveImage = null;
+        page.decodedImage?.dispose();
+        page.decodedImage = null;
+        page.resolvedFilePath = null;
+        evictedIndices.add(i);
       }
-      _loadedChapterIds.remove(id);
-      _chapterLoadOrder.remove(id);
     }
+
+    _loadedChapterIds.removeAll(idsToEvict);
+    _chapterLoadOrder.removeWhere((id) => idsToEvict.contains(id));
+
     return evictedIndices;
   }
 
@@ -376,9 +383,23 @@ class ChapterPreloadManager {
     }
   }
 
+  /// Splits a single page into two pages dynamically.
+  void splitPage(int index, UChapDataPreload page1, UChapDataPreload page2) {
+    if (index < 0 || index >= _pages.length) return;
+    _pages.removeAt(index);
+    _pages.insert(index, page1);
+    _pages.insert(index + 1, page2);
+    onPagesUpdated?.call();
+  }
+
   /// Disposes of all resources.
   Future<void> dispose() async {
     // Clear pages
+    for (final page in _pages) {
+      page.decodedImage?.dispose();
+      page.decodedImage = null;
+      page.resolvedFilePath = null;
+    }
     _pages.clear();
     _loadedChapterIds.clear();
     _chapterLoadOrder.clear();

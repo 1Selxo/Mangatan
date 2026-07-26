@@ -95,7 +95,7 @@ mixin ReaderMemoryManagement {
     return _preloadManager.addLastChapterTransition(chapter);
   }
 
-  /// Updates the cropImage for a page at the given index.
+  /// Updates the cropped image cached for a page.
   void updatePageCropImage(int index, Uint8List? cropImage) {
     _preloadManager.updatePageCropImage(index, cropImage);
   }

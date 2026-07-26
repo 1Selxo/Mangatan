@@ -41,7 +41,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: "26"
 
       - name: Download pinned iOS libffi support
         run: |
@@ -160,7 +160,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: "26"
 
       - name: Fetch pinned OpenJDK sources
         run: |

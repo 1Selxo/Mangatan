@@ -10,7 +10,7 @@ work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
 server_repository="https://github.com/ippo-michi/M-Extension-Server.git"
-server_commit="f64273694e67e2784742db1f28329794a7c78876"
+server_commit="1e909217e8ef06f10ca83ea5d92de5f2aafbfdf5"
 openjdk_framework_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v1/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="c227e55eb3adb0578fff3064828668365f21e02af13430ab8f207553b6d6f7eb"
 openjdk_bundle_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v1/java_bundle-device.zip"

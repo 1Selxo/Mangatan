@@ -14,9 +14,9 @@ permissions:
 
 env:
   MOBILE_REPOSITORY: https://github.com/openjdk/mobile.git
-  MOBILE_COMMIT: 95ef4e34ed887955f9348bbc4b3ede31d033349f
+  MOBILE_COMMIT: 1606564eddfd17f74015e219cd5b754ec35bf0c8
   IOS_TOOLS_REPOSITORY: https://github.com/openjdk-mobile/ios-tools.git
-  IOS_TOOLS_COMMIT: ad4977c01fdfb52255600f47f4be09aaee45f0d1
+  IOS_TOOLS_COMMIT: f8524c91c012040e40e7f8af34e7a0f11af0da83
   LIBFFI_IOS_URL: https://github.com/openjdk-mobile/ios-tools/releases/download/libffi-build/libffi-ios.zip
   LIBFFI_IOS_SHA256: 4f39fd1d53fbd69d1bdbd915413077d130daa3f6792d1b3a03a690a9cbd4dea3
   IOS_MINIMUM_VERSION: "13.0"
@@ -41,7 +41,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "26"
+          java-version: "25"
 
       - name: Download pinned iOS libffi support
         run: |
@@ -160,7 +160,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "26"
+          java-version: "25"
 
       - name: Fetch pinned OpenJDK sources
         run: |

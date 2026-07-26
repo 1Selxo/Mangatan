@@ -66,8 +66,23 @@ void main() {
     );
     expect(
       nativeSource,
-      contains('dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_LOCAL)'),
+      contains('dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_GLOBAL)'),
     );
+    expect(nativeSource, isNot(contains('RTLD_NOW | RTLD_LOCAL')));
+    expect(nativeSource, contains('dlsym(RTLD_DEFAULT, symbol)'));
+    for (final symbol in [
+      'JDK_Canonicalize',
+      'JIMAGE_Open',
+      'JIMAGE_Close',
+      'JIMAGE_FindResource',
+      'JIMAGE_GetResource',
+    ]) {
+      expect(
+        nativeSource,
+        contains('"$symbol",'),
+        reason: '$symbol must be visible to static OpenJDK lookups',
+      );
+    }
     expect(
       nativeSource,
       contains('dlsym(handle, "MangatanOpenJDKLoadFunctions")'),

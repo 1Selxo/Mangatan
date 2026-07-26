@@ -82,7 +82,10 @@ bool LoadOpenJDKRuntime(NSError **error) {
 
   NSString *runtimePath = OpenJDKRuntimePath();
   dlerror();
-  void *handle = dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_LOCAL);
+  // The static OpenJDK build resolves its bundled JIMAGE and JDK native
+  // functions through dlsym(RTLD_DEFAULT, ...). RTLD_GLOBAL is therefore
+  // required even though the framework itself is loaded lazily.
+  void *handle = dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_GLOBAL);
   if (handle == nullptr) {
     const char *details = dlerror();
     if (error != nullptr) {
@@ -93,6 +96,27 @@ bool LoadOpenJDKRuntime(NSError **error) {
               details == nullptr ? "unknown dynamic loader error" : details]);
     }
     return false;
+  }
+
+  const char *const requiredGlobalSymbols[] = {
+      "JDK_Canonicalize",
+      "JIMAGE_Open",
+      "JIMAGE_Close",
+      "JIMAGE_FindResource",
+      "JIMAGE_GetResource",
+  };
+  for (const char *symbol : requiredGlobalSymbols) {
+    dlerror();
+    if (dlsym(RTLD_DEFAULT, symbol) == nullptr) {
+      if (error != nullptr) {
+        *error = EmbeddedMihonError(
+            14,
+            [NSString stringWithFormat:
+                @"The on-device Mihon runtime cannot expose %s.", symbol]);
+      }
+      dlclose(handle);
+      return false;
+    }
   }
 
   dlerror();

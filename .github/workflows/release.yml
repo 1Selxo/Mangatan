@@ -181,12 +181,94 @@ jobs:
             release-windows/SHA256SUMS.txt
           if-no-files-found: error
 
+  build-and-release-linux:
+    needs: validate-release
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang-18
+      CXX: clang++-18
+      CC_x86_64_unknown_linux_gnu: gcc-13
+      CXX_x86_64_unknown_linux_gnu: g++-13
+    steps:
+      - name: checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+
+      - name: install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            clang-18 \
+            cmake \
+            g++-13 \
+            gcc-13 \
+            libasound2-dev \
+            libblkid-dev \
+            libepoxy-dev \
+            libgtk-3-dev \
+            liblzma-dev \
+            libmpv-dev \
+            libsecret-1-dev \
+            libwayland-dev \
+            libwebkit2gtk-4.1-dev \
+            ninja-build \
+            pkg-config
+
+      - name: setup flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: build linux
+        run: flutter build linux --release --verbose
+
+      - name: package Linux archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="build/linux/x64/release/bundle"
+          release_dir="$GITHUB_WORKSPACE/release-linux"
+          archive_name="Mangatan-$RELEASE_TAG-linux-x86_64"
+
+          test -x "$bundle_dir/mangayomi"
+          test -d "$bundle_dir/data"
+          test -d "$bundle_dir/lib"
+
+          mkdir -p "$release_dir/$archive_name"
+          cp -a "$bundle_dir"/. "$release_dir/$archive_name/"
+          tar -C "$release_dir" -czf "$release_dir/$archive_name.tar.gz" "$archive_name"
+          rm -rf -- "${release_dir:?}/${archive_name:?}"
+
+          (
+            cd "$release_dir"
+            sha256sum "$archive_name.tar.gz" > SHA256SUMS-linux.txt
+          )
+
+      - name: upload Linux release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Mangatan-${{ env.RELEASE_TAG }}-linux-x86_64
+          path: |
+            release-linux/Mangatan-*-linux-x86_64.tar.gz
+            release-linux/SHA256SUMS-linux.txt
+          if-no-files-found: error
+
   release:
     permissions:
       contents: write
     needs:
       - build-and-release-macos-dmg
       - build-and-release-windows-exe_zip
+      - build-and-release-linux
     runs-on: ubuntu-latest
     steps:
       - name: download release packages

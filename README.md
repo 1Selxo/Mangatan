@@ -45,6 +45,14 @@ Release IPAs are intentionally unsigned. AltStore, SideStore, Feather, Sideloadl
 
 To build an IPA without publishing a release, open **Actions → Build iOS sideload IPA → Run workflow**. Download the IPA from the completed run's artifacts. Pushing a `v*` tag also attaches the IPA to that GitHub release and refreshes the sideloading source.
 
+### Anki on iOS
+
+The iOS build exports cards through AnkiMobile callbacks instead of
+AnkiConnect. In **Settings → Dictionary → Anki**, tap **Refresh** once to open
+AnkiMobile and import its current decks, note types, and fields. Mining then
+opens AnkiMobile to add the note and returns to Mangatan when the note succeeds;
+images and audio are transferred locally during that callback.
+
 ## Updating This Fork
 
 Open **Actions → Sync upstream release → Run workflow**. Leave the tag empty

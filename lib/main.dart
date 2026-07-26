@@ -43,6 +43,7 @@ import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
 import 'package:mangayomi/utils/discord_rpc.dart';
 import 'package:mangayomi/utils/log/logger.dart';
@@ -440,6 +441,15 @@ class _MyAppState extends ConsumerState<MyApp>
   Future<void> _handleDeepLink(Uri uri) async {
     if (uri == lastUri) return; // Debouncing Deep Links
     lastUri = uri;
+    final ankiMobileCallback = AnkiMobileCallbackCoordinator.instance.handle(
+      uri,
+    );
+    if (ankiMobileCallback != null) {
+      if (ankiMobileCallback == AnkiMobileCallbackKind.added) {
+        botToast('Added to AnkiMobile', second: 3);
+      }
+      return;
+    }
     final googleDriveDiagnosticHandler = _googleDriveDiagnosticHandler;
     if (googleDriveDiagnosticHandler != null &&
         await googleDriveDiagnosticHandler.handle(uri)) {

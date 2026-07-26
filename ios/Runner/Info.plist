@@ -12,7 +12,11 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Mangatan needs permission to save exported images to your photo library.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Mangatan connects to extension servers and AnkiConnect on your local network.</string>
+	<string>Mangatan connects to extension servers and temporarily shares mined images and audio with AnkiMobile.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>anki</string>
+	</array>
 	<key>NSDocumentUsageDescription</key>
 	<string>Mangatan needs access to your files to create and restore backups.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

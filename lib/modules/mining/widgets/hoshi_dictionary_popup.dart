@@ -16,6 +16,7 @@ import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -364,6 +365,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<bool> _isDuplicate(String expression) async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) return false;
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -385,6 +387,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<List<int>> _duplicateNoteIds(String expression) async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) return const [];
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -403,6 +406,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<bool> _browseDuplicateNotes(Object? rawIds) async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) return false;
     final ids = rawIds is Iterable
         ? rawIds
               .map(
@@ -494,20 +498,29 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         dictionaryMedia: dictionaryMedia,
         wordAudio: wordAudio,
       );
-      final noteId =
-          await AnkiConnectService(
-            endpoint: await MiningPreferences.getAnkiEndpoint(),
-          ).exportDraft(
-            draft,
-            duplicateCheck: profile.duplicateCheck,
-            allowDuplicate:
-                content['allowDuplicate'] == true ||
-                dictionaryProfile.duplicateAction == 'allow',
-            duplicateScope: profile.duplicateScope,
-            checkAllModels: profile.checkAllModels,
-            syncOnCreate: profile.syncOnCreate,
-          );
-      botToast('Added to Anki (#$noteId)', second: 3);
+      final allowDuplicate =
+          !profile.duplicateCheck ||
+          content['allowDuplicate'] == true ||
+          dictionaryProfile.duplicateAction == 'allow';
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await AnkiMobileService().exportDraft(
+          draft,
+          allowDuplicate: allowDuplicate,
+        );
+      } else {
+        final noteId =
+            await AnkiConnectService(
+              endpoint: await MiningPreferences.getAnkiEndpoint(),
+            ).exportDraft(
+              draft,
+              duplicateCheck: profile.duplicateCheck,
+              allowDuplicate: allowDuplicate,
+              duplicateScope: profile.duplicateScope,
+              checkAllModels: profile.checkAllModels,
+              syncOnCreate: profile.syncOnCreate,
+            );
+        botToast('Added to Anki (#$noteId)', second: 3);
+      }
       return true;
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);

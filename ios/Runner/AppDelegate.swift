@@ -5,6 +5,9 @@ import app_links
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private static let ankiMobilePasteboardType = "net.ankimobile.json"
+  private var ankiMobileMediaBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -29,6 +32,34 @@ import app_links
                   }
               })
 
+      let ankiMobileChannel = FlutterMethodChannel(
+        name: "com.selxo.mangatan.ankimobile",
+        binaryMessenger: controller.binaryMessenger)
+      ankiMobileChannel.setMethodCallHandler({ [weak self]
+          (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+          switch call.method {
+          case "consumeInfoForAddingPasteboard":
+              if let data = UIPasteboard.general.data(
+                forPasteboardType: Self.ankiMobilePasteboardType
+              ) {
+                  UIPasteboard.general.setData(
+                    Data(),
+                    forPasteboardType: Self.ankiMobilePasteboardType)
+                  result(String(data: data, encoding: .utf8))
+              } else {
+                  result(nil)
+              }
+          case "beginMediaImportBackgroundTask":
+              self?.beginAnkiMobileMediaBackgroundTask()
+              result(nil)
+          case "endMediaImportBackgroundTask":
+              self?.endAnkiMobileMediaBackgroundTask()
+              result(nil)
+          default:
+              result(FlutterMethodNotImplemented)
+          }
+      })
+
     GeneratedPluginRegistrant.register(with: self)
 
     if let url = AppLinks.shared.getLink(launchOptions: launchOptions) {
@@ -37,5 +68,21 @@ import app_links
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func beginAnkiMobileMediaBackgroundTask() {
+    endAnkiMobileMediaBackgroundTask()
+    ankiMobileMediaBackgroundTask = UIApplication.shared.beginBackgroundTask(
+      withName: "AnkiMobile media import"
+    ) { [weak self] in
+      self?.endAnkiMobileMediaBackgroundTask()
+    }
+  }
+
+  private func endAnkiMobileMediaBackgroundTask() {
+    guard ankiMobileMediaBackgroundTask != .invalid else { return }
+    let task = ankiMobileMediaBackgroundTask
+    ankiMobileMediaBackgroundTask = .invalid
+    UIApplication.shared.endBackgroundTask(task)
   }
 }

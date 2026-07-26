@@ -106,11 +106,6 @@ class MExtensionServerPlatform {
   }
 
   Future<void> startServer({int? preferredPort}) {
-    // The available OpenJDK Mobile snapshot is built for iOS 17.5 and causes
-    // older deployment targets to terminate while loading the app. Keep iOS
-    // on its saved external bridge until a compatible embedded runtime exists.
-    if (Platform.isIOS) return Future<void>.value();
-
     final pending = _pendingStart;
     if (pending != null) return pending;
 

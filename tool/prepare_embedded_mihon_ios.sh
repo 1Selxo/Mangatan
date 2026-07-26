@@ -9,11 +9,11 @@ work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
 server_repository="https://github.com/ippo-michi/M-Extension-Server.git"
-server_commit="af3849c5058567785192323206cac777ae122f67"
-openjdk_framework_url="https://github.com/openjdk-mobile/ios-tools/releases/download/snapshot/OpenJDK.xcframework.zip"
-openjdk_framework_sha256="ae8e22142e45e5c1e9e8e3541829f3cc00584658eb21eeeb0d3612e3fbaf7c9f"
-openjdk_bundle_url="https://github.com/openjdk-mobile/ios-tools/releases/download/snapshot/java_bundle-device.zip"
-openjdk_bundle_sha256="37387a48bdd7f1ce1d3a38e88356e61288673c91b42ef27cf1b71d27e05cc54a"
+server_commit="f64273694e67e2784742db1f28329794a7c78876"
+openjdk_framework_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v1/OpenJDK.xcframework.zip"
+openjdk_framework_sha256="c227e55eb3adb0578fff3064828668365f21e02af13430ab8f207553b6d6f7eb"
+openjdk_bundle_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v1/java_bundle-device.zip"
+openjdk_bundle_sha256="4101f1890483e6903917b0437d9fcacc626d394ce52507385b8675009507eb76"
 
 if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/javac" ]]; then
   echo "JAVA_HOME must point to a JDK 21 or newer." >&2
@@ -61,6 +61,14 @@ if "$JAVA_HOME/bin/jar" tf "$server_jar" |
   echo "The iOS server JAR contains excluded desktop runtime classes." >&2
   exit 1
 fi
+server_entries="$work_dir/server-entries.txt"
+"$JAVA_HOME/bin/jar" tf "$server_jar" > "$server_entries"
+for required_resource in r_styles.ini r_values.ini; do
+  if ! grep -qx "$required_resource" "$server_entries"; then
+    echo "The iOS server JAR is missing $required_resource." >&2
+    exit 1
+  fi
+done
 
 echo "Downloading verified OpenJDK Mobile runtime"
 download_and_verify \
@@ -73,6 +81,20 @@ download_and_verify \
   "$work_dir/java_bundle-device.zip"
 unzip -q "$work_dir/OpenJDK.xcframework.zip" -d "$work_dir/framework"
 unzip -q "$work_dir/java_bundle-device.zip" -d "$work_dir/java-bundle"
+runtime_archive=$(find "$work_dir/framework/OpenJDK.xcframework" \
+  -type f -name 'libdevice.a' -print -quit)
+if [[ -z "$runtime_archive" ]]; then
+  echo "The OpenJDK XCFramework does not contain libdevice.a." >&2
+  exit 1
+fi
+runtime_objects="$work_dir/runtime-objects"
+mkdir "$runtime_objects"
+(
+  cd "$runtime_objects"
+  ar -x "$runtime_archive"
+)
+python3 "$repo_dir/tool/verify_macho_min_ios.py" \
+  --maximum 13.0 "$runtime_objects"
 
 echo "Building java.util.logging compatibility shim"
 shim_source="$repo_dir/tool/ios_jul_shim"

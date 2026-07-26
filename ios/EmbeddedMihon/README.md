@@ -13,13 +13,16 @@ JAVA_HOME=/path/to/jdk-21 tool/prepare_embedded_mihon_ios.sh
 The preparation script pins:
 
 - the exact M-Extension-Server commit;
-- the OpenJDK Mobile snapshot asset URLs;
+- the custom OpenJDK Mobile iOS 13 runtime release;
 - SHA-256 checksums for both OpenJDK downloads.
 
 To update the embedded server later, merge the server changes first, replace
 `server_commit` in the script, and rerun the server tests and this preparation
-command. To update OpenJDK, replace both asset URLs and their checksums
-together. The iOS release workflow runs the same script from a clean checkout.
+command. To update OpenJDK, dispatch `build-openjdk-ios13.yml`, then replace
+both asset URLs and their checksums together. The runtime workflow pins the
+OpenJDK and ios-tools source commits and rejects any Mach-O object targeting
+newer than iOS 13. The iOS release workflow runs the same preparation script
+from a clean checkout.
 
 The embedded VM is interpreter-only and is suspended with the app by iOS.
 Extensions that require Android WebView or unsupported native Android

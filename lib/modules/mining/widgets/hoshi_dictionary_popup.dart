@@ -1073,10 +1073,12 @@ String buildHoshiPopupHtml({
   final primary = _cssColor(scheme.primary);
   final primaryContainer = _cssColor(scheme.primaryContainer);
   final onPrimaryContainer = _cssColor(scheme.onPrimaryContainer);
-  final audioSources =
-      audioPreferences.enabled && audioPreferences.url.trim().isNotEmpty
-      ? [audioPreferences.url.trim()]
+  final audioSources = audioPreferences.enabled
+      ? audioPreferences.effectiveSources
+            .map((source) => source.displayName)
+            .toList(growable: false)
       : const <String>[];
+  final firstAudioSource = audioPreferences.effectiveSources.firstOrNull;
   const nativeHandlers = [
     'getEntries',
     'lookupRedirect',
@@ -1187,7 +1189,7 @@ String buildHoshiPopupHtml({
     window.deduplicatePitchAccents = true;
     window.compactPitchAccents = false;
 	    window.audioSources = ${jsonEncode(audioSources)};
-	    window.audioSourceType = ${jsonEncode(audioPreferences.sourceType.name)};
+	    window.audioSourceType = ${jsonEncode(firstAudioSource?.type.name ?? '')};
 	    window.audioSourceLanguage = ${jsonEncode(audioPreferences.language)};
 	    window.audioEnableAutoplay = false;
 	    window.audioPlaybackMode = 'interrupt';

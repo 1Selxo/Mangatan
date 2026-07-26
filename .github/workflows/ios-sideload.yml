@@ -53,7 +53,10 @@ jobs:
           flutter test \
             test/eval/dart/m_manga_bridge_test.dart \
             test/eval/mihon \
+            test/services/hoshidicts/hoshi_dictionary_popup_test.dart \
+            test/services/mining/anki_audio_service_test.dart \
             test/services/mining/anki_mobile_service_test.dart \
+            test/services/mining/mining_preferences_profile_test.dart \
             test/utils/app_font_fallback_test.dart
 
       - name: Verify native dictionary source

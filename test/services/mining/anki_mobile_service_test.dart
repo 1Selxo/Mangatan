@@ -11,7 +11,7 @@ void main() {
     final uri = buildAnkiMobileAddNoteUri(
       draft: const AnkiCardDraft(
         deckName: 'Japanese::Mining',
-        modelName: 'Lapis 日本語',
+        modelName: 'Kaishi 1.5k 日本語',
         expression: '猫',
         fields: {'Expression': '猫 & ねこ', 'Meaning': '<b>cat</b>'},
         tags: ['mangatan', '日本語'],
@@ -24,7 +24,9 @@ void main() {
     expect(uri.host, 'x-callback-url');
     expect(uri.path, '/addnote');
     expect(uri.queryParameters['deck'], 'Japanese::Mining');
-    expect(uri.queryParameters['type'], 'Lapis 日本語');
+    expect(uri.queryParameters['type'], 'Kaishi 1.5k 日本語');
+    expect(uri.toString(), contains('type=Kaishi%201.5k%20'));
+    expect(uri.toString(), isNot(contains('Kaishi+1.5k')));
     expect(uri.queryParameters['fldExpression'], '猫 & ねこ');
     expect(uri.queryParameters['fldMeaning'], '<b>cat</b>');
     expect(uri.queryParameters['tags'], 'mangatan 日本語');

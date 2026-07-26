@@ -102,7 +102,9 @@ void main() {
     expect(html, contains('window.scanLength = 24;'));
     expect(
       html,
-      contains('window.audioSources = ["${AnkiAudioPreferences.defaultUrl}"];'),
+      contains(
+        'window.audioSources = ["JapanesePod101","Jisho.org","LanguagePod101"];',
+      ),
     );
     expect(html, contains('window.needsAudio = true;'));
     expect(html, contains('flutter_inappwebview.callHandler'));
@@ -201,12 +203,7 @@ void main() {
       dark: false,
     );
 
-    expect(
-      html,
-      contains(
-        'window.audioSources = ["http://localhost:5050/?term={term}&reading={reading}"];',
-      ),
-    );
+    expect(html, contains('window.audioSources = ["Custom URL (JSON)"];'));
     expect(html, contains('window.audioSourceType = "customJson";'));
     expect(html, contains('window.needsAudio = true;'));
     expect(html, contains('window.allowDupes = true;'));
@@ -443,6 +440,8 @@ void main() {
     expect(popup, contains('if (hasPopupTextSelection())'));
     expect(popup, contains('const audioKey = audioCacheKey(entry);'));
     expect(popup, contains('audioUrls[audioKey]'));
+    expect(popup, contains('for (const source of sources)'));
+    expect(popup, contains('!await playWordAudio(source.url)'));
     expect(popup, isNot(contains('audioUrls[idx]')));
     expect(popup, isNot(contains('audioUrls[entryIndex]')));
     expect(css, contains('.glossary-group'));

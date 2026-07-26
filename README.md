@@ -53,6 +53,10 @@ AnkiMobile and import its current decks, note types, and fields. Mining then
 opens AnkiMobile to add the note and returns to Mangatan when the note succeeds;
 images and audio are transferred locally during that callback.
 
+Japanese word audio is enabled by default with JapanesePod101, Jisho.org, and
+LanguagePod101. Audio sources are ordered fallbacks: add, remove, edit, or move
+multiple built-in and custom URL/JSON sources from the same Anki settings page.
+
 ## Updating This Fork
 
 Open **Actions → Sync upstream release → Run workflow**. Leave the tag empty

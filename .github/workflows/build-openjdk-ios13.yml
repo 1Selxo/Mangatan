@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/build-openjdk-ios13.yml"
+      - "tool/openjdk/*.patch"
       - "tool/verify_macho_min_ios.py"
   workflow_dispatch:
 
@@ -20,7 +21,8 @@ env:
   LIBFFI_IOS_URL: https://github.com/openjdk-mobile/ios-tools/releases/download/libffi-build/libffi-ios.zip
   LIBFFI_IOS_SHA256: 4f39fd1d53fbd69d1bdbd915413077d130daa3f6792d1b3a03a690a9cbd4dea3
   IOS_MINIMUM_VERSION: "13.0"
-  RUNTIME_RELEASE_TAG: embedded-openjdk-ios13-v1
+  RUNTIME_RELEASE_TAG: embedded-openjdk-ios13-v2
+  ZERO_JNI_PATCH: tool/openjdk/8378080-zero-jni-env-lifetime.patch
 
 jobs:
   build-device:
@@ -61,6 +63,8 @@ jobs:
           git -C mobile fetch --depth 1 origin "$MOBILE_COMMIT"
           git -C mobile -c advice.detachedHead=false checkout --detach FETCH_HEAD
           test "$(git -C mobile rev-parse HEAD)" = "$MOBILE_COMMIT"
+          git -C mobile apply --check "$GITHUB_WORKSPACE/$ZERO_JNI_PATCH"
+          git -C mobile apply "$GITHUB_WORKSPACE/$ZERO_JNI_PATCH"
 
           git init -q ios-tools
           git -C ios-tools remote add origin "$IOS_TOOLS_REPOSITORY"
@@ -133,6 +137,8 @@ jobs:
           OpenJDK Mobile commit: $MOBILE_COMMIT
           ios-tools repository: $IOS_TOOLS_REPOSITORY
           ios-tools commit: $IOS_TOOLS_COMMIT
+          OpenJDK patch: $ZERO_JNI_PATCH
+          OpenJDK patch SHA-256: $(shasum -a 256 "$ZERO_JNI_PATCH" | cut -d ' ' -f 1)
           libffi iOS SHA-256: $LIBFFI_IOS_SHA256
           Minimum iOS deployment target: $IOS_MINIMUM_VERSION
           EOF

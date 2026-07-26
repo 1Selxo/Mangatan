@@ -5,6 +5,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_dir=$(cd "$script_dir/.." && pwd)
 generated_dir="$repo_dir/ios/EmbeddedMihon/runtime"
 framework_dir="$repo_dir/ios/Frameworks/OpenJDK.xcframework"
+lazy_framework_dir="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
@@ -113,6 +114,7 @@ mkdir -p "$shim_classes"
 echo "Staging embedded iOS runtime"
 find "$generated_dir" -depth -delete 2>/dev/null || true
 find "$framework_dir" -depth -delete 2>/dev/null || true
+find "$lazy_framework_dir" -depth -delete 2>/dev/null || true
 mkdir -p "$generated_dir/lib/security"
 mkdir -p "$(dirname "$framework_dir")"
 cp -R "$work_dir/framework/OpenJDK.xcframework" "$framework_dir"
@@ -131,4 +133,8 @@ cp "$repo_dir/ios/EmbeddedMihon/THIRD_PARTY_NOTICES.md" \
 test -f "$framework_dir/Info.plist"
 test -f "$generated_dir/lib/modules"
 test -f "$generated_dir/MExtensionServer.jar"
+if [[ "$(uname -s)" == Darwin ]]; then
+  "$repo_dir/tool/build_lazy_openjdk_ios.sh"
+  test -x "$lazy_framework_dir/OpenJDKRuntime"
+fi
 echo "Embedded Mihon iOS runtime is ready."

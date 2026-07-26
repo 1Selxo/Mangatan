@@ -13,9 +13,11 @@ import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -120,9 +122,13 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   List<Map<String, dynamic>> _entries = const [];
   Map<String, Map<String, String>> _dictionaryMediaData = const {};
   bool _exporting = false;
+  AnkiExportJobController? _activeExportJob;
+  StreamSubscription<AnkiExportJobState>? _exportJobSubscription;
   bool _webReady = false;
   int _lookupGeneration = 0;
   int _cachedMatchNotificationGeneration = 0;
+  int _documentRevision = 0;
+  int? _themeRevision;
   Future<void> _javascriptQueue = Future<void>.value();
   Player? _audioPlayer;
   String? _requestedQuery;
@@ -155,9 +161,13 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     }
     final profileChanged =
         _profileRevision(oldWidget.profile) != _profileRevision(widget.profile);
-    if (profileChanged) {
+    final preferencesChanged = oldWidget.preferences != widget.preferences;
+    if (profileChanged || preferencesChanged) {
       _shellFuture = null;
-      _stylesFuture = _loadStyles();
+      _webReady = false;
+      _controller = null;
+      _documentRevision++;
+      if (profileChanged) _stylesFuture = _loadStyles();
     }
     if (oldWidget.text != widget.text || profileChanged) {
       unawaited(
@@ -188,6 +198,23 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       // A warm popup can be presented for the same spelling at a different
       // reader position. Replay the match only after the new frame is built.
       _notifyCachedMatchAfterBuild();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final revision = Object.hash(
+      Theme.of(context).brightness,
+      Theme.of(context).colorScheme,
+    );
+    final previous = _themeRevision;
+    _themeRevision = revision;
+    if (previous != null && previous != revision) {
+      _shellFuture = null;
+      _webReady = false;
+      _controller = null;
+      _documentRevision++;
     }
   }
 
@@ -364,7 +391,31 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return _entries.length;
   }
 
+  Future<int> _lookupKanjiRedirect(String character) async {
+    final generation = ++_lookupGeneration;
+    final results = await HoshidictsLookupBackend.instance.lookupKanji(
+      character,
+      profile: widget.profile,
+    );
+    if (!mounted || generation != _lookupGeneration) return 0;
+    _setResults(results, dictionaryMediaData: const {});
+    _resultQuery = character;
+    _renderedQuery = character;
+    return _entries.length;
+  }
+
+  Future<bool> _usesAnkiMobile() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return false;
+    final preferredMode = await MiningPreferences.getAnkiIntegrationMode();
+    return effectiveAnkiIntegrationMode(
+          preferredMode: preferredMode,
+          isIOS: true,
+        ) ==
+        AnkiIntegrationMode.ankiMobile;
+  }
+
   Future<bool> _isDuplicate(String expression) async {
+    if (await _usesAnkiMobile()) return false;
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -377,6 +428,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         modelName: profile.modelName,
         expression: expression,
         duplicateScope: profile.duplicateScope,
+        duplicateDeckNames: profile.duplicateDeckNames,
         checkAllModels: profile.checkAllModels,
       );
       return status.isDuplicate;
@@ -386,6 +438,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<List<int>> _duplicateNoteIds(String expression) async {
+    if (await _usesAnkiMobile()) return const [];
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -397,6 +450,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         modelName: profile.modelName,
         expression: expression,
         duplicateScope: profile.duplicateScope,
+        duplicateDeckNames: profile.duplicateDeckNames,
       );
     } catch (_) {
       return const [];
@@ -404,6 +458,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<bool> _browseDuplicateNotes(Object? rawIds) async {
+    if (await _usesAnkiMobile()) return false;
     final ids = rawIds is Iterable
         ? rawIds
               .map(
@@ -437,6 +492,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
     }
     if (result == null || _exporting) return false;
+    final selectedResult = result;
     setState(() => _exporting = true);
     try {
       final miningContext = await widget.miningContext;
@@ -449,78 +505,115 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
 
       MiningContext effectiveContext = miningContext;
-      final cropEnabled = await MiningPreferences.getCropImageBeforeMining();
-      
-      // NEW: Only trigger the crop dialog if the media type is explicitly Manga
       final isManga = effectiveContext.mediaType == MiningMediaType.manga;
-
-      // Intercept image load to crop if preference is enabled AND we are reading manga
-      if (cropEnabled && isManga && effectiveContext.imageBytesLoader != null) {
-        final rawBytes = await effectiveContext.imageBytesLoader!();
-        if (rawBytes != null && rawBytes.isNotEmpty) {
-          if (!mounted) return false;
-
-          final croppedBytes = await _showCropDialog(
-            context: context,
-            imageBytes: rawBytes,
-          );
-
-          if (croppedBytes != null) {
-            // Override the image bytes loader for AnkiCardBuilder
-            effectiveContext = effectiveContext.copyWith(
-              imageBytesLoader: () => croppedBytes,
+      if (dictionaryProfile.screenshotMode == AnkiScreenshotMode.crop &&
+          isManga &&
+          effectiveContext.imageBytesLoader != null) {
+        final originalLoader = effectiveContext.imageBytesLoader!;
+        effectiveContext = effectiveContext.copyWith(
+          imageBytesLoader: () async {
+            final rawBytes = await originalLoader();
+            if (rawBytes == null || rawBytes.isEmpty || !mounted) return null;
+            final cropped = await _showCropDialog(
+              context: context,
+              imageBytes: rawBytes,
             );
-          } else {
-            // User cancelled cropping, abort mining
-            return false;
-          }
-        }
+            if (cropped == null) throw const AnkiExportCancelledException();
+            return cropped;
+          },
+        );
       }
 
-      final dictionaryMedia = await _loadAnkiDictionaryMedia(
-        content['dictionaryMedia'],
-      );
-      final audioPreferences =
-          await MiningPreferences.getAnkiAudioPreferences();
-      final wordAudio = await AnkiAudioService().fetchTermAudio(
-        term: result.term.expression,
-        reading: result.term.reading,
-        preferences: audioPreferences,
-      );
-      final draft = await const AnkiCardBuilder().build(
-        result: result,
-        context: effectiveContext, // Use the cropped effectiveContext
-        profile: profile,
-        renderedContent: content,
-        dictionaryMedia: dictionaryMedia,
-        wordAudio: wordAudio,
-      );
-      final noteId =
-          await AnkiConnectService(
-            endpoint: await MiningPreferences.getAnkiEndpoint(),
-          ).exportDraft(
-            draft,
-            duplicateCheck: profile.duplicateCheck,
-            allowDuplicate:
-                content['allowDuplicate'] == true ||
-                dictionaryProfile.duplicateAction == 'allow',
-            duplicateScope: profile.duplicateScope,
-            checkAllModels: profile.checkAllModels,
-            syncOnCreate: profile.syncOnCreate,
-          );
+      final allowDuplicate =
+          !profile.duplicateCheck ||
+          content['allowDuplicate'] == true ||
+          dictionaryProfile.duplicateAction == 'allow';
+      if (await _usesAnkiMobile()) {
+        final dictionaryMedia = await _loadAnkiDictionaryMedia(
+          content['dictionaryMedia'],
+        );
+        final audioPreferences =
+            await MiningPreferences.getAnkiAudioPreferences();
+        final wordAudio = await AnkiAudioService().fetchTermAudio(
+          term: selectedResult.term.expression,
+          reading: selectedResult.term.reading,
+          preferences: audioPreferences,
+        );
+        final draft = await const AnkiCardBuilder().build(
+          result: selectedResult,
+          context: effectiveContext,
+          profile: profile,
+          renderedContent: content,
+          dictionaryMedia: dictionaryMedia,
+          wordAudio: wordAudio,
+          screenshotMode:
+              dictionaryProfile.screenshotMode ==
+                  AnkiScreenshotMode.noScreenshot
+              ? AnkiScreenshotMode.noScreenshot
+              : AnkiScreenshotMode.full,
+        );
+        await AnkiMobileService().exportDraft(
+          draft,
+          allowDuplicate: allowDuplicate,
+        );
+      } else {
+        final pending = await const AnkiCardBuilder().buildPending(
+          result: selectedResult,
+          context: effectiveContext,
+          profile: profile,
+          screenshotMode: dictionaryProfile.screenshotMode,
+          renderedContent: content,
+          dictionaryMediaLoader: () =>
+              _loadAnkiDictionaryMedia(content['dictionaryMedia']),
+          wordAudioLoader: () async {
+            final audioPreferences =
+                await MiningPreferences.getAnkiAudioPreferences();
+            return AnkiAudioService().fetchTermAudio(
+              term: selectedResult.term.expression,
+              reading: selectedResult.term.reading,
+              preferences: audioPreferences,
+            );
+          },
+        );
+        _activeExportJob = pending.jobController;
+        await _exportJobSubscription?.cancel();
+        _exportJobSubscription = _activeExportJob?.states.listen((_) {
+          if (mounted) setState(() {});
+        });
+        final export =
+            await AnkiConnectService(
+              endpoint: await MiningPreferences.getAnkiEndpoint(),
+            ).exportPending(
+              pending,
+              duplicateCheck: profile.duplicateCheck,
+              allowDuplicate: allowDuplicate,
+              duplicateScope: profile.duplicateScope,
+              duplicateDeckNames: profile.duplicateDeckNames,
+              checkAllModels: profile.checkAllModels,
+              syncOnCreate: profile.syncOnCreate,
+            );
+        final warning = export.warnings.isEmpty
+            ? ''
+            : '\n${export.warnings.join('\n')}';
+        botToast('Added to Anki (#${export.noteId})$warning', second: 5);
+      }
       await AnkiStatsRecorder.recordCard(
         context: effectiveContext,
         profile: dictionaryProfile,
       );
-      botToast('Added to Anki (#$noteId)', second: 3);
       return true;
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);
+      return false;
+    } on AnkiExportCancelledException {
       return false;
     } catch (error) {
       botToast('Anki export failed: $error', second: 5);
       return false;
     } finally {
+      await _exportJobSubscription?.cancel();
+      _exportJobSubscription = null;
+      _activeExportJob = null;
       if (mounted) setState(() => _exporting = false);
     }
   }
@@ -574,6 +667,12 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       handlerName: 'lookupRedirect',
       callback: (arguments) =>
           _lookupRedirect(arguments.isEmpty ? '' : arguments.first.toString()),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'kanjiLookup',
+      callback: (arguments) => _lookupKanjiRedirect(
+        arguments.isEmpty ? '' : arguments.first.toString(),
+      ),
     );
     controller.addJavaScriptHandler(
       handlerName: 'textSelected',
@@ -807,6 +906,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   void dispose() {
     widget.controller?._detach(this);
     _audioPlayer?.dispose();
+    _exportJobSubscription?.cancel();
     super.dispose();
   }
 
@@ -847,45 +947,77 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             }
           },
           onPointerPanZoomUpdate: (event) => _scrollPopupBy(event.panDelta),
-          child: InAppWebView(
-            webViewEnvironment: webViewEnvironment,
-            initialData: InAppWebViewInitialData(
-              data: data.html,
-              baseUrl: WebUri('https://hoshi-popup.local/'),
-            ),
-            initialSettings: InAppWebViewSettings(
-              transparentBackground: true,
-              resourceCustomSchemes: _usesStableCustomSchemes
-                  ? const ['image']
-                  : const [],
-              supportZoom: false,
-              disableHorizontalScroll: true,
-              horizontalScrollBarEnabled: false,
-              verticalScrollBarEnabled: true,
-              isInspectable: kDebugMode,
-            ),
-            onWebViewCreated: (controller) {
-              _controller = controller;
-              _registerHandlers(controller);
-            },
-            onLoadStop: (_, _) async {
-              _webReady = true;
-              await _render(await _stylesFuture);
-              _renderedQuery = _resultQuery;
-              if (_resultQuery == widget.text.trim() && _results.isNotEmpty) {
-                widget.onMatchChanged(_results.first.matched.length);
-              }
-              if (_requestedQuery != widget.text.trim()) {
-                await _lookupAndRender(
-                  widget.text,
-                  notifyMatch: true,
-                  initialResults: widget.initialResults,
-                );
-              }
-            },
-            onLoadResourceWithCustomScheme: _usesStableCustomSchemes
-                ? (_, request) => _loadDictionaryMedia(request)
-                : null,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              InAppWebView(
+                key: ValueKey(_documentRevision),
+                webViewEnvironment: webViewEnvironment,
+                initialData: InAppWebViewInitialData(
+                  data: data.html,
+                  baseUrl: WebUri('https://hoshi-popup.local/'),
+                ),
+                initialSettings: InAppWebViewSettings(
+                  transparentBackground: true,
+                  resourceCustomSchemes: _usesStableCustomSchemes
+                      ? const ['image']
+                      : const [],
+                  supportZoom: false,
+                  disableHorizontalScroll: true,
+                  horizontalScrollBarEnabled: false,
+                  verticalScrollBarEnabled: true,
+                  isInspectable: kDebugMode,
+                ),
+                onWebViewCreated: (controller) {
+                  _controller = controller;
+                  _registerHandlers(controller);
+                },
+                onLoadStop: (_, _) async {
+                  _webReady = true;
+                  await _render(await _stylesFuture);
+                  _renderedQuery = _resultQuery;
+                  if (_resultQuery == widget.text.trim() &&
+                      _results.isNotEmpty) {
+                    widget.onMatchChanged(_results.first.matched.length);
+                  }
+                  if (_requestedQuery != widget.text.trim()) {
+                    await _lookupAndRender(
+                      widget.text,
+                      notifyMatch: true,
+                      initialResults: widget.initialResults,
+                    );
+                  }
+                },
+                onLoadResourceWithCustomScheme: _usesStableCustomSchemes
+                    ? (_, request) => _loadDictionaryMedia(request)
+                    : null,
+              ),
+              if (_activeExportJob?.state case final state?
+                  when state != AnkiExportJobState.idle)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: FilledButton.tonalIcon(
+                      onPressed: state == AnkiExportJobState.preparing
+                          ? _activeExportJob?.cancel
+                          : null,
+                      icon: state == AnkiExportJobState.preparing
+                          ? const Icon(Icons.close, size: 18)
+                          : const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                      label: Text(
+                        state == AnkiExportJobState.preparing
+                            ? 'Preparing… Cancel'
+                            : 'Committing…',
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },
@@ -980,6 +1112,25 @@ Future<Map<String, Map<String, String>>> hoshiPopupMediaDataUris(
 
 Map<String, dynamic> hoshiPopupEntry(HoshiLookupResult result) {
   final term = result.term;
+  if (term.glossaries.length == 1) {
+    try {
+      final content = jsonDecode(term.glossaries.single.glossary);
+      if (content is Map<String, dynamic> &&
+          content['type'] == yomitanKanjiContentType) {
+        return {
+          ...content,
+          'expression': term.expression,
+          'reading': term.reading,
+          'matched': result.matched,
+          'glossaries': const [],
+          'pitches': const [],
+          'rules': const [],
+        };
+      }
+    } on FormatException {
+      // Normal plain-text glossary.
+    }
+  }
   return {
     'expression': term.expression,
     'reading': term.reading,
@@ -1063,15 +1214,19 @@ String buildHoshiPopupHtml({
   final muted3 = _cssColor(scheme.onSurfaceVariant.withValues(alpha: 0.70));
   final muted4 = _cssColor(scheme.onSurfaceVariant.withValues(alpha: 0.56));
   final primary = _cssColor(scheme.primary);
+  final onPrimary = _cssColor(scheme.onPrimary);
   final primaryContainer = _cssColor(scheme.primaryContainer);
   final onPrimaryContainer = _cssColor(scheme.onPrimaryContainer);
-  final audioSources =
-      audioPreferences.enabled && audioPreferences.url.trim().isNotEmpty
-      ? [audioPreferences.url.trim()]
+  final audioSources = audioPreferences.enabled
+      ? audioPreferences.effectiveSources
+            .map((source) => source.displayName)
+            .toList(growable: false)
       : const <String>[];
+  final firstAudioSource = audioPreferences.effectiveSources.firstOrNull;
   const nativeHandlers = [
     'getEntries',
     'lookupRedirect',
+    'kanjiLookup',
     'textSelected',
     'dismissPopup',
     'mineEntry',
@@ -1101,6 +1256,10 @@ String buildHoshiPopupHtml({
       --text-color-light3: $muted3;
       --text-color-light4: $muted4;
       --accent-color: $primary;
+      --on-primary: $onPrimary;
+      --link-color: $primary;
+      --primary-container: $primaryContainer;
+      --on-primary-container: $onPrimaryContainer;
       --freq-tag-color: $primary;
       --pitch-tag-color: $primary;
       --expr-tag-color: $primaryContainer;
@@ -1111,6 +1270,8 @@ String buildHoshiPopupHtml({
     body { min-height: 101%; }
 	    .entry, .entry * { color: var(--text-color); }
 	    .dict-label, .deinflection-tag, .glossary-tag { color: var(--text-color-light1); }
+	    .kanji-tag, .kanji-info-title, .kanji-stat-list dt, .kanji-readings h4 { color: var(--text-color-light1); }
+	    .kanji-dictionary-tag { color: var(--on-primary-container); }
 	    .glossary-group {
 	      background-color: $elevated;
 	      color: var(--text-color);
@@ -1118,7 +1279,7 @@ String buildHoshiPopupHtml({
 	    }
 	    .glossary-content, .glossary-content * { color: var(--text-color); }
 	    .tag-row, .tag-row * { color: var(--text-color-light1); }
-	    .frequency-dict-label, .pitch-dict-label { color: #fff; }
+	    .frequency-dict-label, .pitch-dict-label { color: var(--on-primary); }
 	    .overlay {
 	      background: var(--background-color-dark1);
 	      color: var(--text-color);
@@ -1135,8 +1296,7 @@ String buildHoshiPopupHtml({
 		    .button-slot[hidden] { display: none; }
 		    .button-slot::before { content: none; }
 		    .button-slot[data-state="loading"] .slot-icon,
-		    .button-slot[data-state="error"] .slot-icon,
-		    .button-slot[data-state="duplicate"] .slot-icon { display: none; }
+		    .button-slot[data-state="error"] .slot-icon { display: none; }
 		    .slot-icon {
 		      display: block;
 		      width: calc(23px * var(--popup-scale));
@@ -1148,14 +1308,18 @@ String buildHoshiPopupHtml({
 		      fill: currentColor;
 		      shape-rendering: crispEdges;
 		    }
-		    .audio-icon { transform: translate(calc(1px * var(--popup-scale)), calc(1px * var(--popup-scale))); }
-		    .audio-speaker-body { fill: currentColor; }
+		    .duplicate-icon { display: none; }
+		    .button-slot[data-state="duplicate"] .plus-icon { display: none; }
+		    .button-slot[data-state="duplicate"] .duplicate-icon { display: block; }
+		    .duplicate-line,
 		    .browse-line {
 		      fill: none;
 		      stroke: currentColor;
 		      stroke-width: 1.8;
+		      stroke-linecap: round;
 		      stroke-linejoin: round;
 		    }
+		    .audio-speaker-body { fill: currentColor; }
 			    .audio-wave {
 			      fill: none;
 			      stroke: currentColor;
@@ -1165,7 +1329,6 @@ String buildHoshiPopupHtml({
 		    }
 		    .button-slot[data-state="loading"]::before { content: '…'; font-size: calc(18px * var(--popup-scale)); }
 		    .button-slot[data-state="error"]::before { content: '!'; font-size: calc(18px * var(--popup-scale)); }
-		    .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }
 	    .button-slot[data-enabled="false"] { opacity: .45; pointer-events: none; }
 	  </style>
   <script>
@@ -1179,7 +1342,7 @@ String buildHoshiPopupHtml({
     window.deduplicatePitchAccents = true;
     window.compactPitchAccents = false;
 	    window.audioSources = ${jsonEncode(audioSources)};
-	    window.audioSourceType = ${jsonEncode(audioPreferences.sourceType.name)};
+	    window.audioSourceType = ${jsonEncode(firstAudioSource?.type.name ?? '')};
 	    window.audioSourceLanguage = ${jsonEncode(audioPreferences.language)};
 	    window.audioEnableAutoplay = false;
 	    window.audioPlaybackMode = 'interrupt';
@@ -1224,17 +1387,12 @@ String buildHoshiPopupHtml({
   <div class="overlay"><div class="overlay-close" onclick="closeOverlay()">×</div><div class="overlay-content"></div></div>
 </body>
 </html>''';
-  return html
-      .replaceFirst(
-        RegExp(r'\.button-slot\[data-state="duplicate"\]::before \{[^}]*\}'),
-        '.button-slot[data-state="duplicate"]::before { content: "\\229E"; font-size: calc(19px * var(--popup-scale)); }',
-      )
-      .replaceFirst(
-        RegExp(
-          r'<div class="overlay-close" onclick="closeOverlay\(\)">.*?<div class="overlay-content">',
-        ),
-        '<div class="overlay-close" onclick="closeOverlay()">&times;</div><div class="overlay-content">',
-      );
+  return html.replaceFirst(
+    RegExp(
+      r'<div class="overlay-close" onclick="closeOverlay\(\)">.*?<div class="overlay-content">',
+    ),
+    '<div class="overlay-close" onclick="closeOverlay()">&times;</div><div class="overlay-content">',
+  );
 }
 
 bool _isDarkPopup(
@@ -1271,13 +1429,38 @@ class _HoshiPopupData {
   final String html;
 }
 
+/// Default crop window seeded by the screenshot crop dialog and restored by the
+/// free/square aspect presets: a centered 80% rectangle of the source panel.
+///
+/// Issue #36 ("[Feature request] Scalable screenshot") asked for exporting an
+/// adjustable single-panel region instead of the whole page. Seeding the crop
+/// to a sub-rect (not `0..1`) is what makes the default export smaller than the
+/// full page; a regression to a full-page default would silently re-export the
+/// whole page.
+const Rect kAnkiCropDefaultRect = Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+
+/// Renders the region currently selected on [controller] to PNG bytes — the
+/// exact step the crop dialog's "Crop" button performs before the manually
+/// cropped panel is handed back to the Anki export via
+/// [MiningContext.imageBytesLoader].
+///
+/// The output pixel dimensions are the chosen crop rect scaled by the source
+/// bitmap (`crop.width * image.width` x `crop.height * image.height` for an
+/// unrotated panel), so the exported image is the user's chosen sub-rect, not
+/// the full captured page. Returns `null` when the raster produced no bytes.
+Future<Uint8List?> cropControllerToPngBytes(CropController controller) async {
+  final ui.Image bitmap = await controller.croppedBitmap();
+  final byteData = await bitmap.toByteData(format: ui.ImageByteFormat.png);
+  return byteData?.buffer.asUint8List();
+}
+
 Future<Uint8List?> _showCropDialog({
   required BuildContext context,
   required Uint8List imageBytes,
 }) async {
   final controller = CropController(
     aspectRatio: null, // Free crop by default
-    defaultCrop: const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9),
+    defaultCrop: kAnkiCropDefaultRect,
   );
 
   final theme = Theme.of(context);
@@ -1300,12 +1483,10 @@ Future<Uint8List?> _showCropDialog({
           Future<void> handleCrop() async {
             setState(() => cropping = true);
             try {
-              final ui.Image bitmap = await controller.croppedBitmap();
-              final byteData =
-                  await bitmap.toByteData(format: ui.ImageByteFormat.png);
+              final bytes = await cropControllerToPngBytes(controller);
               if (!context.mounted) return;
-              if (byteData != null) {
-                Navigator.pop(context, byteData.buffer.asUint8List());
+              if (bytes != null) {
+                Navigator.pop(context, bytes);
               } else {
                 botToast('Could not crop image: empty result', second: 4);
                 setState(() => cropping = false);
@@ -1318,8 +1499,13 @@ Future<Uint8List?> _showCropDialog({
           }
 
           return Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 20,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             backgroundColor: colorScheme.surface,
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: width, maxHeight: height),
@@ -1333,7 +1519,10 @@ Future<Uint8List?> _showCropDialog({
                       children: [
                         Icon(Icons.crop, color: colorScheme.primary, size: 20),
                         const SizedBox(width: 8),
-                        Text('Crop Screenshot', style: theme.textTheme.titleMedium),
+                        Text(
+                          'Crop Screenshot',
+                          style: theme.textTheme.titleMedium,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1365,9 +1554,10 @@ Future<Uint8List?> _showCropDialog({
                               selected: aspectMode == _CropAspectMode.free,
                               onPressed: () {
                                 controller.aspectRatio = null;
-                                controller.crop =
-                                    const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
-                                setState(() => aspectMode = _CropAspectMode.free);
+                                controller.crop = kAnkiCropDefaultRect;
+                                setState(
+                                  () => aspectMode = _CropAspectMode.free,
+                                );
                               },
                             ),
                             _CropToolButton(
@@ -1377,9 +1567,10 @@ Future<Uint8List?> _showCropDialog({
                               selected: aspectMode == _CropAspectMode.square,
                               onPressed: () {
                                 controller.aspectRatio = 1.0;
-                                controller.crop =
-                                    const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
-                                setState(() => aspectMode = _CropAspectMode.square);
+                                controller.crop = kAnkiCropDefaultRect;
+                                setState(
+                                  () => aspectMode = _CropAspectMode.square,
+                                );
                               },
                             ),
                           ],
@@ -1408,7 +1599,9 @@ Future<Uint8List?> _showCropDialog({
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
-                          onPressed: cropping ? null : () => Navigator.pop(context),
+                          onPressed: cropping
+                              ? null
+                              : () => Navigator.pop(context),
                           child: const Text('Cancel'),
                         ),
                         const SizedBox(width: 8),
@@ -1418,7 +1611,9 @@ Future<Uint8List?> _showCropDialog({
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Icon(Icons.check, size: 18),
                           label: Text(cropping ? 'Cropping…' : 'Crop'),
@@ -1466,7 +1661,7 @@ class _CropToolbarState extends State<_CropToolbar> {
               selected: _mode == _CropAspectMode.free,
               onPressed: () {
                 widget.controller.aspectRatio = null;
-                widget.controller.crop = const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+                widget.controller.crop = kAnkiCropDefaultRect;
                 setState(() => _mode = _CropAspectMode.free);
               },
             ),
@@ -1477,7 +1672,7 @@ class _CropToolbarState extends State<_CropToolbar> {
               selected: _mode == _CropAspectMode.square,
               onPressed: () {
                 widget.controller.aspectRatio = 1.0;
-                widget.controller.crop = const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+                widget.controller.crop = kAnkiCropDefaultRect;
                 setState(() => _mode = _CropAspectMode.square);
               },
             ),
@@ -1521,11 +1716,10 @@ class _CropActionsRowState extends State<_CropActionsRow> {
   Future<void> _handleCrop() async {
     setState(() => _cropping = true);
     try {
-      final ui.Image bitmap = await widget.controller.croppedBitmap();
-      final byteData = await bitmap.toByteData(format: ui.ImageByteFormat.png);
+      final bytes = await cropControllerToPngBytes(widget.controller);
       if (!mounted) return;
-      if (byteData != null) {
-        Navigator.pop(context, byteData.buffer.asUint8List());
+      if (bytes != null) {
+        Navigator.pop(context, bytes);
         return;
       }
       botToast('Could not crop image: empty result', second: 4);

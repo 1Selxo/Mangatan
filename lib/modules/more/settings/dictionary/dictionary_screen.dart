@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
@@ -12,6 +13,7 @@ import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -61,8 +63,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   List<String> _ankiDecks = const [];
   List<String> _ankiModels = const [];
   List<String> _ankiFields = const [];
+  Map<String, List<String>> _ankiMobileFieldsByModel = const {};
   String? _ankiError;
   bool _ankiRefreshing = false;
+
+  bool get _usesAnkiMobile => defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   void initState() {
@@ -122,7 +127,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _cropImageBeforeMining = values[20] as bool;
       _loading = false;
     });
-    if (widget.section == DictionarySettingsSection.anki) {
+    if (widget.section == DictionarySettingsSection.anki && !_usesAnkiMobile) {
       unawaited(_refreshAnki(silent: true));
     }
   }
@@ -365,6 +370,56 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _ankiError = null;
     });
     try {
+      if (_usesAnkiMobile) {
+        final info = await AnkiMobileService().fetchInfo();
+        final models = info.noteTypes
+            .map((noteType) => noteType.name)
+            .toList(growable: false);
+        final selectedModel = models.contains(_ankiProfile.modelName)
+            ? _ankiProfile.modelName
+            : models.first;
+        final fields = info.fieldsByNoteType[selectedModel] ?? const <String>[];
+        final isLapis = _isLapisLike(selectedModel, fields);
+        final needsLapisMigration = isLapis && _needsLapisMigration();
+        final selectedDeck = info.decks.contains(_ankiProfile.deckName)
+            ? _ankiProfile.deckName
+            : info.decks.first;
+        final configurationChanged =
+            selectedDeck != _ankiProfile.deckName ||
+            selectedModel != _ankiProfile.modelName;
+        final profile =
+            configurationChanged ||
+                (fields.isNotEmpty &&
+                    (!_fieldMapMatches(fields) || needsLapisMigration))
+            ? _ankiProfile.copyWith(
+                deckName: selectedDeck,
+                modelName: selectedModel,
+                fieldMap: fields.isEmpty
+                    ? _ankiProfile.fieldMap
+                    : _autoMapFields(
+                        fields,
+                        needsLapisMigration ? const {} : _ankiProfile.fieldMap,
+                        isLapis: isLapis,
+                      ),
+              )
+            : _ankiProfile;
+        if (!identical(profile, _ankiProfile)) {
+          await MiningPreferences.setAnkiProfile(profile);
+        }
+        if (!mounted) return;
+        setState(() {
+          _ankiProfile = profile;
+          _ankiVersion = 0;
+          _ankiDecks = info.decks;
+          _ankiModels = models;
+          _ankiMobileFieldsByModel = info.fieldsByNoteType;
+          _ankiFields = fields;
+        });
+        if (!silent) {
+          botToast('Connected to AnkiMobile', second: 3);
+        }
+        return;
+      }
       final service = AnkiConnectService(endpoint: _ankiEndpoint);
       final version = await service.version();
       final decks = await service.deckNames();
@@ -398,6 +453,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         _ankiDecks = decks;
         _ankiModels = models;
         _ankiFields = fields;
+        _ankiMobileFieldsByModel = const {};
       });
       if (!silent) botToast('Connected to AnkiConnect v$version', second: 3);
     } catch (error) {
@@ -409,7 +465,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         _ankiFields = const [];
         _ankiError = error.toString();
       });
-      if (!silent) botToast('AnkiConnect failed: $error', second: 5);
+      if (!silent) {
+        botToast(
+          '${_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'} failed: $error',
+          second: 5,
+        );
+      }
     } finally {
       if (mounted) setState(() => _ankiRefreshing = false);
     }
@@ -417,12 +478,16 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   Future<void> _selectAnkiModel(String modelName) async {
     var fields = <String>[];
-    try {
-      fields = await AnkiConnectService(
-        endpoint: _ankiEndpoint,
-      ).modelFieldNames(modelName);
-    } catch (error) {
-      botToast('Could not fetch fields: $error', second: 5);
+    if (_usesAnkiMobile) {
+      fields = _ankiMobileFieldsByModel[modelName] ?? const [];
+    } else {
+      try {
+        fields = await AnkiConnectService(
+          endpoint: _ankiEndpoint,
+        ).modelFieldNames(modelName);
+      } catch (error) {
+        botToast('Could not fetch fields: $error', second: 5);
+      }
     }
     final isLapis = _isLapisLike(modelName, fields);
     final profile = _ankiProfile.copyWith(
@@ -1223,7 +1288,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   _DictionarySettingsGroup.anki,
                 ),
                 const Divider(height: 24),
-                const _SectionHeader('AnkiConnect'),
+                _SectionHeader(_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'),
                 SwitchListTile(
                   secondary: const Icon(Icons.note_add_outlined),
                   title: const Text('Enable Anki export'),
@@ -1358,26 +1423,27 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   },
                 ),
                 const Divider(height: 24),
-                ListTile(
-                  leading: const Icon(Icons.link),
-                  title: const Text('AnkiConnect address'),
-                  subtitle: Text(_ankiEndpoint.toString()),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final value = await _editText(
-                      title: 'AnkiConnect address',
-                      value: _ankiEndpoint.toString(),
-                      hint: 'http://127.0.0.1:8765',
-                    );
-                    final endpoint = value == null
-                        ? null
-                        : Uri.tryParse(value.trim());
-                    if (endpoint == null || !endpoint.hasScheme) return;
-                    setState(() => _ankiEndpoint = endpoint);
-                    await MiningPreferences.setAnkiEndpoint(endpoint);
-                    await _refreshAnki();
-                  },
-                ),
+                if (!_usesAnkiMobile)
+                  ListTile(
+                    leading: const Icon(Icons.link),
+                    title: const Text('AnkiConnect address'),
+                    subtitle: Text(_ankiEndpoint.toString()),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () async {
+                      final value = await _editText(
+                        title: 'AnkiConnect address',
+                        value: _ankiEndpoint.toString(),
+                        hint: 'http://127.0.0.1:8765',
+                      );
+                      final endpoint = value == null
+                          ? null
+                          : Uri.tryParse(value.trim());
+                      if (endpoint == null || !endpoint.hasScheme) return;
+                      setState(() => _ankiEndpoint = endpoint);
+                      await MiningPreferences.setAnkiEndpoint(endpoint);
+                      await _refreshAnki();
+                    },
+                  ),
                 ListTile(
                   leading: Icon(
                     _ankiVersion == null
@@ -1386,13 +1452,17 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   ),
                   title: Text(
                     _ankiVersion == null
-                        ? 'AnkiConnect not connected'
+                        ? '${_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'} not connected'
+                        : _usesAnkiMobile
+                        ? 'AnkiMobile ready'
                         : 'AnkiConnect v$_ankiVersion',
                   ),
                   subtitle: Text(
                     _ankiError ??
                         (_ankiFields.isEmpty
-                            ? 'Refresh to fetch decks, note types, and fields.'
+                            ? _usesAnkiMobile
+                                  ? 'Tap Refresh to open AnkiMobile and approve access to decks and note types.'
+                                  : 'Refresh to fetch decks, note types, and fields.'
                             : '${_ankiDecks.length} decks, ${_ankiModels.length} note types, ${_ankiFields.length} fields fetched.'),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -1523,8 +1593,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 SwitchListTile(
                   title: const Text('Check for duplicates'),
-                  subtitle: const Text(
-                    'Use Anki\'s note-model duplicate rules before adding',
+                  subtitle: Text(
+                    _usesAnkiMobile
+                        ? 'Let AnkiMobile apply the note type\'s duplicate rule when adding'
+                        : 'Use Anki\'s note-model duplicate rules before adding',
                   ),
                   value: _ankiProfile.duplicateCheck,
                   onChanged: (value) =>
@@ -1533,8 +1605,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 if (_ankiProfile.duplicateCheck) ...[
                   SwitchListTile(
                     title: const Text('Allow duplicates'),
-                    subtitle: const Text(
-                      'Show duplicate state but keep the add button enabled',
+                    subtitle: Text(
+                      _usesAnkiMobile
+                          ? 'Allow AnkiMobile to add a card whose first field already matches'
+                          : 'Show duplicate state but keep the add button enabled',
                     ),
                     value: _activeProfile.duplicateAction == 'allow',
                     onChanged: (value) => _updateActiveProfile(
@@ -1543,52 +1617,55 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
                     ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.filter_alt_outlined),
-                    title: const Text('Duplicate scope'),
-                    subtitle: Text(switch (_ankiProfile.duplicateScope) {
-                      'collection' => 'Entire collection',
-                      'deckroot' => 'Deck root and child decks',
-                      _ => 'Selected deck',
-                    }),
-                    trailing: DropdownButton<String>(
-                      value:
-                          const {
-                            'collection',
-                            'deck',
-                            'deckroot',
-                          }.contains(_ankiProfile.duplicateScope)
-                          ? _ankiProfile.duplicateScope
-                          : 'deck',
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'collection',
-                          child: Text('Collection'),
-                        ),
-                        DropdownMenuItem(value: 'deck', child: Text('Deck')),
-                        DropdownMenuItem(
-                          value: 'deckroot',
-                          child: Text('Deck root'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          _saveAnki(
-                            _ankiProfile.copyWith(duplicateScope: value),
-                          );
-                        }
-                      },
+                  if (!_usesAnkiMobile)
+                    ListTile(
+                      leading: const Icon(Icons.filter_alt_outlined),
+                      title: const Text('Duplicate scope'),
+                      subtitle: Text(switch (_ankiProfile.duplicateScope) {
+                        'collection' => 'Entire collection',
+                        'deckroot' => 'Deck root and child decks',
+                        _ => 'Selected deck',
+                      }),
+                      trailing: DropdownButton<String>(
+                        value:
+                            const {
+                              'collection',
+                              'deck',
+                              'deckroot',
+                            }.contains(_ankiProfile.duplicateScope)
+                            ? _ankiProfile.duplicateScope
+                            : 'deck',
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'collection',
+                            child: Text('Collection'),
+                          ),
+                          DropdownMenuItem(value: 'deck', child: Text('Deck')),
+                          DropdownMenuItem(
+                            value: 'deckroot',
+                            child: Text('Deck root'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            _saveAnki(
+                              _ankiProfile.copyWith(duplicateScope: value),
+                            );
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('Check all note types'),
-                    subtitle: const Text(
-                      'Match the first field across every Anki model',
+                  if (!_usesAnkiMobile)
+                    SwitchListTile(
+                      title: const Text('Check all note types'),
+                      subtitle: const Text(
+                        'Match the first field across every Anki model',
+                      ),
+                      value: _ankiProfile.checkAllModels,
+                      onChanged: (value) => _saveAnki(
+                        _ankiProfile.copyWith(checkAllModels: value),
+                      ),
                     ),
-                    value: _ankiProfile.checkAllModels,
-                    onChanged: (value) =>
-                        _saveAnki(_ankiProfile.copyWith(checkAllModels: value)),
-                  ),
                 ],
                 SwitchListTile(
                   secondary: const Icon(Icons.crop_outlined),
@@ -1600,12 +1677,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     await MiningPreferences.setCropImageBeforeMining(value);
                   },
                 ),
-                SwitchListTile(
-                  title: const Text('Sync after adding a note'),
-                  value: _ankiProfile.syncOnCreate,
-                  onChanged: (value) =>
-                      _saveAnki(_ankiProfile.copyWith(syncOnCreate: value)),
-                ),
+                if (_usesAnkiMobile)
+                  const ListTile(
+                    leading: Icon(Icons.sync_outlined),
+                    title: Text('Sync in AnkiMobile'),
+                    subtitle: Text(
+                      'Mangatan returns after adding; use AnkiMobile\'s normal automatic or manual sync.',
+                    ),
+                  )
+                else
+                  SwitchListTile(
+                    title: const Text('Sync after adding a note'),
+                    value: _ankiProfile.syncOnCreate,
+                    onChanged: (value) =>
+                        _saveAnki(_ankiProfile.copyWith(syncOnCreate: value)),
+                  ),
                 const SizedBox(height: 24),
               ]),
             ),

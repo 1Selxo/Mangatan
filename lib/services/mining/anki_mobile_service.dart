@@ -147,8 +147,8 @@ Uri buildAnkiMobileAddNoteUri({
   final encoded = query
       .map(
         (entry) =>
-            '${Uri.encodeQueryComponent(entry.key)}='
-            '${Uri.encodeQueryComponent(entry.value)}',
+            '${Uri.encodeComponent(entry.key)}='
+            '${Uri.encodeComponent(entry.value)}',
       )
       .join('&');
   return Uri.parse('$_ankiMobileAddNoteUrl?$encoded');

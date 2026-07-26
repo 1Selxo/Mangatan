@@ -7,6 +7,140 @@ import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 
 void main() {
+  test('selects the three Yomitan Japanese defaults in fallback order', () {
+    expect(
+      AnkiAudioPreferences.defaults.effectiveSources.map(
+        (source) => source.type,
+      ),
+      [
+        AnkiAudioSourceType.japanesePod101,
+        AnkiAudioSourceType.jisho,
+        AnkiAudioSourceType.languagePod101,
+      ],
+    );
+  });
+
+  test('tries multiple configured sources from top to bottom', () async {
+    final requests = <Uri>[];
+    final client = MockClient((request) async {
+      requests.add(request.url);
+      if (request.url.host == 'missing.example') {
+        return http.Response('not found', 404);
+      }
+      return http.Response.bytes(
+        [0x49, 0x44, 0x33, 0x04],
+        200,
+        headers: {'content-type': 'audio/mpeg'},
+      );
+    });
+
+    final media = await AnkiAudioService(client: client).fetchTermAudio(
+      term: '食べる',
+      reading: 'たべる',
+      preferences: const AnkiAudioPreferences(
+        enabled: true,
+        sourceType: AnkiAudioSourceType.customUrl,
+        url: '',
+        sources: [
+          AnkiAudioSource(
+            type: AnkiAudioSourceType.customUrl,
+            url: 'https://missing.example/{term}.mp3',
+          ),
+          AnkiAudioSource(
+            type: AnkiAudioSourceType.customUrl,
+            url: 'https://audio.example/{reading}.mp3',
+          ),
+        ],
+        timeout: Duration(seconds: 1),
+        language: 'ja',
+      ),
+    );
+
+    expect(media, isNotNull);
+    expect(requests.map((uri) => uri.host), [
+      'missing.example',
+      'audio.example',
+    ]);
+    expect(Uri.decodeComponent(requests.last.path), '/たべる.mp3');
+  });
+
+  test('falls back from JapanesePod101 to matching Jisho audio', () async {
+    final hosts = <String>[];
+    final client = MockClient((request) async {
+      hosts.add(request.url.host);
+      if (request.url.host == 'assets.languagepod101.com') {
+        expect(request.url.queryParameters, {'kanji': '食べる', 'kana': 'たべる'});
+        return http.Response('not audio', 200);
+      }
+      if (request.url.host == 'jisho.org') {
+        return http.Response(
+          '<audio id="audio_食べる:たべる">'
+          '<source src="https://cdn.example/taberu.mp3">'
+          '</audio>',
+          200,
+          headers: {'content-type': 'text/html; charset=utf-8'},
+        );
+      }
+      if (request.url.host == 'cdn.example') {
+        return http.Response.bytes(
+          [0x49, 0x44, 0x33, 0x04],
+          200,
+          headers: {'content-type': 'audio/mpeg'},
+        );
+      }
+      return http.Response('not found', 404);
+    });
+
+    final media = await AnkiAudioService(client: client).fetchTermAudio(
+      term: '食べる',
+      reading: 'たべる',
+      preferences: AnkiAudioPreferences.defaults,
+    );
+
+    expect(media, isNotNull);
+    expect(hosts, ['assets.languagepod101.com', 'jisho.org', 'cdn.example']);
+  });
+
+  test('extracts matching LanguagePod101 dictionary audio', () async {
+    final client = MockClient((request) async {
+      if (request.url.path == '/audio/jouzu.mp3') {
+        return http.Response.bytes(
+          [0x49, 0x44, 0x33, 0x04],
+          200,
+          headers: {'content-type': 'audio/mpeg'},
+        );
+      }
+      if (request.url.host == 'www.japanesepod101.com') {
+        expect(request.method, 'POST');
+        expect(request.bodyFields['search_query'], '上手');
+        return http.Response(
+          '<div class="dc-result-row">'
+          '<span class="dc-vocab_kana">じょうず</span>'
+          '<audio><source src="/audio/jouzu.mp3"></audio>'
+          '</div>',
+          200,
+          headers: {'content-type': 'text/html; charset=utf-8'},
+        );
+      }
+      return http.Response('not found', 404);
+    });
+
+    final media = await AnkiAudioService(client: client).fetchTermAudio(
+      term: '上手',
+      reading: 'じょうず',
+      preferences: const AnkiAudioPreferences(
+        enabled: true,
+        sourceType: AnkiAudioSourceType.languagePod101,
+        url: '',
+        sources: [AnkiAudioSource(type: AnkiAudioSourceType.languagePod101)],
+        timeout: Duration(seconds: 1),
+        language: 'ja',
+      ),
+    );
+
+    expect(media, isNotNull);
+  });
+
   test(
     'keeps owned client alive until custom JSON audio download finishes',
     () async {

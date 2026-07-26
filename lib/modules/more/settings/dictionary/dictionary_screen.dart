@@ -363,6 +363,114 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     await MiningPreferences.setAnkiAudioPreferences(preferences);
   }
 
+  Future<void> _saveAnkiAudioSources(List<AnkiAudioSource> sources) async {
+    final first = sources.firstOrNull;
+    await _saveAnkiAudio(
+      _ankiAudioPreferences.copyWith(
+        sources: List.unmodifiable(sources),
+        sourceType: first?.type ?? _ankiAudioPreferences.sourceType,
+        url: first?.url ?? '',
+      ),
+    );
+  }
+
+  bool _usesDefaultAudioSources(String language) {
+    final current = _ankiAudioPreferences.effectiveSources;
+    final defaults = AnkiAudioPreferences.defaultSourcesForLanguage(language);
+    if (current.length != defaults.length) return false;
+    for (var index = 0; index < current.length; index++) {
+      if (current[index].type != defaults[index].type ||
+          current[index].url != defaults[index].url) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _addAnkiAudioSource() async {
+    final configuredTypes = _ankiAudioPreferences.effectiveSources
+        .where((source) => !source.isCustom)
+        .map((source) => source.type)
+        .toSet();
+    final type = await showDialog<AnkiAudioSourceType>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Add audio source'),
+        children: [
+          for (final sourceType in AnkiAudioSourceType.values)
+            if ((_ankiAudioPreferences.language == 'ja' ||
+                    (sourceType != AnkiAudioSourceType.japanesePod101 &&
+                        sourceType != AnkiAudioSourceType.jisho)) &&
+                (sourceType == AnkiAudioSourceType.customUrl ||
+                    sourceType == AnkiAudioSourceType.customJson ||
+                    !configuredTypes.contains(sourceType)))
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, sourceType),
+                child: Text(AnkiAudioSource(type: sourceType).displayName),
+              ),
+        ],
+      ),
+    );
+    if (type == null) return;
+    var source = AnkiAudioSource(type: type);
+    if (source.isCustom) {
+      final url = await _editText(
+        title: source.displayName,
+        value: '',
+        hint: type == AnkiAudioSourceType.customJson
+            ? AnkiAudioPreferences.defaultUrl
+            : 'https://example.com/{term}.mp3',
+        maxLines: 3,
+      );
+      if (url == null || Uri.tryParse(url.trim())?.hasScheme != true) return;
+      source = source.copyWith(url: url.trim());
+    }
+    await _saveAnkiAudioSources([
+      ..._ankiAudioPreferences.effectiveSources,
+      source,
+    ]);
+  }
+
+  Future<void> _editAnkiAudioSource(int index) async {
+    final sources = [..._ankiAudioPreferences.effectiveSources];
+    if (index < 0 || index >= sources.length || !sources[index].isCustom) {
+      return;
+    }
+    final source = sources[index];
+    final url = await _editText(
+      title: source.displayName,
+      value: source.url,
+      hint: source.type == AnkiAudioSourceType.customJson
+          ? AnkiAudioPreferences.defaultUrl
+          : 'https://example.com/{term}.mp3',
+      maxLines: 3,
+    );
+    if (url == null || Uri.tryParse(url.trim())?.hasScheme != true) return;
+    sources[index] = source.copyWith(url: url.trim());
+    await _saveAnkiAudioSources(sources);
+  }
+
+  Future<void> _moveAnkiAudioSource(int index, int offset) async {
+    final sources = [..._ankiAudioPreferences.effectiveSources];
+    final destination = index + offset;
+    if (index < 0 ||
+        index >= sources.length ||
+        destination < 0 ||
+        destination >= sources.length) {
+      return;
+    }
+    final source = sources.removeAt(index);
+    sources.insert(destination, source);
+    await _saveAnkiAudioSources(sources);
+  }
+
+  Future<void> _removeAnkiAudioSource(int index) async {
+    final sources = [..._ankiAudioPreferences.effectiveSources];
+    if (index < 0 || index >= sources.length) return;
+    sources.removeAt(index);
+    await _saveAnkiAudioSources(sources);
+  }
+
   Future<void> _refreshAnki({bool silent = false}) async {
     if (_ankiRefreshing) return;
     setState(() {
@@ -1334,53 +1442,66 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: DropdownButtonFormField<AnkiAudioSourceType>(
-                    initialValue: _ankiAudioPreferences.sourceType,
-                    decoration: const InputDecoration(
-                      labelText: 'Audio source type',
-                      prefixIcon: Icon(Icons.graphic_eq_outlined),
+                for (final indexed
+                    in _ankiAudioPreferences.effectiveSources.indexed)
+                  ListTile(
+                    leading: CircleAvatar(
+                      radius: 14,
+                      child: Text('${indexed.$1 + 1}'),
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: AnkiAudioSourceType.customJson,
-                        child: Text('Custom URL (JSON)'),
-                      ),
-                      DropdownMenuItem(
-                        value: AnkiAudioSourceType.customUrl,
-                        child: Text('Custom URL'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      _saveAnkiAudio(
-                        _ankiAudioPreferences.copyWith(sourceType: value),
-                      );
-                    },
+                    title: Text(indexed.$2.displayName),
+                    subtitle: Text(
+                      indexed.$2.isCustom
+                          ? indexed.$2.url
+                          : 'Built in • first available audio wins',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: indexed.$2.isCustom
+                        ? () => _editAnkiAudioSource(indexed.$1)
+                        : null,
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (action) {
+                        switch (action) {
+                          case 'up':
+                            _moveAnkiAudioSource(indexed.$1, -1);
+                          case 'down':
+                            _moveAnkiAudioSource(indexed.$1, 1);
+                          case 'edit':
+                            _editAnkiAudioSource(indexed.$1);
+                          case 'remove':
+                            _removeAnkiAudioSource(indexed.$1);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (indexed.$1 > 0)
+                          const PopupMenuItem(
+                            value: 'up',
+                            child: Text('Move up'),
+                          ),
+                        if (indexed.$1 <
+                            _ankiAudioPreferences.effectiveSources.length - 1)
+                          const PopupMenuItem(
+                            value: 'down',
+                            child: Text('Move down'),
+                          ),
+                        if (indexed.$2.isCustom)
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit URL'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'remove',
+                          child: Text('Remove'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 ListTile(
-                  leading: const Icon(Icons.link_outlined),
-                  title: const Text('Audio source URL'),
-                  subtitle: Text(
-                    _ankiAudioPreferences.url,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final value = await _editText(
-                      title: 'Audio source URL',
-                      value: _ankiAudioPreferences.url,
-                      hint: AnkiAudioPreferences.defaultUrl,
-                      maxLines: 3,
-                    );
-                    if (value == null || value.trim().isEmpty) return;
-                    await _saveAnkiAudio(
-                      _ankiAudioPreferences.copyWith(url: value.trim()),
-                    );
-                  },
+                  leading: const Icon(Icons.add_link_outlined),
+                  title: const Text('Add audio source'),
+                  subtitle: const Text('Sources are tried from top to bottom'),
+                  onTap: _addAnkiAudioSource,
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1398,8 +1519,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ],
                     onChanged: (value) {
                       if (value == null) return;
+                      final wasUsingDefaults = _usesDefaultAudioSources(
+                        _ankiAudioPreferences.language,
+                      );
                       _saveAnkiAudio(
-                        _ankiAudioPreferences.copyWith(language: value),
+                        _ankiAudioPreferences.copyWith(
+                          language: value,
+                          sources: wasUsingDefaults
+                              ? AnkiAudioPreferences.defaultSourcesForLanguage(
+                                  value,
+                                )
+                              : _ankiAudioPreferences.effectiveSources,
+                        ),
                       );
                     },
                   ),

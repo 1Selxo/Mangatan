@@ -14,7 +14,7 @@ permissions:
 
 env:
   MOBILE_REPOSITORY: https://github.com/openjdk/mobile.git
-  MOBILE_COMMIT: 1606564eddfd17f74015e219cd5b754ec35bf0c8
+  MOBILE_COMMIT: fc10224720ee1c109b1207daeba8878822bb5363
   IOS_TOOLS_REPOSITORY: https://github.com/openjdk-mobile/ios-tools.git
   IOS_TOOLS_COMMIT: f8524c91c012040e40e7f8af34e7a0f11af0da83
   LIBFFI_IOS_URL: https://github.com/openjdk-mobile/ios-tools/releases/download/libffi-build/libffi-ios.zip

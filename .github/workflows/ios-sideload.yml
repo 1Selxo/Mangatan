@@ -80,6 +80,8 @@ jobs:
           tool/prepare_embedded_mihon_ios.sh
           runtime="ios/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"
           test -x "$runtime"
+          test -f \
+            "ios/Frameworks/OpenJDKRuntime.framework/lib/lib/modules"
           nm -gjU "$runtime" > "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
           grep -E 'JNI_CreateJavaVM|MangatanOpenJDKLoadFunctions' \
             "$RUNNER_TEMP/openjdk-runtime-symbols.txt" || true
@@ -123,6 +125,9 @@ jobs:
           test -x "$app_path/Runner"
           lazy_runtime="$app_path/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"
           test -x "$lazy_runtime"
+          framework_modules="$app_path/Frameworks/OpenJDKRuntime.framework/lib/lib/modules"
+          test -f "$framework_modules"
+          cmp "$app_path/lib/modules" "$framework_modules"
           python3 tool/verify_macho_min_ios.py \
             --maximum 13.0 "$app_path/Runner" "$lazy_runtime"
           python3 tool/verify_macho_initializers.py \

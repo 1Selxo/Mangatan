@@ -5,6 +5,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_dir=$(cd "$script_dir/.." && pwd)
 static_framework="$repo_dir/ios/Frameworks/OpenJDK.xcframework"
 output_framework="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
+runtime_modules="$repo_dir/ios/EmbeddedMihon/runtime/lib/modules"
 minimum_ios_version="${IOS_MINIMUM_VERSION:-13.0}"
 
 if [[ "$(uname -s)" != Darwin ]]; then
@@ -20,11 +21,16 @@ if [[ -z "$static_library" || -z "$headers_dir" ]]; then
   echo "OpenJDK.xcframework is incomplete. Prepare the embedded runtime first." >&2
   exit 1
 fi
+if [[ ! -f "$runtime_modules" ]]; then
+  echo "The embedded OpenJDK module image is missing." >&2
+  exit 1
+fi
 
 find "$output_framework" -depth -delete 2>/dev/null || true
-mkdir -p "$output_framework/Headers"
+mkdir -p "$output_framework/Headers" "$output_framework/lib/lib"
 cp -R "$headers_dir/." "$output_framework/Headers/"
 cp "$script_dir/OpenJDKRuntime-Info.plist" "$output_framework/Info.plist"
+cp "$runtime_modules" "$output_framework/lib/lib/modules"
 
 iphone_sdk=$(xcrun --sdk iphoneos --show-sdk-path)
 xcrun --sdk iphoneos clang++ \
@@ -43,6 +49,7 @@ xcrun --sdk iphoneos clang++ \
   -o "$output_framework/OpenJDKRuntime"
 
 test -x "$output_framework/OpenJDKRuntime"
+test -f "$output_framework/lib/lib/modules"
 python3 "$script_dir/verify_macho_min_ios.py" \
   --maximum "$minimum_ios_version" \
   "$output_framework/OpenJDKRuntime"

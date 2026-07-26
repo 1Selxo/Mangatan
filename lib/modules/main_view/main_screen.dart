@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -122,6 +124,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _initializeProviders() {
+    // Mihon sources start the embedded OpenJDK runtime. On iOS, leave that
+    // heavyweight work to explicit extension and source actions instead of
+    // starting Java as a side effect of opening the main screen.
+    if (Platform.isIOS) return;
+
     Future.microtask(() {
       if (mounted) {
         for (var type in ItemType.values) {

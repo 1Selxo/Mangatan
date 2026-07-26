@@ -98,6 +98,8 @@ void main() {
       nativeSource,
       isNot(contains('dispatch_async(EmbeddedMihonQueue()')),
     );
+    expect(nativeSource, contains('"-XX:+AllowUserSignalHandlers",'));
+    expect(nativeSource, contains('MANGATAN_JVM_SIGNAL sig='));
     expect(
       mainScreenSource,
       contains(

@@ -12,7 +12,12 @@ import app_links
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-      let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+      guard let controller = window?.rootViewController as? FlutterViewController else {
+        GeneratedPluginRegistrant.register(with: self)
+        return super.application(
+          application,
+          didFinishLaunchingWithOptions: launchOptions)
+      }
       let mChannel = FlutterMethodChannel(name: "com.kodjodevf.mangayomi.libmtorrentserver", binaryMessenger: controller.binaryMessenger)
               mChannel.setMethodCallHandler({
                   (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in

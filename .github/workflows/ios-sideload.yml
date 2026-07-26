@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "repo/source.json"
     tags:
       - "v*"
   workflow_call:
@@ -128,6 +130,12 @@ jobs:
             echo "OpenJDKRuntime must not be loaded during app launch." >&2
             exit 1
           fi
+          codesign --force --sign - --timestamp=none \
+            "$app_path/Frameworks/OpenJDKRuntime.framework"
+          codesign --verify --strict --verbose=2 \
+            "$app_path/Frameworks/OpenJDKRuntime.framework"
+          test -d \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/_CodeSignature"
           du -sh "$app_path"
 
       - name: Package IPA
@@ -145,8 +153,8 @@ jobs:
           fi
 
           safe_ref="${GITHUB_REF_NAME//\//-}"
-          ipa_name="Mangatan-${safe_ref}-ios.ipa"
           short_sha="${GITHUB_SHA:0:7}"
+          ipa_name="Mangatan-${safe_ref}-v${app_version}-build.${app_build}-${short_sha}-ios.ipa"
           release_tag="ios-v${app_version}-build.${app_build}-${short_sha}"
           package_dir="$RUNNER_TEMP/mangatan-ipa"
           app_path="$GITHUB_WORKSPACE/build/ios/Build/Products/Release-iphoneos/Runner.app"
@@ -159,6 +167,12 @@ jobs:
           bundle_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
             "$package_dir/Payload/Runner.app/Info.plist")
           test "$bundle_id" = "com.selxo.mangatan"
+          bundle_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
+            "$package_dir/Payload/Runner.app/Info.plist")
+          test "$bundle_version" = "$app_build"
+          /usr/libexec/PlistBuddy -c \
+            "Add :MangatanSourceCommit string $GITHUB_SHA" \
+            "$package_dir/Payload/Runner.app/Info.plist"
 
           (
             cd "$package_dir"

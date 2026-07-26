@@ -101,6 +101,34 @@ void main() {
     expect(hosts, ['assets.languagepod101.com', 'jisho.org', 'cdn.example']);
   });
 
+  test('uses the audio MIME type for JapanesePod101 PHP downloads', () async {
+    final client = MockClient((request) async {
+      expect(request.url.path, '/dictionary/japanese/audiomp3.php');
+      return http.Response.bytes(
+        [0x49, 0x44, 0x33, 0x04],
+        200,
+        headers: {'content-type': 'audio/mpeg'},
+      );
+    });
+
+    final media = await AnkiAudioService(client: client).fetchTermAudio(
+      term: '猫',
+      reading: 'ねこ',
+      preferences: const AnkiAudioPreferences(
+        enabled: true,
+        sourceType: AnkiAudioSourceType.japanesePod101,
+        url: '',
+        sources: [AnkiAudioSource(type: AnkiAudioSourceType.japanesePod101)],
+        timeout: Duration(seconds: 1),
+        language: 'ja',
+      ),
+    );
+
+    expect(media, isNotNull);
+    expect(media!.filename, endsWith('.mp3'));
+    expect(media.filename, isNot(endsWith('.php')));
+  });
+
   test('extracts matching LanguagePod101 dictionary audio', () async {
     final client = MockClient((request) async {
       if (request.url.path == '/audio/jouzu.mp3') {

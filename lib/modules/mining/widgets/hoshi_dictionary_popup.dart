@@ -378,6 +378,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         modelName: profile.modelName,
         expression: expression,
         duplicateScope: profile.duplicateScope,
+        duplicateDeckNames: profile.duplicateDeckNames,
         checkAllModels: profile.checkAllModels,
       );
       return status.isDuplicate;
@@ -399,6 +400,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         modelName: profile.modelName,
         expression: expression,
         duplicateScope: profile.duplicateScope,
+        duplicateDeckNames: profile.duplicateDeckNames,
       );
     } catch (_) {
       return const [];
@@ -516,6 +518,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
               duplicateCheck: profile.duplicateCheck,
               allowDuplicate: allowDuplicate,
               duplicateScope: profile.duplicateScope,
+              duplicateDeckNames: profile.duplicateDeckNames,
               checkAllModels: profile.checkAllModels,
               syncOnCreate: profile.syncOnCreate,
             );

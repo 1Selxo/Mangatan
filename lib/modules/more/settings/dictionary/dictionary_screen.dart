@@ -732,6 +732,87 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     await _saveAnki(_ankiProfile.copyWith(fieldMap: saved));
   }
 
+  Future<void> _editAnkiDuplicateDecks() async {
+    final available = <String>{
+      _ankiProfile.deckName,
+      ..._ankiDecks,
+      ..._ankiProfile.duplicateDeckNames,
+    }.where((deck) => deck.trim().isNotEmpty).toList()..sort();
+    if (_ankiDecks.isEmpty) {
+      final raw = await _editText(
+        title: 'Decks to check for duplicates',
+        value: _ankiProfile.duplicateDeckNames.join(', '),
+        hint: 'Japanese::Mining, Japanese::Archive',
+        maxLines: 4,
+      );
+      if (raw == null) return;
+      final decks = <String>{
+        _ankiProfile.deckName,
+        ...raw
+            .split(RegExp(r'[,\n]+'))
+            .map((deck) => deck.trim())
+            .where((deck) => deck.isNotEmpty),
+      }.toList();
+      await _saveAnki(_ankiProfile.copyWith(duplicateDeckNames: decks));
+      return;
+    }
+
+    var selected = <String>{
+      _ankiProfile.deckName,
+      ..._ankiProfile.duplicateDeckNames,
+    };
+    final saved = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Decks to check'),
+          content: SizedBox(
+            width: 480,
+            height: 420,
+            child: ListView.builder(
+              itemCount: available.length,
+              itemBuilder: (context, index) {
+                final deck = available[index];
+                final isDestination = deck == _ankiProfile.deckName;
+                return CheckboxListTile(
+                  value: selected.contains(deck),
+                  title: Text(deck),
+                  subtitle: isDestination
+                      ? const Text('Destination deck (always checked)')
+                      : null,
+                  onChanged: isDestination
+                      ? null
+                      : (checked) {
+                          setDialogState(() {
+                            selected = {...selected};
+                            if (checked == true) {
+                              selected.add(deck);
+                            } else {
+                              selected.remove(deck);
+                            }
+                          });
+                        },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, selected.toList()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == null) return;
+    await _saveAnki(_ankiProfile.copyWith(duplicateDeckNames: saved));
+  }
+
   List<Widget> _childrenForSection(List<Widget> children) {
     // Keep one source of truth for the existing controls while presenting
     // Chimahon's Dictionary, Popup, and Anki pages as separate routes.
@@ -1755,7 +1836,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       subtitle: Text(switch (_ankiProfile.duplicateScope) {
                         'collection' => 'Entire collection',
                         'deckroot' => 'Deck root and child decks',
-                        _ => 'Selected deck',
+                        'decks' => 'Selected list of decks',
+                        _ => 'Destination deck',
                       }),
                       trailing: DropdownButton<String>(
                         value:
@@ -1763,6 +1845,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                               'collection',
                               'deck',
                               'deckroot',
+                              'decks',
                             }.contains(_ankiProfile.duplicateScope)
                             ? _ankiProfile.duplicateScope
                             : 'deck',
@@ -1776,6 +1859,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                             value: 'deckroot',
                             child: Text('Deck root'),
                           ),
+                          DropdownMenuItem(
+                            value: 'decks',
+                            child: Text('Custom decks'),
+                          ),
                         ],
                         onChanged: (value) {
                           if (value != null) {
@@ -1784,6 +1871,30 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                             );
                           }
                         },
+                      ),
+                    ),
+                  if (!_usesAnkiMobile &&
+                      _ankiProfile.duplicateScope == 'decks')
+                    ListTile(
+                      leading: const Icon(Icons.library_books_outlined),
+                      title: const Text('Decks to check'),
+                      subtitle: Text(
+                        <String>{
+                          _ankiProfile.deckName,
+                          ..._ankiProfile.duplicateDeckNames,
+                        }.join(', '),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: _editAnkiDuplicateDecks,
+                    ),
+                  if (_usesAnkiMobile)
+                    const ListTile(
+                      leading: Icon(Icons.library_books_outlined),
+                      title: Text('Duplicate decks'),
+                      subtitle: Text(
+                        'AnkiMobile checks the first field across all decks that use the selected note type. Its callback API cannot limit the check to a custom deck list.',
                       ),
                     ),
                   if (!_usesAnkiMobile)

@@ -87,7 +87,17 @@ void main() {
       nativeSource,
       contains('dlsym(handle, "MangatanOpenJDKLoadFunctions")'),
     );
-    expect(nativeSource, contains('dispatch_async(EmbeddedMihonQueue(), ^{'));
+    expect(
+      nativeSource,
+      contains('self.stackSize = 8 * 1024 * 1024;'),
+      reason:
+          'the Zero interpreter needs more stack than an iOS dispatch worker',
+    );
+    expect(nativeSource, contains('[EmbeddedMihonThread() enqueueBlock:^{'));
+    expect(
+      nativeSource,
+      isNot(contains('dispatch_async(EmbeddedMihonQueue()')),
+    );
     expect(
       mainScreenSource,
       contains(

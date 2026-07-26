@@ -8,6 +8,62 @@
 #include <string>
 #include <vector>
 
+@interface MangatanEmbeddedMihonThread : NSThread {
+  NSCondition *_condition;
+  NSMutableArray *_pendingBlocks;
+}
+
+- (void)enqueueBlock:(dispatch_block_t)block;
+
+@end
+
+@implementation MangatanEmbeddedMihonThread
+
+- (instancetype)init {
+  self = [super init];
+  if (self != nil) {
+    _condition = [[NSCondition alloc] init];
+    _pendingBlocks = [[NSMutableArray alloc] init];
+    self.name = @"com.selxo.mangatan.embedded-mihon";
+    // The Zero interpreter divides the current native stack between its
+    // Java operand stack and C/C++ calls. iOS dispatch workers only provide
+    // a small implementation-defined stack, which can exhaust during
+    // java.lang bootstrap. Give the embedded VM a stable, JVM-sized stack.
+    self.stackSize = 8 * 1024 * 1024;
+  }
+  return self;
+}
+
+- (void)enqueueBlock:(dispatch_block_t)block {
+  [_condition lock];
+  [_pendingBlocks addObject:[block copy]];
+  [_condition signal];
+  [_condition unlock];
+}
+
+- (void)main {
+  while (!self.cancelled) {
+    dispatch_block_t block = nil;
+    [_condition lock];
+    while (_pendingBlocks.count == 0 && !self.cancelled) {
+      [_condition wait];
+    }
+    if (_pendingBlocks.count > 0) {
+      block = _pendingBlocks.firstObject;
+      [_pendingBlocks removeObjectAtIndex:0];
+    }
+    [_condition unlock];
+
+    if (block != nil) {
+      @autoreleasepool {
+        block();
+      }
+    }
+  }
+}
+
+@end
+
 namespace {
 
 NSString *const kEmbeddedMihonErrorDomain =
@@ -44,15 +100,14 @@ class JavaVMLockGuard {
   JavaVMLockGuard &operator=(const JavaVMLockGuard &) = delete;
 };
 
-dispatch_queue_t EmbeddedMihonQueue() {
-  static dispatch_queue_t queue;
+MangatanEmbeddedMihonThread *EmbeddedMihonThread() {
+  static MangatanEmbeddedMihonThread *thread;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
-    queue = dispatch_queue_create(
-        "com.selxo.mangatan.embedded-mihon",
-        DISPATCH_QUEUE_SERIAL);
+    thread = [[MangatanEmbeddedMihonThread alloc] init];
+    [thread start];
   });
-  return queue;
+  return thread;
 }
 
 NSError *EmbeddedMihonError(NSInteger code, NSString *message) {
@@ -400,7 +455,7 @@ void MangatanEmbeddedMihonStart(
   // Loading the framework and starting the VM are intentionally kept off the
   // app launch path and the UI thread. The framework remains loaded for the
   // lifetime of the process after the first Mihon request.
-  dispatch_async(EmbeddedMihonQueue(), ^{
+  [EmbeddedMihonThread() enqueueBlock:^{
     @autoreleasepool {
       NSError *error = nil;
       JNIEnv *environment = nullptr;
@@ -433,12 +488,12 @@ void MangatanEmbeddedMihonStart(
         completion(startedPort, error);
       });
     }
-  });
+  }];
 }
 
 void MangatanEmbeddedMihonStop(
     MangatanEmbeddedMihonCompletion completion) {
-  dispatch_async(EmbeddedMihonQueue(), ^{
+  [EmbeddedMihonThread() enqueueBlock:^{
     @autoreleasepool {
       NSError *error = nil;
       JNIEnv *environment = nullptr;
@@ -458,12 +513,12 @@ void MangatanEmbeddedMihonStop(
         completion(error);
       });
     }
-  });
+  }];
 }
 
 void MangatanEmbeddedMihonIsRunning(
     MangatanEmbeddedMihonStatusCompletion completion) {
-  dispatch_async(EmbeddedMihonQueue(), ^{
+  [EmbeddedMihonThread() enqueueBlock:^{
     @autoreleasepool {
       NSError *error = nil;
       JNIEnv *environment = nullptr;
@@ -487,5 +542,5 @@ void MangatanEmbeddedMihonIsRunning(
         completion(isRunning, error);
       });
     }
-  });
+  }];
 }

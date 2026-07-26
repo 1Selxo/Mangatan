@@ -119,14 +119,23 @@ void main() {
           r'http://127\.0\.0\.1:\d+/media/[^"\s<]+',
         ).allMatches(fields.join('\n')).map((match) => match.group(0)!).toSet();
         final client = HttpClient();
+        client
+          ..findProxy = ((_) => 'DIRECT')
+          ..connectionTimeout = const Duration(seconds: 3);
         try {
           for (final value in urls) {
-            final request = await client.getUrl(Uri.parse(value));
-            final response = await request.close();
-            fetched[value] = await response.fold<List<int>>(
-              <int>[],
-              (bytes, chunk) => bytes..addAll(chunk),
+            final request = await client
+                .getUrl(Uri.parse(value))
+                .timeout(const Duration(seconds: 3));
+            final response = await request.close().timeout(
+              const Duration(seconds: 3),
             );
+            fetched[value] = await response
+                .fold<List<int>>(
+                  <int>[],
+                  (bytes, chunk) => bytes..addAll(chunk),
+                )
+                .timeout(const Duration(seconds: 3));
           }
         } finally {
           client.close(force: true);
@@ -155,8 +164,8 @@ void main() {
       ),
     );
 
-    expect(openedUri.queryParameters['fldImage'], contains('<img src="http'));
-    expect(openedUri.queryParameters['fldImage'], endsWith('.png">'));
+    expect(openedUri.queryParameters['fldImage'], startsWith('http://'));
+    expect(openedUri.queryParameters['fldImage'], endsWith('.png'));
     expect(openedUri.queryParameters['fldAudio'], endsWith('.mp3'));
     expect(
       fetched.values,
@@ -168,6 +177,16 @@ void main() {
     expect(beganBackgroundTask, isTrue);
     await Future<void>.delayed(const Duration(milliseconds: 60));
     expect(endedBackgroundTask, isTrue);
+  });
+
+  test('keeps media URLs inside fields that contain other HTML', () {
+    final value = replaceAnkiMobileMediaReferences(
+      '<b>cat</b><br><img src="dictionary.png">',
+      {'dictionary.png': 'http://127.0.0.1:1234/media/dictionary.png'},
+    );
+
+    expect(value, startsWith('<b>cat</b>'));
+    expect(value, contains('<img src="http://127.0.0.1:1234/'));
   });
 
   test('iOS runner declares callback bridge and Anki URL scheme', () {

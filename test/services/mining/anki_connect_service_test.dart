@@ -111,6 +111,60 @@ void main() {
   });
 
   test(
+    'checks Anki duplicate rules across selected decks in one call',
+    () async {
+      final actions = <String>[];
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final action = body['action'] as String;
+        actions.add(action);
+        if (action == 'modelFieldNames') {
+          return http.Response(
+            '{"result": ["Expression", "Meaning"], "error": null}',
+            200,
+          );
+        }
+        expect(action, 'canAddNotesWithErrorDetail');
+        final params = body['params'] as Map<String, dynamic>;
+        final notes = params['notes'] as List;
+        expect(notes.map((note) => (note as Map)['deckName']), [
+          'Japanese::Mining',
+          'Japanese::Archive',
+          'Japanese::Reading',
+        ]);
+        for (final rawNote in notes) {
+          final note = rawNote as Map<String, dynamic>;
+          final options = note['options'] as Map<String, dynamic>;
+          expect(options['duplicateScope'], 'deck');
+          expect(
+            (options['duplicateScopeOptions'] as Map)['deckName'],
+            note['deckName'],
+          );
+        }
+        return http.Response(
+          '{"result": [{"canAdd": true, "error": null}, '
+          '{"canAdd": false, "error": "duplicate"}, '
+          '{"canAdd": true, "error": null}], "error": null}',
+          200,
+        );
+      });
+
+      final result = await AnkiConnectService(client: client)
+          .checkDuplicateExpression(
+            deckName: 'Japanese::Mining',
+            modelName: 'Mining',
+            expression: '事件',
+            duplicateScope: 'decks',
+            duplicateDeckNames: ['Japanese::Archive', 'Japanese::Reading'],
+          );
+
+      expect(result.isDuplicate, isTrue);
+      expect(result.error, contains('Japanese::Archive'));
+      expect(actions, ['modelFieldNames', 'canAddNotesWithErrorDetail']);
+    },
+  );
+
+  test(
     'blocks an authoritative duplicate before adding media or a note',
     () async {
       final actions = <String>[];
@@ -227,6 +281,37 @@ void main() {
       expect(ids, [41, 42]);
     },
   );
+
+  test('finds duplicate note ids across selected decks', () async {
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      switch (body['action']) {
+        case 'modelFieldNames':
+          return http.Response(
+            '{"result": ["Expression", "Meaning"], "error": null}',
+            200,
+          );
+        case 'findNotes':
+          expect(
+            (body['params'] as Map<String, dynamic>)['query'],
+            '("deck:Japanese::Mining" or "deck:Japanese::Archive") '
+            '"expression:事件"',
+          );
+          return http.Response('{"result": [51], "error": null}', 200);
+      }
+      fail('Unexpected action: ${body['action']}');
+    });
+
+    final ids = await AnkiConnectService(client: client).findDuplicateNoteIds(
+      deckName: 'Japanese::Mining',
+      modelName: 'Mining',
+      expression: '事件',
+      duplicateScope: 'decks',
+      duplicateDeckNames: ['Japanese::Archive'],
+    );
+
+    expect(ids, [51]);
+  });
 
   test('opens matching notes in the Anki card browser', () async {
     final client = MockClient((request) async {

@@ -1066,6 +1066,7 @@ class _DictionaryLookupResultsViewState
             duplicateCheck: profile.duplicateCheck,
             allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
             duplicateScope: profile.duplicateScope,
+            duplicateDeckNames: profile.duplicateDeckNames,
             checkAllModels: profile.checkAllModels,
             syncOnCreate: profile.syncOnCreate,
           );

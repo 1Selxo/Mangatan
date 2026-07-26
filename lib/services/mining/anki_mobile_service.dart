@@ -285,7 +285,7 @@ class AnkiMobileService {
         expression: draft.expression,
         fields: {
           for (final field in draft.fields.entries)
-            field.key: _replaceMediaReferences(field.value, mediaUrls),
+            field.key: replaceAnkiMobileMediaReferences(field.value, mediaUrls),
         },
         tags: draft.tags,
       );
@@ -350,25 +350,37 @@ class AnkiMobileService {
       rethrow;
     }
   }
+}
 
-  static String _replaceMediaReferences(
-    String html,
-    Map<String, String> mediaUrls,
-  ) {
-    var value = html;
-    for (final media in mediaUrls.entries) {
-      final escapedName = RegExp.escape(media.key);
-      value = value.replaceAll('[sound:${media.key}]', media.value);
-      value = value.replaceAllMapped(
-        RegExp(
-          '(<img\\b[^>]*\\bsrc\\s*=\\s*["\\\'])$escapedName(["\\\'])',
-          caseSensitive: false,
-        ),
-        (match) => '${match.group(1)}${media.value}${match.group(2)}',
-      );
+@visibleForTesting
+String replaceAnkiMobileMediaReferences(
+  String html,
+  Map<String, String> mediaUrls,
+) {
+  var value = html;
+  for (final media in mediaUrls.entries) {
+    final escapedName = RegExp.escape(media.key);
+    final standaloneImage = RegExp(
+      '^\\s*<img\\b[^>]*\\bsrc\\s*=\\s*["\\\']$escapedName["\\\'][^>]*>\\s*\$',
+      caseSensitive: false,
+    );
+    if (standaloneImage.hasMatch(value)) {
+      // AnkiMobile imports media when the field value itself is a media URL.
+      // Leaving the loopback URL inside HTML would produce a broken image as
+      // soon as the temporary media server shuts down.
+      value = media.value;
+      continue;
     }
-    return value;
+    value = value.replaceAll('[sound:${media.key}]', media.value);
+    value = value.replaceAllMapped(
+      RegExp(
+        '(<img\\b[^>]*\\bsrc\\s*=\\s*["\\\'])$escapedName(["\\\'])',
+        caseSensitive: false,
+      ),
+      (match) => '${match.group(1)}${media.value}${match.group(2)}',
+    );
   }
+  return value;
 }
 
 @visibleForTesting
@@ -456,8 +468,12 @@ class AnkiMobileMediaServer {
       'svg' => ContentType('image', 'svg+xml'),
       'mp3' => ContentType('audio', 'mpeg'),
       'm4a' || 'mp4' => ContentType('audio', 'mp4'),
-      'ogg' || 'opus' => ContentType('audio', 'ogg'),
+      'ogg' => ContentType('audio', 'ogg'),
+      'opus' => ContentType('audio', 'opus'),
       'wav' => ContentType('audio', 'wav'),
+      'webm' => ContentType('audio', 'webm'),
+      'aac' => ContentType('audio', 'aac'),
+      'flac' => ContentType('audio', 'flac'),
       _ => ContentType.binary,
     };
   }

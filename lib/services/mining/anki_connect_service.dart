@@ -116,15 +116,22 @@ class AnkiConnectService {
     required String modelName,
     required String expression,
     String duplicateScope = 'deck',
+    List<String> duplicateDeckNames = const [],
   }) async {
     final fields = await modelFieldNames(modelName);
     if (fields.isEmpty || expression.trim().isEmpty) return const [];
     final escapedDeck = _escapeSearch(deckName);
     final rootDeck = _escapeSearch(deckName.split('::').first);
     final escapedExpression = _escapeSearch(expression);
+    final selectedDecks = _effectiveDuplicateDecks(
+      deckName,
+      duplicateDeckNames,
+    );
     final scope = switch (duplicateScope) {
       'collection' => '',
       'deckroot' => '"deck:$rootDeck" ',
+      'decks' when selectedDecks.isNotEmpty =>
+        '(${selectedDecks.map((deck) => '"deck:${_escapeSearch(deck)}"').join(' or ')}) ',
       _ => '"deck:$escapedDeck" ',
     };
     return findNotes(
@@ -200,12 +207,14 @@ class AnkiConnectService {
   Future<AnkiCanAddResult> canAddDraft(
     AnkiCardDraft draft, {
     String duplicateScope = 'deck',
+    List<String> duplicateDeckNames = const [],
     bool checkAllModels = false,
   }) async {
     final normalized = await _normalizeFieldsForModel(draft);
-    return _canAddNormalizedDraft(
+    return _canAddNormalizedDraftForScope(
       normalized,
       duplicateScope: duplicateScope,
+      duplicateDeckNames: duplicateDeckNames,
       checkAllModels: checkAllModels,
     );
   }
@@ -215,11 +224,12 @@ class AnkiConnectService {
     required String modelName,
     required String expression,
     String duplicateScope = 'deck',
+    List<String> duplicateDeckNames = const [],
     bool checkAllModels = false,
   }) async {
     final fields = await modelFieldNames(modelName);
     if (fields.isEmpty) return const AnkiCanAddResult(canAdd: true);
-    return _canAddNormalizedDraft(
+    return _canAddNormalizedDraftForScope(
       AnkiCardDraft(
         deckName: deckName,
         modelName: modelName,
@@ -230,6 +240,7 @@ class AnkiConnectService {
         },
       ),
       duplicateScope: duplicateScope,
+      duplicateDeckNames: duplicateDeckNames,
       checkAllModels: checkAllModels,
     );
   }
@@ -239,14 +250,16 @@ class AnkiConnectService {
     bool duplicateCheck = true,
     bool allowDuplicate = false,
     String duplicateScope = 'deck',
+    List<String> duplicateDeckNames = const [],
     bool checkAllModels = false,
     bool syncOnCreate = false,
   }) async {
     final normalized = await _normalizeFieldsForModel(draft);
     if (duplicateCheck) {
-      final status = await _canAddNormalizedDraft(
+      final status = await _canAddNormalizedDraftForScope(
         normalized,
         duplicateScope: duplicateScope,
+        duplicateDeckNames: duplicateDeckNames,
         checkAllModels: checkAllModels,
       );
       if (!status.canAdd && !allowDuplicate) {
@@ -271,6 +284,77 @@ class AnkiConnectService {
     );
     if (syncOnCreate) await sync();
     return noteId;
+  }
+
+  Future<AnkiCanAddResult> _canAddNormalizedDraftForScope(
+    AnkiCardDraft draft, {
+    required String duplicateScope,
+    required List<String> duplicateDeckNames,
+    required bool checkAllModels,
+  }) {
+    if (duplicateScope == 'decks') {
+      return _canAddNormalizedDraftAcrossDecks(
+        draft,
+        duplicateDeckNames: duplicateDeckNames,
+        checkAllModels: checkAllModels,
+      );
+    }
+    return _canAddNormalizedDraft(
+      draft,
+      duplicateScope: duplicateScope,
+      checkAllModels: checkAllModels,
+    );
+  }
+
+  Future<AnkiCanAddResult> _canAddNormalizedDraftAcrossDecks(
+    AnkiCardDraft draft, {
+    required List<String> duplicateDeckNames,
+    required bool checkAllModels,
+  }) async {
+    final decks = _effectiveDuplicateDecks(draft.deckName, duplicateDeckNames);
+    final result = await invoke(
+      'canAddNotesWithErrorDetail',
+      params: {
+        'notes': [
+          for (final deck in decks)
+            {
+              'deckName': deck,
+              'modelName': draft.modelName,
+              'fields': draft.fields,
+              'tags': draft.tags,
+              'options': _duplicateOptions(
+                deckName: deck,
+                allowDuplicate: false,
+                duplicateScope: 'deck',
+                checkAllModels: checkAllModels,
+              ),
+            },
+        ],
+      },
+    );
+    if (result is! List || result.length != decks.length) {
+      throw const AnkiConnectException(
+        'AnkiConnect returned an invalid multi-deck duplicate response.',
+      );
+    }
+    for (final indexed in result.indexed) {
+      final entry = indexed.$2;
+      if (entry is! Map) {
+        throw const AnkiConnectException(
+          'AnkiConnect returned an invalid multi-deck duplicate response.',
+        );
+      }
+      if (entry['canAdd'] != true) {
+        final detail = entry['error']?.toString();
+        return AnkiCanAddResult(
+          canAdd: false,
+          error: detail == null || detail.isEmpty
+              ? 'Duplicate found in ${decks[indexed.$1]}'
+              : '${decks[indexed.$1]}: $detail',
+        );
+      }
+    }
+    return const AnkiCanAddResult(canAdd: true);
   }
 
   Future<AnkiCanAddResult> _canAddNormalizedDraft(
@@ -336,6 +420,20 @@ class AnkiConnectService {
       };
     }
     return options;
+  }
+
+  static List<String> _effectiveDuplicateDecks(
+    String destinationDeck,
+    List<String> selectedDecks,
+  ) {
+    final decks = <String>[];
+    for (final deck in [destinationDeck, ...selectedDecks]) {
+      final normalized = deck.trim();
+      if (normalized.isNotEmpty && !decks.contains(normalized)) {
+        decks.add(normalized);
+      }
+    }
+    return decks;
   }
 
   static String _escapeSearch(String value) => value.replaceAll('"', '');

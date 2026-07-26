@@ -361,20 +361,38 @@ class AnkiAudioService {
 
   String _audioExtension(String contentType, Uri uri) {
     final type = contentType.split(';').first.trim().toLowerCase();
+    final contentTypeExtension = switch (type) {
+      'audio/mpeg' || 'audio/mp3' => 'mp3',
+      'audio/ogg' => 'ogg',
+      'audio/opus' => 'opus',
+      'audio/wav' || 'audio/wave' || 'audio/x-wav' => 'wav',
+      'audio/webm' => 'webm',
+      'audio/mp4' || 'audio/x-m4a' => 'm4a',
+      'audio/aac' => 'aac',
+      'audio/flac' || 'audio/x-flac' => 'flac',
+      _ => null,
+    };
+    // Dynamic audio endpoints frequently end in .php or another server-side
+    // extension. Prefer their declared audio MIME type so AnkiMobile receives
+    // a filename it recognizes as downloadable media.
+    if (contentTypeExtension != null) return contentTypeExtension;
     final pathExtension = uri.pathSegments.isEmpty
         ? ''
         : uri.pathSegments.last.split('.').last.toLowerCase();
-    if (pathExtension.length >= 2 && pathExtension.length <= 5) {
+    if (const {
+      'mp3',
+      'ogg',
+      'opus',
+      'wav',
+      'webm',
+      'm4a',
+      'aac',
+      'mp4',
+      'flac',
+    }.contains(pathExtension)) {
       return pathExtension;
     }
-    return switch (type) {
-      'audio/mpeg' || 'audio/mp3' => 'mp3',
-      'audio/ogg' || 'audio/opus' => 'ogg',
-      'audio/wav' || 'audio/wave' || 'audio/x-wav' => 'wav',
-      'audio/webm' => 'webm',
-      'audio/mp4' || 'audio/aac' => 'm4a',
-      _ => 'mp3',
-    };
+    return 'mp3';
   }
 
   String _safeAudioFilename(String term, String reading, String extension) {

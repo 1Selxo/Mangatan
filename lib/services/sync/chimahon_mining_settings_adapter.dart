@@ -232,7 +232,9 @@ class ChimahonMiningSettingsAdapter {
               .where((tag) => tag.isNotEmpty)
               .toList(),
           duplicateCheck: profile.ankiDuplicateCheck,
-          duplicateScope: profile.ankiDuplicateScope,
+          duplicateScope: current.duplicateScope == 'decks'
+              ? 'decks'
+              : profile.ankiDuplicateScope,
           syncOnCreate: profile.ankiSyncOnCreate,
           fieldMap: profile.ankiFieldMap,
         ),
@@ -426,7 +428,9 @@ class ChimahonMiningSettingsAdapter {
       ankiFieldMap: anki.fieldMap,
       ankiTags: anki.tags.join(' '),
       ankiDuplicateCheck: anki.duplicateCheck,
-      ankiDuplicateScope: anki.duplicateScope,
+      ankiDuplicateScope: anki.duplicateScope == 'decks'
+          ? 'deck'
+          : anki.duplicateScope,
       ankiDuplicateAction: profile.duplicateAction,
       ankiCropMode: profile.cropMode,
       ankiSyncOnCreate: anki.syncOnCreate,
@@ -456,7 +460,9 @@ class ChimahonMiningSettingsAdapter {
             .where((tag) => tag.isNotEmpty)
             .toList(),
         duplicateCheck: profile.ankiDuplicateCheck,
-        duplicateScope: profile.ankiDuplicateScope,
+        duplicateScope: localAnki.duplicateScope == 'decks'
+            ? 'decks'
+            : profile.ankiDuplicateScope,
         syncOnCreate: profile.ankiSyncOnCreate,
         fieldMap: profile.ankiFieldMap,
       ),

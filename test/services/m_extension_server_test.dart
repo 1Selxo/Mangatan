@@ -64,6 +64,10 @@ void main() {
     );
     expect(
       nativeSource,
+      contains('dlsym(handle, "MangatanOpenJDKLoadFunctions")'),
+    );
+    expect(
+      nativeSource,
       contains('dispatch_async(EmbeddedMihonQueue(), ^{'),
     );
     expect(

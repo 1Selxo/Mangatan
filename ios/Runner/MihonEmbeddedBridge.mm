@@ -88,7 +88,8 @@ bool LoadOpenJDKRuntime(NSError **error) {
 
   dlerror();
   auto loadFunctions =
-      reinterpret_cast<LoadFunctions>(dlsym(handle, "loadfunctions"));
+      reinterpret_cast<LoadFunctions>(
+          dlsym(handle, "MangatanOpenJDKLoadFunctions"));
   const char *loadFunctionsError = dlerror();
   dlerror();
   auto createJavaVM =

@@ -9,8 +9,9 @@ lazy_framework_dir="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
-server_repository="https://github.com/ippo-michi/M-Extension-Server.git"
 server_commit="1e909217e8ef06f10ca83ea5d92de5f2aafbfdf5"
+server_jar_url="https://github.com/ippo-michi/M-Extension-Server/releases/download/ios-runtime-v1/MExtensionServer-ios.jar"
+server_jar_sha256="799269277018ec4f2fc5195e80ce124b22224df23be9c6ae7096f6f8c9bc3f94"
 openjdk_framework_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v1/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="c227e55eb3adb0578fff3064828668365f21e02af13430ab8f207553b6d6f7eb"
 openjdk_bundle_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v1/java_bundle-device.zip"
@@ -40,23 +41,9 @@ download_and_verify() {
   )
 }
 
-echo "Building pinned M-Extension-Server $server_commit"
-git init -q "$work_dir/server"
-git -C "$work_dir/server" remote add origin "$server_repository"
-git -C "$work_dir/server" fetch --depth 1 origin "$server_commit"
-git -C "$work_dir/server" -c advice.detachedHead=false \
-  checkout --detach FETCH_HEAD
-(
-  cd "$work_dir/server"
-  GRADLE_USER_HOME="${GRADLE_USER_HOME:-$work_dir/gradle}" \
-    ./gradlew :server:shadowJar -PiosRuntime=true --no-daemon
-)
-server_jar=$(find "$work_dir/server/server/build" -maxdepth 1 \
-  -type f -name 'MExtensionServer-*.jar' -print -quit)
-if [[ -z "$server_jar" ]]; then
-  echo "The embedded extension server JAR was not produced." >&2
-  exit 1
-fi
+echo "Downloading pinned M-Extension-Server $server_commit"
+server_jar="$work_dir/MExtensionServer-ios.jar"
+download_and_verify "$server_jar_url" "$server_jar_sha256" "$server_jar"
 if "$JAVA_HOME/bin/jar" tf "$server_jar" |
   grep -Eq '^(ch/qos/logback|org/cef|dev/datlag/kcef)/'; then
   echo "The iOS server JAR contains excluded desktop runtime classes." >&2

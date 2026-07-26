@@ -34,6 +34,21 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
       ),
     );
   }
+
+  /// Changes the address used by the running app without overwriting the
+  /// user's external bridge fallback in the database.
+  void setRuntime(String value) {
+    state = normalizeMihonBridgeBaseUrl(value);
+  }
+
+  void restoreSaved() {
+    final savedAddress = isar.settings.getSync(227)!.androidProxyServer;
+    state = normalizeMihonBridgeBaseUrl(
+      savedAddress == null || savedAddress.trim().isEmpty
+          ? "http://127.0.0.1:8080"
+          : savedAddress,
+    );
+  }
 }
 
 @riverpod

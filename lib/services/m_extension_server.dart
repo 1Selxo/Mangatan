@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:m_extension_server/m_extension_server.dart';
 import 'package:mangayomi/main.dart';
@@ -13,8 +14,35 @@ import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as path;
 
+@visibleForTesting
+String? embeddedMihonBaseUrlFromResponse(Map<Object?, Object?>? response) {
+  final port = (response?['port'] as num?)?.toInt();
+  final returnedBaseUrl = response?['baseUrl'] as String?;
+  final baseUrl =
+      returnedBaseUrl ?? (port == null ? null : 'http://127.0.0.1:$port');
+  final uri = baseUrl == null ? null : Uri.tryParse(baseUrl);
+  if (port == null ||
+      port <= 0 ||
+      port > 65535 ||
+      uri == null ||
+      uri.scheme != 'http' ||
+      uri.port != port ||
+      (uri.path.isNotEmpty && uri.path != '/') ||
+      uri.hasQuery ||
+      uri.hasFragment ||
+      (uri.host != InternetAddress.loopbackIPv4.address &&
+          uri.host != InternetAddress.loopbackIPv6.address &&
+          uri.host != 'localhost')) {
+    return null;
+  }
+  return 'http://127.0.0.1:$port';
+}
+
 class MExtensionServerPlatform {
   static const _unavailableBaseUrl = 'http://127.0.0.1:0';
+  static const _embeddedIosChannel = MethodChannel(
+    'com.selxo.mangatan.embedded_mihon',
+  );
   static const _launchAttempts = 3;
   static Future<void>? _pendingStart;
   static Process? _windowsProcess;
@@ -29,11 +57,17 @@ class MExtensionServerPlatform {
 
   late final String Function() _readBaseUrl;
   late final void Function(String) _writeBaseUrl;
+  late final void Function(String) _writeRuntimeBaseUrl;
+  late final void Function() _restoreSavedBaseUrl;
 
   MExtensionServerPlatform(WidgetRef ref, {bool persistent = false}) {
     _readBaseUrl = () => ref.read(androidProxyServerStateProvider);
     _writeBaseUrl = (value) =>
         ref.read(androidProxyServerStateProvider.notifier).set(value);
+    _writeRuntimeBaseUrl = (value) =>
+        ref.read(androidProxyServerStateProvider.notifier).setRuntime(value);
+    _restoreSavedBaseUrl = () =>
+        ref.read(androidProxyServerStateProvider.notifier).restoreSaved();
     if (persistent) {
       _stableReadBaseUrl = _readBaseUrl;
       _stableWriteBaseUrl = _writeBaseUrl;
@@ -44,6 +78,10 @@ class MExtensionServerPlatform {
     _readBaseUrl = () => ref.read(androidProxyServerStateProvider);
     _writeBaseUrl = (value) =>
         ref.read(androidProxyServerStateProvider.notifier).set(value);
+    _writeRuntimeBaseUrl = (value) =>
+        ref.read(androidProxyServerStateProvider.notifier).setRuntime(value);
+    _restoreSavedBaseUrl = () =>
+        ref.read(androidProxyServerStateProvider.notifier).restoreSaved();
   }
 
   Future<bool> check() async {
@@ -68,10 +106,6 @@ class MExtensionServerPlatform {
   }
 
   Future<void> startServer({int? preferredPort}) {
-    // iOS cannot host the Android extension runtime. Keep the user's external
-    // APKBridge address instead of replacing it with an unusable loopback URL.
-    if (Platform.isIOS) return Future<void>.value();
-
     final pending = _pendingStart;
     if (pending != null) return pending;
 
@@ -79,13 +113,54 @@ class MExtensionServerPlatform {
     final requestedPort = preferredPort ?? _preferredRestartPort;
     _preferredRestartPort = null;
     late final Future<void> operation;
-    operation = _startServer(generation, requestedPort).whenComplete(() {
+    final startOperation = Platform.isIOS
+        ? _startEmbeddedIosBridge(generation, requestedPort)
+        : _startServer(generation, requestedPort);
+    operation = startOperation.whenComplete(() {
       if (identical(_pendingStart, operation)) {
         _pendingStart = null;
       }
     });
     _pendingStart = operation;
     return operation;
+  }
+
+  Future<void> _startEmbeddedIosBridge(
+    int generation,
+    int? preferredPort,
+  ) async {
+    try {
+      final runningBaseUrl = _baseUrl;
+      if (_isLoopbackServer(runningBaseUrl) &&
+          await _supportsMangatanMihonBridge(runningBaseUrl)) {
+        return;
+      }
+
+      final response = await _embeddedIosChannel
+          .invokeMapMethod<String, Object?>('start', <String, Object?>{
+            'port': preferredPort ?? 0,
+          });
+      if (_isCancelled(generation)) {
+        await _stopEmbeddedIosBridge();
+        return;
+      }
+
+      final baseUrl = embeddedMihonBaseUrlFromResponse(response);
+      if (baseUrl == null ||
+          !await _waitForMangatanMihonBridge(baseUrl, generation)) {
+        throw StateError('The embedded iOS bridge did not become ready.');
+      }
+
+      _writeRuntimeBaseUrl(baseUrl);
+      _log('Embedded iPhone Mihon bridge is ready at $baseUrl.');
+    } catch (error, stackTrace) {
+      _restoreSavedBaseUrl();
+      _log(
+        'Embedded iPhone Mihon bridge startup failed; using the saved '
+        'external bridge instead: $error\n$stackTrace',
+        level: LogLevel.error,
+      );
+    }
   }
 
   Future<void> _startServer(int generation, int? preferredPort) async {
@@ -164,10 +239,6 @@ class MExtensionServerPlatform {
   }
 
   Future<void> stopServer() async {
-    // The iOS bridge is an external Android device, so there is no local
-    // process to stop and its persisted address must remain intact.
-    if (Platform.isIOS) return;
-
     _lifecycleGeneration++;
     _preferredRestartPort = null;
     _restartTimer?.cancel();
@@ -177,6 +248,11 @@ class MExtensionServerPlatform {
       try {
         await pending;
       } catch (_) {}
+    }
+    if (Platform.isIOS) {
+      await _stopEmbeddedIosBridge();
+      _restoreSavedBaseUrl();
+      return;
     }
     final baseUrl = _baseUrl;
     if (isDesktop &&
@@ -195,6 +271,17 @@ class MExtensionServerPlatform {
       await MExtensionServer().stopServer();
     } catch (_) {}
     _setBaseUrl(_unavailableBaseUrl);
+  }
+
+  Future<void> _stopEmbeddedIosBridge() async {
+    try {
+      await _embeddedIosChannel.invokeMethod<void>('stop');
+    } catch (error, stackTrace) {
+      _log(
+        'Embedded iPhone Mihon bridge stop failed: $error\n$stackTrace',
+        level: LogLevel.warning,
+      );
+    }
   }
 
   bool _isCancelled(int generation) => generation != _lifecycleGeneration;
@@ -407,7 +494,8 @@ class MExtensionServerPlatform {
 
 Future<String> prepareMihonBridge(Ref ref, Source? source) async {
   final server = MExtensionServerPlatform.fromRef(ref);
-  if (isDesktop && source?.sourceCodeLanguage == SourceCodeLanguage.mihon) {
+  if ((isDesktop || Platform.isIOS) &&
+      source?.sourceCodeLanguage == SourceCodeLanguage.mihon) {
     await server.startServer();
   }
   final baseUrl = server.baseUrl;

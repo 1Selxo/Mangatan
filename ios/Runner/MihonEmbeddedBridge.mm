@@ -3,11 +3,10 @@
 #include <jni.h>
 
 #include <cstdint>
-#include <mutex>
+#include <dlfcn.h>
+#include <os/lock.h>
 #include <string>
 #include <vector>
-
-extern "C" void loadfunctions(void);
 
 namespace {
 
@@ -15,13 +14,35 @@ NSString *const kEmbeddedMihonErrorDomain =
     @"com.selxo.mangatan.embedded_mihon";
 const char *const kEmbeddedBridgeClassName =
     "mextensionserver/EmbeddedBridge";
+const char *const kOpenJDKFrameworkRelativePath =
+    "Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime";
+
+using LoadFunctions = void (*)(void);
+using CreateJavaVM = jint (*)(JavaVM **, void **, void *);
 
 JavaVM *gJavaVM = nullptr;
 jclass gEmbeddedBridgeClass = nullptr;
 jmethodID gStartMethod = nullptr;
 jmethodID gStopMethod = nullptr;
 jmethodID gIsRunningMethod = nullptr;
-std::mutex gJavaVMLock;
+void *gOpenJDKHandle = nullptr;
+LoadFunctions gLoadFunctions = nullptr;
+CreateJavaVM gCreateJavaVM = nullptr;
+os_unfair_lock gJavaVMLock = OS_UNFAIR_LOCK_INIT;
+
+class JavaVMLockGuard {
+ public:
+  JavaVMLockGuard() {
+    os_unfair_lock_lock(&gJavaVMLock);
+  }
+
+  ~JavaVMLockGuard() {
+    os_unfair_lock_unlock(&gJavaVMLock);
+  }
+
+  JavaVMLockGuard(const JavaVMLockGuard &) = delete;
+  JavaVMLockGuard &operator=(const JavaVMLockGuard &) = delete;
+};
 
 dispatch_queue_t EmbeddedMihonQueue() {
   static dispatch_queue_t queue;
@@ -38,6 +59,58 @@ NSError *EmbeddedMihonError(NSInteger code, NSString *message) {
   return [NSError errorWithDomain:kEmbeddedMihonErrorDomain
                              code:code
                          userInfo:@{NSLocalizedDescriptionKey : message}];
+}
+
+bool LoadOpenJDKRuntime(NSError **error) {
+  if (gOpenJDKHandle != nullptr &&
+      gLoadFunctions != nullptr &&
+      gCreateJavaVM != nullptr) {
+    return true;
+  }
+
+  NSString *relativePath =
+      [NSString stringWithUTF8String:kOpenJDKFrameworkRelativePath];
+  NSString *runtimePath =
+      [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:relativePath];
+  dlerror();
+  void *handle = dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_LOCAL);
+  if (handle == nullptr) {
+    const char *details = dlerror();
+    if (error != nullptr) {
+      *error = EmbeddedMihonError(
+          12,
+          [NSString stringWithFormat:
+              @"The on-device Mihon runtime could not be loaded: %s",
+              details == nullptr ? "unknown dynamic loader error" : details]);
+    }
+    return false;
+  }
+
+  dlerror();
+  auto loadFunctions =
+      reinterpret_cast<LoadFunctions>(dlsym(handle, "loadfunctions"));
+  const char *loadFunctionsError = dlerror();
+  dlerror();
+  auto createJavaVM =
+      reinterpret_cast<CreateJavaVM>(dlsym(handle, "JNI_CreateJavaVM"));
+  const char *createJavaVMError = dlerror();
+  if (loadFunctions == nullptr ||
+      createJavaVM == nullptr ||
+      loadFunctionsError != nullptr ||
+      createJavaVMError != nullptr) {
+    if (error != nullptr) {
+      *error = EmbeddedMihonError(
+          13,
+          @"The on-device Mihon runtime is missing its JNI entry points.");
+    }
+    dlclose(handle);
+    return false;
+  }
+
+  gOpenJDKHandle = handle;
+  gLoadFunctions = loadFunctions;
+  gCreateJavaVM = createJavaVM;
+  return true;
 }
 
 NSString *JavaExceptionMessage(JNIEnv *env, NSString *fallback) {
@@ -164,7 +237,7 @@ bool CacheBridgeEntryPoints(JNIEnv *env, NSError **error) {
 }
 
 bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
-  std::lock_guard<std::mutex> guard(gJavaVMLock);
+  JavaVMLockGuard guard;
   if (gJavaVM != nullptr) {
     if (gEmbeddedBridgeClass == nullptr ||
         gStartMethod == nullptr ||
@@ -190,6 +263,9 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
 
   NSString *resourcePath = NSBundle.mainBundle.resourcePath;
   if (!VerifyRuntimeFiles(resourcePath, error)) {
+    return false;
+  }
+  if (!LoadOpenJDKRuntime(error)) {
     return false;
   }
 
@@ -242,8 +318,8 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
   arguments.options = options.data();
   arguments.ignoreUnrecognized = JNI_FALSE;
 
-  loadfunctions();
-  jint result = JNI_CreateJavaVM(
+  gLoadFunctions();
+  jint result = gCreateJavaVM(
       &gJavaVM, reinterpret_cast<void **>(environment), &arguments);
   if (result != JNI_OK || gJavaVM == nullptr || *environment == nullptr) {
     gJavaVM = nullptr;
@@ -273,13 +349,10 @@ void DetachCurrentWorker() {
 void MangatanEmbeddedMihonStart(
     int32_t port,
     MangatanEmbeddedMihonStartCompletion completion) {
-  // OpenJDK Mobile's iOS launcher creates its first VM on the application
-  // main thread. Match that path for initial bootstrap; once the VM exists,
-  // normal bridge work can stay on the serial worker.
-  dispatch_queue_t queue = gJavaVM == nullptr
-      ? dispatch_get_main_queue()
-      : EmbeddedMihonQueue();
-  dispatch_async(queue, ^{
+  // Loading the framework and starting the VM are intentionally kept off the
+  // app launch path and the UI thread. The framework remains loaded for the
+  // lifetime of the process after the first Mihon request.
+  dispatch_async(EmbeddedMihonQueue(), ^{
     @autoreleasepool {
       NSError *error = nil;
       JNIEnv *environment = nullptr;

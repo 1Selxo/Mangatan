@@ -20,9 +20,8 @@
 		A3045F752B62677C0046BD95 /* Libmtorrentserver.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A3045F732B62677C0046BD95 /* Libmtorrentserver.xcframework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A33AA3042B62949C00A19BF1 /* libresolv.9.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A33AA3032B62949C00A19BF1 /* libresolv.9.tbd */; };
 		D081C25C294826C0006EB10B /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = D081C25B294826C0006EB10B /* libc++.tbd */; };
-		E493A0012F2B000100000001 /* OpenJDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = E493A0112F2B000100000001 /* OpenJDK.xcframework */; };
 		E493A0022F2B000100000001 /* MihonEmbeddedBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = E493A0132F2B000100000001 /* MihonEmbeddedBridge.mm */; };
-		E493A0032F2B000100000001 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = E493A0142F2B000100000001 /* libz.tbd */; };
+		E493A0042F2B000100000001 /* OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime */ = {isa = PBXBuildFile; fileRef = E493A0152F2B000100000001 /* OpenJDKRuntime.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +45,17 @@
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 1;
+		};
+		E493A0302F2B000100000001 /* Embed Lazy OpenJDK Runtime */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E493A0042F2B000100000001 /* OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime */,
+			);
+			name = "Embed Lazy OpenJDK Runtime";
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -80,6 +90,7 @@
 		E493A0122F2B000100000001 /* MihonEmbeddedBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MihonEmbeddedBridge.h; sourceTree = "<group>"; };
 		E493A0132F2B000100000001 /* MihonEmbeddedBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MihonEmbeddedBridge.mm; sourceTree = "<group>"; };
 		E493A0142F2B000100000001 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
+		E493A0152F2B000100000001 /* OpenJDKRuntime.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenJDKRuntime.framework; path = Frameworks/OpenJDKRuntime.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,8 +102,6 @@
 				2B39CF7DA699CAC000F142BE /* Pods_Runner.framework in Frameworks */,
 				A3045F742B62677C0046BD95 /* Libmtorrentserver.xcframework in Frameworks */,
 				D081C25C294826C0006EB10B /* libc++.tbd in Frameworks */,
-				E493A0012F2B000100000001 /* OpenJDK.xcframework in Frameworks */,
-				E493A0032F2B000100000001 /* libz.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -122,6 +131,7 @@
 				A3045F732B62677C0046BD95 /* Libmtorrentserver.xcframework */,
 				D081C25B294826C0006EB10B /* libc++.tbd */,
 				E493A0112F2B000100000001 /* OpenJDK.xcframework */,
+				E493A0152F2B000100000001 /* OpenJDKRuntime.framework */,
 				E493A0142F2B000100000001 /* libz.tbd */,
 				AB7DB3653F826C1130BA821D /* Pods_Runner.framework */,
 				7BD77255B8011AAE8AE211FF /* Pods_RunnerTests.framework */,
@@ -223,6 +233,7 @@
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
+				E493A0302F2B000100000001 /* Embed Lazy OpenJDK Runtime */,
 				E493A0202F2B000100000001 /* Copy Embedded Mihon Runtime */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				2E2E01C939E975DA4A5EDCA9 /* [CP] Embed Pods Frameworks */,
@@ -542,6 +553,10 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks/OpenJDK.xcframework/ios-arm64/Headers",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -720,6 +735,10 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks/OpenJDK.xcframework/ios-arm64/Headers",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -742,6 +761,10 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks/OpenJDK.xcframework/ios-arm64/Headers",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

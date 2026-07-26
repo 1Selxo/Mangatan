@@ -73,7 +73,14 @@ jobs:
         run: test -f third_party/hoshidicts/CMakeLists.txt
 
       - name: Prepare on-device Mihon bridge
-        run: tool/prepare_embedded_mihon_ios.sh
+        run: |
+          tool/prepare_embedded_mihon_ios.sh
+          runtime="ios/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"
+          test -x "$runtime"
+          nm -gU "$runtime" | grep -q ' _JNI_CreateJavaVM$'
+          nm -gU "$runtime" | grep -q ' _loadfunctions$'
+          otool -D "$runtime" |
+            grep -q '@rpath/OpenJDKRuntime.framework/OpenJDKRuntime'
 
       - name: Configure iOS release
         run: flutter build ios --release --no-codesign --config-only
@@ -104,6 +111,16 @@ jobs:
           test -f "$app_path/java-logging-shim.jar"
           test -f "$app_path/EMBEDDED_MIHON_NOTICES.md"
           test -x "$app_path/Runner"
+          lazy_runtime="$app_path/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"
+          test -x "$lazy_runtime"
+          python3 tool/verify_macho_min_ios.py \
+            --maximum 13.0 "$app_path/Runner" "$lazy_runtime"
+          python3 tool/verify_macho_initializers.py \
+            --maximum 64 "$app_path/Runner"
+          if otool -L "$app_path/Runner" | grep -q OpenJDKRuntime; then
+            echo "OpenJDKRuntime must not be loaded during app launch." >&2
+            exit 1
+          fi
           du -sh "$app_path"
 
       - name: Package IPA
@@ -178,9 +195,9 @@ jobs:
             Built from `${{ github.sha }}`. Sign the IPA with your preferred
             sideloading tool before installation.
 
-            Mihon extensions are hosted on the iPhone itself. The JVM starts
-            lazily when a Mihon source is used, and the saved external bridge
-            remains available as a fallback.
+            Mihon extensions are hosted on the iPhone itself. OpenJDK is kept
+            out of the app launch image and loaded only when a Mihon source is
+            used. The saved external bridge remains available as a fallback.
           files: release-ios/${{ steps.package.outputs.ipa_name }}
           fail_on_unmatched_files: true
           prerelease: false

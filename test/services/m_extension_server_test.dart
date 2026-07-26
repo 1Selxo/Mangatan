@@ -42,10 +42,13 @@ void main() {
     });
   });
 
-  test('keeps iOS VM startup lazy and bootstraps it on the main thread', () {
+  test('keeps the iOS VM outside the app launch image and UI thread', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
     final nativeSource = File(
       'ios/Runner/MihonEmbeddedBridge.mm',
+    ).readAsStringSync();
+    final xcodeProject = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsStringSync();
 
     expect(
@@ -57,11 +60,19 @@ void main() {
     );
     expect(
       nativeSource,
-      contains(
-        'gJavaVM == nullptr\n'
-        '      ? dispatch_get_main_queue()\n'
-        '      : EmbeddedMihonQueue()',
-      ),
+      contains('dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_LOCAL)'),
+    );
+    expect(
+      nativeSource,
+      contains('dispatch_async(EmbeddedMihonQueue(), ^{'),
+    );
+    expect(
+      xcodeProject,
+      isNot(contains('OpenJDK.xcframework in Frameworks')),
+    );
+    expect(
+      xcodeProject,
+      contains('OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime'),
     );
   });
 }

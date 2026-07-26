@@ -36,7 +36,6 @@ xcrun --sdk iphoneos clang++ \
   -Wl,-install_name,@rpath/OpenJDKRuntime.framework/OpenJDKRuntime \
   -Wl,-compatibility_version,1.0.0 \
   -Wl,-current_version,1.0.0 \
-  -lc++ \
   -lz \
   -framework Foundation \
   -framework CoreFoundation \

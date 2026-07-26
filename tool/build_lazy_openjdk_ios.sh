@@ -33,6 +33,7 @@ xcrun --sdk iphoneos clang++ \
   -dynamiclib \
   -Wl,-all_load \
   "$static_library" \
+  "$script_dir/openjdk_runtime_exports.cpp" \
   -Wl,-install_name,@rpath/OpenJDKRuntime.framework/OpenJDKRuntime \
   -Wl,-compatibility_version,1.0.0 \
   -Wl,-current_version,1.0.0 \

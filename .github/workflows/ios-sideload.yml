@@ -89,6 +89,15 @@ jobs:
             "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
           grep -Fxq '_MangatanOpenJDKLoadFunctions' \
             "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          for symbol in \
+            _JDK_Canonicalize \
+            _JIMAGE_Open \
+            _JIMAGE_Close \
+            _JIMAGE_FindResource \
+            _JIMAGE_GetResource; do
+            grep -Fxq "$symbol" \
+              "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          done
           otool -D "$runtime" > "$RUNNER_TEMP/openjdk-runtime-id.txt"
           cat "$RUNNER_TEMP/openjdk-runtime-id.txt"
           grep -q '@rpath/OpenJDKRuntime.framework/OpenJDKRuntime' \

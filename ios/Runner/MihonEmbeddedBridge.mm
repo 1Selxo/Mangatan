@@ -227,7 +227,7 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
       "-Djava.net.preferIPv4Stack=true",
       "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn",
       "-Xms16m",
-      "-Xmx384m",
+      "-Xmx256m",
   };
   std::vector<JavaVMOption> options(optionStrings.size());
   for (size_t index = 0; index < optionStrings.size(); index++) {
@@ -273,7 +273,13 @@ void DetachCurrentWorker() {
 void MangatanEmbeddedMihonStart(
     int32_t port,
     MangatanEmbeddedMihonStartCompletion completion) {
-  dispatch_async(EmbeddedMihonQueue(), ^{
+  // OpenJDK Mobile's iOS launcher creates its first VM on the application
+  // main thread. Match that path for initial bootstrap; once the VM exists,
+  // normal bridge work can stay on the serial worker.
+  dispatch_queue_t queue = gJavaVM == nullptr
+      ? dispatch_get_main_queue()
+      : EmbeddedMihonQueue();
+  dispatch_async(queue, ^{
     @autoreleasepool {
       NSError *error = nil;
       JNIEnv *environment = nullptr;

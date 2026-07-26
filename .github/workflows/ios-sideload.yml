@@ -29,12 +29,6 @@ jobs:
           architecture: arm64
           cache: true
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -72,9 +66,6 @@ jobs:
       - name: Verify native dictionary source
         run: test -f third_party/hoshidicts/CMakeLists.txt
 
-      - name: Prepare embedded iPhone Mihon bridge
-        run: tool/prepare_embedded_mihon_ios.sh
-
       - name: Configure iOS release
         run: flutter build ios --release --no-codesign --config-only
 
@@ -94,17 +85,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=
-
-      - name: Verify embedded iPhone Mihon bridge
-        run: |
-          app_path="$GITHUB_WORKSPACE/build/ios/Build/Products/Release-iphoneos/Runner.app"
-          test -f "$app_path/lib/modules"
-          test -f "$app_path/lib/security/cacerts"
-          test -f "$app_path/MExtensionServer.jar"
-          test -f "$app_path/java-logging-shim.jar"
-          test -f "$app_path/EMBEDDED_MIHON_NOTICES.md"
-          test -x "$app_path/Runner"
-          du -sh "$app_path"
 
       - name: Package IPA
         id: package
@@ -177,10 +157,6 @@ jobs:
 
             Built from `${{ github.sha }}`. Sign the IPA with your preferred
             sideloading tool before installation.
-
-            This build includes an experimental on-device Mihon extension
-            bridge for iPhone. Mangatan starts it automatically and retains
-            the configured external APKBridge address as a fallback.
           files: release-ios/${{ steps.package.outputs.ipa_name }}
           fail_on_unmatched_files: true
           prerelease: false

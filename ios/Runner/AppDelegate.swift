@@ -60,55 +60,6 @@ import app_links
           }
       })
 
-      let embeddedMihonChannel = FlutterMethodChannel(
-        name: "com.selxo.mangatan.embedded_mihon",
-        binaryMessenger: controller.binaryMessenger)
-      embeddedMihonChannel.setMethodCallHandler({
-          (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
-          switch call.method {
-          case "start":
-              let args = call.arguments as? [String: Any]
-              let port = Int32(args?["port"] as? Int ?? 0)
-              MangatanEmbeddedMihonStart(port) { startedPort, error in
-                  if let error = error {
-                      result(FlutterError(
-                        code: "EMBEDDED_MIHON_START",
-                        message: error.localizedDescription,
-                        details: nil))
-                  } else {
-                      result([
-                        "port": Int(startedPort),
-                        "baseUrl": "http://127.0.0.1:\(startedPort)",
-                      ])
-                  }
-              }
-          case "stop":
-              MangatanEmbeddedMihonStop { error in
-                  if let error = error {
-                      result(FlutterError(
-                        code: "EMBEDDED_MIHON_STOP",
-                        message: error.localizedDescription,
-                        details: nil))
-                  } else {
-                      result(nil)
-                  }
-              }
-          case "status":
-              MangatanEmbeddedMihonIsRunning { isRunning, error in
-                  if let error = error {
-                      result(FlutterError(
-                        code: "EMBEDDED_MIHON_STATUS",
-                        message: error.localizedDescription,
-                        details: nil))
-                  } else {
-                      result(isRunning)
-                  }
-              }
-          default:
-              result(FlutterMethodNotImplemented)
-          }
-      })
-
     GeneratedPluginRegistrant.register(with: self)
 
     if let url = AppLinks.shared.getLink(launchOptions: launchOptions) {

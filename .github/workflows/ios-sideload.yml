@@ -77,10 +77,14 @@ jobs:
           tool/prepare_embedded_mihon_ios.sh
           runtime="ios/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"
           test -x "$runtime"
-          nm -gU "$runtime" | grep -q ' _JNI_CreateJavaVM$'
-          nm -gU "$runtime" | grep -q ' _loadfunctions$'
-          otool -D "$runtime" |
-            grep -q '@rpath/OpenJDKRuntime.framework/OpenJDKRuntime'
+          nm -gU "$runtime" > "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          grep -q ' _JNI_CreateJavaVM$' \
+            "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          grep -q ' _loadfunctions$' \
+            "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          otool -D "$runtime" > "$RUNNER_TEMP/openjdk-runtime-id.txt"
+          grep -q '@rpath/OpenJDKRuntime.framework/OpenJDKRuntime' \
+            "$RUNNER_TEMP/openjdk-runtime-id.txt"
 
       - name: Configure iOS release
         run: flutter build ios --release --no-codesign --config-only

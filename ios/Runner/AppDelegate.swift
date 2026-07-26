@@ -1,7 +1,6 @@
 import UIKit
 import Flutter
 import Libmtorrentserver
-import app_links
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -26,7 +25,8 @@ import app_links
                       let args = call.arguments as? Dictionary<String, Any>
                       let config = args?["config"] as? String
                       var error: NSError?
-                      let mPort = UnsafeMutablePointer<Int>.allocate(capacity: MemoryLayout<Int>.stride)
+                      let mPort = UnsafeMutablePointer<Int>.allocate(capacity: 1)
+                      defer { mPort.deallocate() }
                       if LibmtorrentserverStart(config, mPort, &error){
                           result(mPort.pointee)
                       }else{
@@ -115,11 +115,6 @@ import app_links
       })
 
     GeneratedPluginRegistrant.register(with: self)
-
-    if let url = AppLinks.shared.getLink(launchOptions: launchOptions) {
-      AppLinks.shared.handleLink(url: url)
-      return true
-    }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

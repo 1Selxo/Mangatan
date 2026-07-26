@@ -65,6 +65,7 @@ late Isar isar;
 DiscordRPC? discordRpc;
 WebViewEnvironment? webViewEnvironment;
 String? customDns;
+bool _didMountApplication = false;
 
 /// Captures a supported cold-start URI supplied directly to a desktop runner.
 ///
@@ -127,8 +128,6 @@ void main(List<String> args) async {
       // Detect Android TV / leanback so the UI can branch on form factor.
       // No-op on other platforms. See #729.
       await initIsTv();
-      await getIsolateService.start();
-      await ffiImageDecoder.start();
       if (!isMobile) {
         await windowManager.ensureInitialized();
         await WindowGeometry.restore();
@@ -184,15 +183,28 @@ void main(List<String> args) async {
                 retry: (retryCount, error) => null,
               ),
       );
-      if (startupError == null) unawaited(_postLaunchInit(storage));
+      _didMountApplication = true;
+      if (startupError == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          unawaited(_postLaunchInit(storage));
+        });
+      }
     },
-    (Object error, StackTrace stack) {
-      AppLogger.log(
-        'runZonedGuarded error: $error\n$stack',
-        logLevel: LogLevel.error,
-      );
-    },
+    _handleUncaughtError,
   );
+}
+
+void _handleUncaughtError(Object error, StackTrace stack) {
+  debugPrint('Uncaught startup error: $error\n$stack');
+  AppLogger.log(
+    'runZonedGuarded error: $error\n$stack',
+    logLevel: LogLevel.error,
+  );
+  if (_didMountApplication) return;
+
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(_StartupErrorApp(error: error.toString()));
+  _didMountApplication = true;
 }
 
 class _StartupErrorApp extends StatelessWidget {
@@ -230,6 +242,11 @@ class _StartupErrorApp extends StatelessWidget {
 }
 
 Future<void> _postLaunchInit(StorageProvider storage) async {
+  // These services spawn five isolates in total, and the extension workers
+  // each open the database. Warming them before runApp can consume the iOS
+  // launch-watchdog window without presenting a frame.
+  unawaited(getIsolateService.start());
+  unawaited(ffiImageDecoder.start());
   await AppLogger.init();
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   if (isApple || Platform.isAndroid) {

@@ -63,6 +63,7 @@ jobs:
             test/eval/mihon
           flutter test --concurrency=1 \
             test/services/hoshidicts/hoshi_dictionary_popup_test.dart \
+            test/services/ios_launch_wiring_test.dart \
             test/services/mining/anki_audio_service_test.dart \
             test/services/mining/anki_connect_service_test.dart \
             test/services/mining/anki_mobile_service_test.dart \

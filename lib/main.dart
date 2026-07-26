@@ -299,7 +299,13 @@ class _MyAppState extends ConsumerState<MyApp>
     unawaited(ref.read(scanLocalLibraryProvider.future));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      MExtensionServerPlatform(ref, persistent: true).startServer();
+      // OpenJDK Mobile initialization is intentionally lazy on iOS. Starting
+      // a full embedded VM during the first frame can terminate the app before
+      // Flutter has finished restoring its UI. Mihon operations call
+      // prepareMihonBridge and start it when it is actually needed.
+      if (!Platform.isIOS) {
+        MExtensionServerPlatform(ref, persistent: true).startServer();
+      }
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
         ref.watch(totalChapterCacheSizeStateProvider);

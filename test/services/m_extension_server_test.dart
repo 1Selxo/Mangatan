@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 
@@ -38,5 +40,28 @@ void main() {
       expect(embeddedMihonBaseUrlFromResponse({'port': 0}), isNull);
       expect(embeddedMihonBaseUrlFromResponse({'port': 70000}), isNull);
     });
+  });
+
+  test('keeps iOS VM startup lazy and bootstraps it on the main thread', () {
+    final mainSource = File('lib/main.dart').readAsStringSync();
+    final nativeSource = File(
+      'ios/Runner/MihonEmbeddedBridge.mm',
+    ).readAsStringSync();
+
+    expect(
+      mainSource,
+      contains(
+        'if (!Platform.isIOS) {\n'
+        '        MExtensionServerPlatform(ref, persistent: true).startServer();',
+      ),
+    );
+    expect(
+      nativeSource,
+      contains(
+        'gJavaVM == nullptr\n'
+        '      ? dispatch_get_main_queue()\n'
+        '      : EmbeddedMihonQueue()',
+      ),
+    );
   });
 }

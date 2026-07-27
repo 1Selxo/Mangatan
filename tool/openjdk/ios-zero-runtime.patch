@@ -1,29 +1,51 @@
 diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
-index 3c1626a9f51..94682b69c45 100644
+index 3c1626a9f51..7f766067885 100644
 --- a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
 +++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
-@@ -224,7 +224,26 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
+@@ -34,6 +34,7 @@
+ #include "interpreter/zero/zeroInterpreterGenerator.hpp"
+ #include "oops/access.inline.hpp"
+ #include "oops/cpCache.inline.hpp"
++#include "oops/instanceKlass.inline.hpp"
+ #include "oops/klass.inline.hpp"
+ #include "oops/methodData.hpp"
+ #include "oops/method.hpp"
+@@ -224,7 +225,40 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
        stack->set_sp(istate->stack() + 1);
  
        // Make the call
 -      Interpreter::invoke_method(callee, istate->callee_entry_point(), THREAD);
 +      address entry = istate->callee_entry_point();
 +      if (entry == nullptr) {
-+        // A dynamically loaded class can become callable while its Method is
-+        // still missing the cached interpreter entry on iOS. Calling through
-+        // that null ZeroEntry raises SIGSEGV before Java can report an error.
-+        // Zero has no compiled call path, so restoring the table-selected
-+        // interpreter entry is sufficient and keeps subsequent calls fast.
-+        entry = callee->interpreter_entry();
-+        if (entry == nullptr) {
-+          methodHandle callee_handle(thread, callee);
-+          entry = Interpreter::entry_for_method(callee_handle);
-+        }
-+        guarantee(entry != nullptr, "Zero interpreter entry must be non-null");
-+        tty->print("Zero: restored missing interpreter entry for ");
++        // A class reached through the dynamically loaded iOS runtime can be
++        // callable before link_class has installed its constant-pool cache
++        // and Method entry points. Synthesizing only an interpreter entry
++        // creates an invalid frame with a null cache. Complete normal class
++        // linkage instead, with the caller exposed as the last Java frame.
++        InstanceKlass* holder = callee->method_holder();
++        tty->print("Zero: linking method holder for ");
 +        callee->print_short_name(tty);
 +        tty->cr();
-+        callee->set_interpreter_entry(entry);
++        thread->set_last_Java_frame();
++        {
++          ThreadInVMfromJava transition(thread);
++          holder->link_class(THREAD);
++        }
++        thread->reset_last_Java_frame();
++
++        if (HAS_PENDING_EXCEPTION) {
++          // Resume the caller so the bytecode interpreter can dispatch the
++          // linkage exception at the original invoke instruction.
++          stack->set_sp(istate->stack_limit() + 1);
++          istate->set_msg(BytecodeInterpreter::method_resume);
++          continue;
++        }
++
++        entry = callee->from_interpreted_entry();
++        guarantee(entry != nullptr,
++                  "linked Zero interpreter entry must be non-null");
++        guarantee(callee->constants()->cache() != nullptr,
++                  "linked Zero method constant-pool cache must be non-null");
 +        istate->set_callee_entry_point(entry);
 +      }
 +      Interpreter::invoke_method(callee, entry, THREAD);

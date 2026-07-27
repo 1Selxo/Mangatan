@@ -93,6 +93,12 @@ void main() {
       reason:
           'the Zero interpreter needs more stack than an iOS dispatch worker',
     );
+    expect(
+      nativeSource,
+      contains('"-Xss8m",'),
+      reason:
+          'NanoHTTPD request workers need the same full Zero interpreter stack',
+    );
     expect(nativeSource, contains('[EmbeddedMihonThread() enqueueBlock:^{'));
     expect(
       nativeSource,

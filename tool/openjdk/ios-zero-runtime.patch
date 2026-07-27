@@ -1,0 +1,118 @@
+diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+index 3c1626a9f51..94682b69c45 100644
+--- a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
++++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+@@ -224,7 +224,26 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
+       stack->set_sp(istate->stack() + 1);
+ 
+       // Make the call
+-      Interpreter::invoke_method(callee, istate->callee_entry_point(), THREAD);
++      address entry = istate->callee_entry_point();
++      if (entry == nullptr) {
++        // A dynamically loaded class can become callable while its Method is
++        // still missing the cached interpreter entry on iOS. Calling through
++        // that null ZeroEntry raises SIGSEGV before Java can report an error.
++        // Zero has no compiled call path, so restoring the table-selected
++        // interpreter entry is sufficient and keeps subsequent calls fast.
++        entry = callee->interpreter_entry();
++        if (entry == nullptr) {
++          methodHandle callee_handle(thread, callee);
++          entry = Interpreter::entry_for_method(callee_handle);
++        }
++        guarantee(entry != nullptr, "Zero interpreter entry must be non-null");
++        tty->print("Zero: restored missing interpreter entry for ");
++        callee->print_short_name(tty);
++        tty->cr();
++        callee->set_interpreter_entry(entry);
++        istate->set_callee_entry_point(entry);
++      }
++      Interpreter::invoke_method(callee, entry, THREAD);
+       fixup_after_potential_safepoint();
+ 
+       // Convert the result
+diff --git a/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp b/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp
+index 74071932654..26d0496887b 100644
+--- a/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp
++++ b/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp
+@@ -55,6 +55,16 @@
+ # include <pthread_np.h> /* For pthread_attr_get_np */
+ #endif
+ 
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++// Darwin prefixes the ARM64 thread-state fields in UNIX03 mode.
++// Keep these definitions local to Zero instead of depending on the
++// bsd_aarch64 port, which is not compiled for a Zero VM.
++#define ZERO_DARWIN_CONTEXT_FIELD(state, member) __ ## state.__ ## member
++#define ZERO_CONTEXT_FP uc_mcontext->ZERO_DARWIN_CONTEXT_FIELD(ss, fp)
++#define ZERO_CONTEXT_SP uc_mcontext->ZERO_DARWIN_CONTEXT_FIELD(ss, sp)
++#define ZERO_CONTEXT_PC uc_mcontext->ZERO_DARWIN_CONTEXT_FIELD(ss, pc)
++#endif
++
+ address os::current_stack_pointer() {
+   address dummy = (address) &dummy;
+   return dummy;
+@@ -89,29 +99,64 @@ char* os::non_memory_address_word() {
+ }
+ 
+ address os::Posix::ucontext_get_pc(const ucontext_t* uc) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  return (address) uc->ZERO_CONTEXT_PC;
++#else
+   ShouldNotCallThis();
+   return nullptr;
++#endif
+ }
+ 
+ void os::Posix::ucontext_set_pc(ucontext_t * uc, address pc) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  uc->ZERO_CONTEXT_PC = (uintptr_t) pc;
++#else
+   ShouldNotCallThis();
++#endif
+ }
+ 
+ address os::fetch_frame_from_context(const void* ucVoid,
+                                      intptr_t** ret_sp,
+                                      intptr_t** ret_fp) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  const ucontext_t* uc = (const ucontext_t*) ucVoid;
++  if (uc == nullptr) {
++    if (ret_sp != nullptr) *ret_sp = nullptr;
++    if (ret_fp != nullptr) *ret_fp = nullptr;
++    return nullptr;
++  }
++  if (ret_sp != nullptr) *ret_sp = (intptr_t*) uc->ZERO_CONTEXT_SP;
++  if (ret_fp != nullptr) *ret_fp = (intptr_t*) uc->ZERO_CONTEXT_FP;
++  return os::Posix::ucontext_get_pc(uc);
++#else
+   ShouldNotCallThis();
+   return nullptr;
++#endif
+ }
+ 
+ frame os::fetch_frame_from_context(const void* ucVoid) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  intptr_t* sp = nullptr;
++  address pc = fetch_frame_from_context(ucVoid, &sp, nullptr);
++  frame result;
++  result.set_sp(sp);
++  result.set_pc(pc);
++  return result;
++#else
+   ShouldNotCallThis();
+   return frame();
++#endif
+ }
+ 
+ intptr_t* os::fetch_bcp_from_context(const void* ucVoid) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  // Zero keeps the bytecode pointer in interpreterState, not a native
++  // register, so there is no BCP to recover from a Darwin ucontext.
++  return nullptr;
++#else
+   ShouldNotCallThis();
+   return nullptr;
++#endif
+ }
+ 
+ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,

@@ -6,6 +6,8 @@ on:
       - main
     paths-ignore:
       - "repo/source.json"
+      - "tool/openjdk/**"
+      - ".github/workflows/build-openjdk-ios13.yml"
     tags:
       - "v*"
   workflow_call:

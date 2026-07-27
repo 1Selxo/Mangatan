@@ -203,7 +203,15 @@ diff --git a/src/hotspot/share/gc/serial/serialHeap.cpp b/src/hotspot/share/gc/s
 index 8eafdfdc..edc414e9 100644
 --- a/src/hotspot/share/gc/serial/serialHeap.cpp
 +++ b/src/hotspot/share/gc/serial/serialHeap.cpp
-@@ -345,3 +345,17 @@ HeapWord* SerialHeap::mem_allocate_work(size_t size, bool is_tlab) {
+@@ -69,6 +69,7 @@
+ #include "runtime/handles.inline.hpp"
+ #include "runtime/init.hpp"
+ #include "runtime/java.hpp"
++#include "runtime/javaThread.hpp"
+ #include "runtime/mutexLocker.hpp"
+ #include "runtime/prefetch.inline.hpp"
+ #include "runtime/threads.hpp"
+@@ -345,3 +345,22 @@ HeapWord* SerialHeap::mem_allocate_work(size_t size, bool is_tlab) {
 +    if (!is_init_completed()) {
 +      tty->print_cr(
 +          "Mangatan Serial bootstrap allocation exhausted: "
@@ -217,6 +225,11 @@ index 8eafdfdc..edc414e9 100644
 +          _old_gen->used(),
 +          _old_gen->capacity(),
 +          _old_gen->max_capacity());
++      Thread* current = Thread::current_or_null();
++      if (current != nullptr && current->is_Java_thread()) {
++        tty->print_cr("Mangatan Serial bootstrap Java stack:");
++        JavaThread::cast(current)->print_stack_on(tty);
++      }
 +    }
      VM_SerialCollectForAllocation op(size, is_tlab, gc_count_before);
      VMThread::execute(&op);

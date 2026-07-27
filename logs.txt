@@ -1,0 +1,129 @@
+[27/07/2026 23:14:25][INFO] 
+
+Logger initialized
+
+
+[27/07/2026 23:14:27][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+
+[27/07/2026 23:14:27][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[27/07/2026 23:14:27][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+
+[27/07/2026 23:14:51][INFO] Mihon bridge is ready at http://127.0.0.1:64646.
+[27/07/2026 23:14:59][INFO] 
+
+Logger initialized
+
+
+[27/07/2026 23:15:01][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+
+[27/07/2026 23:15:01][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[27/07/2026 23:15:01][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+
+[27/07/2026 23:15:02][ERROR] FlutterError: Bad state: Failed to load /data/user/0/app.chimahon/files/novels/c70ea660a3097f6082707e6a869b20c9/cover.jpeg.
+
+[27/07/2026 23:15:02][ERROR] FlutterError: Bad state: Failed to load /data/user/0/app.chimahon/files/novels/dc2e98044bcc971b6e9dbde496cb4cee/cover.jpeg.
+
+[27/07/2026 23:15:02][ERROR] FlutterError: Bad state: Failed to load /data/user/0/app.chimahon/files/novels/168510d94cc8a2f41c2629d403b56bba/item/image/cover.jpg.
+
+[27/07/2026 23:24:51][INFO] 
+
+Logger initialized
+
+
+[27/07/2026 23:24:53][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+
+[27/07/2026 23:24:53][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[27/07/2026 23:24:53][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+
+[27/07/2026 23:33:31][INFO] 
+
+Logger initialized
+
+
+[27/07/2026 23:33:33][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+
+[27/07/2026 23:33:33][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[27/07/2026 23:33:33][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1BivgY/lc.webp?h=mUT3jBuo4EkEb_Kx2nRIbA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1zqx59/ic.webp?h=dJP4XBZahUWT_5ndTJXkZA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1yfl7O/eC.webp?h=Ky-l0ZnNSEt5pYdix8XYgQ&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1yVOKv/gL.webp?h=rGUjChVpPEOxNEglssc4oQ&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xh4b2/X.webp?h=vx7R0gOvEYdofjPolTZ5KA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1FchXh/t7.webp?h=sFnCL5e7wf2uo0inmLBwiQ&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1Abe6T/ji.webp?h=o93yhnDkU-ieeTb6hzYb1g&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1DvWCp/qk.webp?h=A_Lsu2yY4d9yCBPxfbKb8w&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xuCfF/co.webp?h=JSSGHXg7xg3hUbzzdep6ag&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1CL2d7/oh.webp?h=i72NQh_C-KWeO6UqVmu-vg&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1DHNic/qy.webp?h=puKQ5-eEk8O-Ji31X9p2QQ&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xuC69/bB.webp?h=pevOuOqD7gWxLTcmxULeDw&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1EbqXZ/rh.webp?h=tEe2aZzOpyOQsZmSlenesA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xjoeX/9e.webp?h=odQRT1GaMYDmycOWxpDRnQ&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1G7CJI/uz.webp?h=TmrQjNvhKWW-9LbN2jp5Zw&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1yfmp8/f4.webp?h=6qvj7EEpYCjvM1aL1JrFfw&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1FFiyz/tO.webp?h=ZuScWem_rqeyJjXR1LzXPg&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1Di4d2/pY.webp?h=MPT7XHLFq62L4NuwFUs8Pw&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1yflMO/eO.webp?h=TPY2s-uVfjJmt_R2uWwXNA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1FrNns/tx.webp?h=2GmmMb8sx7WlVUK6MNg2ZQ&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1EZM68/sT.webp?h=GmKYYq5Ldoilfzu8bZpSKA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1yGK9x/g2.webp?h=PbqvLEZu7cMFE1_XWkV-Nw&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1EVS4w/sK.webp?h=3-nYMe6xpcMdh-J-OIOi3g&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1EhHlG/rn.webp?h=f7UP2OQP55Az4LyHdJhfSg&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1z4scc/h9.webp?h=Ax7as14c9Uw0FLfWXiGdMA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xh4b2/26.webp?h=nWV--CvRMViDt9wLY4JMaA&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1FNcI8/u7.webp?h=ez6yLl572MYWVx37JmgbyQ&e=5000000000.
+
+[27/07/2026 23:34:29][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1yUxjn/gI.webp?h=CmdUE7bFYR4B1jj8bo1H-w&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1BmOkn/li.webp?h=pewVCZPx7VIvFWt6I36QUg&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1CcdEU/n6.webp?h=ZjCRe4k-qrHzJzV5MvcGdQ&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xuBiC/bd.webp?h=UVI4O03TgNv33dkCEPv83A&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1yBo9i/fG.webp?h=JtYDeO8vvluJYXaNohYoPQ&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1DQ1Br/qQ.webp?h=Ls4LEquK5IDRb5FumrNjjQ&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1AaZux/jc.webp?h=SpSvBozC-Bh5F5UxwnrMFg&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1ANRS8/kg.webp?h=i6zQo6ISlpMY6m-v0WRzqw&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xh4b2/5l.webp?h=5BO3yQJp6Lxxc2auZIMY_g&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xh4b2/4p.webp?h=Mt0G42jLlyL-eNXwBttmHw&e=5000000000.
+
+[27/07/2026 23:34:30][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xh4b2/2c.webp?h=FfFkrZMFk8XbNccbVSr1ng&e=5000000000.
+
+[27/07/2026 23:35:08][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xjnwE/5x.webp?h=27DXFBe2_vhKH7TH0QJipQ&e=5000000000.
+

@@ -198,6 +198,11 @@ void main() {
       contains('Mangatan Serial bootstrap Java stack:'),
       reason: 'pre-initialization exhaustion must identify its Java caller',
     );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Serial raw Zero frame chain:'),
+      reason: 'Zero bootstrap failures need the complete interpreter chain',
+    );
     expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
     expect(
       xcodeProject,

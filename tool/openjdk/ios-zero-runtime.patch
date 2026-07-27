@@ -203,15 +203,18 @@ diff --git a/src/hotspot/share/gc/serial/serialHeap.cpp b/src/hotspot/share/gc/s
 index 8eafdfdc..edc414e9 100644
 --- a/src/hotspot/share/gc/serial/serialHeap.cpp
 +++ b/src/hotspot/share/gc/serial/serialHeap.cpp
-@@ -69,6 +69,7 @@
+@@ -69,6 +69,10 @@
  #include "runtime/handles.inline.hpp"
  #include "runtime/init.hpp"
  #include "runtime/java.hpp"
 +#include "runtime/javaThread.hpp"
++#ifdef ZERO
++#include "interpreterFrame_zero.hpp"
++#endif
  #include "runtime/mutexLocker.hpp"
  #include "runtime/prefetch.inline.hpp"
  #include "runtime/threads.hpp"
-@@ -345,3 +345,22 @@ HeapWord* SerialHeap::mem_allocate_work(size_t size, bool is_tlab) {
+@@ -345,3 +345,52 @@ HeapWord* SerialHeap::mem_allocate_work(size_t size, bool is_tlab) {
 +    if (!is_init_completed()) {
 +      tty->print_cr(
 +          "Mangatan Serial bootstrap allocation exhausted: "
@@ -228,7 +231,37 @@ index 8eafdfdc..edc414e9 100644
 +      Thread* current = Thread::current_or_null();
 +      if (current != nullptr && current->is_Java_thread()) {
 +        tty->print_cr("Mangatan Serial bootstrap Java stack:");
-+        JavaThread::cast(current)->print_stack_on(tty);
++        JavaThread* java_thread = JavaThread::cast(current);
++        java_thread->print_stack_on(tty);
++#ifdef ZERO
++        tty->print_cr("Mangatan Serial raw Zero frame chain:");
++        int frames_seen = 0;
++        int java_depth = 0;
++        for (ZeroFrame* raw_frame = java_thread->top_zero_frame();
++             raw_frame != nullptr && frames_seen < 64;
++             raw_frame = raw_frame->next(), frames_seen++) {
++          if (raw_frame->is_interpreter_frame()) {
++            interpreterState raw_state =
++                raw_frame->as_interpreter_frame()->interpreter_state();
++            if (raw_state->self_link() != raw_state) {
++              tty->print_cr("  raw #%d type=interpreter state=invalid",
++                            frames_seen);
++              continue;
++            }
++            Method* raw_method = raw_state->method();
++            tty->print("  raw #%d java #%d type=interpreter ",
++                       frames_seen, java_depth);
++            raw_method->print_short_name(tty);
++            tty->print_cr(" bci=%d",
++                          raw_method->validate_bci_from_bcp(raw_state->bcp()));
++            java_depth++;
++          } else if (raw_frame->is_entry_frame()) {
++            tty->print_cr("  raw #%d type=entry", frames_seen);
++          } else {
++            tty->print_cr("  raw #%d type=fake-stub", frames_seen);
++          }
++        }
++#endif
 +      }
 +    }
      VM_SerialCollectForAllocation op(size, is_tlab, gc_count_before);

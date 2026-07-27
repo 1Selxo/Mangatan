@@ -407,6 +407,12 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
       "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn",
       "-Xms16m",
       "-Xmx256m",
+      // The dedicated JNI bootstrap thread above has an 8 MiB stack, but
+      // NanoHTTPD and the Android compatibility layer create ordinary Java
+      // threads. BSD Zero otherwise gives those threads only 1536 KiB and its
+      // stack-overflow signal path is not implemented, turning a deep request
+      // into a process-fatal ShouldNotCall instead of StackOverflowError.
+      "-Xss8m",
   };
   std::vector<JavaVMOption> options(optionStrings.size());
   for (size_t index = 0; index < optionStrings.size(); index++) {

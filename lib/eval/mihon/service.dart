@@ -15,6 +15,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/models/video.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 
@@ -258,12 +259,13 @@ class MihonExtensionService implements ExtensionService {
                 (e['date_upload'] as int?)?.toString() ??
                 DateTime.now().millisecondsSinceEpoch.toString(),
             scanlator: e['scanlator'],
-            chapterNumber:
-                (e[source.itemType == ItemType.anime
-                            ? 'episode_number'
-                            : 'chapter_number']
-                        as num?)
-                    ?.toDouble(),
+            chapterNumber: normalizeSourceChapterNumber(
+              (e[source.itemType == ItemType.anime
+                          ? 'episode_number'
+                          : 'chapter_number']
+                      as num?)
+                  ?.toDouble(),
+            ),
           ),
         )
         .toList();

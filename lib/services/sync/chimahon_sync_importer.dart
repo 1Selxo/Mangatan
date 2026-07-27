@@ -2,11 +2,13 @@ import 'package:fixnum/fixnum.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart';
+import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
@@ -16,8 +18,9 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMa
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
-import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_local_chapter_policy.dart';
+import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_category_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/services/sync/chimahon_tracking_adapter.dart';
@@ -667,13 +670,11 @@ class ChimahonSyncImporter {
   }) {
     var created = 0;
     var updated = 0;
-    final portableLocal = localChapters
-        .where(
-          (chapter) =>
-              chapter.mangaId == manga.id &&
-              const ChimahonLocalChapterPolicy().hasPortableIdentity(chapter),
-        )
-        .toList(growable: false);
+    final portableLocal = _repairLocalChildAliases(
+      database: database,
+      manga: manga,
+      localChapters: localChapters,
+    );
     final localByKey = <String, Chapter>{
       for (final chapter in portableLocal) _localChapterKey(chapter): chapter,
     };
@@ -681,7 +682,7 @@ class ChimahonSyncImporter {
     for (final chapter in portableLocal) {
       localByUrl.putIfAbsent(chapter.url!, () => <Chapter>[]).add(chapter);
     }
-    final remoteList = remoteChapters.toList(growable: false);
+    final remoteList = canonicalizeChimahonChapters(remoteChapters);
     final remoteUrlCounts = <String, int>{};
     for (final remote in remoteList) {
       remoteUrlCounts[remote.url] = (remoteUrlCounts[remote.url] ?? 0) + 1;
@@ -756,13 +757,12 @@ class ChimahonSyncImporter {
   }) {
     var created = 0;
     var updated = 0;
-    final portableLocal = localChapters
-        .where(
-          (episode) =>
-              episode.mangaId == anime.id &&
-              const ChimahonLocalChapterPolicy().hasPortableIdentity(episode),
-        )
-        .toList(growable: false);
+    final portableLocal = _repairLocalChildAliases(
+      database: database,
+      manga: anime,
+      localChapters: localChapters,
+      episodes: true,
+    );
     final localByKey = <String, Chapter>{
       for (final episode in portableLocal) _localEpisodeKey(episode): episode,
     };
@@ -770,7 +770,7 @@ class ChimahonSyncImporter {
     for (final episode in portableLocal) {
       localByUrl.putIfAbsent(episode.url!, () => <Chapter>[]).add(episode);
     }
-    final remoteList = remoteEpisodes.toList(growable: false);
+    final remoteList = canonicalizeChimahonEpisodes(remoteEpisodes);
     final remoteUrlCounts = <String, int>{};
     for (final remote in remoteList) {
       remoteUrlCounts[remote.url] = (remoteUrlCounts[remote.url] ?? 0) + 1;
@@ -986,17 +986,157 @@ class ChimahonSyncImporter {
 
   String _sourceUrlKey(int source, String url) => '$source|$url';
 
-  String _localChapterKey(Chapter chapter) =>
-      '${chapter.url}|${chapter.name ?? ''}|${chapter.chapterNumber ?? 0.0}';
+  List<Chapter> _repairLocalChildAliases({
+    required Isar database,
+    required Manga manga,
+    required List<Chapter> localChapters,
+    bool episodes = false,
+  }) {
+    final portable = localChapters
+        .where(
+          (chapter) =>
+              chapter.mangaId == manga.id &&
+              const ChimahonLocalChapterPolicy().hasPortableIdentity(chapter),
+        )
+        .toList();
+    final byIdentity = <String, List<Chapter>>{};
+    for (final chapter in portable) {
+      final key = episodes
+          ? _localEpisodeKey(chapter)
+          : _localChapterKey(chapter);
+      byIdentity.putIfAbsent(key, () => <Chapter>[]).add(chapter);
+    }
+
+    for (final aliases in byIdentity.values.where(
+      (aliases) => aliases.length > 1,
+    )) {
+      aliases.sort((left, right) => left.id!.compareTo(right.id!));
+      final survivor = aliases.first;
+      final latest = aliases.reduce((left, right) {
+        final leftUpdated = left.updatedAt ?? 0;
+        final rightUpdated = right.updatedAt ?? 0;
+        if (leftUpdated != rightUpdated) {
+          return leftUpdated > rightUpdated ? left : right;
+        }
+        return left.id! > right.id! ? left : right;
+      });
+      final archivePath = aliases
+          .map((chapter) => chapter.archivePath?.trim() ?? '')
+          .firstWhere((path) => path.isNotEmpty, orElse: () => '');
+      survivor
+        ..name = latest.name
+        ..url = latest.url
+        ..dateUpload = latest.dateUpload
+        ..scanlator = latest.scanlator
+        ..chapterNumber = chimahonCanonicalChildNumber(
+          name: latest.name ?? '',
+          sourceNumber: latest.chapterNumber,
+        )
+        ..isBookmarked = aliases.any((chapter) => chapter.isBookmarked ?? false)
+        ..isRead = aliases.any((chapter) => chapter.isRead ?? false)
+        ..lastPageRead = _progressString(
+          aliases
+              .map((chapter) => int.tryParse(chapter.lastPageRead ?? '') ?? 0)
+              .fold<int>(0, _max),
+        )
+        ..archivePath = archivePath
+        ..isFiller = latest.isFiller
+        ..thumbnailUrl = latest.thumbnailUrl
+        ..description = latest.description
+        ..downloadSize = latest.downloadSize
+        ..duration = latest.duration
+        ..updatedAt = aliases
+            .map((chapter) => chapter.updatedAt ?? 0)
+            .fold<int>(0, _max);
+      database.chapters.putSync(survivor);
+
+      for (final duplicate in aliases.skip(1)) {
+        _moveChapterReferences(
+          database: database,
+          duplicate: duplicate,
+          survivor: survivor,
+        );
+        database.chapters.deleteSync(duplicate.id!);
+        localChapters.removeWhere((chapter) => chapter.id == duplicate.id);
+        portable.removeWhere((chapter) => chapter.id == duplicate.id);
+      }
+    }
+    return portable;
+  }
+
+  void _moveChapterReferences({
+    required Isar database,
+    required Chapter duplicate,
+    required Chapter survivor,
+  }) {
+    for (final history
+        in database.historys
+            .filter()
+            .chapterIdEqualTo(duplicate.id)
+            .findAllSync()) {
+      history
+        ..chapterId = survivor.id
+        ..chapter.value = survivor;
+      database.historys.putSync(history);
+      history.chapter.saveSync();
+    }
+    for (final update
+        in database.updates
+            .filter()
+            .chapter((chapter) => chapter.idEqualTo(duplicate.id))
+            .findAllSync()) {
+      update.chapter.value = survivor;
+      database.updates.putSync(update);
+      update.chapter.saveSync();
+    }
+
+    final survivorDownload = database.downloads.getSync(survivor.id!);
+    final duplicateDownload = database.downloads.getSync(duplicate.id!);
+    if (survivorDownload != null || duplicateDownload != null) {
+      final mergedDownload = Download(
+        id: survivor.id,
+        succeeded: _max(
+          survivorDownload?.succeeded ?? 0,
+          duplicateDownload?.succeeded ?? 0,
+        ),
+        failed: _max(
+          survivorDownload?.failed ?? 0,
+          duplicateDownload?.failed ?? 0,
+        ),
+        total: _max(
+          survivorDownload?.total ?? 0,
+          duplicateDownload?.total ?? 0,
+        ),
+        isDownload:
+            (survivorDownload?.isDownload ?? false) ||
+            (duplicateDownload?.isDownload ?? false),
+        isStartDownload:
+            (survivorDownload?.isStartDownload ?? false) ||
+            (duplicateDownload?.isStartDownload ?? false),
+      )..chapter.value = survivor;
+      database.downloads.putSync(mergedDownload);
+      mergedDownload.chapter.saveSync();
+    }
+    database.downloads.deleteSync(duplicate.id!);
+  }
+
+  String _localChapterKey(Chapter chapter) => chimahonChapterIdentityValues(
+    url: chapter.url ?? '',
+    name: chapter.name ?? '',
+    chapterNumber: chapter.chapterNumber,
+  );
 
   String _remoteChapterKey(BackupChapter chapter) =>
-      '${chapter.url}|${chapter.name}|${chapter.chapterNumber}';
+      chimahonChapterIdentity(chapter);
 
-  String _localEpisodeKey(Chapter episode) =>
-      '${episode.url}|${episode.name ?? ''}|${episode.chapterNumber ?? 0.0}';
+  String _localEpisodeKey(Chapter episode) => chimahonEpisodeIdentityValues(
+    url: episode.url ?? '',
+    name: episode.name ?? '',
+    episodeNumber: episode.chapterNumber,
+  );
 
   String _remoteEpisodeKey(BackupEpisode episode) =>
-      '${episode.url}|${episode.name}|${episode.episodeNumber}';
+      chimahonEpisodeIdentity(episode);
 
   String _progressString(int value) => value == 0 ? '1' : '$value';
 

@@ -95,6 +95,12 @@ void main() {
     );
     expect(
       nativeSource,
+      contains('"-XX:NewSize=8m",'),
+      reason:
+          'primordial class linking must not trigger GC before VM initialization',
+    );
+    expect(
+      nativeSource,
       contains('"-Xss8m",'),
       reason:
           'NanoHTTPD request workers need the same full Zero interpreter stack',

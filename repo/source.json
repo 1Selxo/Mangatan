@@ -26,17 +26,10 @@
       "versions": [
         {
           "version": "1.0.8",
-          "date": "2026-07-27T02:44:34Z",
-          "localizedDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"204cdddd29489dfea285f3aebc9317c042865c46\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
-          "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.133-204cddd/Mangatan-main-v1.0.8-build.133-204cddd-ios.ipa",
-          "size": 119134962
-        },
-        {
-          "version": "1.0.7",
-          "date": "2026-07-25T06:01:56Z",
-          "localizedDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"a9d7f5e71e4f5f03972322bbfc5431b9ec986ac6\". Sign the IPA with your preferred\nsideloading tool before installation.\n",
-          "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.7-beta-build.121-a9d7f5e/Mangatan-main-ios.ipa",
-          "size": 51297730
+          "date": "2026-07-27T03:16:18Z",
+          "localizedDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"a6758d2f7808430bc183af01a93edef5e0259445\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
+          "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.134-a6758d2/Mangatan-main-v1.0.8-build.134-a6758d2-ios.ipa",
+          "size": 119134827
         }
       ],
       "appPermissions": {
@@ -44,10 +37,10 @@
         "privacy": []
       },
       "version": "1.0.8",
-      "versionDate": "2026-07-27T02:44:34Z",
-      "versionDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"204cdddd29489dfea285f3aebc9317c042865c46\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
-      "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.133-204cddd/Mangatan-main-v1.0.8-build.133-204cddd-ios.ipa",
-      "size": 119134962
+      "versionDate": "2026-07-27T03:16:18Z",
+      "versionDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"a6758d2f7808430bc183af01a93edef5e0259445\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
+      "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.134-a6758d2/Mangatan-main-v1.0.8-build.134-a6758d2-ios.ipa",
+      "size": 119134827
     }
   ],
   "news": [
@@ -193,6 +186,17 @@
       "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.133-204cddd"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "ios-v1.0.8-build.134-a6758d2 - 27 Jul",
+      "identifier": "release-ios-v1.0.8-build.134-a6758d2",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-07-27T03:16:18Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.134-a6758d2"
     }
   ]
 }

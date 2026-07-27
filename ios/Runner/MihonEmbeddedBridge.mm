@@ -405,8 +405,16 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
       "-Dfile.encoding=UTF-8",
       "-Djava.net.preferIPv4Stack=true",
       "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn",
-      "-Xms16m",
+      // OpenJDK Zero uses Serial GC on iOS. Its default maximum young
+      // generation is too small to install java.lang.Class's required
+      // resolved-reference array before VM initialization permits a GC.
+      // Reserve balanced startup generations without precommitting the full
+      // heap, which would increase iOS jetsam pressure.
+      "-XX:+UseSerialGC",
+      "-Xms64m",
       "-Xmx256m",
+      "-XX:NewSize=32m",
+      "-XX:MaxNewSize=128m",
       // The dedicated JNI bootstrap thread above has an 8 MiB stack, but
       // NanoHTTPD and the Android compatibility layer create ordinary Java
       // threads. BSD Zero otherwise gives those threads only 1536 KiB and its

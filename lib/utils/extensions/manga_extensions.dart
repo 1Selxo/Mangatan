@@ -7,6 +7,49 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 
+List<Chapter> sortChaptersForDisplay({
+  required Iterable<Chapter> chapters,
+  required String mangaTitle,
+  required int sortIndex,
+  required bool reverse,
+}) {
+  final list = chapters.toList();
+  final recognition = ChapterRecognition();
+  final numCache = <Chapter, double>{};
+  double chapterNumber(Chapter chapter) =>
+      numCache[chapter] ??= recognition.resolveChapterNumber(
+        mangaTitle,
+        chapter.name ?? '',
+        sourceChapterNumber: chapter.chapterNumber,
+      );
+
+  switch (sortIndex) {
+    case 0:
+      list.sort((a, b) {
+        final scanlatorOrder = (a.scanlator ?? '').compareTo(b.scanlator ?? '');
+        if (scanlatorOrder != 0) return scanlatorOrder;
+        return chapterNumber(a).compareTo(chapterNumber(b));
+      });
+      break;
+    case 2:
+      list.sort(
+        (a, b) => (int.tryParse(a.dateUpload ?? '') ?? 0).compareTo(
+          int.tryParse(b.dateUpload ?? '') ?? 0,
+        ),
+      );
+      break;
+    case 3:
+      list.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+      break;
+    case 1:
+    default:
+      list.sort((a, b) => chapterNumber(a).compareTo(chapterNumber(b)));
+      break;
+  }
+
+  return reverse ? list : list.reversed.toList();
+}
+
 extension MangaExtensions on Manga {
   /// Filtered chapters respecting the user's active filters (unread,
   /// bookmarked, downloaded, scanlator). Sorted by chapter number ascending.
@@ -99,63 +142,21 @@ extension MangaExtensions on Manga {
   /// Filtered chapters for display in the chapter list UI: same filters as
   /// [getFilteredChapters] with the user's chosen sort order and direction applied.
   List<Chapter> getSortedFilteredChapters({Iterable<Chapter>? sourceChapters}) {
-    if (isLocalEpubManga(this)) {
-      return getFilteredChapters(sourceChapters: sourceChapters);
-    }
     final settings = isar.settings.getSync(227)!;
 
     final sortChapterEntry =
-        settings.sortChapterList!.where((e) => e.mangaId == id).firstOrNull ??
+        (settings.sortChapterList ?? const [])
+            .where((e) => e.mangaId == id)
+            .firstOrNull ??
         SortChapter(mangaId: id, index: 1);
-    final sortIndex = sortChapterEntry.index!;
-    final reverse = sortChapterEntry.reverse!;
 
     // Build on getFilteredChapters so filter logic lives in one place.
-    List<Chapter> list = getFilteredChapters(sourceChapters: sourceChapters);
-
-    switch (sortIndex) {
-      case 0: // by scanlator, then chapter number
-        // Cache recognition instance — parseChapterNumber is called O(n log n)
-        // times during sort, so avoid constructing it inside the comparator.
-        final recognition = ChapterRecognition();
-        final mangaTitle = name ?? '';
-
-        // Returns the parsed chapter number for a chapter, used as the primary
-        // numeric sort key for cases 0 and 1.
-        final numCache = <Chapter, double>{};
-        double chapNum(Chapter c) =>
-            numCache[c] ??= recognition.resolveChapterNumber(
-              mangaTitle,
-              c.name ?? '',
-              sourceChapterNumber: c.chapterNumber,
-            );
-        list.sort((a, b) {
-          final s = (a.scanlator ?? '').compareTo(b.scanlator ?? '');
-          if (s != 0) return s;
-          return chapNum(a).compareTo(chapNum(b));
-        });
-        break;
-      case 2: // by upload date
-        list.sort((a, b) {
-          if (a.dateUpload == null || b.dateUpload == null) return 0;
-          return (int.tryParse(a.dateUpload!) ?? 0).compareTo(
-            int.tryParse(b.dateUpload!) ?? 0,
-          );
-        });
-        break;
-      case 3: // by name
-        list.sort((a, b) {
-          if (a.name == null || b.name == null) return 0;
-          return a.name!.compareTo(b.name!);
-        });
-        break;
-      case 1:
-      default:
-        // getFilteredChapters already sorted by chapter number; nothing to do.
-        break;
-    }
-
-    return reverse ? list : list.reversed.toList();
+    return sortChaptersForDisplay(
+      chapters: getFilteredChapters(sourceChapters: sourceChapters),
+      mangaTitle: name ?? '',
+      sortIndex: sortChapterEntry.index ?? 1,
+      reverse: sortChapterEntry.reverse ?? false,
+    );
   }
 
   /// Filtered chapters ready for sequential reading: same filters as

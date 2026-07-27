@@ -151,20 +151,21 @@ void main() {
       zeroRuntimePatch,
       contains(
         'if (!is_init_completed() &&\n'
-        '+              holder == vmClasses::Class_klass())',
+        '+            holder == vmClasses::Class_klass() &&\n'
+        '+            callee->name()->equals("desiredAssertionStatus")',
       ),
       reason:
-          'the partial linkage path must be limited to primordial java.lang.Class',
+          'the bootstrap bypass must be limited to the primordial assertion query',
     );
     expect(
       zeroRuntimePatch,
-      contains('holder->rewrite_class(THREAD);'),
-      reason: 'primordial calls need a constant-pool cache before invocation',
+      contains('enabled = JavaAssertions::enabled('),
+      reason: 'the primordial query must use HotSpot assertion semantics',
     );
     expect(
       zeroRuntimePatch,
-      contains('holder->link_methods(THREAD);'),
-      reason: 'primordial calls need installed Zero interpreter entries',
+      contains('asserted_klass->class_loader() == nullptr'),
+      reason: 'dynamic non-bootstrap assertion settings must not be bypassed',
     );
     expect(
       zeroRuntimePatch,
@@ -173,9 +174,14 @@ void main() {
     );
     expect(
       zeroRuntimePatch,
-      contains('vmClasses::Class_klass()->link_class(CHECK);'),
+      isNot(contains('vmClasses::Class_klass()->link_class(CHECK);')),
       reason:
-          'Zero must link java.lang.Class before String runs the first bytecode',
+          'java.lang.Class must remain on its normal bootstrap linkage lifecycle',
+    );
+    expect(
+      zeroRuntimePatch,
+      isNot(contains('holder->rewrite_class(THREAD);')),
+      reason: 'the fallback must not partially rewrite java.lang.Class',
     );
     expect(
       zeroRuntimePatch,

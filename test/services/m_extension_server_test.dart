@@ -53,6 +53,9 @@ void main() {
     final runtimeBuilder = File(
       'tool/build_lazy_openjdk_ios.sh',
     ).readAsStringSync();
+    final zeroRuntimePatch = File(
+      'tool/openjdk/ios-zero-runtime.patch',
+    ).readAsStringSync();
     final xcodeProject = File(
       'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsStringSync();
@@ -95,12 +98,6 @@ void main() {
     );
     expect(
       nativeSource,
-      contains('"-XX:NewSize=8m",'),
-      reason:
-          'primordial class linking must not trigger GC before VM initialization',
-    );
-    expect(
-      nativeSource,
       contains('"-Xss8m",'),
       reason:
           'NanoHTTPD request workers need the same full Zero interpreter stack',
@@ -131,6 +128,30 @@ void main() {
     expect(
       runtimeBuilder,
       contains(r'cp "$runtime_modules" "$output_framework/lib/lib/modules"'),
+    );
+    expect(
+      zeroRuntimePatch,
+      contains(
+        'if (!is_init_completed() &&\n'
+        '+              holder == vmClasses::Class_klass())',
+      ),
+      reason:
+          'the partial linkage path must be limited to primordial java.lang.Class',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('holder->rewrite_class(THREAD);'),
+      reason: 'primordial calls need a constant-pool cache before invocation',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('holder->link_methods(THREAD);'),
+      reason: 'primordial calls need installed Zero interpreter entries',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('holder->link_class(THREAD);'),
+      reason: 'extension and post-bootstrap classes must retain full linkage',
     );
     expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
     expect(

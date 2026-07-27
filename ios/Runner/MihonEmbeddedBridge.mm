@@ -407,11 +407,6 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
       "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn",
       "-Xms16m",
       "-Xmx256m",
-      // HotSpot cannot collect until VM initialization completes. Linking
-      // java.lang.Class on Zero exhausts the ergonomic 1331 KiB young
-      // generation first, so reserve enough young space for primordial class
-      // linkage while leaving MaxNewSize free to grow normally afterward.
-      "-XX:NewSize=8m",
       // The dedicated JNI bootstrap thread above has an 8 MiB stack, but
       // NanoHTTPD and the Android compatibility layer create ordinary Java
       // threads. BSD Zero otherwise gives those threads only 1536 KiB and its

@@ -409,10 +409,10 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
       // before the first Java bytecode, so ordinary balanced generation
       // ceilings are sufficient without reserving an oversized heap.
       "-XX:+UseSerialGC",
-      "-Xms64m",
-      "-Xmx256m",
-      "-XX:NewSize=32m",
-      "-XX:MaxNewSize=128m",
+        "-Xms128m",
+        "-Xmx512m",
+        "-XX:NewSize=64m",
+        "-XX:MaxNewSize=256m",
       // The dedicated JNI bootstrap thread above has an 8 MiB stack, but
       // NanoHTTPD and the Android compatibility layer create ordinary Java
       // threads. BSD Zero otherwise gives those threads only 1536 KiB and its

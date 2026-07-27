@@ -104,10 +104,10 @@ void main() {
     );
     for (final option in [
       '-XX:+UseSerialGC',
-      '-Xms64m',
-      '-Xmx256m',
-      '-XX:NewSize=32m',
-      '-XX:MaxNewSize=128m',
+      '-Xms128m',
+      '-Xmx512m',
+      '-XX:NewSize=64m',
+      '-XX:MaxNewSize=256m',
     ]) {
       expect(
         nativeSource,
@@ -192,6 +192,11 @@ void main() {
       zeroRuntimePatch,
       contains('Mangatan Serial bootstrap allocation exhausted:'),
       reason: 'pre-initialization allocation failures need generation evidence',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Serial bootstrap Java stack:'),
+      reason: 'pre-initialization exhaustion must identify its Java caller',
     );
     expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
     expect(

@@ -114,13 +114,30 @@ class SortChapterState extends _$SortChapterState {
   }
 
   void update(bool reverse, int index) {
-    var value = SortChapter()
-      ..index = index
-      ..mangaId = mangaId
-      ..reverse = state.index == index ? !reverse : reverse;
+    final value = SortChapter(
+      mangaId: mangaId,
+      index: index,
+      reverse: state.index == index ? !reverse : reverse,
+      displayMode: state.displayMode,
+    );
+    _persist(value);
+  }
+
+  void setDisplayMode(int displayMode) {
+    if (displayMode == state.displayMode) return;
+    final value = SortChapter(
+      mangaId: mangaId,
+      index: state.index,
+      reverse: state.reverse,
+      displayMode: displayMode,
+    );
+    _persist(value);
+  }
+
+  void _persist(SortChapter value) {
     final settings = isar.settings.getSync(227)!;
-    List<SortChapter>? sortChapterList = [];
-    for (var sortChapter in settings.sortChapterList!) {
+    final sortChapterList = <SortChapter>[];
+    for (final sortChapter in settings.sortChapterList ?? const []) {
       if (sortChapter.mangaId != mangaId) {
         sortChapterList.add(sortChapter);
       }
@@ -143,7 +160,7 @@ class SortChapterState extends _$SortChapterState {
   }
 
   bool isReverse() {
-    return state.reverse!;
+    return state.reverse ?? false;
   }
 }
 

@@ -2,6 +2,12 @@ diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp b/src/hotspot/cpu/zer
 index 3c1626a9f51..7f766067885 100644
 --- a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
 +++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+@@ -27,4 +27,5 @@
+ #include "asm/assembler.hpp"
++#include "classfile/vmClasses.hpp"
+ #include "interpreter/interpreter.hpp"
+ #include "interpreter/interpreterRuntime.hpp"
+ #include "interpreter/zero/bytecodeInterpreter.hpp"
 @@ -34,6 +34,7 @@
  #include "interpreter/zero/zeroInterpreterGenerator.hpp"
  #include "oops/access.inline.hpp"
@@ -13,7 +19,15 @@ index 3c1626a9f51..7f766067885 100644
 @@ -37,1 +38,2 @@
 +#include "oops/method.inline.hpp"
  #include "oops/oop.inline.hpp"
-@@ -224,7 +226,40 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
+@@ -43,6 +45,7 @@
+ #include "runtime/frame.inline.hpp"
+ #include "runtime/handles.inline.hpp"
+ #include "runtime/interfaceSupport.inline.hpp"
++#include "runtime/init.hpp"
+ #include "runtime/jniHandles.inline.hpp"
+ #include "runtime/timer.hpp"
+ #include "runtime/timerTrace.hpp"
+@@ -224,7 +227,59 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
        stack->set_sp(istate->stack() + 1);
  
        // Make the call
@@ -21,18 +35,37 @@ index 3c1626a9f51..7f766067885 100644
 +      address entry = istate->callee_entry_point();
 +      if (entry == nullptr) {
 +        // A class reached through the dynamically loaded iOS runtime can be
-+        // callable before link_class has installed its constant-pool cache
-+        // and Method entry points. Synthesizing only an interpreter entry
-+        // creates an invalid frame with a null cache. Complete normal class
-+        // linkage instead, with the caller exposed as the last Java frame.
++        // callable before linkage has installed its constant-pool cache and
++        // Method entry points. Synthesizing only an interpreter entry creates
++        // an invalid frame with a null cache.
 +        InstanceKlass* holder = callee->method_holder();
-+        tty->print("Zero: linking method holder for ");
++        tty->print("Zero: preparing method holder for ");
 +        callee->print_short_name(tty);
 +        tty->cr();
 +        thread->set_last_Java_frame();
 +        {
 +          ThreadInVMfromJava transition(thread);
-+          holder->link_class(THREAD);
++          if (!is_init_completed() &&
++              holder == vmClasses::Class_klass()) {
++            // java.lang.Class can invoke desiredAssertionStatus during
++            // primordial bootstrap while it is still unlinked. Full late
++            // linkage expands more bootstrap work until HotSpot requests a
++            // GC, which is forbidden before VM initialization completes.
++            // Install exactly the missing cache and Method entries here;
++            // normal later link_class completes its tables and linked state.
++            if (!holder->is_rewritten()) {
++              holder->rewrite_class(THREAD);
++            }
++            if (!HAS_PENDING_EXCEPTION) {
++              // link_methods is explicitly safe to run again when normal
++              // class linkage resumes.
++              holder->link_methods(THREAD);
++            }
++          } else {
++            // Extension and post-bootstrap classes retain full verification,
++            // rewriting, method, vtable, and itable linkage.
++            holder->link_class(THREAD);
++          }
 +        }
 +        thread->reset_last_Java_frame();
 +
@@ -46,9 +79,9 @@ index 3c1626a9f51..7f766067885 100644
 +
 +        entry = callee->from_interpreted_entry();
 +        guarantee(entry != nullptr,
-+                  "linked Zero interpreter entry must be non-null");
++                  "prepared Zero interpreter entry must be non-null");
 +        guarantee(callee->constants()->cache() != nullptr,
-+                  "linked Zero method constant-pool cache must be non-null");
++                  "prepared Zero method constant-pool cache must be non-null");
 +        istate->set_callee_entry_point(entry);
 +      }
 +      Interpreter::invoke_method(callee, entry, THREAD);

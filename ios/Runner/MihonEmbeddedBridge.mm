@@ -5,10 +5,7 @@
 #include <cstdint>
 #include <dlfcn.h>
 #include <os/lock.h>
-#include <signal.h>
 #include <string>
-#include <sys/ucontext.h>
-#include <unistd.h>
 #include <vector>
 
 @interface MangatanEmbeddedMihonThread : NSThread {
@@ -117,131 +114,6 @@ NSError *EmbeddedMihonError(NSInteger code, NSString *message) {
   return [NSError errorWithDomain:kEmbeddedMihonErrorDomain
                              code:code
                          userInfo:@{NSLocalizedDescriptionKey : message}];
-}
-
-void AppendSignalText(char **cursor, const char *end, const char *text) {
-  while (*text != '\0' && *cursor < end) {
-    *(*cursor)++ = *text++;
-  }
-}
-
-void AppendSignalUnsigned(
-    char **cursor,
-    const char *end,
-    uint64_t value,
-    unsigned int base) {
-  char digits[32];
-  size_t count = 0;
-  do {
-    const uint64_t digit = value % base;
-    digits[count++] =
-        static_cast<char>(digit < 10 ? '0' + digit : 'a' + digit - 10);
-    value /= base;
-  } while (value != 0 && count < sizeof(digits));
-  while (count > 0 && *cursor < end) {
-    *(*cursor)++ = digits[--count];
-  }
-}
-
-void AppendSignalSigned(char **cursor, const char *end, int64_t value) {
-  if (value < 0) {
-    AppendSignalText(cursor, end, "-");
-    AppendSignalUnsigned(
-        cursor,
-        end,
-        static_cast<uint64_t>(-(value + 1)) + 1,
-        10);
-    return;
-  }
-  AppendSignalUnsigned(cursor, end, static_cast<uint64_t>(value), 10);
-}
-
-void AppendSignalHex(char **cursor, const char *end, uintptr_t value) {
-  AppendSignalText(cursor, end, "0x");
-  AppendSignalUnsigned(cursor, end, value, 16);
-}
-
-void JavaVMDiagnosticSignalHandler(
-    int signalNumber,
-    siginfo_t *info,
-    void *rawContext) {
-  char message[2048];
-  char *cursor = message;
-  const char *const end = message + sizeof(message) - 1;
-  AppendSignalText(&cursor, end, "MANGATAN_JVM_SIGNAL sig=");
-  AppendSignalSigned(&cursor, end, signalNumber);
-  AppendSignalText(&cursor, end, " code=");
-  AppendSignalSigned(&cursor, end, info == nullptr ? 0 : info->si_code);
-  AppendSignalText(&cursor, end, " addr=");
-  AppendSignalHex(
-      &cursor,
-      end,
-      info == nullptr
-          ? 0
-          : reinterpret_cast<uintptr_t>(info->si_addr));
-
-#if defined(__APPLE__) && defined(__arm64__)
-#define MANGATAN_CONTEXT_FIELD(state, member) __##state.__##member
-  auto *context = static_cast<ucontext_t *>(rawContext);
-  if (context != nullptr && context->uc_mcontext != nullptr) {
-    const auto &registers =
-        context->uc_mcontext->MANGATAN_CONTEXT_FIELD(ss, x);
-    AppendSignalText(&cursor, end, " pc=");
-    AppendSignalHex(
-        &cursor,
-        end,
-        context->uc_mcontext->MANGATAN_CONTEXT_FIELD(ss, pc));
-    AppendSignalText(&cursor, end, " sp=");
-    AppendSignalHex(
-        &cursor,
-        end,
-        context->uc_mcontext->MANGATAN_CONTEXT_FIELD(ss, sp));
-    AppendSignalText(&cursor, end, " fp=");
-    AppendSignalHex(
-        &cursor,
-        end,
-        context->uc_mcontext->MANGATAN_CONTEXT_FIELD(ss, fp));
-    AppendSignalText(&cursor, end, " lr=");
-    AppendSignalHex(
-        &cursor,
-        end,
-        context->uc_mcontext->MANGATAN_CONTEXT_FIELD(ss, lr));
-    for (size_t index = 0; index < 29; index++) {
-      AppendSignalText(&cursor, end, " x");
-      AppendSignalUnsigned(&cursor, end, index, 10);
-      AppendSignalText(&cursor, end, "=");
-      AppendSignalHex(&cursor, end, registers[index]);
-    }
-  }
-#undef MANGATAN_CONTEXT_FIELD
-#endif
-
-  AppendSignalText(&cursor, end, "\n");
-  const size_t length = static_cast<size_t>(cursor - message);
-  static_cast<void>(write(STDERR_FILENO, message, length));
-  _exit(128 + signalNumber);
-}
-
-bool InstallJavaVMDiagnosticSignalHandlers(NSError **error) {
-  struct sigaction action = {};
-  action.sa_sigaction = JavaVMDiagnosticSignalHandler;
-  action.sa_flags = SA_SIGINFO | SA_RESTART;
-  sigfillset(&action.sa_mask);
-
-  const int signals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
-  for (const int signalNumber : signals) {
-    if (sigaction(signalNumber, &action, nullptr) != 0) {
-      if (error != nullptr) {
-        *error = EmbeddedMihonError(
-            15,
-            [NSString stringWithFormat:
-                @"Could not install the JVM diagnostic handler for signal %d.",
-                signalNumber]);
-      }
-      return false;
-    }
-  }
-  return true;
 }
 
 NSString *OpenJDKRuntimePath() {
@@ -533,7 +405,6 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
       "-Dfile.encoding=UTF-8",
       "-Djava.net.preferIPv4Stack=true",
       "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn",
-      "-XX:+AllowUserSignalHandlers",
       "-Xms16m",
       "-Xmx256m",
   };
@@ -551,9 +422,9 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
   arguments.ignoreUnrecognized = JNI_FALSE;
 
   gLoadFunctions();
-  if (!InstallJavaVMDiagnosticSignalHandlers(error)) {
-    return false;
-  }
+  // HotSpot must own SIGSEGV/SIGBUS while the VM is running. OpenJDK Zero
+  // uses those signals internally on iOS, so an app-level handler here would
+  // turn a recoverable VM signal into an app termination.
   jint result = gCreateJavaVM(
       &gJavaVM, reinterpret_cast<void **>(environment), &arguments);
   if (result != JNI_OK || gJavaVM == nullptr || *environment == nullptr) {

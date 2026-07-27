@@ -102,6 +102,25 @@ void main() {
       reason:
           'NanoHTTPD request workers need the same full Zero interpreter stack',
     );
+    for (final option in [
+      '-XX:+UseSerialGC',
+      '-Xms64m',
+      '-Xmx256m',
+      '-XX:NewSize=32m',
+      '-XX:MaxNewSize=128m',
+    ]) {
+      expect(
+        nativeSource,
+        contains('"$option",'),
+        reason:
+            'the embedded VM needs balanced deterministic bootstrap generations',
+      );
+    }
+    expect(
+      nativeSource,
+      isNot(contains('"-Xmn')),
+      reason: 'the young generation must remain elastic after bootstrap',
+    );
     expect(nativeSource, contains('[EmbeddedMihonThread() enqueueBlock:^{'));
     expect(
       nativeSource,

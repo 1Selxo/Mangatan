@@ -44,6 +44,9 @@ void main() {
 
   test('keeps the iOS VM outside the app launch image and UI thread', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
+    final serviceSource = File(
+      'lib/services/m_extension_server.dart',
+    ).readAsStringSync();
     final mainScreenSource = File(
       'lib/modules/main_view/main_screen.dart',
     ).readAsStringSync();
@@ -127,6 +130,29 @@ void main() {
     );
     expect(nativeSource, isNot(contains('AllowUserSignalHandlers')));
     expect(nativeSource, isNot(contains('JavaVMDiagnosticSignalHandler')));
+    expect(
+      serviceSource,
+      contains(
+        'if (_isLoopbackServer(_baseUrl)) {\n'
+        '        // A saved desktop loopback URL points back at the iPhone',
+      ),
+      reason: 'iOS must not reuse a stale desktop loopback bridge',
+    );
+    expect(
+      serviceSource,
+      contains('if ((isDesktop || Platform.isIOS) &&'),
+      reason: 'an unavailable embedded iOS bridge must fail before HTTP',
+    );
+    expect(
+      nativeSource,
+      contains('TraceEmbeddedMihon(@"calling JNI_CreateJavaVM");'),
+      reason: 'device builds must expose the embedded VM startup boundary',
+    );
+    expect(
+      nativeSource,
+      contains('@"EmbeddedBridge.start returned %d (exception=%@)"'),
+      reason: 'device builds must distinguish server errors from VM errors',
+    );
     expect(
       mainScreenSource,
       contains(

@@ -155,9 +155,15 @@ class MExtensionServerPlatform {
       _log('Embedded iPhone Mihon bridge is ready at $baseUrl.');
     } catch (error, stackTrace) {
       _restoreSavedBaseUrl();
+      if (_isLoopbackServer(_baseUrl)) {
+        // A saved desktop loopback URL points back at the iPhone on iOS and
+        // can never reach the user's computer. Do not hide an embedded-runtime
+        // failure behind a misleading connection-refused error for that URL.
+        _writeRuntimeBaseUrl(_unavailableBaseUrl);
+      }
       _log(
-        'Embedded iPhone Mihon bridge startup failed; using the saved '
-        'external bridge instead: $error\n$stackTrace',
+        'Embedded iPhone Mihon bridge startup failed; a usable saved external '
+        'bridge will be used when available: $error\n$stackTrace',
         level: LogLevel.error,
       );
     }
@@ -499,7 +505,7 @@ Future<String> prepareMihonBridge(Ref ref, Source? source) async {
     await server.startServer();
   }
   final baseUrl = server.baseUrl;
-  if (isDesktop &&
+  if ((isDesktop || Platform.isIOS) &&
       source?.sourceCodeLanguage == SourceCodeLanguage.mihon &&
       baseUrl == MExtensionServerPlatform._unavailableBaseUrl) {
     throw const MihonBridgeUnavailableException();

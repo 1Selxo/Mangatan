@@ -2,6 +2,7 @@
 
 #include <jni.h>
 
+#include <cstdio>
 #include <cstdint>
 #include <dlfcn.h>
 #include <os/lock.h>
@@ -99,6 +100,15 @@ class JavaVMLockGuard {
   JavaVMLockGuard(const JavaVMLockGuard &) = delete;
   JavaVMLockGuard &operator=(const JavaVMLockGuard &) = delete;
 };
+
+void TraceEmbeddedMihon(NSString *message) {
+  const char *utf8 = message.UTF8String;
+  fprintf(
+      stderr,
+      "Mangatan EmbeddedMihon: %s\n",
+      utf8 == nullptr ? "(null)" : utf8);
+  fflush(stderr);
+}
 
 MangatanEmbeddedMihonThread *EmbeddedMihonThread() {
   static MangatanEmbeddedMihonThread *thread;
@@ -295,8 +305,13 @@ NSString *CreateApplicationDirectory(NSError **error) {
 }
 
 bool CacheBridgeEntryPoints(JNIEnv *env, NSError **error) {
+  TraceEmbeddedMihon(@"looking up mextensionserver/EmbeddedBridge");
   jclass localClass = env->FindClass(kEmbeddedBridgeClassName);
   if (localClass == nullptr) {
+    TraceEmbeddedMihon(
+        [NSString stringWithFormat:
+            @"EmbeddedBridge lookup failed (exception=%@)",
+            env->ExceptionCheck() ? @"yes" : @"no"]);
     if (error != nullptr) {
       *error = EmbeddedMihonError(
           3,
@@ -305,6 +320,7 @@ bool CacheBridgeEntryPoints(JNIEnv *env, NSError **error) {
     }
     return false;
   }
+  TraceEmbeddedMihon(@"EmbeddedBridge class lookup succeeded");
 
   gEmbeddedBridgeClass =
       static_cast<jclass>(env->NewGlobalRef(localClass));
@@ -316,6 +332,7 @@ bool CacheBridgeEntryPoints(JNIEnv *env, NSError **error) {
     }
     return false;
   }
+  TraceEmbeddedMihon(@"EmbeddedBridge global reference retained");
 
   gStartMethod = env->GetStaticMethodID(
       gEmbeddedBridgeClass, "start", "(ILjava/lang/String;)I");
@@ -335,6 +352,7 @@ bool CacheBridgeEntryPoints(JNIEnv *env, NSError **error) {
     }
     return false;
   }
+  TraceEmbeddedMihon(@"EmbeddedBridge JNI entry points cached");
   return true;
 }
 
@@ -433,12 +451,19 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
   arguments.options = options.data();
   arguments.ignoreUnrecognized = JNI_FALSE;
 
+  TraceEmbeddedMihon(@"calling JNI_CreateJavaVM");
   gLoadFunctions();
   // HotSpot must own SIGSEGV/SIGBUS while the VM is running. OpenJDK Zero
   // uses those signals internally on iOS, so an app-level handler here would
   // turn a recoverable VM signal into an app termination.
   jint result = gCreateJavaVM(
       &gJavaVM, reinterpret_cast<void **>(environment), &arguments);
+  TraceEmbeddedMihon(
+      [NSString stringWithFormat:
+          @"JNI_CreateJavaVM returned %d (vm=%@, env=%@)",
+          result,
+          gJavaVM == nullptr ? @"null" : @"set",
+          *environment == nullptr ? @"null" : @"set"]);
   if (result != JNI_OK || gJavaVM == nullptr || *environment == nullptr) {
     gJavaVM = nullptr;
     if (error != nullptr) {
@@ -450,9 +475,12 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
     }
     return false;
   }
+  TraceEmbeddedMihon(@"JNI_CreateJavaVM succeeded");
   if (!CacheBridgeEntryPoints(*environment, error)) {
+    TraceEmbeddedMihon(@"EmbeddedBridge JNI cache failed");
     return false;
   }
+  TraceEmbeddedMihon(@"embedded Java runtime initialization completed");
   return true;
 }
 
@@ -475,13 +503,21 @@ void MangatanEmbeddedMihonStart(
       NSError *error = nil;
       JNIEnv *environment = nullptr;
       int32_t startedPort = 0;
+      TraceEmbeddedMihon(
+          [NSString stringWithFormat:@"start requested on port %d", port]);
       if (CreateJavaVMIfNeeded(&environment, &error)) {
         NSString *applicationDirectory = CreateApplicationDirectory(&error);
         if (applicationDirectory != nil) {
           jstring appDirectory =
               environment->NewStringUTF(applicationDirectory.UTF8String);
+          TraceEmbeddedMihon(@"calling EmbeddedBridge.start");
           jint result = environment->CallStaticIntMethod(
               gEmbeddedBridgeClass, gStartMethod, port, appDirectory);
+          TraceEmbeddedMihon(
+              [NSString stringWithFormat:
+                  @"EmbeddedBridge.start returned %d (exception=%@)",
+                  result,
+                  environment->ExceptionCheck() ? @"yes" : @"no"]);
           if (environment->ExceptionCheck()) {
             error = EmbeddedMihonError(
                 8,
@@ -498,6 +534,15 @@ void MangatanEmbeddedMihonStart(
           }
         }
         DetachCurrentWorker();
+      }
+      if (error != nil) {
+        TraceEmbeddedMihon(
+            [NSString stringWithFormat:@"start failed: %@",
+                                       error.localizedDescription]);
+      } else {
+        TraceEmbeddedMihon(
+            [NSString stringWithFormat:@"start completed on port %d",
+                                       startedPort]);
       }
       dispatch_async(dispatch_get_main_queue(), ^{
         completion(startedPort, error);

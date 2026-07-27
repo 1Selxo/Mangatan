@@ -1242,20 +1242,31 @@ class SortLibraryManga {
 
 @embedded
 class SortChapter {
+  static const sourceTitleDisplay = 0;
+  static const chapterNumberDisplay = 1;
+
   int? mangaId;
   bool? reverse;
   int? index;
-  SortChapter({this.mangaId, this.reverse = false, this.index = 1});
+  int? displayMode;
+  SortChapter({
+    this.mangaId,
+    this.reverse = false,
+    this.index = 1,
+    this.displayMode = sourceTitleDisplay,
+  });
   SortChapter.fromJson(Map<String, dynamic> json) {
     index = json['index'];
     mangaId = json['mangaId'];
     reverse = json['reverse'];
+    displayMode = json['displayMode'] ?? sourceTitleDisplay;
   }
 
   Map<String, dynamic> toJson() => {
     'index': index,
     'mangaId': mangaId,
     'reverse': reverse,
+    'displayMode': displayMode,
   };
 }
 

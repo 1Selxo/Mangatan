@@ -105,15 +105,15 @@ void main() {
     for (final option in [
       '-XX:+UseSerialGC',
       '-Xms64m',
-      '-Xmx256m',
+      '-Xmx384m',
       '-XX:NewSize=32m',
-      '-XX:MaxNewSize=128m',
+      '-XX:MaxNewSize=192m',
     ]) {
       expect(
         nativeSource,
         contains('"$option",'),
         reason:
-            'the embedded VM needs balanced deterministic bootstrap generations',
+            'the embedded VM needs a deterministic pre-sized bootstrap nursery',
       );
     }
     expect(

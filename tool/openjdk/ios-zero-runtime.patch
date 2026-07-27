@@ -10,7 +10,10 @@ index 3c1626a9f51..7f766067885 100644
  #include "oops/klass.inline.hpp"
  #include "oops/methodData.hpp"
  #include "oops/method.hpp"
-@@ -224,7 +225,40 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
+@@ -37,1 +38,2 @@
++#include "oops/method.inline.hpp"
+ #include "oops/oop.inline.hpp"
+@@ -224,7 +226,40 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
        stack->set_sp(istate->stack() + 1);
  
        // Make the call

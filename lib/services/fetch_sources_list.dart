@@ -513,8 +513,8 @@ int compareVersions(String version1, String version2) {
       : v2Parts.length;
 
   for (var i = 0; i < minLength; i++) {
-    final v1Value = int.parse(v1Parts[i].padRight(2, '0'));
-    final v2Value = int.parse(v2Parts[i].padRight(2, '0'));
+    final v1Value = _parseVersionPart(v1Parts[i]);
+    final v2Value = _parseVersionPart(v2Parts[i]);
 
     final comparison = v1Value.compareTo(v2Value);
     if (comparison != 0) return comparison;
@@ -522,6 +522,8 @@ int compareVersions(String version1, String version2) {
 
   return v1Parts.length.compareTo(v2Parts.length);
 }
+
+int _parseVersionPart(String part) => part.isEmpty ? 0 : int.parse(part);
 
 Future<Map<String, String>> fetchHeadersDalvik(
   InterceptedClient client,

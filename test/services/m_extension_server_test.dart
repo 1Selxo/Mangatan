@@ -105,15 +105,14 @@ void main() {
     for (final option in [
       '-XX:+UseSerialGC',
       '-Xms64m',
-      '-Xmx384m',
+      '-Xmx256m',
       '-XX:NewSize=32m',
-      '-XX:MaxNewSize=192m',
+      '-XX:MaxNewSize=128m',
     ]) {
       expect(
         nativeSource,
         contains('"$option",'),
-        reason:
-            'the embedded VM needs a deterministic pre-sized bootstrap nursery',
+        reason: 'the embedded VM needs deterministic balanced generations',
       );
     }
     expect(
@@ -171,6 +170,22 @@ void main() {
       zeroRuntimePatch,
       contains('holder->link_class(THREAD);'),
       reason: 'extension and post-bootstrap classes must retain full linkage',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('vmClasses::Class_klass()->link_class(CHECK);'),
+      reason:
+          'Zero must link java.lang.Class before String runs the first bytecode',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Rewriter: class=java.lang.Class'),
+      reason: 'the Class constant-pool sizing fallback must remain observable',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Serial bootstrap allocation exhausted:'),
+      reason: 'pre-initialization allocation failures need generation evidence',
     );
     expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
     expect(

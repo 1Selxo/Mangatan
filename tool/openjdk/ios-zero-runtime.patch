@@ -2,9 +2,12 @@ diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp b/src/hotspot/cpu/zer
 index 3c1626a9f51..7f766067885 100644
 --- a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
 +++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
-@@ -27,4 +27,5 @@
+@@ -27,4 +27,8 @@
  #include "asm/assembler.hpp"
++#include "classfile/javaAssertions.hpp"
++#include "classfile/javaClasses.inline.hpp"
 +#include "classfile/vmClasses.hpp"
++#include "classfile/vmSymbols.hpp"
  #include "interpreter/interpreter.hpp"
  #include "interpreter/interpreterRuntime.hpp"
  #include "interpreter/zero/bytecodeInterpreter.hpp"
@@ -27,65 +30,87 @@ index 3c1626a9f51..7f766067885 100644
  #include "runtime/jniHandles.inline.hpp"
  #include "runtime/timer.hpp"
  #include "runtime/timerTrace.hpp"
-@@ -224,7 +227,59 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
+@@ -224,7 +231,80 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
        stack->set_sp(istate->stack() + 1);
  
        // Make the call
 -      Interpreter::invoke_method(callee, istate->callee_entry_point(), THREAD);
 +      address entry = istate->callee_entry_point();
++      bool result_ready = false;
 +      if (entry == nullptr) {
 +        // A class reached through the dynamically loaded iOS runtime can be
 +        // callable before linkage has installed its constant-pool cache and
 +        // Method entry points. Synthesizing only an interpreter entry creates
 +        // an invalid frame with a null cache.
 +        InstanceKlass* holder = callee->method_holder();
-+        tty->print("Zero: preparing method holder for ");
-+        callee->print_short_name(tty);
-+        tty->cr();
-+        thread->set_last_Java_frame();
-+        {
-+          ThreadInVMfromJava transition(thread);
-+          if (!is_init_completed() &&
-+              holder == vmClasses::Class_klass()) {
-+            // java.lang.Class can invoke desiredAssertionStatus during
-+            // primordial bootstrap while it is still unlinked. Full late
-+            // linkage expands more bootstrap work until HotSpot requests a
-+            // GC, which is forbidden before VM initialization completes.
-+            // Install exactly the missing cache and Method entries here;
-+            // normal later link_class completes its tables and linked state.
-+            if (!holder->is_rewritten()) {
-+              holder->rewrite_class(THREAD);
-+            }
-+            if (!HAS_PENDING_EXCEPTION) {
-+              // link_methods is explicitly safe to run again when normal
-+              // class linkage resumes.
-+              holder->link_methods(THREAD);
-+            }
-+          } else {
++        if (!is_init_completed() &&
++            holder == vmClasses::Class_klass() &&
++            callee->name()->equals("desiredAssertionStatus") &&
++            callee->signature() == vmSymbols::void_boolean_signature()) {
++          // MemberName asks for its assertion status while java.lang.Class is
++          // intentionally still unlinked. Resolve that exact bootstrap query
++          // through the VM's native assertion table; forcing partial or early
++          // Class linkage violates InstanceKlass's verify/rewrite lifecycle.
++          guarantee(callee->size_of_parameters() == 1,
++                    "desiredAssertionStatus must only receive its mirror");
++          oop mirror = cast_to_oop(stack->sp()[0]);
++          guarantee(mirror != nullptr && java_lang_Class::is_instance(mirror),
++                    "desiredAssertionStatus receiver must be a class mirror");
++          Klass* asserted_klass = java_lang_Class::as_Klass(mirror);
++          bool enabled = false;
++          bool native_equivalent = asserted_klass == nullptr ||
++                                   !asserted_klass->is_instance_klass();
++          if (asserted_klass != nullptr &&
++              asserted_klass->is_instance_klass() &&
++              asserted_klass->class_loader() == nullptr) {
++            ResourceMark rm(thread);
++            enabled = JavaAssertions::enabled(
++                asserted_klass->name()->as_C_string(), true);
++            native_equivalent = true;
++          }
++          if (native_equivalent) {
++            stack->set_sp(stack->sp() + callee->size_of_parameters());
++            stack->push(enabled ? 1 : 0);
++            result_ready = true;
++            tty->print_cr(
++                "Mangatan Zero: served primordial desiredAssertionStatus=%s",
++                enabled ? "true" : "false");
++          }
++        }
++        if (!result_ready) {
++          tty->print("Zero: preparing method holder for ");
++          callee->print_short_name(tty);
++          tty->cr();
++          thread->set_last_Java_frame();
++          {
++            ThreadInVMfromJava transition(thread);
 +            // Extension and post-bootstrap classes retain full verification,
 +            // rewriting, method, vtable, and itable linkage.
 +            holder->link_class(THREAD);
 +          }
-+        }
-+        thread->reset_last_Java_frame();
++          thread->reset_last_Java_frame();
 +
-+        if (HAS_PENDING_EXCEPTION) {
-+          // Resume the caller so the bytecode interpreter can dispatch the
-+          // linkage exception at the original invoke instruction.
-+          stack->set_sp(istate->stack_limit() + 1);
-+          istate->set_msg(BytecodeInterpreter::method_resume);
-+          continue;
-+        }
++          if (HAS_PENDING_EXCEPTION) {
++            // Resume the caller so the bytecode interpreter can dispatch the
++            // linkage exception at the original invoke instruction.
++            stack->set_sp(istate->stack_limit() + 1);
++            istate->set_msg(BytecodeInterpreter::method_resume);
++            continue;
++          }
 +
-+        entry = callee->from_interpreted_entry();
-+        guarantee(entry != nullptr,
-+                  "prepared Zero interpreter entry must be non-null");
-+        guarantee(callee->constants()->cache() != nullptr,
-+                  "prepared Zero method constant-pool cache must be non-null");
-+        istate->set_callee_entry_point(entry);
++          entry = callee->from_interpreted_entry();
++          guarantee(entry != nullptr,
++                    "prepared Zero interpreter entry must be non-null");
++          guarantee(callee->constants()->cache() != nullptr,
++                    "prepared Zero method constant-pool cache must be non-null");
++          istate->set_callee_entry_point(entry);
++        }
 +      }
-+      Interpreter::invoke_method(callee, entry, THREAD);
-       fixup_after_potential_safepoint();
++      if (!result_ready) {
++        Interpreter::invoke_method(callee, entry, THREAD);
++        fixup_after_potential_safepoint();
++      }
+-      fixup_after_potential_safepoint();
  
        // Convert the result
 diff --git a/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp b/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp
@@ -232,20 +257,3 @@ index 640b2f24..db281717 100644
      objArrayOop stom = oopFactory::new_objArray(vmClasses::Object_klass(), map_length, CHECK);
      HandleMark hm(THREAD);
      Handle refs_handle (THREAD, stom);  // must handleize.
-diff --git a/src/hotspot/share/runtime/threads.cpp b/src/hotspot/share/runtime/threads.cpp
-index f7f755a3..a29c147e 100644
---- a/src/hotspot/share/runtime/threads.cpp
-+++ b/src/hotspot/share/runtime/threads.cpp
-@@ -348,3 +348,12 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
-+#ifdef ZERO
-+  // Zero installs Method interpreter entries during class linkage. String
-+  // initialization can enter java.lang.invoke.MemberName before the normal
-+  // java.lang.Class initialization step below, so Class must already be linked
-+  // before the first Java bytecode runs.
-+  tty->print_cr("Mangatan Zero: early-linking java.lang.Class");
-+  vmClasses::Class_klass()->link_class(CHECK);
-+#endif
-+
-   // This is before the execution of the very first Java bytecode.
-   if (CDSConfig::is_using_aot_linked_classes()) {
-     AOTLinkedClassBulkLoader::link_classes(THREAD);

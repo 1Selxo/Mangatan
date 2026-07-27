@@ -174,3 +174,78 @@ index 74071932654..26d0496887b 100644
  }
  
  bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
+diff --git a/src/hotspot/share/gc/serial/serialHeap.cpp b/src/hotspot/share/gc/serial/serialHeap.cpp
+index 8eafdfdc..edc414e9 100644
+--- a/src/hotspot/share/gc/serial/serialHeap.cpp
++++ b/src/hotspot/share/gc/serial/serialHeap.cpp
+@@ -345,3 +345,17 @@ HeapWord* SerialHeap::mem_allocate_work(size_t size, bool is_tlab) {
++    if (!is_init_completed()) {
++      tty->print_cr(
++          "Mangatan Serial bootstrap allocation exhausted: "
++          "words=%zu tlab=%s young_used=%zu young_capacity=%zu "
++          "young_max=%zu old_used=%zu old_capacity=%zu old_max=%zu",
++          size,
++          is_tlab ? "true" : "false",
++          _young_gen->used(),
++          _young_gen->capacity(),
++          _young_gen->max_capacity(),
++          _old_gen->used(),
++          _old_gen->capacity(),
++          _old_gen->max_capacity());
++    }
+     VM_SerialCollectForAllocation op(size, is_tlab, gc_count_before);
+     VMThread::execute(&op);
+     if (op.gc_succeeded()) {
+diff --git a/src/hotspot/share/interpreter/rewriter.cpp b/src/hotspot/share/interpreter/rewriter.cpp
+index a9ee92cb..5080136f 100644
+--- a/src/hotspot/share/interpreter/rewriter.cpp
++++ b/src/hotspot/share/interpreter/rewriter.cpp
+@@ -120,5 +120,13 @@ void Rewriter::make_constant_pool_cache(TRAPS) {
+   // _resolved_references is stored in pool->cache(), so need to be done after
+   // the above lines.
++  if (_klass == vmClasses::Class_klass()) {
++    tty->print_cr(
++        "Mangatan Rewriter: class=java.lang.Class cp=%d "
++        "resolved=%d constant_pool_map=%d",
++        _pool->length(),
++        _resolved_references_map.length(),
++        _resolved_reference_limit);
++  }
+   _pool->initialize_resolved_references(loader_data, _resolved_references_map,
+                                         _resolved_reference_limit,
+                                         THREAD);
+diff --git a/src/hotspot/share/oops/constantPool.cpp b/src/hotspot/share/oops/constantPool.cpp
+index 640b2f24..db281717 100644
+--- a/src/hotspot/share/oops/constantPool.cpp
++++ b/src/hotspot/share/oops/constantPool.cpp
+@@ -221,5 +221,13 @@ void ConstantPool::initialize_resolved_references(ClassLoaderData* loader_data,
+     // Create Java array for holding resolved strings, methodHandles,
+     // methodTypes, invokedynamic and invokehandle appendix objects, etc.
++    if (pool_holder() == vmClasses::Class_klass()) {
++      tty->print_cr(
++          "Mangatan ConstantPool: class=java.lang.Class cp=%d "
++          "requested_resolved_array=%d constant_pool_map=%d",
++          length(),
++          map_length,
++          constant_pool_map_length);
++    }
+     objArrayOop stom = oopFactory::new_objArray(vmClasses::Object_klass(), map_length, CHECK);
+     HandleMark hm(THREAD);
+     Handle refs_handle (THREAD, stom);  // must handleize.
+diff --git a/src/hotspot/share/runtime/threads.cpp b/src/hotspot/share/runtime/threads.cpp
+index f7f755a3..a29c147e 100644
+--- a/src/hotspot/share/runtime/threads.cpp
++++ b/src/hotspot/share/runtime/threads.cpp
+@@ -348,3 +348,12 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
++#ifdef ZERO
++  // Zero installs Method interpreter entries during class linkage. String
++  // initialization can enter java.lang.invoke.MemberName before the normal
++  // java.lang.Class initialization step below, so Class must already be linked
++  // before the first Java bytecode runs.
++  tty->print_cr("Mangatan Zero: early-linking java.lang.Class");
++  vmClasses::Class_klass()->link_class(CHECK);
++#endif
++
+   // This is before the execution of the very first Java bytecode.
+   if (CDSConfig::is_using_aot_linked_classes()) {
+     AOTLinkedClassBulkLoader::link_classes(THREAD);

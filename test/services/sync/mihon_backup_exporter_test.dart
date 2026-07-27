@@ -609,6 +609,68 @@ void main() {
     expect(backup.backupManga.single.chapters.single.chapterNumber, 32);
   });
 
+  test('collapses unknown-number aliases while preserving progress', () {
+    final source = Source(
+      id: 104,
+      name: 'Manga source',
+      lang: 'en',
+      isAdded: true,
+      sourceCode: 'apk',
+      additionalParams: encodeMihonSourceMetadata(
+        sourceId: 97531,
+        packageName: 'pkg.sentinel',
+      ),
+    )..sourceCodeLanguage = SourceCodeLanguage.mihon;
+    final manga = Manga(
+      id: 50,
+      source: source.name,
+      sourceId: source.id,
+      author: null,
+      artist: null,
+      genre: const [],
+      imageUrl: null,
+      lang: 'en',
+      link: '/sentinel-title',
+      name: 'Sentinel title',
+      status: Status.ongoing,
+      description: null,
+      favorite: true,
+    );
+    final original = Chapter(
+      id: 51,
+      mangaId: manga.id,
+      name: 'Chapter 54',
+      url: '/chapter-54',
+      chapterNumber: 54,
+      lastPageRead: '4',
+      updatedAt: 100000,
+    );
+    final duplicate = Chapter(
+      id: 52,
+      mangaId: manga.id,
+      name: 'Chapter 54',
+      url: '/chapter-54',
+      chapterNumber: -1,
+      lastPageRead: '5',
+      isBookmarked: true,
+      updatedAt: 101000,
+    );
+
+    final backup = const MihonBackupExporter().export(
+      mangas: [manga],
+      categories: const [],
+      chapters: [original, duplicate],
+      histories: const [],
+      sources: [source],
+      epubBookProgress: const [],
+    );
+
+    final chapter = backup.backupManga.single.chapters.single;
+    expect(chapter.chapterNumber, 54);
+    expect(chapter.lastPageRead, Int64(5));
+    expect(chapter.bookmark, isTrue);
+  });
+
   test(
     'exports favorite tombstones from their deletion clock, not stale metadata',
     () {

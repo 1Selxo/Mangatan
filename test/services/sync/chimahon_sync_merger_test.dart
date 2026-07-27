@@ -252,6 +252,68 @@ void main() {
     expect(merged.backupManga.single.chapters, hasLength(3));
   });
 
+  test('repairs negative unknown-number aliases without losing progress', () {
+    final merged = merger.merge(
+      local: BackupMihon(
+        backupManga: [
+          BackupManga(
+            source: Int64(1),
+            url: '/same',
+            title: 'Same',
+            author: 'Author',
+            version: Int64.ZERO,
+            chapters: [
+              BackupChapter(
+                url: '/chapter-54',
+                name: 'Chapter 54',
+                chapterNumber: -1,
+                lastPageRead: Int64(5),
+                bookmark: true,
+                lastModifiedAt: Int64(200),
+                version: Int64.ZERO,
+              ),
+            ],
+          ),
+        ],
+      ),
+      remote: BackupMihon(
+        backupManga: [
+          BackupManga(
+            source: Int64(1),
+            url: '/same',
+            title: 'Same',
+            author: 'Author',
+            version: Int64(3),
+            chapters: [
+              BackupChapter(
+                url: '/chapter-54',
+                name: 'Chapter 54',
+                chapterNumber: 54,
+                lastPageRead: Int64(4),
+                lastModifiedAt: Int64(100),
+                version: Int64(7),
+              ),
+              BackupChapter(
+                url: '/chapter-54',
+                name: 'Chapter 54',
+                chapterNumber: -1,
+                lastPageRead: Int64(3),
+                read: true,
+                lastModifiedAt: Int64(90),
+                version: Int64(6),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final chapter = merged.backupManga.single.chapters.single;
+    expect(chapter.chapterNumber, 54);
+    expect(chapter.lastPageRead, Int64(5));
+    expect(chapter.bookmark, isTrue);
+  });
+
   test('metadata refresh cannot clear custom title field 800', () {
     final merged = merger.merge(
       local: BackupMihon(

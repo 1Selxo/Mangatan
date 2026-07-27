@@ -1,3 +1,20 @@
+/// Mihon uses negative values for "number unknown". Mangatan keeps `-2` as a
+/// meaningful source value for compatibility, but all other negative and
+/// non-finite values must fall back to name recognition.
+double? normalizeSourceChapterNumber(double? number) {
+  if (number == null || !number.isFinite) return null;
+  return number == -2 || number >= 0 ? number : null;
+}
+
+/// Matches the legacy Mihon backup projection: use the final numeric token in
+/// a chapter or episode name when the source did not provide a known number.
+double fallbackChapterNumberFromName(String? name) {
+  final matches = RegExp(r'\d+(?:\.\d+)?').allMatches(name ?? '').toList();
+  return matches.isEmpty
+      ? 0
+      : double.tryParse(matches.last.group(0) ?? '') ?? 0;
+}
+
 class ChapterRecognition {
   static final _unwanted = RegExp(
     r"\b(?:v|ver|vol|version|volume|season|staffel|saison|temporada|s)[^a-z]?[0-9]+",
@@ -57,7 +74,7 @@ class ChapterRecognition {
   }
 
   double? _knownSourceNumber(double? number) {
-    return number == -2 || (number ?? -1) >= 0 ? number : null;
+    return normalizeSourceChapterNumber(number);
   }
 
   int _parse(

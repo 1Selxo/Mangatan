@@ -9,6 +9,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupHi
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_media_child_projection_proof.dart';
 import 'package:mangayomi/services/sync/chimahon_media_parent_projection_proof.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
@@ -118,7 +119,7 @@ class ChimahonMediaSafetyAudit {
       final parentKey = mangaIdentity(manga);
       duplicateChapters.addAll(
         _duplicateSurplus(
-          manga.chapters.map(chapterIdentity),
+          manga.chapters.map(_rawChapterIdentity),
         ).map((key) => _join([parentKey, key])),
       );
       duplicateMangaHistory.addAll(
@@ -147,7 +148,7 @@ class ChimahonMediaSafetyAudit {
       final parentKey = animeIdentity(anime);
       duplicateEpisodes.addAll(
         _duplicateSurplus(
-          anime.episodes.map(episodeIdentity),
+          anime.episodes.map(_rawEpisodeIdentity),
         ).map((key) => _join([parentKey, key])),
       );
       duplicateAnimeHistory.addAll(
@@ -354,8 +355,8 @@ class ChimahonMediaSafetyAudit {
     required Iterable<BackupChapter> local,
     required Iterable<BackupChapter> remote,
   }) {
-    final localList = local.toList(growable: false);
-    final remoteList = remote.toList(growable: false);
+    final localList = canonicalizeChimahonChapters(local);
+    final remoteList = canonicalizeChimahonChapters(remote);
     final remoteKeys = remoteList.map(chapterIdentity).toSet();
     final localByUrl = _groupByKey(localList, (chapter) => chapter.url);
     final remoteByUrl = _groupByKey(remoteList, (chapter) => chapter.url);
@@ -386,8 +387,8 @@ class ChimahonMediaSafetyAudit {
     required Iterable<BackupEpisode> local,
     required Iterable<BackupEpisode> remote,
   }) {
-    final localList = local.toList(growable: false);
-    final remoteList = remote.toList(growable: false);
+    final localList = canonicalizeChimahonEpisodes(local);
+    final remoteList = canonicalizeChimahonEpisodes(remote);
     final remoteKeys = remoteList.map(episodeIdentity).toSet();
     final localByUrl = _groupByKey(localList, (episode) => episode.url);
     final remoteByUrl = _groupByKey(remoteList, (episode) => episode.url);
@@ -883,11 +884,11 @@ class ChimahonMediaSafetyAudit {
     required List<String> valuesChanged,
     required List<String> unknownFieldsChanged,
   }) {
-    final baselineList = baseline.toList(growable: false);
+    final baselineList = canonicalizeChimahonChapters(baseline);
     final baselineByUrl = _groupByKey(baselineList, (chapter) => chapter.url);
-    final proposedList = proposed.toList(growable: false);
+    final proposedList = canonicalizeChimahonChapters(proposed);
     final proposedByKey = _lastByKey(proposedList, chapterIdentity);
-    final competingList = competing.toList(growable: false);
+    final competingList = canonicalizeChimahonChapters(competing);
     final competingByKey = _groupByKey(competingList, chapterIdentity);
     final competingByUrl = _groupByKey(competingList, (chapter) => chapter.url);
     for (final chapter in baselineList) {
@@ -949,11 +950,11 @@ class ChimahonMediaSafetyAudit {
     required List<String> valuesChanged,
     required List<String> unknownFieldsChanged,
   }) {
-    final baselineList = baseline.toList(growable: false);
+    final baselineList = canonicalizeChimahonEpisodes(baseline);
     final baselineByUrl = _groupByKey(baselineList, (episode) => episode.url);
-    final proposedList = proposed.toList(growable: false);
+    final proposedList = canonicalizeChimahonEpisodes(proposed);
     final proposedByKey = _lastByKey(proposedList, episodeIdentity);
-    final competingList = competing.toList(growable: false);
+    final competingList = canonicalizeChimahonEpisodes(competing);
     final competingByKey = _groupByKey(competingList, episodeIdentity);
     final competingByUrl = _groupByKey(competingList, (episode) => episode.url);
     for (final episode in baselineList) {
@@ -2846,10 +2847,28 @@ class ChimahonMediaSafetyAudit {
     anime.url,
   ]);
 
-  static String chapterIdentity(BackupChapter chapter) =>
+  static String chapterIdentity(BackupChapter chapter) => _join([
+    chapter.url,
+    chapter.name,
+    chimahonCanonicalChildNumber(
+      name: chapter.name,
+      sourceNumber: chapter.chapterNumber,
+    ).toString(),
+  ]);
+
+  static String episodeIdentity(BackupEpisode episode) => _join([
+    episode.url,
+    episode.name,
+    chimahonCanonicalChildNumber(
+      name: episode.name,
+      sourceNumber: episode.episodeNumber,
+    ).toString(),
+  ]);
+
+  static String _rawChapterIdentity(BackupChapter chapter) =>
       _join([chapter.url, chapter.name, chapter.chapterNumber.toString()]);
 
-  static String episodeIdentity(BackupEpisode episode) =>
+  static String _rawEpisodeIdentity(BackupEpisode episode) =>
       _join([episode.url, episode.name, episode.episodeNumber.toString()]);
 
   static String _normalized(String value) => value.trim().toLowerCase();

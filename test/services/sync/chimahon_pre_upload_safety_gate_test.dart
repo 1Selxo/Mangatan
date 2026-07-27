@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
@@ -314,6 +315,63 @@ void main() {
     expect(storage.uploadCount, 1);
     expect(storage.expectedAbsent, isTrue);
   });
+
+  test(
+    'opaque sources and negative-number chapter aliases pass the full gate',
+    () async {
+      final remote = backup(title: 'Series', url: '/series')
+        ..backupSources.clear();
+      remote.backupManga.single.chapters.addAll([
+        BackupChapter(
+          url: '/chapter-54',
+          name: 'Chapter 54',
+          chapterNumber: 54,
+          lastPageRead: Int64(4),
+          lastModifiedAt: Int64(100),
+          version: Int64(4),
+        ),
+        BackupChapter(
+          url: '/chapter-54',
+          name: 'Chapter 54',
+          chapterNumber: -1,
+          lastPageRead: Int64(5),
+          bookmark: true,
+          lastModifiedAt: Int64(200),
+          version: Int64(5),
+        ),
+      ]);
+      final local = backup(title: 'Series', url: '/series')
+        ..backupSources.clear();
+      local.backupManga.single.chapters.add(
+        BackupChapter(
+          url: '/chapter-54',
+          name: 'Chapter 54',
+          chapterNumber: 54,
+          lastPageRead: Int64(5),
+          bookmark: true,
+          lastModifiedAt: Int64(200),
+        ),
+      );
+      final storage = _GateStorage(
+        RemoteSyncSnapshot(
+          bytes: codec.encode(remote),
+          revision: 'legacy-alias-revision',
+          isCompleteRecovery: true,
+        ),
+      );
+
+      await CrossDeviceSyncEngine(
+        storage: storage,
+        exportLocal: () async => local,
+        importMerged: (_) async {},
+        preUpload: ChimahonPreUploadSafetyGate(
+          recoveryStore: _RecordingRecoveryStore(),
+        ).check,
+      ).uploadPreservingRemote();
+
+      expect(storage.uploadCount, 1);
+    },
+  );
 }
 
 class _PendingSidecar

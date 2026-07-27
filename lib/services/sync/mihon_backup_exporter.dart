@@ -17,8 +17,9 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMi
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
-import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_local_chapter_policy.dart';
+import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_category_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_stats_adapter.dart';
@@ -149,10 +150,11 @@ class MihonBackupExporter {
           status: _status(manga.status),
           thumbnailUrl: manga.imageUrl,
           dateAdded: Int64(manga.dateAdded ?? 0),
-          chapters: [
-            for (final indexed in mangaChapters.indexed)
-              _backupChapter(indexed.$2, indexed.$1),
-          ],
+          chapters: canonicalizeChimahonChapters(
+            mangaChapters.indexed.map(
+              (indexed) => _backupChapter(indexed.$2, indexed.$1),
+            ),
+          ),
           categories: (manga.categories ?? const [])
               .map((id) => categoryOrderById[id])
               .nonNulls
@@ -238,10 +240,11 @@ class MihonBackupExporter {
           status: _status(anime.status),
           thumbnailUrl: anime.imageUrl,
           dateAdded: Int64(anime.dateAdded ?? 0),
-          episodes: [
-            for (final indexed in animeEpisodes.indexed)
-              _backupEpisode(indexed.$2, indexed.$1),
-          ],
+          episodes: canonicalizeChimahonEpisodes(
+            animeEpisodes.indexed.map(
+              (indexed) => _backupEpisode(indexed.$2, indexed.$1),
+            ),
+          ),
           categories: (anime.categories ?? const [])
               .map((id) => animeCategoryOrderById[id])
               .nonNulls
@@ -337,7 +340,10 @@ class MihonBackupExporter {
       lastPageRead: Int64(_wireProgress(chapter.lastPageRead)),
       dateFetch: Int64(0),
       dateUpload: Int64(int.tryParse(chapter.dateUpload ?? '') ?? 0),
-      chapterNumber: chapter.chapterNumber ?? _chapterNumber(chapter.name),
+      chapterNumber: chimahonCanonicalChildNumber(
+        name: chapter.name ?? '',
+        sourceNumber: chapter.chapterNumber,
+      ),
       sourceOrder: Int64(sourceOrder),
       lastModifiedAt: Int64(modified),
       version: Int64.ZERO,
@@ -355,7 +361,10 @@ class MihonBackupExporter {
       lastSecondSeen: Int64(_wireProgress(episode.lastPageRead)),
       dateFetch: Int64(0),
       dateUpload: Int64(int.tryParse(episode.dateUpload ?? '') ?? 0),
-      episodeNumber: episode.chapterNumber ?? _chapterNumber(episode.name),
+      episodeNumber: chimahonCanonicalChildNumber(
+        name: episode.name ?? '',
+        sourceNumber: episode.chapterNumber,
+      ),
       sourceOrder: Int64(sourceOrder),
       lastModifiedAt: Int64(modified),
       version: Int64.ZERO,
@@ -427,13 +436,6 @@ class MihonBackupExporter {
   int _wireProgress(String? progress) {
     final parsed = int.tryParse(progress ?? '');
     return parsed != null && parsed > 1 ? parsed : 0;
-  }
-
-  double _chapterNumber(String? name) {
-    final matches = RegExp(r'\d+(?:\.\d+)?').allMatches(name ?? '').toList();
-    return matches.isEmpty
-        ? 0
-        : double.tryParse(matches.last.group(0) ?? '') ?? 0;
   }
 
   /// Mangatan normally stores timestamps in milliseconds, while Chimahon's

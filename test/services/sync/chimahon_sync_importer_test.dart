@@ -1432,6 +1432,129 @@ void main() {
     );
     expect(database.mangas.getSync(chapterParent.id!), isNotNull);
   });
+
+  test('repairs local unknown-number aliases and moves chapter links', () {
+    late Manga manga;
+    late Chapter survivor;
+    late Chapter duplicate;
+    late History history;
+    late Update update;
+
+    database.writeTxnSync(() {
+      database.sources.putSync(_source());
+      manga = _manga(
+        name: 'Sentinel title',
+        sourceTitle: 'Sentinel title',
+        link: '/sentinel-title',
+        sourceId: 42,
+      );
+      database.mangas.putSync(manga);
+      survivor = Chapter(
+        id: 500,
+        mangaId: manga.id,
+        name: 'Chapter 54',
+        url: '/chapter-54',
+        chapterNumber: 54,
+        lastPageRead: '4',
+        updatedAt: 100000,
+      )..manga.value = manga;
+      duplicate = Chapter(
+        id: 501,
+        mangaId: manga.id,
+        name: 'Chapter 54',
+        url: '/chapter-54',
+        chapterNumber: -1,
+        lastPageRead: '5',
+        isBookmarked: true,
+        updatedAt: 101000,
+      )..manga.value = manga;
+      database.chapters.putAllSync([survivor, duplicate]);
+      survivor.manga.saveSync();
+      duplicate.manga.saveSync();
+
+      history = History(
+        mangaId: manga.id,
+        chapterId: duplicate.id,
+        itemType: ItemType.manga,
+        date: '101000',
+      )..chapter.value = duplicate;
+      database.historys.putSync(history);
+      history.chapter.saveSync();
+
+      final download = Download(
+        id: duplicate.id,
+        succeeded: 5,
+        failed: 0,
+        total: 5,
+        isDownload: true,
+        isStartDownload: false,
+      )..chapter.value = duplicate;
+      database.downloads.putSync(download);
+      download.chapter.saveSync();
+
+      update = Update(
+        mangaId: manga.id,
+        chapterName: duplicate.name,
+        date: '101000',
+      )..chapter.value = duplicate;
+      database.updates.putSync(update);
+      update.chapter.saveSync();
+    });
+
+    const ChimahonSyncImporter().apply(
+      database: database,
+      backup: BackupMihon(
+        backupSources: [
+          BackupSource(name: 'Remote source', sourceId: Int64(9001)),
+        ],
+        backupManga: [
+          BackupManga(
+            source: Int64(9001),
+            url: '/sentinel-title',
+            title: 'Sentinel title',
+            favorite: true,
+            chapters: [
+              BackupChapter(
+                url: '/chapter-54',
+                name: 'Chapter 54',
+                chapterNumber: 54,
+                lastPageRead: Int64(5),
+                bookmark: true,
+                lastModifiedAt: Int64(101),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final chapters = database.chapters
+        .filter()
+        .mangaIdEqualTo(manga.id)
+        .urlEqualTo('/chapter-54')
+        .findAllSync();
+    expect(chapters, hasLength(1));
+    expect(chapters.single.id, survivor.id);
+    expect(chapters.single.chapterNumber, 54);
+    expect(chapters.single.lastPageRead, '5');
+    expect(chapters.single.isBookmarked, isTrue);
+    expect(database.chapters.getSync(duplicate.id!), isNull);
+
+    final restoredHistory = database.historys.getSync(history.id!)!;
+    restoredHistory.chapter.loadSync();
+    expect(restoredHistory.chapterId, survivor.id);
+    expect(restoredHistory.chapter.value?.id, survivor.id);
+
+    final restoredDownload = database.downloads.getSync(survivor.id!)!;
+    restoredDownload.chapter.loadSync();
+    expect(restoredDownload.isDownload, isTrue);
+    expect(restoredDownload.chapter.value?.id, survivor.id);
+    expect(database.downloads.getSync(duplicate.id!), isNull);
+
+    final restoredUpdate = database.updates.getSync(update.id!)!;
+    restoredUpdate.chapter.loadSync();
+    expect(restoredUpdate.chapter.value?.id, survivor.id);
+  });
 }
 
 BackupMihon _exportProjection(Isar database) =>

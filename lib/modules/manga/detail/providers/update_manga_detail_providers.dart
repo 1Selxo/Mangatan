@@ -166,7 +166,7 @@ Future<dynamic> updateMangaDetail(
                 ? now.toString()
                 : chap.dateUpload.toString(),
             scanlator: chap.scanlator ?? '',
-            chapterNumber: chap.chapterNumber,
+            chapterNumber: normalizeSourceChapterNumber(chap.chapterNumber),
             mangaId: savedMangaId,
             updatedAt: now,
             isFiller: chap.isFiller,
@@ -188,7 +188,9 @@ Future<dynamic> updateMangaDetail(
           existing
             ..name = chap.name
             ..scanlator = chap.scanlator
-            ..chapterNumber = chap.chapterNumber ?? existing.chapterNumber
+            ..chapterNumber =
+                normalizeSourceChapterNumber(chap.chapterNumber) ??
+                normalizeSourceChapterNumber(existing.chapterNumber)
             ..updatedAt = now
             ..isFiller = chap.isFiller
             ..thumbnailUrl = chap.thumbnailUrl

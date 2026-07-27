@@ -203,6 +203,17 @@ void main() {
       contains('Mangatan Serial raw Zero frame chain:'),
       reason: 'Zero bootstrap failures need the complete interpreter chain',
     );
+    expect(
+      zeroRuntimePatch,
+      contains('return RTLD_DEFAULT;'),
+      reason:
+          'the iOS Zero runtime must resolve JNI symbols from its global framework',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('scope=RTLD_DEFAULT found=%s'),
+      reason: 'bootstrap native lookup must remain observable on physical iOS',
+    );
     expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
     expect(
       xcodeProject,

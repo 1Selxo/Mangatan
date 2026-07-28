@@ -139,6 +139,8 @@ jobs:
           framework_modules="$app_path/Frameworks/OpenJDKRuntime.framework/lib/lib/modules"
           test -f "$framework_modules"
           cmp "$app_path/lib/modules" "$framework_modules"
+          test -f \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/lib/conf/security/java.security"
           python3 tool/verify_macho_min_ios.py \
             --maximum 13.0 "$app_path/Runner" "$lazy_runtime"
           python3 tool/verify_macho_initializers.py \

@@ -12,10 +12,10 @@ trap 'find "$work_dir" -depth -delete' EXIT
 server_commit="1e909217e8ef06f10ca83ea5d92de5f2aafbfdf5"
 server_jar_url="https://github.com/ippo-michi/M-Extension-Server/releases/download/ios-runtime-v1/MExtensionServer-ios.jar"
 server_jar_sha256="799269277018ec4f2fc5195e80ce124b22224df23be9c6ae7096f6f8c9bc3f94"
-openjdk_framework_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v12/OpenJDK.xcframework.zip"
-openjdk_framework_sha256="0831f6b161205c33e1108151a224a1137fb7ed05b22c88c7256fbe6c39f47be3"
-openjdk_bundle_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v12/java_bundle-device.zip"
-openjdk_bundle_sha256="959253e524bc283c83ab103b01db1d28801ae789ae98e63b3596148342f78faf"
+openjdk_framework_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v13/OpenJDK.xcframework.zip"
+openjdk_framework_sha256="85dcf4ae32a9421f2f51df7154b67ad5c8b34a4888a7d854812c6603831f65f3"
+openjdk_bundle_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v13/java_bundle-device.zip"
+openjdk_bundle_sha256="282b1f012bc035a7eccab8af1c7ce697ae8fb7679247f48f674f08ee88dfcf37"
 
 if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/javac" ]]; then
   echo "JAVA_HOME must point to a JDK 21 or newer." >&2
@@ -107,6 +107,8 @@ mkdir -p "$(dirname "$framework_dir")"
 cp -R "$work_dir/framework/OpenJDK.xcframework" "$framework_dir"
 cp "$work_dir/java-bundle/java_bundle-device/lib/modules" \
   "$generated_dir/lib/modules"
+cp -R "$work_dir/java-bundle/java_bundle-device/conf" \
+  "$generated_dir/conf"
 cp "$work_dir/java-bundle/java_bundle-device/release" \
   "$generated_dir/release"
 cp "$JAVA_HOME/lib/security/cacerts" \
@@ -119,6 +121,7 @@ cp "$repo_dir/ios/EmbeddedMihon/THIRD_PARTY_NOTICES.md" \
 
 test -f "$framework_dir/Info.plist"
 test -f "$generated_dir/lib/modules"
+test -f "$generated_dir/conf/security/java.security"
 test -f "$generated_dir/MExtensionServer.jar"
 if [[ "$(uname -s)" == Darwin ]]; then
   "$repo_dir/tool/build_lazy_openjdk_ios.sh"

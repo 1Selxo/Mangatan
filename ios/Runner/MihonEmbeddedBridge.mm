@@ -280,6 +280,17 @@ bool VerifyRuntimeFiles(
     }
     return false;
   }
+  NSString *securityConfiguration =
+      [runtimeHome stringByAppendingPathComponent:@"conf/security/java.security"];
+  if (![fileManager fileExistsAtPath:securityConfiguration]) {
+    if (error != nullptr) {
+      *error = EmbeddedMihonError(
+          1,
+          @"The embedded Mihon runtime is incomplete: the framework-local "
+          @"OpenJDK security configuration is missing.");
+    }
+    return false;
+  }
   return true;
 }
 

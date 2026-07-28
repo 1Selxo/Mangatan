@@ -56,6 +56,9 @@ void main() {
     final runtimeBuilder = File(
       'tool/build_lazy_openjdk_ios.sh',
     ).readAsStringSync();
+    final openJdkWorkflow = File(
+      '.github/workflows/build-openjdk-ios13.yml',
+    ).readAsStringSync();
     final zeroRuntimePatch = File(
       'tool/openjdk/ios-zero-runtime.patch',
     ).readAsStringSync();
@@ -175,6 +178,23 @@ void main() {
     expect(
       runtimeBuilder,
       contains(r'cp "$runtime_modules" "$output_framework/lib/lib/modules"'),
+    );
+    expect(
+      runtimeBuilder,
+      contains(r'cp -R "$runtime_conf" "$output_framework/lib/conf"'),
+      reason: 'java.home must include the matching OpenJDK configuration',
+    );
+    expect(
+      openJdkWorkflow,
+      contains('cp -R host-jdk/conf java_bundle-device/conf'),
+      reason: 'the security configuration must match the OpenJDK source build',
+    );
+    expect(
+      nativeSource,
+      contains(
+        'stringByAppendingPathComponent:@"conf/security/java.security"',
+      ),
+      reason: 'missing security properties must fail before VM startup',
     );
     expect(
       zeroRuntimePatch,

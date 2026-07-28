@@ -159,3 +159,9 @@ fallback for extensions that genuinely require unsupported Android features.
 For HTTP and media regressions, compare request URL, headers, cookies,
 redirects, range behavior, and response content type with native Mihon before
 adding source-specific workarounds.
+
+The pinned OpenJDK runtime currently emits class-file major version 71
+(Java 27). Dex2jar hierarchy analysis must therefore resolve a coherent ASM
+toolchain that supports `Opcodes.V27`. Keep the server regression test and the
+preparation-time `javap` check when updating either OpenJDK or the extension
+server.

@@ -183,6 +183,15 @@ For HTTP and media regressions, compare request URL, headers, cookies,
 redirects, range behavior, and response content type with native Mihon before
 adding source-specific workarounds.
 
+Current Keiyoushi extensions validate Mihon's default OkHttp client at runtime.
+The server client must include `UncaughtExceptionInterceptor`,
+`UserAgentInterceptor`, and `CloudflareInterceptor`, but must not install
+`IgnoreGzipInterceptor` or `BrotliInterceptor` as network interceptors.
+Compression and request signing belong to each extension; do not inject a
+global MangaFire signer ahead of the extension's `VrfSigner`. Test server
+updates against the current released APK, not only a synthetic interceptor
+test.
+
 The pinned OpenJDK runtime currently emits class-file major version 71
 (Java 27). Dex2jar hierarchy analysis must therefore resolve a coherent ASM
 toolchain that supports `Opcodes.V27`. Keep the server regression test and the

@@ -24777,9 +24777,14 @@ const SortChapterSchema = Schema(
   name: r'SortChapter',
   id: -468129901904543096,
   properties: {
-    r'index': PropertySchema(id: 0, name: r'index', type: IsarType.long),
-    r'mangaId': PropertySchema(id: 1, name: r'mangaId', type: IsarType.long),
-    r'reverse': PropertySchema(id: 2, name: r'reverse', type: IsarType.bool),
+    r'displayMode': PropertySchema(
+      id: 0,
+      name: r'displayMode',
+      type: IsarType.long,
+    ),
+    r'index': PropertySchema(id: 1, name: r'index', type: IsarType.long),
+    r'mangaId': PropertySchema(id: 2, name: r'mangaId', type: IsarType.long),
+    r'reverse': PropertySchema(id: 3, name: r'reverse', type: IsarType.bool),
   },
 
   estimateSize: _sortChapterEstimateSize,
@@ -24803,9 +24808,10 @@ void _sortChapterSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.index);
-  writer.writeLong(offsets[1], object.mangaId);
-  writer.writeBool(offsets[2], object.reverse);
+  writer.writeLong(offsets[0], object.displayMode);
+  writer.writeLong(offsets[1], object.index);
+  writer.writeLong(offsets[2], object.mangaId);
+  writer.writeBool(offsets[3], object.reverse);
 }
 
 SortChapter _sortChapterDeserialize(
@@ -24815,9 +24821,10 @@ SortChapter _sortChapterDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = SortChapter(
-    index: reader.readLongOrNull(offsets[0]),
-    mangaId: reader.readLongOrNull(offsets[1]),
-    reverse: reader.readBoolOrNull(offsets[2]),
+    displayMode: reader.readLongOrNull(offsets[0]),
+    index: reader.readLongOrNull(offsets[1]),
+    mangaId: reader.readLongOrNull(offsets[2]),
+    reverse: reader.readBoolOrNull(offsets[3]),
   );
   return object;
 }
@@ -24834,6 +24841,8 @@ P _sortChapterDeserializeProp<P>(
     case 1:
       return (reader.readLongOrNull(offset)) as P;
     case 2:
+      return (reader.readLongOrNull(offset)) as P;
+    case 3:
       return (reader.readBoolOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -24842,6 +24851,79 @@ P _sortChapterDeserializeProp<P>(
 
 extension SortChapterQueryFilter
     on QueryBuilder<SortChapter, SortChapter, QFilterCondition> {
+  QueryBuilder<SortChapter, SortChapter, QAfterFilterCondition>
+  displayModeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'displayMode'),
+      );
+    });
+  }
+
+  QueryBuilder<SortChapter, SortChapter, QAfterFilterCondition>
+  displayModeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'displayMode'),
+      );
+    });
+  }
+
+  QueryBuilder<SortChapter, SortChapter, QAfterFilterCondition>
+  displayModeEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'displayMode', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SortChapter, SortChapter, QAfterFilterCondition>
+  displayModeGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'displayMode',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SortChapter, SortChapter, QAfterFilterCondition>
+  displayModeLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'displayMode',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SortChapter, SortChapter, QAfterFilterCondition>
+  displayModeBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'displayMode',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<SortChapter, SortChapter, QAfterFilterCondition> indexIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(

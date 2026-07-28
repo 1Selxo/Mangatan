@@ -91,6 +91,59 @@ void main() {
   BackupCategory category(String name, int order) =>
       BackupCategory(name: name, order: Int64(order));
 
+  test('allows canonical repair of negative chapter-number aliases', () {
+    final remote = BackupMihon(
+      backupManga: [
+        manga(
+          chapters: [
+            BackupChapter(
+              url: '/chapter-54',
+              name: 'Chapter 54',
+              chapterNumber: 54,
+              lastPageRead: Int64(4),
+              lastModifiedAt: Int64(100),
+              version: Int64(5),
+            ),
+            BackupChapter(
+              url: '/chapter-54',
+              name: 'Chapter 54',
+              chapterNumber: -1,
+              lastPageRead: Int64(5),
+              lastModifiedAt: Int64(101),
+              version: Int64(6),
+            ),
+          ],
+        ),
+      ],
+    );
+    final local = BackupMihon(
+      backupManga: [
+        manga(
+          version: 0,
+          modifiedAt: 101,
+          chapters: [
+            BackupChapter(
+              url: '/chapter-54',
+              name: 'Chapter 54',
+              chapterNumber: -1,
+              lastPageRead: Int64(5),
+              lastModifiedAt: Int64(101),
+              version: Int64.ZERO,
+            ),
+          ],
+        ),
+      ],
+    );
+    final proposed = const ChimahonSyncMerger().merge(
+      local: local,
+      remote: remote,
+    );
+
+    expect(proposed.backupManga.single.chapters, hasLength(1));
+    expect(proposed.backupManga.single.chapters.single.chapterNumber, 54);
+    expect(failures(remote: remote, local: local, proposed: proposed), isEmpty);
+  });
+
   group('clock-only child projection proof', () {
     final remoteChapter = BackupChapter(
       url: '/chapter',

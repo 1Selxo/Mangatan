@@ -56,6 +56,9 @@ void main() {
     final nativeSource = File(
       'ios/Runner/MihonEmbeddedBridge.mm',
     ).readAsStringSync();
+    final appDelegateSource = File(
+      'ios/Runner/AppDelegate.swift',
+    ).readAsStringSync();
     final runtimeBuilder = File(
       'tool/build_lazy_openjdk_ios.sh',
     ).readAsStringSync();
@@ -76,8 +79,38 @@ void main() {
       mainSource,
       contains(
         'if (!Platform.isIOS) {\n'
-        '        MExtensionServerPlatform(ref, persistent: true).startServer();',
+        '        _mExtensionServer.startServer();',
       ),
+    );
+    expect(
+      mainSource,
+      contains('unawaited(_mExtensionServer.suspendEmbeddedIosBridge());'),
+      reason: 'the listener must stop before iOS suspends the process',
+    );
+    expect(
+      mainSource,
+      contains('unawaited(_mExtensionServer.resumeEmbeddedIosBridge());'),
+      reason: 'the on-device bridge must return after device wake',
+    );
+    expect(
+      appDelegateSource,
+      contains('applicationWillResignActive'),
+      reason: 'native pause must begin before iOS suspends the Dart isolate',
+    );
+    expect(
+      serviceSource,
+      contains("invokeMethod<bool>('status')"),
+      reason: 'a stale native listener must be detected before restart',
+    );
+    expect(
+      serviceSource,
+      contains("invokeMethod<void>('pause')"),
+      reason: 'app suspension must preserve loaded extension instances',
+    );
+    expect(
+      nativeSource,
+      contains('gEmbeddedBridgeClass, "pause", "()V"'),
+      reason: 'the native bridge must expose listener-only suspension',
     );
     expect(
       nativeSource,
@@ -228,9 +261,7 @@ void main() {
     );
     expect(
       nativeSource,
-      contains(
-        'stringByAppendingPathComponent:@"conf/security/java.security"',
-      ),
+      contains('stringByAppendingPathComponent:@"conf/security/java.security"'),
       reason: 'missing security properties must fail before VM startup',
     );
     expect(

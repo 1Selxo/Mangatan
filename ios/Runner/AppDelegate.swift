@@ -87,6 +87,17 @@ import Libmtorrentserver
                       ])
                   }
               }
+          case "pause":
+              MangatanEmbeddedMihonPause { error in
+                  if let error = error {
+                      result(FlutterError(
+                        code: "EMBEDDED_MIHON_PAUSE",
+                        message: error.localizedDescription,
+                        details: nil))
+                  } else {
+                      result(nil)
+                  }
+              }
           case "stop":
               MangatanEmbeddedMihonStop { error in
                   if let error = error {
@@ -117,6 +128,14 @@ import Libmtorrentserver
     GeneratedPluginRegistrant.register(with: self)
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func applicationWillResignActive(_ application: UIApplication) {
+    // Pause from the native lifecycle callback as early as possible. Waiting
+    // only for Flutter's inactive notification can let iOS suspend the process
+    // while OpenJDK is still blocked in accept(), which spins after wake.
+    MangatanEmbeddedMihonPause { _ in }
+    super.applicationWillResignActive(application)
   }
 
   private func beginAnkiMobileMediaBackgroundTask() {

@@ -290,11 +290,13 @@ class _MyAppState extends ConsumerState<MyApp>
   GoogleDriveDebugDiagnosticHandler? _googleDriveDiagnosticHandler;
   Uri? lastUri;
   late final AnimationController _disabledProgressController;
+  late final MExtensionServerPlatform _mExtensionServer;
 
   @override
   void initState() {
     super.initState();
     _disabledProgressController = AnimationController(vsync: this, value: 0.5);
+    _mExtensionServer = MExtensionServerPlatform(ref, persistent: true);
     WidgetsBinding.instance.addObserver(this);
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
@@ -321,7 +323,7 @@ class _MyAppState extends ConsumerState<MyApp>
       // Flutter has finished restoring its UI. Mihon operations call
       // prepareMihonBridge and start it when it is actually needed.
       if (!Platform.isIOS) {
-        MExtensionServerPlatform(ref, persistent: true).startServer();
+        _mExtensionServer.startServer();
       }
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
@@ -336,6 +338,16 @@ class _MyAppState extends ConsumerState<MyApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (Platform.isIOS) {
+      if (state == AppLifecycleState.inactive) {
+        // iOS can leave OpenJDK's blocking accept call spinning after device
+        // sleep. Stop the loopback listener before suspension; loaded Mihon
+        // extension instances remain cached in the embedded JVM.
+        unawaited(_mExtensionServer.suspendEmbeddedIosBridge());
+      } else if (state == AppLifecycleState.resumed) {
+        unawaited(_mExtensionServer.resumeEmbeddedIosBridge());
+      }
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       if (Platform.isLinux) {
@@ -430,7 +442,7 @@ class _MyAppState extends ConsumerState<MyApp>
       windowManager.removeListener(this);
       WindowGeometry.save();
     }
-    MExtensionServerPlatform(ref).stopServer();
+    unawaited(_mExtensionServer.stopServer());
     _linkSubscription?.cancel();
     _googleDriveDiagnosticHandler?.close();
     discordRpc?.destroy();

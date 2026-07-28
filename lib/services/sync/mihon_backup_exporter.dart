@@ -14,6 +14,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEp
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
@@ -21,7 +22,9 @@ import 'package:mangayomi/services/sync/chimahon_local_chapter_policy.dart';
 import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_category_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_stats_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_tracking_adapter.dart';
+import 'package:mangayomi/services/statistics/immersion_stats_models.dart';
 
 /// Pure mapper from Mangatan's persisted entities to the common Mihon backup
 /// envelope. Database access and scheduling deliberately remain outside it.
@@ -39,6 +42,9 @@ class MihonBackupExporter {
     Iterable<ChimahonTrackingDeletion> deletedTracks = const [],
     Iterable<BackupPreference> appPreferences = const [],
     Iterable<BackupSourcePreferences> sourcePreferences = const [],
+    Iterable<MangaStatsEntry> mangaStats = const [],
+    Iterable<AnkiStatsEntry> ankiStats = const [],
+    Map<String, List<NovelStatsEntry>> novelStats = const {},
   }) {
     final localMangas = mangas.toList(growable: false);
     final localCategories = categories.toList(growable: false);
@@ -283,12 +289,44 @@ class MihonBackupExporter {
       backupAnimeSources: usedAnimeSources.values,
       backupPreferences: appPreferences,
       backupSourcePreferences: sourcePreferences,
-      backupNovels: const ChimahonNovelProgressAdapter().exportAll(
-        epubBookProgress,
-        categoryIdsByMangaId: novelCategoryProjection.categoryIdsByMangaId,
+      backupNovels: _withNovelStats(
+        const ChimahonNovelProgressAdapter().exportAll(
+          epubBookProgress,
+          categoryIdsByMangaId: novelCategoryProjection.categoryIdsByMangaId,
+        ),
+        novelStats,
       ),
       backupNovelCategories: novelCategoryProjection.categories,
+      backupMangaStats: const ChimahonStatsAdapter().exportAllMangaStats(
+        mangaStats,
+      ),
+      backupAnkiStats: const ChimahonStatsAdapter().exportAllAnkiStats(
+        ankiStats,
+      ),
     );
+  }
+
+  /// Attaches each book's statistics to its own backup record.
+  ///
+  /// Chimahon nests novel statistics inside `BackupNovel`, keyed by the same
+  /// stable ID the progress adapter produces, so a book with no recorded
+  /// reading simply carries an empty list.
+  List<BackupNovel> _withNovelStats(
+    List<BackupNovel> novels,
+    Map<String, List<NovelStatsEntry>> statsByNovelId,
+  ) {
+    if (statsByNovelId.isEmpty) return novels;
+    const adapter = ChimahonStatsAdapter();
+    return [
+      for (final novel in novels)
+        () {
+          final stats = statsByNovelId[novel.id];
+          if (stats == null || stats.isEmpty) return novel;
+          return novel.deepCopy()
+            ..stats.clear()
+            ..stats.addAll(adapter.exportAllNovelStats(stats));
+        }(),
+    ];
   }
 
   BackupChapter _backupChapter(Chapter chapter, int sourceOrder) {

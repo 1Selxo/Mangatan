@@ -472,6 +472,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statistics => '统计';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => '设置';
 
   @override

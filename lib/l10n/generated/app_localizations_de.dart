@@ -487,6 +487,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get statistics => 'Statistiken';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'Einstellungen';
 
   @override

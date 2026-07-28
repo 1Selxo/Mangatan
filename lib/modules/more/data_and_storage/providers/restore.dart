@@ -33,6 +33,9 @@ import 'package:mangayomi/services/sync/chimahon_local_sync_projection_service.d
 import 'package:mangayomi/services/sync/chimahon_media_sync_selection.dart';
 import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
+import 'package:mangayomi/services/statistics/immersion_stats_models.dart';
+import 'package:mangayomi/services/statistics/immersion_stats_storage.dart';
+import 'package:mangayomi/services/sync/chimahon_stats_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_importer.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
@@ -855,6 +858,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
     isar.updates.clearSync();
   });
   await _importChimahonSettings(backup);
+  await _importImmersionStats(backup, replace: true);
   _importChimahonMediaSelection(backup);
   ref.invalidate(synchingProvider(syncId: 1));
   if (pendingStore case ChimahonLocalPreferenceBaselineStore preferenceStore) {
@@ -884,6 +888,42 @@ Future<void> _restoreTachiBkBackupDataExclusive(
     await lifecycle.markReady();
   }
   _invalidateCommonState(ref);
+}
+
+/// Restores immersion statistics from a Chimahon-compatible backup.
+///
+/// A manual restore is an explicit "make this device look like the backup", so
+/// it replaces the local rows. Sync merges instead, because both sides may hold
+/// reading the other has not seen.
+Future<void> _importImmersionStats(
+  BackupMihon backup, {
+  required bool replace,
+}) async {
+  const adapter = ChimahonStatsAdapter();
+  final mangaStats = adapter.importAllMangaStats(backup.backupMangaStats);
+  final ankiStats = adapter.importAllAnkiStats(backup.backupAnkiStats);
+  final novelStats = <String, List<NovelStatsEntry>>{};
+  for (final novel in backup.backupNovels) {
+    if (novel.stats.isEmpty || novel.id.isEmpty) continue;
+    novelStats
+        .putIfAbsent(novel.id, () => [])
+        .addAll(adapter.importAllNovelStats(novel.stats));
+  }
+
+  if (replace) {
+    await ImmersionStatsStorage.clear();
+    await ImmersionStatsStorage.saveMangaStats(mangaStats);
+    await ImmersionStatsStorage.saveAnkiStats(ankiStats);
+    for (final entry in novelStats.entries) {
+      await ImmersionStatsStorage.saveNovelStats(entry.key, entry.value);
+    }
+    return;
+  }
+  await ImmersionStatsStorage.mergeMangaStats(mangaStats);
+  await ImmersionStatsStorage.mergeAnkiStats(ankiStats);
+  for (final entry in novelStats.entries) {
+    await ImmersionStatsStorage.mergeNovelStats(entry.key, entry.value);
+  }
 }
 
 void _importChimahonMediaSelection(BackupMihon backup) {
@@ -930,6 +970,7 @@ Future<void> restoreChimahonSyncData(Ref ref, BackupMihon backup) async {
     backup,
     preserveUnrepresentableLocalSettings: true,
   );
+  await _importImmersionStats(backup, replace: false);
   _invalidateCommonState(ref);
 }
 

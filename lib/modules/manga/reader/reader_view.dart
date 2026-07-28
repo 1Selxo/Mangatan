@@ -31,6 +31,8 @@ import 'package:mangayomi/modules/manga/reader/widgets/page_indicator.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/image_actions_dialog.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
+import 'package:mangayomi/modules/more/statistics/widgets/manga_stats_sheet.dart';
+import 'package:mangayomi/services/statistics/manga_statistics_tracker.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:mangayomi/utils/riverpod.dart';
@@ -164,6 +166,14 @@ class _MangaChapterPageGalleryState
   final Stopwatch _readingStopwatch = Stopwatch();
   final String _macosPagedWheelOwner = UniqueKey().toString();
 
+  /// Chimahon-compatible immersion statistics for this reading session.
+  late final MangaStatisticsTracker _statsTracker = MangaStatisticsTracker(
+    mangaId: chapter.manga.value?.id ?? 0,
+  );
+
+  /// Rebuilt whenever the sheet is open so its live session values update.
+  final ValueNotifier<int> _statsSheetRevision = ValueNotifier(0);
+
   /// Flag to prevent fullscreen from being disabled when navigating between
   /// chapters via pushReplacement. The old widget's dispose runs after the new
   /// widget is created, which would clobber the new reader's fullscreen state.
@@ -211,6 +221,14 @@ class _MangaChapterPageGalleryState
       );
     }
     disposePreloadManager();
+    // Attribute the page still on screen before the OCR cache goes away.
+    unawaited(
+      _statsTracker.flush(
+        charactersForPage: _charactersForPageIndex,
+        incognito: _statsIncognito,
+      ),
+    );
+    _statsSheetRevision.dispose();
     ReaderOcrState.cancelScan();
     _readerController.keepAliveLink?.close();
     WakelockPlus.disable();
@@ -533,6 +551,7 @@ class _MangaChapterPageGalleryState
                         });
                       },
                       onOcrPressed: _showCurrentPageOcr,
+                      onStatsPressed: _showStatsSheet,
                       onWebViewPressed:
                           (chapter.manga.value!.isLocalArchive ?? false) ==
                               false
@@ -1014,6 +1033,86 @@ class _MangaChapterPageGalleryState
     await ReaderOcrState.toggle();
   }
 
+  /// Opens the immersion statistics sheet for this manga.
+  Future<void> _showStatsSheet() async {
+    final estimate = await _statsEstimate();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => ValueListenableBuilder<int>(
+        valueListenable: _statsSheetRevision,
+        builder: (context, _, _) => MangaStatsSheet(
+          mangaId: chapter.manga.value?.id ?? 0,
+          session: _statsTracker.session,
+          estimate: estimate,
+          onToggleTracking: () {
+            _statsTracker.toggleTracking();
+            _statsSheetRevision.value++;
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Projects time-to-finish from the session's reading speed.
+  ///
+  /// Remaining characters are estimated from the already-OCRed pages' average
+  /// rather than measured, because pages ahead have not been recognized yet.
+  Future<MangaStatsEstimate> _statsEstimate() async {
+    final speed = _statsTracker.session.charactersPerHour;
+    if (speed <= 0) return const MangaStatsEstimate();
+
+    final actualIndex = _pageViewToActualIndex(_currentIndex ?? 0);
+    final chapterPages = pages
+        .where((page) => page.chapter?.id == chapter.id)
+        .toList();
+    var recognizedPages = 0;
+    var recognizedCharacters = 0;
+    for (final page in chapterPages) {
+      final characters = await ReaderOcrState.cachedCharacterCount(page);
+      if (characters > 0) {
+        recognizedPages++;
+        recognizedCharacters += characters;
+      }
+    }
+    // With nothing recognized there is no basis for a per-page estimate.
+    if (recognizedPages == 0) return const MangaStatsEstimate();
+    final averagePerPage = recognizedCharacters / recognizedPages;
+
+    final chapterRemainingPages =
+        (chapterPages.length - _chapterPageOffset(actualIndex) - 1)
+            .clamp(0, chapterPages.length)
+            .toInt();
+    final bookRemainingPages = (pages.length - actualIndex - 1)
+        .clamp(0, pages.length)
+        .toInt();
+    final chapterCharacters = (averagePerPage * chapterRemainingPages).round();
+    final bookCharacters = (averagePerPage * bookRemainingPages).round();
+
+    return MangaStatsEstimate(
+      remainingChapterCharacters: chapterCharacters,
+      remainingBookCharacters: bookCharacters,
+      remainingChapterSeconds: MangaStatsEstimate.secondsRemaining(
+        chapterCharacters,
+        speed,
+      ),
+      remainingBookSeconds: MangaStatsEstimate.secondsRemaining(
+        bookCharacters,
+        speed,
+      ),
+    );
+  }
+
+  /// Index of [actualIndex] within its own chapter's pages.
+  int _chapterPageOffset(int actualIndex) {
+    var offset = 0;
+    for (var i = 0; i < actualIndex && i < pages.length; i++) {
+      if (pages[i].chapter?.id == chapter.id) offset++;
+    }
+    return offset;
+  }
+
   void _initCurrentIndex() async {
     if (ref.read(cropBordersStateProvider)) _processCropBorders();
     final readerMode = _readerController.getReaderMode();
@@ -1272,7 +1371,27 @@ class _MangaChapterPageGalleryState
     // Prefetch pages in order for the new page window
     _prefetchPagesInOrder();
     _scanCurrentChapterOcr(actualIndex: actualIndex);
+    unawaited(_trackStatsForPage(actualIndex));
   }
+
+  /// Records the page just left into immersion statistics.
+  Future<void> _trackStatsForPage(int actualIndex) async {
+    await _statsTracker.onPageChanged(
+      pageIndex: actualIndex,
+      charactersForPage: _charactersForPageIndex,
+      incognito: _statsIncognito,
+    );
+    if (mounted) _statsSheetRevision.value++;
+  }
+
+  /// OCR character count for a page, or zero if it has not been recognized.
+  Future<int> _charactersForPageIndex(int actualIndex) async {
+    if (actualIndex < 0 || actualIndex >= pages.length) return 0;
+    return ReaderOcrState.cachedCharacterCount(pages[actualIndex]);
+  }
+
+  bool get _statsIncognito =>
+      isar.settings.getSync(227)?.incognitoMode ?? false;
 
   late final _pageOffset = ValueNotifier(
     _readerController.autoScrollValues().$2,

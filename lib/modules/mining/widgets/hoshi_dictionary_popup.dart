@@ -20,6 +20,7 @@ import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/statistics/anki_stats_recorder.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -524,6 +525,10 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             );
         botToast('Added to Anki (#$noteId)', second: 3);
       }
+      await AnkiStatsRecorder.recordCard(
+        context: effectiveContext,
+        profile: dictionaryProfile,
+      );
       return true;
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);

@@ -499,6 +499,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statistics => 'Статистика';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'Настройки';
 
   @override

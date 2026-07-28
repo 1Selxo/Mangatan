@@ -488,6 +488,9 @@ class AppLocalizationsAs extends AppLocalizations {
   String get statistics => 'পৰিসংখ্যা';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'ছেটিং';
 
   @override

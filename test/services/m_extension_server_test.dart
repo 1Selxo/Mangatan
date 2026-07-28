@@ -88,6 +88,7 @@ void main() {
       'JIMAGE_Close',
       'JIMAGE_FindResource',
       'JIMAGE_GetResource',
+      'VerifyClassForMajorVersion',
     ]) {
       expect(
         nativeSource,
@@ -190,11 +191,31 @@ void main() {
       reason: 'the security configuration must match the OpenJDK source build',
     );
     expect(
+      openJdkWorkflow,
+      contains('cp host-jdk/lib/tzdb.dat java_bundle-device/lib/tzdb.dat'),
+      reason: 'the timezone database must match the OpenJDK source build',
+    );
+    expect(
+      openJdkWorkflow,
+      contains('libnet.a libnio.a libjimage.a libverify.a'),
+      reason: 'dex2jar-generated classes need the static legacy verifier',
+    );
+    expect(
+      runtimeBuilder,
+      contains(r'cp "$runtime_tzdb" "$output_framework/lib/lib/tzdb.dat"'),
+      reason: 'java.home must include the matching timezone database',
+    );
+    expect(
       nativeSource,
       contains(
         'stringByAppendingPathComponent:@"conf/security/java.security"',
       ),
       reason: 'missing security properties must fail before VM startup',
+    );
+    expect(
+      nativeSource,
+      contains('stringByAppendingPathComponent:@"lib/tzdb.dat"'),
+      reason: 'missing timezone data must fail before VM startup',
     );
     expect(
       zeroRuntimePatch,

@@ -30,7 +30,7 @@ Features include:
 </div>
 
 ## Download
-Get desktop builds and sideloadable iOS IPAs from the [Mangatan releases page](https://github.com/ippo-michi/Mangatan/releases).
+Get the app from our [releases page](https://github.com/1Selxo/Mangatan/releases).
 
 ## iOS Sideloading Sources
 <a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
@@ -56,18 +56,6 @@ images and audio are transferred locally during that callback.
 Japanese word audio is enabled by default with JapanesePod101, Jisho.org, and
 LanguagePod101. Audio sources are ordered fallbacks: add, remove, edit, or move
 multiple built-in and custom URL/JSON sources from the same Anki settings page.
-
-## Updating This Fork
-
-Open **Actions → Sync upstream release → Run workflow**. Leave the tag empty
-to merge the latest stable `1Selxo/Mangatan` release into `main`, or enter a
-specific upstream tag. A successful sync push automatically starts the iOS IPA
-release workflow.
-
-The sync uses a merge commit, so fork-only fixes remain in history and later
-updates only need to consider changes since the last merge. If upstream and the
-fork edit the same lines, the workflow stops without pushing so the conflict can
-be reviewed safely.
 
 # Contributing
 

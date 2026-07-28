@@ -1547,11 +1547,18 @@ async function playEntryAudio(entryIndex) {
     const audioKey = audioCacheKey(entry);
     
     updateButtonSlot(audioSlot, { state: 'loading' });
-    if (!audioUrls[audioKey]) {
+    let played = false;
+    if (audioUrls[audioKey]) {
+        played = await playWordAudio(audioUrls[audioKey]);
+    } else {
         const sources = await resolveEntryAudioSources(entry);
-        audioUrls[audioKey] = sources[0]?.url || '';
+        for (const source of sources) {
+            if (!source?.url || !await playWordAudio(source.url)) { continue; }
+            audioUrls[audioKey] = source.url;
+            played = true;
+            break;
+        }
     }
-    const played = audioUrls[audioKey] ? await playWordAudio(audioUrls[audioKey]) : false;
     if (played) {
         updateButtonSlot(audioSlot, { state: 'default' });
     } else {

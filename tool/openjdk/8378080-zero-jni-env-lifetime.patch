@@ -1,0 +1,35 @@
+From f0529a854215f325ac67082a44c0aaacc1505c87 Mon Sep 17 00:00:00 2001
+From: Aleksey Shipilev <shade@openjdk.org>
+Date: Fri, 20 Feb 2026 06:48:58 +0000
+Subject: [PATCH] 8378080: Zero: JNIEnv argument is corrupted in native calls
+
+Reviewed-by: mdoerr, serb, phh
+---
+ src/hotspot/cpu/zero/zeroInterpreter_zero.cpp | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+index 28c2364315e..1b20761f6e4 100644
+--- a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
++++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+@@ -368,12 +368,15 @@ int ZeroInterpreter::native_entry(Method* method, intptr_t UNUSED, TRAPS) {
+     goto unlock_unwind_and_return;
+ 
+   void **arguments;
+-  void *mirror; {
++  // These locals must remain on stack until call completes
++  void *mirror;
++  void *env;
++  {
+     arguments =
+       (void **) stack->alloc(handler->argument_count() * sizeof(void **));
+     void **dst = arguments;
+ 
+-    void *env = thread->jni_environment();
++    env = thread->jni_environment();
+     *(dst++) = &env;
+ 
+     if (method->is_static()) {
+-- 
+2.48.1
+

@@ -341,18 +341,15 @@ class ChimahonSyncSafetyAudit {
     required void Function(String, Iterable<String>) fail,
   }) {
     for (final entry in inputs.entries) {
-      final sourceIds = entry.value.backupSources
-          .where((source) => source.hasSourceId())
-          .map(_sourceKey)
-          .toSet();
+      // A Chimahon sync payload may omit BackupSource metadata entirely.
+      // The source scalar on each media row remains its portable identity, and
+      // import can bind it to an installed source (or retain it as Unknown).
+      // Requiring an auxiliary catalog entry would reject valid Chimahon data
+      // and cannot be repaired when neither side has metadata for that source.
       fail(
         '${entry.key}_manga_source_unresolved',
         entry.value.backupManga
-            .where(
-              (manga) =>
-                  !manga.hasSource() ||
-                  !sourceIds.contains(_mangaSourceKey(manga)),
-            )
+            .where((manga) => !manga.hasSource())
             .map(_mangaKey),
       );
     }

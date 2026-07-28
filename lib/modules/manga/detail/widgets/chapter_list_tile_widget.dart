@@ -11,8 +11,10 @@ import 'package:mangayomi/utils/constant.dart';
 import 'package:marquee/marquee.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/date.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
@@ -27,11 +29,13 @@ class ChapterListTileWidget extends ConsumerWidget {
   final List<Chapter> chapterList;
   final List<Chapter> allChapters;
   final bool sourceExist;
+  final int displayMode;
   const ChapterListTileWidget({
     required this.chapterList,
     required this.chapter,
     required this.allChapters,
     required this.sourceExist,
+    required this.displayMode,
     super.key,
   });
 
@@ -41,6 +45,12 @@ class ChapterListTileWidget extends ConsumerWidget {
     final isLongPressed = ref.watch(isLongPressedStateProvider);
     final isEpubShortcut = isEpubNavigationChapter(chapter);
     final epubCharacterStart = epubChapterCharacterStart(chapter);
+    final displayTitle = displayMode == SortChapter.chapterNumberDisplay
+        ? _chapterNumberTitle(
+            chapterLabel: l10n.chapter,
+            episodeLabel: l10n.episode,
+          )
+        : chapter.name!;
     return Dismissible(
       key: ValueKey('chapter_swipe_${chapter.id}'),
       direction: isLongPressed
@@ -137,7 +147,7 @@ class ChapterListTileWidget extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildTitle(chapter.name!, context),
+                            _buildTitle(displayTitle, context),
                             Text(
                               chapter.description!,
                               style: const TextStyle(fontSize: 11),
@@ -146,7 +156,7 @@ class ChapterListTileWidget extends ConsumerWidget {
                           ],
                         ),
                       )
-                    : Flexible(child: _buildTitle(chapter.name!, context)),
+                    : Flexible(child: _buildTitle(displayTitle, context)),
               ],
             ),
             subtitle: Row(
@@ -263,6 +273,25 @@ class ChapterListTileWidget extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  String _chapterNumberTitle({
+    required String chapterLabel,
+    required String episodeLabel,
+  }) {
+    final manga = chapter.manga.value;
+    final label = manga?.itemType == ItemType.anime
+        ? episodeLabel
+        : chapterLabel;
+    final capitalized = label.isEmpty
+        ? label
+        : '${label[0].toUpperCase()}${label.substring(1)}';
+    return chapterNumberDisplayTitle(
+      sourceTitle: chapter.name ?? '',
+      mangaTitle: manga?.name ?? '',
+      numberLabel: capitalized,
+      sourceChapterNumber: chapter.chapterNumber,
     );
   }
 

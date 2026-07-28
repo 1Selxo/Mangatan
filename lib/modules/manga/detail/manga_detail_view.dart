@@ -15,6 +15,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
@@ -238,6 +239,9 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
   Widget _buildWidget({required List<Chapter> chapters}) {
     final chapterList = ref.watch(chaptersListStateProvider);
     final isLongPressed = ref.watch(isLongPressedStateProvider);
+    final chapterDisplayMode = ref
+        .watch(sortChapterStateProvider(mangaId: widget.manga!.id!))
+        .displayMode;
     final checkCategoryList = isar.categorys
         .filter()
         .idIsNotNull()
@@ -881,6 +885,9 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                 chapterList: chapterList,
                                 allChapters: chapters,
                                 sourceExist: widget.sourceExist,
+                                displayMode:
+                                    chapterDisplayMode ??
+                                    SortChapter.sourceTitleDisplay,
                               );
                             },
                           ),
@@ -1213,56 +1220,62 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
         Column(
           children: [
             if (!isLocalArchive)
-              ListTileChapterFilter(
-                label: l10n.downloaded,
-                type: ref.watch(
-                  chapterFilterDownloadedStateProvider(
-                    mangaId: widget.manga!.id!,
+              Consumer(
+                builder: (context, ref, child) => ListTileChapterFilter(
+                  label: l10n.downloaded,
+                  type: ref.watch(
+                    chapterFilterDownloadedStateProvider(
+                      mangaId: widget.manga!.id!,
+                    ),
                   ),
+                  onTap: () {
+                    ref
+                        .read(
+                          chapterFilterDownloadedStateProvider(
+                            mangaId: widget.manga!.id!,
+                          ).notifier,
+                        )
+                        .update();
+                  },
+                ),
+              ),
+            Consumer(
+              builder: (context, ref, child) => ListTileChapterFilter(
+                label: widget.itemType != ItemType.anime
+                    ? l10n.unread
+                    : l10n.unwatched,
+                type: ref.watch(
+                  chapterFilterUnreadStateProvider(mangaId: widget.manga!.id!),
                 ),
                 onTap: () {
                   ref
                       .read(
-                        chapterFilterDownloadedStateProvider(
+                        chapterFilterUnreadStateProvider(
                           mangaId: widget.manga!.id!,
                         ).notifier,
                       )
                       .update();
                 },
               ),
-            ListTileChapterFilter(
-              label: widget.itemType != ItemType.anime
-                  ? l10n.unread
-                  : l10n.unwatched,
-              type: ref.watch(
-                chapterFilterUnreadStateProvider(mangaId: widget.manga!.id!),
-              ),
-              onTap: () {
-                ref
-                    .read(
-                      chapterFilterUnreadStateProvider(
-                        mangaId: widget.manga!.id!,
-                      ).notifier,
-                    )
-                    .update();
-              },
             ),
-            ListTileChapterFilter(
-              label: l10n.bookmarked,
-              type: ref.watch(
-                chapterFilterBookmarkedStateProvider(
-                  mangaId: widget.manga!.id!,
+            Consumer(
+              builder: (context, ref, child) => ListTileChapterFilter(
+                label: l10n.bookmarked,
+                type: ref.watch(
+                  chapterFilterBookmarkedStateProvider(
+                    mangaId: widget.manga!.id!,
+                  ),
                 ),
+                onTap: () {
+                  ref
+                      .read(
+                        chapterFilterBookmarkedStateProvider(
+                          mangaId: widget.manga!.id!,
+                        ).notifier,
+                      )
+                      .update();
+                },
               ),
-              onTap: () {
-                ref
-                    .read(
-                      chapterFilterBookmarkedStateProvider(
-                        mangaId: widget.manga!.id!,
-                      ).notifier,
-                    )
-                    .update();
-              },
             ),
             if (scanlators.$1.isNotEmpty)
               Padding(
@@ -1449,29 +1462,43 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
             );
           },
         ),
-        RadioGroup(
-          groupValue: "e",
-          onChanged: (value) {},
-          child: Column(
-            children: [
-              RadioListTile(
-                dense: true,
-                title: Text(l10n.source_title),
-                value: "e",
-                selected: true,
+        Consumer(
+          builder: (context, ref, child) {
+            final displayMode = ref
+                .watch(sortChapterStateProvider(mangaId: widget.manga!.id!))
+                .displayMode;
+            return RadioGroup<int>(
+              groupValue: displayMode ?? SortChapter.sourceTitleDisplay,
+              onChanged: (value) {
+                if (value == null) return;
+                ref
+                    .read(
+                      sortChapterStateProvider(
+                        mangaId: widget.manga!.id!,
+                      ).notifier,
+                    )
+                    .setDisplayMode(value);
+              },
+              child: Column(
+                children: [
+                  RadioListTile<int>(
+                    dense: true,
+                    title: Text(l10n.source_title),
+                    value: SortChapter.sourceTitleDisplay,
+                  ),
+                  RadioListTile<int>(
+                    dense: true,
+                    title: Text(
+                      widget.itemType != ItemType.anime
+                          ? l10n.chapter_number
+                          : l10n.episode_number,
+                    ),
+                    value: SortChapter.chapterNumberDisplay,
+                  ),
+                ],
               ),
-              RadioListTile(
-                dense: true,
-                title: Text(
-                  widget.itemType != ItemType.anime
-                      ? l10n.chapter_number
-                      : l10n.episode_number,
-                ),
-                value: "ej",
-                selected: false,
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ],
       context: context,

@@ -1,0 +1,360 @@
+diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+index 3c1626a9f51..7f766067885 100644
+--- a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
++++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+@@ -27,4 +27,8 @@
+ #include "asm/assembler.hpp"
++#include "classfile/javaAssertions.hpp"
++#include "classfile/javaClasses.inline.hpp"
++#include "classfile/vmClasses.hpp"
++#include "classfile/vmSymbols.hpp"
+ #include "interpreter/interpreter.hpp"
+ #include "interpreter/interpreterRuntime.hpp"
+ #include "interpreter/zero/bytecodeInterpreter.hpp"
+@@ -34,6 +34,7 @@
+ #include "interpreter/zero/zeroInterpreterGenerator.hpp"
+ #include "oops/access.inline.hpp"
+ #include "oops/cpCache.inline.hpp"
++#include "oops/instanceKlass.inline.hpp"
+ #include "oops/klass.inline.hpp"
+ #include "oops/methodData.hpp"
+ #include "oops/method.hpp"
+@@ -37,1 +38,2 @@
++#include "oops/method.inline.hpp"
+ #include "oops/oop.inline.hpp"
+@@ -43,6 +45,7 @@
+ #include "runtime/frame.inline.hpp"
+ #include "runtime/handles.inline.hpp"
+ #include "runtime/interfaceSupport.inline.hpp"
++#include "runtime/init.hpp"
+ #include "runtime/jniHandles.inline.hpp"
+ #include "runtime/timer.hpp"
+ #include "runtime/timerTrace.hpp"
+@@ -224,7 +231,80 @@ void ZeroInterpreter::main_loop(int recurse, TRAPS) {
+       stack->set_sp(istate->stack() + 1);
+ 
+       // Make the call
+-      Interpreter::invoke_method(callee, istate->callee_entry_point(), THREAD);
++      address entry = istate->callee_entry_point();
++      bool result_ready = false;
++      if (entry == nullptr) {
++        // A class reached through the dynamically loaded iOS runtime can be
++        // callable before linkage has installed its constant-pool cache and
++        // Method entry points. Synthesizing only an interpreter entry creates
++        // an invalid frame with a null cache.
++        InstanceKlass* holder = callee->method_holder();
++        if (!is_init_completed() &&
++            holder == vmClasses::Class_klass() &&
++            callee->name()->equals("desiredAssertionStatus") &&
++            callee->signature() == vmSymbols::void_boolean_signature()) {
++          // MemberName asks for its assertion status while java.lang.Class is
++          // intentionally still unlinked. Resolve that exact bootstrap query
++          // through the VM's native assertion table; forcing partial or early
++          // Class linkage violates InstanceKlass's verify/rewrite lifecycle.
++          guarantee(callee->size_of_parameters() == 1,
++                    "desiredAssertionStatus must only receive its mirror");
++          oop mirror = cast_to_oop(stack->sp()[0]);
++          guarantee(mirror != nullptr && java_lang_Class::is_instance(mirror),
++                    "desiredAssertionStatus receiver must be a class mirror");
++          Klass* asserted_klass = java_lang_Class::as_Klass(mirror);
++          bool enabled = false;
++          bool native_equivalent = asserted_klass == nullptr ||
++                                   !asserted_klass->is_instance_klass();
++          if (asserted_klass != nullptr &&
++              asserted_klass->is_instance_klass() &&
++              asserted_klass->class_loader() == nullptr) {
++            ResourceMark rm(thread);
++            enabled = JavaAssertions::enabled(
++                asserted_klass->name()->as_C_string(), true);
++            native_equivalent = true;
++          }
++          if (native_equivalent) {
++            stack->set_sp(stack->sp() + callee->size_of_parameters());
++            stack->push(enabled ? 1 : 0);
++            result_ready = true;
++            tty->print_cr(
++                "Mangatan Zero: served primordial desiredAssertionStatus=%s",
++                enabled ? "true" : "false");
++          }
++        }
++        if (!result_ready) {
++          tty->print("Zero: preparing method holder for ");
++          callee->print_short_name(tty);
++          tty->cr();
++          thread->set_last_Java_frame();
++          {
++            ThreadInVMfromJava transition(thread);
++            // Extension and post-bootstrap classes retain full verification,
++            // rewriting, method, vtable, and itable linkage.
++            holder->link_class(THREAD);
++          }
++          thread->reset_last_Java_frame();
++
++          if (HAS_PENDING_EXCEPTION) {
++            // Resume the caller so the bytecode interpreter can dispatch the
++            // linkage exception at the original invoke instruction.
++            stack->set_sp(istate->stack_limit() + 1);
++            istate->set_msg(BytecodeInterpreter::method_resume);
++            continue;
++          }
++
++          entry = callee->from_interpreted_entry();
++          guarantee(entry != nullptr,
++                    "prepared Zero interpreter entry must be non-null");
++          guarantee(callee->constants()->cache() != nullptr,
++                    "prepared Zero method constant-pool cache must be non-null");
++          istate->set_callee_entry_point(entry);
++        }
++      }
++      if (!result_ready) {
++        Interpreter::invoke_method(callee, entry, THREAD);
++        fixup_after_potential_safepoint();
++      }
+-      fixup_after_potential_safepoint();
+ 
+       // Convert the result
+diff --git a/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp b/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp
+index 74071932654..26d0496887b 100644
+--- a/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp
++++ b/src/hotspot/os_cpu/bsd_zero/os_bsd_zero.cpp
+@@ -55,6 +55,16 @@
+ # include <pthread_np.h> /* For pthread_attr_get_np */
+ #endif
+ 
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++// Darwin prefixes the ARM64 thread-state fields in UNIX03 mode.
++// Keep these definitions local to Zero instead of depending on the
++// bsd_aarch64 port, which is not compiled for a Zero VM.
++#define ZERO_DARWIN_CONTEXT_FIELD(state, member) __ ## state.__ ## member
++#define ZERO_CONTEXT_FP uc_mcontext->ZERO_DARWIN_CONTEXT_FIELD(ss, fp)
++#define ZERO_CONTEXT_SP uc_mcontext->ZERO_DARWIN_CONTEXT_FIELD(ss, sp)
++#define ZERO_CONTEXT_PC uc_mcontext->ZERO_DARWIN_CONTEXT_FIELD(ss, pc)
++#endif
++
+ address os::current_stack_pointer() {
+   address dummy = (address) &dummy;
+   return dummy;
+@@ -89,29 +99,64 @@ char* os::non_memory_address_word() {
+ }
+ 
+ address os::Posix::ucontext_get_pc(const ucontext_t* uc) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  return (address) uc->ZERO_CONTEXT_PC;
++#else
+   ShouldNotCallThis();
+   return nullptr;
++#endif
+ }
+ 
+ void os::Posix::ucontext_set_pc(ucontext_t * uc, address pc) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  uc->ZERO_CONTEXT_PC = (uintptr_t) pc;
++#else
+   ShouldNotCallThis();
++#endif
+ }
+ 
+ address os::fetch_frame_from_context(const void* ucVoid,
+                                      intptr_t** ret_sp,
+                                      intptr_t** ret_fp) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  const ucontext_t* uc = (const ucontext_t*) ucVoid;
++  if (uc == nullptr) {
++    if (ret_sp != nullptr) *ret_sp = nullptr;
++    if (ret_fp != nullptr) *ret_fp = nullptr;
++    return nullptr;
++  }
++  if (ret_sp != nullptr) *ret_sp = (intptr_t*) uc->ZERO_CONTEXT_SP;
++  if (ret_fp != nullptr) *ret_fp = (intptr_t*) uc->ZERO_CONTEXT_FP;
++  return os::Posix::ucontext_get_pc(uc);
++#else
+   ShouldNotCallThis();
+   return nullptr;
++#endif
+ }
+ 
+ frame os::fetch_frame_from_context(const void* ucVoid) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  intptr_t* sp = nullptr;
++  address pc = fetch_frame_from_context(ucVoid, &sp, nullptr);
++  frame result;
++  result.set_sp(sp);
++  result.set_pc(pc);
++  return result;
++#else
+   ShouldNotCallThis();
+   return frame();
++#endif
+ }
+ 
+ intptr_t* os::fetch_bcp_from_context(const void* ucVoid) {
++#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
++  // Zero keeps the bytecode pointer in interpreterState, not a native
++  // register, so there is no BCP to recover from a Darwin ucontext.
++  return nullptr;
++#else
+   ShouldNotCallThis();
+   return nullptr;
++#endif
+ }
+ 
+ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
+diff --git a/src/hotspot/share/gc/serial/serialHeap.cpp b/src/hotspot/share/gc/serial/serialHeap.cpp
+index 8eafdfdc..edc414e9 100644
+--- a/src/hotspot/share/gc/serial/serialHeap.cpp
++++ b/src/hotspot/share/gc/serial/serialHeap.cpp
+@@ -69,6 +69,10 @@
+ #include "runtime/handles.inline.hpp"
+ #include "runtime/init.hpp"
+ #include "runtime/java.hpp"
++#include "runtime/javaThread.hpp"
++#ifdef ZERO
++#include "interpreterFrame_zero.hpp"
++#endif
+ #include "runtime/mutexLocker.hpp"
+ #include "runtime/prefetch.inline.hpp"
+ #include "runtime/threads.hpp"
+@@ -345,3 +345,52 @@ HeapWord* SerialHeap::mem_allocate_work(size_t size, bool is_tlab) {
++    if (!is_init_completed()) {
++      tty->print_cr(
++          "Mangatan Serial bootstrap allocation exhausted: "
++          "words=%zu tlab=%s young_used=%zu young_capacity=%zu "
++          "young_max=%zu old_used=%zu old_capacity=%zu old_max=%zu",
++          size,
++          is_tlab ? "true" : "false",
++          _young_gen->used(),
++          _young_gen->capacity(),
++          _young_gen->max_capacity(),
++          _old_gen->used(),
++          _old_gen->capacity(),
++          _old_gen->max_capacity());
++      Thread* current = Thread::current_or_null();
++      if (current != nullptr && current->is_Java_thread()) {
++        tty->print_cr("Mangatan Serial bootstrap Java stack:");
++        JavaThread* java_thread = JavaThread::cast(current);
++        java_thread->print_stack_on(tty);
++#ifdef ZERO
++        tty->print_cr("Mangatan Serial raw Zero frame chain:");
++        int frames_seen = 0;
++        int java_depth = 0;
++        for (ZeroFrame* raw_frame = java_thread->top_zero_frame();
++             raw_frame != nullptr && frames_seen < 64;
++             raw_frame = raw_frame->next(), frames_seen++) {
++          if (raw_frame->is_interpreter_frame()) {
++            interpreterState raw_state =
++                raw_frame->as_interpreter_frame()->interpreter_state();
++            if (raw_state->self_link() != raw_state) {
++              tty->print_cr("  raw #%d type=interpreter state=invalid",
++                            frames_seen);
++              continue;
++            }
++            Method* raw_method = raw_state->method();
++            tty->print("  raw #%d java #%d type=interpreter ",
++                       frames_seen, java_depth);
++            raw_method->print_short_name(tty);
++            tty->print_cr(" bci=%d",
++                          raw_method->validate_bci_from_bcp(raw_state->bcp()));
++            java_depth++;
++          } else if (raw_frame->is_entry_frame()) {
++            tty->print_cr("  raw #%d type=entry", frames_seen);
++          } else {
++            tty->print_cr("  raw #%d type=fake-stub", frames_seen);
++          }
++        }
++#endif
++      }
++    }
+     VM_SerialCollectForAllocation op(size, is_tlab, gc_count_before);
+     VMThread::execute(&op);
+     if (op.gc_succeeded()) {
+diff --git a/src/hotspot/share/interpreter/rewriter.cpp b/src/hotspot/share/interpreter/rewriter.cpp
+index a9ee92cb..5080136f 100644
+--- a/src/hotspot/share/interpreter/rewriter.cpp
++++ b/src/hotspot/share/interpreter/rewriter.cpp
+@@ -120,5 +120,13 @@ void Rewriter::make_constant_pool_cache(TRAPS) {
+   // _resolved_references is stored in pool->cache(), so need to be done after
+   // the above lines.
++  if (_klass == vmClasses::Class_klass()) {
++    tty->print_cr(
++        "Mangatan Rewriter: class=java.lang.Class cp=%d "
++        "resolved=%d constant_pool_map=%d",
++        _pool->length(),
++        _resolved_references_map.length(),
++        _resolved_reference_limit);
++  }
+   _pool->initialize_resolved_references(loader_data, _resolved_references_map,
+                                         _resolved_reference_limit,
+                                         THREAD);
+diff --git a/src/hotspot/share/oops/constantPool.cpp b/src/hotspot/share/oops/constantPool.cpp
+index 640b2f24..db281717 100644
+--- a/src/hotspot/share/oops/constantPool.cpp
++++ b/src/hotspot/share/oops/constantPool.cpp
+@@ -221,5 +221,13 @@ void ConstantPool::initialize_resolved_references(ClassLoaderData* loader_data,
+     // Create Java array for holding resolved strings, methodHandles,
+     // methodTypes, invokedynamic and invokehandle appendix objects, etc.
++    if (pool_holder() == vmClasses::Class_klass()) {
++      tty->print_cr(
++          "Mangatan ConstantPool: class=java.lang.Class cp=%d "
++          "requested_resolved_array=%d constant_pool_map=%d",
++          length(),
++          map_length,
++          constant_pool_map_length);
++    }
+     objArrayOop stom = oopFactory::new_objArray(vmClasses::Object_klass(), map_length, CHECK);
+     HandleMark hm(THREAD);
+     Handle refs_handle (THREAD, stom);  // must handleize.
+diff --git a/src/hotspot/os/posix/os_posix.cpp b/src/hotspot/os/posix/os_posix.cpp
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -823,5 +823,12 @@
+ void* os::get_default_process_handle() {
+-#ifdef __APPLE__
++#if defined(__APPLE__) && defined(ZERO) && \
++    defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++  // The iOS Zero VM is linked into a framework which the app loads with
++  // RTLD_GLOBAL. A main-executable RTLD_FIRST handle cannot see the JNI and
++  // ZIP symbols in that framework, causing native lookup to recursively enter
++  // ClassLoader.findNative during VM bootstrap.
++  return RTLD_DEFAULT;
++#elif defined(__APPLE__)
+   // MacOS X needs to use RTLD_FIRST instead of RTLD_LAZY
+   // to avoid finding unexpected symbols on second (or later)
+   // loads of a library.
+diff --git a/src/hotspot/share/prims/nativeLookup.cpp b/src/hotspot/share/prims/nativeLookup.cpp
+--- a/src/hotspot/share/prims/nativeLookup.cpp
++++ b/src/hotspot/share/prims/nativeLookup.cpp
+@@ -40,5 +40,6 @@
+ #include "runtime/arguments.hpp"
+ #include "runtime/handles.inline.hpp"
++#include "runtime/init.hpp"
+ #include "runtime/interfaceSupport.inline.hpp"
+ #include "runtime/javaCalls.hpp"
+ #include "runtime/os.hpp"
+@@ -48,5 +49,6 @@
+ #include "runtime/signature.hpp"
+ #include "utilities/macros.hpp"
++#include "utilities/ostream.hpp"
+ #include "utilities/utf8.hpp"
+ #if INCLUDE_JFR
+ #include "jfr/jfr.hpp"
+@@ -262,11 +264,19 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name,
+   // another VM/library dependency
+   Handle loader(THREAD, method->method_holder()->class_loader());
+   if (loader.is_null()) {
+     entry = lookup_special_native(jni_name);
+     if (entry == nullptr) {
+-       entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
++      entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
++#if defined(__APPLE__) && defined(ZERO) && \
++    defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++      if (!is_init_completed()) {
++        tty->print_cr(
++            "Mangatan NativeLookup: jni=%s scope=RTLD_DEFAULT found=%s",
++            jni_name, entry == nullptr ? "false" : "true");
++      }
++#endif
+     }
+     if (entry != nullptr) {
+       return entry;
+     }
+   }

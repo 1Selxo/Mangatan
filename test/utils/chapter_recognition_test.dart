@@ -15,6 +15,33 @@ void main() {
     );
   });
 
+  test('negative unknown sentinels fall back without erasing chapter zero', () {
+    expect(
+      recognition.resolveChapterNumber(
+        'Series',
+        'Chapter 54',
+        sourceChapterNumber: -1,
+      ),
+      54,
+    );
+    expect(
+      recognition.resolveChapterNumber(
+        'Series',
+        'Prologue 9',
+        sourceChapterNumber: 0,
+      ),
+      0,
+    );
+    expect(
+      recognition.resolveChapterNumber(
+        'Series',
+        'Special 9',
+        sourceChapterNumber: -2,
+      ),
+      -2,
+    );
+  });
+
   test('recognizes Japanese Mokuro volume names as a fallback', () {
     expect(
       recognition.parseChapterNumber('14 Sai no Koi', '[水谷フーカ] 14歳の恋 第12巻'),

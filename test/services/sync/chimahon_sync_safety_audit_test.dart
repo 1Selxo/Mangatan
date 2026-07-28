@@ -574,9 +574,43 @@ void main() {
         'remote_custom_title_not_retained',
         'remote_preference_key_missing',
         'remote_source_preference_key_missing',
-        'proposed_manga_source_unresolved',
+        'local_source_missing_from_proposed',
+        'remote_source_missing_from_proposed',
       }),
     );
+    expect(
+      failureCodes(report),
+      isNot(contains('proposed_manga_source_unresolved')),
+    );
+  });
+
+  test('accepts opaque manga source IDs without a source catalog', () {
+    final remote = backup(mangaRows: [manga()], sources: const []);
+    final local = backup(mangaRows: [manga()], sources: const []);
+    final proposed = const ChimahonSyncMerger().merge(
+      local: local,
+      remote: remote,
+    );
+
+    final report = audit.audit(
+      remote: remote,
+      local: local,
+      proposed: proposed,
+    );
+
+    expect(
+      failureCodes(report),
+      isNot(contains('remote_manga_source_unresolved')),
+    );
+    expect(
+      failureCodes(report),
+      isNot(contains('local_manga_source_unresolved')),
+    );
+    expect(
+      failureCodes(report),
+      isNot(contains('proposed_manga_source_unresolved')),
+    );
+    expect(report.safeToUpload, isTrue);
   });
 
   test('rejects inferred manual and malformed local chapter identities', () {

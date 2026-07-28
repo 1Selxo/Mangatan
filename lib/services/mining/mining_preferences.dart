@@ -20,7 +20,48 @@ DictionaryLookupTrigger dictionaryLookupTriggerFromName(String? name) {
   );
 }
 
-enum AnkiAudioSourceType { customUrl, customJson }
+enum AnkiAudioSourceType {
+  japanesePod101,
+  jisho,
+  languagePod101,
+  customUrl,
+  customJson,
+}
+
+class AnkiAudioSource {
+  const AnkiAudioSource({required this.type, this.url = ''});
+
+  factory AnkiAudioSource.fromJson(Map<dynamic, dynamic> json) {
+    final typeName = json['type']?.toString() ?? '';
+    return AnkiAudioSource(
+      type: AnkiAudioSourceType.values.firstWhere(
+        (value) => value.name == typeName,
+        orElse: () => AnkiAudioSourceType.customJson,
+      ),
+      url: json['url']?.toString() ?? '',
+    );
+  }
+
+  final AnkiAudioSourceType type;
+  final String url;
+
+  bool get isCustom =>
+      type == AnkiAudioSourceType.customUrl ||
+      type == AnkiAudioSourceType.customJson;
+
+  String get displayName => switch (type) {
+    AnkiAudioSourceType.japanesePod101 => 'JapanesePod101',
+    AnkiAudioSourceType.jisho => 'Jisho.org',
+    AnkiAudioSourceType.languagePod101 => 'LanguagePod101',
+    AnkiAudioSourceType.customUrl => 'Custom URL',
+    AnkiAudioSourceType.customJson => 'Custom URL (JSON)',
+  };
+
+  Map<String, String> toJson() => {'type': type.name, 'url': url.trim()};
+
+  AnkiAudioSource copyWith({AnkiAudioSourceType? type, String? url}) =>
+      AnkiAudioSource(type: type ?? this.type, url: url ?? this.url);
+}
 
 class AnkiAudioPreferences {
   const AnkiAudioPreferences({
@@ -29,6 +70,7 @@ class AnkiAudioPreferences {
     required this.url,
     required this.timeout,
     required this.language,
+    this.sources,
   });
 
   static const defaultUrl =
@@ -36,17 +78,41 @@ class AnkiAudioPreferences {
 
   static const defaults = AnkiAudioPreferences(
     enabled: true,
-    sourceType: AnkiAudioSourceType.customJson,
-    url: defaultUrl,
+    sourceType: AnkiAudioSourceType.japanesePod101,
+    url: '',
     timeout: Duration(milliseconds: 5000),
     language: 'ja',
+    sources: defaultJapaneseSources,
   );
+
+  static const defaultJapaneseSources = <AnkiAudioSource>[
+    AnkiAudioSource(type: AnkiAudioSourceType.japanesePod101),
+    AnkiAudioSource(type: AnkiAudioSourceType.jisho),
+    AnkiAudioSource(type: AnkiAudioSourceType.languagePod101),
+  ];
+
+  static const defaultLanguageSources = <AnkiAudioSource>[
+    AnkiAudioSource(type: AnkiAudioSourceType.languagePod101),
+  ];
+
+  static List<AnkiAudioSource> defaultSourcesForLanguage(String language) =>
+      language == 'ja' ? defaultJapaneseSources : defaultLanguageSources;
 
   final bool enabled;
   final AnkiAudioSourceType sourceType;
   final String url;
   final Duration timeout;
   final String language;
+  final List<AnkiAudioSource>? sources;
+
+  List<AnkiAudioSource> get effectiveSources {
+    final configured = sources;
+    if (configured != null) return configured;
+    if (url.trim().isNotEmpty) {
+      return [AnkiAudioSource(type: sourceType, url: url.trim())];
+    }
+    return defaultSourcesForLanguage(language);
+  }
 
   AnkiAudioPreferences copyWith({
     bool? enabled,
@@ -54,6 +120,7 @@ class AnkiAudioPreferences {
     String? url,
     Duration? timeout,
     String? language,
+    List<AnkiAudioSource>? sources,
   }) {
     return AnkiAudioPreferences(
       enabled: enabled ?? this.enabled,
@@ -61,6 +128,7 @@ class AnkiAudioPreferences {
       url: url ?? this.url,
       timeout: timeout ?? this.timeout,
       language: language ?? this.language,
+      sources: sources ?? this.sources,
     );
   }
 }
@@ -194,6 +262,7 @@ class MiningPreferences {
   static const _ankiAudioEnabled = 'anki_audio_enabled';
   static const _ankiAudioSourceType = 'anki_audio_source_type';
   static const _ankiAudioUrl = 'anki_audio_url';
+  static const _ankiAudioSources = 'anki_audio_sources';
   static const _ankiAudioTimeoutMs = 'anki_audio_timeout_ms';
   static const _ankiAudioLanguage = 'anki_audio_language';
   static const _ocrEngine = 'ocr_engine';
@@ -678,22 +747,40 @@ class MiningPreferences {
             )
             as String? ??
         AnkiAudioSourceType.customJson.name;
+    final legacyType = AnkiAudioSourceType.values.firstWhere(
+      (value) => value.name == sourceTypeName,
+      orElse: () => AnkiAudioSourceType.customJson,
+    );
+    final legacyUrl =
+        box?.get(_ankiAudioUrl, defaultValue: AnkiAudioPreferences.defaultUrl)
+            as String? ??
+        AnkiAudioPreferences.defaultUrl;
+    final language =
+        box?.get(_ankiAudioLanguage, defaultValue: 'ja') as String? ?? 'ja';
+    final rawSources = box?.get(_ankiAudioSources);
+    List<AnkiAudioSource>? sources;
+    if (rawSources is List) {
+      sources = rawSources
+          .whereType<Map>()
+          .map(AnkiAudioSource.fromJson)
+          .where((source) => !source.isCustom || source.url.trim().isNotEmpty)
+          .toList(growable: false);
+    } else if (legacyUrl.trim().isEmpty ||
+        legacyUrl.trim() == AnkiAudioPreferences.defaultUrl) {
+      sources = AnkiAudioPreferences.defaultSourcesForLanguage(language);
+    } else {
+      sources = [AnkiAudioSource(type: legacyType, url: legacyUrl.trim())];
+    }
     return AnkiAudioPreferences(
       enabled: box?.get(_ankiAudioEnabled, defaultValue: true) as bool? ?? true,
-      sourceType: AnkiAudioSourceType.values.firstWhere(
-        (value) => value.name == sourceTypeName,
-        orElse: () => AnkiAudioSourceType.customJson,
-      ),
-      url:
-          box?.get(_ankiAudioUrl, defaultValue: AnkiAudioPreferences.defaultUrl)
-              as String? ??
-          AnkiAudioPreferences.defaultUrl,
+      sourceType: legacyType,
+      url: legacyUrl,
       timeout: Duration(
         milliseconds:
             (box?.get(_ankiAudioTimeoutMs, defaultValue: 5000) as int?) ?? 5000,
       ),
-      language:
-          box?.get(_ankiAudioLanguage, defaultValue: 'ja') as String? ?? 'ja',
+      language: language,
+      sources: sources,
     );
   }
 
@@ -704,6 +791,10 @@ class MiningPreferences {
     await box?.put(_ankiAudioEnabled, preferences.enabled);
     await box?.put(_ankiAudioSourceType, preferences.sourceType.name);
     await box?.put(_ankiAudioUrl, preferences.url.trim());
+    await box?.put(
+      _ankiAudioSources,
+      preferences.effectiveSources.map((source) => source.toJson()).toList(),
+    );
     await box?.put(_ankiAudioTimeoutMs, preferences.timeout.inMilliseconds);
     await box?.put(_ankiAudioLanguage, preferences.language.trim());
   }

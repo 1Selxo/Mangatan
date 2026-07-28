@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
@@ -12,6 +13,7 @@ import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -61,8 +63,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   List<String> _ankiDecks = const [];
   List<String> _ankiModels = const [];
   List<String> _ankiFields = const [];
+  Map<String, List<String>> _ankiMobileFieldsByModel = const {};
   String? _ankiError;
   bool _ankiRefreshing = false;
+
+  bool get _usesAnkiMobile => defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   void initState() {
@@ -122,7 +127,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _cropImageBeforeMining = values[20] as bool;
       _loading = false;
     });
-    if (widget.section == DictionarySettingsSection.anki) {
+    if (widget.section == DictionarySettingsSection.anki && !_usesAnkiMobile) {
       unawaited(_refreshAnki(silent: true));
     }
   }
@@ -358,6 +363,114 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     await MiningPreferences.setAnkiAudioPreferences(preferences);
   }
 
+  Future<void> _saveAnkiAudioSources(List<AnkiAudioSource> sources) async {
+    final first = sources.firstOrNull;
+    await _saveAnkiAudio(
+      _ankiAudioPreferences.copyWith(
+        sources: List.unmodifiable(sources),
+        sourceType: first?.type ?? _ankiAudioPreferences.sourceType,
+        url: first?.url ?? '',
+      ),
+    );
+  }
+
+  bool _usesDefaultAudioSources(String language) {
+    final current = _ankiAudioPreferences.effectiveSources;
+    final defaults = AnkiAudioPreferences.defaultSourcesForLanguage(language);
+    if (current.length != defaults.length) return false;
+    for (var index = 0; index < current.length; index++) {
+      if (current[index].type != defaults[index].type ||
+          current[index].url != defaults[index].url) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _addAnkiAudioSource() async {
+    final configuredTypes = _ankiAudioPreferences.effectiveSources
+        .where((source) => !source.isCustom)
+        .map((source) => source.type)
+        .toSet();
+    final type = await showDialog<AnkiAudioSourceType>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Add audio source'),
+        children: [
+          for (final sourceType in AnkiAudioSourceType.values)
+            if ((_ankiAudioPreferences.language == 'ja' ||
+                    (sourceType != AnkiAudioSourceType.japanesePod101 &&
+                        sourceType != AnkiAudioSourceType.jisho)) &&
+                (sourceType == AnkiAudioSourceType.customUrl ||
+                    sourceType == AnkiAudioSourceType.customJson ||
+                    !configuredTypes.contains(sourceType)))
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, sourceType),
+                child: Text(AnkiAudioSource(type: sourceType).displayName),
+              ),
+        ],
+      ),
+    );
+    if (type == null) return;
+    var source = AnkiAudioSource(type: type);
+    if (source.isCustom) {
+      final url = await _editText(
+        title: source.displayName,
+        value: '',
+        hint: type == AnkiAudioSourceType.customJson
+            ? AnkiAudioPreferences.defaultUrl
+            : 'https://example.com/{term}.mp3',
+        maxLines: 3,
+      );
+      if (url == null || Uri.tryParse(url.trim())?.hasScheme != true) return;
+      source = source.copyWith(url: url.trim());
+    }
+    await _saveAnkiAudioSources([
+      ..._ankiAudioPreferences.effectiveSources,
+      source,
+    ]);
+  }
+
+  Future<void> _editAnkiAudioSource(int index) async {
+    final sources = [..._ankiAudioPreferences.effectiveSources];
+    if (index < 0 || index >= sources.length || !sources[index].isCustom) {
+      return;
+    }
+    final source = sources[index];
+    final url = await _editText(
+      title: source.displayName,
+      value: source.url,
+      hint: source.type == AnkiAudioSourceType.customJson
+          ? AnkiAudioPreferences.defaultUrl
+          : 'https://example.com/{term}.mp3',
+      maxLines: 3,
+    );
+    if (url == null || Uri.tryParse(url.trim())?.hasScheme != true) return;
+    sources[index] = source.copyWith(url: url.trim());
+    await _saveAnkiAudioSources(sources);
+  }
+
+  Future<void> _moveAnkiAudioSource(int index, int offset) async {
+    final sources = [..._ankiAudioPreferences.effectiveSources];
+    final destination = index + offset;
+    if (index < 0 ||
+        index >= sources.length ||
+        destination < 0 ||
+        destination >= sources.length) {
+      return;
+    }
+    final source = sources.removeAt(index);
+    sources.insert(destination, source);
+    await _saveAnkiAudioSources(sources);
+  }
+
+  Future<void> _removeAnkiAudioSource(int index) async {
+    final sources = [..._ankiAudioPreferences.effectiveSources];
+    if (index < 0 || index >= sources.length) return;
+    sources.removeAt(index);
+    await _saveAnkiAudioSources(sources);
+  }
+
   Future<void> _refreshAnki({bool silent = false}) async {
     if (_ankiRefreshing) return;
     setState(() {
@@ -365,6 +478,56 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _ankiError = null;
     });
     try {
+      if (_usesAnkiMobile) {
+        final info = await AnkiMobileService().fetchInfo();
+        final models = info.noteTypes
+            .map((noteType) => noteType.name)
+            .toList(growable: false);
+        final selectedModel = models.contains(_ankiProfile.modelName)
+            ? _ankiProfile.modelName
+            : models.first;
+        final fields = info.fieldsByNoteType[selectedModel] ?? const <String>[];
+        final isLapis = _isLapisLike(selectedModel, fields);
+        final needsLapisMigration = isLapis && _needsLapisMigration();
+        final selectedDeck = info.decks.contains(_ankiProfile.deckName)
+            ? _ankiProfile.deckName
+            : info.decks.first;
+        final configurationChanged =
+            selectedDeck != _ankiProfile.deckName ||
+            selectedModel != _ankiProfile.modelName;
+        final profile =
+            configurationChanged ||
+                (fields.isNotEmpty &&
+                    (!_fieldMapMatches(fields) || needsLapisMigration))
+            ? _ankiProfile.copyWith(
+                deckName: selectedDeck,
+                modelName: selectedModel,
+                fieldMap: fields.isEmpty
+                    ? _ankiProfile.fieldMap
+                    : _autoMapFields(
+                        fields,
+                        needsLapisMigration ? const {} : _ankiProfile.fieldMap,
+                        isLapis: isLapis,
+                      ),
+              )
+            : _ankiProfile;
+        if (!identical(profile, _ankiProfile)) {
+          await MiningPreferences.setAnkiProfile(profile);
+        }
+        if (!mounted) return;
+        setState(() {
+          _ankiProfile = profile;
+          _ankiVersion = 0;
+          _ankiDecks = info.decks;
+          _ankiModels = models;
+          _ankiMobileFieldsByModel = info.fieldsByNoteType;
+          _ankiFields = fields;
+        });
+        if (!silent) {
+          botToast('Connected to AnkiMobile', second: 3);
+        }
+        return;
+      }
       final service = AnkiConnectService(endpoint: _ankiEndpoint);
       final version = await service.version();
       final decks = await service.deckNames();
@@ -398,6 +561,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         _ankiDecks = decks;
         _ankiModels = models;
         _ankiFields = fields;
+        _ankiMobileFieldsByModel = const {};
       });
       if (!silent) botToast('Connected to AnkiConnect v$version', second: 3);
     } catch (error) {
@@ -409,7 +573,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         _ankiFields = const [];
         _ankiError = error.toString();
       });
-      if (!silent) botToast('AnkiConnect failed: $error', second: 5);
+      if (!silent) {
+        botToast(
+          '${_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'} failed: $error',
+          second: 5,
+        );
+      }
     } finally {
       if (mounted) setState(() => _ankiRefreshing = false);
     }
@@ -417,12 +586,16 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   Future<void> _selectAnkiModel(String modelName) async {
     var fields = <String>[];
-    try {
-      fields = await AnkiConnectService(
-        endpoint: _ankiEndpoint,
-      ).modelFieldNames(modelName);
-    } catch (error) {
-      botToast('Could not fetch fields: $error', second: 5);
+    if (_usesAnkiMobile) {
+      fields = _ankiMobileFieldsByModel[modelName] ?? const [];
+    } else {
+      try {
+        fields = await AnkiConnectService(
+          endpoint: _ankiEndpoint,
+        ).modelFieldNames(modelName);
+      } catch (error) {
+        botToast('Could not fetch fields: $error', second: 5);
+      }
     }
     final isLapis = _isLapisLike(modelName, fields);
     final profile = _ankiProfile.copyWith(
@@ -557,6 +730,87 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     );
     if (saved == null) return;
     await _saveAnki(_ankiProfile.copyWith(fieldMap: saved));
+  }
+
+  Future<void> _editAnkiDuplicateDecks() async {
+    final available = <String>{
+      _ankiProfile.deckName,
+      ..._ankiDecks,
+      ..._ankiProfile.duplicateDeckNames,
+    }.where((deck) => deck.trim().isNotEmpty).toList()..sort();
+    if (_ankiDecks.isEmpty) {
+      final raw = await _editText(
+        title: 'Decks to check for duplicates',
+        value: _ankiProfile.duplicateDeckNames.join(', '),
+        hint: 'Japanese::Mining, Japanese::Archive',
+        maxLines: 4,
+      );
+      if (raw == null) return;
+      final decks = <String>{
+        _ankiProfile.deckName,
+        ...raw
+            .split(RegExp(r'[,\n]+'))
+            .map((deck) => deck.trim())
+            .where((deck) => deck.isNotEmpty),
+      }.toList();
+      await _saveAnki(_ankiProfile.copyWith(duplicateDeckNames: decks));
+      return;
+    }
+
+    var selected = <String>{
+      _ankiProfile.deckName,
+      ..._ankiProfile.duplicateDeckNames,
+    };
+    final saved = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Decks to check'),
+          content: SizedBox(
+            width: 480,
+            height: 420,
+            child: ListView.builder(
+              itemCount: available.length,
+              itemBuilder: (context, index) {
+                final deck = available[index];
+                final isDestination = deck == _ankiProfile.deckName;
+                return CheckboxListTile(
+                  value: selected.contains(deck),
+                  title: Text(deck),
+                  subtitle: isDestination
+                      ? const Text('Destination deck (always checked)')
+                      : null,
+                  onChanged: isDestination
+                      ? null
+                      : (checked) {
+                          setDialogState(() {
+                            selected = {...selected};
+                            if (checked == true) {
+                              selected.add(deck);
+                            } else {
+                              selected.remove(deck);
+                            }
+                          });
+                        },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, selected.toList()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == null) return;
+    await _saveAnki(_ankiProfile.copyWith(duplicateDeckNames: saved));
   }
 
   List<Widget> _childrenForSection(List<Widget> children) {
@@ -1223,7 +1477,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   _DictionarySettingsGroup.anki,
                 ),
                 const Divider(height: 24),
-                const _SectionHeader('AnkiConnect'),
+                _SectionHeader(_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'),
                 SwitchListTile(
                   secondary: const Icon(Icons.note_add_outlined),
                   title: const Text('Enable Anki export'),
@@ -1269,53 +1523,66 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: DropdownButtonFormField<AnkiAudioSourceType>(
-                    initialValue: _ankiAudioPreferences.sourceType,
-                    decoration: const InputDecoration(
-                      labelText: 'Audio source type',
-                      prefixIcon: Icon(Icons.graphic_eq_outlined),
+                for (final indexed
+                    in _ankiAudioPreferences.effectiveSources.indexed)
+                  ListTile(
+                    leading: CircleAvatar(
+                      radius: 14,
+                      child: Text('${indexed.$1 + 1}'),
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: AnkiAudioSourceType.customJson,
-                        child: Text('Custom URL (JSON)'),
-                      ),
-                      DropdownMenuItem(
-                        value: AnkiAudioSourceType.customUrl,
-                        child: Text('Custom URL'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      _saveAnkiAudio(
-                        _ankiAudioPreferences.copyWith(sourceType: value),
-                      );
-                    },
+                    title: Text(indexed.$2.displayName),
+                    subtitle: Text(
+                      indexed.$2.isCustom
+                          ? indexed.$2.url
+                          : 'Built in • first available audio wins',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: indexed.$2.isCustom
+                        ? () => _editAnkiAudioSource(indexed.$1)
+                        : null,
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (action) {
+                        switch (action) {
+                          case 'up':
+                            _moveAnkiAudioSource(indexed.$1, -1);
+                          case 'down':
+                            _moveAnkiAudioSource(indexed.$1, 1);
+                          case 'edit':
+                            _editAnkiAudioSource(indexed.$1);
+                          case 'remove':
+                            _removeAnkiAudioSource(indexed.$1);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (indexed.$1 > 0)
+                          const PopupMenuItem(
+                            value: 'up',
+                            child: Text('Move up'),
+                          ),
+                        if (indexed.$1 <
+                            _ankiAudioPreferences.effectiveSources.length - 1)
+                          const PopupMenuItem(
+                            value: 'down',
+                            child: Text('Move down'),
+                          ),
+                        if (indexed.$2.isCustom)
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit URL'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'remove',
+                          child: Text('Remove'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 ListTile(
-                  leading: const Icon(Icons.link_outlined),
-                  title: const Text('Audio source URL'),
-                  subtitle: Text(
-                    _ankiAudioPreferences.url,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final value = await _editText(
-                      title: 'Audio source URL',
-                      value: _ankiAudioPreferences.url,
-                      hint: AnkiAudioPreferences.defaultUrl,
-                      maxLines: 3,
-                    );
-                    if (value == null || value.trim().isEmpty) return;
-                    await _saveAnkiAudio(
-                      _ankiAudioPreferences.copyWith(url: value.trim()),
-                    );
-                  },
+                  leading: const Icon(Icons.add_link_outlined),
+                  title: const Text('Add audio source'),
+                  subtitle: const Text('Sources are tried from top to bottom'),
+                  onTap: _addAnkiAudioSource,
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1333,8 +1600,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ],
                     onChanged: (value) {
                       if (value == null) return;
+                      final wasUsingDefaults = _usesDefaultAudioSources(
+                        _ankiAudioPreferences.language,
+                      );
                       _saveAnkiAudio(
-                        _ankiAudioPreferences.copyWith(language: value),
+                        _ankiAudioPreferences.copyWith(
+                          language: value,
+                          sources: wasUsingDefaults
+                              ? AnkiAudioPreferences.defaultSourcesForLanguage(
+                                  value,
+                                )
+                              : _ankiAudioPreferences.effectiveSources,
+                        ),
                       );
                     },
                   ),
@@ -1358,26 +1635,27 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   },
                 ),
                 const Divider(height: 24),
-                ListTile(
-                  leading: const Icon(Icons.link),
-                  title: const Text('AnkiConnect address'),
-                  subtitle: Text(_ankiEndpoint.toString()),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final value = await _editText(
-                      title: 'AnkiConnect address',
-                      value: _ankiEndpoint.toString(),
-                      hint: 'http://127.0.0.1:8765',
-                    );
-                    final endpoint = value == null
-                        ? null
-                        : Uri.tryParse(value.trim());
-                    if (endpoint == null || !endpoint.hasScheme) return;
-                    setState(() => _ankiEndpoint = endpoint);
-                    await MiningPreferences.setAnkiEndpoint(endpoint);
-                    await _refreshAnki();
-                  },
-                ),
+                if (!_usesAnkiMobile)
+                  ListTile(
+                    leading: const Icon(Icons.link),
+                    title: const Text('AnkiConnect address'),
+                    subtitle: Text(_ankiEndpoint.toString()),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () async {
+                      final value = await _editText(
+                        title: 'AnkiConnect address',
+                        value: _ankiEndpoint.toString(),
+                        hint: 'http://127.0.0.1:8765',
+                      );
+                      final endpoint = value == null
+                          ? null
+                          : Uri.tryParse(value.trim());
+                      if (endpoint == null || !endpoint.hasScheme) return;
+                      setState(() => _ankiEndpoint = endpoint);
+                      await MiningPreferences.setAnkiEndpoint(endpoint);
+                      await _refreshAnki();
+                    },
+                  ),
                 ListTile(
                   leading: Icon(
                     _ankiVersion == null
@@ -1386,13 +1664,17 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   ),
                   title: Text(
                     _ankiVersion == null
-                        ? 'AnkiConnect not connected'
+                        ? '${_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'} not connected'
+                        : _usesAnkiMobile
+                        ? 'AnkiMobile ready'
                         : 'AnkiConnect v$_ankiVersion',
                   ),
                   subtitle: Text(
                     _ankiError ??
                         (_ankiFields.isEmpty
-                            ? 'Refresh to fetch decks, note types, and fields.'
+                            ? _usesAnkiMobile
+                                  ? 'Tap Refresh to open AnkiMobile and approve access to decks and note types.'
+                                  : 'Refresh to fetch decks, note types, and fields.'
                             : '${_ankiDecks.length} decks, ${_ankiModels.length} note types, ${_ankiFields.length} fields fetched.'),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -1523,8 +1805,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 SwitchListTile(
                   title: const Text('Check for duplicates'),
-                  subtitle: const Text(
-                    'Use Anki\'s note-model duplicate rules before adding',
+                  subtitle: Text(
+                    _usesAnkiMobile
+                        ? 'Let AnkiMobile apply the note type\'s duplicate rule when adding'
+                        : 'Use Anki\'s note-model duplicate rules before adding',
                   ),
                   value: _ankiProfile.duplicateCheck,
                   onChanged: (value) =>
@@ -1533,8 +1817,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 if (_ankiProfile.duplicateCheck) ...[
                   SwitchListTile(
                     title: const Text('Allow duplicates'),
-                    subtitle: const Text(
-                      'Show duplicate state but keep the add button enabled',
+                    subtitle: Text(
+                      _usesAnkiMobile
+                          ? 'Allow AnkiMobile to add a card whose first field already matches'
+                          : 'Show duplicate state but keep the add button enabled',
                     ),
                     value: _activeProfile.duplicateAction == 'allow',
                     onChanged: (value) => _updateActiveProfile(
@@ -1543,52 +1829,85 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
                     ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.filter_alt_outlined),
-                    title: const Text('Duplicate scope'),
-                    subtitle: Text(switch (_ankiProfile.duplicateScope) {
-                      'collection' => 'Entire collection',
-                      'deckroot' => 'Deck root and child decks',
-                      _ => 'Selected deck',
-                    }),
-                    trailing: DropdownButton<String>(
-                      value:
-                          const {
-                            'collection',
-                            'deck',
-                            'deckroot',
-                          }.contains(_ankiProfile.duplicateScope)
-                          ? _ankiProfile.duplicateScope
-                          : 'deck',
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'collection',
-                          child: Text('Collection'),
-                        ),
-                        DropdownMenuItem(value: 'deck', child: Text('Deck')),
-                        DropdownMenuItem(
-                          value: 'deckroot',
-                          child: Text('Deck root'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          _saveAnki(
-                            _ankiProfile.copyWith(duplicateScope: value),
-                          );
-                        }
-                      },
+                  if (!_usesAnkiMobile)
+                    ListTile(
+                      leading: const Icon(Icons.filter_alt_outlined),
+                      title: const Text('Duplicate scope'),
+                      subtitle: Text(switch (_ankiProfile.duplicateScope) {
+                        'collection' => 'Entire collection',
+                        'deckroot' => 'Deck root and child decks',
+                        'decks' => 'Selected list of decks',
+                        _ => 'Destination deck',
+                      }),
+                      trailing: DropdownButton<String>(
+                        value:
+                            const {
+                              'collection',
+                              'deck',
+                              'deckroot',
+                              'decks',
+                            }.contains(_ankiProfile.duplicateScope)
+                            ? _ankiProfile.duplicateScope
+                            : 'deck',
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'collection',
+                            child: Text('Collection'),
+                          ),
+                          DropdownMenuItem(value: 'deck', child: Text('Deck')),
+                          DropdownMenuItem(
+                            value: 'deckroot',
+                            child: Text('Deck root'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'decks',
+                            child: Text('Custom decks'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            _saveAnki(
+                              _ankiProfile.copyWith(duplicateScope: value),
+                            );
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('Check all note types'),
-                    subtitle: const Text(
-                      'Match the first field across every Anki model',
+                  if (!_usesAnkiMobile &&
+                      _ankiProfile.duplicateScope == 'decks')
+                    ListTile(
+                      leading: const Icon(Icons.library_books_outlined),
+                      title: const Text('Decks to check'),
+                      subtitle: Text(
+                        <String>{
+                          _ankiProfile.deckName,
+                          ..._ankiProfile.duplicateDeckNames,
+                        }.join(', '),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: _editAnkiDuplicateDecks,
                     ),
-                    value: _ankiProfile.checkAllModels,
-                    onChanged: (value) =>
-                        _saveAnki(_ankiProfile.copyWith(checkAllModels: value)),
-                  ),
+                  if (_usesAnkiMobile)
+                    const ListTile(
+                      leading: Icon(Icons.library_books_outlined),
+                      title: Text('Duplicate decks'),
+                      subtitle: Text(
+                        'AnkiMobile checks the first field across all decks that use the selected note type. Its callback API cannot limit the check to a custom deck list.',
+                      ),
+                    ),
+                  if (!_usesAnkiMobile)
+                    SwitchListTile(
+                      title: const Text('Check all note types'),
+                      subtitle: const Text(
+                        'Match the first field across every Anki model',
+                      ),
+                      value: _ankiProfile.checkAllModels,
+                      onChanged: (value) => _saveAnki(
+                        _ankiProfile.copyWith(checkAllModels: value),
+                      ),
+                    ),
                 ],
                 SwitchListTile(
                   secondary: const Icon(Icons.crop_outlined),
@@ -1602,12 +1921,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     await MiningPreferences.setCropImageBeforeMining(value);
                   },
                 ),
-                SwitchListTile(
-                  title: const Text('Sync after adding a note'),
-                  value: _ankiProfile.syncOnCreate,
-                  onChanged: (value) =>
-                      _saveAnki(_ankiProfile.copyWith(syncOnCreate: value)),
-                ),
+                if (_usesAnkiMobile)
+                  const ListTile(
+                    leading: Icon(Icons.sync_outlined),
+                    title: Text('Sync in AnkiMobile'),
+                    subtitle: Text(
+                      'Mangatan returns after adding; use AnkiMobile\'s normal automatic or manual sync.',
+                    ),
+                  )
+                else
+                  SwitchListTile(
+                    title: const Text('Sync after adding a note'),
+                    value: _ankiProfile.syncOnCreate,
+                    onChanged: (value) =>
+                        _saveAnki(_ankiProfile.copyWith(syncOnCreate: value)),
+                  ),
                 const SizedBox(height: 24),
               ]),
             ),

@@ -2,10 +2,21 @@ name: Update Sideloading Source
 
 on:
   workflow_call:
+  workflow_run:
+    workflows:
+      - Build iOS sideload IPA
+    types:
+      - completed
   workflow_dispatch: # Allow manual triggering of this workflow
+
+permissions:
+  contents: write
 
 jobs:
   update-source:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -14,10 +25,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-  
-      - name: Get Latest Release Tag
-        run: echo "RELEASE_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-        
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -39,6 +47,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes detected, skipping commit."
           else
-            git commit -m "source update: $RELEASE_TAG"
+            git commit -m "chore(source): update iOS release [skip ci]"
             git push
           fi

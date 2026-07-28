@@ -17,6 +17,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSa
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_category_payload_adapter.dart';
+import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_feed_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_media_child_projection_proof.dart';
 import 'package:mangayomi/services/sync/chimahon_media_parent_projection_proof.dart';
@@ -522,10 +523,11 @@ class ChimahonSyncMerger {
     required bool leftWinsTie,
     required bool localProjectionRules,
   }) {
-    final remoteList = remote.toList(growable: false);
+    final remoteList = canonicalizeChimahonChapters(remote);
+    final canonicalLocal = canonicalizeChimahonChapters(local);
     final localList = localProjectionRules
-        ? _rebaseLocalChapterIdentity(local, remoteList)
-        : local.toList(growable: false);
+        ? _rebaseLocalChapterIdentity(canonicalLocal, remoteList)
+        : canonicalLocal;
     final localByKey = _lastByKey<BackupChapter, String>(
       localList,
       _chapterKey,
@@ -839,10 +841,11 @@ class ChimahonSyncMerger {
     required bool leftWinsTie,
     required bool localProjectionRules,
   }) {
-    final remoteList = remote.toList(growable: false);
+    final remoteList = canonicalizeChimahonEpisodes(remote);
+    final canonicalLocal = canonicalizeChimahonEpisodes(local);
     final localList = localProjectionRules
-        ? _rebaseLocalEpisodeIdentity(local, remoteList)
-        : local.toList(growable: false);
+        ? _rebaseLocalEpisodeIdentity(canonicalLocal, remoteList)
+        : canonicalLocal;
     final localByKey = _lastByKey<BackupEpisode, String>(
       localList,
       _episodeKey,
@@ -1771,11 +1774,9 @@ class ChimahonSyncMerger {
   String _animeSourceUrlKey(BackupAnime anime) =>
       '${anime.source}|${anime.url}';
 
-  String _chapterKey(BackupChapter chapter) =>
-      '${chapter.url}|${chapter.name}|${chapter.chapterNumber}';
+  String _chapterKey(BackupChapter chapter) => chimahonChapterIdentity(chapter);
 
-  String _episodeKey(BackupEpisode episode) =>
-      '${episode.url}|${episode.name}|${episode.episodeNumber}';
+  String _episodeKey(BackupEpisode episode) => chimahonEpisodeIdentity(episode);
 
   String _stableNovelId(BackupNovel novel) {
     final title = _normalized(novel.title);

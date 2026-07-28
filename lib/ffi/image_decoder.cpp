@@ -433,7 +433,7 @@ ImageDecoderContext* init_decoder(const char* file_path, bool crop_borders, int*
         ctx->width = *out_width;
         ctx->height = *out_height;
         ctx->bmp_ctx = bmp;
-        
+
         if (crop_borders) {
             perform_bmp_autocrop(ctx);
         } else {
@@ -450,21 +450,21 @@ ImageDecoderContext* init_decoder(const char* file_path, bool crop_borders, int*
 
     CFStringRef path_str = CFStringCreateWithCString(NULL, file_path, kCFStringEncodingUTF8);
     if (!path_str) return NULL;
-    
+
     CFURLRef url = CFURLCreateWithFileSystemPath(NULL, path_str, kCFURLPOSIXPathStyle, false);
     CFRelease(path_str);
     if (!url) return NULL;
-    
+
     CGImageSourceRef source = CGImageSourceCreateWithURL(url, NULL);
     CFRelease(url);
     if (!source) return NULL;
-    
+
     CFDictionaryRef properties = CGImageSourceCopyPropertiesAtIndex(source, 0, NULL);
     if (!properties) {
         CFRelease(source);
         return NULL;
     }
-    
+
     int w = 0, h = 0;
     CFNumberRef width_num = (CFNumberRef)CFDictionaryGetValue(properties, kCGImagePropertyPixelWidth);
     CFNumberRef height_num = (CFNumberRef)CFDictionaryGetValue(properties, kCGImagePropertyPixelHeight);
@@ -484,14 +484,14 @@ ImageDecoderContext* init_decoder(const char* file_path, bool crop_borders, int*
         CFRelease(source);
         return NULL;
     }
-    
+
     ImageDecoderContext* ctx = (ImageDecoderContext*)malloc(sizeof(ImageDecoderContext));
     ctx->type = TYPE_NATIVE;
     ctx->width = w;
     ctx->height = h;
     ctx->apple_ctx.source = source;
     ctx->apple_ctx.cached_image = cached_image;
-    
+
     if (crop_borders) {
         perform_apple_autocrop(ctx);
     } else {
@@ -522,18 +522,18 @@ bool decode_region(ImageDecoderContext* ctx, int left, int top, int right, int b
     // Reuse the cached CGImageRef — no full re-decode per tile.
     CGImageRef full_image = ctx->apple_ctx.cached_image;
     if (!full_image) return false;
-    
+
     CGRect crop_rect = CGRectMake(raw_left, raw_top, raw_right - raw_left, raw_bottom - raw_top);
     CGImageRef cropped_image = CGImageCreateWithImageInRect(full_image, crop_rect);
     if (!cropped_image) return false;
-    
+
     int dest_width  = (raw_right - raw_left) / sample_size;
     int dest_height = (raw_bottom - raw_top) / sample_size;
     if (dest_width <= 0 || dest_height <= 0) {
         CGImageRelease(cropped_image);
         return false;
     }
-    
+
     CGColorSpaceRef color_space = CGColorSpaceCreateDeviceRGB();
     CGContextRef context = CGBitmapContextCreate(
         out_rgba_buffer,
@@ -549,12 +549,12 @@ bool decode_region(ImageDecoderContext* ctx, int left, int top, int right, int b
         CGImageRelease(cropped_image);
         return false;
     }
-    
+
     CGRect dest_rect = CGRectMake(0, 0, dest_width, dest_height);
     CGContextDrawImage(context, dest_rect, cropped_image);
     CGContextRelease(context);
     CGImageRelease(cropped_image);
-    
+
     return true;
 }
 
@@ -717,7 +717,7 @@ ImageDecoderContext* init_decoder(const char* file_path, bool crop_borders, int*
         ctx->width = *out_width;
         ctx->height = *out_height;
         ctx->bmp_ctx = bmp;
-        
+
         if (crop_borders) {
             perform_bmp_autocrop(ctx);
         } else {
@@ -981,7 +981,7 @@ ImageDecoderContext* init_decoder(const char* file_path, bool crop_borders, int*
         ctx->width = *out_width;
         ctx->height = *out_height;
         ctx->bmp_ctx = bmp;
-        
+
         if (crop_borders) {
             perform_bmp_autocrop(ctx);
         } else {
@@ -1168,7 +1168,7 @@ ImageDecoderContext* init_decoder(const char* file_path, bool crop_borders, int*
         ctx->width = *out_width;
         ctx->height = *out_height;
         ctx->bmp_ctx = bmp;
-        
+
         if (crop_borders) {
             perform_bmp_autocrop(ctx);
         } else {
@@ -1194,7 +1194,7 @@ bool decode_region(ImageDecoderContext* ctx, int left, int top, int right, int b
     int raw_top = top + ctx->crop_top;
     int raw_right = right + ctx->crop_left;
     int raw_bottom = bottom + ctx->crop_top;
-    
+
     if (ctx->type == TYPE_BMP) {
         return decode_bmp_region(ctx->bmp_ctx, raw_left, raw_top, raw_right, raw_bottom, sample_size, out_rgba_buffer);
     }

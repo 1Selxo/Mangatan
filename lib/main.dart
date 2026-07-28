@@ -43,6 +43,7 @@ import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
 import 'package:mangayomi/utils/discord_rpc.dart';
 import 'package:mangayomi/utils/log/logger.dart';
@@ -64,6 +65,7 @@ late Isar isar;
 DiscordRPC? discordRpc;
 WebViewEnvironment? webViewEnvironment;
 String? customDns;
+bool _didMountApplication = false;
 
 /// Captures a supported cold-start URI supplied directly to a desktop runner.
 ///
@@ -126,8 +128,6 @@ void main(List<String> args) async {
       // Detect Android TV / leanback so the UI can branch on form factor.
       // No-op on other platforms. See #729.
       await initIsTv();
-      await getIsolateService.start();
-      await ffiImageDecoder.start();
       if (!isMobile) {
         await windowManager.ensureInitialized();
         await WindowGeometry.restore();
@@ -183,15 +183,28 @@ void main(List<String> args) async {
                 retry: (retryCount, error) => null,
               ),
       );
-      if (startupError == null) unawaited(_postLaunchInit(storage));
+      _didMountApplication = true;
+      if (startupError == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          unawaited(_postLaunchInit(storage));
+        });
+      }
     },
-    (Object error, StackTrace stack) {
-      AppLogger.log(
-        'runZonedGuarded error: $error\n$stack',
-        logLevel: LogLevel.error,
-      );
-    },
+    _handleUncaughtError,
   );
+}
+
+void _handleUncaughtError(Object error, StackTrace stack) {
+  debugPrint('Uncaught startup error: $error\n$stack');
+  AppLogger.log(
+    'runZonedGuarded error: $error\n$stack',
+    logLevel: LogLevel.error,
+  );
+  if (_didMountApplication) return;
+
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(_StartupErrorApp(error: error.toString()));
+  _didMountApplication = true;
 }
 
 class _StartupErrorApp extends StatelessWidget {
@@ -229,6 +242,11 @@ class _StartupErrorApp extends StatelessWidget {
 }
 
 Future<void> _postLaunchInit(StorageProvider storage) async {
+  // These services spawn five isolates in total, and the extension workers
+  // each open the database. Warming them before runApp can consume the iOS
+  // launch-watchdog window without presenting a frame.
+  unawaited(getIsolateService.start());
+  unawaited(ffiImageDecoder.start());
   await AppLogger.init();
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   if (isApple || Platform.isAndroid) {
@@ -272,11 +290,13 @@ class _MyAppState extends ConsumerState<MyApp>
   GoogleDriveDebugDiagnosticHandler? _googleDriveDiagnosticHandler;
   Uri? lastUri;
   late final AnimationController _disabledProgressController;
+  late final MExtensionServerPlatform _mExtensionServer;
 
   @override
   void initState() {
     super.initState();
     _disabledProgressController = AnimationController(vsync: this, value: 0.5);
+    _mExtensionServer = MExtensionServerPlatform(ref, persistent: true);
     WidgetsBinding.instance.addObserver(this);
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
@@ -298,7 +318,13 @@ class _MyAppState extends ConsumerState<MyApp>
     unawaited(ref.read(scanLocalLibraryProvider.future));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      MExtensionServerPlatform(ref, persistent: true).startServer();
+      // OpenJDK Mobile initialization is intentionally lazy on iOS. Starting
+      // a full embedded VM during the first frame can terminate the app before
+      // Flutter has finished restoring its UI. Mihon operations call
+      // prepareMihonBridge and start it when it is actually needed.
+      if (!Platform.isIOS) {
+        _mExtensionServer.startServer();
+      }
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
         ref.watch(totalChapterCacheSizeStateProvider);
@@ -312,6 +338,16 @@ class _MyAppState extends ConsumerState<MyApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (Platform.isIOS) {
+      if (state == AppLifecycleState.inactive) {
+        // iOS can leave OpenJDK's blocking accept call spinning after device
+        // sleep. Stop the loopback listener before suspension; loaded Mihon
+        // extension instances remain cached in the embedded JVM.
+        unawaited(_mExtensionServer.suspendEmbeddedIosBridge());
+      } else if (state == AppLifecycleState.resumed) {
+        unawaited(_mExtensionServer.resumeEmbeddedIosBridge());
+      }
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       if (Platform.isLinux) {
@@ -406,7 +442,7 @@ class _MyAppState extends ConsumerState<MyApp>
       windowManager.removeListener(this);
       WindowGeometry.save();
     }
-    MExtensionServerPlatform(ref).stopServer();
+    unawaited(_mExtensionServer.stopServer());
     _linkSubscription?.cancel();
     _googleDriveDiagnosticHandler?.close();
     discordRpc?.destroy();
@@ -440,6 +476,15 @@ class _MyAppState extends ConsumerState<MyApp>
   Future<void> _handleDeepLink(Uri uri) async {
     if (uri == lastUri) return; // Debouncing Deep Links
     lastUri = uri;
+    final ankiMobileCallback = AnkiMobileCallbackCoordinator.instance.handle(
+      uri,
+    );
+    if (ankiMobileCallback != null) {
+      if (ankiMobileCallback == AnkiMobileCallbackKind.added) {
+        botToast('Added to AnkiMobile', second: 3);
+      }
+      return;
+    }
     final googleDriveDiagnosticHandler = _googleDriveDiagnosticHandler;
     if (googleDriveDiagnosticHandler != null &&
         await googleDriveDiagnosticHandler.handle(uri)) {

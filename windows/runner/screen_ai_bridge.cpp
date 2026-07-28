@@ -245,7 +245,7 @@ extern "C" __declspec(dllexport) int ScreenAiRecognize(
   const uint64_t pixel_count =
       static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
   std::vector<uint8_t> pixels(pixel_count);
-  
+
   // Fast C++ byte swap from RGBA to BGRA
   for (size_t i = 0; i < pixel_count; i += 4) {
     pixels[i]     = rgba_pixels[i + 2]; // B

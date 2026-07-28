@@ -39,6 +39,33 @@ void main() {
     expect(chapters.single.chapterNumber, 12.0);
   });
 
+  test('normalizes Mihon unknown chapter-number sentinels', () async {
+    final client = MockClient(
+      (request) async => http.Response(
+        jsonEncode([
+          {
+            'name': 'Chapter 54',
+            'url': '/chapter-54',
+            'date_upload': 0,
+            'scanlator': null,
+            'chapter_number': -1,
+          },
+        ]),
+        200,
+      ),
+    );
+    final service = MihonExtensionService(
+      Source(itemType: ItemType.manga, sourceCode: 'extension-package'),
+      'https://bridge.example.test',
+      client: client,
+      requestHeaders: const {},
+    );
+
+    final chapters = await service.getChapterList('/series');
+
+    expect(chapters.single.chapterNumber, isNull);
+  });
+
   test('requests the extension-defined chapter WebView URL', () async {
     late Map<String, dynamic> requestBody;
     final client = MockClient((request) async {

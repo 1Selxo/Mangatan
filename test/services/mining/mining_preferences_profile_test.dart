@@ -48,6 +48,64 @@ void main() {
     });
   });
 
+  test('uses and persists ordered Japanese audio sources', () async {
+    final defaults = await MiningPreferences.getAnkiAudioPreferences();
+    expect(defaults.effectiveSources.map((source) => source.type), [
+      AnkiAudioSourceType.japanesePod101,
+      AnkiAudioSourceType.jisho,
+      AnkiAudioSourceType.languagePod101,
+    ]);
+
+    const configured = AnkiAudioPreferences(
+      enabled: true,
+      sourceType: AnkiAudioSourceType.jisho,
+      url: '',
+      sources: [
+        AnkiAudioSource(type: AnkiAudioSourceType.jisho),
+        AnkiAudioSource(
+          type: AnkiAudioSourceType.customUrl,
+          url: 'https://audio.example/{term}.mp3',
+        ),
+      ],
+      timeout: Duration(seconds: 7),
+      language: 'ja',
+    );
+    await MiningPreferences.setAnkiAudioPreferences(configured);
+    await Hive.box<dynamic>('mining_preferences').close();
+
+    final restored = await MiningPreferences.getAnkiAudioPreferences();
+    expect(restored.effectiveSources.map((source) => source.type), [
+      AnkiAudioSourceType.jisho,
+      AnkiAudioSourceType.customUrl,
+    ]);
+    expect(
+      restored.effectiveSources.last.url,
+      'https://audio.example/{term}.mp3',
+    );
+    expect(restored.timeout, const Duration(seconds: 7));
+  });
+
+  test('migrates an existing custom single audio source', () async {
+    final box = await Hive.openBox<dynamic>('mining_preferences');
+    await box.put('anki_audio_source_type', 'customJson');
+    await box.put(
+      'anki_audio_url',
+      'http://audio.local/?term={term}&reading={reading}',
+    );
+
+    final restored = await MiningPreferences.getAnkiAudioPreferences();
+
+    expect(restored.effectiveSources, hasLength(1));
+    expect(
+      restored.effectiveSources.single.type,
+      AnkiAudioSourceType.customJson,
+    );
+    expect(
+      restored.effectiveSources.single.url,
+      'http://audio.local/?term={term}&reading={reading}',
+    );
+  });
+
   test('deleting a profile sweeps overrides at every cascade level', () async {
     const japanese = DictionaryProfile(id: 'ja', name: 'Japanese');
     const english = DictionaryProfile(

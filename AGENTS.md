@@ -67,6 +67,10 @@ The generated directories `ios/EmbeddedMihon/runtime`,
 `ios/Frameworks/OpenJDKRuntime.framework` are build products. Do not commit
 them.
 
+The framework-local `java.home` must contain both `lib/modules` and the
+matching OpenJDK `conf` tree. In particular, Java security initialization
+requires `conf/security/java.security`; a trust store alone is insufficient.
+
 When publishing a new runtime:
 
 1. Keep the OpenJDK Mobile and ios-tools commits pinned.

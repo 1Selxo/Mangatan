@@ -59,6 +59,9 @@ void main() {
     final zeroRuntimePatch = File(
       'tool/openjdk/ios-zero-runtime.patch',
     ).readAsStringSync();
+    final libjavaGlobalSymbolsPatch = File(
+      'tool/openjdk/ios-libjava-global-symbols.patch',
+    ).readAsStringSync();
     final xcodeProject = File(
       'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsStringSync();
@@ -239,6 +242,24 @@ void main() {
       zeroRuntimePatch,
       contains('scope=RTLD_DEFAULT found=%s'),
       reason: 'bootstrap native lookup must remain observable on physical iOS',
+    );
+    expect(
+      libjavaGlobalSymbolsPatch,
+      contains('procHandle = RTLD_DEFAULT;'),
+      reason:
+          'libjava must see built-in native libraries in the lazy iOS framework',
+    );
+    expect(
+      libjavaGlobalSymbolsPatch,
+      contains(
+        'defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)\n'
+        '+    // The iOS Zero VM lives in a framework loaded after process launch.\n'
+        '+    // RTLD_FIRST only searches the main executable, so built-in libjava,\n'
+        '+    // jimage, net, nio, and zip symbols cannot be found.\n'
+        '+    procHandle = RTLD_DEFAULT;\n'
+        '+#elif defined(__APPLE__)',
+      ),
+      reason: 'only iOS should replace the macOS RTLD_FIRST search scope',
     );
     expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
     expect(

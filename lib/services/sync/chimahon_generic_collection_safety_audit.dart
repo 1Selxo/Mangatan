@@ -5,6 +5,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupFe
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSavedSearch.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupStatistics.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_feed_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_opaque_rows.dart';
 import 'package:mangayomi/services/sync/chimahon_unknown_field_safety.dart';
@@ -14,9 +15,9 @@ import 'package:protobuf/protobuf.dart';
 ///
 /// Local known fields win ordinary conflicts for these keyed collections, but
 /// remote identities and both sides' future protobuf fields must survive. The
-/// global statistics collections are intentionally treated as exact opaque
-/// rows: Chimahon excludes them from normal sync and manga statistics contain
-/// a device-local database ID, so Mangatan must not invent a cross-device key.
+/// global statistics collections are checked on Chimahon's own daily identity
+/// and for counter regressions rather than byte equality, because the merger
+/// intentionally rewrites those rows to the larger value per field.
 class ChimahonGenericCollectionSafetyAudit {
   const ChimahonGenericCollectionSafetyAudit();
 
@@ -82,7 +83,7 @@ class ChimahonGenericCollectionSafetyAudit {
       proposed: proposed,
       fail: fail,
     );
-    _auditOpaqueStatistics(
+    _auditStatistics(
       local: local,
       remote: remote,
       proposed: proposed,
@@ -274,50 +275,91 @@ class ChimahonGenericCollectionSafetyAudit {
     fail('local_root_unknown_field_changed_in_proposed', localChanged);
   }
 
-  void _auditOpaqueStatistics({
+  /// Verifies that merging statistics neither drops a day nor loses reading.
+  ///
+  /// These rows are now produced locally rather than passed through opaquely,
+  /// so exact-byte preservation is no longer the right check: the merger
+  /// deliberately rewrites a row to the larger value per field. What must still
+  /// hold is that every `(dateKey, id)` present on either side survives, and
+  /// that no counter goes backwards — a regression would silently erase
+  /// recorded reading or mined cards.
+  void _auditStatistics({
     required BackupMihon local,
     required BackupMihon remote,
     required BackupMihon proposed,
     required void Function(String code, Iterable<String> affected) fail,
     required void Function(String code, Iterable<String> affected) observe,
   }) {
-    fail(
-      'local_manga_stat_missing_from_proposed',
-      ChimahonOpaqueRows.missingExactRows(
-        local.backupMangaStats,
-        proposed.backupMangaStats,
-      ),
+    final proposedManga = _statsByKey(
+      proposed.backupMangaStats,
+      _mangaStatKey,
     );
-    fail(
-      'remote_manga_stat_missing_from_proposed',
-      ChimahonOpaqueRows.missingExactRows(
-        remote.backupMangaStats,
-        proposed.backupMangaStats,
-      ),
-    );
-    fail(
-      'local_anki_stat_missing_from_proposed',
-      ChimahonOpaqueRows.missingExactRows(
-        local.backupAnkiStats,
-        proposed.backupAnkiStats,
-      ),
-    );
-    fail(
-      'remote_anki_stat_missing_from_proposed',
-      ChimahonOpaqueRows.missingExactRows(
-        remote.backupAnkiStats,
-        proposed.backupAnkiStats,
-      ),
-    );
+    final proposedAnki = _statsByKey(proposed.backupAnkiStats, _ankiStatKey);
+
+    for (final side in [('local', local), ('remote', remote)]) {
+      final missingManga = <String>[];
+      final regressedManga = <String>[];
+      for (final row in side.$2.backupMangaStats) {
+        final key = _mangaStatKey(row);
+        final candidate = proposedManga[key];
+        if (candidate == null) {
+          missingManga.add(key);
+        } else if (candidate.charactersRead < row.charactersRead ||
+            candidate.readingTime < row.readingTime) {
+          regressedManga.add(key);
+        }
+      }
+      fail('${side.$1}_manga_stat_missing_from_proposed', missingManga);
+      fail('${side.$1}_manga_stat_regressed_in_proposed', regressedManga);
+
+      final missingAnki = <String>[];
+      final regressedAnki = <String>[];
+      for (final row in side.$2.backupAnkiStats) {
+        final key = _ankiStatKey(row);
+        final candidate = proposedAnki[key];
+        if (candidate == null) {
+          missingAnki.add(key);
+        } else if (candidate.mangaCards < row.mangaCards ||
+            candidate.novelCards < row.novelCards) {
+          regressedAnki.add(key);
+        }
+      }
+      fail('${side.$1}_anki_stat_missing_from_proposed', missingAnki);
+      fail('${side.$1}_anki_stat_regressed_in_proposed', regressedAnki);
+    }
+
     observe(
-      'manga_statistics_manual_backup_only',
+      'manga_statistics_merged',
       ChimahonOpaqueRows.opaqueDigests(proposed.backupMangaStats),
     );
     observe(
-      'anki_statistics_manual_backup_only',
+      'anki_statistics_merged',
       ChimahonOpaqueRows.opaqueDigests(proposed.backupAnkiStats),
     );
   }
+
+  /// Keeps the row with the largest counters per key, so an audit against a
+  /// side that itself contains duplicate keys still compares against the
+  /// strongest claim rather than whichever row happened to come last.
+  Map<String, T> _statsByKey<T extends GeneratedMessage>(
+    Iterable<T> rows,
+    String Function(T row) keyOf,
+  ) {
+    final result = <String, T>{};
+    for (final row in rows) {
+      result[keyOf(row)] = row;
+    }
+    return result;
+  }
+
+  static String _mangaStatKey(BackupMangaStats row) =>
+      '${row.dateKey}|${row.mangaId}';
+
+  /// An absent `titleId` is distinct from an empty one, so the sentinel must
+  /// not collide with a real empty-string title ID.
+  static String _ankiStatKey(BackupAnkiStats row) =>
+      '${row.dateKey}|${row.profileId}|'
+      '${row.hasTitleId() ? 'id:${row.titleId}' : 'none'}';
 
   T _messageWithOnlyUnknownField<T extends GeneratedMessage>(
     T source,

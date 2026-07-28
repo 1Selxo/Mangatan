@@ -20,7 +20,7 @@ import 'package:mangayomi/services/sync/chimahon_category_payload_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_feed_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_media_child_projection_proof.dart';
 import 'package:mangayomi/services/sync/chimahon_media_parent_projection_proof.dart';
-import 'package:mangayomi/services/sync/chimahon_opaque_rows.dart';
+import 'package:mangayomi/services/sync/chimahon_stats_row_merge.dart';
 import 'package:protobuf/protobuf.dart';
 
 typedef ChimahonTrackingDeletionKey = ({int source, String url, int syncId});
@@ -139,11 +139,11 @@ class ChimahonSyncMerger {
         leftWinsTie,
       ),
       backupNovelCategories: novelCategories,
-      backupMangaStats: ChimahonOpaqueRows.mergeMaxMultiplicity(
+      backupMangaStats: ChimahonStatsRowMerge.mangaStats(
         local.backupMangaStats,
         remote.backupMangaStats,
       ),
-      backupAnkiStats: ChimahonOpaqueRows.mergeMaxMultiplicity(
+      backupAnkiStats: ChimahonStatsRowMerge.ankiStats(
         local.backupAnkiStats,
         remote.backupAnkiStats,
       ),

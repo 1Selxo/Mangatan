@@ -14,6 +14,7 @@ import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/statistics/anki_stats_recorder.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
 class DictionaryPopupHandle {
@@ -1068,6 +1069,10 @@ class _DictionaryLookupResultsViewState
             checkAllModels: profile.checkAllModels,
             syncOnCreate: profile.syncOnCreate,
           );
+      await AnkiStatsRecorder.recordCard(
+        context: widget.miningContext,
+        profile: dictionaryProfile,
+      );
       botToast('Added to Anki (#$noteId)', second: 3);
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);

@@ -57,6 +57,9 @@ class ReaderAppBar extends ConsumerWidget {
   /// Callback that opens the OCR overlay for the visible page.
   final VoidCallback? onOcrPressed;
 
+  /// Callback that opens the immersion statistics sheet.
+  final VoidCallback? onStatsPressed;
+
   /// Overrides route replacement when a reader can navigate chapters in place.
   final ValueChanged<Chapter>? onChapterSelected;
 
@@ -74,6 +77,7 @@ class ReaderAppBar extends ConsumerWidget {
     required this.onBookmarkPressed,
     this.onWebViewPressed,
     this.onOcrPressed,
+    this.onStatsPressed,
     this.onChapterSelected,
     required this.backgroundColor,
   });
@@ -146,6 +150,13 @@ class ReaderAppBar extends ConsumerWidget {
                   : Icons.document_scanner_outlined,
             ),
           ),
+        ),
+
+      if (onStatsPressed != null)
+        IconButton(
+          tooltip: 'Statistics',
+          onPressed: onStatsPressed,
+          icon: const Icon(Icons.query_stats_outlined),
         ),
 
       // Chapter list button

@@ -1219,6 +1219,86 @@ class _MangaChapterPageGalleryState
     return offset;
   }
 
+  /// Opens the immersion statistics sheet for this manga.
+  Future<void> _showStatsSheet() async {
+    final estimate = await _statsEstimate();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => ValueListenableBuilder<int>(
+        valueListenable: _statsSheetRevision,
+        builder: (context, _, _) => MangaStatsSheet(
+          mangaId: chapter.manga.value?.id ?? 0,
+          session: _statsTracker.session,
+          estimate: estimate,
+          onToggleTracking: () {
+            _statsTracker.toggleTracking();
+            _statsSheetRevision.value++;
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Projects time-to-finish from the session's reading speed.
+  ///
+  /// Remaining characters are estimated from the already-OCRed pages' average
+  /// rather than measured, because pages ahead have not been recognized yet.
+  Future<MangaStatsEstimate> _statsEstimate() async {
+    final speed = _statsTracker.session.charactersPerHour;
+    if (speed <= 0) return const MangaStatsEstimate();
+
+    final actualIndex = _pageViewToActualIndex(_currentIndex ?? 0);
+    final chapterPages = pages
+        .where((page) => page.chapter?.id == chapter.id)
+        .toList();
+    var recognizedPages = 0;
+    var recognizedCharacters = 0;
+    for (final page in chapterPages) {
+      final characters = await ReaderOcrState.cachedCharacterCount(page);
+      if (characters > 0) {
+        recognizedPages++;
+        recognizedCharacters += characters;
+      }
+    }
+    // With nothing recognized there is no basis for a per-page estimate.
+    if (recognizedPages == 0) return const MangaStatsEstimate();
+    final averagePerPage = recognizedCharacters / recognizedPages;
+
+    final chapterRemainingPages =
+        (chapterPages.length - _chapterPageOffset(actualIndex) - 1)
+            .clamp(0, chapterPages.length)
+            .toInt();
+    final bookRemainingPages = (pages.length - actualIndex - 1)
+        .clamp(0, pages.length)
+        .toInt();
+    final chapterCharacters = (averagePerPage * chapterRemainingPages).round();
+    final bookCharacters = (averagePerPage * bookRemainingPages).round();
+
+    return MangaStatsEstimate(
+      remainingChapterCharacters: chapterCharacters,
+      remainingBookCharacters: bookCharacters,
+      remainingChapterSeconds: MangaStatsEstimate.secondsRemaining(
+        chapterCharacters,
+        speed,
+      ),
+      remainingBookSeconds: MangaStatsEstimate.secondsRemaining(
+        bookCharacters,
+        speed,
+      ),
+    );
+  }
+
+  /// Index of [actualIndex] within its own chapter's pages.
+  int _chapterPageOffset(int actualIndex) {
+    var offset = 0;
+    for (var i = 0; i < actualIndex && i < pages.length; i++) {
+      if (pages[i].chapter?.id == chapter.id) offset++;
+    }
+    return offset;
+  }
+
   void _initCurrentIndex() async {
     if (ref.read(cropBordersStateProvider)) _processCropBorders();
     final readerMode = _readerController.getReaderMode();

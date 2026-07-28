@@ -213,6 +213,7 @@ class AnkiMiningProfile {
   final List<String> tags;
   final bool duplicateCheck;
   final String duplicateScope;
+  final List<String> duplicateDeckNames;
   final bool checkAllModels;
   final bool syncOnCreate;
   final AnkiSentenceAudioFormat sentenceAudioFormat;
@@ -225,6 +226,7 @@ class AnkiMiningProfile {
     this.tags = const ['mangatan'],
     this.duplicateCheck = true,
     this.duplicateScope = 'deck',
+    this.duplicateDeckNames = const [],
     this.checkAllModels = false,
     this.syncOnCreate = false,
     this.sentenceAudioFormat = AnkiSentenceAudioFormat.mp3,
@@ -243,6 +245,12 @@ class AnkiMiningProfile {
           const ['mangatan'],
       duplicateCheck: json['duplicateCheck'] as bool? ?? true,
       duplicateScope: json['duplicateScope'] as String? ?? 'deck',
+      duplicateDeckNames:
+          (json['duplicateDeckNames'] as List?)
+              ?.map((deck) => deck.toString())
+              .where((deck) => deck.trim().isNotEmpty)
+              .toList() ??
+          const [],
       checkAllModels: json['checkAllModels'] as bool? ?? false,
       syncOnCreate: json['syncOnCreate'] as bool? ?? false,
       sentenceAudioFormat: AnkiSentenceAudioFormat.values.firstWhere(
@@ -264,6 +272,7 @@ class AnkiMiningProfile {
     List<String>? tags,
     bool? duplicateCheck,
     String? duplicateScope,
+    List<String>? duplicateDeckNames,
     bool? checkAllModels,
     bool? syncOnCreate,
     AnkiSentenceAudioFormat? sentenceAudioFormat,
@@ -276,6 +285,7 @@ class AnkiMiningProfile {
       tags: tags ?? this.tags,
       duplicateCheck: duplicateCheck ?? this.duplicateCheck,
       duplicateScope: duplicateScope ?? this.duplicateScope,
+      duplicateDeckNames: duplicateDeckNames ?? this.duplicateDeckNames,
       checkAllModels: checkAllModels ?? this.checkAllModels,
       syncOnCreate: syncOnCreate ?? this.syncOnCreate,
       sentenceAudioFormat: sentenceAudioFormat ?? this.sentenceAudioFormat,
@@ -291,6 +301,7 @@ class AnkiMiningProfile {
       'tags': tags,
       'duplicateCheck': duplicateCheck,
       'duplicateScope': duplicateScope,
+      'duplicateDeckNames': duplicateDeckNames,
       'checkAllModels': checkAllModels,
       'syncOnCreate': syncOnCreate,
       'sentenceAudioFormat': sentenceAudioFormat.name,

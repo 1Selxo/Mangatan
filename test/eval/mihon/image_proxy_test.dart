@@ -45,6 +45,41 @@ void main() {
       );
     });
 
+    test('routes loopback proxy images through a LAN bridge', () {
+      expect(
+        resolveMihonImageUrl(
+          'http://192.168.2.112:8080',
+          'http://127.0.0.1:39641/image/6e7a9ad0-token',
+        ),
+        'http://192.168.2.112:8080/image/6e7a9ad0-token',
+      );
+    });
+
+    test('routes loopback proxy images through a hosted HTTPS bridge', () {
+      expect(
+        resolveMihonImageUrl(
+          'https://bridge.mangayomi.30062022.xyz/',
+          'http://localhost:39641/image/token',
+        ),
+        'https://bridge.mangayomi.30062022.xyz/image/token',
+      );
+    });
+
+    test('leaves ordinary and synthetic extension URLs unchanged', () {
+      const ordinaryUrl = 'https://cdn.example/001.jpg';
+      const syntheticUrl =
+          'https://mokuro.moe/volume.cbz#%7B%22name%22:%22001.jpg%22%7D';
+
+      expect(
+        resolveMihonImageUrl('http://192.168.2.112:8080', ordinaryUrl),
+        ordinaryUrl,
+      );
+      expect(
+        resolveMihonImageUrl('http://192.168.2.112:8080', syntheticUrl),
+        syntheticUrl,
+      );
+    });
+
     test('persists transient URLs for metadata but never reuses them', () {
       final proxyUrls = ['http://127.0.0.1:39641/image/token'];
       final ordinaryUrls = ['https://cdn.example/001.jpg'];

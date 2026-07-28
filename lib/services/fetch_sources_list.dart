@@ -5,6 +5,7 @@ import 'package:http_interceptor/http_interceptor.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/filter.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
+import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -533,13 +534,14 @@ Future<Map<String, String>> fetchHeadersDalvik(
 }) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+    final res = await postMihonBridge(
+      client,
+      mihonBridgeDalvikUri(androidProxyServer),
+      body: {
         "method": "headers$name",
         "data": source.sourceCode,
         "preferences": mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
     final Map<String, String> headers = {};
@@ -560,13 +562,14 @@ Future<bool> fetchSupportLatestDalvik(
 }) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+    final res = await postMihonBridge(
+      client,
+      mihonBridgeDalvikUri(androidProxyServer),
+      body: {
         "method": "supportLatest$name",
         "data": source.sourceCode,
         "preferences": mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     return res.body.trim() == "true";
   } catch (_) {
@@ -582,13 +585,14 @@ Future<FilterList?> fetchFilterListDalvik(
 }) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+    final res = await postMihonBridge(
+      client,
+      mihonBridgeDalvikUri(androidProxyServer),
+      body: {
         "method": "filters$name",
         "data": source.sourceCode,
         "preferences": mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
 
@@ -681,9 +685,10 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
 }) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
-    final res = await client.post(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+    final res = await postMihonBridge(
+      client,
+      mihonBridgeDalvikUri(androidProxyServer),
+      body: {
         "method": changedPreferenceKey == null
             ? "preferences$name"
             : "setPreference$name",
@@ -693,7 +698,7 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
           preferences,
           changedPreferenceKey: changedPreferenceKey,
         ),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
     return data
@@ -716,13 +721,14 @@ Future<List<MihonSourceDescriptor>?> fetchMihonSourceDescriptors(
 }) async {
   try {
     final name = source.itemType == ItemType.anime ? 'Anime' : 'Manga';
-    final res = await client.post(
-      Uri.parse('$androidProxyServer/dalvik'),
-      body: jsonEncode({
+    final res = await postMihonBridge(
+      client,
+      mihonBridgeDalvikUri(androidProxyServer),
+      body: {
         'method': 'sources$name',
         'data': source.sourceCode,
         'preferences': mihonPreferencePayload(source, preferences),
-      }),
+      },
     );
     final data = jsonDecode(res.body) as List;
     return data

@@ -56,6 +56,9 @@ AGENTS.override.md
 /ios/.symlinks/
 /ios/Flutter/ephemeral/
 /ios/Pods/
+/ios/EmbeddedMihon/runtime/
+/ios/Frameworks/OpenJDK.xcframework/
+/ios/Frameworks/OpenJDKRuntime.framework/
 /macos/Flutter/ephemeral/
 /macos/Pods/
 /linux/flutter/ephemeral/

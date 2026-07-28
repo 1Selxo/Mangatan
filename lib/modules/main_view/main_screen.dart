@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +27,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/sync_server.dart';
+import 'package:mangayomi/utils/app_font_fallback.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
@@ -121,6 +124,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _initializeProviders() {
+    // Mihon sources start the embedded OpenJDK runtime. On iOS, leave that
+    // heavyweight work to explicit extension and source actions instead of
+    // starting Java as a side effect of opening the main screen.
+    if (Platform.isIOS) return;
+
     Future.microtask(() {
       if (mounted) {
         for (var type in ItemType.values) {
@@ -604,6 +612,7 @@ class _DownloadedOnlyBar extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.white,
                   fontFamily: GoogleFonts.aBeeZee().fontFamily,
+                  fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),
             ),
@@ -643,6 +652,7 @@ class _IncognitoModeBar extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.white,
                   fontFamily: GoogleFonts.aBeeZee().fontFamily,
+                  fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),
             ),
@@ -765,8 +775,8 @@ class _MobileBottomNavigation extends StatelessWidget {
       height: _getBottomNavigationHeight(isLongPressed, location),
       child: NavigationBarTheme(
         data: NavigationBarThemeData(
-          labelTextStyle: const WidgetStatePropertyAll(
-            TextStyle(overflow: TextOverflow.ellipsis),
+          labelTextStyle: WidgetStatePropertyAll(
+            appBottomNavigationLabelStyle(Theme.of(context), dest.length),
           ),
           indicatorShape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),

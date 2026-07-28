@@ -69,7 +69,7 @@ def load_config(config_path: str) -> AppConfig:
     try:
         with open(config_path, 'r') as config_file:
             config_data = json.load(config_file)
-        
+
         return {
             "repo_url": config_data["repo_url"],
             "json_file": config_data["json_file"],
@@ -79,7 +79,7 @@ def load_config(config_path: str) -> AppConfig:
             "tint_colour": config_data["tint_colour"],
             "image_url": config_data["image_url"],
         }
-    
+
     except FileNotFoundError:
         print(f"Configuration file not found at {config_path}")
         raise
@@ -105,31 +105,6 @@ def fetch_all_releases(repo_url: str) -> List[GitHubRelease]:
     sorted_releases = sorted(releases, key=lambda x: x["published_at"], reverse=False)
 
     return sorted_releases
-
-
-def fetch_latest_release(repo_url: str) -> GitHubRelease:
-    """
-    Fetch the latest GitHub release for the repository.
-
-    Returns:
-        GitHubRelease: The latest release
-
-    Raises:
-        ValueError: If no releases are found
-    """
-    api_url: str = f"https://api.github.com/repos/{repo_url}/releases"
-    headers: Dict[str, str] = {"Accept": "application/vnd.github+json"}
-
-    response = requests.get(api_url, headers=headers)
-    response.raise_for_status()  # Raise exception for HTTP errors
-
-    releases: List[GitHubRelease] = response.json()
-    sorted_releases = sorted(releases, key=lambda x: x["published_at"], reverse=True)
-
-    if sorted_releases:
-        return sorted_releases[0]
-
-    raise ValueError("No release found.")
 
 
 # 2025-03-25: Reimplement this at a later date (@tanakrit-d)
@@ -327,7 +302,7 @@ def update_json_file(
     if not version_match:
         raise ValueError("Invalid version format")
 
-    app["version"] = normalize_version(full_version)
+    app["version"] = normalize_version(latest_version)
     app["versionDate"] = fetched_data_latest["published_at"]
     app["versionDescription"] = format_description(fetched_data_latest["body"])
 
@@ -374,11 +349,27 @@ def main() -> None:
     try:
         config = load_config("repo/config.json")
         fetched_data_all = fetch_all_releases(config["repo_url"])
-        fetched_data_latest = fetch_latest_release(config["repo_url"])
-        update_json_file(config, "repo/source.json", fetched_data_all, fetched_data_latest)
+        releases_with_ipa = [
+            release
+            for release in fetched_data_all
+            if find_download_url_and_size(release)[0] is not None
+        ]
+        if not releases_with_ipa:
+            raise ValueError("No release containing an iOS IPA was found.")
+        fetched_data_latest = max(
+            releases_with_ipa,
+            key=lambda release: release["published_at"],
+        )
+        update_json_file(
+            config,
+            "repo/source.json",
+            releases_with_ipa,
+            fetched_data_latest,
+        )
         print("Successfully updated repo/source.json with latest releases.")
     except Exception as e:
         print(f"Error updating releases: {e}")
+        raise
 
 
 if __name__ == "__main__":

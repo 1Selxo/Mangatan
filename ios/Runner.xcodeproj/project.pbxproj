@@ -20,6 +20,8 @@
 		A3045F752B62677C0046BD95 /* Libmtorrentserver.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A3045F732B62677C0046BD95 /* Libmtorrentserver.xcframework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A33AA3042B62949C00A19BF1 /* libresolv.9.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A33AA3032B62949C00A19BF1 /* libresolv.9.tbd */; };
 		D081C25C294826C0006EB10B /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = D081C25B294826C0006EB10B /* libc++.tbd */; };
+		E493A0022F2B000100000001 /* MihonEmbeddedBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = E493A0132F2B000100000001 /* MihonEmbeddedBridge.mm */; };
+		E493A0042F2B000100000001 /* OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime */ = {isa = PBXBuildFile; fileRef = E493A0152F2B000100000001 /* OpenJDKRuntime.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,6 +45,17 @@
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 1;
+		};
+		E493A0302F2B000100000001 /* Embed Lazy OpenJDK Runtime */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E493A0042F2B000100000001 /* OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime */,
+			);
+			name = "Embed Lazy OpenJDK Runtime";
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -73,6 +86,11 @@
 		AB7DB3653F826C1130BA821D /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C285F7A67E9BCA1B19C52A22 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		D081C25B294826C0006EB10B /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
+		E493A0112F2B000100000001 /* OpenJDK.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = OpenJDK.xcframework; path = Frameworks/OpenJDK.xcframework; sourceTree = "<group>"; };
+		E493A0122F2B000100000001 /* MihonEmbeddedBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MihonEmbeddedBridge.h; sourceTree = "<group>"; };
+		E493A0132F2B000100000001 /* MihonEmbeddedBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MihonEmbeddedBridge.mm; sourceTree = "<group>"; };
+		E493A0142F2B000100000001 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
+		E493A0152F2B000100000001 /* OpenJDKRuntime.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenJDKRuntime.framework; path = Frameworks/OpenJDKRuntime.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +130,9 @@
 				A33AA3032B62949C00A19BF1 /* libresolv.9.tbd */,
 				A3045F732B62677C0046BD95 /* Libmtorrentserver.xcframework */,
 				D081C25B294826C0006EB10B /* libc++.tbd */,
+				E493A0112F2B000100000001 /* OpenJDK.xcframework */,
+				E493A0152F2B000100000001 /* OpenJDKRuntime.framework */,
+				E493A0142F2B000100000001 /* libz.tbd */,
 				AB7DB3653F826C1130BA821D /* Pods_Runner.framework */,
 				7BD77255B8011AAE8AE211FF /* Pods_RunnerTests.framework */,
 			);
@@ -174,6 +195,8 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				E493A0122F2B000100000001 /* MihonEmbeddedBridge.h */,
+				E493A0132F2B000100000001 /* MihonEmbeddedBridge.mm */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -210,6 +233,8 @@
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
+				E493A0302F2B000100000001 /* Embed Lazy OpenJDK Runtime */,
+				E493A0202F2B000100000001 /* Copy Embedded Mihon Runtime */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				2E2E01C939E975DA4A5EDCA9 /* [CP] Embed Pods Frameworks */,
 				3370BAFD8EB148956C9E3778 /* [CP] Copy Pods Resources */,
@@ -370,6 +395,33 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
+		E493A0202F2B000100000001 /* Copy Embedded Mihon Runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/EmbeddedMihon/runtime/lib/modules",
+				"$(SRCROOT)/EmbeddedMihon/runtime/lib/security/cacerts",
+				"$(SRCROOT)/EmbeddedMihon/runtime/MExtensionServer.jar",
+				"$(SRCROOT)/EmbeddedMihon/runtime/java-logging-shim.jar",
+				"$(SRCROOT)/EmbeddedMihon/runtime/release",
+				"$(SRCROOT)/EmbeddedMihon/runtime/THIRD_PARTY_NOTICES.md",
+			);
+			name = "Copy Embedded Mihon Runtime";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/lib/modules",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/lib/security/cacerts",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/MExtensionServer.jar",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/java-logging-shim.jar",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/release",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/EMBEDDED_MIHON_NOTICES.md",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nruntime_dir=\"${SRCROOT}/EmbeddedMihon/runtime\"\nresources_dir=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nfor required_file in lib/modules lib/security/cacerts MExtensionServer.jar java-logging-shim.jar release THIRD_PARTY_NOTICES.md; do\n  if [ ! -f \"${runtime_dir}/${required_file}\" ]; then\n    echo \"error: Embedded Mihon runtime is missing ${required_file}. Run tool/prepare_embedded_mihon_ios.sh.\" >&2\n    exit 1\n  fi\ndone\nmkdir -p \"${resources_dir}/lib/security\"\ncp \"${runtime_dir}/lib/modules\" \"${resources_dir}/lib/modules\"\ncp \"${runtime_dir}/lib/security/cacerts\" \"${resources_dir}/lib/security/cacerts\"\ncp \"${runtime_dir}/MExtensionServer.jar\" \"${resources_dir}/MExtensionServer.jar\"\ncp \"${runtime_dir}/java-logging-shim.jar\" \"${resources_dir}/java-logging-shim.jar\"\ncp \"${runtime_dir}/release\" \"${resources_dir}/release\"\ncp \"${runtime_dir}/THIRD_PARTY_NOTICES.md\" \"${resources_dir}/EMBEDDED_MIHON_NOTICES.md\"\n";
+		};
 		C3872998E5EE82D803AA315D /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -409,6 +461,7 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				E493A0022F2B000100000001 /* MihonEmbeddedBridge.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -500,12 +553,16 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks/OpenJDK.xcframework/ios-arm64/Headers",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.kodjodevf.mangayomi;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selxo.mangatan;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -522,7 +579,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kodjodevf.mangayomi.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selxo.mangatan.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -540,7 +597,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kodjodevf.mangayomi.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selxo.mangatan.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
@@ -556,7 +613,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kodjodevf.mangayomi.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selxo.mangatan.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
@@ -678,12 +735,16 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks/OpenJDK.xcframework/ios-arm64/Headers",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.kodjodevf.mangayomi;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selxo.mangatan;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -700,12 +761,16 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Frameworks/OpenJDK.xcframework/ios-arm64/Headers",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.kodjodevf.mangayomi;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selxo.mangatan;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

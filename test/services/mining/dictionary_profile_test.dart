@@ -12,6 +12,8 @@ void main() {
         deckName: 'English',
         modelName: 'Lapis',
         tags: ['mangatan', 'english'],
+        duplicateScope: 'decks',
+        duplicateDeckNames: ['English', 'English::Archive'],
       ),
       dictionaryOrder: ['English Frequency', 'English Dictionary'],
       enabledDictionaries: {'English Dictionary'},
@@ -24,6 +26,8 @@ void main() {
     expect(restored.id, profile.id);
     expect(restored.languageCode, 'en');
     expect(restored.anki.deckName, 'English');
+    expect(restored.anki.duplicateScope, 'decks');
+    expect(restored.anki.duplicateDeckNames, ['English', 'English::Archive']);
     expect(restored.dictionaryOrder, profile.dictionaryOrder);
     expect(restored.enabledDictionaries, {'English Dictionary'});
     expect(restored.isDictionaryEnabled('English Dictionary'), isTrue);

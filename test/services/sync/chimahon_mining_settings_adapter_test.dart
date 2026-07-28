@@ -431,6 +431,8 @@ void main() {
         id: 'japanese',
         name: 'Local name',
         anki: AnkiMiningProfile(
+          duplicateScope: 'decks',
+          duplicateDeckNames: ['Mining', 'Archive'],
           checkAllModels: true,
           sentenceAudioFormat: AnkiSentenceAudioFormat.opus,
         ),
@@ -453,6 +455,8 @@ void main() {
     final restored = (await MiningPreferences.getDictionaryProfiles()).single;
     expect(restored.name, 'Remote name');
     expect(restored.anki.deckName, 'Remote deck');
+    expect(restored.anki.duplicateScope, 'decks');
+    expect(restored.anki.duplicateDeckNames, ['Mining', 'Archive']);
     expect(restored.anki.checkAllModels, isTrue);
     expect(restored.anki.sentenceAudioFormat, AnkiSentenceAudioFormat.opus);
   });

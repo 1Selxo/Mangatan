@@ -10,6 +10,7 @@ import 'package:mangayomi/eval/model/m_pages.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/page.dart';
@@ -29,26 +30,29 @@ class MihonExtensionService implements ExtensionService {
   late Source source;
   late final http.Client client;
   final Map<String, String>? requestHeaders;
+  final bool _ownsClient;
 
   MihonExtensionService(
     this.source,
     this.androidProxyServer, {
     http.Client? client,
     this.requestHeaders,
-  }) {
+  }) : _ownsClient = client == null {
     this.client = client ?? _createClient();
   }
 
   @override
   void dispose() {
-    if (_usesLoopbackBridge) client.close();
+    if (_ownsClient) client.close();
   }
 
   bool get _usesLoopbackBridge => isLoopbackMihonBridge(androidProxyServer);
 
-  http.Client _createClient() {
-    if (!_usesLoopbackBridge) return MClient.init();
+  String? _resolveBridgeMediaUrl(String? mediaUrl) => mediaUrl == null
+      ? null
+      : resolveMihonMediaUrl(androidProxyServer, mediaUrl);
 
+  http.Client _createClient() {
     final httpClient = HttpClient();
     httpClient.findProxy = (_) => 'DIRECT';
     httpClient.connectionTimeout = const Duration(seconds: 10);
@@ -56,13 +60,12 @@ class MihonExtensionService implements ExtensionService {
     return IOClient(httpClient);
   }
 
-  Future<http.Response> _postDalvik(
-    Uri uri, {
+  Future<http.Response> _postDalvik({
     Object? body,
     Map<String, String>? headers,
   }) => postMihonBridge(
     client,
-    uri,
+    mihonBridgeDalvikUri(androidProxyServer),
     body: body,
     headers: headers,
     retryTransientFailures: _usesLoopbackBridge,
@@ -89,14 +92,13 @@ class MihonExtensionService implements ExtensionService {
   Future<MPages> getPopular(int page) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+      body: {
         "method": "getPopular$name",
         "page": mihonCataloguePage(page),
         "search": "",
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -113,7 +115,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: e.thumbnailUrl,
+              imageUrl: _resolveBridgeMediaUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -126,14 +128,13 @@ class MihonExtensionService implements ExtensionService {
   Future<MPages> getLatestUpdates(int page) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+      body: {
         "method": "getLatest$name",
         "page": mihonCataloguePage(page),
         "search": "",
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -150,7 +151,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: e.thumbnailUrl,
+              imageUrl: _resolveBridgeMediaUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -163,15 +164,14 @@ class MihonExtensionService implements ExtensionService {
   Future<MPages> search(String query, int page, List<dynamic> filters) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+      body: {
         "method": "getSearch$name",
         "page": mihonCataloguePage(page),
         "search": query,
         "filterList": _convertFilters(filters),
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -188,7 +188,7 @@ class MihonExtensionService implements ExtensionService {
               description: e.description,
               genre: e.genre,
               status: e.status,
-              imageUrl: e.thumbnailUrl,
+              imageUrl: _resolveBridgeMediaUrl(e.thumbnailUrl),
               chapters: [],
             ),
           )
@@ -201,14 +201,13 @@ class MihonExtensionService implements ExtensionService {
   Future<MManga> getDetail(String url) async {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
     final res = await _postDalvik(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+      body: {
         "method": "getDetails$name",
         if (source.itemType == ItemType.manga) "mangaData": {"url": url},
         if (source.itemType == ItemType.anime) "animeData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -229,15 +228,14 @@ class MihonExtensionService implements ExtensionService {
         6 => Status.onHiatus,
         _ => Status.unknown,
       },
-      imageUrl: data['thumbnail_url'],
+      imageUrl: _resolveBridgeMediaUrl(data['thumbnail_url'] as String?),
       chapters: chapters,
     );
   }
 
   Future<List<MChapter>> getChapterList(String url) async {
     final res = await _postDalvik(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+      body: {
         "method": source.itemType == ItemType.anime
             ? "getEpisodeList"
             : "getChapterList",
@@ -245,7 +243,7 @@ class MihonExtensionService implements ExtensionService {
         if (source.itemType == ItemType.anime) "animeData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -284,13 +282,12 @@ class MihonExtensionService implements ExtensionService {
       'initialized': true,
     };
     final res = await _postDalvik(
-      Uri.parse('$androidProxyServer/dalvik'),
-      body: jsonEncode({
+      body: {
         'method': isAnime ? 'getAnimeUrl' : 'getMangaUrl',
         isAnime ? 'animeData' : 'mangaData': mediaData,
         'preferences': mihonPreferencePayload(source, getSourcePreferences()),
         'data': source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -307,13 +304,12 @@ class MihonExtensionService implements ExtensionService {
       'scanlator': chapter.scanlator,
     };
     final res = await _postDalvik(
-      Uri.parse('$androidProxyServer/dalvik'),
-      body: jsonEncode({
+      body: {
         'method': isAnime ? 'getEpisodeUrl' : 'getChapterUrl',
         isAnime ? 'episodeData' : 'chapterData': chapterData,
         'preferences': mihonPreferencePayload(source, getSourcePreferences()),
         'data': source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -323,30 +319,37 @@ class MihonExtensionService implements ExtensionService {
   @override
   Future<List<PageUrl>> getPageList(String url) async {
     final res = await _postDalvik(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+      body: {
         "method": "getPageList",
         "chapterData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
     final data = jsonDecode(res.body) as List;
-    return data.map((e) => PageUrl(e['imageUrl'])).toList();
+    return data
+        .map(
+          (e) => PageUrl(
+            resolveMihonImageUrl(
+              androidProxyServer,
+              e['imageUrl']?.toString() ?? '',
+            ),
+          ),
+        )
+        .toList();
   }
 
   @override
   Future<List<Video>> getVideoList(String url) async {
     final res = await _postDalvik(
-      Uri.parse("$androidProxyServer/dalvik"),
-      body: jsonEncode({
+      body: {
         "method": "getVideoList",
         "episodeData": {"url": url},
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
-      }),
+      },
       headers: getCookie(),
     );
     hasError(res);
@@ -361,7 +364,7 @@ class MihonExtensionService implements ExtensionService {
         }
       }
       return Video(
-        e['videoUrl'],
+        _resolveBridgeMediaUrl(e['videoUrl']?.toString()) ?? '',
         e['quality'],
         e['url'],
         headers: headers,
@@ -369,7 +372,9 @@ class MihonExtensionService implements ExtensionService {
             (e['audioTracks'] as List?)
                 ?.map(
                   (e) => Track(
-                    file: e['file'] ?? e['url'],
+                    file: _resolveBridgeMediaUrl(
+                      (e['file'] ?? e['url'])?.toString(),
+                    ),
                     label: e['label'] ?? e['lang'],
                   ),
                 )
@@ -379,7 +384,9 @@ class MihonExtensionService implements ExtensionService {
             (e['subtitleTracks'] as List?)
                 ?.map(
                   (e) => Track(
-                    file: e['file'] ?? e['url'],
+                    file: _resolveBridgeMediaUrl(
+                      (e['file'] ?? e['url'])?.toString(),
+                    ),
                     label: e['label'] ?? e['lang'],
                   ),
                 )

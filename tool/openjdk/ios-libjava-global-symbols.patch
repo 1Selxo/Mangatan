@@ -1,0 +1,19 @@
+diff --git a/src/java.base/unix/native/libjava/jni_util_md.c b/src/java.base/unix/native/libjava/jni_util_md.c
+index a66b2244427..5b553df0158 100644
+--- a/src/java.base/unix/native/libjava/jni_util_md.c
++++ b/src/java.base/unix/native/libjava/jni_util_md.c
+@@ -42,7 +42,13 @@ void* getProcessHandle() {
+     if (procHandle != NULL) {
+         return procHandle;
+     }
+-#ifdef __APPLE__
++#if defined(__APPLE__) && \
++    defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    // The iOS Zero VM lives in a framework loaded after process launch.
++    // RTLD_FIRST only searches the main executable, so built-in libjava,
++    // jimage, net, nio, and zip symbols cannot be found.
++    procHandle = RTLD_DEFAULT;
++#elif defined(__APPLE__)
+     procHandle = (void*)dlopen(NULL, RTLD_FIRST);
+ #else
+     procHandle = (void*)dlopen(NULL, RTLD_LAZY);

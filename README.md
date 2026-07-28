@@ -11,7 +11,7 @@
  [![Discord server](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/SqwE6b7Bb)
 
 
-Mangatan is an open-source desktop app for reading manga and novels, watching anime, and learning languages through dictionary lookup, OCR, subtitle mining, and Anki export.
+ Mangatan is an open-source desktop app for reading manga and novels, watching anime, and learning languages through dictionary lookup, OCR, subtitle mining, and Anki export.
 </div>
 
 ## Features
@@ -31,6 +31,31 @@ Features include:
 
 ## Download
 Get the app from our [releases page](https://github.com/1Selxo/Mangatan/releases).
+
+## iOS Sideloading Sources
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
+&nbsp;
+<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="Feather Source" src="repo/images/buttons/feather_button.png" width="150"></a>
+&nbsp;
+<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="Sidestore Source" src="repo/images/buttons/sidestore_button.png" width="150"></a>
+&nbsp;
+<a href="https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/source.json"><img alt="Direct URL Source" src="repo/images/buttons/url_button.png" width="150"></a>
+
+Release IPAs are intentionally unsigned. AltStore, SideStore, Feather, Sideloadly, and similar tools sign the app with your Apple ID during installation.
+
+To build an IPA without publishing a release, open **Actions → Build iOS sideload IPA → Run workflow**. Download the IPA from the completed run's artifacts. Pushing a `v*` tag also attaches the IPA to that GitHub release and refreshes the sideloading source.
+
+### Anki on iOS
+
+The iOS build exports cards through AnkiMobile callbacks instead of
+AnkiConnect. In **Settings → Dictionary → Anki**, tap **Refresh** once to open
+AnkiMobile and import its current decks, note types, and fields. Mining then
+opens AnkiMobile to add the note and returns to Mangatan when the note succeeds;
+images and audio are transferred locally during that callback.
+
+Japanese word audio is enabled by default with JapanesePod101, Jisho.org, and
+LanguagePod101. Audio sources are ordered fallbacks: add, remove, edit, or move
+multiple built-in and custom URL/JSON sources from the same Anki settings page.
 
 # Contributing
 
@@ -99,8 +124,8 @@ Useful options:
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
     GNU General Public License for more details.
-    
+
 
 ## Disclaimer
 
-Mangatan does not host any content, and the developers of this application are not affiliated with content providers available on the internet.
+ Mangatan does not host any content, and the developers of this application are not affiliated with content providers available on the internet.

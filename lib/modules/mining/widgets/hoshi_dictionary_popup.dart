@@ -16,6 +16,7 @@ import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -364,6 +365,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<bool> _isDuplicate(String expression) async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) return false;
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -376,6 +378,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         modelName: profile.modelName,
         expression: expression,
         duplicateScope: profile.duplicateScope,
+        duplicateDeckNames: profile.duplicateDeckNames,
         checkAllModels: profile.checkAllModels,
       );
       return status.isDuplicate;
@@ -385,6 +388,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<List<int>> _duplicateNoteIds(String expression) async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) return const [];
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -396,6 +400,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         modelName: profile.modelName,
         expression: expression,
         duplicateScope: profile.duplicateScope,
+        duplicateDeckNames: profile.duplicateDeckNames,
       );
     } catch (_) {
       return const [];
@@ -403,6 +408,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<bool> _browseDuplicateNotes(Object? rawIds) async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) return false;
     final ids = rawIds is Iterable
         ? rawIds
               .map(
@@ -494,20 +500,30 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         dictionaryMedia: dictionaryMedia,
         wordAudio: wordAudio,
       );
-      final noteId =
-          await AnkiConnectService(
-            endpoint: await MiningPreferences.getAnkiEndpoint(),
-          ).exportDraft(
-            draft,
-            duplicateCheck: profile.duplicateCheck,
-            allowDuplicate:
-                content['allowDuplicate'] == true ||
-                dictionaryProfile.duplicateAction == 'allow',
-            duplicateScope: profile.duplicateScope,
-            checkAllModels: profile.checkAllModels,
-            syncOnCreate: profile.syncOnCreate,
-          );
-      botToast('Added to Anki (#$noteId)', second: 3);
+      final allowDuplicate =
+          !profile.duplicateCheck ||
+          content['allowDuplicate'] == true ||
+          dictionaryProfile.duplicateAction == 'allow';
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await AnkiMobileService().exportDraft(
+          draft,
+          allowDuplicate: allowDuplicate,
+        );
+      } else {
+        final noteId =
+            await AnkiConnectService(
+              endpoint: await MiningPreferences.getAnkiEndpoint(),
+            ).exportDraft(
+              draft,
+              duplicateCheck: profile.duplicateCheck,
+              allowDuplicate: allowDuplicate,
+              duplicateScope: profile.duplicateScope,
+              duplicateDeckNames: profile.duplicateDeckNames,
+              checkAllModels: profile.checkAllModels,
+              syncOnCreate: profile.syncOnCreate,
+            );
+        botToast('Added to Anki (#$noteId)', second: 3);
+      }
       return true;
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);
@@ -1060,10 +1076,12 @@ String buildHoshiPopupHtml({
   final primary = _cssColor(scheme.primary);
   final primaryContainer = _cssColor(scheme.primaryContainer);
   final onPrimaryContainer = _cssColor(scheme.onPrimaryContainer);
-  final audioSources =
-      audioPreferences.enabled && audioPreferences.url.trim().isNotEmpty
-      ? [audioPreferences.url.trim()]
+  final audioSources = audioPreferences.enabled
+      ? audioPreferences.effectiveSources
+            .map((source) => source.displayName)
+            .toList(growable: false)
       : const <String>[];
+  final firstAudioSource = audioPreferences.effectiveSources.firstOrNull;
   const nativeHandlers = [
     'getEntries',
     'lookupRedirect',
@@ -1174,7 +1192,7 @@ String buildHoshiPopupHtml({
     window.deduplicatePitchAccents = true;
     window.compactPitchAccents = false;
 	    window.audioSources = ${jsonEncode(audioSources)};
-	    window.audioSourceType = ${jsonEncode(audioPreferences.sourceType.name)};
+	    window.audioSourceType = ${jsonEncode(firstAudioSource?.type.name ?? '')};
 	    window.audioSourceLanguage = ${jsonEncode(audioPreferences.language)};
 	    window.audioEnableAutoplay = false;
 	    window.audioPlaybackMode = 'interrupt';

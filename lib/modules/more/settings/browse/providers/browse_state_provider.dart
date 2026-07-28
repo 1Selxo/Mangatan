@@ -14,6 +14,8 @@ part 'browse_state_provider.g.dart';
 class AndroidProxyServerState extends _$AndroidProxyServerState {
   @override
   String build() {
+    // The embedded iOS bridge outlives any individual source provider.
+    ref.keepAlive();
     final savedAddress = isar.settings.getSync(227)!.androidProxyServer;
     return normalizeMihonBridgeBaseUrl(
       savedAddress == null || savedAddress.trim().isEmpty
@@ -21,6 +23,8 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
           : savedAddress,
     );
   }
+
+  String get currentValue => state;
 
   void set(String value) {
     final proxyServer = normalizeMihonBridgeBaseUrl(value);

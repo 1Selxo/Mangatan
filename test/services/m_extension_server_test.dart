@@ -50,6 +50,9 @@ void main() {
     final mainScreenSource = File(
       'lib/modules/main_view/main_screen.dart',
     ).readAsStringSync();
+    final browseStateSource = File(
+      'lib/modules/more/settings/browse/providers/browse_state_provider.dart',
+    ).readAsStringSync();
     final nativeSource = File(
       'ios/Runner/MihonEmbeddedBridge.mm',
     ).readAsStringSync();
@@ -149,6 +152,24 @@ void main() {
       serviceSource,
       contains('if ((isDesktop || Platform.isIOS) &&'),
       reason: 'an unavailable embedded iOS bridge must fail before HTTP',
+    );
+    expect(
+      browseStateSource,
+      contains(
+        '// The embedded iOS bridge outlives any individual source provider.\n'
+        '    ref.keepAlive();',
+      ),
+      reason: 'the process-wide bridge address must survive source disposal',
+    );
+    expect(
+      serviceSource,
+      isNot(contains('_readBaseUrl = () => ref.read(')),
+      reason: 'bridge startup must not read a disposed source Ref',
+    );
+    expect(
+      serviceSource,
+      contains('_readBaseUrl = () => proxyServerState.currentValue;'),
+      reason: 'bridge startup must retain the process-wide state notifier',
     );
     expect(
       nativeSource,

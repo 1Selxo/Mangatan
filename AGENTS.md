@@ -36,6 +36,10 @@ it.
 
 Do not restore a silent `127.0.0.1:8080` fallback on iOS. If the embedded
 bridge fails, surface the native startup error before making HTTP requests.
+The embedded loopback address is process-wide. Keep it independently of
+auto-disposed Riverpod providers: a source provider may be disposed while the
+native VM is still starting, and its `Ref` must never be read after that async
+gap.
 
 ## iOS runtime constraints
 

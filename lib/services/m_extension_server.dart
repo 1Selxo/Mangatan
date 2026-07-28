@@ -61,13 +61,13 @@ class MExtensionServerPlatform {
   late final void Function() _restoreSavedBaseUrl;
 
   MExtensionServerPlatform(WidgetRef ref, {bool persistent = false}) {
-    _readBaseUrl = () => ref.read(androidProxyServerStateProvider);
-    _writeBaseUrl = (value) =>
-        ref.read(androidProxyServerStateProvider.notifier).set(value);
-    _writeRuntimeBaseUrl = (value) =>
-        ref.read(androidProxyServerStateProvider.notifier).setRuntime(value);
-    _restoreSavedBaseUrl = () =>
-        ref.read(androidProxyServerStateProvider.notifier).restoreSaved();
+    final proxyServerState = ref.read(
+      androidProxyServerStateProvider.notifier,
+    );
+    _readBaseUrl = () => proxyServerState.currentValue;
+    _writeBaseUrl = proxyServerState.set;
+    _writeRuntimeBaseUrl = proxyServerState.setRuntime;
+    _restoreSavedBaseUrl = proxyServerState.restoreSaved;
     if (persistent) {
       _stableReadBaseUrl = _readBaseUrl;
       _stableWriteBaseUrl = _writeBaseUrl;
@@ -75,13 +75,13 @@ class MExtensionServerPlatform {
   }
 
   MExtensionServerPlatform.fromRef(Ref ref) {
-    _readBaseUrl = () => ref.read(androidProxyServerStateProvider);
-    _writeBaseUrl = (value) =>
-        ref.read(androidProxyServerStateProvider.notifier).set(value);
-    _writeRuntimeBaseUrl = (value) =>
-        ref.read(androidProxyServerStateProvider.notifier).setRuntime(value);
-    _restoreSavedBaseUrl = () =>
-        ref.read(androidProxyServerStateProvider.notifier).restoreSaved();
+    final proxyServerState = ref.read(
+      androidProxyServerStateProvider.notifier,
+    );
+    _readBaseUrl = () => proxyServerState.currentValue;
+    _writeBaseUrl = proxyServerState.set;
+    _writeRuntimeBaseUrl = proxyServerState.setRuntime;
+    _restoreSavedBaseUrl = proxyServerState.restoreSaved;
   }
 
   Future<bool> check() async {

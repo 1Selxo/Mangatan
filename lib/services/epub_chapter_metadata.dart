@@ -123,6 +123,31 @@ List<Chapter> epubNavigationChaptersInSpineOrder(Iterable<Chapter> chapters) {
   return result;
 }
 
+/// Returns the user-facing EPUB chapter containing [spineIndex].
+///
+/// A logical chapter can span multiple physical spine items, so the active
+/// shortcut is the last navigation row whose spine does not exceed the live
+/// reader position.
+Chapter? epubNavigationChapterForSpine(
+  Iterable<Chapter> chapters,
+  int spineIndex,
+) {
+  final shortcuts = chapters.where(isEpubNavigationChapter).toList()
+    ..sort(
+      (left, right) => (epubChapterSpineIndex(left) ?? 0).compareTo(
+        epubChapterSpineIndex(right) ?? 0,
+      ),
+    );
+  if (shortcuts.isEmpty) return null;
+  var current = shortcuts.first;
+  for (final shortcut in shortcuts) {
+    final shortcutSpine = epubChapterSpineIndex(shortcut);
+    if (shortcutSpine == null || shortcutSpine > spineIndex) break;
+    current = shortcut;
+  }
+  return current;
+}
+
 bool isLocalEpubManga(Manga manga) =>
     manga.itemType == ItemType.novel && (manga.isLocalArchive ?? false);
 

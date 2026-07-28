@@ -273,7 +273,6 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   int? _effectiveInitialEpubSpineIndex;
   int? _explorationTargetSpineIndex;
   double? _pendingSeekFraction;
-  int fontSize = 14;
   bool get _ttsSupported => !Platform.isLinux;
 
   final Stopwatch _readingStopwatch = Stopwatch();
@@ -306,7 +305,14 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     _epubChapterIndex = epubChapterIndex ?? _epubChapterIndex;
     _epubChapterProgress = epubChapterProgress ?? _epubChapterProgress;
     _epubCharacterCount = epubCharacterCount ?? _epubCharacterCount;
+    final previousBookmarkChapterId = _activeBookmarkChapter().id;
     _currentEpubSpineIndex = epubSpineIndex ?? _currentEpubSpineIndex;
+    final activeBookmarkChapter = _activeBookmarkChapter();
+    if (activeBookmarkChapter.id != previousBookmarkChapterId && mounted) {
+      setState(() {
+        _isBookmarked = activeBookmarkChapter.isBookmarked ?? false;
+      });
+    }
     _pendingSeekFraction = null;
     if (!_isDisposed && !_rebuildDetail.isClosed) {
       _rebuildDetail.add(newOffset);
@@ -563,10 +569,6 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     if (!_epubPositionLocked) _readingStopwatch.start();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollController.addListener(onScroll);
-      final initFontSize = ref.read(novelFontSizeStateProvider);
-      setState(() {
-        fontSize = initFontSize;
-      });
     });
     if (!isDesktop) SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
     discordRpc?.showChapterDetails(ref, chapter);
@@ -602,6 +604,34 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   }
 
   late bool _isBookmarked = _readerController.getChapterBookmarked();
+
+  Chapter _activeBookmarkChapter() {
+    final spineIndex =
+        _currentEpubSpineIndex ??
+        widget.initialEpubSpineIndex ??
+        epubChapterSpineIndex(chapter);
+    if (!_usingTtsuReader || spineIndex == null) return chapter;
+    return epubNavigationChapterForSpine(
+          chapter.manga.value!.chapters.where(
+            (candidate) => candidate.archivePath == chapter.archivePath,
+          ),
+          spineIndex,
+        ) ??
+        chapter;
+  }
+
+  void _toggleActiveBookmark() {
+    if (_readerController.incognitoMode) return;
+    final activeChapter = _activeBookmarkChapter();
+    final nextValue = !(activeChapter.isBookmarked ?? false);
+    isar.writeTxnSync(() {
+      activeChapter
+        ..isBookmarked = nextValue
+        ..updatedAt = DateTime.now().millisecondsSinceEpoch;
+      isar.chapters.putSync(activeChapter);
+    });
+    setState(() => _isBookmarked = nextValue);
+  }
 
   bool _isView = false;
   final _keyboardFocusNode = FocusNode();
@@ -1776,18 +1806,16 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   }
 
   Widget _appBar() {
+    final activeChapter = _activeBookmarkChapter();
     return ReaderAppBar(
-      chapter: chapter,
+      chapter: activeChapter,
       mangaName: _readerController.getMangaName(),
-      chapterTitle: _readerController.getChapterTitle(),
+      chapterTitle: activeChapter.name ?? _readerController.getChapterTitle(),
       isVisible: _isView,
       isBookmarked: _isBookmarked,
       backgroundColor: _backgroundColor,
       onBackPressed: () => _goBack(context),
-      onBookmarkPressed: () {
-        _readerController.setChapterBookmarked();
-        setState(() => _isBookmarked = !_isBookmarked);
-      },
+      onBookmarkPressed: _toggleActiveBookmark,
       onChapterSelected: _usingTtsuReader ? _selectEpubChapter : null,
       onStatsPressed: _showStatsSheet,
       onWebViewPressed: (chapter.manga.value!.isLocalArchive ?? false)
@@ -1834,6 +1862,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     final hasPrevChapter = _hasAdjacentChapter(false);
     final hasNextChapter = _hasAdjacentChapter(true);
     final bodyLargeColor = Theme.of(context).textTheme.bodyLarge!.color;
+    final fontSize = ref.watch(novelFontSizeStateProvider);
     return Positioned(
       bottom: 0,
       child: AnimatedContainer(
@@ -1927,9 +1956,6 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                   .notifier,
                                             )
                                             .set(newFontSize);
-                                        setState(() {
-                                          fontSize = newFontSize;
-                                        });
                                       },
                                       icon: Icon(Icons.text_decrease),
                                       iconSize: 20,
@@ -1988,9 +2014,6 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                   .notifier,
                                             )
                                             .set(newFontSize);
-                                        setState(() {
-                                          fontSize = newFontSize;
-                                        });
                                       },
                                       icon: const Icon(Icons.text_increase),
                                       iconSize: 20,

@@ -53,6 +53,7 @@ import 'package:mangayomi/utils/global_style.dart';
 import 'package:mangayomi/utils/headers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
+import 'package:mangayomi/modules/manga/detail/chapter_bulk_actions.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/readmore.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_filter_list_tile_widget.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_list_tile_widget.dart';
@@ -905,8 +906,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
               bool getLength1 = chap.length == 1;
               bool checkFirstBookmarked =
                   chap.isNotEmpty && chap.first.isBookmarked! && getLength1;
-              bool checkReadBookmarked =
-                  chap.isNotEmpty && chap.first.isRead! && getLength1;
+              final markSelectedAsRead = bulkChapterTargetReadState(chap);
               final l10n = l10nLocalizations(context)!;
               final color = Theme.of(context).textTheme.bodyLarge!.color!;
               final downloadedIds =
@@ -950,7 +950,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                   ),
                   BottomSelectButton(
                     icon: Icon(
-                      checkReadBookmarked
+                      !markSelectedAsRead
                           ? Icons.remove_done_sharp
                           : Icons.done_all_sharp,
                       color: color,
@@ -964,7 +964,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                       final recognition = ChapterRecognition();
                       final mangaTitle = widget.manga!.name ?? '';
                       for (var chapter in chapters) {
-                        chapter.isRead = !chapter.isRead!;
+                        chapter.isRead = markSelectedAsRead;
                         if (!chapter.isRead!) chapter.lastPageRead = "1";
                         chapter.updatedAt = now;
                         chapter.manga.value = widget.manga;

@@ -124,6 +124,8 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   bool _webReady = false;
   int _lookupGeneration = 0;
   int _cachedMatchNotificationGeneration = 0;
+  int _documentRevision = 0;
+  int? _themeRevision;
   Future<void> _javascriptQueue = Future<void>.value();
   Player? _audioPlayer;
   String? _requestedQuery;
@@ -156,9 +158,13 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     }
     final profileChanged =
         _profileRevision(oldWidget.profile) != _profileRevision(widget.profile);
-    if (profileChanged) {
+    final preferencesChanged = oldWidget.preferences != widget.preferences;
+    if (profileChanged || preferencesChanged) {
       _shellFuture = null;
-      _stylesFuture = _loadStyles();
+      _webReady = false;
+      _controller = null;
+      _documentRevision++;
+      if (profileChanged) _stylesFuture = _loadStyles();
     }
     if (oldWidget.text != widget.text || profileChanged) {
       unawaited(
@@ -189,6 +195,23 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       // A warm popup can be presented for the same spelling at a different
       // reader position. Replay the match only after the new frame is built.
       _notifyCachedMatchAfterBuild();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final revision = Object.hash(
+      Theme.of(context).brightness,
+      Theme.of(context).colorScheme,
+    );
+    final previous = _themeRevision;
+    _themeRevision = revision;
+    if (previous != null && previous != revision) {
+      _shellFuture = null;
+      _webReady = false;
+      _controller = null;
+      _documentRevision++;
     }
   }
 
@@ -864,6 +887,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           },
           onPointerPanZoomUpdate: (event) => _scrollPopupBy(event.panDelta),
           child: InAppWebView(
+            key: ValueKey(_documentRevision),
             webViewEnvironment: webViewEnvironment,
             initialData: InAppWebViewInitialData(
               data: data.html,

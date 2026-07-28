@@ -160,6 +160,37 @@ class DictionaryPopupPreferences {
   final bool showPitchNumber;
   final bool showPitchText;
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DictionaryPopupPreferences &&
+          width == other.width &&
+          height == other.height &&
+          fontSize == other.fontSize &&
+          theme == other.theme &&
+          eInkMode == other.eInkMode &&
+          paginatedScrolling == other.paginatedScrolling &&
+          customCss == other.customCss &&
+          showFrequencyHarmonic == other.showFrequencyHarmonic &&
+          showFrequencyAverage == other.showFrequencyAverage &&
+          showPitchNumber == other.showPitchNumber &&
+          showPitchText == other.showPitchText;
+
+  @override
+  int get hashCode => Object.hash(
+    width,
+    height,
+    fontSize,
+    theme,
+    eInkMode,
+    paginatedScrolling,
+    customCss,
+    showFrequencyHarmonic,
+    showFrequencyAverage,
+    showPitchNumber,
+    showPitchText,
+  );
+
   DictionaryPopupPreferences copyWith({
     double? width,
     double? height,

@@ -17,6 +17,7 @@ class ReaderSettingsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final padding = ref.watch(novelReaderPaddingStateProvider);
+    final fontSize = ref.watch(novelFontSizeStateProvider);
     final lineHeight = ref.watch(novelReaderLineHeightStateProvider);
     final paragraphSpacing = ref.watch(
       novelReaderParagraphSpacingStateProvider,
@@ -121,6 +122,53 @@ class ReaderSettingsTab extends ConsumerWidget {
                       ),
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          _SettingSection(
+            title: context.l10n.text_size,
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: context.l10n.text_size,
+                  onPressed: fontSize <= 4
+                      ? null
+                      : () => ref
+                            .read(novelFontSizeStateProvider.notifier)
+                            .set(fontSize - 1),
+                  icon: const Icon(Icons.text_decrease),
+                ),
+                Expanded(
+                  child: Slider(
+                    min: 4,
+                    max: 40,
+                    divisions: 36,
+                    value: fontSize.toDouble(),
+                    label: '$fontSize px',
+                    onChanged: (value) => ref
+                        .read(novelFontSizeStateProvider.notifier)
+                        .set(value.round()),
+                  ),
+                ),
+                SizedBox(
+                  width: 52,
+                  child: Text(
+                    '$fontSize px',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  tooltip: context.l10n.text_size,
+                  onPressed: fontSize >= 40
+                      ? null
+                      : () => ref
+                            .read(novelFontSizeStateProvider.notifier)
+                            .set(fontSize + 1),
+                  icon: const Icon(Icons.text_increase),
                 ),
               ],
             ),

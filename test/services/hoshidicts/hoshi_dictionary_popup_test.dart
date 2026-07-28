@@ -10,6 +10,25 @@ import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
 void main() {
+  test('dictionary popup preferences compare by their rendered values', () {
+    const preferences = DictionaryPopupPreferences(
+      width: 430,
+      height: 360,
+      fontSize: 14,
+      theme: DictionaryThemePreference.system,
+      eInkMode: false,
+      paginatedScrolling: false,
+      customCss: '',
+      showFrequencyHarmonic: false,
+      showFrequencyAverage: false,
+      showPitchNumber: true,
+      showPitchText: true,
+    );
+
+    expect(preferences, preferences.copyWith());
+    expect(preferences, isNot(preferences.copyWith(fontSize: 15)));
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('converts lookup results to Hoshi popup entry schema', () {

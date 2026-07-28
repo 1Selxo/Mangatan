@@ -151,6 +151,21 @@ void main() {
     expect(rows.map((row) => row.id), [1, 2, 3, 4]);
   });
 
+  test('resolves the logical chapter containing the live spine', () {
+    final first = chapter(id: 1, spineIndex: 0, navigation: true);
+    final third = chapter(id: 3, spineIndex: 8, navigation: true);
+    final seventh = chapter(id: 7, spineIndex: 20, navigation: true);
+
+    expect(
+      epubNavigationChapterForSpine([seventh, first, third], 13),
+      same(third),
+    );
+    expect(
+      epubNavigationChapterForSpine([seventh, first, third], 20),
+      same(seventh),
+    );
+  });
+
   test('preserves an explicitly unsplit EPUB row', () {
     final unsplit = Chapter(
       id: 1,

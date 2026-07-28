@@ -124,7 +124,15 @@ class _DictionaryPopupHostController {
   OverlayEntry? _entry;
   Future<void>? _initializing;
 
-  Future<void> prewarm(BuildContext context) => _ensure(context);
+  Future<void> prewarm(BuildContext context) async {
+    await _ensure(context);
+    await _refreshPreferences();
+  }
+
+  Future<void> _refreshPreferences() async {
+    final preferences = await MiningPreferences.getDictionaryPopupPreferences();
+    key.currentState?.updatePreferences(preferences);
+  }
 
   Future<void> prepare({
     required BuildContext context,
@@ -133,6 +141,7 @@ class _DictionaryPopupHostController {
     required DictionaryProfile profile,
   }) async {
     await _ensure(context);
+    await _refreshPreferences();
     if (!context.mounted) return;
     key.currentState?.prepare(
       text: text,
@@ -217,6 +226,11 @@ class _DictionaryPopupHostController {
     final miningContextFuture = Future<MiningContext?>.value(
       resolvedMiningContext,
     );
+    await _ensure(context);
+    await _refreshPreferences();
+    if (!_presentationGate.isCurrent(generation) || !context.mounted) {
+      return null;
+    }
     final existingState = key.currentState;
 
     // Hide an older result immediately, then give the persistent WebView the
@@ -233,10 +247,6 @@ class _DictionaryPopupHostController {
       results: results,
     );
 
-    await _ensure(context);
-    if (!_presentationGate.isCurrent(generation) || !context.mounted) {
-      return null;
-    }
     if (existingState == null) {
       key.currentState?.prepare(
         text: text,
@@ -329,6 +339,7 @@ class _DictionaryPopupOverlayHostState
   );
 
   _DictionaryPopupRequest _request = _warmRequest;
+  late DictionaryPopupPreferences _preferences = widget.preferences;
   Completer<void>? _dismissed;
   bool _visible = false;
   late double _left;
@@ -345,6 +356,18 @@ class _DictionaryPopupOverlayHostState
   int _childLookupGeneration = 0;
 
   bool get isVisible => _visible;
+
+  void updatePreferences(DictionaryPopupPreferences preferences) {
+    if (_preferences == preferences) return;
+    setState(() {
+      _preferences = preferences;
+      if (!_visible) {
+        _width = preferences.width;
+        _height = preferences.height;
+        _left = -_width - 100;
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -445,7 +468,7 @@ class _DictionaryPopupOverlayHostState
     final popupRect = dictionaryPopupRect(
       screen: screen,
       anchor: anchor,
-      preferredSize: Size(widget.preferences.width, widget.preferences.height),
+      preferredSize: Size(_preferences.width, _preferences.height),
       placement: placement,
     );
     final completer = Completer<void>();
@@ -554,7 +577,7 @@ class _DictionaryPopupOverlayHostState
     final rect = dictionaryPopupRect(
       screen: screen,
       anchor: anchor,
-      preferredSize: Size(widget.preferences.width, widget.preferences.height),
+      preferredSize: Size(_preferences.width, _preferences.height),
     );
     final child = _DictionaryChildPopup(
       id: ++_nextChildId,
@@ -600,7 +623,7 @@ class _DictionaryPopupOverlayHostState
   Widget build(BuildContext context) {
     final request = _request;
     final presentationGeneration = _presentationGeneration;
-    final popupTheme = _popupTheme(Theme.of(context), widget.preferences.theme);
+    final popupTheme = _popupTheme(Theme.of(context), _preferences.theme);
     return Stack(
       children: [
         Positioned(
@@ -618,16 +641,14 @@ class _DictionaryPopupOverlayHostState
                 child: Theme(
                   data: popupTheme.copyWith(
                     textTheme: popupTheme.textTheme.apply(
-                      fontSizeFactor: widget.preferences.fontSize / 14,
+                      fontSizeFactor: _preferences.fontSize / 14,
                     ),
                   ),
                   child: Material(
-                    elevation: _visible && !widget.preferences.eInkMode
-                        ? 12
-                        : 0,
+                    elevation: _visible && !_preferences.eInkMode ? 12 : 0,
                     clipBehavior: Clip.antiAlias,
                     borderRadius: BorderRadius.circular(
-                      widget.preferences.eInkMode ? 0 : 8,
+                      _preferences.eInkMode ? 0 : 8,
                     ),
                     color: popupTheme.colorScheme.surface,
                     child: HoshiDictionaryPopup(
@@ -636,7 +657,7 @@ class _DictionaryPopupOverlayHostState
                       profile: request.profile,
                       miningContext: request.miningContext,
                       initialResults: request.initialResults,
-                      preferences: widget.preferences,
+                      preferences: _preferences,
                       onMatchChanged: (count) {
                         if (_visible &&
                             presentationGeneration == _presentationGeneration &&
@@ -672,14 +693,14 @@ class _DictionaryPopupOverlayHostState
               child: Theme(
                 data: popupTheme.copyWith(
                   textTheme: popupTheme.textTheme.apply(
-                    fontSizeFactor: widget.preferences.fontSize / 14,
+                    fontSizeFactor: _preferences.fontSize / 14,
                   ),
                 ),
                 child: Material(
-                  elevation: widget.preferences.eInkMode ? 0 : 12,
+                  elevation: _preferences.eInkMode ? 0 : 12,
                   clipBehavior: Clip.antiAlias,
                   borderRadius: BorderRadius.circular(
-                    widget.preferences.eInkMode ? 0 : 8,
+                    _preferences.eInkMode ? 0 : 8,
                   ),
                   color: popupTheme.colorScheme.surface,
                   child: HoshiDictionaryPopup(
@@ -688,7 +709,7 @@ class _DictionaryPopupOverlayHostState
                     profile: indexed.$2.request.profile,
                     miningContext: indexed.$2.request.miningContext,
                     initialResults: indexed.$2.request.initialResults,
-                    preferences: widget.preferences,
+                    preferences: _preferences,
                     onMatchChanged: (_) {},
                     onDismiss: () => _dismissChild(indexed.$1),
                     onTextSelected: (selection) => _openChild(

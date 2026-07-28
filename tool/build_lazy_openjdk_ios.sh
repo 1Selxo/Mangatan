@@ -6,6 +6,8 @@ repo_dir=$(cd "$script_dir/.." && pwd)
 static_framework="$repo_dir/ios/Frameworks/OpenJDK.xcframework"
 output_framework="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 runtime_modules="$repo_dir/ios/EmbeddedMihon/runtime/lib/modules"
+runtime_tzdb="$repo_dir/ios/EmbeddedMihon/runtime/lib/tzdb.dat"
+runtime_security="$repo_dir/ios/EmbeddedMihon/runtime/lib/security"
 runtime_conf="$repo_dir/ios/EmbeddedMihon/runtime/conf"
 minimum_ios_version="${IOS_MINIMUM_VERSION:-13.0}"
 
@@ -26,6 +28,14 @@ if [[ ! -f "$runtime_modules" ]]; then
   echo "The embedded OpenJDK module image is missing." >&2
   exit 1
 fi
+if [[ ! -f "$runtime_tzdb" ]]; then
+  echo "The embedded OpenJDK timezone database is missing." >&2
+  exit 1
+fi
+if [[ ! -f "$runtime_security/public_suffix_list.dat" ]]; then
+  echo "The embedded OpenJDK security data is missing." >&2
+  exit 1
+fi
 if [[ ! -f "$runtime_conf/security/java.security" ]]; then
   echo "The embedded OpenJDK security configuration is missing." >&2
   exit 1
@@ -36,6 +46,8 @@ mkdir -p "$output_framework/Headers" "$output_framework/lib/lib"
 cp -R "$headers_dir/." "$output_framework/Headers/"
 cp "$script_dir/OpenJDKRuntime-Info.plist" "$output_framework/Info.plist"
 cp "$runtime_modules" "$output_framework/lib/lib/modules"
+cp "$runtime_tzdb" "$output_framework/lib/lib/tzdb.dat"
+cp -R "$runtime_security" "$output_framework/lib/lib/security"
 cp -R "$runtime_conf" "$output_framework/lib/conf"
 
 iphone_sdk=$(xcrun --sdk iphoneos --show-sdk-path)
@@ -56,6 +68,8 @@ xcrun --sdk iphoneos clang++ \
 
 test -x "$output_framework/OpenJDKRuntime"
 test -f "$output_framework/lib/lib/modules"
+test -f "$output_framework/lib/lib/tzdb.dat"
+test -f "$output_framework/lib/lib/security/public_suffix_list.dat"
 test -f "$output_framework/lib/conf/security/java.security"
 python3 "$script_dir/verify_macho_min_ios.py" \
   --maximum "$minimum_ios_version" \

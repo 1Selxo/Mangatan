@@ -169,6 +169,7 @@ bool LoadOpenJDKRuntime(NSError **error) {
       "JIMAGE_Close",
       "JIMAGE_FindResource",
       "JIMAGE_GetResource",
+      "VerifyClassForMajorVersion",
   };
   for (const char *symbol : requiredGlobalSymbols) {
     dlerror();
@@ -288,6 +289,17 @@ bool VerifyRuntimeFiles(
           1,
           @"The embedded Mihon runtime is incomplete: the framework-local "
           @"OpenJDK security configuration is missing.");
+    }
+    return false;
+  }
+  NSString *timezoneDatabase =
+      [runtimeHome stringByAppendingPathComponent:@"lib/tzdb.dat"];
+  if (![fileManager fileExistsAtPath:timezoneDatabase]) {
+    if (error != nullptr) {
+      *error = EmbeddedMihonError(
+          1,
+          @"The embedded Mihon runtime is incomplete: the framework-local "
+          @"OpenJDK timezone database is missing.");
     }
     return false;
   }

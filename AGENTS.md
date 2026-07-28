@@ -70,6 +70,8 @@ them.
 The framework-local `java.home` must contain both `lib/modules` and the
 matching OpenJDK `conf` tree. In particular, Java security initialization
 requires `conf/security/java.security`; a trust store alone is insufficient.
+It also needs matching non-module runtime data, especially `lib/tzdb.dat` and
+the `lib/security` data files. Do not package only the module image.
 
 When publishing a new runtime:
 
@@ -92,6 +94,9 @@ framework is loaded after process launch.
 - Do not replace either iOS path with macOS `RTLD_FIRST`.
 - Keep the `JIMAGE_*` and `JDK_Canonicalize` visibility checks in
   `MihonEmbeddedBridge.mm`.
+- Keep `libverify.a` in the static runtime and verify that
+  `VerifyClassForMajorVersion` is exported. Dex2jar output can require the
+  legacy verifier even when ordinary app classes use the split verifier.
 - Keep JNI boundary logs until the server starts reliably on physical devices.
 
 ## Testing

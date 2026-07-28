@@ -96,7 +96,8 @@ jobs:
             _JIMAGE_Open \
             _JIMAGE_Close \
             _JIMAGE_FindResource \
-            _JIMAGE_GetResource; do
+            _JIMAGE_GetResource \
+            _VerifyClassForMajorVersion; do
             grep -Fxq "$symbol" \
               "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
           done
@@ -141,6 +142,10 @@ jobs:
           cmp "$app_path/lib/modules" "$framework_modules"
           test -f \
             "$app_path/Frameworks/OpenJDKRuntime.framework/lib/conf/security/java.security"
+          test -f \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/lib/lib/tzdb.dat"
+          test -f \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/lib/lib/security/public_suffix_list.dat"
           python3 tool/verify_macho_min_ios.py \
             --maximum 13.0 "$app_path/Runner" "$lazy_runtime"
           python3 tool/verify_macho_initializers.py \

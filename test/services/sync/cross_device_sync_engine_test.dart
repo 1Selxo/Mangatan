@@ -1379,25 +1379,15 @@ void main() {
         contains('Cloud-only novel'),
       );
 
+      // The restored backup, the post-restore local edit, and the cloud record
+      // all describe the same day and title, so they collapse into one row
+      // holding the largest value seen for each field — Chimahon's merge rule.
+      // Keeping three rows would triple count that day's reading.
       final selectedStat = uploaded.backupMangaStats.singleWhere(
-        (stat) =>
-            stat.dateKey == '2026-07-17' &&
-            stat.mangaId == Int64(1) &&
-            stat.charactersRead == 15 &&
-            stat.readingTime == Int64(1500),
+        (stat) => stat.dateKey == '2026-07-17' && stat.mangaId == Int64(1),
       );
-      expect(selectedStat.charactersRead, 15);
-      expect(selectedStat.readingTime, Int64(1500));
-      expect(
-        uploaded.backupMangaStats
-            .where(
-              (stat) =>
-                  stat.dateKey == '2026-07-17' && stat.mangaId == Int64(1),
-            )
-            .map((stat) => (stat.charactersRead, stat.readingTime))
-            .toSet(),
-        {(10, Int64(1000)), (15, Int64(1500)), (99, Int64(9000))},
-      );
+      expect(selectedStat.charactersRead, 99);
+      expect(selectedStat.readingTime, Int64(9000));
       expect(
         uploaded.backupMangaStats.any(
           (stat) => stat.dateKey == '2026-07-18' && stat.mangaId == Int64(42),

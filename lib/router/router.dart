@@ -31,6 +31,9 @@ import 'package:mangayomi/modules/more/settings/player/player_decoder_screen.dar
 import 'package:mangayomi/modules/more/settings/player/player_overview_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
+import 'package:mangayomi/modules/more/statistics/immersion_stats_data.dart';
+import 'package:mangayomi/modules/more/statistics/immersion_stats_screen.dart';
+import 'package:mangayomi/modules/more/statistics/immersion_stats_titles_screen.dart';
 import 'package:mangayomi/modules/more/statistics/statistics_screen.dart';
 import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/modules/tracker_library/tracker_library_screen.dart';
@@ -223,6 +226,25 @@ class RouterNotifier extends ChangeNotifier {
       builder: (data) => CategoriesScreen(data: data),
     ),
     _genericRoute(name: "statistics", child: const StatisticsScreen()),
+    _genericRoute(
+      path: "/statistics/immersion",
+      name: "immersionStatistics",
+      child: const ImmersionStatsScreen(),
+    ),
+    _genericRoute<ImmersionStatsQuery>(
+      path: "/statistics/titles",
+      name: "immersionStatisticsTitles",
+      builder: (query) => ImmersionStatsTitlesScreen(query: query),
+    ),
+    _genericRoute<ImmersionStatsTitle>(
+      path: "/statistics/title",
+      name: "immersionStatisticsTitle",
+      builder: (title) => ImmersionStatsScreen(
+        titleId: title.id,
+        isNovel: title.isNovel,
+        titleName: title.title,
+      ),
+    ),
     _genericRoute(name: "general", child: const GeneralScreen()),
     _genericRoute(name: "readerMode", child: const ReaderScreen()),
     _genericRoute(name: "dictionary", child: const DictionaryScreen()),

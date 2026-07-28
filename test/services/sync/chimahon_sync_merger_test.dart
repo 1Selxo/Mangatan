@@ -1731,7 +1731,7 @@ void main() {
     expect(anime.fetchType, 10);
   });
 
-  test('merges novels while retaining opaque root statistics', () {
+  test('merges novels alongside root statistics', () {
     BackupNovel novel(
       int modified,
       int statModified,
@@ -1788,15 +1788,11 @@ void main() {
     expect(merged.backupNovels.single.stats.single.charactersRead, 250);
     expect(merged.backupNovels.single.categoryIds, ['reading']);
     expect(merged.backupNovels.single.lang, 'ja');
-    expect(merged.backupMangaStats, hasLength(2));
-    expect(
-      merged.backupMangaStats.map((stat) => stat.charactersRead),
-      containsAll([100, 250]),
-    );
-    expect(
-      merged.backupMangaStats.map((stat) => stat.readingTime),
-      containsAll([Int64(200), Int64(180)]),
-    );
+    // The same day and title collapse to one row holding each side's larger
+    // value, so a novel merge does not disturb the manga statistics rule.
+    expect(merged.backupMangaStats, hasLength(1));
+    expect(merged.backupMangaStats.single.charactersRead, 250);
+    expect(merged.backupMangaStats.single.readingTime, Int64(200));
   });
 
   test('does not materialize a synthetic default novel category on a tie', () {
@@ -2087,7 +2083,7 @@ void main() {
     ]);
   });
 
-  test('manga statistics preserve both exact opaque rows', () {
+  test('manga statistics merge per day taking the larger value per field', () {
     final localStat =
         BackupMangaStats(
             dateKey: '2026-07-10',
@@ -2112,24 +2108,44 @@ void main() {
       remote: BackupMihon(backupMangaStats: [remoteStat]),
     );
 
-    expect(merged.backupMangaStats, hasLength(2));
-    final local = merged.backupMangaStats.first;
-    final remote = merged.backupMangaStats.last;
-    expect(local.charactersRead, 100);
-    expect(local.readingTime, Int64(200));
-    expect(local.unknownFields.getField(90)!.varints, [Int64(1)]);
-    expect(local.unknownFields.getField(91)!.lengthDelimited, [
+    // Same day and title: one row, each field at whichever side was ahead.
+    expect(merged.backupMangaStats, hasLength(1));
+    final row = merged.backupMangaStats.single;
+    expect(row.charactersRead, 250);
+    expect(row.readingTime, Int64(200));
+    // Both sides' future protobuf fields must still survive the merge.
+    expect(row.unknownFields.getField(90)!.varints, isNotEmpty);
+    expect(row.unknownFields.getField(91)!.lengthDelimited, [
       [1, 2],
     ]);
-    expect(remote.charactersRead, 250);
-    expect(remote.readingTime, Int64(180));
-    expect(remote.unknownFields.getField(90)!.varints, [Int64(2)]);
-    expect(remote.unknownFields.getField(92)!.lengthDelimited, [
+    expect(row.unknownFields.getField(92)!.lengthDelimited, [
       [3, 4],
     ]);
   });
 
-  test('Anki statistics preserve both exact opaque rows', () {
+  test('manga statistics keep distinct days and titles apart', () {
+    final merged = merger.merge(
+      local: BackupMihon(
+        backupMangaStats: [
+          BackupMangaStats(dateKey: '2026-07-10', mangaId: Int64(1), charactersRead: 10),
+          BackupMangaStats(dateKey: '2026-07-11', mangaId: Int64(1), charactersRead: 20),
+        ],
+      ),
+      remote: BackupMihon(
+        backupMangaStats: [
+          BackupMangaStats(dateKey: '2026-07-10', mangaId: Int64(2), charactersRead: 30),
+        ],
+      ),
+    );
+
+    expect(merged.backupMangaStats, hasLength(3));
+    expect(
+      merged.backupMangaStats.map((row) => row.charactersRead),
+      containsAll([10, 20, 30]),
+    );
+  });
+
+  test('Anki statistics merge per day taking the larger card counts', () {
     final localStat =
         BackupAnkiStats(
             dateKey: '2026-07-10',
@@ -2156,19 +2172,15 @@ void main() {
       remote: BackupMihon(backupAnkiStats: [remoteStat]),
     );
 
-    expect(merged.backupAnkiStats, hasLength(2));
-    final local = merged.backupAnkiStats.first;
-    final remote = merged.backupAnkiStats.last;
-    expect(local.mangaCards, 7);
-    expect(local.novelCards, 3);
-    expect(local.unknownFields.getField(90)!.varints, [Int64(1)]);
-    expect(local.unknownFields.getField(91)!.lengthDelimited, [
+    expect(merged.backupAnkiStats, hasLength(1));
+    final row = merged.backupAnkiStats.single;
+    expect(row.mangaCards, 7);
+    expect(row.novelCards, 9);
+    expect(row.unknownFields.getField(90)!.varints, isNotEmpty);
+    expect(row.unknownFields.getField(91)!.lengthDelimited, [
       [1, 2],
     ]);
-    expect(remote.mangaCards, 5);
-    expect(remote.novelCards, 9);
-    expect(remote.unknownFields.getField(90)!.varints, [Int64(2)]);
-    expect(remote.unknownFields.getField(92)!.lengthDelimited, [
+    expect(row.unknownFields.getField(92)!.lengthDelimited, [
       [3, 4],
     ]);
   });

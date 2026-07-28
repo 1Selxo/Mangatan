@@ -20,7 +20,11 @@ import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
+import 'package:mangayomi/modules/more/statistics/widgets/novel_stats_sheet.dart';
 import 'package:mangayomi/modules/novel/novel_reader_progress.dart';
+import 'package:mangayomi/services/statistics/immersion_stats_storage.dart';
+import 'package:mangayomi/services/statistics/novel_statistics_tracker.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
 import 'package:mangayomi/modules/novel/tts/novel_tts_service.dart';
 import 'package:mangayomi/modules/novel/tts/tts_player_bar.dart';
 import 'package:mangayomi/modules/novel/tts/tts_settings_tab.dart';
@@ -323,6 +327,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         );
       }
     }
+    _trackStatsProgress();
     _progressPersistDebounce?.cancel();
     _progressPersistDebounce = Timer(const Duration(seconds: 2), () {
       if (!_isDisposed) {
@@ -342,6 +347,116 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     );
   }
 
+  /// Resolves this book's Chimahon identity and loads its stored statistics.
+  Future<void> _initStatsTracker() async {
+    final progress = _statsBookProgress();
+    // A book with no Chimahon-representable identity cannot be persisted
+    // against; tracking is disabled rather than writing rows that would be
+    // dropped on the next sync.
+    final novelId = progress == null
+        ? null
+        : const ChimahonNovelProgressAdapter().stableLocalIdOrNull(progress);
+    if (novelId == null) return;
+    final stored = await ImmersionStatsStorage.loadNovelStats(novelId);
+    if (!mounted || _isDisposed) return;
+    final tracker = NovelStatisticsTracker(
+      novelId: novelId,
+      initialStatistics: stored,
+    );
+    // Anchor at the restored position so the first tick does not credit the
+    // whole book's offset as characters read in this session.
+    tracker.start(_epubCharacterCount ?? 0);
+    _statsTracker = tracker;
+    _statsSheetRevision.value++;
+  }
+
+  /// Computes the book's total character count and the current chapter's end
+  /// offset, both in Chimahon's explored-character space.
+  void _updateStatsCharacterBounds(EpubNovel book) {
+    final starts = epubCharacterStartsBySpine(book);
+    var total = 0;
+    for (final entry in book.chapters) {
+      if (entry.isLinear) {
+        total += chimahonChapterCharacterCount(entry.content);
+      }
+    }
+    _statsTotalCharacters = total;
+
+    final currentSpine =
+        _currentEpubSpineIndex ??
+        widget.initialEpubSpineIndex ??
+        epubChapterSpineIndex(chapter);
+    if (currentSpine == null) {
+      _statsChapterEndCharacter = total;
+      return;
+    }
+    // The chapter ends where the next linear spine item begins; the last
+    // chapter ends at the book's total.
+    final laterStarts = starts.entries
+        .where((entry) => entry.key > currentSpine)
+        .map((entry) => entry.value)
+        .toList();
+    _statsChapterEndCharacter = laterStarts.isEmpty
+        ? total
+        : laterStarts.reduce((a, b) => a < b ? a : b);
+  }
+
+  EpubBookProgress? _statsBookProgress() {
+    final mangaId = chapter.mangaId;
+    if (mangaId == null) return null;
+    final archivePath = chapter.archivePath;
+    final query = isar.epubBookProgress.filter().mangaIdEqualTo(mangaId);
+    return archivePath == null || archivePath.isEmpty
+        ? query.findFirstSync()
+        : query.archivePathEqualTo(archivePath).findFirstSync();
+  }
+
+  /// Feeds the reader's absolute character position to the tracker.
+  void _trackStatsProgress() {
+    final tracker = _statsTracker;
+    if (tracker == null) return;
+    tracker.update(_epubCharacterCount ?? 0);
+    if (_statsSheetOpen) _statsSheetRevision.value++;
+  }
+
+  bool _statsSheetOpen = false;
+
+  /// Opens the immersion statistics sheet for this book.
+  Future<void> _showStatsSheet() async {
+    final tracker = _statsTracker;
+    if (tracker == null) {
+      // The book has no Chimahon-representable identity, so nothing can be
+      // recorded against it.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Statistics are unavailable for this book'),
+        ),
+      );
+      return;
+    }
+    _trackStatsProgress();
+    _statsSheetOpen = true;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => ValueListenableBuilder<int>(
+        valueListenable: _statsSheetRevision,
+        builder: (context, _, _) => NovelStatsSheet(
+          tracker: tracker,
+          currentCharacter: _epubCharacterCount ?? 0,
+          totalCharacters: _statsTotalCharacters,
+          chapterEndCharacter: _statsChapterEndCharacter,
+          onToggleTracking: () {
+            tracker.togglePause(_epubCharacterCount ?? 0);
+            _statsSheetRevision.value++;
+          },
+        ),
+      ),
+    );
+    _statsSheetOpen = false;
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
@@ -355,6 +470,12 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
       );
     }
+    final statsTracker = _statsTracker;
+    if (statsTracker != null) {
+      statsTracker.stop(_epubCharacterCount ?? 0);
+      unawaited(statsTracker.persist());
+    }
+    _statsSheetRevision.dispose();
     _scrollController.removeListener(onScroll);
     _scrollController.dispose();
     _progressPersistDebounce?.cancel();
@@ -386,9 +507,17 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
       _appIsActive = false;
       _readingStopwatch.stop();
       if (!_epubPositionLocked) _persistProgress();
+      // Backgrounded time is not reading time, so close the tick window and
+      // flush what has accumulated.
+      final statsTracker = _statsTracker;
+      if (statsTracker != null) {
+        statsTracker.pause(_epubCharacterCount ?? 0);
+        unawaited(statsTracker.persist());
+      }
     } else if (state == AppLifecycleState.resumed) {
       _appIsActive = true;
       if (!_epubPositionLocked) _readingStopwatch.start();
+      _statsTracker?.start(_epubCharacterCount ?? 0);
     }
   }
 
@@ -397,9 +526,26 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
 
   final StreamController<double> _rebuildDetail =
       StreamController<double>.broadcast();
+
+  /// Chimahon-compatible immersion statistics for this book.
+  ///
+  /// Created lazily in [initState] because it needs the persisted rows, which
+  /// are loaded asynchronously; until then reader ticks are simply dropped.
+  NovelStatisticsTracker? _statsTracker;
+
+  /// Rebuilt while the statistics sheet is open so its values stay live.
+  final ValueNotifier<int> _statsSheetRevision = ValueNotifier(0);
+
+  /// Total characters in the whole book, for the time-to-finish projection.
+  int _statsTotalCharacters = 0;
+
+  /// Character offset at which the current chapter ends.
+  int _statsChapterEndCharacter = 0;
+
   @override
   void initState() {
     super.initState();
+    unawaited(_initStatsTracker());
     HardwareKeyboard.instance.addHandler(_handleHiddenEpubEscape);
     unawaited(ReaderLookupTriggerState.initialize());
     _epubLayout.addListener(_onEpubLayoutChanged);
@@ -830,6 +976,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                 epubBook = data.$2;
                 if (epubBook != null) {
                   _initializeSavedEpubSpine(epubBook!);
+                  _updateStatsCharacterBounds(epubBook!);
                 }
                 _currentHtmlContent = data.$1;
                 final chapterCharacterCount = _usingTtsuReader
@@ -1642,6 +1789,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         setState(() => _isBookmarked = !_isBookmarked);
       },
       onChapterSelected: _usingTtsuReader ? _selectEpubChapter : null,
+      onStatsPressed: _showStatsSheet,
       onWebViewPressed: (chapter.manga.value!.isLocalArchive ?? false)
           ? null
           : () async {

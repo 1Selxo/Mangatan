@@ -489,6 +489,9 @@ class AppLocalizationsId extends AppLocalizations {
   String get statistics => 'Statistik';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'Pengaturan';
 
   @override

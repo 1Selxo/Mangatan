@@ -469,6 +469,25 @@ class ReaderOcrState {
       stage: stage,
     );
   }
+
+  /// Recognized character count for [data], for reading statistics.
+  ///
+  /// This only consults the OCR cache: a page whose recognition has not
+  /// finished contributes zero characters rather than blocking a page turn or
+  /// triggering OCR the reader did not ask for. Chimahon behaves the same way
+  /// (`getCachedOcrBlocks`), so an un-OCRed page counts time but no characters.
+  static Future<int> cachedCharacterCount(UChapDataPreload data) async {
+    for (final controller in _controllers) {
+      if (!identical(controller.data, data)) continue;
+      final page = controller._page;
+      if (page == null) return 0;
+      return page.blocks.fold<int>(
+        0,
+        (sum, block) => sum + block.text.length,
+      );
+    }
+    return 0;
+  }
 }
 
 enum ReaderOcrProgressStage { recognizing, loadingMokuro, mokuro }

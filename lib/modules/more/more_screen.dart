@@ -96,10 +96,17 @@ class MoreScreenState extends ConsumerState<MoreScreen> {
             ),
             ListTileWidget(
               onTap: () {
-                context.push('/statistics');
+                context.push('/statistics/immersion');
               },
               icon: Icons.query_stats_outlined,
               title: l10n.statistics,
+            ),
+            ListTileWidget(
+              onTap: () {
+                context.push('/statistics');
+              },
+              icon: Icons.pie_chart_outline,
+              title: l10n.library_statistics,
             ),
             ListTileWidget(
               onTap: () {

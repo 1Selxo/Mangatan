@@ -19,6 +19,7 @@ import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/services/sync/chimahon_source_preferences_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/chimahon_tracking_adapter.dart';
+import 'package:mangayomi/services/statistics/immersion_stats_storage.dart';
 import 'package:mangayomi/services/sync/mihon_backup_exporter.dart';
 
 typedef ChimahonMediaSyncSelectionProvider =
@@ -243,6 +244,9 @@ class ChimahonLocalSyncProjectionService {
       deletedTracks: trackingDeletions.deletions,
       appPreferences: appPreferences,
       sourcePreferences: sourcePreferences,
+      mangaStats: await ImmersionStatsStorage.loadMangaStats(),
+      ankiStats: await ImmersionStatsStorage.loadAnkiStats(),
+      novelStats: await ImmersionStatsStorage.loadAllNovelStats(),
     );
     // Keep every local media record until the engine has read the current
     // remote and can safely resolve a first-contact selection. Only the exact

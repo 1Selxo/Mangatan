@@ -487,6 +487,9 @@ class AppLocalizationsTh extends AppLocalizations {
   String get statistics => 'สถิติ';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'การตั้งค่า';
 
   @override

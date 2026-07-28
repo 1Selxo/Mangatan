@@ -490,6 +490,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get statistics => 'Statistiques';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'Paramètres';
 
   @override

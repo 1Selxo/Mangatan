@@ -887,6 +887,12 @@ abstract class AppLocalizations {
   /// **'Statistics'**
   String get statistics;
 
+  /// No description provided for @library_statistics.
+  ///
+  /// In en, this message translates to:
+  /// **'Library statistics'**
+  String get library_statistics;
+
   /// No description provided for @settings.
   ///
   /// In en, this message translates to:

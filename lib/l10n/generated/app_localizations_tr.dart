@@ -485,6 +485,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get statistics => 'İstatistikler';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'Ayarlar';
 
   @override

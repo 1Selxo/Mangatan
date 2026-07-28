@@ -10,8 +10,9 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupHi
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupStatistics.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
-import 'package:mangayomi/services/sync/chimahon_opaque_rows.dart';
+import 'package:mangayomi/services/sync/chimahon_stats_row_merge.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:protobuf/protobuf.dart';
 
@@ -156,7 +157,7 @@ class ChimahonPendingRestoreAuthority {
     result.backupMangaStats
       ..clear()
       ..addAll(
-        ChimahonOpaqueRows.mergeMaxMultiplicity(
+        ChimahonStatsRowMerge.mangaStats(
           merged.backupMangaStats,
           pending.backupMangaStats,
         ),
@@ -164,7 +165,7 @@ class ChimahonPendingRestoreAuthority {
     result.backupAnkiStats
       ..clear()
       ..addAll(
-        ChimahonOpaqueRows.mergeMaxMultiplicity(
+        ChimahonStatsRowMerge.ankiStats(
           merged.backupAnkiStats,
           pending.backupAnkiStats,
         ),
@@ -265,20 +266,50 @@ class ChimahonPendingRestoreAuthority {
     )) {
       return false;
     }
-    if (ChimahonOpaqueRows.missingExactRows(
-      pending.backupMangaStats,
-      uploaded.backupMangaStats,
-    ).isNotEmpty) {
+    // Statistics are merged rather than passed through, so the upload cannot be
+    // expected to contain the pending rows byte for byte. What must hold is that
+    // every pending day survives and no counter went backwards.
+    if (!_statisticsRepresented<BackupMangaStats>(
+      pending: pending.backupMangaStats,
+      uploaded: uploaded.backupMangaStats,
+      keyOf: ChimahonStatsRowMerge.mangaKey,
+      covers: (uploadedRow, pendingRow) =>
+          uploadedRow.charactersRead >= pendingRow.charactersRead &&
+          uploadedRow.readingTime >= pendingRow.readingTime,
+    )) {
       return false;
     }
-    if (ChimahonOpaqueRows.missingExactRows(
-      pending.backupAnkiStats,
-      uploaded.backupAnkiStats,
-    ).isNotEmpty) {
+    if (!_statisticsRepresented<BackupAnkiStats>(
+      pending: pending.backupAnkiStats,
+      uploaded: uploaded.backupAnkiStats,
+      keyOf: ChimahonStatsRowMerge.ankiKey,
+      covers: (uploadedRow, pendingRow) =>
+          uploadedRow.mangaCards >= pendingRow.mangaCards &&
+          uploadedRow.novelCards >= pendingRow.novelCards,
+    )) {
       return false;
     }
 
     return _containsPendingPreferences(uploaded, pending, localIntent);
+  }
+
+  /// True when every pending statistics row has an uploaded counterpart on the
+  /// same daily identity whose counters are at least as large.
+  bool _statisticsRepresented<T extends GeneratedMessage>({
+    required Iterable<T> pending,
+    required Iterable<T> uploaded,
+    required String Function(T row) keyOf,
+    required bool Function(T uploadedRow, T pendingRow) covers,
+  }) {
+    final uploadedByKey = <String, T>{};
+    for (final row in uploaded) {
+      uploadedByKey[keyOf(row)] = row;
+    }
+    for (final row in pending) {
+      final candidate = uploadedByKey[keyOf(row)];
+      if (candidate == null || !covers(candidate, row)) return false;
+    }
+    return true;
   }
 
   BackupManga _overlayManga(

@@ -130,7 +130,9 @@ void main() {
     );
   });
 
-  test('global statistics remain exact opaque rows', () {
+  test('global statistics merge per day without losing reading', () {
+    // The same day and title on both devices, each ahead on one field. Chimahon
+    // takes the larger value per field, so one row must survive with both.
     final localManga = BackupMangaStats(
       dateKey: '2026-07-18',
       mangaId: Int64(7),
@@ -167,16 +169,118 @@ void main() {
       proposed: proposed,
     );
 
-    expect(proposed.backupMangaStats, hasLength(2));
-    expect(proposed.backupAnkiStats, hasLength(2));
+    expect(proposed.backupMangaStats, hasLength(1));
+    expect(proposed.backupMangaStats.single.charactersRead, 100);
+    expect(proposed.backupMangaStats.single.readingTime, Int64(90));
+    // Repeated identical rows collapse: they are the same day, profile, and
+    // title, so keeping both would double count the mined cards.
+    expect(proposed.backupAnkiStats, hasLength(1));
+    expect(proposed.backupAnkiStats.single.mangaCards, 3);
     expect(result.failures, isEmpty);
+    expect(result.observations['manga_statistics_merged'], hasLength(1));
+    expect(result.observations['anki_statistics_merged'], hasLength(1));
+  });
+
+  test('fails closed when a merged statistic loses recorded reading', () {
+    final local = BackupMihon(
+      backupMangaStats: [
+        BackupMangaStats(
+          dateKey: '2026-07-18',
+          mangaId: Int64(7),
+          charactersRead: 100,
+          readingTime: Int64(50),
+        ),
+      ],
+      backupAnkiStats: [
+        BackupAnkiStats(
+          dateKey: '2026-07-18',
+          profileId: 'profile',
+          mangaCards: 5,
+        ),
+      ],
+    );
+    // A proposal that reduces either counter has silently erased reading or
+    // mined cards, which the audit must reject rather than upload.
+    final proposed = BackupMihon(
+      backupMangaStats: [
+        BackupMangaStats(
+          dateKey: '2026-07-18',
+          mangaId: Int64(7),
+          charactersRead: 90,
+          readingTime: Int64(50),
+        ),
+      ],
+      backupAnkiStats: [
+        BackupAnkiStats(
+          dateKey: '2026-07-18',
+          profileId: 'profile',
+          mangaCards: 4,
+        ),
+      ],
+    );
+    final result = _run(
+      audit,
+      local: local,
+      remote: BackupMihon(),
+      proposed: proposed,
+    );
+
     expect(
-      result.observations['manga_statistics_manual_backup_only'],
-      hasLength(2),
+      result.failures['local_manga_stat_regressed_in_proposed'],
+      hasLength(1),
     );
     expect(
-      result.observations['anki_statistics_manual_backup_only'],
-      hasLength(2),
+      result.failures['local_anki_stat_regressed_in_proposed'],
+      hasLength(1),
+    );
+  });
+
+  test('fails closed when a statistics day disappears from the proposal', () {
+    final local = BackupMihon(
+      backupMangaStats: [
+        BackupMangaStats(
+          dateKey: '2026-07-18',
+          mangaId: Int64(7),
+          charactersRead: 100,
+        ),
+      ],
+    );
+    final result = _run(
+      audit,
+      local: local,
+      remote: BackupMihon(),
+      proposed: BackupMihon(),
+    );
+
+    expect(
+      result.failures['local_manga_stat_missing_from_proposed'],
+      hasLength(1),
+    );
+  });
+
+  test('an absent Anki titleId is distinct from an empty one', () {
+    // These are different rows: absent means "mined outside any title", while
+    // an empty string is a real (if degenerate) title ID.
+    final withoutTitle = BackupAnkiStats(
+      dateKey: '2026-07-18',
+      profileId: 'profile',
+      novelCards: 2,
+    );
+    final withEmptyTitle = BackupAnkiStats(
+      dateKey: '2026-07-18',
+      profileId: 'profile',
+      novelCards: 4,
+      titleId: '',
+    );
+    final proposed = const ChimahonSyncMerger().merge(
+      local: BackupMihon(backupAnkiStats: [withoutTitle]),
+      remote: BackupMihon(backupAnkiStats: [withEmptyTitle]),
+    );
+
+    expect(proposed.backupAnkiStats, hasLength(2));
+    expect(
+      proposed.backupAnkiStats.map((row) => row.novelCards),
+      containsAll([2, 4]),
     );
   });
 

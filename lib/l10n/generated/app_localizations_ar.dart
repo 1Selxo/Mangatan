@@ -499,6 +499,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statistics => 'الإحصائيات';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'الإعدادات';
 
   @override

@@ -13,6 +13,8 @@ typedef void (^MangatanEmbeddedMihonStatusCompletion)(
 FOUNDATION_EXPORT void MangatanEmbeddedMihonStart(
     int32_t port,
     MangatanEmbeddedMihonStartCompletion completion);
+FOUNDATION_EXPORT void MangatanEmbeddedMihonPause(
+    MangatanEmbeddedMihonCompletion completion);
 FOUNDATION_EXPORT void MangatanEmbeddedMihonStop(
     MangatanEmbeddedMihonCompletion completion);
 FOUNDATION_EXPORT void MangatanEmbeddedMihonIsRunning(

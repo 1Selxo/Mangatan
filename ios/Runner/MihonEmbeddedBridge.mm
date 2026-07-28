@@ -80,6 +80,7 @@ using CreateJavaVM = jint (*)(JavaVM **, void **, void *);
 JavaVM *gJavaVM = nullptr;
 jclass gEmbeddedBridgeClass = nullptr;
 jmethodID gStartMethod = nullptr;
+jmethodID gPauseMethod = nullptr;
 jmethodID gStopMethod = nullptr;
 jmethodID gIsRunningMethod = nullptr;
 void *gOpenJDKHandle = nullptr;
@@ -359,11 +360,14 @@ bool CacheBridgeEntryPoints(JNIEnv *env, NSError **error) {
 
   gStartMethod = env->GetStaticMethodID(
       gEmbeddedBridgeClass, "start", "(ILjava/lang/String;)I");
+  gPauseMethod =
+      env->GetStaticMethodID(gEmbeddedBridgeClass, "pause", "()V");
   gStopMethod =
       env->GetStaticMethodID(gEmbeddedBridgeClass, "stop", "()V");
   gIsRunningMethod =
       env->GetStaticMethodID(gEmbeddedBridgeClass, "isRunning", "()Z");
   if (gStartMethod == nullptr ||
+      gPauseMethod == nullptr ||
       gStopMethod == nullptr ||
       gIsRunningMethod == nullptr ||
       env->ExceptionCheck()) {
@@ -384,6 +388,7 @@ bool CreateJavaVMIfNeeded(JNIEnv **environment, NSError **error) {
   if (gJavaVM != nullptr) {
     if (gEmbeddedBridgeClass == nullptr ||
         gStartMethod == nullptr ||
+        gPauseMethod == nullptr ||
         gStopMethod == nullptr ||
         gIsRunningMethod == nullptr) {
       if (error != nullptr) {
@@ -589,6 +594,31 @@ void MangatanEmbeddedMihonStop(
               10,
               JavaExceptionMessage(
                   environment, @"The embedded Mihon bridge failed to stop."));
+        }
+        DetachCurrentWorker();
+      }
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(error);
+      });
+    }
+  }];
+}
+
+void MangatanEmbeddedMihonPause(
+    MangatanEmbeddedMihonCompletion completion) {
+  [EmbeddedMihonThread() enqueueBlock:^{
+    @autoreleasepool {
+      NSError *error = nil;
+      JNIEnv *environment = nullptr;
+      if (gJavaVM != nullptr &&
+          CreateJavaVMIfNeeded(&environment, &error)) {
+        environment->CallStaticVoidMethod(
+            gEmbeddedBridgeClass, gPauseMethod);
+        if (environment->ExceptionCheck()) {
+          error = EmbeddedMihonError(
+              12,
+              JavaExceptionMessage(
+                  environment, @"The embedded Mihon bridge failed to pause."));
         }
         DetachCurrentWorker();
       }

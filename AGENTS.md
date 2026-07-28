@@ -41,6 +41,25 @@ auto-disposed Riverpod providers: a source provider may be disposed while the
 native VM is still starting, and its `Ref` must never be read after that async
 gap.
 
+### iOS suspension and thermal behavior
+
+The iOS OpenJDK port's blocking `accept()` can spin after device sleep. On the
+test device this changed an idle bridge from approximately 0% CPU to one full
+core, heated the phone, and left the loopback port unable to serve requests.
+
+- Begin stopping the Java loopback listener in native
+  `applicationWillResignActive`, then mirror the state in
+  `AppLifecycleState.inactive`, before iOS suspends the process.
+- Restart it on `AppLifecycleState.resumed`, preferring the previous port so
+  existing image and media proxy URLs stay valid.
+- Keep loaded extension instances while the listener is paused. Re-converting
+  each APK on every unlock is slow and wastes battery.
+- A native `isRunning` result does not prove HTTP health after device sleep.
+  If `/capabilities` fails while native status is true, stop the stale listener
+  before starting it again.
+- Do not keep the bridge running in the background. iOS suspends ordinary
+  sideloaded apps, so this cannot provide a reliable background server.
+
 ## iOS runtime constraints
 
 - The normal sideload build must not require JIT, unsigned executable memory,

@@ -21,7 +21,7 @@ env:
   LIBFFI_IOS_URL: https://github.com/openjdk-mobile/ios-tools/releases/download/libffi-build/libffi-ios.zip
   LIBFFI_IOS_SHA256: 4f39fd1d53fbd69d1bdbd915413077d130daa3f6792d1b3a03a690a9cbd4dea3
   IOS_MINIMUM_VERSION: "13.0"
-  RUNTIME_RELEASE_TAG: embedded-openjdk-ios13-v11
+  RUNTIME_RELEASE_TAG: embedded-openjdk-ios13-v12
 
 jobs:
   build-device:

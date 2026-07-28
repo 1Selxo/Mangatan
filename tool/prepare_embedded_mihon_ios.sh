@@ -9,9 +9,9 @@ lazy_framework_dir="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
-server_commit="1e909217e8ef06f10ca83ea5d92de5f2aafbfdf5"
-server_jar_url="https://github.com/ippo-michi/M-Extension-Server/releases/download/ios-runtime-v1/MExtensionServer-ios.jar"
-server_jar_sha256="799269277018ec4f2fc5195e80ce124b22224df23be9c6ae7096f6f8c9bc3f94"
+server_commit="c51bc938b75b5181fb143ced65750309f6fc5de5"
+server_jar_url="https://github.com/ippo-michi/M-Extension-Server/releases/download/ios-runtime-v2/MExtensionServer-ios.jar"
+server_jar_sha256="89eb9817563550b94a13dbbed5c305388752687bc0d073251585a8e91defb1b9"
 openjdk_framework_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="1224f55d06b780c8e5e22728066773c715bb6d9f9520f0668a67d94ef73ea0d6"
 openjdk_bundle_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"
@@ -57,6 +57,13 @@ for required_resource in r_styles.ini r_values.ini; do
     exit 1
   fi
 done
+if ! "$JAVA_HOME/bin/javap" \
+  -classpath "$server_jar" \
+  -constants org.objectweb.asm.Opcodes |
+  grep -q 'V27 = 71'; then
+  echo "The iOS server JAR cannot read OpenJDK 27 class files." >&2
+  exit 1
+fi
 
 echo "Downloading verified OpenJDK Mobile runtime"
 download_and_verify \

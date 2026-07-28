@@ -26,10 +26,10 @@
       "versions": [
         {
           "version": "1.0.8",
-          "date": "2026-07-27T14:54:48Z",
-          "localizedDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"8bdb2dd5469e01e30a1590ec2a7a984a1c9fb249\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
-          "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.144-8bdb2dd/Mangatan-main-v1.0.8-build.144-8bdb2dd-ios.ipa",
-          "size": 119137430
+          "date": "2026-07-28T04:12:16Z",
+          "localizedDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"bd266083464210bac54071bd8aec4b88ebf6716f\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
+          "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.144-bd26608/Mangatan-main-v1.0.8-build.144-bd26608-ios.ipa",
+          "size": 119137433
         }
       ],
       "appPermissions": {
@@ -37,10 +37,10 @@
         "privacy": []
       },
       "version": "1.0.8",
-      "versionDate": "2026-07-27T14:54:48Z",
-      "versionDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"8bdb2dd5469e01e30a1590ec2a7a984a1c9fb249\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
-      "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.144-8bdb2dd/Mangatan-main-v1.0.8-build.144-8bdb2dd-ios.ipa",
-      "size": 119137430
+      "versionDate": "2026-07-28T04:12:16Z",
+      "versionDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"bd266083464210bac54071bd8aec4b88ebf6716f\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
+      "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.144-bd26608/Mangatan-main-v1.0.8-build.144-bd26608-ios.ipa",
+      "size": 119137433
     }
   ],
   "news": [
@@ -318,6 +318,17 @@
       "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.144-8bdb2dd"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "ios-v1.0.8-build.144-bd26608 - 28 Jul",
+      "identifier": "release-ios-v1.0.8-build.144-bd26608",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-07-28T04:12:16Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.144-bd26608"
     }
   ]
 }

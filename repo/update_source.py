@@ -14,7 +14,7 @@ class ReleaseAsset(TypedDict):
 class GitHubRelease(TypedDict):
     tag_name: str
     published_at: str
-    body: str
+    body: Optional[str]
     assets: List[ReleaseAsset]
 
 
@@ -262,7 +262,7 @@ def update_json_file(
         base_version = normalize_version(full_version)
 
         # Clean up description
-        description = release["body"]
+        description = release.get("body") or ""
         keyword = "{APP_NAME} Release Information"
         if keyword in description:
             description = description.split(keyword, 1)[1].strip()
@@ -304,7 +304,9 @@ def update_json_file(
 
     app["version"] = normalize_version(latest_version)
     app["versionDate"] = fetched_data_latest["published_at"]
-    app["versionDescription"] = format_description(fetched_data_latest["body"])
+    app["versionDescription"] = format_description(
+        fetched_data_latest.get("body") or ""
+    )
 
     # Find latest download URL and size
     download_url, size = find_download_url_and_size(fetched_data_latest)

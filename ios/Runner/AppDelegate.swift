@@ -6,6 +6,9 @@ import Libmtorrentserver
 @objc class AppDelegate: FlutterAppDelegate {
   private static let ankiMobilePasteboardType = "net.ankimobile.json"
   private var ankiMobileMediaBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+  private var embeddedMihonRequested = false
+  private var embeddedMihonNeedsResume = false
+  private var embeddedMihonPort: Int32?
 
   override func application(
     _ application: UIApplication,
@@ -68,12 +71,13 @@ import Libmtorrentserver
       let embeddedMihonChannel = FlutterMethodChannel(
         name: "com.selxo.mangatan.embedded_mihon",
         binaryMessenger: controller.binaryMessenger)
-      embeddedMihonChannel.setMethodCallHandler({
+      embeddedMihonChannel.setMethodCallHandler({ [weak self]
           (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
           switch call.method {
           case "start":
               let args = call.arguments as? [String: Any]
               let port = Int32(args?["port"] as? Int ?? 0)
+              self?.embeddedMihonRequested = true
               MangatanEmbeddedMihonStart(port) { startedPort, error in
                   if let error = error {
                       result(FlutterError(
@@ -81,6 +85,8 @@ import Libmtorrentserver
                         message: error.localizedDescription,
                         details: nil))
                   } else {
+                      self?.embeddedMihonPort = startedPort
+                      self?.embeddedMihonNeedsResume = false
                       result([
                         "port": Int(startedPort),
                         "baseUrl": "http://127.0.0.1:\(startedPort)",
@@ -99,6 +105,9 @@ import Libmtorrentserver
                   }
               }
           case "stop":
+              self?.embeddedMihonRequested = false
+              self?.embeddedMihonNeedsResume = false
+              self?.embeddedMihonPort = nil
               MangatanEmbeddedMihonStop { error in
                   if let error = error {
                       result(FlutterError(
@@ -134,8 +143,31 @@ import Libmtorrentserver
     // Pause from the native lifecycle callback as early as possible. Waiting
     // only for Flutter's inactive notification can let iOS suspend the process
     // while OpenJDK is still blocked in accept(), which spins after wake.
-    MangatanEmbeddedMihonPause { _ in }
+    if embeddedMihonRequested {
+      embeddedMihonNeedsResume = true
+      MangatanEmbeddedMihonPause { _ in }
+    }
     super.applicationWillResignActive(application)
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    guard embeddedMihonRequested,
+          embeddedMihonNeedsResume,
+          let port = embeddedMihonPort else {
+      return
+    }
+
+    // Native pause can run before Flutter receives its inactive event. Resume
+    // at the matching native boundary as well, otherwise the Dart reader can
+    // keep valid /image tokens that point at a listener iOS already stopped.
+    MangatanEmbeddedMihonStart(port) { [weak self] startedPort, error in
+      guard let self else { return }
+      if error == nil && startedPort > 0 {
+        self.embeddedMihonPort = startedPort
+        self.embeddedMihonNeedsResume = false
+      }
+    }
   }
 
   private func beginAnkiMobileMediaBackgroundTask() {

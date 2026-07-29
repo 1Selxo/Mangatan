@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:m_extension_server/m_extension_server.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
@@ -60,6 +61,7 @@ class MExtensionServerPlatform {
   static final List<DateTime> _automaticRestartHistory = [];
   static String Function()? _stableReadBaseUrl;
   static void Function(String)? _stableWriteBaseUrl;
+  static MExtensionServerPlatform? _stableInstance;
 
   late final String Function() _readBaseUrl;
   late final void Function(String) _writeBaseUrl;
@@ -75,6 +77,7 @@ class MExtensionServerPlatform {
     if (persistent) {
       _stableReadBaseUrl = _readBaseUrl;
       _stableWriteBaseUrl = _writeBaseUrl;
+      _stableInstance = this;
     }
   }
 
@@ -265,8 +268,13 @@ class MExtensionServerPlatform {
       final resumePort = _iosResumePort;
       _iosResumePort = null;
       await startServer(preferredPort: resumePort);
-      if (_iosAppIsForeground) {
+      final restarted =
+          _isLoopbackServer(_baseUrl) &&
+          await _supportsMangatanMihonBridge(_baseUrl);
+      if (_iosAppIsForeground && restarted) {
         _iosRestartOnResume = false;
+      } else {
+        _iosRestartOnResume = true;
       }
     });
   }
@@ -626,6 +634,29 @@ class MExtensionServerPlatform {
     AppLogger.log(message, logLevel: level);
     if (kDebugMode) debugPrint(message);
   }
+}
+
+/// Restarts the embedded listener before a reader retries a transient Mihon
+/// image URL. Image tokens live in the retained JVM, so only the loopback
+/// origin needs to be updated if iOS could not reclaim the previous port.
+Future<String> resolveActiveIosMihonProxyUrl(String url) async {
+  if (!Platform.isIOS || !isTransientMihonImageUrl(url)) return url;
+
+  final server = MExtensionServerPlatform._stableInstance;
+  final proxyUri = Uri.tryParse(url);
+  if (server == null || proxyUri == null) return url;
+
+  await server.startServer(
+    preferredPort: proxyUri.hasPort && proxyUri.port > 0
+        ? proxyUri.port
+        : null,
+  );
+  final baseUrl = server.baseUrl;
+  if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+      !server._isLoopbackServer(baseUrl)) {
+    return url;
+  }
+  return resolveMihonImageUrl(baseUrl, url);
 }
 
 Future<String> prepareMihonBridge(Ref ref, Source? source) async {

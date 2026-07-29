@@ -33,6 +33,21 @@ List<EpubBookProgress> scannedNovelProgressCandidates(
     .where((progress) => progress.mangaId == parentId)
     .toList(growable: false);
 
+/// Produces a stable identity for a local filesystem path.
+///
+/// Windows paths are case-insensitive and may arrive with either separator.
+/// Keeping the drive/root in the key is important: a custom folder on `D:`
+/// must never alias a title with the same relative path on `C:`.
+String localLibraryPathKey(String path) {
+  final isWindowsPath =
+      RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(path) || path.startsWith(r'\\');
+  final context = p.Context(
+    style: isWindowsPath ? p.Style.windows : p.Style.posix,
+  );
+  final normalized = context.normalize(path);
+  return isWindowsPath ? normalized.toLowerCase() : normalized;
+}
+
 @riverpod
 class LocalFoldersState extends _$LocalFoldersState {
   @override
@@ -100,7 +115,9 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       .or()
       .linkContains("Mangayomi\\local")
       .findAll();
-  final mangaMap = {for (var m in existingMangas) _getRelativePath(m.link!): m};
+  final mangaMap = {
+    for (var m in existingMangas) localLibraryPathKey(m.link!): m,
+  };
 
   // Fetch all chapters for existing mangas
   final existingMangaIds = existingMangas.map((m) => m.id);
@@ -114,7 +131,7 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
 
   // Add manga.Ids with all the corresponding relative! paths (Manga/Chapter)
   for (var chap in existingChapters) {
-    String path = _getRelativePath(chap.archivePath!);
+    final path = localLibraryPathKey(chap.archivePath!);
     // For the given manga ID, add the path to its associated set.
     // If there's no entry for the manga ID yet, create a new empty set.
     chaptersMap.putIfAbsent(chap.mangaId!, () => <String>{}).add(path);
@@ -135,13 +152,13 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   /// helper function to add chapters to newChapters list
   void addNewChapters(List<FileSystemEntity> items, bool imageFolder) {
     for (final chapter in items) {
-      final relPath = _getRelativePath(chapter.path).trim();
-      // Skip if the relative path is empty (invalid entry).
-      if (relPath.isEmpty) continue;
+      final pathKey = localLibraryPathKey(chapter.path).trim();
+      // Skip if the path is empty (invalid entry).
+      if (pathKey.isEmpty) continue;
 
-      if (!existingPaths.contains(relPath)) {
+      if (!existingPaths.contains(pathKey)) {
         newChapters.add([chapter.path, imageFolder]);
-        existingPaths.add(relPath);
+        existingPaths.add(pathKey);
       }
     }
   }
@@ -150,7 +167,7 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   await for (final folder in dir.list()) {
     if (folder is! Directory) continue;
     final title = p.basename(folder.path); // Anime/Manga title
-    String relativePath = _getRelativePath(folder.path);
+    final folderPathKey = localLibraryPathKey(folder.path);
 
     // List all folders and files inside a Manga/Anime title
     final children = await folder.list().toList();
@@ -176,12 +193,12 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       continue; // nothing to import from this folder
     }
     // Does Manga/Anime already exist in library?
-    bool existingManga = mangaMap.containsKey(relativePath);
+    final existingManga = mangaMap.containsKey(folderPathKey);
 
     // Create new Manga entry if it doesn't already exist
     Manga manga;
     if (existingManga) {
-      manga = mangaMap[relativePath]!;
+      manga = mangaMap[folderPathKey]!;
     } else {
       Manga? matchingCloudParent;
       if (itemType == ItemType.novel &&
@@ -331,7 +348,8 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       ...savedMangas.where(
         (m) => processedMangas.any(
           (newManga) =>
-              _getRelativePath(newManga.link) == _getRelativePath(m.link),
+              localLibraryPathKey(newManga.link!) ==
+              localLibraryPathKey(m.link!),
         ),
       ),
       ...pendingCloudParents,
@@ -343,9 +361,9 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
   final chaptersToSave = <Chapter>[];
   final epubProgressToSave = <EpubBookProgress>[];
   int saveManga = 0; // Just to update the lastUpdate value of not new Mangas
-  final mangaByName = {
+  final mangaByFolder = {
     for (var m in processedMangas)
-      p.basename(pendingCloudFolderByParentId[m.id] ?? m.link!): m,
+      localLibraryPathKey(pendingCloudFolderByParentId[m.id] ?? m.link!): m,
   };
 
   // iterate through newChapters elements, which are: ["full_path/to/chapter1", "true"]
@@ -354,8 +372,8 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
     // pathBool[0] = first element of list (path)
     // dirname = remove last part of path (chapter name), = "full_path/to"
     // basename = remove everything except last (manga name) = "to"
-    final itemName = p.basename(p.dirname(chapterPath));
-    final manga = mangaByName[itemName];
+    final itemFolder = localLibraryPathKey(p.dirname(chapterPath));
+    final manga = mangaByFolder[itemFolder];
     if (manga != null) {
       if (manga.isLocalArchive != true) manga.hasLocalChapterOverlay = true;
       if (manga.itemType == ItemType.novel) {
@@ -467,34 +485,6 @@ Future<Directory?> getLocalLibrary() async {
     BotToast.showText(text: "Error getting local library: $e");
     return null;
   }
-}
-
-/// Finds the app's `local` directory marker and extracts the path after it.
-/// ```
-/// "C:\Users\user\Documents\Mangatan\local\Manga 1\chapter1.zip"
-/// becomes:
-/// "Manga 1/chapter1.zip"
-/// ```
-String _getRelativePath(dynamic dir) {
-  String relativePath;
-
-  if (dir is Directory) {
-    relativePath = dir.path;
-  } else if (dir is String) {
-    relativePath = dir;
-  } else {
-    throw ArgumentError("Input must be a Directory or a String");
-  }
-
-  // Normalize path separators
-  relativePath = relativePath.replaceAll("\\", "/");
-  for (final marker in const ['Mangatan/local/', 'Mangayomi/local/']) {
-    final index = relativePath.indexOf(marker);
-    if (index != -1) {
-      return relativePath.substring(index + marker.length);
-    }
-  }
-  return relativePath;
 }
 
 /// Returns if file is a json

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -1079,23 +1081,40 @@ class _DictionaryLookupResultsViewState
         context: widget.miningContext,
         profile: profile,
       );
-      final noteId =
-          await AnkiConnectService(
-            endpoint: await MiningPreferences.getAnkiEndpoint(),
-          ).exportDraft(
-            draft,
-            duplicateCheck: profile.duplicateCheck,
-            allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
-            duplicateScope: profile.duplicateScope,
-            duplicateDeckNames: profile.duplicateDeckNames,
-            checkAllModels: profile.checkAllModels,
-            syncOnCreate: profile.syncOnCreate,
-          );
+      final preferredMode = await MiningPreferences.getAnkiIntegrationMode();
+      final integrationMode = effectiveAnkiIntegrationMode(
+        preferredMode: preferredMode,
+        isIOS: defaultTargetPlatform == TargetPlatform.iOS,
+      );
+      int? noteId;
+      if (integrationMode == AnkiIntegrationMode.ankiMobile) {
+        await AnkiMobileService().exportDraft(
+          draft,
+          allowDuplicate:
+              !profile.duplicateCheck ||
+              dictionaryProfile.duplicateAction == 'allow',
+        );
+      } else {
+        noteId =
+            await AnkiConnectService(
+              endpoint: await MiningPreferences.getAnkiEndpoint(),
+            ).exportDraft(
+              draft,
+              duplicateCheck: profile.duplicateCheck,
+              allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
+              duplicateScope: profile.duplicateScope,
+              duplicateDeckNames: profile.duplicateDeckNames,
+              checkAllModels: profile.checkAllModels,
+              syncOnCreate: profile.syncOnCreate,
+            );
+      }
       await AnkiStatsRecorder.recordCard(
         context: widget.miningContext,
         profile: dictionaryProfile,
       );
-      botToast('Added to Anki (#$noteId)', second: 3);
+      if (noteId != null) {
+        botToast('Added to Anki (#$noteId)', second: 3);
+      }
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);
     } catch (error) {

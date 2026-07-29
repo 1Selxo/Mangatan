@@ -48,6 +48,40 @@ void main() {
     });
   });
 
+  test('defaults to AnkiMobile and persists the selected iOS mode', () async {
+    expect(
+      await MiningPreferences.getAnkiIntegrationMode(),
+      AnkiIntegrationMode.ankiMobile,
+    );
+
+    await MiningPreferences.setAnkiIntegrationMode(
+      AnkiIntegrationMode.ankiConnect,
+    );
+    await Hive.box<dynamic>('mining_preferences').close();
+
+    expect(
+      await MiningPreferences.getAnkiIntegrationMode(),
+      AnkiIntegrationMode.ankiConnect,
+    );
+  });
+
+  test('desktop always resolves to AnkiConnect', () {
+    expect(
+      effectiveAnkiIntegrationMode(
+        preferredMode: AnkiIntegrationMode.ankiMobile,
+        isIOS: false,
+      ),
+      AnkiIntegrationMode.ankiConnect,
+    );
+    expect(
+      effectiveAnkiIntegrationMode(
+        preferredMode: AnkiIntegrationMode.ankiMobile,
+        isIOS: true,
+      ),
+      AnkiIntegrationMode.ankiMobile,
+    );
+  });
+
   test('uses and persists ordered Japanese audio sources', () async {
     final defaults = await MiningPreferences.getAnkiAudioPreferences();
     expect(defaults.effectiveSources.map((source) => source.type), [

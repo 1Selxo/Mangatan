@@ -122,6 +122,16 @@ void main() {
       contains('Future<String> resolveActiveIosMihonProxyUrl(String url)'),
       reason: 'reader image retries must heal a stopped loopback listener',
     );
+    expect(
+      serviceSource,
+      contains('WidgetsBinding.instance.lifecycleState'),
+      reason: 'a stale lifecycle notification must not block a visible reader',
+    );
+    expect(
+      serviceSource,
+      contains('!await server._supportsMangatanMihonBridge(baseUrl)'),
+      reason: 'a dead saved loopback address must never be returned as ready',
+    );
     final imageProviderSource = File(
       'lib/modules/widgets/custom_extended_image_provider.dart',
     ).readAsStringSync();

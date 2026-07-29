@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:m_extension_server/m_extension_server.dart';
 import 'package:mangayomi/eval/mihon/image_proxy.dart';
@@ -113,6 +114,16 @@ class MExtensionServerPlatform {
   Future<void> startServer({int? preferredPort}) {
     if (Platform.isIOS) {
       _iosBridgeWasRequested = true;
+      final lifecycleState = WidgetsBinding.instance.lifecycleState;
+      if (lifecycleState == AppLifecycleState.resumed ||
+          lifecycleState == null) {
+        // Lifecycle notifications and image retries can race during route
+        // restoration. Trust Flutter's current state instead of a stale
+        // notification cached before the route became visible.
+        _iosAppIsForeground = true;
+      } else {
+        _iosAppIsForeground = false;
+      }
       if (!_iosAppIsForeground) {
         _iosRestartOnResume = true;
         return Future<void>.value();
@@ -653,7 +664,8 @@ Future<String> resolveActiveIosMihonProxyUrl(String url) async {
   );
   final baseUrl = server.baseUrl;
   if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
-      !server._isLoopbackServer(baseUrl)) {
+      !server._isLoopbackServer(baseUrl) ||
+      !await server._supportsMangatanMihonBridge(baseUrl)) {
     return url;
   }
   return resolveMihonImageUrl(baseUrl, url);
@@ -666,9 +678,16 @@ Future<String> prepareMihonBridge(Ref ref, Source? source) async {
     await server.startServer();
   }
   final baseUrl = server.baseUrl;
-  if ((isDesktop || Platform.isIOS) &&
-      source?.sourceCodeLanguage == SourceCodeLanguage.mihon &&
-      baseUrl == MExtensionServerPlatform._unavailableBaseUrl) {
+  final requiresMihonBridge =
+      (isDesktop || Platform.isIOS) &&
+      source?.sourceCodeLanguage == SourceCodeLanguage.mihon;
+  final unusableIosLoopback =
+      Platform.isIOS &&
+      server._isLoopbackServer(baseUrl) &&
+      !await server._supportsMangatanMihonBridge(baseUrl);
+  if (requiresMihonBridge &&
+      (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+          unusableIosLoopback)) {
     throw const MihonBridgeUnavailableException();
   }
   return baseUrl;

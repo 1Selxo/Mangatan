@@ -1,9 +1,9 @@
 {
   "name": "Mangatan",
   "identifier": "com.selxo.mangatan",
-  "headerURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/headers/source_header_default.webp",
-  "website": "https://github.com/ippo-michi/Mangatan",
-  "iconURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
+  "headerURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/headers/source_header_default.webp",
+  "website": "https://github.com/1Selxo/Mangatan",
+  "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
   "subtitle": "Read, look up, and mine.",
   "description": "The official sideloading source for Mangatan, a Mangayomi fork focused on dictionary lookup, OCR, subtitle mining, and Anki export.",
   "tintColor": "EF4444",
@@ -12,400 +12,48 @@
       "beta": true,
       "name": "Mangatan",
       "bundleIdentifier": "com.selxo.mangatan",
-      "developerName": "ippo-michi",
+      "developerName": "1Selxo",
       "subtitle": "Read, look up, and mine",
       "localizedDescription": "Mangatan is a Mangayomi fork focused on Yomitan-style dictionary lookup, OCR overlays, subtitle mining, and Anki export.",
-      "iconURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
+      "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
-        "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
-        "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/screenshots/image_2_default.webp"
+        "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
+        "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
+        "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_2_default.webp"
       ],
       "versions": [
         {
-          "version": "1.0.8",
-          "date": "2026-07-28T10:14:54Z",
-          "localizedDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"1cfdd29057554f2bacbd407abdf2190e8e135f9d\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
-          "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.151-1cfdd29/Mangatan-main-v1.0.8-build.151-1cfdd29-ios.ipa",
-          "size": 119390014
+          "version": "1.0.9",
+          "date": "2026-07-29T01:08:38Z",
+          "localizedDescription": "What's changed\n\n\u2022 Added [Chimahon\u2022compatible immersion statistics](https://github.com/1Selxo/Mangatan/pull/65), including novel and manga reading tracking, Anki mining stats, reader statistics sheets, backup, and sync support.\n\u2022 Added Yomitan kanji dictionary imports and Yomitan\u2022style kanji lookup by selecting a kanji inside a word popup.\n\u2022 Fixed dictionary WebView refresh after theme, language, and dictionary changes.\n\u2022 Fixed marking multiple selected manga or novel chapters as unread.\n\u2022 Fixed bookmarks so they follow the chapter currently being read instead of the chapter originally opened.\n\u2022 Added the novel reader Text Size control to reader settings.\n\u2022 Added AVIF page support and preserved OCR loading progress when changing pages.\n\u2022 Improved iOS sideload and Mihon bridge compatibility, and added Linux release packaging.\n\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.0.8...v1.0.9",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.0.9/Mangatan-v1.0.9-build.155-82df3bb-ios.ipa",
+          "size": 119491337
         }
       ],
       "appPermissions": {
         "entitlements": [],
         "privacy": []
       },
-      "version": "1.0.8",
-      "versionDate": "2026-07-28T10:14:54Z",
-      "versionDescription": "Unsigned Mangatan IPA for sideloading.\n\nBuilt from \"1cfdd29057554f2bacbd407abdf2190e8e135f9d\". Sign the IPA with your preferred\nsideloading tool before installation.\n\nMihon extensions are hosted on the iPhone itself. OpenJDK is kept\nout of the app launch image and loaded only when a Mihon source is\nused. The saved external bridge remains available as a fallback.\n",
-      "downloadURL": "https://github.com/ippo-michi/Mangatan/releases/download/ios-v1.0.8-build.151-1cfdd29/Mangatan-main-v1.0.8-build.151-1cfdd29-ios.ipa",
-      "size": 119390014
+      "version": "1.0.9",
+      "versionDate": "2026-07-29T01:08:38Z",
+      "versionDescription": "What's changed\n\n\u2022 Added [Chimahon\u2022compatible immersion statistics](https://github.com/1Selxo/Mangatan/pull/65), including novel and manga reading tracking, Anki mining stats, reader statistics sheets, backup, and sync support.\n\u2022 Added Yomitan kanji dictionary imports and Yomitan\u2022style kanji lookup by selecting a kanji inside a word popup.\n\u2022 Fixed dictionary WebView refresh after theme, language, and dictionary changes.\n\u2022 Fixed marking multiple selected manga or novel chapters as unread.\n\u2022 Fixed bookmarks so they follow the chapter currently being read instead of the chapter originally opened.\n\u2022 Added the novel reader Text Size control to reader settings.\n\u2022 Added AVIF page support and preserved OCR loading progress when changing pages.\n\u2022 Improved iOS sideload and Mihon bridge compatibility, and added Linux release packaging.\n\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.0.8...v1.0.9",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.0.9/Mangatan-v1.0.9-build.155-82df3bb-ios.ipa",
+      "size": 119491337
     }
   ],
   "news": [
     {
       "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.124-bae933f - 26 Jul",
-      "identifier": "release-ios-v1.0.8-build.124-bae933f",
+      "title": "1.0.9 - 29 Jul",
+      "identifier": "release-1.0.9",
       "caption": "Update for Mangatan now available!",
-      "date": "2026-07-26T19:21:38Z",
+      "date": "2026-07-29T01:08:38Z",
       "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.124-bae933f"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.125-3682569 - 26 Jul",
-      "identifier": "release-ios-v1.0.8-build.125-3682569",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-26T20:14:44Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.125-3682569"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.125-4c81fa7 - 26 Jul",
-      "identifier": "release-ios-v1.0.8-build.125-4c81fa7",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-26T21:10:09Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.125-4c81fa7"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.126-8e85639 - 26 Jul",
-      "identifier": "release-ios-v1.0.8-build.126-8e85639",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-26T21:24:27Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.126-8e85639"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.127-994d1e8 - 26 Jul",
-      "identifier": "release-ios-v1.0.8-build.127-994d1e8",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-26T21:51:01Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.127-994d1e8"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.128-0395495 - 26 Jul",
-      "identifier": "release-ios-v1.0.8-build.128-0395495",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-26T22:18:49Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.128-0395495"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.129-d88cbb2 - 26 Jul",
-      "identifier": "release-ios-v1.0.8-build.129-d88cbb2",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-26T22:51:23Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.129-d88cbb2"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.129-fb43516 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.129-fb43516",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T00:07:18Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.129-fb43516"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.130-4c56145 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.130-4c56145",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T00:24:38Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.130-4c56145"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.131-b9ea4c5 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.131-b9ea4c5",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T00:52:51Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.131-b9ea4c5"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.131-6d99cea - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.131-6d99cea",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T01:30:29Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.131-6d99cea"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.132-59b4c6e - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.132-59b4c6e",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T01:45:19Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.132-59b4c6e"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.133-204cddd - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.133-204cddd",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T02:44:34Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.133-204cddd"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.134-a6758d2 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.134-a6758d2",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T03:16:18Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.134-a6758d2"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.135-6358bf4 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.135-6358bf4",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T09:19:13Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.135-6358bf4"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.136-f99aedd - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.136-f99aedd",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T10:08:43Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.136-f99aedd"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.138-1dc992d - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.138-1dc992d",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T10:56:52Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.138-1dc992d"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.139-fb95738 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.139-fb95738",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T11:29:18Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.139-fb95738"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.140-c65155e - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.140-c65155e",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T12:15:53Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.140-c65155e"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.141-d2ae0bf - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.141-d2ae0bf",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T12:47:03Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.141-d2ae0bf"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.141-6e4fcba - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.141-6e4fcba",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T13:13:31Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.141-6e4fcba"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.142-3e836a8 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.142-3e836a8",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T13:29:28Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.142-3e836a8"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.142-4c88f75 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.142-4c88f75",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T14:09:41Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.142-4c88f75"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.143-5fa0781 - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.143-5fa0781",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T14:19:36Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.143-5fa0781"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.144-8bdb2dd - 27 Jul",
-      "identifier": "release-ios-v1.0.8-build.144-8bdb2dd",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-27T14:54:48Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.144-8bdb2dd"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.144-bd26608 - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.144-bd26608",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T04:12:16Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.144-bd26608"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.145-75059e1 - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.145-75059e1",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T04:28:30Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.145-75059e1"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.146-139aa96 - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.146-139aa96",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T04:58:09Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.146-139aa96"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.147-847ad48 - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.147-847ad48",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T05:37:06Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.147-847ad48"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.148-71e8bce - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.148-71e8bce",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T06:08:50Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.148-71e8bce"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.149-dc54759 - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.149-dc54759",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T06:35:57Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.149-dc54759"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.150-a6ec5e9 - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.150-a6ec5e9",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T08:27:33Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.150-a6ec5e9"
-    },
-    {
-      "appID": "com.selxo.mangatan",
-      "title": "ios-v1.0.8-build.151-1cfdd29 - 28 Jul",
-      "identifier": "release-ios-v1.0.8-build.151-1cfdd29",
-      "caption": "Update for Mangatan now available!",
-      "date": "2026-07-28T10:14:54Z",
-      "tintColor": "EF4444",
-      "imageURL": "https://raw.githubusercontent.com/ippo-michi/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
-      "notify": true,
-      "url": "https://github.com/ippo-michi/Mangatan/releases/tag/ios-v1.0.8-build.151-1cfdd29"
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.0.9"
     }
   ]
 }

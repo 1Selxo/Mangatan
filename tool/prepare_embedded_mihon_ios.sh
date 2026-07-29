@@ -9,13 +9,13 @@ lazy_framework_dir="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
-server_commit="8c60117930020b4aceb116eaa7c98f0c64632760"
-server_jar_url="https://github.com/ippo-michi/M-Extension-Server/releases/download/ios-runtime-v4/MExtensionServer-ios.jar"
-server_jar_sha256="59967456c5e64bee52282cdb685b4e18d9beff866006f70eca7b86268428607c"
-openjdk_framework_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
-openjdk_framework_sha256="1224f55d06b780c8e5e22728066773c715bb6d9f9520f0668a67d94ef73ea0d6"
-openjdk_bundle_url="https://github.com/ippo-michi/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"
-openjdk_bundle_sha256="6d49219f21c10c3837ff57f654772cae1533c9d91a76fd41af88cf710ead7347"
+server_commit="c151cda985a5e9d9255ba8a59b9c9e4234107983"
+server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v4/MExtensionServer-ios.jar"
+server_jar_sha256="1c8c325601c540fb6453cf84db7ab747ba03c6f3e960334017d2563f543bcc5b"
+openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
+openjdk_framework_sha256="24589886361678b369e4703d82fcb3deff1b40728d725fef4fea7e70cb728f55"
+openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"
+openjdk_bundle_sha256="168d1174063a35ddda9e1acbd3978c8015e3ed656f6670d2e09688078e08deeb"
 
 if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/javac" ]]; then
   echo "JAVA_HOME must point to a JDK 21 or newer." >&2

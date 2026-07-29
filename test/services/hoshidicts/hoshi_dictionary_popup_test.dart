@@ -337,12 +337,24 @@ void main() {
       contains('webkit.messageHandlers.kanjiLookup.postMessage(character)'),
     );
     expect(script, contains("entry.type === 'mangatan-yomitan-kanji-v1'"));
-    expect(script, contains("['Classifications', entry.stats?.class]"));
-    expect(script, contains("['Codepoints', entry.stats?.code]"));
-    expect(script, contains("['Dictionary Indices', entry.stats?.index]"));
+    expect(script, contains('...(entry.stats?.class || [])'));
+    expect(script, contains('...(entry.stats?.code || [])'));
+    expect(script, contains('...(entry.stats?.index || [])'));
+    expect(script, contains("createKanjiStatGroup('Statistics', statistics)"));
     expect(script, contains('kanji-readings-chinese'));
     expect(script, contains('kanji-readings-japanese'));
     expect(styles, contains('.kanji-reading-list'));
+    expect(styles, contains('@media (max-width: 360px)'));
+  });
+
+  test('supports Chimahon-style keyboard and volume-key popup paging', () {
+    final script = File('assets/hoshi_popup/popup.js').readAsStringSync();
+
+    expect(script, contains('AudioVolumeDown: 0.8'));
+    expect(script, contains('AudioVolumeUp: -0.8'));
+    expect(script, contains('PageDown: 0.8'));
+    expect(script, contains('scrollingElement.scrollBy'));
+    expect(script, contains("event.key === 'Home' ? 0"));
   });
 
   test('keeps frequency and pitch labels white on accent tags', () {

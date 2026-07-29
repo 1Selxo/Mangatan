@@ -20,6 +20,22 @@ DictionaryLookupTrigger dictionaryLookupTriggerFromName(String? name) {
   );
 }
 
+enum AnkiIntegrationMode { ankiMobile, ankiConnect }
+
+AnkiIntegrationMode ankiIntegrationModeFromName(String? name) {
+  return AnkiIntegrationMode.values.firstWhere(
+    (value) => value.name == name,
+    orElse: () => AnkiIntegrationMode.ankiMobile,
+  );
+}
+
+AnkiIntegrationMode effectiveAnkiIntegrationMode({
+  required AnkiIntegrationMode preferredMode,
+  required bool isIOS,
+}) {
+  return isIOS ? preferredMode : AnkiIntegrationMode.ankiConnect;
+}
+
 enum AnkiAudioSourceType {
   japanesePod101,
   jisho,
@@ -281,6 +297,7 @@ class MiningPreferences {
   static const _jimakuApiKey = 'jimaku_api_key';
   static const _autoJimaku = 'auto_jimaku';
   static const _ankiEndpoint = 'anki_endpoint';
+  static const _ankiIntegrationMode = 'anki_integration_mode';
   static const _ankiProfile = 'anki_profile';
   static const _dictionaryProfiles = 'dictionary_profiles';
   static const _activeDictionaryProfileId = 'active_dictionary_profile_id';
@@ -579,6 +596,20 @@ class MiningPreferences {
 
   static Future<void> setAnkiEndpoint(Uri value) async {
     await (await _boxOrNull())?.put(_ankiEndpoint, value.toString());
+  }
+
+  static Future<AnkiIntegrationMode> getAnkiIntegrationMode() async {
+    final raw =
+        (await _boxOrNull())?.get(
+              _ankiIntegrationMode,
+              defaultValue: AnkiIntegrationMode.ankiMobile.name,
+            )
+            as String?;
+    return ankiIntegrationModeFromName(raw);
+  }
+
+  static Future<void> setAnkiIntegrationMode(AnkiIntegrationMode value) async {
+    await (await _boxOrNull())?.put(_ankiIntegrationMode, value.name);
   }
 
   static Future<AnkiMiningProfile> getAnkiProfile() async {

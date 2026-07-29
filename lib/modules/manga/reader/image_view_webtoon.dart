@@ -40,6 +40,7 @@ class ImageViewWebtoon extends StatelessWidget {
   final bool showPageGaps;
   final bool reverse;
   final ValueNotifier<bool> isScrolling;
+  final VoidCallback? onRefreshMihonPages;
 
   const ImageViewWebtoon({
     super.key,
@@ -65,6 +66,7 @@ class ImageViewWebtoon extends StatelessWidget {
     required this.onDoubleTapDown,
     required this.onDoubleTap,
     required this.isScrolling,
+    this.onRefreshMihonPages,
     this.webtoonSidePadding = 0,
     this.showPageGaps = true,
     this.reverse = false,
@@ -178,6 +180,7 @@ class ImageViewWebtoon extends StatelessWidget {
           onLongPressData: onLongPressData,
           isHorizontal: isHorizontalContinuous,
           isScrolling: isScrolling,
+          onRefreshMihonPages: onRefreshMihonPages,
         ),
       ),
     );
@@ -203,6 +206,7 @@ class ImageViewWebtoon extends StatelessWidget {
         backgroundColor: backgroundColor,
         onFailedToLoadImage: onFailedToLoadImage,
         onLongPressData: onLongPressData,
+        onRefreshMihonPages: onRefreshMihonPages,
       ),
     );
   }

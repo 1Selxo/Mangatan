@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:m_extension_server/m_extension_server.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
@@ -53,6 +55,7 @@ class MExtensionServerPlatform {
   static int _lifecycleGeneration = 0;
   static bool _iosAppIsForeground = true;
   static bool _iosBridgeWasRequested = false;
+  static bool _iosBridgeIsReady = false;
   static bool _iosRestartOnResume = false;
   static int? _iosResumePort;
   static int? _preferredRestartPort;
@@ -60,6 +63,7 @@ class MExtensionServerPlatform {
   static final List<DateTime> _automaticRestartHistory = [];
   static String Function()? _stableReadBaseUrl;
   static void Function(String)? _stableWriteBaseUrl;
+  static MExtensionServerPlatform? _stableInstance;
 
   late final String Function() _readBaseUrl;
   late final void Function(String) _writeBaseUrl;
@@ -75,6 +79,7 @@ class MExtensionServerPlatform {
     if (persistent) {
       _stableReadBaseUrl = _readBaseUrl;
       _stableWriteBaseUrl = _writeBaseUrl;
+      _stableInstance = this;
     }
   }
 
@@ -107,9 +112,23 @@ class MExtensionServerPlatform {
     }
   }
 
-  Future<void> startServer({int? preferredPort}) {
+  Future<void> startServer({
+    int? preferredPort,
+    bool foregroundRequest = false,
+  }) {
     if (Platform.isIOS) {
       _iosBridgeWasRequested = true;
+      final lifecycleState = WidgetsBinding.instance.lifecycleState;
+      if (foregroundRequest ||
+          lifecycleState == AppLifecycleState.resumed ||
+          lifecycleState == null) {
+        // Lifecycle notifications and image retries can race during route
+        // restoration. Trust Flutter's current state instead of a stale
+        // notification cached before the route became visible.
+        _iosAppIsForeground = true;
+      } else {
+        _iosAppIsForeground = false;
+      }
       if (!_iosAppIsForeground) {
         _iosRestartOnResume = true;
         return Future<void>.value();
@@ -144,8 +163,10 @@ class MExtensionServerPlatform {
       final runningBaseUrl = _baseUrl;
       if (_isLoopbackServer(runningBaseUrl) &&
           await _supportsMangatanMihonBridge(runningBaseUrl)) {
+        _iosBridgeIsReady = true;
         return;
       }
+      _iosBridgeIsReady = false;
 
       final runningUri = Uri.tryParse(runningBaseUrl);
       if (_isLoopbackServer(runningBaseUrl) &&
@@ -180,6 +201,7 @@ class MExtensionServerPlatform {
                 deadline: const Duration(seconds: 8),
               )) {
             _writeRuntimeBaseUrl(baseUrl);
+            _iosBridgeIsReady = true;
             _log('Embedded iPhone Mihon bridge is ready at $baseUrl.');
             return;
           }
@@ -200,6 +222,7 @@ class MExtensionServerPlatform {
         '$_embeddedIosLaunchAttempts attempts.',
       );
     } catch (error, stackTrace) {
+      _iosBridgeIsReady = false;
       _restoreSavedBaseUrl();
       if (_isLoopbackServer(_baseUrl)) {
         // A saved desktop loopback URL points back at the iPhone on iOS and
@@ -229,6 +252,7 @@ class MExtensionServerPlatform {
   Future<void> suspendEmbeddedIosBridge() {
     if (!Platform.isIOS) return Future<void>.value();
     _iosAppIsForeground = false;
+    _iosBridgeIsReady = false;
     if (!_iosBridgeWasRequested) return Future<void>.value();
     _iosRestartOnResume = true;
 
@@ -265,8 +289,14 @@ class MExtensionServerPlatform {
       final resumePort = _iosResumePort;
       _iosResumePort = null;
       await startServer(preferredPort: resumePort);
-      if (_iosAppIsForeground) {
+      final restarted =
+          _isLoopbackServer(_baseUrl) &&
+          await _supportsMangatanMihonBridge(_baseUrl);
+      _iosBridgeIsReady = restarted;
+      if (_iosAppIsForeground && restarted) {
         _iosRestartOnResume = false;
+      } else {
+        _iosRestartOnResume = true;
       }
     });
   }
@@ -628,6 +658,45 @@ class MExtensionServerPlatform {
   }
 }
 
+/// Restarts the embedded listener before a reader retries a transient Mihon
+/// image URL. Image tokens live in the retained JVM, so only the loopback
+/// origin needs to be updated if iOS could not reclaim the previous port.
+Future<String> prepareActiveIosMihonProxyUrl(String url) async {
+  if (!Platform.isIOS || !isTransientMihonImageUrl(url)) return url;
+
+  // Wake the bridge before the first restored reader request. Concurrent
+  // pages await the same pending launch; later healthy requests take this
+  // synchronous fast path and avoid per-image capability probes.
+  if (MExtensionServerPlatform._iosBridgeIsReady &&
+      !MExtensionServerPlatform._iosRestartOnResume &&
+      MExtensionServerPlatform._pendingStart == null) {
+    return url;
+  }
+  return resolveActiveIosMihonProxyUrl(url);
+}
+
+Future<String> resolveActiveIosMihonProxyUrl(String url) async {
+  if (!Platform.isIOS || !isTransientMihonImageUrl(url)) return url;
+
+  final server = MExtensionServerPlatform._stableInstance;
+  final proxyUri = Uri.tryParse(url);
+  if (server == null || proxyUri == null) return url;
+
+  await server.startServer(
+    preferredPort: proxyUri.hasPort && proxyUri.port > 0
+        ? proxyUri.port
+        : null,
+    foregroundRequest: true,
+  );
+  final baseUrl = server.baseUrl;
+  if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+      !server._isLoopbackServer(baseUrl) ||
+      !await server._supportsMangatanMihonBridge(baseUrl)) {
+    return url;
+  }
+  return resolveMihonImageUrl(baseUrl, url);
+}
+
 Future<String> prepareMihonBridge(Ref ref, Source? source) async {
   final server = MExtensionServerPlatform.fromRef(ref);
   if ((isDesktop || Platform.isIOS) &&
@@ -635,9 +704,16 @@ Future<String> prepareMihonBridge(Ref ref, Source? source) async {
     await server.startServer();
   }
   final baseUrl = server.baseUrl;
-  if ((isDesktop || Platform.isIOS) &&
-      source?.sourceCodeLanguage == SourceCodeLanguage.mihon &&
-      baseUrl == MExtensionServerPlatform._unavailableBaseUrl) {
+  final requiresMihonBridge =
+      (isDesktop || Platform.isIOS) &&
+      source?.sourceCodeLanguage == SourceCodeLanguage.mihon;
+  final unusableIosLoopback =
+      Platform.isIOS &&
+      server._isLoopbackServer(baseUrl) &&
+      !await server._supportsMangatanMihonBridge(baseUrl);
+  if (requiresMihonBridge &&
+      (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+          unusableIosLoopback)) {
     throw const MihonBridgeUnavailableException();
   }
   return baseUrl;

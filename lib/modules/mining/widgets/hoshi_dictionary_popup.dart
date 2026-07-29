@@ -402,8 +402,18 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return _entries.length;
   }
 
+  Future<bool> _usesAnkiMobile() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return false;
+    final preferredMode = await MiningPreferences.getAnkiIntegrationMode();
+    return effectiveAnkiIntegrationMode(
+          preferredMode: preferredMode,
+          isIOS: true,
+        ) ==
+        AnkiIntegrationMode.ankiMobile;
+  }
+
   Future<bool> _isDuplicate(String expression) async {
-    if (defaultTargetPlatform == TargetPlatform.iOS) return false;
+    if (await _usesAnkiMobile()) return false;
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -426,7 +436,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<List<int>> _duplicateNoteIds(String expression) async {
-    if (defaultTargetPlatform == TargetPlatform.iOS) return const [];
+    if (await _usesAnkiMobile()) return const [];
     try {
       final dictionaryProfile = await _resolvedProfile();
       final profile = dictionaryProfile.anki;
@@ -446,7 +456,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<bool> _browseDuplicateNotes(Object? rawIds) async {
-    if (defaultTargetPlatform == TargetPlatform.iOS) return false;
+    if (await _usesAnkiMobile()) return false;
     final ids = rawIds is Iterable
         ? rawIds
               .map(
@@ -542,7 +552,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
           !profile.duplicateCheck ||
           content['allowDuplicate'] == true ||
           dictionaryProfile.duplicateAction == 'allow';
-      if (defaultTargetPlatform == TargetPlatform.iOS) {
+      if (await _usesAnkiMobile()) {
         await AnkiMobileService().exportDraft(
           draft,
           allowDuplicate: allowDuplicate,

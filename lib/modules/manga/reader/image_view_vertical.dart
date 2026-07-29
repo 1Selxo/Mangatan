@@ -5,6 +5,7 @@ import 'package:mangayomi/modules/manga/reader/providers/reader_controller_provi
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_colors.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -19,6 +20,7 @@ class ImageViewVertical extends ConsumerStatefulWidget {
   final ValueNotifier<bool> isScrolling;
 
   final Function(bool) failedToLoadImage;
+  final VoidCallback? onRefreshMihonPages;
 
   const ImageViewVertical({
     super.key,
@@ -27,6 +29,7 @@ class ImageViewVertical extends ConsumerStatefulWidget {
     required this.failedToLoadImage,
     required this.isHorizontal,
     required this.isScrolling,
+    this.onRefreshMihonPages,
   });
 
   @override
@@ -129,6 +132,18 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
           }
           if (state.extendedImageLoadState == LoadState.failed) {
             widget.failedToLoadImage(true);
+            void retry() {
+              widget.failedToLoadImage(false);
+              final url = widget.data.pageUrl?.url;
+              if (url != null &&
+                  isTransientMihonImageUrl(url) &&
+                  widget.onRefreshMihonPages != null) {
+                widget.onRefreshMihonPages!();
+                return;
+              }
+              state.reLoadImage();
+            }
+
             return Container(
               color: Colors.black,
               height: placeholderHeight,
@@ -145,14 +160,8 @@ class _ImageViewVerticalState extends ConsumerState<ImageViewVertical> {
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: GestureDetector(
-                      onLongPress: () {
-                        state.reLoadImage();
-                        widget.failedToLoadImage(false);
-                      },
-                      onTap: () {
-                        state.reLoadImage();
-                        widget.failedToLoadImage(false);
-                      },
+                      onLongPress: retry,
+                      onTap: retry,
                       child: Container(
                         decoration: BoxDecoration(
                           color: context.primaryColor,

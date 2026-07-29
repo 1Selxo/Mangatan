@@ -98,6 +98,16 @@ void main() {
       reason: 'native pause must begin before iOS suspends the Dart isolate',
     );
     expect(
+      appDelegateSource,
+      contains('applicationDidBecomeActive'),
+      reason: 'a listener paused natively must also resume natively',
+    );
+    expect(
+      appDelegateSource,
+      contains('MangatanEmbeddedMihonStart(port)'),
+      reason: 'existing image tokens must regain their original loopback port',
+    );
+    expect(
       serviceSource,
       contains("invokeMethod<bool>('status')"),
       reason: 'a stale native listener must be detected before restart',
@@ -106,6 +116,55 @@ void main() {
       serviceSource,
       contains("invokeMethod<void>('pause')"),
       reason: 'app suspension must preserve loaded extension instances',
+    );
+    expect(
+      serviceSource,
+      contains('Future<String> resolveActiveIosMihonProxyUrl(String url)'),
+      reason: 'reader image retries must heal a stopped loopback listener',
+    );
+    expect(
+      serviceSource,
+      contains('Future<String> prepareActiveIosMihonProxyUrl(String url)'),
+      reason: 'restored reader pages must wake the bridge before first HTTP',
+    );
+    expect(
+      serviceSource,
+      contains('WidgetsBinding.instance.lifecycleState'),
+      reason: 'a stale lifecycle notification must not block a visible reader',
+    );
+    expect(
+      serviceSource,
+      contains('foregroundRequest: true'),
+      reason: 'an active reader request must bypass stale inactive state',
+    );
+    expect(
+      serviceSource,
+      contains('MExtensionServerPlatform._iosBridgeIsReady'),
+      reason: 'a failed launch must not suppress the next reader wake-up',
+    );
+    expect(
+      serviceSource,
+      contains('!await server._supportsMangatanMihonBridge(baseUrl)'),
+      reason: 'a dead saved loopback address must never be returned as ready',
+    );
+    final imageProviderSource = File(
+      'lib/modules/widgets/custom_extended_image_provider.dart',
+    ).readAsStringSync();
+    expect(
+      imageProviderSource,
+      contains(
+        'prepareActiveIosMihonProxyUrl(\n'
+        '      resolved.toString(),',
+      ),
+      reason: 'the first restored reader request must start the bridge',
+    );
+    expect(
+      imageProviderSource,
+      contains(
+        'resolveActiveIosMihonProxyUrl(\n'
+        '          requestUri.toString(),',
+      ),
+      reason: 'transient reader images must restart the bridge before HTTP',
     );
     expect(
       nativeSource,

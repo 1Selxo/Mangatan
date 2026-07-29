@@ -235,7 +235,14 @@ String normalizeEpubResourcePath(String value) {
 
 bool _isRasterImagePath(String value) {
   final extension = p.posix.extension(value).toLowerCase();
-  return const {'.jpg', '.jpeg', '.png', '.gif', '.webp'}.contains(extension);
+  return const {
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+    '.avif',
+  }.contains(extension);
 }
 
 bool _isSvgPath(String value) =>

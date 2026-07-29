@@ -131,6 +131,7 @@ ContentType _contentType(String path) =>
       '.png' => ContentType('image', 'png'),
       '.gif' => ContentType('image', 'gif'),
       '.webp' => ContentType('image', 'webp'),
+      '.avif' => ContentType('image', 'avif'),
       '.woff' => ContentType('font', 'woff'),
       '.woff2' => ContentType('font', 'woff2'),
       '.ttf' => ContentType('font', 'ttf'),

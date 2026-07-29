@@ -1,8 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 
 void main() {
+  test('page changes reuse the active or completed chapter OCR scan', () {
+    List<UChapDataPreload> pages() => [
+      UChapDataPreload(
+        null,
+        null,
+        null,
+        true,
+        null,
+        0,
+        null,
+        0,
+        localArtifactPath: 'chapter/page-0.avif',
+      ),
+      UChapDataPreload(
+        null,
+        null,
+        null,
+        true,
+        null,
+        1,
+        null,
+        1,
+        localArtifactPath: 'chapter/page-1.avif',
+      ),
+    ];
+
+    final scanKey = readerOcrChapterScanKey(pages());
+    expect(readerOcrChapterScanKey(pages()), scanKey);
+    expect(
+      readerOcrShouldStartChapterScan(scanKey: scanKey, activeScanKey: scanKey),
+      isFalse,
+    );
+    expect(
+      readerOcrShouldStartChapterScan(
+        scanKey: scanKey,
+        completedScanKey: scanKey,
+      ),
+      isFalse,
+    );
+    expect(
+      readerOcrShouldStartChapterScan(
+        scanKey: scanKey,
+        completedScanKey: 'another chapter',
+      ),
+      isTrue,
+    );
+  });
+
   testWidgets('OCR progress follows the reader menu in both directions', (
     tester,
   ) async {

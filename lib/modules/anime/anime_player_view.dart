@@ -948,15 +948,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         await _setSubtitleTrack(track);
       } catch (_) {}
     }
-    if (_firstVid.subtitles?.isNotEmpty ?? false) {
-      if (_firstVid.audios?.isNotEmpty ?? false) {
-        try {
-          final at = _firstVid.audios!.first;
-          await _player.setAudioTrack(
-            AudioTrack.uri(at.file ?? "", title: at.label, language: at.label),
-          );
-        } catch (_) {}
-      }
+    if (_firstVid.audios?.isNotEmpty ?? false) {
+      try {
+        final at = _firstVid.audios!.first;
+        await _player.setAudioTrack(
+          AudioTrack.uri(at.file ?? "", title: at.label, language: at.label),
+        );
+      } catch (_) {}
     }
     await _autoLoadJimakuSubtitle();
   }

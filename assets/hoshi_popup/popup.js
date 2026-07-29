@@ -1777,19 +1777,15 @@ function createKanjiEntry(entry) {
         overview.appendChild(readings);
     }
 
-    const misc = createKanjiStatGroup('Statistics', entry.stats?.misc);
-    if (misc) overview.appendChild(misc);
-    if (overview.childElementCount) root.appendChild(overview);
-
-    const fullWidthGroups = [
-        ['Classifications', entry.stats?.class],
-        ['Codepoints', entry.stats?.code],
-        ['Dictionary Indices', entry.stats?.index]
+    const statistics = [
+        ...(entry.stats?.misc || []),
+        ...(entry.stats?.class || []),
+        ...(entry.stats?.code || []),
+        ...(entry.stats?.index || [])
     ];
-    for (const [title, stats] of fullWidthGroups) {
-        const group = createKanjiStatGroup(title, stats);
-        if (group) root.appendChild(group);
-    }
+    const statisticsSection = createKanjiStatGroup('Statistics', statistics);
+    if (statisticsSection) overview.appendChild(statisticsSection);
+    if (overview.childElementCount) root.appendChild(overview);
     return root;
 }
 
@@ -2234,10 +2230,37 @@ window.renderPopup = function() {
 
 document.addEventListener('selectionchange', rememberPopupTextSelection);
 
-// The embedded WebView owns keyboard focus while the popup is open, so these
-// keys need to cross the JavaScript bridge instead of relying solely on the
-// Flutter focus tree.
+// The embedded WebView owns keyboard focus while the popup is open, so handle
+// paging here and bridge dismissal instead of relying on Flutter's focus tree.
 document.addEventListener('keydown', (event) => {
+    const scrollDirections = {
+        ArrowDown: 0.25,
+        ArrowUp: -0.25,
+        PageDown: 0.8,
+        PageUp: -0.8,
+        AudioVolumeDown: 0.8,
+        AudioVolumeUp: -0.8
+    };
+    const direction = scrollDirections[event.key];
+    const scrollingElement = document.scrollingElement;
+    if (direction && scrollingElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        scrollingElement.scrollBy({
+            top: Math.max(48, scrollingElement.clientHeight * Math.abs(direction)) * Math.sign(direction),
+            behavior: window.eInkMode ? 'auto' : 'smooth'
+        });
+        return;
+    }
+    if ((event.key === 'Home' || event.key === 'End') && scrollingElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        scrollingElement.scrollTo({
+            top: event.key === 'Home' ? 0 : scrollingElement.scrollHeight,
+            behavior: window.eInkMode ? 'auto' : 'smooth'
+        });
+        return;
+    }
     if (event.key !== 'Escape' && event.key !== 'Backspace' && event.key !== 'BrowserBack') {
         return;
     }

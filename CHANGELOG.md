@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Added Chimahon-style YouTube support as a built-in anime source, including
+  mixed video/channel/playlist search, direct YouTube URLs, recent searches,
+  preferred-quality selection, optional library channel saving, live-stream
+  fallback, closed captions, and alternate audio tracks in Mangatan's existing
+  video OCR and mining player.
+- Fixed alternate video audio tracks not initializing unless the video also
+  exposed subtitles.
+- Redesigned Yomitan Kanji entries into a compact three-column Meaning,
+  Readings, and Statistics layout, keeping classifications, codepoints, and
+  dictionary indices visible without long stacked sections.
+- Added Chimahon-style dictionary popup paging with Page Up/Down, arrow,
+  Home/End, and hardware volume keys, while respecting E-Ink instant scrolling.
+
 ## 1.0.8+123 - 2026-07-26
 
 - Promoted Mangatan 1.0.8 from beta to the stable release channel.

@@ -10,6 +10,7 @@ import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
+import 'package:mangayomi/modules/anime/youtube/youtube_browser_screen.dart';
 import 'package:mangayomi/modules/browse/extension/edit_code.dart';
 import 'package:mangayomi/modules/browse/extension/extension_detail.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/create_extension.dart';
@@ -183,6 +184,7 @@ class RouterNotifier extends ChangeNotifier {
       name: "animePlayerView",
       builder: (id) => AnimePlayerView(episodeId: id),
     ),
+    _genericRoute(name: "youtubeBrowser", child: const YouTubeBrowserScreen()),
     _genericRoute<Object>(
       name: "novelReaderView",
       builder: (extra) => switch (extra) {

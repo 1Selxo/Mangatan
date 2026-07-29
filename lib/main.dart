@@ -44,6 +44,7 @@ import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/anki_mobile_service.dart';
+import 'package:mangayomi/services/youtube/youtube_preferences.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
 import 'package:mangayomi/utils/discord_rpc.dart';
 import 'package:mangayomi/utils/log/logger.dart';
@@ -263,6 +264,7 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
     MiningPreferences.configureStorageDirectory(databaseDirectory.path);
   }
   Hive.registerAdapter(TrackSearchAdapter());
+  YouTubePreferences.markStorageReady();
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");
     await discordRpc?.initialize();

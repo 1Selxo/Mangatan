@@ -1,0 +1,134 @@
+name: Publish AUR package
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Stable tag to publish, or blank for the latest release
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aur-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - name: require AUR publishing key
+        shell: bash
+        run: |
+          if [[ -z "$AUR_SSH_PRIVATE_KEY" ]]; then
+            echo "::error::Add the AUR SSH private key as the AUR_SSH_PRIVATE_KEY repository secret."
+            exit 1
+          fi
+
+      - name: resolve stable release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          release_tag=$REQUESTED_TAG
+          if [[ -z "$release_tag" ]]; then
+            release_tag=$(gh api \
+              repos/1Selxo/Mangatan/releases/latest \
+              --jq .tag_name)
+          fi
+
+          if [[ ! $release_tag =~ ^v[0-9]+([.][0-9]+)*$ ]]; then
+            echo "::error::Expected a stable vX.Y.Z-style tag, got: $release_tag"
+            exit 1
+          fi
+
+          printf 'RELEASE_TAG=%s\n' "$release_tag" >> "$GITHUB_ENV"
+          printf 'release_tag=%s\n' "$release_tag" >> "$GITHUB_OUTPUT"
+          printf 'Publishing Mangatan %s to the AUR\n' "$release_tag"
+
+      - name: checkout packaging source
+        uses: actions/checkout@v7
+
+      - name: download Linux checksums
+        shell: bash
+        run: |
+          install -d release-linux
+          curl --fail --location --silent --show-error \
+            --output release-linux/SHA256SUMS-linux.txt \
+            "https://github.com/1Selxo/Mangatan/releases/download/$RELEASE_TAG/SHA256SUMS-linux.txt"
+
+      - name: render AUR package
+        shell: bash
+        run: |
+          scripts/render_aur_package.sh \
+            "$RELEASE_TAG" \
+            release-linux/SHA256SUMS-linux.txt \
+            aur-package
+
+      - name: generate AUR metadata
+        shell: bash
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE/aur-package:/pkg:ro" \
+            --workdir /pkg \
+            archlinux:base-devel \
+            runuser -u nobody -- env \
+              HOME=/tmp \
+              BUILDDIR=/tmp/makepkg-build \
+              SRCDEST=/tmp/makepkg-sources \
+              PKGDEST=/tmp/makepkg-packages \
+              makepkg --printsrcinfo \
+            > aur-package/.SRCINFO
+
+          grep -Fx 'pkgbase = mangatan-bin' aur-package/.SRCINFO
+          grep -Fx "	pkgver = ${RELEASE_TAG#v}" aur-package/.SRCINFO
+
+      - name: configure AUR SSH access
+        shell: bash
+        run: |
+          install -dm700 "$HOME/.ssh"
+          install -m600 /dev/null "$HOME/.ssh/aur"
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > "$HOME/.ssh/aur"
+          printf '%s\n' \
+            'aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN' \
+            > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: publish AUR package
+        shell: bash
+        env:
+          GIT_SSH_COMMAND: >-
+            ssh -i ~/.ssh/aur -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+        run: |
+          git clone \
+            ssh://aur@aur.archlinux.org/mangatan-bin.git \
+            aur-repository
+
+          install -m644 aur-package/PKGBUILD aur-repository/PKGBUILD
+          install -m644 aur-package/.SRCINFO aur-repository/.SRCINFO
+          install -m644 aur-package/LICENSE aur-repository/LICENSE
+
+          git -C aur-repository config user.name "Mangatan release bot"
+          git -C aur-repository config user.email \
+            "10378052+bee-san@users.noreply.github.com"
+          git -C aur-repository config commit.gpgsign false
+          git -C aur-repository add PKGBUILD .SRCINFO LICENSE
+
+          if git -C aur-repository diff --cached --quiet; then
+            echo "AUR package is already up to date."
+            exit 0
+          fi
+
+          git -C aur-repository commit \
+            -m "Update to ${RELEASE_TAG#v}"
+          git -C aur-repository push origin HEAD:master

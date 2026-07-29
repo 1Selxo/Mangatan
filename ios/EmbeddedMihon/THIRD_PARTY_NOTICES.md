@@ -8,8 +8,8 @@ Mangatan's optional embedded Mihon-extension runtime contains:
   <https://github.com/openjdk-mobile/ios-tools>.
 - M-Extension-Server, distributed under the Mozilla Public License 2.0. The
   exact bundled source revision is
-  `c151cda985a5e9d9255ba8a59b9c9e4234107983` at
-  <https://github.com/1Selxo/M-Extension-Server>.
+  `e2f662e83f9379eb7a12de3fc1d0917c7a0f61a4` at
+  <https://github.com/ippo-michi/M-Extension-Server>.
 
 The server archive also includes the notices supplied by its dependencies.
 These components are provided without warranty.

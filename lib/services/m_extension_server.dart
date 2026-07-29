@@ -650,6 +650,20 @@ class MExtensionServerPlatform {
 /// Restarts the embedded listener before a reader retries a transient Mihon
 /// image URL. Image tokens live in the retained JVM, so only the loopback
 /// origin needs to be updated if iOS could not reclaim the previous port.
+Future<String> prepareActiveIosMihonProxyUrl(String url) async {
+  if (!Platform.isIOS || !isTransientMihonImageUrl(url)) return url;
+
+  // Wake the bridge before the first restored reader request. Concurrent
+  // pages await the same pending launch; later healthy requests take this
+  // synchronous fast path and avoid per-image capability probes.
+  if (MExtensionServerPlatform._iosBridgeWasRequested &&
+      !MExtensionServerPlatform._iosRestartOnResume &&
+      MExtensionServerPlatform._pendingStart == null) {
+    return url;
+  }
+  return resolveActiveIosMihonProxyUrl(url);
+}
+
 Future<String> resolveActiveIosMihonProxyUrl(String url) async {
   if (!Platform.isIOS || !isTransientMihonImageUrl(url)) return url;
 

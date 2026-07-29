@@ -450,7 +450,10 @@ class CustomExtendedNetworkImageProvider
     cancelToken?.throwIfCancellationRequested();
 
     int attempt = 0;
-    var requestUri = resolved;
+    final preparedUrl = await prepareActiveIosMihonProxyUrl(
+      resolved.toString(),
+    );
+    var requestUri = Uri.tryParse(preparedUrl) ?? resolved;
     while (attempt < retries) {
       try {
         return await CancellationTokenSource.register(

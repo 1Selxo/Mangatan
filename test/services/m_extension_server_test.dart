@@ -124,6 +124,11 @@ void main() {
     );
     expect(
       serviceSource,
+      contains('Future<String> prepareActiveIosMihonProxyUrl(String url)'),
+      reason: 'restored reader pages must wake the bridge before first HTTP',
+    );
+    expect(
+      serviceSource,
       contains('WidgetsBinding.instance.lifecycleState'),
       reason: 'a stale lifecycle notification must not block a visible reader',
     );
@@ -135,6 +140,14 @@ void main() {
     final imageProviderSource = File(
       'lib/modules/widgets/custom_extended_image_provider.dart',
     ).readAsStringSync();
+    expect(
+      imageProviderSource,
+      contains(
+        'prepareActiveIosMihonProxyUrl(\n'
+        '      resolved.toString(),',
+      ),
+      reason: 'the first restored reader request must start the bridge',
+    );
     expect(
       imageProviderSource,
       contains(

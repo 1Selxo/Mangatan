@@ -320,9 +320,11 @@ class _MangaChapterPageGalleryState
 
   void _refreshMihonChapterPages() {
     if (!mounted) return;
+    final chapterId = chapter.id;
+    if (chapterId == null) return;
     _failedToLoadImage.value = false;
     ref.invalidate(getChapterPagesProvider(chapter: chapter));
-    ref.invalidate(mangaReaderProvider(chapter.id));
+    ref.invalidate(mangaReaderProvider(chapterId));
   }
 
   // final double _horizontalScaleValue = 1.0;

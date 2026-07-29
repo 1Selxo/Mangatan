@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.0+166 - 2026-07-30
+
 - Added shared dictionary lookup history to manual, recursive, subtitle, and
   reader lookups, with quick recall and clear-history controls.
 - Added safe dictionary display-name aliases plus Yomitan-compatible revision

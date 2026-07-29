@@ -5,11 +5,11 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/browse/widgets/source_extension_icon.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
-import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:mangayomi/utils/language.dart';
@@ -61,20 +61,7 @@ class SourceListTile extends StatelessWidget {
             ).secondaryHeaderColor.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(5),
           ),
-          child: source.iconUrl!.isEmpty
-              ? const Icon(Icons.extension_rounded)
-              : cachedNetworkImage(
-                  imageUrl: source.iconUrl!,
-                  fit: BoxFit.contain,
-                  width: 37,
-                  height: 37,
-                  errorWidget: const SizedBox(
-                    width: 37,
-                    height: 37,
-                    child: Center(child: Icon(Icons.extension_rounded)),
-                  ),
-                  useCustomNetworkImage: false,
-                ),
+          child: SourceExtensionIcon(source: source, size: 37),
         ),
         subtitle: Row(
           children: [
@@ -242,22 +229,7 @@ class TvSourceRow extends StatelessWidget {
                         ).secondaryHeaderColor.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(5),
                       ),
-                      child: source.iconUrl!.isEmpty
-                          ? const Icon(Icons.extension_rounded)
-                          : cachedNetworkImage(
-                              imageUrl: source.iconUrl!,
-                              fit: BoxFit.contain,
-                              width: 37,
-                              height: 37,
-                              errorWidget: const SizedBox(
-                                width: 37,
-                                height: 37,
-                                child: Center(
-                                  child: Icon(Icons.extension_rounded),
-                                ),
-                              ),
-                              useCustomNetworkImage: false,
-                            ),
+                      child: SourceExtensionIcon(source: source, size: 37),
                     ),
                     const SizedBox(width: 14),
                     Expanded(

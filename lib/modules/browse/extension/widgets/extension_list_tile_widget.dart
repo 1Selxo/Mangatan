@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/modules/browse/extension/extension_package.dart';
+import 'package:mangayomi/modules/browse/widgets/source_extension_icon.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/uninstall_extension.dart';
-import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
 
@@ -192,20 +192,7 @@ class _ExtensionListTileWidgetState
           color: Theme.of(context).secondaryHeaderColor.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(5),
         ),
-        child: (widget.entry.source.iconUrl ?? '').isEmpty
-            ? const Icon(Icons.extension_rounded)
-            : cachedNetworkImage(
-                imageUrl: widget.entry.source.iconUrl!,
-                fit: BoxFit.contain,
-                width: 37,
-                height: 37,
-                errorWidget: const SizedBox(
-                  width: 37,
-                  height: 37,
-                  child: Center(child: Icon(Icons.extension_rounded)),
-                ),
-                useCustomNetworkImage: false,
-              ),
+        child: SourceExtensionIcon(source: widget.entry.source, size: 37),
       ),
       title: Text(widget.entry.name),
       subtitle: Row(

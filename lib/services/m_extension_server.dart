@@ -55,6 +55,7 @@ class MExtensionServerPlatform {
   static int _lifecycleGeneration = 0;
   static bool _iosAppIsForeground = true;
   static bool _iosBridgeWasRequested = false;
+  static bool _iosBridgeIsReady = false;
   static bool _iosRestartOnResume = false;
   static int? _iosResumePort;
   static int? _preferredRestartPort;
@@ -111,11 +112,15 @@ class MExtensionServerPlatform {
     }
   }
 
-  Future<void> startServer({int? preferredPort}) {
+  Future<void> startServer({
+    int? preferredPort,
+    bool foregroundRequest = false,
+  }) {
     if (Platform.isIOS) {
       _iosBridgeWasRequested = true;
       final lifecycleState = WidgetsBinding.instance.lifecycleState;
-      if (lifecycleState == AppLifecycleState.resumed ||
+      if (foregroundRequest ||
+          lifecycleState == AppLifecycleState.resumed ||
           lifecycleState == null) {
         // Lifecycle notifications and image retries can race during route
         // restoration. Trust Flutter's current state instead of a stale
@@ -158,8 +163,10 @@ class MExtensionServerPlatform {
       final runningBaseUrl = _baseUrl;
       if (_isLoopbackServer(runningBaseUrl) &&
           await _supportsMangatanMihonBridge(runningBaseUrl)) {
+        _iosBridgeIsReady = true;
         return;
       }
+      _iosBridgeIsReady = false;
 
       final runningUri = Uri.tryParse(runningBaseUrl);
       if (_isLoopbackServer(runningBaseUrl) &&
@@ -194,6 +201,7 @@ class MExtensionServerPlatform {
                 deadline: const Duration(seconds: 8),
               )) {
             _writeRuntimeBaseUrl(baseUrl);
+            _iosBridgeIsReady = true;
             _log('Embedded iPhone Mihon bridge is ready at $baseUrl.');
             return;
           }
@@ -214,6 +222,7 @@ class MExtensionServerPlatform {
         '$_embeddedIosLaunchAttempts attempts.',
       );
     } catch (error, stackTrace) {
+      _iosBridgeIsReady = false;
       _restoreSavedBaseUrl();
       if (_isLoopbackServer(_baseUrl)) {
         // A saved desktop loopback URL points back at the iPhone on iOS and
@@ -243,6 +252,7 @@ class MExtensionServerPlatform {
   Future<void> suspendEmbeddedIosBridge() {
     if (!Platform.isIOS) return Future<void>.value();
     _iosAppIsForeground = false;
+    _iosBridgeIsReady = false;
     if (!_iosBridgeWasRequested) return Future<void>.value();
     _iosRestartOnResume = true;
 
@@ -282,6 +292,7 @@ class MExtensionServerPlatform {
       final restarted =
           _isLoopbackServer(_baseUrl) &&
           await _supportsMangatanMihonBridge(_baseUrl);
+      _iosBridgeIsReady = restarted;
       if (_iosAppIsForeground && restarted) {
         _iosRestartOnResume = false;
       } else {
@@ -656,7 +667,7 @@ Future<String> prepareActiveIosMihonProxyUrl(String url) async {
   // Wake the bridge before the first restored reader request. Concurrent
   // pages await the same pending launch; later healthy requests take this
   // synchronous fast path and avoid per-image capability probes.
-  if (MExtensionServerPlatform._iosBridgeWasRequested &&
+  if (MExtensionServerPlatform._iosBridgeIsReady &&
       !MExtensionServerPlatform._iosRestartOnResume &&
       MExtensionServerPlatform._pendingStart == null) {
     return url;
@@ -675,6 +686,7 @@ Future<String> resolveActiveIosMihonProxyUrl(String url) async {
     preferredPort: proxyUri.hasPort && proxyUri.port > 0
         ? proxyUri.port
         : null,
+    foregroundRequest: true,
   );
   final baseUrl = server.baseUrl;
   if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||

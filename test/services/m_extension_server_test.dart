@@ -134,6 +134,16 @@ void main() {
     );
     expect(
       serviceSource,
+      contains('foregroundRequest: true'),
+      reason: 'an active reader request must bypass stale inactive state',
+    );
+    expect(
+      serviceSource,
+      contains('MExtensionServerPlatform._iosBridgeIsReady'),
+      reason: 'a failed launch must not suppress the next reader wake-up',
+    );
+    expect(
+      serviceSource,
       contains('!await server._supportsMangatanMihonBridge(baseUrl)'),
       reason: 'a dead saved loopback address must never be returned as ready',
     );

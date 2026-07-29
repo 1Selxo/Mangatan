@@ -79,6 +79,151 @@ body {
     -webkit-user-select: none;
 }
 
+.kanji-link {
+    appearance: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    line-height: inherit;
+    cursor: pointer;
+}
+
+.kanji-link:hover,
+.kanji-link:focus-visible {
+    color: var(--link-color, #4a80d8);
+    text-decoration: underline;
+    text-decoration-thickness: calc(1px * var(--popup-scale));
+    text-underline-offset: calc(2px * var(--popup-scale));
+}
+
+.kanji-entry-header {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(10px * var(--popup-scale));
+    padding-top: calc(4px * var(--popup-scale));
+}
+
+.kanji-glyph {
+    flex: 0 0 auto;
+    font-size: calc(52px * var(--popup-scale));
+    line-height: 1.05;
+}
+
+.kanji-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(3px * var(--popup-scale));
+    padding-top: calc(5px * var(--popup-scale));
+}
+
+.kanji-tag {
+    padding: calc(3px * var(--popup-scale)) calc(5px * var(--popup-scale));
+    border-radius: calc(4px * var(--popup-scale));
+    color: var(--text-color-light1);
+    background: rgba(128, 128, 128, 0.18);
+    font-size: calc(11px * var(--popup-scale));
+    line-height: 1.15;
+}
+
+.kanji-dictionary-tag {
+    color: var(--on-primary-container, inherit);
+    background: var(--primary-container, rgba(90, 120, 180, 0.22));
+}
+
+.kanji-frequency-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(3px * var(--popup-scale));
+    margin-top: calc(5px * var(--popup-scale));
+}
+
+.kanji-frequency {
+    padding: calc(2px * var(--popup-scale)) calc(5px * var(--popup-scale));
+    border: calc(1px * var(--popup-scale)) solid var(--freq-tag-color, #77aaeb);
+    border-radius: calc(4px * var(--popup-scale));
+    font-size: calc(11px * var(--popup-scale));
+}
+
+.kanji-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+    margin-top: calc(7px * var(--popup-scale));
+    border-top: calc(1px * var(--popup-scale)) solid rgba(128, 128, 128, 0.35);
+    border-bottom: calc(1px * var(--popup-scale)) solid rgba(128, 128, 128, 0.35);
+}
+
+.kanji-info-section {
+    padding: calc(6px * var(--popup-scale)) calc(8px * var(--popup-scale));
+}
+
+.kanji-overview > .kanji-info-section + .kanji-info-section {
+    border-left: calc(1px * var(--popup-scale)) solid rgba(128, 128, 128, 0.35);
+}
+
+.kanji-info-title {
+    margin-bottom: calc(4px * var(--popup-scale));
+    color: var(--text-color-light1);
+    font-size: calc(12px * var(--popup-scale));
+    font-weight: 600;
+}
+
+.kanji-readings h4 {
+    margin-top: calc(4px * var(--popup-scale));
+    color: var(--text-color-light2);
+    font-size: calc(10px * var(--popup-scale));
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.kanji-gloss-list,
+.kanji-reading-list {
+    padding-left: calc(19px * var(--popup-scale));
+}
+
+.kanji-reading-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.kanji-reading-list li {
+    display: inline;
+}
+
+.kanji-reading-list li:not(:last-child)::after {
+    content: "、";
+}
+
+.kanji-stat-section {
+    border-bottom: calc(1px * var(--popup-scale)) solid rgba(128, 128, 128, 0.35);
+}
+
+.kanji-stat-list {
+    display: grid;
+    grid-template-columns: minmax(8em, max-content) minmax(0, 1fr);
+    gap: calc(2px * var(--popup-scale)) calc(10px * var(--popup-scale));
+}
+
+.kanji-stat-list dt {
+    color: var(--text-color-light1);
+}
+
+.kanji-stat-list dd {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+    .kanji-overview {
+        grid-template-columns: 1fr;
+    }
+
+    .kanji-overview > .kanji-info-section + .kanji-info-section {
+        border-left: 0;
+        border-top: calc(1px * var(--popup-scale)) solid rgba(128, 128, 128, 0.35);
+    }
+}
+
 .header-buttons {
     display: flex;
     align-items: center;

@@ -129,6 +129,7 @@ void main() {
     expect(html, contains('flutter_inappwebview.callHandler'));
     expect(html, contains('getTermAudioSources'));
     expect(html, contains('playWordAudio'));
+    expect(html, contains('"kanjiLookup"'));
     expect(html, contains("'duplicateCheck'"));
     expect(html, contains('"duplicateNotes"'));
     expect(html, contains('"browseNotes"'));
@@ -325,6 +326,23 @@ void main() {
     );
     expect(script, contains('window.hoshiDictionaryMedia[dictionary][path]'));
     expect(script, contains('img.src = imageUrl'));
+  });
+
+  test('navigates from term headwords to Yomitan Kanji entries', () {
+    final script = File('assets/hoshi_popup/popup.js').readAsStringSync();
+    final styles = File('assets/hoshi_popup/popup.css').readAsStringSync();
+
+    expect(
+      script,
+      contains('webkit.messageHandlers.kanjiLookup.postMessage(character)'),
+    );
+    expect(script, contains("entry.type === 'mangatan-yomitan-kanji-v1'"));
+    expect(script, contains("['Classifications', entry.stats?.class]"));
+    expect(script, contains("['Codepoints', entry.stats?.code]"));
+    expect(script, contains("['Dictionary Indices', entry.stats?.index]"));
+    expect(script, contains('kanji-readings-chinese'));
+    expect(script, contains('kanji-readings-japanese'));
+    expect(styles, contains('.kanji-reading-list'));
   });
 
   test('keeps frequency and pitch labels white on accent tags', () {

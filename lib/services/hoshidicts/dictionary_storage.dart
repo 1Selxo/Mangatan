@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -8,11 +9,13 @@ class DictionaryPaths {
   final List<String> termPaths;
   final List<String> frequencyPaths;
   final List<String> pitchPaths;
+  final List<String> kanjiPaths;
 
   const DictionaryPaths({
     this.termPaths = const [],
     this.frequencyPaths = const [],
     this.pitchPaths = const [],
+    this.kanjiPaths = const [],
   });
 }
 
@@ -21,12 +24,14 @@ class InstalledDictionary {
   final bool hasTerms;
   final bool hasFrequencies;
   final bool hasPitch;
+  final bool hasKanji;
 
   const InstalledDictionary({
     required this.name,
     required this.hasTerms,
     required this.hasFrequencies,
     required this.hasPitch,
+    this.hasKanji = false,
   });
 }
 
@@ -70,6 +75,10 @@ class DictionaryStorage {
         for (final dictionary in dictionaries)
           if (dictionary.hasPitch) p.join(directory.path, dictionary.name),
       ],
+      kanjiPaths: [
+        for (final dictionary in dictionaries)
+          if (dictionary.hasKanji) p.join(directory.path, dictionary.name),
+      ],
     );
   }
 
@@ -105,6 +114,7 @@ class DictionaryStorage {
     required BigInt termCount,
     required BigInt frequencyCount,
     required BigInt pitchCount,
+    BigInt? kanjiCount,
     Directory? root,
   }) async {
     final directory = root ?? await rootDirectory;
@@ -119,6 +129,7 @@ class DictionaryStorage {
       'terms': termCount > BigInt.zero,
       'frequencies': frequencyCount > BigInt.zero,
       'pitch': pitchCount > BigInt.zero,
+      'kanji': (kanjiCount ?? BigInt.zero) > BigInt.zero,
     };
     _writeOrder(manifest, names, preferredOrder);
     await _writeManifest(directory, manifest);
@@ -177,6 +188,7 @@ class DictionaryStorage {
         _dictionaryFromMetadata(
           p.basename(directory.path),
           manifest[p.basename(directory.path)],
+          directory,
         ),
     ];
   }
@@ -198,14 +210,19 @@ class DictionaryStorage {
   InstalledDictionary _dictionaryFromMetadata(
     String name,
     Map<String, dynamic>? metadata,
+    Directory directory,
   ) {
     // Imports made before the manifest was introduced are overwhelmingly term
     // dictionaries. This fallback also repairs existing JMdict installations.
+    final hasKanjiMarker = File(
+      p.join(directory.path, yomitanKanjiDataFileName),
+    ).existsSync();
     return InstalledDictionary(
       name: name,
-      hasTerms: metadata?['terms'] as bool? ?? true,
+      hasTerms: metadata?['terms'] as bool? ?? !hasKanjiMarker,
       hasFrequencies: metadata?['frequencies'] as bool? ?? false,
       hasPitch: metadata?['pitch'] as bool? ?? false,
+      hasKanji: metadata?['kanji'] as bool? ?? hasKanjiMarker,
     );
   }
 

@@ -9,9 +9,9 @@ lazy_framework_dir="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
-server_commit="8c60117930020b4aceb116eaa7c98f0c64632760"
-server_jar_url="https://github.com/ippo-michi/M-Extension-Server/releases/download/ios-runtime-v4/MExtensionServer-ios.jar"
-server_jar_sha256="59967456c5e64bee52282cdb685b4e18d9beff866006f70eca7b86268428607c"
+server_commit="c151cda985a5e9d9255ba8a59b9c9e4234107983"
+server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v4/MExtensionServer-ios.jar"
+server_jar_sha256="1c8c325601c540fb6453cf84db7ab747ba03c6f3e960334017d2563f543bcc5b"
 openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="24589886361678b369e4703d82fcb3deff1b40728d725fef4fea7e70cb728f55"
 openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"

@@ -43,6 +43,7 @@ import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/dictionary_update_service.dart';
 import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/youtube/youtube_preferences.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
@@ -92,107 +93,104 @@ Uri? initialDesktopAppLinkFromArguments(
 
 void main(List<String> args) async {
   // Zone-level catch-all for anything that slips through both layers
-  runZonedGuarded(
-    () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      if (Platform.isLinux && runWebViewTitleBarWidget(args)) return;
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (Platform.isLinux && runWebViewTitleBarWidget(args)) return;
 
-      // Cap the decoded image cache so a large library grid can't fill the
-      // default 100 MB ceiling with full-resolution covers and OOM constrained
-      // mobile heaps. Mobile gets a tight 64 MB; desktop keeps 256 MB. The
-      // encoded-bytes LRU in CustomExtendedNetworkImageProvider (50 MB) is a
-      // separate cache and is not affected by this setting.
-      PaintingBinding.instance.imageCache.maximumSizeBytes = isMobile
-          ? 64 << 20
-          : 256 << 20;
+    // Cap the decoded image cache so a large library grid can't fill the
+    // default 100 MB ceiling with full-resolution covers and OOM constrained
+    // mobile heaps. Mobile gets a tight 64 MB; desktop keeps 256 MB. The
+    // encoded-bytes LRU in CustomExtendedNetworkImageProvider (50 MB) is a
+    // separate cache and is not affected by this setting.
+    PaintingBinding.instance.imageCache.maximumSizeBytes = isMobile
+        ? 64 << 20
+        : 256 << 20;
 
-      // Widget-layer errors (build / layout / paint)
-      FlutterError.onError = (FlutterErrorDetails details) {
-        FlutterError.presentError(details); // keep default red-screen in debug
-        AppLogger.log(
-          'FlutterError: ${details.exceptionAsString()}\n${details.stack}',
-          logLevel: LogLevel.error,
-        );
-      };
-
-      // Async errors that escape the Flutter framework (PlatformDispatcher)
-      PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-        AppLogger.log(
-          'PlatformDispatcher error: $error\n$stack',
-          logLevel: LogLevel.error,
-        );
-        return true; // handled — prevent app termination
-      };
-
-      MediaKit.ensureInitialized();
-      await RustLib.init();
-      // Detect Android TV / leanback so the UI can branch on form factor.
-      // No-op on other platforms. See #729.
-      await initIsTv();
-      if (!isMobile) {
-        await windowManager.ensureInitialized();
-        await WindowGeometry.restore();
-      }
-      if (Platform.isWindows || Platform.isLinux) {
-        try {
-          registerPersistentProtocolHandler("mangayomi");
-        } catch (error, stackTrace) {
-          // A protocol collision must not prevent Mangatan itself from opening.
-          // The conflicting handler is deliberately left untouched.
-          debugPrint('Could not register the mangayomi URL protocol: $error');
-          AppLogger.log(
-            'Could not register the desktop mangayomi URL protocol: '
-            '$error\n$stackTrace',
-            logLevel: LogLevel.warning,
-          );
-        }
-      }
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-        final availableVersion = await WebViewEnvironment.getAvailableVersion();
-        if (availableVersion != null) {
-          final document = await getApplicationDocumentsDirectory();
-          webViewEnvironment = await WebViewEnvironment.create(
-            settings: WebViewEnvironmentSettings(
-              userDataFolder: p.join(document.path, 'flutter_inappwebview'),
-            ),
-          );
-        }
-      }
-      final storage = StorageProvider();
-      // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
-      // prompt at launch. The database lives in scoped app storage, so the app
-      // can start, browse and read online without it. The permission is still
-      // requested lazily by `createDirectorySafely` / `initDB` the first time a
-      // public path actually needs to be written (e.g. a download). See #740.
-      Object? startupError;
-      try {
-        isar = await storage.initDB(null, inspector: kDebugMode);
-      } catch (e, st) {
-        AppLogger.log('DB init failed: $e\n$st', logLevel: LogLevel.error);
-        startupError = e;
-      }
-      runApp(
-        startupError != null
-            ? _StartupErrorApp(error: startupError.toString())
-            : ProviderScope(
-                child: MyApp(
-                  initialAppLink: initialDesktopAppLinkFromArguments(
-                    args,
-                    platform: defaultTargetPlatform,
-                  ),
-                ),
-                retry: (retryCount, error) => null,
-              ),
+    // Widget-layer errors (build / layout / paint)
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details); // keep default red-screen in debug
+      AppLogger.log(
+        'FlutterError: ${details.exceptionAsString()}\n${details.stack}',
+        logLevel: LogLevel.error,
       );
-      _didMountApplication = true;
-      if (startupError == null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          unawaited(_postLaunchInit(storage));
-        });
+    };
+
+    // Async errors that escape the Flutter framework (PlatformDispatcher)
+    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+      AppLogger.log(
+        'PlatformDispatcher error: $error\n$stack',
+        logLevel: LogLevel.error,
+      );
+      return true; // handled — prevent app termination
+    };
+
+    MediaKit.ensureInitialized();
+    await RustLib.init();
+    // Detect Android TV / leanback so the UI can branch on form factor.
+    // No-op on other platforms. See #729.
+    await initIsTv();
+    if (!isMobile) {
+      await windowManager.ensureInitialized();
+      await WindowGeometry.restore();
+    }
+    if (Platform.isWindows || Platform.isLinux) {
+      try {
+        registerPersistentProtocolHandler("mangayomi");
+      } catch (error, stackTrace) {
+        // A protocol collision must not prevent Mangatan itself from opening.
+        // The conflicting handler is deliberately left untouched.
+        debugPrint('Could not register the mangayomi URL protocol: $error');
+        AppLogger.log(
+          'Could not register the desktop mangayomi URL protocol: '
+          '$error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
       }
-    },
-    _handleUncaughtError,
-  );
+    }
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      final availableVersion = await WebViewEnvironment.getAvailableVersion();
+      if (availableVersion != null) {
+        final document = await getApplicationDocumentsDirectory();
+        webViewEnvironment = await WebViewEnvironment.create(
+          settings: WebViewEnvironmentSettings(
+            userDataFolder: p.join(document.path, 'flutter_inappwebview'),
+          ),
+        );
+      }
+    }
+    final storage = StorageProvider();
+    // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
+    // prompt at launch. The database lives in scoped app storage, so the app
+    // can start, browse and read online without it. The permission is still
+    // requested lazily by `createDirectorySafely` / `initDB` the first time a
+    // public path actually needs to be written (e.g. a download). See #740.
+    Object? startupError;
+    try {
+      isar = await storage.initDB(null, inspector: kDebugMode);
+    } catch (e, st) {
+      AppLogger.log('DB init failed: $e\n$st', logLevel: LogLevel.error);
+      startupError = e;
+    }
+    runApp(
+      startupError != null
+          ? _StartupErrorApp(error: startupError.toString())
+          : ProviderScope(
+              child: MyApp(
+                initialAppLink: initialDesktopAppLinkFromArguments(
+                  args,
+                  platform: defaultTargetPlatform,
+                ),
+              ),
+              retry: (retryCount, error) => null,
+            ),
+    );
+    _didMountApplication = true;
+    if (startupError == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_postLaunchInit(storage));
+      });
+    }
+  }, _handleUncaughtError);
 }
 
 void _handleUncaughtError(Object error, StackTrace stack) {
@@ -318,6 +316,7 @@ class _MyAppState extends ConsumerState<MyApp>
     _initDeepLinks();
     _setupMpvConfig();
     unawaited(ref.read(scanLocalLibraryProvider.future));
+    unawaited(DictionaryUpdateService.instance.runAutomaticIfDue());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // OpenJDK Mobile initialization is intentionally lazy on iOS. Starting

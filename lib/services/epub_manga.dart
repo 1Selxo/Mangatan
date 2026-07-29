@@ -242,6 +242,9 @@ bool _isRasterImagePath(String value) {
     '.gif',
     '.webp',
     '.avif',
+    '.heic',
+    '.heif',
+    '.jxl',
   }.contains(extension);
 }
 

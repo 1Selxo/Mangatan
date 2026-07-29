@@ -561,6 +561,7 @@ class _DictionaryPopupOverlayHostState
   }) async {
     final query = selection.text.trim();
     if (query.isEmpty) return 0;
+    unawaited(MiningPreferences.recordDictionaryLookup(query));
     final generation = ++_childLookupGeneration;
     final resultsFuture = DictionaryLookupPopup.lookup(
       query,
@@ -769,6 +770,7 @@ class DictionaryLookupPopup extends StatelessWidget {
   }) async {
     final lookupText = text.trim();
     if (lookupText.isEmpty) return null;
+    unawaited(MiningPreferences.recordDictionaryLookup(lookupText));
     return _dictionaryPopupHost.show(
       context: context,
       anchor: anchor,

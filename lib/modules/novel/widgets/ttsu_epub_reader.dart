@@ -2958,6 +2958,9 @@ String _mimeType(String name) {
   if (lower.endsWith('.gif')) return 'image/gif';
   if (lower.endsWith('.webp')) return 'image/webp';
   if (lower.endsWith('.avif')) return 'image/avif';
+  if (lower.endsWith('.heic')) return 'image/heic';
+  if (lower.endsWith('.heif')) return 'image/heif';
+  if (lower.endsWith('.jxl')) return 'image/jxl';
   if (lower.endsWith('.svg')) return 'image/svg+xml';
   return 'image/jpeg';
 }

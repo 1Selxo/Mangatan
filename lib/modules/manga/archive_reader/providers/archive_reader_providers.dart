@@ -16,6 +16,9 @@ const List<String> _kImageExtensions = [
   '.gif',
   '.webp',
   '.avif',
+  '.heic',
+  '.heif',
+  '.jxl',
 ];
 const List<String> _kArchiveExtensions = ['.cbz', '.zip', '.cbt', '.tar'];
 

@@ -65,6 +65,36 @@ void main() {
     );
   });
 
+  test('lookup history is shared, bounded, and most-recent-first', () async {
+    expect(
+      updatedDictionaryLookupHistory(
+        const ['古い', '読む', '語'],
+        ' 読む ',
+        maximumEntries: 3,
+      ),
+      const ['読む', '古い', '語'],
+    );
+
+    await MiningPreferences.recordDictionaryLookup('読む');
+    await MiningPreferences.recordDictionaryLookup('言葉');
+    await MiningPreferences.recordDictionaryLookup('読む');
+
+    expect(await MiningPreferences.getDictionaryLookupHistory(), ['読む', '言葉']);
+    await MiningPreferences.clearDictionaryLookupHistory();
+    expect(await MiningPreferences.getDictionaryLookupHistory(), isEmpty);
+  });
+
+  test('parallel OCR limit is clamped and persisted', () async {
+    await MiningPreferences.setParallelOcrLimit(3);
+    expect(await MiningPreferences.getParallelOcrLimit(), 3);
+
+    await MiningPreferences.setParallelOcrLimit(99);
+    expect(await MiningPreferences.getParallelOcrLimit(), 4);
+
+    await MiningPreferences.setParallelOcrLimit(-2);
+    expect(await MiningPreferences.getParallelOcrLimit(), 1);
+  });
+
   test('desktop always resolves to AnkiConnect', () {
     expect(
       effectiveAnkiIntegrationMode(

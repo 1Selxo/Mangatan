@@ -10,6 +10,7 @@ import 'package:flutter/widgets.dart';
 import 'package:http_client_helper/http_client_helper.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:path/path.dart';
 import 'package:extended_image_library/src/network/extended_network_image_provider.dart'
     as image_provider;
@@ -384,17 +385,29 @@ class CustomExtendedNetworkImageProvider
     cancelToken?.throwIfCancellationRequested();
 
     int attempt = 0;
+    final preparedUrl = await prepareActiveIosMihonProxyUrl(
+      resolved.toString(),
+    );
+    var requestUri = Uri.tryParse(preparedUrl) ?? resolved;
     while (attempt < retries) {
       try {
         return await CancellationTokenSource.register(
           cancelToken,
-          _getResponse(resolved),
+          _getResponse(requestUri),
         );
       } catch (e) {
         attempt++;
         if (attempt >= retries) {
           rethrow;
         }
+
+        // The embedded JVM keeps image tokens across listener suspension.
+        // Restart only after a real request failure so healthy page loads do
+        // not perform a capabilities probe for every image.
+        final activeUrl = await resolveActiveIosMihonProxyUrl(
+          requestUri.toString(),
+        );
+        requestUri = Uri.tryParse(activeUrl) ?? requestUri;
 
         // Exponential backoff: 100ms, 200ms, 400ms, 800ms, etc.
         final backoffDelay = Duration(

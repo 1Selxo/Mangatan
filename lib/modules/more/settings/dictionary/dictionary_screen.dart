@@ -59,6 +59,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
   AnkiAudioPreferences _ankiAudioPreferences = AnkiAudioPreferences.defaults;
   Uri _ankiEndpoint = Uri.parse('http://127.0.0.1:8765');
+  AnkiIntegrationMode _ankiIntegrationMode = AnkiIntegrationMode.ankiMobile;
   int? _ankiVersion;
   List<String> _ankiDecks = const [];
   List<String> _ankiModels = const [];
@@ -67,7 +68,14 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   String? _ankiError;
   bool _ankiRefreshing = false;
 
-  bool get _usesAnkiMobile => defaultTargetPlatform == TargetPlatform.iOS;
+  bool get _isIOS => defaultTargetPlatform == TargetPlatform.iOS;
+
+  bool get _usesAnkiMobile =>
+      effectiveAnkiIntegrationMode(
+        preferredMode: _ankiIntegrationMode,
+        isIOS: _isIOS,
+      ) ==
+      AnkiIntegrationMode.ankiMobile;
 
   @override
   void initState() {
@@ -98,6 +106,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getActiveDictionaryProfile(),
       MiningPreferences.getMokuroWebsiteOcrEnabled(),
       MiningPreferences.getCropImageBeforeMining(),
+      MiningPreferences.getAnkiIntegrationMode(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -125,6 +134,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _additionalLeftClick = values[15] as bool;
       _dictionaryLanguage = values[16] as String;
       _cropImageBeforeMining = values[20] as bool;
+      _ankiIntegrationMode = values[21] as AnkiIntegrationMode;
       _loading = false;
     });
     if (widget.section == DictionarySettingsSection.anki && !_usesAnkiMobile) {
@@ -583,6 +593,20 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     } finally {
       if (mounted) setState(() => _ankiRefreshing = false);
     }
+  }
+
+  Future<void> _setAnkiIntegrationMode(AnkiIntegrationMode mode) async {
+    if (mode == _ankiIntegrationMode) return;
+    setState(() {
+      _ankiIntegrationMode = mode;
+      _ankiVersion = null;
+      _ankiDecks = const [];
+      _ankiModels = const [];
+      _ankiFields = const [];
+      _ankiMobileFieldsByModel = const {};
+      _ankiError = null;
+    });
+    await MiningPreferences.setAnkiIntegrationMode(mode);
   }
 
   Future<void> _selectAnkiModel(String modelName) async {
@@ -1478,7 +1502,52 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   _DictionarySettingsGroup.anki,
                 ),
                 const Divider(height: 24),
-                _SectionHeader(_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'),
+                const _SectionHeader('Anki'),
+                if (_isIOS) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: DropdownButtonFormField<AnkiIntegrationMode>(
+                      key: ValueKey(_ankiIntegrationMode),
+                      initialValue: _ankiIntegrationMode,
+                      decoration: const InputDecoration(
+                        labelText: 'iOS Anki integration',
+                        prefixIcon: Icon(Icons.swap_horiz_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: AnkiIntegrationMode.ankiMobile,
+                          child: Text('AnkiMobile'),
+                        ),
+                        DropdownMenuItem(
+                          value: AnkiIntegrationMode.ankiConnect,
+                          child: Text('AnkiConnect'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          _setAnkiIntegrationMode(value);
+                        }
+                      },
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      _usesAnkiMobile
+                          ? Icons.phone_iphone_outlined
+                          : Icons.lan_outlined,
+                    ),
+                    title: Text(
+                      _usesAnkiMobile
+                          ? 'Use AnkiMobile on this iPhone'
+                          : 'Use an AnkiConnect server',
+                    ),
+                    subtitle: Text(
+                      _usesAnkiMobile
+                          ? 'Opens AnkiMobile through its iOS callback API when you mine a card.'
+                          : 'Connects over HTTP to Anki running on a reachable computer. Use its LAN address, not 127.0.0.1.',
+                    ),
+                  ),
+                ],
                 SwitchListTile(
                   secondary: const Icon(Icons.note_add_outlined),
                   title: const Text('Enable Anki export'),
@@ -1651,7 +1720,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       final endpoint = value == null
                           ? null
                           : Uri.tryParse(value.trim());
-                      if (endpoint == null || !endpoint.hasScheme) return;
+                      if (endpoint == null ||
+                          !const {'http', 'https'}.contains(endpoint.scheme) ||
+                          endpoint.host.isEmpty) {
+                        botToast(
+                          'Enter a complete http:// or https:// AnkiConnect address',
+                          second: 4,
+                        );
+                        return;
+                      }
                       setState(() => _ankiEndpoint = endpoint);
                       await MiningPreferences.setAnkiEndpoint(endpoint);
                       await _refreshAnki();

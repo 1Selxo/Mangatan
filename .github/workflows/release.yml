@@ -287,3 +287,11 @@ jobs:
           immutableCreate: true
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           tag: ${{ env.RELEASE_TAG }}
+
+  publish-aur:
+    needs: release
+    if: ${{ !contains(inputs.release_tag || github.ref_name, '-') }}
+    uses: ./.github/workflows/publish-aur.yml
+    with:
+      release_tag: ${{ inputs.release_tag || github.ref_name }}
+    secrets: inherit

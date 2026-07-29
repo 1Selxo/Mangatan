@@ -1,7 +1,6 @@
 # AUR publishing
 
-The user's fork checks upstream's latest stable Mangatan release every six
-hours and publishes `mangatan-bin` to the AUR when the version changes.
+Each successful stable Mangatan release publishes `mangatan-bin` to the AUR.
 Private and prerelease releases are excluded.
 
 ## One-time setup
@@ -19,8 +18,8 @@ Private and prerelease releases are excluded.
 5. Delete both local key files after storing the private key somewhere secure,
    or retain them in a password manager for recovery.
 
-The next scheduled run will create or update the `mangatan-bin` AUR
-repository. To publish immediately without rebuilding Mangatan, run the
+The next stable release will update the `mangatan-bin` AUR repository. To
+publish an existing release without rebuilding Mangatan, run the
 `Publish AUR package` workflow manually. Leave the tag blank for the latest
 stable release or enter a tag such as `v1.0.9`.
 

@@ -15,6 +15,7 @@ const List<String> _kImageExtensions = [
   '.jpeg',
   '.gif',
   '.webp',
+  '.avif',
 ];
 const List<String> _kArchiveExtensions = ['.cbz', '.zip', '.cbt', '.tar'];
 
@@ -162,7 +163,8 @@ Future<void> _scanDirectoryRecursive(
 }
 
 /// Check if a file is an image based on extension
-bool _isImageFile(String path) {
+@visibleForTesting
+bool isArchiveReaderImagePath(String path) {
   final extension = p.extension(path).toLowerCase();
   return _kImageExtensions.contains(extension);
 }
@@ -199,7 +201,10 @@ Future<LocalArchive> _extractFromImageFolder(String path) async {
   final imageFiles =
       await dir
             .list()
-            .where((entity) => entity is File && _isImageFile(entity.path))
+            .where(
+              (entity) =>
+                  entity is File && isArchiveReaderImagePath(entity.path),
+            )
             .cast<File>()
             .toList()
         ..sort((a, b) => a.path.compareTo(b.path));
@@ -242,7 +247,7 @@ LocalArchive _extractFromArchiveFile(String path) {
             .where(
               (file) =>
                   file.isFile &&
-                  _isImageFile(file.name) &&
+                  isArchiveReaderImagePath(file.name) &&
                   !file.name.startsWith('.'),
             )
             .toList()
@@ -304,7 +309,10 @@ _extractMetadataFromImageFolder(String path) async {
   final images =
       await dir
             .list()
-            .where((entity) => entity is File && _isImageFile(entity.path))
+            .where(
+              (entity) =>
+                  entity is File && isArchiveReaderImagePath(entity.path),
+            )
             .cast<File>()
             .toList()
         ..sort((a, b) => a.path.compareTo(b.path));
@@ -334,7 +342,7 @@ _extractMetadataFromImageFolder(String path) async {
     final coverFile = archive.files.firstWhere(
       (file) =>
           file.isFile &&
-          _isImageFile(file.name) &&
+          isArchiveReaderImagePath(file.name) &&
           file.name.toLowerCase().contains('cover') &&
           !file.name.startsWith('.'),
       orElse: () {
@@ -344,7 +352,7 @@ _extractMetadataFromImageFolder(String path) async {
                 .where(
                   (file) =>
                       file.isFile &&
-                      _isImageFile(file.name) &&
+                      isArchiveReaderImagePath(file.name) &&
                       !file.name.startsWith('.'),
                 )
                 .toList()

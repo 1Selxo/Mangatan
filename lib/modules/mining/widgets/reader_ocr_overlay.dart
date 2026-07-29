@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -56,6 +57,9 @@ class ReaderOcrState {
   static List<UChapDataPreload> _lastScanPages = const [];
   static int _lastStartIndex = 0;
   static Future<void> Function(UChapDataPreload)? _lastPreparePage;
+  static String? _activeScanKey;
+  static Future<void>? _activeScan;
+  static String? _completedScanKey;
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -386,6 +390,18 @@ class ReaderOcrState {
     if (!enabled.value) return;
     final scanPages = pages.where((page) => !page.isTransitionPage).toList();
     if (scanPages.isEmpty) return;
+    final scanKey = readerOcrChapterScanKey(scanPages);
+    final activeScan = _activeScan;
+    if (!readerOcrShouldStartChapterScan(
+      scanKey: scanKey,
+      activeScanKey: _activeScanKey,
+      completedScanKey: _completedScanKey,
+    )) {
+      if (activeScan != null && _activeScanKey == scanKey) {
+        return activeScan;
+      }
+      return;
+    }
     final generation = ++_scanGeneration;
     _usingMokuroWebsiteData = false;
     final start = startIndex.clamp(0, scanPages.length - 1);
@@ -393,7 +409,30 @@ class ReaderOcrState {
       ...scanPages.sublist(start),
       ...scanPages.sublist(0, start),
     ];
-    var completed = 0;
+    late final Future<void> scan;
+    scan =
+        _runChapterScan(
+          ordered,
+          generation: generation,
+          scanKey: scanKey,
+          preparePage: preparePage,
+        ).whenComplete(() {
+          if (identical(_activeScan, scan)) {
+            _activeScan = null;
+            _activeScanKey = null;
+          }
+        });
+    _activeScanKey = scanKey;
+    _activeScan = scan;
+    return scan;
+  }
+
+  static Future<void> _runChapterScan(
+    List<UChapDataPreload> ordered, {
+    required int generation,
+    required String scanKey,
+    Future<void> Function(UChapDataPreload)? preparePage,
+  }) async {
     progress.value = _scanProgress(completed: 0, total: ordered.length);
     for (var index = 0; index < ordered.length; index += 2) {
       if (generation != _scanGeneration || !enabled.value) return;
@@ -408,24 +447,26 @@ class ReaderOcrState {
           }
         }),
       );
-      completed = end;
       if (generation == _scanGeneration) {
-        progress.value = _scanProgress(
-          completed: completed,
-          total: ordered.length,
-        );
+        progress.value = _scanProgress(completed: end, total: ordered.length);
       }
     }
     await Future<void>.delayed(const Duration(milliseconds: 800));
-    if (generation == _scanGeneration) progress.value = null;
+    if (generation == _scanGeneration) {
+      _completedScanKey = scanKey;
+      progress.value = null;
+    }
   }
 
   static void cancelScan({bool clearLast = true}) {
     _scanGeneration++;
     progress.value = null;
+    _activeScan = null;
+    _activeScanKey = null;
     if (clearLast) {
       _lastScanPages = const [];
       _lastPreparePage = null;
+      _completedScanKey = null;
     }
   }
 
@@ -481,14 +522,31 @@ class ReaderOcrState {
       if (!identical(controller.data, data)) continue;
       final page = controller._page;
       if (page == null) return 0;
-      return page.blocks.fold<int>(
-        0,
-        (sum, block) => sum + block.text.length,
-      );
+      return page.blocks.fold<int>(0, (sum, block) => sum + block.text.length);
     }
     return 0;
   }
 }
+
+@visibleForTesting
+String readerOcrChapterScanKey(List<UChapDataPreload> pages) => jsonEncode([
+  for (final page in pages)
+    [
+      page.chapter?.id,
+      page.index,
+      page.pageIndex,
+      page.pageUrl?.url,
+      page.directory?.path,
+      page.localArtifactPath,
+    ],
+]);
+
+@visibleForTesting
+bool readerOcrShouldStartChapterScan({
+  required String scanKey,
+  String? activeScanKey,
+  String? completedScanKey,
+}) => activeScanKey != scanKey && completedScanKey != scanKey;
 
 enum ReaderOcrProgressStage { recognizing, loadingMokuro, mokuro }
 

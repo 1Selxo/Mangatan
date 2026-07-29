@@ -66,7 +66,7 @@ class LocalFoldersState extends _$LocalFoldersState {
 /// **Supported filetypes:** (taken from lib/modules/library/providers/local_archive.dart, line 98)
 /// ```
 /// Videotypes:   mp4, mov, avi, flv, wmv, mpeg, mkv
-/// Imagetypes:   jpg, jpeg, png, webp
+/// Imagetypes:   jpg, jpeg, png, webp, avif
 /// Archivetypes: cbz, zip, cbt, tar
 /// Other types: epub
 /// ```
@@ -506,7 +506,11 @@ bool _isJson(String path) {
 /// Returns if file is an image
 bool _isImage(String path) {
   final ext = p.extension(path).toLowerCase();
-  return ext == '.jpg' || ext == '.jpeg' || ext == '.png' || ext == '.webp';
+  return ext == '.jpg' ||
+      ext == '.jpeg' ||
+      ext == '.png' ||
+      ext == '.webp' ||
+      ext == '.avif';
 }
 
 /// Returns if file is an archive

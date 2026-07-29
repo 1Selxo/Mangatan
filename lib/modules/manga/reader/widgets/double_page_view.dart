@@ -2,6 +2,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_paged.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_colors.dart';
@@ -32,6 +33,7 @@ class DoublePageView extends StatefulWidget {
 
   /// Callback for image load failure state.
   final Function(bool)? onFailedToLoadImage;
+  final VoidCallback? onRefreshMihonPages;
 
   /// Whether to use the paged mode (with PhotoView zoom) or vertical mode.
   ///
@@ -51,6 +53,7 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
+    this.onRefreshMihonPages,
     this.isPagedMode = true,
     this.addTopPadding = true,
     this.readingDirection = ReadingDirection.leftToRight,
@@ -63,6 +66,7 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
+    this.onRefreshMihonPages,
     this.readingDirection = ReadingDirection.leftToRight,
   }) : isPagedMode = true,
        addTopPadding = false;
@@ -74,6 +78,7 @@ class DoublePageView extends StatefulWidget {
     required this.backgroundColor,
     this.onLongPressData,
     this.onFailedToLoadImage,
+    this.onRefreshMihonPages,
     this.addTopPadding = true,
     this.readingDirection = ReadingDirection.leftToRight,
   }) : isPagedMode = false;
@@ -277,7 +282,7 @@ class DoublePageViewState extends State<DoublePageView>
           case LoadState.completed:
             return _buildCompletedState(state);
           case LoadState.failed:
-            return _buildFailedState(state, l10n);
+            return _buildFailedState(state, l10n, pageData);
         }
       },
       onLongPressData: onLongPress,
@@ -303,7 +308,11 @@ class DoublePageViewState extends State<DoublePageView>
     return null;
   }
 
-  Widget _buildFailedState(ExtendedImageState state, dynamic l10n) {
+  Widget _buildFailedState(
+    ExtendedImageState state,
+    dynamic l10n,
+    UChapDataPreload pageData,
+  ) {
     widget.onFailedToLoadImage?.call(true);
     final backgroundColor =
         getBackgroundColor(widget.backgroundColor) ??
@@ -323,23 +332,33 @@ class DoublePageViewState extends State<DoublePageView>
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: _buildRetryButton(state, l10n),
+            child: _buildRetryButton(state, l10n, pageData),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRetryButton(ExtendedImageState state, dynamic l10n) {
+  Widget _buildRetryButton(
+    ExtendedImageState state,
+    dynamic l10n,
+    UChapDataPreload pageData,
+  ) {
+    void retry() {
+      widget.onFailedToLoadImage?.call(false);
+      final url = pageData.pageUrl?.url;
+      if (url != null &&
+          isTransientMihonImageUrl(url) &&
+          widget.onRefreshMihonPages != null) {
+        widget.onRefreshMihonPages!();
+        return;
+      }
+      state.reLoadImage();
+    }
+
     return GestureDetector(
-      onLongPress: () {
-        state.reLoadImage();
-        widget.onFailedToLoadImage?.call(false);
-      },
-      onTap: () {
-        state.reLoadImage();
-        widget.onFailedToLoadImage?.call(false);
-      },
+      onLongPress: retry,
+      onTap: retry,
       child: Container(
         decoration: BoxDecoration(
           color: context.primaryColor,

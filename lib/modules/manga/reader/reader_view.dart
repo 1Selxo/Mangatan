@@ -94,6 +94,7 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
         }
 
         return MangaChapterPageGallery(
+          key: ObjectKey(model),
           chapter: chapter,
           chapterUrlModel: model,
         );
@@ -317,6 +318,13 @@ class _MangaChapterPageGalleryState
     }
   }
 
+  void _refreshMihonChapterPages() {
+    if (!mounted) return;
+    _failedToLoadImage.value = false;
+    ref.invalidate(getChapterPagesProvider(chapter: chapter));
+    ref.invalidate(mangaReaderProvider(chapter.id));
+  }
+
   // final double _horizontalScaleValue = 1.0;
   bool _isNextChapterPreloading = false;
   int _prefetchSessionId = 0;
@@ -492,6 +500,7 @@ class _MangaChapterPageGalleryState
                                 isHorizontalContinuous &&
                                 readingDirection.isRtl,
                             isScrolling: _isScrolling,
+                            onRefreshMihonPages: _refreshMihonChapterPages,
                           )
                         : Material(
                             color: getBackgroundColor(backgroundColor),
@@ -731,6 +740,7 @@ class _MangaChapterPageGalleryState
           _failedToLoadImage.value = val;
         }
       },
+      onRefreshMihonPages: _refreshMihonChapterPages,
       onLongPressData: (data) {
         ImageActionsDialog.show(
           context: context,

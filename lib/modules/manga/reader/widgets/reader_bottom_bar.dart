@@ -63,6 +63,7 @@ class ReaderBottomBar extends ConsumerWidget {
 
   /// Callback when settings button is pressed
   final VoidCallback onSettingsPressed;
+  final VoidCallback? onPagePreviewsPressed;
 
   /// Provider for watching current reader mode
   /// Accepts any ProviderListenable that returns ReaderMode?
@@ -104,6 +105,7 @@ class ReaderBottomBar extends ConsumerWidget {
     required this.onReadingDirectionChanged,
     this.onPageModeToggle,
     required this.onSettingsPressed,
+    this.onPagePreviewsPressed,
     required this.currentReaderModeProvider,
     required this.currentReadingDirectionProvider,
     required this.currentPageListenable,
@@ -479,6 +481,13 @@ class ReaderBottomBar extends ConsumerWidget {
             tooltip: _pageModeTooltip,
             icon: _pageModeIcon,
           ),
+
+          if (onPagePreviewsPressed != null)
+            IconButton(
+              tooltip: 'Page previews',
+              onPressed: onPagePreviewsPressed,
+              icon: const Icon(Icons.grid_view_outlined),
+            ),
 
           // Settings button
           IconButton(

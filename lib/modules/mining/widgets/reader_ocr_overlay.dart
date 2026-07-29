@@ -38,6 +38,10 @@ class ReaderOcrState {
   );
   static final outlineVisible = ValueNotifier<bool>(false);
   static final lookupOnHover = ValueNotifier<bool>(false);
+  static final engine = ValueNotifier<OcrEnginePreference>(
+    OcrEnginePreference.automatic,
+  );
+  static final parallelOcrLimit = ValueNotifier<int>(1);
   static bool _initialized = false;
   static Future<void>? _initializing;
   static final Set<ReaderOcrController> _controllers = {};
@@ -76,6 +80,8 @@ class ReaderOcrState {
         MiningPreferences.getOcrTextOpacity(),
         MiningPreferences.getOcrOutlineVisible(),
         MiningPreferences.getOcrLookupOnHover(),
+        MiningPreferences.getOcrEngine(),
+        MiningPreferences.getParallelOcrLimit(),
         ReaderLookupTriggerState.initialize(),
       ]);
       enabled.value = values[0] as bool;
@@ -83,6 +89,8 @@ class ReaderOcrState {
       textOpacity.value = values[2] as double;
       outlineVisible.value = values[3] as bool;
       lookupOnHover.value = values[4] as bool;
+      engine.value = values[5] as OcrEnginePreference;
+      parallelOcrLimit.value = values[6] as int;
       _initialized = true;
     } finally {
       _initializing = null;
@@ -133,6 +141,34 @@ class ReaderOcrState {
     lookupOnHover.value = value;
     await MiningPreferences.setOcrLookupOnHover(value);
     if (!value) _dismissHoverPopup();
+  }
+
+  static Future<void> setEngine(OcrEnginePreference value) async {
+    await initialize();
+    if (engine.value == value) return;
+    engine.value = value;
+    await MiningPreferences.setOcrEngine(value);
+    _completedScanKey = null;
+    cancelScan(clearLast: false);
+    for (final controller in _controllers.toList()) {
+      controller._resetPage();
+    }
+    if (enabled.value && _lastScanPages.isNotEmpty) {
+      unawaited(
+        scanChapter(
+          _lastScanPages,
+          startIndex: _lastStartIndex,
+          preparePage: _lastPreparePage,
+        ),
+      );
+    }
+  }
+
+  static Future<void> setParallelOcrLimit(int value) async {
+    await initialize();
+    final clamped = value.clamp(1, 4);
+    parallelOcrLimit.value = clamped;
+    await MiningPreferences.setParallelOcrLimit(clamped);
   }
 
   static bool handlePointerUp(Offset globalPosition) {
@@ -434,9 +470,10 @@ class ReaderOcrState {
     Future<void> Function(UChapDataPreload)? preparePage,
   }) async {
     progress.value = _scanProgress(completed: 0, total: ordered.length);
-    for (var index = 0; index < ordered.length; index += 2) {
+    final batchSize = parallelOcrLimit.value.clamp(1, 4);
+    for (var index = 0; index < ordered.length; index += batchSize) {
       if (generation != _scanGeneration || !enabled.value) return;
-      final end = math.min(index + 2, ordered.length);
+      final end = math.min(index + batchSize, ordered.length);
       await Future.wait(
         ordered.sublist(index, end).map((page) async {
           try {
@@ -456,6 +493,56 @@ class ReaderOcrState {
       _completedScanKey = scanKey;
       progress.value = null;
     }
+  }
+
+  /// Preloads OCR for multiple chapter page lists using the same cache as the
+  /// reader. Chapters are processed concurrently up to the configured limit,
+  /// while pages within each chapter remain ordered to avoid request bursts.
+  static Future<void> preOcrChapters(
+    List<List<UChapDataPreload>> chapters,
+  ) async {
+    await initialize();
+    final queues = chapters
+        .map(
+          (pages) => pages
+              .where((page) => !page.isTransitionPage)
+              .toList(growable: false),
+        )
+        .where((pages) => pages.isNotEmpty)
+        .toList(growable: false);
+    if (queues.isEmpty) return;
+    final generation = ++_scanGeneration;
+    _activeScan = null;
+    _activeScanKey = null;
+    _usingMokuroWebsiteData = false;
+    final total = queues.fold<int>(0, (sum, pages) => sum + pages.length);
+    var completed = 0;
+    var nextChapter = 0;
+    progress.value = _scanProgress(completed: 0, total: total);
+
+    Future<void> worker() async {
+      while (generation == _scanGeneration) {
+        final chapterIndex = nextChapter++;
+        if (chapterIndex >= queues.length) return;
+        for (final page in queues[chapterIndex]) {
+          if (generation != _scanGeneration) return;
+          try {
+            await ReaderOcrController._preload(page);
+          } catch (error) {
+            debugPrint('Pre-OCR page ${page.pageIndex} failed: $error');
+          }
+          if (generation == _scanGeneration) {
+            completed++;
+            progress.value = _scanProgress(completed: completed, total: total);
+          }
+        }
+      }
+    }
+
+    final workerCount = math.min(parallelOcrLimit.value, queues.length);
+    await Future.wait(List.generate(workerCount, (_) => worker()));
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (generation == _scanGeneration) progress.value = null;
   }
 
   static void cancelScan({bool clearLast = true}) {
@@ -635,6 +722,18 @@ class ReaderOcrController extends ChangeNotifier {
   String? _prefetchedLookupKey;
 
   bool get enabled => ReaderOcrState.enabled.value;
+
+  void _resetPage() {
+    _page = null;
+    _paintedBlocks = const [];
+    _activeBlock = null;
+    _activeOffset = -1;
+    _prefetchedLookupKey = null;
+    if (!_disposed) {
+      notifyListeners();
+      unawaited(load());
+    }
+  }
 
   void updateTheme(Color primary) {
     _highlightColor = primary;

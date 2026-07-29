@@ -96,17 +96,19 @@ class ReaderGestureHandler extends StatelessWidget {
       5 => _buildDisabled(context),
       _ => _buildDefault(context),
     };
-    return Listener(
-      onPointerMove: (event) {
-        ReaderOcrState.handleMiddleLookupMove(event.position);
-      },
-      child: MouseRegion(
-        opaque: false,
-        onHover: (event) {
-          unawaited(ReaderOcrState.handleHover(event.position));
+    return _TwoFingerOcrToggle(
+      child: Listener(
+        onPointerMove: (event) {
+          ReaderOcrState.handleMiddleLookupMove(event.position);
         },
-        onExit: (_) => ReaderOcrState.handleHoverExit(),
-        child: zones,
+        child: MouseRegion(
+          opaque: false,
+          onHover: (event) {
+            unawaited(ReaderOcrState.handleHover(event.position));
+          },
+          onExit: (_) => ReaderOcrState.handleHoverExit(),
+          child: zones,
+        ),
       ),
     );
   }
@@ -290,6 +292,79 @@ class ReaderGestureHandler extends StatelessWidget {
   Widget _buildDisabled(BuildContext context) {
     return SizedBox.expand(child: _uiZone());
   }
+}
+
+class _TwoFingerOcrToggle extends StatefulWidget {
+  const _TwoFingerOcrToggle({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_TwoFingerOcrToggle> createState() => _TwoFingerOcrToggleState();
+}
+
+class _TwoFingerOcrToggleState extends State<_TwoFingerOcrToggle> {
+  final Set<int> _pointers = {};
+  final Map<int, Offset> _starts = {};
+  DateTime? _startedAt;
+  bool _candidate = false;
+
+  void _down(PointerDownEvent event) {
+    if (isDesktop) return;
+    _pointers.add(event.pointer);
+    _starts[event.pointer] = event.position;
+    if (_pointers.length == 2) {
+      _candidate = true;
+      _startedAt = DateTime.now();
+    } else if (_pointers.length > 2) {
+      _candidate = false;
+    }
+  }
+
+  void _move(PointerMoveEvent event) {
+    final start = _starts[event.pointer];
+    if (_candidate && start != null && (event.position - start).distance > 24) {
+      _candidate = false;
+    }
+  }
+
+  void _up(PointerUpEvent event) {
+    final shouldToggle =
+        _candidate &&
+        _pointers.length == 2 &&
+        _startedAt != null &&
+        DateTime.now().difference(_startedAt!) <=
+            const Duration(milliseconds: 350);
+    _pointers.remove(event.pointer);
+    _starts.remove(event.pointer);
+    if (shouldToggle) {
+      _candidate = false;
+      unawaited(ReaderOcrState.toggle());
+    }
+    if (_pointers.isEmpty) _reset();
+  }
+
+  void _cancel(PointerCancelEvent event) {
+    _pointers.remove(event.pointer);
+    _starts.remove(event.pointer);
+    _candidate = false;
+    if (_pointers.isEmpty) _reset();
+  }
+
+  void _reset() {
+    _candidate = false;
+    _startedAt = null;
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: _down,
+    onPointerMove: _move,
+    onPointerUp: _up,
+    onPointerCancel: _cancel,
+    child: widget.child,
+  );
 }
 
 /// Individual gesture detector for a zone.

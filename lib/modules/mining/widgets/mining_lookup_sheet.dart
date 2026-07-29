@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_history_sheet.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 
 class MiningLookupSheet extends StatefulWidget {
@@ -52,8 +56,16 @@ class _MiningLookupSheetState extends State<MiningLookupSheet> {
     super.dispose();
   }
 
-  void _lookup() {
+  void _lookup([String? selectedText]) {
+    if (selectedText != null) {
+      _controller.text = selectedText;
+      _controller.selection = TextSelection.collapsed(
+        offset: selectedText.length,
+      );
+    }
     final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    unawaited(MiningPreferences.recordDictionaryLookup(text));
     setState(() => _lookupText = text);
   }
 
@@ -115,6 +127,15 @@ class _MiningLookupSheetState extends State<MiningLookupSheet> {
                         tooltip: 'Lookup',
                         onPressed: _lookup,
                         icon: const Icon(Icons.search),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        tooltip: 'Lookup history',
+                        onPressed: () => DictionaryLookupHistorySheet.show(
+                          context: context,
+                          onSelected: _lookup,
+                        ),
+                        icon: const Icon(Icons.history),
                       ),
                     ],
                   ),

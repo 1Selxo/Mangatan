@@ -21,18 +21,28 @@ class DictionaryPaths {
 
 class InstalledDictionary {
   final String name;
+  final String displayName;
   final bool hasTerms;
   final bool hasFrequencies;
   final bool hasPitch;
   final bool hasKanji;
+  final String? revision;
+  final bool isUpdatable;
+  final String? indexUrl;
+  final String? downloadUrl;
 
   const InstalledDictionary({
     required this.name,
+    String? displayName,
     required this.hasTerms,
     required this.hasFrequencies,
     required this.hasPitch,
     this.hasKanji = false,
-  });
+    this.revision,
+    this.isUpdatable = false,
+    this.indexUrl,
+    this.downloadUrl,
+  }) : displayName = displayName ?? name;
 }
 
 class DictionaryStorage {
@@ -157,6 +167,31 @@ class DictionaryStorage {
     await _writeManifest(directory, manifest);
   }
 
+  Future<void> renameDisplayName(
+    String name,
+    String displayName, {
+    Directory? root,
+  }) async {
+    final value = displayName.trim();
+    if (value.isEmpty) {
+      throw ArgumentError.value(
+        displayName,
+        'displayName',
+        'Must not be empty',
+      );
+    }
+    final directory = root ?? await rootDirectory;
+    final names = await _dictionaryNames(directory);
+    if (!names.contains(name)) {
+      throw StateError('Dictionary "$name" is not installed.');
+    }
+    final manifest = await _readManifest(directory);
+    manifest.putIfAbsent(name, () => <String, dynamic>{})['displayName'] =
+        value;
+    _writeOrder(manifest, names, _orderedNames(names, manifest));
+    await _writeManifest(directory, manifest);
+  }
+
   Future<List<InstalledDictionary>> _installedFromRoot(Directory root) async {
     if (!await root.exists()) return const [];
     final manifest = await _readManifest(root);
@@ -217,13 +252,31 @@ class DictionaryStorage {
     final hasKanjiMarker = File(
       p.join(directory.path, yomitanKanjiDataFileName),
     ).existsSync();
+    final index = _readDictionaryIndex(directory);
     return InstalledDictionary(
       name: name,
+      displayName:
+          metadata?['displayName']?.toString() ?? index?['title']?.toString(),
       hasTerms: metadata?['terms'] as bool? ?? !hasKanjiMarker,
       hasFrequencies: metadata?['frequencies'] as bool? ?? false,
       hasPitch: metadata?['pitch'] as bool? ?? false,
       hasKanji: metadata?['kanji'] as bool? ?? hasKanjiMarker,
+      revision: index?['revision']?.toString(),
+      isUpdatable: index?['isUpdatable'] as bool? ?? false,
+      indexUrl: index?['indexUrl']?.toString(),
+      downloadUrl: index?['downloadUrl']?.toString(),
     );
+  }
+
+  Map<String, dynamic>? _readDictionaryIndex(Directory directory) {
+    final file = File(p.join(directory.path, 'index.json'));
+    if (!file.existsSync()) return null;
+    try {
+      final decoded = jsonDecode(file.readAsStringSync());
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
   }
 
   Future<List<String>> _dictionaryNames(Directory root) async {

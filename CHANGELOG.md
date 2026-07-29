@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Added shared dictionary lookup history to manual, recursive, subtitle, and
+  reader lookups, with quick recall and clear-history controls.
+- Added safe dictionary display-name aliases plus Yomitan-compatible revision
+  checks, manual updates, and configurable automatic dictionary updates.
+- Added selected-chapter pre-OCR, configurable parallel OCR tasks, and OCR
+  engine switching directly inside the manga reader.
+- Added HEIC, HEIF, and JPEG XL discovery and MIME handling for local
+  manga/archive and EPUB content alongside AVIF.
+- Added Chimahon-compatible subtitle cleanup filters for speaker labels,
+  bracketed text, uppercase cues, music markers, multiline merging, and custom
+  regular expressions.
+- Added two-finger OCR toggles for touch manga/video readers, a full-reader
+  E-Ink mode, and an in-reader thumbnail grid for page previews and jumps.
 - Added Chimahon-style YouTube support as a built-in anime source, including
   mixed video/channel/playlist search, direct YouTube URLs, recent searches,
   preferred-quality selection, optional library channel saving, live-stream

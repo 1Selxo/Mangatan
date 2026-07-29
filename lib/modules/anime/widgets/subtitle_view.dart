@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/subtitles/subtitle_regex_filters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -68,6 +69,8 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   @override
   void initState() {
     super.initState();
+    SubtitleRegexFilterState.options.addListener(_filtersChanged);
+    unawaited(SubtitleRegexFilterState.initialize());
     _hideNativeSubtitlePaintSoon();
     _subtitleSubscription = widget.controller.player.stream.subtitle.listen((
       value,
@@ -95,6 +98,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
 
   @override
   void dispose() {
+    SubtitleRegexFilterState.options.removeListener(_filtersChanged);
     _subtitleSubscription?.cancel();
     _trackSubscription?.cancel();
     _nativeSubtitlePaintTimer?.cancel();
@@ -105,6 +109,10 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       unawaited(widget.controller.player.play());
     }
     super.dispose();
+  }
+
+  void _filtersChanged() {
+    if (mounted) setState(_clearHighlight);
   }
 
   bool get _desktopHoverEnabled =>
@@ -434,10 +442,13 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
         final textScaler =
             widget.configuration.textScaler ??
             TextScaler.linear(textScaleFactor);
-        final subtitleText = [
-          for (final line in subtitle)
-            if (line.trim().isNotEmpty) line.trim(),
-        ].join('\n');
+        final subtitleText = applySubtitleRegexFilters(
+          [
+            for (final line in subtitle)
+              if (line.trim().isNotEmpty) line.trim(),
+          ].join('\n'),
+          SubtitleRegexFilterState.options.value,
+        );
         final rawSubtitleStyle = widget.paintSubtitle
             ? style
             : style.copyWith(

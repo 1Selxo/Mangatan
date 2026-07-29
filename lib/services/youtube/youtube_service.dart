@@ -111,6 +111,19 @@ class YouTubeService {
 
   Future<int> prepareVideoForPlayback(YouTubeBrowseItem item) async {
     final video = await _client.videos.get(item.id);
+    return _prepareVideoForPlayback(video);
+  }
+
+  Future<int> prepareVideoUrlForPlayback(String url) async {
+    final videoId = youtube.VideoId.parseVideoId(url);
+    if (videoId == null) {
+      throw ArgumentError.value(url, 'url', 'Not a YouTube video URL');
+    }
+    final video = await _client.videos.get(videoId);
+    return _prepareVideoForPlayback(video);
+  }
+
+  Future<int> _prepareVideoForPlayback(youtube.Video video) async {
     final channelUrl = 'https://www.youtube.com/channel/${video.channelId}';
     var manga = isar.mangas
         .filter()
@@ -140,7 +153,8 @@ class YouTubeService {
         dateAdded: now,
         lastUpdate: now,
       );
-      isar.mangas.putSync(manga);
+      final createdManga = manga;
+      isar.writeTxnSync(() => isar.mangas.putSync(createdManga));
     }
 
     var chapter = isar.chapters
@@ -159,8 +173,11 @@ class YouTubeService {
         description: video.description,
         duration: _formatDuration(video.duration),
       )..manga.value = manga;
-      isar.chapters.putSync(chapter);
-      chapter.manga.saveSync();
+      final createdChapter = chapter;
+      isar.writeTxnSync(() {
+        isar.chapters.putSync(createdChapter);
+        createdChapter.manga.saveSync();
+      });
     }
     return chapter.id!;
   }

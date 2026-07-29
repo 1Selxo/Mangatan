@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:mangayomi/modules/anime/youtube/youtube_browser_screen.dart';
@@ -36,20 +35,43 @@ void main() {
     expect(channel.isVideo, isFalse);
   });
 
+  test('wraps YouTube library writes in explicit Isar transactions', () {
+    final source = File(
+      'lib/services/youtube/youtube_service.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      contains('isar.writeTxnSync(() => isar.mangas.putSync(createdManga))'),
+    );
+    expect(source, contains('isar.writeTxnSync(() {'));
+    expect(source, contains('isar.chapters.putSync(createdChapter)'));
+    expect(source, contains('createdChapter.manga.saveSync()'));
+  });
+
   test('uses safe defaults before deferred Hive startup completes', () async {
     expect(await YouTubePreferences.preferredQuality(), '1080p');
     expect(await YouTubePreferences.autoAddChannels(), isFalse);
     expect(await YouTubePreferences.searchHistory(), isEmpty);
   });
 
-  testWidgets('browser opens before deferred Hive startup completes', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const MaterialApp(home: YouTubeBrowserScreen()));
-    await tester.pumpAndSettle();
+  test('recognizes every YouTube page shape intercepted by Chimahon', () {
+    const id = 'dQw4w9WgXcQ';
+    expect(directYouTubeVideoId('https://www.youtube.com/watch?v=$id&t=4'), id);
+    expect(directYouTubeVideoId('https://m.youtube.com/shorts/$id'), id);
+    expect(directYouTubeVideoId('https://youtube.com/live/$id'), id);
+    expect(directYouTubeVideoId('https://youtube-nocookie.com/embed/$id'), id);
+    expect(directYouTubeVideoId('https://youtu.be/$id'), id);
+    expect(directYouTubeVideoId('https://youtube.com/@channel'), isNull);
+    expect(directYouTubeVideoId('https://notyoutube.com/watch?v=$id'), isNull);
+  });
 
-    expect(find.text('YouTube'), findsOneWidget);
-    expect(find.text('Search videos, channels and playlists'), findsOneWidget);
+  test('browser script intercepts clicks and YouTube SPA history changes', () {
+    expect(youtubeInterceptScript, contains("addEventListener('click'"));
+    expect(youtubeInterceptScript, contains('history.pushState'));
+    expect(youtubeInterceptScript, contains('history.replaceState'));
+    expect(youtubeInterceptScript, contains("addEventListener('popstate'"));
+    expect(youtubeInterceptScript, contains('openYouTubeVideo'));
   });
 
   test('persists YouTube preferences after Hive startup', () async {

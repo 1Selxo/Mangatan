@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/yomitan_language_parser.dart';
+import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
@@ -19,6 +20,7 @@ class HoshidictsLookupBackend {
   static const _directProfileKey = '<direct-rebuild>';
 
   final YomitanLanguageParser _yomitanParser = YomitanLanguageParser();
+  final YomitanKanjiStore _kanjiStore = YomitanKanjiStore();
 
   hoshidicts.HoshiLookupSession? _session;
   Future<hoshidicts.HoshiLookupSession>? _initializing;
@@ -34,22 +36,72 @@ class HoshidictsLookupBackend {
 
   bool get hasSession => _session != null;
 
-  Future<HoshiImportResult> importDictionary({
+  Future<DictionaryImportResult> importDictionary({
     required String zipPath,
     required String outputDir,
     bool lowRam = false,
-  }) {
-    return hoshidicts.importDictionary(
-      zipPath: zipPath,
-      outputDir: outputDir,
-      lowRam: lowRam,
-    );
+  }) async {
+    try {
+      final kanjiArchive = await YomitanKanjiArchive.read(zipPath);
+      if (kanjiArchive == null) {
+        return DictionaryImportResult.fromHoshi(
+          await hoshidicts.importDictionary(
+            zipPath: zipPath,
+            outputDir: outputDir,
+            lowRam: lowRam,
+          ),
+        );
+      }
+      HoshiImportResult? nativeResult;
+      if (kanjiArchive.hasNativeBanks) {
+        if (kanjiArchive.storageName != kanjiArchive.title) {
+          throw const FormatException(
+            'Mixed term/Kanji dictionaries must use a filesystem-safe title.',
+          );
+        }
+        nativeResult = await hoshidicts.importDictionary(
+          zipPath: zipPath,
+          outputDir: outputDir,
+          lowRam: lowRam,
+        );
+        if (!nativeResult.success) {
+          return DictionaryImportResult.fromHoshi(nativeResult);
+        }
+      }
+      await kanjiArchive.persist(outputDir);
+      return DictionaryImportResult(
+        success: true,
+        title: kanjiArchive.storageName,
+        termCount: nativeResult?.termCount ?? BigInt.zero,
+        metaCount: nativeResult?.metaCount ?? BigInt.zero,
+        freqCount: nativeResult?.freqCount ?? BigInt.zero,
+        pitchCount: nativeResult?.pitchCount ?? BigInt.zero,
+        mediaCount: nativeResult?.mediaCount ?? BigInt.zero,
+        kanjiCount: BigInt.from(
+          kanjiArchive.entries.length + kanjiArchive.frequencies.length,
+        ),
+        errors: nativeResult?.errors ?? const [],
+      );
+    } catch (error) {
+      return DictionaryImportResult(
+        success: false,
+        title: '',
+        termCount: BigInt.zero,
+        metaCount: BigInt.zero,
+        freqCount: BigInt.zero,
+        pitchCount: BigInt.zero,
+        mediaCount: BigInt.zero,
+        kanjiCount: BigInt.zero,
+        errors: [error.toString()],
+      );
+    }
   }
 
   Future<void> rebuildQuery({
     required List<String> termPaths,
     List<String> freqPaths = const [],
     List<String> pitchPaths = const [],
+    List<String> kanjiPaths = const [],
   }) async {
     await _enqueueQuery(() async {
       final pending = _initializing;
@@ -61,6 +113,7 @@ class HoshidictsLookupBackend {
         termPaths: termPaths,
         freqPaths: freqPaths,
         pitchPaths: pitchPaths,
+        kanjiPaths: kanjiPaths,
       );
       // A direct rebuild has always remained active until an explicit reload.
       // Profile-less operations preserve it; an explicitly supplied profile
@@ -123,6 +176,21 @@ class HoshidictsLookupBackend {
     );
     _lookupsInFlight[request] = lookup;
     return lookup;
+  }
+
+  Future<List<HoshiLookupResult>> lookupKanji(
+    String text, {
+    DictionaryProfile? profile,
+  }) async {
+    final query = text.trim();
+    if (query.isEmpty) return const [];
+    final preserveDirectConfiguration = profile == null;
+    final resolvedProfile =
+        profile ?? await MiningPreferences.getActiveDictionaryProfile();
+    return _enqueueQuery(() async {
+      await _ensureSession(resolvedProfile, preserveDirectConfiguration);
+      return List<HoshiLookupResult>.unmodifiable(_kanjiStore.lookup(query));
+    });
   }
 
   Future<List<HoshiDictionaryStyle>> getStyles({
@@ -234,6 +302,7 @@ class HoshidictsLookupBackend {
       termPaths: paths.termPaths,
       freqPaths: paths.frequencyPaths,
       pitchPaths: paths.pitchPaths,
+      kanjiPaths: paths.kanjiPaths,
     );
     _configuredProfileKey = profileKey;
     return session;
@@ -243,6 +312,7 @@ class HoshidictsLookupBackend {
     required List<String> termPaths,
     required List<String> freqPaths,
     required List<String> pitchPaths,
+    List<String> kanjiPaths = const [],
   }) async {
     final session = _session ??= await hoshidicts.createLookupSession();
     await hoshidicts.rebuildQuery(
@@ -251,6 +321,7 @@ class HoshidictsLookupBackend {
       freqPaths: freqPaths,
       pitchPaths: pitchPaths,
     );
+    await _kanjiStore.configure(kanjiPaths);
     _configured = true;
     return session;
   }

@@ -373,14 +373,48 @@ function buildFuriganaEl(parent, expression, reading) {
     const segments = segmentFurigana(expression, reading);
     for (const [text, furigana] of segments) {
         if (furigana) {
-            const ruby = el('ruby', {}, [text]);
+            const ruby = el('ruby');
+            appendExpressionText(ruby, text);
             ruby.appendChild(el('rt', { textContent: furigana }));
             parent.appendChild(ruby);
         } else {
-            parent.appendChild(document.createTextNode(text));
+            appendExpressionText(parent, text);
         }
     }
     return segments.length === 1 && segments[0][1];
+}
+
+function isKanjiCharacter(character) {
+    const code = character.codePointAt(0);
+    return character === '\u3005' ||
+        (code >= 0x3400 && code <= 0x4dbf) ||
+        (code >= 0x4e00 && code <= 0x9fff) ||
+        (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0x20000 && code <= 0x2ffff) ||
+        (code >= 0x30000 && code <= 0x323af);
+}
+
+function appendExpressionText(parent, text) {
+    for (const character of [...text]) {
+        if (!isKanjiCharacter(character)) {
+            parent.appendChild(document.createTextNode(character));
+            continue;
+        }
+        const link = el('button', {
+            className: 'kanji-link',
+            type: 'button',
+            textContent: character,
+            title: `Look up ${character}`
+        });
+        link.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (hasPopupTextSelection()) return;
+            const count = await webkit.messageHandlers.kanjiLookup.postMessage(character);
+            if (count > 0) redirect(count);
+        });
+        parent.appendChild(link);
+    }
 }
 
 function constructFuriganaPlain(expression, reading) {
@@ -1618,7 +1652,7 @@ function createEntryHeader(entry, idx) {
     if (reading && reading !== expression) {
         needsScroll = buildFuriganaEl(expressionSpan, expression, reading);
     } else {
-        expressionSpan.textContent = expression;
+        appendExpressionText(expressionSpan, expression);
     }
     if (needsScroll) {
         const expressionScroll = el('div', { className: 'expression-scroll' });
@@ -1659,6 +1693,104 @@ function createEntryHeader(entry, idx) {
     requestAnimationFrame(reportButtonRects);
     
     return header;
+}
+
+function createKanjiTags(tags, dictionary) {
+    const container = el('div', { className: 'kanji-tags' });
+    container.appendChild(el('span', {
+        className: 'kanji-tag kanji-dictionary-tag',
+        textContent: dictionary
+    }));
+    for (const tag of tags || []) {
+        container.appendChild(el('span', {
+            className: 'kanji-tag',
+            textContent: tag.content || tag.name,
+            title: tag.name || ''
+        }));
+    }
+    return container;
+}
+
+function createKanjiList(items, className) {
+    const list = el('ul', { className });
+    for (const item of items || []) {
+        list.appendChild(el('li', { textContent: item }));
+    }
+    return list;
+}
+
+function createKanjiStatGroup(title, stats) {
+    if (!Array.isArray(stats) || stats.length === 0) return null;
+    const section = el('section', { className: 'kanji-info-section kanji-stat-section' });
+    section.appendChild(el('h3', { className: 'kanji-info-title', textContent: title }));
+    const list = el('dl', { className: 'kanji-stat-list' });
+    for (const stat of stats) {
+        list.appendChild(el('dt', { textContent: stat.content || stat.name }));
+        list.appendChild(el('dd', { textContent: stat.value }));
+    }
+    section.appendChild(list);
+    return section;
+}
+
+function createKanjiEntry(entry) {
+    const root = el('div', { className: 'entry kanji-entry' });
+    const header = el('div', { className: 'kanji-entry-header' });
+    header.appendChild(el('span', {
+        className: 'kanji-glyph',
+        textContent: entry.character || entry.expression
+    }));
+    header.appendChild(createKanjiTags(entry.tags, entry.dictionary));
+    root.appendChild(header);
+
+    if (entry.frequencies?.length) {
+        const frequencyList = el('div', { className: 'kanji-frequency-list' });
+        for (const frequency of entry.frequencies) {
+            const value = frequency.displayValue ?? frequency.value;
+            frequencyList.appendChild(el('span', {
+                className: 'kanji-frequency',
+                title: frequency.dictionary,
+                textContent: `${frequency.dictionary}: ${value}`
+            }));
+        }
+        root.appendChild(frequencyList);
+    }
+
+    const overview = el('div', { className: 'kanji-overview' });
+    if (entry.definitions?.length) {
+        const meanings = el('section', { className: 'kanji-info-section kanji-meanings' });
+        meanings.appendChild(el('h3', { className: 'kanji-info-title', textContent: 'Meaning' }));
+        meanings.appendChild(createKanjiList(entry.definitions, 'kanji-gloss-list'));
+        overview.appendChild(meanings);
+    }
+
+    if (entry.onyomi?.length || entry.kunyomi?.length) {
+        const readings = el('section', { className: 'kanji-info-section kanji-readings' });
+        readings.appendChild(el('h3', { className: 'kanji-info-title', textContent: 'Readings' }));
+        if (entry.onyomi?.length) {
+            readings.appendChild(el('h4', { textContent: 'Onyomi' }));
+            readings.appendChild(createKanjiList(entry.onyomi, 'kanji-reading-list kanji-readings-chinese'));
+        }
+        if (entry.kunyomi?.length) {
+            readings.appendChild(el('h4', { textContent: 'Kunyomi' }));
+            readings.appendChild(createKanjiList(entry.kunyomi, 'kanji-reading-list kanji-readings-japanese'));
+        }
+        overview.appendChild(readings);
+    }
+
+    const misc = createKanjiStatGroup('Statistics', entry.stats?.misc);
+    if (misc) overview.appendChild(misc);
+    if (overview.childElementCount) root.appendChild(overview);
+
+    const fullWidthGroups = [
+        ['Classifications', entry.stats?.class],
+        ['Codepoints', entry.stats?.code],
+        ['Dictionary Indices', entry.stats?.index]
+    ];
+    for (const [title, stats] of fullWidthGroups) {
+        const group = createKanjiStatGroup(title, stats);
+        if (group) root.appendChild(group);
+    }
+    return root;
 }
 
 function initialOpenDictionaries(dictNames) {
@@ -1936,6 +2068,12 @@ window.renderPopup = function() {
                 container.appendChild(document.createElement('hr'));
             }
             
+            if (entry.type === 'mangatan-yomitan-kanji-v1') {
+                container.appendChild(createKanjiEntry(entry));
+                if (idx > 0) await new Promise(r => requestAnimationFrame(r));
+                continue;
+            }
+
             const entryDiv = el('div', { className: 'entry' });
             entryDiv.appendChild(createEntryHeader(entry, idx));
             

@@ -156,6 +156,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
           termCount: imported.termCount,
           frequencyCount: imported.freqCount,
           pitchCount: imported.pitchCount,
+          kanjiCount: imported.kanjiCount,
         );
         importedNames.add(imported.title);
       }
@@ -1988,6 +1989,7 @@ class _DictionaryListTile extends StatelessWidget {
       if (dictionary.hasTerms) 'Terms',
       if (dictionary.hasFrequencies) 'Frequency',
       if (dictionary.hasPitch) 'Pitch',
+      if (dictionary.hasKanji) 'Kanji',
     ];
     return ListTile(
       leading: Row(

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
+import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
@@ -51,6 +52,31 @@ void main() {
 
     expect(paths.termPaths, isEmpty);
     expect(paths.frequencyPaths, [dictionary.path]);
+  });
+
+  test('routes Kanji-only dictionaries outside the term query', () async {
+    final root = await Directory.systemTemp.createTemp('dictionary-storage-');
+    addTearDown(() => root.delete(recursive: true));
+    final dictionary = await _createDictionary(root, 'Kanji');
+    await File(
+      p.join(dictionary.path, yomitanKanjiDataFileName),
+    ).writeAsString('{}');
+
+    await DictionaryStorage.instance.recordImport(
+      name: 'Kanji',
+      termCount: BigInt.zero,
+      frequencyCount: BigInt.zero,
+      pitchCount: BigInt.zero,
+      kanjiCount: BigInt.one,
+      root: root,
+    );
+
+    final paths = await DictionaryStorage.instance.paths(root: root);
+    final installed = await DictionaryStorage.instance.installed(root: root);
+
+    expect(paths.termPaths, isEmpty);
+    expect(paths.kanjiPaths, [dictionary.path]);
+    expect(installed.single.hasKanji, isTrue);
   });
 
   test('orders installed dictionaries from persisted manifest order', () async {

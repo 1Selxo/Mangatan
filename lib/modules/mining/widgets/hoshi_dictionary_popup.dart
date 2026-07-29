@@ -13,6 +13,7 @@ import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
@@ -388,6 +389,19 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     return _entries.length;
   }
 
+  Future<int> _lookupKanjiRedirect(String character) async {
+    final generation = ++_lookupGeneration;
+    final results = await HoshidictsLookupBackend.instance.lookupKanji(
+      character,
+      profile: widget.profile,
+    );
+    if (!mounted || generation != _lookupGeneration) return 0;
+    _setResults(results, dictionaryMediaData: const {});
+    _resultQuery = character;
+    _renderedQuery = character;
+    return _entries.length;
+  }
+
   Future<bool> _isDuplicate(String expression) async {
     if (defaultTargetPlatform == TargetPlatform.iOS) return false;
     try {
@@ -613,6 +627,12 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       handlerName: 'lookupRedirect',
       callback: (arguments) =>
           _lookupRedirect(arguments.isEmpty ? '' : arguments.first.toString()),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'kanjiLookup',
+      callback: (arguments) => _lookupKanjiRedirect(
+        arguments.isEmpty ? '' : arguments.first.toString(),
+      ),
     );
     controller.addJavaScriptHandler(
       handlerName: 'textSelected',
@@ -1020,6 +1040,25 @@ Future<Map<String, Map<String, String>>> hoshiPopupMediaDataUris(
 
 Map<String, dynamic> hoshiPopupEntry(HoshiLookupResult result) {
   final term = result.term;
+  if (term.glossaries.length == 1) {
+    try {
+      final content = jsonDecode(term.glossaries.single.glossary);
+      if (content is Map<String, dynamic> &&
+          content['type'] == yomitanKanjiContentType) {
+        return {
+          ...content,
+          'expression': term.expression,
+          'reading': term.reading,
+          'matched': result.matched,
+          'glossaries': const [],
+          'pitches': const [],
+          'rules': const [],
+        };
+      }
+    } on FormatException {
+      // Normal plain-text glossary.
+    }
+  }
   return {
     'expression': term.expression,
     'reading': term.reading,
@@ -1114,6 +1153,7 @@ String buildHoshiPopupHtml({
   const nativeHandlers = [
     'getEntries',
     'lookupRedirect',
+    'kanjiLookup',
     'textSelected',
     'dismissPopup',
     'mineEntry',
@@ -1143,6 +1183,9 @@ String buildHoshiPopupHtml({
       --text-color-light3: $muted3;
       --text-color-light4: $muted4;
       --accent-color: $primary;
+      --link-color: $primary;
+      --primary-container: $primaryContainer;
+      --on-primary-container: $onPrimaryContainer;
       --freq-tag-color: $primary;
       --pitch-tag-color: $primary;
       --expr-tag-color: $primaryContainer;
@@ -1153,6 +1196,8 @@ String buildHoshiPopupHtml({
     body { min-height: 101%; }
 	    .entry, .entry * { color: var(--text-color); }
 	    .dict-label, .deinflection-tag, .glossary-tag { color: var(--text-color-light1); }
+	    .kanji-tag, .kanji-info-title, .kanji-stat-list dt, .kanji-readings h4 { color: var(--text-color-light1); }
+	    .kanji-dictionary-tag { color: var(--on-primary-container); }
 	    .glossary-group {
 	      background-color: $elevated;
 	      color: var(--text-color);

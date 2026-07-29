@@ -66,6 +66,29 @@ void main() {
     });
   });
 
+  group('localLibraryPathKey', () {
+    test('keeps Windows drive roots distinct', () {
+      expect(
+        localLibraryPathKey(r'C:\Users\me\Mangatan\local\Title'),
+        isNot(localLibraryPathKey(r'D:\JP\Mangatan\local\Title')),
+      );
+    });
+
+    test('normalizes Windows separators, casing, and dot segments', () {
+      expect(
+        localLibraryPathKey(r'D:\JP\Mangatan\local\Title\.\Chapter.cbz'),
+        localLibraryPathKey(r'd:/jp/mangatan/local/title/Chapter.cbz'),
+      );
+    });
+
+    test('does not alias identical title names in separate custom roots', () {
+      expect(
+        localLibraryPathKey(r'D:\Manga\local\Title'),
+        isNot(localLibraryPathKey(r'E:\Other Library\Title')),
+      );
+    });
+  });
+
   test(
     'localArchiveName handles desktop separators and uppercase extensions',
     () {

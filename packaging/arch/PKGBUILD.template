@@ -28,6 +28,7 @@ depends=(
   'mpv'
   'pango'
   'webkit2gtk-4.1'
+  'xdg-user-dirs'
   'xdg-utils'
   'zlib-ng-compat'
 )

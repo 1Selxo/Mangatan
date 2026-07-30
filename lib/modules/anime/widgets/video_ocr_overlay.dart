@@ -24,6 +24,20 @@ class VideoOcrResult {
   final List<OcrTextBlock> blocks;
 }
 
+class VideoOcrFrame {
+  const VideoOcrFrame({required this.bytes, required this.position});
+
+  final Uint8List bytes;
+  final Duration position;
+}
+
+typedef VideoOcrMiningContextBuilder =
+    Future<MiningContext> Function(
+      String text,
+      Uint8List imageBytes,
+      Duration? position,
+    );
+
 Future<VideoOcrResult> recognizeVideoFrame(
   Uint8List bytes, {
   String? language,
@@ -74,14 +88,16 @@ class VideoOcrOverlay extends StatefulWidget {
   const VideoOcrOverlay({
     super.key,
     required this.imageBytes,
+    required this.imagePosition,
     required this.fit,
     required this.miningContextBuilder,
     required this.onDismiss,
   });
 
   final Uint8List imageBytes;
+  final Duration? imagePosition;
   final BoxFit fit;
-  final Future<MiningContext> Function(String text) miningContextBuilder;
+  final VideoOcrMiningContextBuilder miningContextBuilder;
   final VoidCallback onDismiss;
 
   @override
@@ -93,6 +109,7 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
   Object? _error;
   _VideoOcrSelection? _selection;
   DictionaryPopupHandle? _popup;
+  MiningContext? _frameMiningContext;
 
   @override
   void initState() {
@@ -103,7 +120,11 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
 
   Future<void> _recognize() async {
     try {
-      final miningContext = await widget.miningContextBuilder('');
+      final miningContext = await widget.miningContextBuilder(
+        '',
+        widget.imageBytes,
+        widget.imagePosition,
+      );
       final profile = await DictionaryProfileResolver.resolveMiningContext(
         miningContext,
       );
@@ -113,7 +134,10 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
         language: language,
       );
       if (!mounted) return;
-      setState(() => _result = result);
+      setState(() {
+        _frameMiningContext = miningContext;
+        _result = result;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error);
@@ -123,6 +147,7 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
   @override
   void dispose() {
     _popup?.dismiss();
+    unawaited(_frameMiningContext?.sceneCapture?.dispose());
     super.dispose();
   }
 
@@ -144,7 +169,18 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
     if (selection.text.isEmpty) return;
     _popup?.dismiss();
     setState(() => _selection = selection);
-    final miningContext = widget.miningContextBuilder(block.text);
+    final resolvedMiningContext =
+        _frameMiningContext?.copyWith(sentence: block.text) ??
+        await widget.miningContextBuilder(
+          block.text,
+          widget.imageBytes,
+          widget.imagePosition,
+        );
+    if (!mounted || !context.mounted) {
+      await resolvedMiningContext.sceneCapture?.dispose();
+      return;
+    }
+    final miningContext = Future.value(resolvedMiningContext);
     final prefetch = DictionaryLookupPopup.prefetch(
       selection.text,
       miningContext: miningContext,
@@ -340,9 +376,9 @@ class LiveVideoOcrOverlay extends StatefulWidget {
     required this.onDismiss,
   });
 
-  final Future<Uint8List?> Function() imageBytesLoader;
+  final Future<VideoOcrFrame?> Function() imageBytesLoader;
   final BoxFit fit;
-  final Future<MiningContext> Function(String text) miningContextBuilder;
+  final VideoOcrMiningContextBuilder miningContextBuilder;
   final VoidCallback onDismiss;
 
   @override
@@ -359,6 +395,8 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
   String _lastSignature = '';
   _VideoOcrSelection? _selection;
   DictionaryPopupHandle? _popup;
+  VideoOcrFrame? _recognizedFrame;
+  MiningContext? _recognizedMiningContext;
 
   @override
   void initState() {
@@ -372,6 +410,7 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
   void dispose() {
     _timer?.cancel();
     _popup?.dismiss();
+    unawaited(_recognizedMiningContext?.sceneCapture?.dispose());
     super.dispose();
   }
 
@@ -383,28 +422,42 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
       _scanning = true;
     }
     try {
-      final miningContext = await widget.miningContextBuilder('');
+      final frame = await widget.imageBytesLoader();
+      if (frame == null || frame.bytes.isEmpty) return;
+      final miningContext = await widget.miningContextBuilder(
+        '',
+        frame.bytes,
+        frame.position,
+      );
       final profile = await DictionaryProfileResolver.resolveMiningContext(
         miningContext,
       );
-      final bytes = await widget.imageBytesLoader();
-      if (bytes == null || bytes.isEmpty) return;
       final result = await recognizeVideoFrame(
-        bytes,
+        frame.bytes,
         language: profileOcrLanguage(profile.languageCode),
       );
       if (!mounted) return;
       final signature = result.blocks.map((block) => block.text).join('\n');
-      if (signature == _lastSignature && _error == null) return;
+      if (signature == _lastSignature && _error == null) {
+        final previous = _recognizedMiningContext;
+        _recognizedFrame = frame;
+        _recognizedMiningContext = miningContext;
+        unawaited(previous?.sceneCapture?.dispose());
+        return;
+      }
+      final previous = _recognizedMiningContext;
       setState(() {
         _lastSignature = signature;
         _result = result;
+        _recognizedFrame = frame;
+        _recognizedMiningContext = miningContext;
         _error = null;
         if (signature.isEmpty) {
           _popup?.dismiss();
           _selection = null;
         }
       });
+      unawaited(previous?.sceneCapture?.dispose());
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error);
@@ -435,7 +488,20 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
     if (selection.text.isEmpty) return;
     _popup?.dismiss();
     setState(() => _selection = selection);
-    final miningContext = widget.miningContextBuilder(block.text);
+    final frame = _recognizedFrame;
+    if (frame == null) return;
+    final resolvedMiningContext =
+        _recognizedMiningContext?.copyWith(sentence: block.text) ??
+        await widget.miningContextBuilder(
+          block.text,
+          frame.bytes,
+          frame.position,
+        );
+    if (!mounted || !context.mounted) {
+      await resolvedMiningContext.sceneCapture?.dispose();
+      return;
+    }
+    final miningContext = Future.value(resolvedMiningContext);
     final prefetch = DictionaryLookupPopup.prefetch(
       selection.text,
       miningContext: miningContext,

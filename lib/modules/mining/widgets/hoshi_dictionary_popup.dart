@@ -122,6 +122,8 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   List<Map<String, dynamic>> _entries = const [];
   Map<String, Map<String, String>> _dictionaryMediaData = const {};
   bool _exporting = false;
+  AnkiExportJobController? _activeExportJob;
+  StreamSubscription<AnkiExportJobState>? _exportJobSubscription;
   bool _webReady = false;
   int _lookupGeneration = 0;
   int _cachedMatchNotificationGeneration = 0;
@@ -490,6 +492,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
     }
     if (result == null || _exporting) return false;
+    final selectedResult = result;
     setState(() => _exporting = true);
     try {
       final miningContext = await widget.miningContext;
@@ -502,67 +505,86 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       }
 
       MiningContext effectiveContext = miningContext;
-      final cropEnabled = await MiningPreferences.getCropImageBeforeMining();
-
-      // NEW: Only trigger the crop dialog if the media type is explicitly Manga
       final isManga = effectiveContext.mediaType == MiningMediaType.manga;
-
-      // Intercept image load to crop if preference is enabled AND we are reading manga
-      if (cropEnabled && isManga && effectiveContext.imageBytesLoader != null) {
-        final rawBytes = await effectiveContext.imageBytesLoader!();
-        if (rawBytes != null && rawBytes.isNotEmpty) {
-          if (!mounted) return false;
-
-          final croppedBytes = await _showCropDialog(
-            context: context,
-            imageBytes: rawBytes,
-          );
-
-          if (croppedBytes != null) {
-            // Override the image bytes loader for AnkiCardBuilder
-            effectiveContext = effectiveContext.copyWith(
-              imageBytesLoader: () => croppedBytes,
+      if (dictionaryProfile.screenshotMode == AnkiScreenshotMode.crop &&
+          isManga &&
+          effectiveContext.imageBytesLoader != null) {
+        final originalLoader = effectiveContext.imageBytesLoader!;
+        effectiveContext = effectiveContext.copyWith(
+          imageBytesLoader: () async {
+            final rawBytes = await originalLoader();
+            if (rawBytes == null || rawBytes.isEmpty || !mounted) return null;
+            final cropped = await _showCropDialog(
+              context: context,
+              imageBytes: rawBytes,
             );
-          } else {
-            // User cancelled cropping, abort mining
-            return false;
-          }
-        }
+            if (cropped == null) throw const AnkiExportCancelledException();
+            return cropped;
+          },
+        );
       }
 
-      final dictionaryMedia = await _loadAnkiDictionaryMedia(
-        content['dictionaryMedia'],
-      );
-      final audioPreferences =
-          await MiningPreferences.getAnkiAudioPreferences();
-      final wordAudio = await AnkiAudioService().fetchTermAudio(
-        term: result.term.expression,
-        reading: result.term.reading,
-        preferences: audioPreferences,
-      );
-      final draft = await const AnkiCardBuilder().build(
-        result: result,
-        context: effectiveContext, // Use the cropped effectiveContext
-        profile: profile,
-        renderedContent: content,
-        dictionaryMedia: dictionaryMedia,
-        wordAudio: wordAudio,
-      );
       final allowDuplicate =
           !profile.duplicateCheck ||
           content['allowDuplicate'] == true ||
           dictionaryProfile.duplicateAction == 'allow';
       if (await _usesAnkiMobile()) {
+        final dictionaryMedia = await _loadAnkiDictionaryMedia(
+          content['dictionaryMedia'],
+        );
+        final audioPreferences =
+            await MiningPreferences.getAnkiAudioPreferences();
+        final wordAudio = await AnkiAudioService().fetchTermAudio(
+          term: selectedResult.term.expression,
+          reading: selectedResult.term.reading,
+          preferences: audioPreferences,
+        );
+        final draft = await const AnkiCardBuilder().build(
+          result: selectedResult,
+          context: effectiveContext,
+          profile: profile,
+          renderedContent: content,
+          dictionaryMedia: dictionaryMedia,
+          wordAudio: wordAudio,
+          screenshotMode:
+              dictionaryProfile.screenshotMode ==
+                  AnkiScreenshotMode.noScreenshot
+              ? AnkiScreenshotMode.noScreenshot
+              : AnkiScreenshotMode.full,
+        );
         await AnkiMobileService().exportDraft(
           draft,
           allowDuplicate: allowDuplicate,
         );
       } else {
-        final noteId =
+        final pending = await const AnkiCardBuilder().buildPending(
+          result: selectedResult,
+          context: effectiveContext,
+          profile: profile,
+          screenshotMode: dictionaryProfile.screenshotMode,
+          renderedContent: content,
+          dictionaryMediaLoader: () =>
+              _loadAnkiDictionaryMedia(content['dictionaryMedia']),
+          wordAudioLoader: () async {
+            final audioPreferences =
+                await MiningPreferences.getAnkiAudioPreferences();
+            return AnkiAudioService().fetchTermAudio(
+              term: selectedResult.term.expression,
+              reading: selectedResult.term.reading,
+              preferences: audioPreferences,
+            );
+          },
+        );
+        _activeExportJob = pending.jobController;
+        await _exportJobSubscription?.cancel();
+        _exportJobSubscription = _activeExportJob?.states.listen((_) {
+          if (mounted) setState(() {});
+        });
+        final export =
             await AnkiConnectService(
               endpoint: await MiningPreferences.getAnkiEndpoint(),
-            ).exportDraft(
-              draft,
+            ).exportPending(
+              pending,
               duplicateCheck: profile.duplicateCheck,
               allowDuplicate: allowDuplicate,
               duplicateScope: profile.duplicateScope,
@@ -570,7 +592,10 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
               checkAllModels: profile.checkAllModels,
               syncOnCreate: profile.syncOnCreate,
             );
-        botToast('Added to Anki (#$noteId)', second: 3);
+        final warning = export.warnings.isEmpty
+            ? ''
+            : '\n${export.warnings.join('\n')}';
+        botToast('Added to Anki (#${export.noteId})$warning', second: 5);
       }
       await AnkiStatsRecorder.recordCard(
         context: effectiveContext,
@@ -580,10 +605,15 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);
       return false;
+    } on AnkiExportCancelledException {
+      return false;
     } catch (error) {
       botToast('Anki export failed: $error', second: 5);
       return false;
     } finally {
+      await _exportJobSubscription?.cancel();
+      _exportJobSubscription = null;
+      _activeExportJob = null;
       if (mounted) setState(() => _exporting = false);
     }
   }
@@ -876,6 +906,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   void dispose() {
     widget.controller?._detach(this);
     _audioPlayer?.dispose();
+    _exportJobSubscription?.cancel();
     super.dispose();
   }
 
@@ -916,46 +947,77 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
             }
           },
           onPointerPanZoomUpdate: (event) => _scrollPopupBy(event.panDelta),
-          child: InAppWebView(
-            key: ValueKey(_documentRevision),
-            webViewEnvironment: webViewEnvironment,
-            initialData: InAppWebViewInitialData(
-              data: data.html,
-              baseUrl: WebUri('https://hoshi-popup.local/'),
-            ),
-            initialSettings: InAppWebViewSettings(
-              transparentBackground: true,
-              resourceCustomSchemes: _usesStableCustomSchemes
-                  ? const ['image']
-                  : const [],
-              supportZoom: false,
-              disableHorizontalScroll: true,
-              horizontalScrollBarEnabled: false,
-              verticalScrollBarEnabled: true,
-              isInspectable: kDebugMode,
-            ),
-            onWebViewCreated: (controller) {
-              _controller = controller;
-              _registerHandlers(controller);
-            },
-            onLoadStop: (_, _) async {
-              _webReady = true;
-              await _render(await _stylesFuture);
-              _renderedQuery = _resultQuery;
-              if (_resultQuery == widget.text.trim() && _results.isNotEmpty) {
-                widget.onMatchChanged(_results.first.matched.length);
-              }
-              if (_requestedQuery != widget.text.trim()) {
-                await _lookupAndRender(
-                  widget.text,
-                  notifyMatch: true,
-                  initialResults: widget.initialResults,
-                );
-              }
-            },
-            onLoadResourceWithCustomScheme: _usesStableCustomSchemes
-                ? (_, request) => _loadDictionaryMedia(request)
-                : null,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              InAppWebView(
+                key: ValueKey(_documentRevision),
+                webViewEnvironment: webViewEnvironment,
+                initialData: InAppWebViewInitialData(
+                  data: data.html,
+                  baseUrl: WebUri('https://hoshi-popup.local/'),
+                ),
+                initialSettings: InAppWebViewSettings(
+                  transparentBackground: true,
+                  resourceCustomSchemes: _usesStableCustomSchemes
+                      ? const ['image']
+                      : const [],
+                  supportZoom: false,
+                  disableHorizontalScroll: true,
+                  horizontalScrollBarEnabled: false,
+                  verticalScrollBarEnabled: true,
+                  isInspectable: kDebugMode,
+                ),
+                onWebViewCreated: (controller) {
+                  _controller = controller;
+                  _registerHandlers(controller);
+                },
+                onLoadStop: (_, _) async {
+                  _webReady = true;
+                  await _render(await _stylesFuture);
+                  _renderedQuery = _resultQuery;
+                  if (_resultQuery == widget.text.trim() &&
+                      _results.isNotEmpty) {
+                    widget.onMatchChanged(_results.first.matched.length);
+                  }
+                  if (_requestedQuery != widget.text.trim()) {
+                    await _lookupAndRender(
+                      widget.text,
+                      notifyMatch: true,
+                      initialResults: widget.initialResults,
+                    );
+                  }
+                },
+                onLoadResourceWithCustomScheme: _usesStableCustomSchemes
+                    ? (_, request) => _loadDictionaryMedia(request)
+                    : null,
+              ),
+              if (_activeExportJob?.state case final state?
+                  when state != AnkiExportJobState.idle)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: FilledButton.tonalIcon(
+                      onPressed: state == AnkiExportJobState.preparing
+                          ? _activeExportJob?.cancel
+                          : null,
+                      icon: state == AnkiExportJobState.preparing
+                          ? const Icon(Icons.close, size: 18)
+                          : const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                      label: Text(
+                        state == AnkiExportJobState.preparing
+                            ? 'Preparing… Cancel'
+                            : 'Committing…',
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },

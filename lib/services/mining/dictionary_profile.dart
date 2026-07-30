@@ -1,4 +1,5 @@
 import 'package:mangayomi/services/mining/anki_markers.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 
 /// A Chimahon-compatible language profile. Dictionary order, enabled state,
 /// lookup language, and Anki mining configuration move together when profiles
@@ -49,6 +50,9 @@ class DictionaryProfile {
   final Map<String, String> dictionaryDisplayModes;
   final String duplicateAction;
   final String cropMode;
+
+  AnkiScreenshotMode get screenshotMode =>
+      AnkiScreenshotMode.fromWireValue(cropMode);
 
   bool isDictionaryEnabled(String name) =>
       enabledDictionaries.isEmpty || enabledDictionaries.contains(name);

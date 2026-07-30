@@ -26,6 +26,20 @@ void main() {
     expect(timing.end, const Duration(seconds: 245, milliseconds: 250));
   });
 
+  test('applies subtitle speed before delay exactly once', () {
+    final timing = subtitleAudioTimingForCue(
+      subtitleStart: const Duration(seconds: 10),
+      subtitleEnd: const Duration(seconds: 12),
+      currentPosition: const Duration(seconds: 22),
+      subtitleSpeed: 2,
+      subtitleDelay: const Duration(seconds: 1),
+      padding: Duration.zero,
+    );
+
+    expect(timing.start, const Duration(seconds: 21));
+    expect(timing.end, const Duration(seconds: 25));
+  });
+
   test(
     'uses a bounded current-position fallback when cue timing is absent',
     () {
@@ -55,7 +69,7 @@ void main() {
       outputPath: '/tmp/sentence.mp3',
     );
 
-    expect(timing.duration, const Duration(seconds: 35));
+    expect(timing.duration, const Duration(seconds: 30));
     expect(
       args,
       containsAllInOrder([

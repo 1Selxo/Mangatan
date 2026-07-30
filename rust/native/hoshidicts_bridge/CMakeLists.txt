@@ -51,6 +51,8 @@ set(HOSHIDICTS_KANJI_MAPPING_HEADER "${HOSHIDICTS_GENERATED_DIR}/hoshidicts_full
 file(MAKE_DIRECTORY "${HOSHIDICTS_GENERATED_DIR}")
 file(WRITE "${HOSHIDICTS_RANGES_TO_HEADER}"
     "#pragma once\n"
+    "#include <climits>\n"
+    "#include <cstdint>\n"
     "#include <ranges>\n"
     "#include <vector>\n"
     "#ifndef __cpp_lib_ranges_to_container\n"

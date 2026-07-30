@@ -430,6 +430,7 @@ void main() {
       DictionaryProfile(
         id: 'japanese',
         name: 'Local name',
+        cropMode: 'animated_scene',
         anki: AnkiMiningProfile(
           duplicateScope: 'decks',
           duplicateDeckNames: ['Mining', 'Archive'],
@@ -459,6 +460,8 @@ void main() {
     expect(restored.anki.duplicateDeckNames, ['Mining', 'Archive']);
     expect(restored.anki.checkAllModels, isTrue);
     expect(restored.anki.sentenceAudioFormat, AnkiSentenceAudioFormat.opus);
+    expect(restored.cropMode, 'animated_scene');
+    expect(restored.screenshotMode, AnkiScreenshotMode.animatedScene);
   });
 }
 

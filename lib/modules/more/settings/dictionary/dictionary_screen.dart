@@ -62,7 +62,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _dictionaryAutoUpdate = false;
   int _dictionaryAutoUpdateHours = 24;
   Map<String, DictionaryUpdateInfo> _dictionaryUpdates = const {};
-  bool _cropImageBeforeMining = false;
   late DictionaryPopupPreferences _popupPreferences;
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
   AnkiAudioPreferences _ankiAudioPreferences = AnkiAudioPreferences.defaults;
@@ -113,7 +112,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getDictionaryProfiles(),
       MiningPreferences.getActiveDictionaryProfile(),
       MiningPreferences.getMokuroWebsiteOcrEnabled(),
-      MiningPreferences.getCropImageBeforeMining(),
       MiningPreferences.getAnkiIntegrationMode(),
       MiningPreferences.getDictionaryAutoUpdateEnabled(),
       MiningPreferences.getDictionaryAutoUpdateIntervalHours(),
@@ -144,11 +142,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _lookupTrigger = values[14] as DictionaryLookupTrigger;
       _additionalLeftClick = values[15] as bool;
       _dictionaryLanguage = values[16] as String;
-      _cropImageBeforeMining = values[20] as bool;
-      _ankiIntegrationMode = values[21] as AnkiIntegrationMode;
-      _dictionaryAutoUpdate = values[22] as bool;
-      _dictionaryAutoUpdateHours = values[23] as int;
-      _parallelOcrLimit = values[24] as int;
+      _ankiIntegrationMode = values[20] as AnkiIntegrationMode;
+      _dictionaryAutoUpdate = values[21] as bool;
+      _dictionaryAutoUpdateHours = values[22] as int;
+      _parallelOcrLimit = values[23] as int;
       _loading = false;
     });
     if (widget.section == DictionarySettingsSection.anki && !_usesAnkiMobile) {
@@ -2168,17 +2165,39 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
                     ),
                 ],
-                SwitchListTile(
-                  secondary: const Icon(Icons.crop_outlined),
-                  title: const Text('Crop manga image before mining'),
-                  subtitle: const Text(
-                    'Manually crop the page before sending to Anki',
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<AnkiScreenshotMode>(
+                    initialValue: _activeProfile.screenshotMode,
+                    decoration: const InputDecoration(
+                      labelText: 'Screenshot',
+                      prefixIcon: Icon(Icons.photo_camera_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.full,
+                        child: Text('Full image'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.crop,
+                        child: Text('Crop manga image'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.noScreenshot,
+                        child: Text('No screenshot'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.animatedScene,
+                        child: Text('Animated scene (desktop only)'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _updateActiveProfile(
+                        _activeProfile.copyWith(cropMode: value.wireValue),
+                      );
+                    },
                   ),
-                  value: _cropImageBeforeMining,
-                  onChanged: (value) async {
-                    setState(() => _cropImageBeforeMining = value);
-                    await MiningPreferences.setCropImageBeforeMining(value);
-                  },
                 ),
                 if (_usesAnkiMobile)
                   const ListTile(

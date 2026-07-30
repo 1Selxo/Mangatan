@@ -36,6 +36,17 @@ sha256sums=(
 )
 
 prepare() {
+  # bsdtar fails on a pattern that matches nothing, but a pattern matching two
+  # entries would concatenate them into one corrupt file and still exit 0, so
+  # require exactly one match before extracting rather than after.
+  local matches
+  matches=$(bsdtar --list --file "${_bundle}" 'MExtensionServer-*.jar' | wc -l)
+  if (( matches != 1 )); then
+    printf 'Expected exactly one MExtensionServer JAR in %s, matched %s\n' \
+      "${_bundle}" "${matches}" >&2
+    return 1
+  fi
+
   # Renamed from the upstream MExtensionServer-v<ver>-r1.jar: Mangatan only
   # requires the MExtensionServer- prefix, the .jar suffix and a parseable
   # version in the basename, so dropping the build-number suffix keeps the
@@ -43,8 +54,6 @@ prepare() {
   bsdtar --extract --to-stdout --file "${_bundle}" 'MExtensionServer-*.jar' \
     > "${_jar}"
 
-  # bsdtar reports a missing pattern via its exit status, but a glob matching an
-  # unexpected extra entry would silently concatenate archives.
   if (( $(stat -c %s "${_jar}") < 10000000 )); then
     printf 'Extracted %s is implausibly small\n' "${_jar}" >&2
     return 1

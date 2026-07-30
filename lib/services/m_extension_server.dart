@@ -613,6 +613,22 @@ class MExtensionServerPlatform {
     }
   }
 
+  Future<bool> _supportsYouTubeResolver(
+    String baseUrl, {
+    Duration timeout = const Duration(seconds: 2),
+  }) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/capabilities'))
+          .timeout(timeout);
+      if (response.statusCode != 200) return false;
+      final capabilities = jsonDecode(response.body) as Map<String, dynamic>;
+      return capabilities['youtubeResolver'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> _waitForMangatanMihonBridge(
     String baseUrl,
     int generation, {
@@ -658,6 +674,21 @@ class MExtensionServerPlatform {
   }
 }
 
+Future<String?> prepareYouTubeResolverBridge() async {
+  if (!isDesktop && !Platform.isIOS) return null;
+  final server = MExtensionServerPlatform._stableInstance;
+  if (server == null) return null;
+
+  await server.startServer(foregroundRequest: Platform.isIOS);
+  final baseUrl = server.baseUrl;
+  if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+      !server._isLoopbackServer(baseUrl) ||
+      !await server._supportsYouTubeResolver(baseUrl)) {
+    return null;
+  }
+  return baseUrl;
+}
+
 /// Restarts the embedded listener before a reader retries a transient Mihon
 /// image URL. Image tokens live in the retained JVM, so only the loopback
 /// origin needs to be updated if iOS could not reclaim the previous port.
@@ -683,9 +714,7 @@ Future<String> resolveActiveIosMihonProxyUrl(String url) async {
   if (server == null || proxyUri == null) return url;
 
   await server.startServer(
-    preferredPort: proxyUri.hasPort && proxyUri.port > 0
-        ? proxyUri.port
-        : null,
+    preferredPort: proxyUri.hasPort && proxyUri.port > 0 ? proxyUri.port : null,
     foregroundRequest: true,
   );
   final baseUrl = server.baseUrl;

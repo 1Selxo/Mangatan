@@ -49,6 +49,27 @@ void main() {
     expect(source, contains('createdChapter.manga.saveSync()'));
   });
 
+  test('prefers the cross-platform NewPipe bridge before Dart extraction', () {
+    final youtubeSource = File(
+      'lib/services/youtube/youtube_service.dart',
+    ).readAsStringSync();
+    final bridgeSource = File(
+      'lib/services/m_extension_server.dart',
+    ).readAsStringSync();
+
+    expect(youtubeSource, contains('prepareYouTubeResolverBridge()'));
+    expect(youtubeSource, contains("'\$baseUrl/youtube/resolve'"));
+    expect(
+      youtubeSource,
+      contains('final bridgeVideo = await _resolveWithBridge'),
+    );
+    expect(bridgeSource, contains("capabilities['youtubeResolver'] == true"));
+    expect(
+      bridgeSource,
+      contains('Future<String?> prepareYouTubeResolverBridge()'),
+    );
+  });
+
   test('uses safe defaults before deferred Hive startup completes', () async {
     expect(await YouTubePreferences.preferredQuality(), '1080p');
     expect(await YouTubePreferences.autoAddChannels(), isFalse);
@@ -72,6 +93,9 @@ void main() {
     expect(youtubeInterceptScript, contains('history.replaceState'));
     expect(youtubeInterceptScript, contains("addEventListener('popstate'"));
     expect(youtubeInterceptScript, contains('openYouTubeVideo'));
+    expect(youtubeInterceptScript, contains('setTimeout(fallback, 350)'));
+    expect(youtubeInterceptScript, contains('window.location.assign(href)'));
+    expect(youtubeInterceptScript, contains('result === true'));
   });
 
   test('persists YouTube preferences after Hive startup', () async {

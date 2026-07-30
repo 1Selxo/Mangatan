@@ -57,6 +57,9 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   bool _popupHovered = false;
   bool _resumeAfterHover = false;
   bool _popupPrewarmed = false;
+  String _captureCueText = '';
+  Future<MiningContext>? _captureContext;
+  final List<Future<MiningContext>> _recentCaptureContexts = [];
 
   StreamSubscription<List<String>>? _subtitleSubscription;
   StreamSubscription<Track>? _trackSubscription;
@@ -73,6 +76,11 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       value,
     ) {
       _hideNativeSubtitlePaintSoon();
+      final text = value
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .join('\n');
+      if (text != _captureCueText) _rotateCaptureContext(text);
       setState(() {
         subtitle = value;
         _clearHighlight();
@@ -101,6 +109,14 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     _hoverLookupTimer?.cancel();
     _hoverExitTimer?.cancel();
     _hoverPopup?.dismiss();
+    final captureContexts = [..._recentCaptureContexts, ?_captureContext];
+    for (final context in captureContexts) {
+      unawaited(
+        context
+            .then((value) => value.sceneCapture?.dispose())
+            .catchError((_) {}),
+      );
+    }
     if (_resumeAfterHover) {
       unawaited(widget.controller.player.play());
     }
@@ -112,6 +128,31 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       (defaultTargetPlatform == TargetPlatform.windows ||
           defaultTargetPlatform == TargetPlatform.linux ||
           defaultTargetPlatform == TargetPlatform.macOS);
+
+  Future<MiningContext> _miningContextFor(String subtitleText) {
+    final text = subtitleText.trim();
+    if (_captureContext == null || _captureCueText != text) {
+      _rotateCaptureContext(text);
+    }
+    return _captureContext ??= widget.miningContextBuilder!(subtitleText);
+  }
+
+  void _rotateCaptureContext(String text) {
+    final previous = _captureContext;
+    if (previous != null) {
+      _recentCaptureContexts.add(previous);
+      if (_recentCaptureContexts.length > 8) {
+        final expired = _recentCaptureContexts.removeAt(0);
+        unawaited(
+          expired
+              .then((value) => value.sceneCapture?.dispose())
+              .catchError((_) {}),
+        );
+      }
+    }
+    _captureCueText = text;
+    _captureContext = null;
+  }
 
   void setPadding(
     EdgeInsets padding, {
@@ -215,7 +256,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       context: context,
       anchor: anchor,
       text: selection.text,
-      miningContext: miningContext ?? builder(subtitleText),
+      miningContext: miningContext ?? _miningContextFor(subtitleText),
       prefetch: prefetch,
       dismissOnOutsideTap: !hoverTriggered,
       onMatchChanged: (count) {
@@ -271,7 +312,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     if (_sameSelection(_hoverSelection, selection)) return;
     _clearHighlightIfNeeded();
     _hoverSelection = selection;
-    final miningContext = widget.miningContextBuilder!(subtitleText);
+    final miningContext = _miningContextFor(subtitleText);
     final prefetch = DictionaryLookupPopup.prefetch(
       selection.text,
       miningContext: miningContext,

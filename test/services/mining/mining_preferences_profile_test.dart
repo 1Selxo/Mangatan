@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 
 void main() {
   late Directory tempDirectory;
@@ -104,6 +105,34 @@ void main() {
       restored.effectiveSources.single.url,
       'http://audio.local/?term={term}&reading={reading}',
     );
+  });
+
+  test('migrates the legacy crop toggle into cropMode once', () async {
+    final box = await Hive.openBox<dynamic>('mining_preferences');
+    await box.put('crop_image_before_mining', true);
+    await box.put('dictionary_profiles', [
+      {'id': 'legacy', 'name': 'Legacy', 'languageCode': 'ja'},
+    ]);
+
+    final profiles = await MiningPreferences.getDictionaryProfiles();
+
+    expect(profiles.single.screenshotMode, AnkiScreenshotMode.crop);
+    expect(box.containsKey('crop_image_before_mining'), isFalse);
+    expect(
+      (box.get('dictionary_profiles') as List).single['cropMode'],
+      AnkiScreenshotMode.crop.wireValue,
+    );
+  });
+
+  test('defaults legacy profiles without a crop toggle to full', () async {
+    final box = await Hive.openBox<dynamic>('mining_preferences');
+    await box.put('dictionary_profiles', [
+      {'id': 'legacy', 'name': 'Legacy', 'languageCode': 'ja'},
+    ]);
+
+    final profiles = await MiningPreferences.getDictionaryProfiles();
+
+    expect(profiles.single.screenshotMode, AnkiScreenshotMode.full);
   });
 
   test('deleting a profile sweeps overrides at every cascade level', () async {

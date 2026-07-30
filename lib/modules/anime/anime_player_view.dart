@@ -52,8 +52,10 @@ import 'package:mangayomi/services/mining/anime_sentence_audio_service.dart';
 import 'package:mangayomi/services/get_video_list.dart';
 import 'package:mangayomi/services/mining/jimaku_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/mining/desktop_scene_capture.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/scene_capture_timing.dart';
 import 'package:mangayomi/services/torrent_server.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
@@ -318,6 +320,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _videoOcrCapturing = false;
   bool _liveVideoOcrEnabled = false;
   Uint8List? _videoOcrBytes;
+  Duration? _videoOcrPosition;
   List<AnimeSubtitleCue> _subtitleCues = const [];
   final Map<String, List<AnimeSubtitleCue>> _subtitleCuesByTitle = {};
   String _lastSubtitleHistoryText = '';
@@ -327,6 +330,8 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   double _subSpeed = 1;
   final _subSpeedController = TextEditingController(text: "1");
   int lastRpcTimestampUpdate = DateTime.now().millisecondsSinceEpoch;
+  final AnkiExportJobController _sceneJobController = AnkiExportJobController();
+  final Set<AnkiSceneCaptureHandle> _sceneCaptures = {};
 
   late final StreamSubscription<Duration> _currentPositionSub;
   late final StreamSubscription<List<String>> _subtitleTextSub;
@@ -848,6 +853,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
     await _player.pause();
     try {
+      final position = _currentPosition.value;
       final bytes = await _player.screenshot(
         format: 'image/png',
         includeLibassSubtitles: _includeSubtitles,
@@ -857,7 +863,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         botToast('Unable to capture the current video frame', second: 4);
         return;
       }
-      setState(() => _videoOcrBytes = bytes);
+      setState(() {
+        _videoOcrBytes = bytes;
+        _videoOcrPosition = position;
+      });
     } catch (error) {
       if (mounted) botToast('Video OCR capture failed: $error', second: 5);
     } finally {
@@ -870,6 +879,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     final wasLiveOcrEnabled = _liveVideoOcrEnabled;
     setState(() {
       _videoOcrBytes = null;
+      _videoOcrPosition = null;
       _liveVideoOcrEnabled = false;
     });
     if (wasLiveOcrEnabled) {
@@ -897,11 +907,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     await MiningPreferences.setLiveVideoOcrEnabled(enabled);
   }
 
-  Future<Uint8List?> _captureLiveVideoOcrFrame() {
-    return _player.screenshot(
+  Future<VideoOcrFrame?> _captureLiveVideoOcrFrame() async {
+    final position = _currentPosition.value;
+    final bytes = await _player.screenshot(
       format: 'image/png',
       includeLibassSubtitles: _includeSubtitles,
     );
+    if (bytes == null || bytes.isEmpty) return null;
+    return VideoOcrFrame(bytes: bytes, position: position);
   }
 
   void _hideNativeSubtitlePaintSoon() {
@@ -977,25 +990,48 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (_skipPhase.value != newPhase) _skipPhase.value = newPhase;
   }
 
-  Future<MiningContext> _subtitleMiningContext(String subtitleText) async {
+  Future<MiningContext> _subtitleMiningContext(
+    String subtitleText, {
+    Uint8List? frozenImageBytes,
+    Duration? frozenPosition,
+    bool ocrTiming = false,
+  }) async {
     final manga = widget.episode.manga.value;
     final source = manga?.sourceId == null
         ? null
         : isar.sources.getSync(manga!.sourceId!);
-    final video = _video.value;
-    final snapshot = await AnimeSentenceAudioService.snapshot(
-      player: _player,
-      fallbackSource: video?.videoTrack?.id ?? _firstVid.url,
-      fallbackPosition: _currentPosition.value,
-      subtitleDelay: Duration(milliseconds: _subDelay),
-    );
-    final activeAudio = _player.state.track.audio;
-    final audioSource = activeAudio.uri && activeAudio.id != 'no'
-        ? activeAudio.id
-        : snapshot.source;
-    final headers = video?.headers == null
+    final capturePosition = frozenPosition ?? _currentPosition.value;
+    final imageBytes =
+        frozenImageBytes ??
+        await _player.screenshot(
+          format: 'image/png',
+          includeLibassSubtitles: _includeSubtitles,
+        );
+    final capture = imageBytes == null || imageBytes.isEmpty
         ? null
+        : await _createSceneCapture(
+            subtitleText: subtitleText,
+            frozenImageBytes: imageBytes,
+            frozenPosition: capturePosition,
+            ocrTiming: ocrTiming,
+          );
+    final video = _video.value;
+    final fallbackSource = video?.videoTrack?.id ?? _firstVid.url;
+    final audioTiming = capture == null
+        ? subtitleAudioTimingForCue(
+            currentPosition: capturePosition,
+            subtitleDelay: Duration(milliseconds: _subDelay),
+          )
+        : SubtitleAudioTiming(start: capture.audioStart, end: capture.audioEnd);
+    final audioSource = capture?.playerSource ?? fallbackSource;
+    final activeAudio = _player.state.track.audio;
+    final selectedAudioSource = activeAudio.uri && activeAudio.id != 'no'
+        ? activeAudio.id
+        : audioSource;
+    final headers = video?.headers == null
+        ? const <String, String>{}
         : Map<String, String>.unmodifiable(video!.headers!);
+    final position = capture?.position ?? capturePosition;
     return MiningContext(
       mediaType: MiningMediaType.anime,
       mangaId: manga?.id,
@@ -1007,23 +1043,126 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       sourceTitle: manga?.name ?? '',
       chapterTitle: widget.episode.name ?? '',
       sentence: subtitleText,
-      position: _currentPosition.value,
+      position: position,
       sourceUri: Uri.tryParse(_firstVid.originalUrl),
-      imageBytesLoader: () async => _player.screenshot(
-        format: 'image/png',
-        includeLibassSubtitles: _includeSubtitles,
-      ),
-      sentenceAudioLoader: audioSource.trim().isEmpty
+      imageBytesLoader: imageBytes == null
+          ? null
+          : () async => Uint8List.fromList(imageBytes),
+      sentenceAudioLoader: selectedAudioSource.trim().isEmpty
           ? null
           : (format) => AnimeSentenceAudioService().capture(
-              source: audioSource,
+              source: selectedAudioSource,
               headers: headers,
-              timing: snapshot.timing,
+              timing: audioTiming,
               format: format,
               sourceTitle: widget.episode.manga.value?.name ?? '',
               chapterTitle: widget.episode.name ?? '',
+              audioStreamIndex:
+                  capture != null && selectedAudioSource == capture.playerSource
+                  ? capture.audioStreamIndex
+                  : null,
             ),
+      sceneCapture: capture,
     );
+  }
+
+  Future<AnkiSceneCaptureHandle> _createSceneCapture({
+    required String subtitleText,
+    required Uint8List frozenImageBytes,
+    Duration? frozenPosition,
+    required bool ocrTiming,
+  }) async {
+    final native = _player.platform;
+    Future<String?> property(String name) async {
+      if (native is! NativePlayer) return null;
+      try {
+        final value = await native.getProperty(name);
+        return value.trim().isEmpty ? null : value.trim();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final values = await Future.wait([
+      property('path'),
+      property('time-pos'),
+      property('duration'),
+      property('sub-start/full'),
+      property('sub-end/full'),
+      property('seekable'),
+      property('current-tracks/video/ff-index'),
+      property('current-tracks/audio/ff-index'),
+    ]);
+    final video = _video.value;
+    final selectedSource = video?.videoTrack?.id ?? _firstVid.url;
+    final liveSource = values[0];
+    final source = liveSource ?? selectedSource.trim();
+    final position =
+        frozenPosition ??
+        _durationFromSeconds(values[1]) ??
+        _currentPosition.value;
+    final duration =
+        _durationFromSeconds(values[2]) ??
+        _currentTotalDuration.value ??
+        _player.state.duration;
+    final timing = ocrTiming
+        ? resolveOcrSceneTiming(
+            playbackPosition: position,
+            mediaDuration: duration,
+          )
+        : resolveSubtitleSceneTiming(
+            subtitleText: subtitleText,
+            playbackPosition: position,
+            mediaDuration: duration,
+            liveSubtitleStart: _durationFromSeconds(values[3]),
+            liveSubtitleEnd: _durationFromSeconds(values[4]),
+            parsedCues: [
+              for (final cue in _subtitleCues)
+                ParsedSubtitleTiming(
+                  text: cue.text,
+                  start: cue.start,
+                  end: cue.end,
+                ),
+            ],
+            subtitleSpeed: _subSpeed,
+            subtitleDelay: Duration(milliseconds: _subDelay),
+          );
+    final videoIndex = int.tryParse(values[6] ?? '');
+    final audioIndex = int.tryParse(values[7] ?? '');
+    final selectedVideoId = _player.state.track.video.id;
+    final selectedAudioId = _player.state.track.audio.id;
+    final headers = Map<String, String>.unmodifiable(
+      video?.headers ?? const {},
+    );
+    late final AnkiSceneCaptureHandle handle;
+    handle = AnkiSceneCaptureHandle(
+      fallbackScreenshot: frozenImageBytes,
+      playerSource: source,
+      position: position,
+      duration: duration,
+      sceneStart: timing.scene.start,
+      sceneEnd: timing.scene.end,
+      audioStart: timing.audio.start,
+      audioEnd: timing.audio.end,
+      subtitleDelay: Duration(milliseconds: _subDelay),
+      subtitleSpeed: _subSpeed,
+      videoStreamIndex: videoIndex,
+      audioStreamIndex: audioIndex,
+      headers: headers,
+      seekable: _booleanProperty(values[5], fallback: widget.isLocal),
+      jobController: _sceneJobController,
+      validatePlayerState: () async =>
+          mounted &&
+          _player.state.track.video.id == selectedVideoId &&
+          _player.state.track.audio.id == selectedAudioId,
+      prepareAnimatedScreenshot: (session) => const DesktopSceneCaptureService()
+          .prepare(capture: handle, session: session),
+      disposeCapture: () async {
+        _sceneCaptures.remove(handle);
+      },
+    );
+    _sceneCaptures.add(handle);
+    return handle;
   }
 
   Future<void> _autoLoadJimakuSubtitle() async {
@@ -1534,6 +1673,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     discordRpc?.showIdleText();
     discordRpc?.showOriginalTimestamp();
     _streamController.keepAliveLink?.close();
+    for (final capture in _sceneCaptures.toList(growable: false)) {
+      unawaited(capture.dispose());
+    }
+    _sceneCaptures.clear();
+    unawaited(_sceneJobController.dispose());
     _player.dispose();
     super.dispose();
   }
@@ -2660,15 +2804,28 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         if (_videoOcrBytes case final imageBytes?)
           VideoOcrOverlay(
             imageBytes: imageBytes,
+            imagePosition: _videoOcrPosition,
             fit: fit,
-            miningContextBuilder: _subtitleMiningContext,
+            miningContextBuilder: (text, bytes, position) =>
+                _subtitleMiningContext(
+                  text,
+                  frozenImageBytes: bytes,
+                  frozenPosition: position,
+                  ocrTiming: true,
+                ),
             onDismiss: _dismissVideoOcr,
           ),
         if (_liveVideoOcrEnabled && _videoOcrBytes == null)
           LiveVideoOcrOverlay(
             imageBytesLoader: _captureLiveVideoOcrFrame,
             fit: fit,
-            miningContextBuilder: _subtitleMiningContext,
+            miningContextBuilder: (text, bytes, position) =>
+                _subtitleMiningContext(
+                  text,
+                  frozenImageBytes: bytes,
+                  frozenPosition: position,
+                  ocrTiming: true,
+                ),
             onDismiss: () {
               DictionaryLookupPopup.dismissActive();
               setState(() => _liveVideoOcrEnabled = false);
@@ -2915,6 +3072,22 @@ Widget seekIndicatorTextWidget(Duration duration, Duration currentPosition) {
       ),
     ],
   );
+}
+
+Duration? _durationFromSeconds(String? value) {
+  final seconds = double.tryParse(value ?? '');
+  if (seconds == null || !seconds.isFinite || seconds < 0) return null;
+  return Duration(
+    microseconds: (seconds * Duration.microsecondsPerSecond).round(),
+  );
+}
+
+bool _booleanProperty(String? value, {required bool fallback}) {
+  return switch (value?.trim().toLowerCase()) {
+    'yes' || 'true' || '1' => true,
+    'no' || 'false' || '0' => false,
+    _ => fallback,
+  };
 }
 
 class VideoPrefs {

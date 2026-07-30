@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 
 void main() {
   test('round-trips Chimahon-compatible profile state', () {
@@ -39,6 +40,27 @@ void main() {
 
     expect(profile.isDictionaryEnabled('JMdict'), isTrue);
     expect(profile.isDictionaryEnabled('Frequency'), isTrue);
+  });
+
+  test('preserves every Chimahon cropMode wire value', () {
+    for (final mode in AnkiScreenshotMode.values) {
+      final profile = DictionaryProfile.fromJson({
+        'id': mode.name,
+        'name': mode.name,
+        'cropMode': mode.wireValue,
+      });
+
+      expect(profile.screenshotMode, mode);
+      expect(profile.toJson()['cropMode'], mode.wireValue);
+    }
+    expect(
+      DictionaryProfile.fromJson({
+        'id': 'old',
+        'name': 'Old',
+        'cropMode': 'future_mode',
+      }).screenshotMode,
+      AnkiScreenshotMode.full,
+    );
   });
 
   test('unknown and blank profile languages survive compatible storage', () {

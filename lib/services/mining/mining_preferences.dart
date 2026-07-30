@@ -5,6 +5,7 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:path/path.dart' as p;
 
 enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }
@@ -1165,12 +1166,40 @@ class MiningPreferences {
     Box<dynamic> box,
   ) async {
     final reader = _MiningPreferencesReader.box(box);
-    final profiles = _readProfiles(reader);
-    if (profiles.isNotEmpty) return profiles;
+    var profiles = _readProfiles(reader);
+    final legacyCrop = box.get(_cropImageBeforeMining);
+    if (profiles.isNotEmpty) {
+      if (legacyCrop is bool) {
+        final rawProfiles = box.get(_dictionaryProfiles);
+        final rawList = rawProfiles is Iterable
+            ? rawProfiles.whereType<Map>().toList(growable: false)
+            : const <Map>[];
+        profiles = [
+          for (final indexed in profiles.indexed)
+            indexed.$1 < rawList.length &&
+                    !rawList[indexed.$1].containsKey('cropMode')
+                ? indexed.$2.copyWith(
+                    cropMode: legacyCrop
+                        ? AnkiScreenshotMode.crop.wireValue
+                        : AnkiScreenshotMode.full.wireValue,
+                  )
+                : indexed.$2,
+        ];
+        await _writeProfiles(box, profiles);
+        await box.delete(_cropImageBeforeMining);
+      }
+      return profiles;
+    }
     final migrated = _legacyProfile(reader);
-    await _writeProfiles(box, [migrated]);
+    final withLegacyCrop = migrated.copyWith(
+      cropMode: legacyCrop == true
+          ? AnkiScreenshotMode.crop.wireValue
+          : AnkiScreenshotMode.full.wireValue,
+    );
+    await _writeProfiles(box, [withLegacyCrop]);
     await box.put(_activeDictionaryProfileId, migrated.id);
-    return [migrated];
+    await box.delete(_cropImageBeforeMining);
+    return [withLegacyCrop];
   }
 
   static DictionaryProfile _legacyProfile(_MiningPreferencesReader reader) {

@@ -159,6 +159,15 @@ class AnkiConnectService {
     return result?.toString();
   }
 
+  Future<String?> storeMediaSource({
+    required String filename,
+    required AnkiMediaSource source,
+  }) {
+    return source.readBytes().then(
+      (data) => storeMediaFile(filename: filename, data: data),
+    );
+  }
+
   Future<int> addNote(
     AnkiCardDraft draft, {
     bool allowDuplicate = false,
@@ -267,14 +276,17 @@ class AnkiConnectService {
       }
     }
     for (final media in normalized.mediaFiles) {
-      await storeMediaFile(filename: media.filename, data: media.bytes);
+      await storeMediaSource(filename: media.filename, source: media.source);
     }
-    if (normalized.screenshotBytes != null &&
-        normalized.screenshotFileName != null) {
-      await storeMediaFile(
-        filename: normalized.screenshotFileName!,
-        data: normalized.screenshotBytes!,
-      );
+    if (normalized.screenshotFileName case final filename?) {
+      var source = normalized.screenshotSource;
+      final screenshotBytes = normalized.screenshotBytes;
+      if (source == null && screenshotBytes != null) {
+        source = AnkiMediaSource.bytes(screenshotBytes);
+      }
+      if (source != null) {
+        await storeMediaSource(filename: filename, source: source);
+      }
     }
     final noteId = await addNote(
       normalized,
@@ -284,6 +296,125 @@ class AnkiConnectService {
     );
     if (syncOnCreate) await sync();
     return noteId;
+  }
+
+  Future<AnkiExportResult> exportPending(
+    PendingAnkiCard pending, {
+    bool duplicateCheck = true,
+    bool allowDuplicate = false,
+    String duplicateScope = 'deck',
+    List<String> duplicateDeckNames = const [],
+    bool checkAllModels = false,
+    bool syncOnCreate = false,
+  }) async {
+    final placeholder = await _normalizeFieldsForModel(
+      pending.placeholderDraft,
+    );
+    if (duplicateCheck) {
+      final status = await _canAddNormalizedDraftForScope(
+        placeholder,
+        duplicateScope: duplicateScope,
+        duplicateDeckNames: duplicateDeckNames,
+        checkAllModels: checkAllModels,
+      );
+      if (!status.canAdd && !allowDuplicate) {
+        throw AnkiDuplicateException(placeholder.expression, status.error);
+      }
+    }
+
+    AnkiExportJobSession? session;
+    PreparedAnkiCard? prepared;
+    final warnings = <String>[];
+    try {
+      session = pending.jobController?.beginPreparing();
+      prepared = await pending.prepare(session);
+      session?.throwIfCancelled();
+      var normalized = await _normalizeFieldsForModel(prepared.draft);
+      session?.throwIfCancelled();
+      session?.beginCommitting();
+
+      final screenshot = prepared.screenshot;
+      if (screenshot != null) {
+        var storedFilename = screenshot.filename;
+        try {
+          await storeMediaSource(
+            filename: screenshot.filename,
+            source: screenshot.source,
+          );
+        } catch (_) {
+          if (screenshot.animated) {
+            try {
+              await storeMediaSource(
+                filename: screenshot.fallbackFilename,
+                source: screenshot.fallbackSource,
+              );
+              storedFilename = screenshot.fallbackFilename;
+              warnings.add(
+                'Animated scene storage failed; the frozen still was used.',
+              );
+            } catch (_) {
+              storedFilename = '';
+              warnings.add(
+                'Screenshot storage failed; the note was added without an image.',
+              );
+            }
+          } else {
+            storedFilename = '';
+            warnings.add(
+              'Screenshot storage failed; the note was added without an image.',
+            );
+          }
+          normalized = _replaceScreenshotReference(
+            normalized,
+            from: screenshot.filename,
+            to: storedFilename,
+          );
+        }
+      }
+
+      // The screenshot is committed first so animation/storage failures can
+      // still degrade to the frozen frame before any note mutation.
+      for (final media in normalized.mediaFiles) {
+        await storeMediaSource(filename: media.filename, source: media.source);
+      }
+      final noteId = await addNote(
+        normalized,
+        allowDuplicate: allowDuplicate || !duplicateCheck,
+        duplicateScope: duplicateScope,
+        checkAllModels: checkAllModels,
+      );
+      if (syncOnCreate) await sync();
+      warnings
+        ..insertAll(0, prepared.warnings)
+        ..removeWhere((warning) => warning.trim().isEmpty);
+      return AnkiExportResult(noteId: noteId, warnings: warnings);
+    } finally {
+      await prepared?.dispose();
+      session?.finish();
+    }
+  }
+
+  static AnkiCardDraft _replaceScreenshotReference(
+    AnkiCardDraft draft, {
+    required String from,
+    required String to,
+  }) {
+    final expected = '<img src="$from">';
+    final replacement = to.isEmpty ? '' : '<img src="$to">';
+    return AnkiCardDraft(
+      deckName: draft.deckName,
+      modelName: draft.modelName,
+      expression: draft.expression,
+      fields: draft.fields.map(
+        (field, value) =>
+            MapEntry(field, value.replaceAll(expected, replacement)),
+      ),
+      tags: draft.tags,
+      screenshotFileName: to.isEmpty ? null : to,
+      screenshotBytes: draft.screenshotBytes,
+      screenshotSource: draft.screenshotSource,
+      mediaFiles: draft.mediaFiles,
+    );
   }
 
   Future<AnkiCanAddResult> _canAddNormalizedDraftForScope(
@@ -451,6 +582,7 @@ class AnkiConnectService {
       tags: draft.tags,
       screenshotFileName: draft.screenshotFileName,
       screenshotBytes: draft.screenshotBytes,
+      screenshotSource: draft.screenshotSource,
       mediaFiles: draft.mediaFiles,
     );
   }

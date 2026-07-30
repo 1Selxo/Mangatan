@@ -529,4 +529,148 @@ void main() {
     expect(compressed, isNotNull);
     expect(compressed!.width, lessThanOrEqualTo(1280));
   });
+
+  test('pending cards gate media work until preparation', () async {
+    var screenshotLoads = 0;
+    var audioLoads = 0;
+    var wordAudioLoads = 0;
+    final pending = await const AnkiCardBuilder().buildPending(
+      result: _simpleResult(),
+      context: MiningContext(
+        sentence: '事件だ。',
+        imageBytesLoader: () async {
+          screenshotLoads++;
+          return Uint8List.fromList([
+            0x89,
+            0x50,
+            0x4e,
+            0x47,
+            0x0d,
+            0x0a,
+            0x1a,
+            0x0a,
+          ]);
+        },
+        sentenceAudioLoader: (_) async {
+          audioLoads++;
+          return AnkiMediaFile(
+            filename: 'sentence.mp3',
+            bytes: Uint8List.fromList([1]),
+          );
+        },
+      ),
+      profile: const AnkiMiningProfile(
+        fieldMap: {
+          'Front': AnkiMarker.expression,
+          'Picture': AnkiMarker.screenshot,
+        },
+      ),
+      wordAudioLoader: () async {
+        wordAudioLoads++;
+        return AnkiMediaFile(
+          filename: 'word.mp3',
+          bytes: Uint8List.fromList([2]),
+        );
+      },
+    );
+
+    expect(pending.placeholderDraft.fields['Front'], '事件');
+    expect(pending.placeholderDraft.fields['Picture'], isEmpty);
+    expect(screenshotLoads, 0);
+    expect(audioLoads, 0);
+    expect(wordAudioLoads, 0);
+
+    final prepared = await pending.prepare(null);
+    expect(screenshotLoads, 1);
+    expect(audioLoads, 0);
+    expect(wordAudioLoads, 0);
+    expect(prepared.draft.fields['Picture'], contains('<img src="'));
+  });
+
+  test(
+    'no_screenshot suppresses the image loader even with a marker',
+    () async {
+      var loads = 0;
+      final draft = await const AnkiCardBuilder().build(
+        result: _simpleResult(),
+        context: MiningContext(
+          imageBytesLoader: () async {
+            loads++;
+            return Uint8List.fromList([1, 2, 3]);
+          },
+        ),
+        profile: const AnkiMiningProfile(
+          fieldMap: {'Picture': AnkiMarker.screenshot},
+        ),
+        screenshotMode: AnkiScreenshotMode.noScreenshot,
+      );
+
+      expect(loads, 0);
+      expect(draft.fields['Picture'], isEmpty);
+      expect(draft.screenshotFileName, isNull);
+    },
+  );
+
+  test(
+    'animated mode without a desktop capture keeps the frozen still',
+    () async {
+      final draft = await const AnkiCardBuilder().build(
+        result: _simpleResult(),
+        context: MiningContext(
+          imageBytesLoader: () async => Uint8List.fromList([
+            0x89,
+            0x50,
+            0x4e,
+            0x47,
+            0x0d,
+            0x0a,
+            0x1a,
+            0x0a,
+          ]),
+        ),
+        profile: const AnkiMiningProfile(
+          fieldMap: {'Picture': AnkiMarker.screenshot},
+        ),
+        screenshotMode: AnkiScreenshotMode.animatedScene,
+      );
+
+      expect(draft.screenshotFileName, endsWith('.png'));
+      expect(draft.fields['Picture'], contains('<img src="'));
+    },
+  );
+
+  test('DefinitionPicture alone does not request screenshot media', () async {
+    var loads = 0;
+    final draft = await const AnkiCardBuilder().build(
+      result: _simpleResult(),
+      context: MiningContext(
+        imageBytesLoader: () async {
+          loads++;
+          return Uint8List.fromList([1, 2, 3]);
+        },
+      ),
+      profile: const AnkiMiningProfile(
+        fieldMap: {'DefinitionPicture': AnkiMarker.screenshot},
+      ),
+    );
+
+    expect(loads, 0);
+    expect(draft.fields['DefinitionPicture'], isEmpty);
+  });
 }
+
+HoshiLookupResult _simpleResult() => const HoshiLookupResult(
+  matched: '事件',
+  deinflected: '事件',
+  trace: [],
+  preprocessorSteps: 0,
+  term: HoshiTermResult(
+    expression: '事件',
+    reading: 'じけん',
+    rules: 'n',
+    score: 1,
+    glossaries: [],
+    frequencies: [],
+    pitches: [],
+  ),
+);

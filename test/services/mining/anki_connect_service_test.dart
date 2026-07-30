@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -202,6 +203,197 @@ void main() {
       expect(actions, ['modelFieldNames', 'canAddNotesWithErrorDetail']);
     },
   );
+
+  test('blocks a pending card before running any media request', () async {
+    final actions = <String>[];
+    var preparations = 0;
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final action = body['action'] as String;
+      actions.add(action);
+      return switch (action) {
+        'modelFieldNames' => http.Response(
+          '{"result": ["Front", "Back"], "error": null}',
+          200,
+        ),
+        'canAddNotesWithErrorDetail' => http.Response(
+          '{"result": [{"canAdd": false, "error": "duplicate"}], "error": null}',
+          200,
+        ),
+        _ => throw StateError('Unexpected action: $action'),
+      };
+    });
+    final pending = PendingAnkiCard(
+      placeholderDraft: const AnkiCardDraft(
+        deckName: 'Mining',
+        modelName: 'Basic',
+        expression: '事件',
+        fields: {'Front': '事件', 'Back': ''},
+      ),
+      prepare: (_) async {
+        preparations++;
+        throw StateError('must not prepare a duplicate');
+      },
+    );
+
+    await expectLater(
+      AnkiConnectService(client: client).exportPending(pending),
+      throwsA(isA<AnkiDuplicateException>()),
+    );
+    expect(preparations, 0);
+    expect(actions, ['modelFieldNames', 'canAddNotesWithErrorDetail']);
+  });
+
+  test(
+    'stores an animated scene first and falls back to the frozen still',
+    () async {
+      final actions = <String>[];
+      final storedNames = <String>[];
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final action = body['action'] as String;
+        actions.add(action);
+        switch (action) {
+          case 'modelFieldNames':
+            return http.Response(
+              '{"result": ["Front", "Back"], "error": null}',
+              200,
+            );
+          case 'canAddNotesWithErrorDetail':
+            return http.Response(
+              '{"result": [{"canAdd": true, "error": null}], "error": null}',
+              200,
+            );
+          case 'storeMediaFile':
+            final filename =
+                (body['params'] as Map<String, dynamic>)['filename'] as String;
+            storedNames.add(filename);
+            if (filename.endsWith('.avif')) {
+              return http.Response(
+                '{"result": null, "error": "storage failed"}',
+                200,
+              );
+            }
+            return http.Response('{"result": "scene.png", "error": null}', 200);
+          case 'addNote':
+            final note =
+                (body['params'] as Map<String, dynamic>)['note']
+                    as Map<String, dynamic>;
+            expect(note['fields'], {
+              'Front': '事件',
+              'Back': '<img src="scene.png">',
+            });
+            return http.Response('{"result": 77, "error": null}', 200);
+        }
+        throw StateError('Unexpected action: $action');
+      });
+      final scene = AnkiScreenshotPreparation(
+        filename: 'scene.avif',
+        source: AnkiMediaSource.bytes(Uint8List.fromList([1, 2, 3])),
+        fallbackFilename: 'scene.png',
+        fallbackSource: AnkiMediaSource.bytes(Uint8List.fromList([4, 5, 6])),
+        animated: true,
+      );
+      final pending = PendingAnkiCard(
+        placeholderDraft: const AnkiCardDraft(
+          deckName: 'Mining',
+          modelName: 'Basic',
+          expression: '事件',
+          fields: {'Front': '事件', 'Back': ''},
+        ),
+        prepare: (_) async => PreparedAnkiCard(
+          draft: AnkiCardDraft(
+            deckName: 'Mining',
+            modelName: 'Basic',
+            expression: '事件',
+            fields: const {'Front': '事件', 'Back': '<img src="scene.avif">'},
+            screenshotFileName: scene.filename,
+            screenshotSource: scene.source,
+          ),
+          screenshot: scene,
+        ),
+      );
+
+      final result = await AnkiConnectService(
+        client: client,
+      ).exportPending(pending);
+
+      expect(result.noteId, 77);
+      expect(result.warnings.single, contains('frozen still'));
+      expect(storedNames, ['scene.avif', 'scene.png']);
+      expect(actions, [
+        'modelFieldNames',
+        'canAddNotesWithErrorDetail',
+        'modelFieldNames',
+        'storeMediaFile',
+        'storeMediaFile',
+        'addNote',
+      ]);
+    },
+  );
+
+  test('adds the note without an image when both media stores fail', () async {
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      switch (body['action']) {
+        case 'modelFieldNames':
+          return http.Response(
+            '{"result": ["Front", "Back"], "error": null}',
+            200,
+          );
+        case 'canAddNotesWithErrorDetail':
+          return http.Response(
+            '{"result": [{"canAdd": true, "error": null}], "error": null}',
+            200,
+          );
+        case 'storeMediaFile':
+          return http.Response(
+            '{"result": null, "error": "storage failed"}',
+            200,
+          );
+        case 'addNote':
+          final note =
+              (body['params'] as Map<String, dynamic>)['note']
+                  as Map<String, dynamic>;
+          expect(note['fields'], {'Front': '事件', 'Back': ''});
+          return http.Response('{"result": 78, "error": null}', 200);
+      }
+      throw StateError('Unexpected action: ${body['action']}');
+    });
+    final scene = AnkiScreenshotPreparation(
+      filename: 'scene.avif',
+      source: AnkiMediaSource.bytes(Uint8List.fromList([1])),
+      fallbackFilename: 'scene.png',
+      fallbackSource: AnkiMediaSource.bytes(Uint8List.fromList([2])),
+      animated: true,
+    );
+    final pending = PendingAnkiCard(
+      placeholderDraft: const AnkiCardDraft(
+        deckName: 'Mining',
+        modelName: 'Basic',
+        expression: '事件',
+        fields: {'Front': '事件', 'Back': ''},
+      ),
+      prepare: (_) async => PreparedAnkiCard(
+        draft: AnkiCardDraft(
+          deckName: 'Mining',
+          modelName: 'Basic',
+          expression: '事件',
+          fields: const {'Front': '事件', 'Back': '<img src="scene.avif">'},
+          screenshotFileName: scene.filename,
+          screenshotSource: scene.source,
+        ),
+        screenshot: scene,
+      ),
+    );
+
+    final result = await AnkiConnectService(
+      client: client,
+    ).exportPending(pending);
+
+    expect(result.noteId, 78);
+    expect(result.warnings.single, contains('without an image'));
+  });
 
   test('can add a known duplicate when the profile permits it', () async {
     final actions = <String>[];

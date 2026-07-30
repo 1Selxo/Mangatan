@@ -1012,6 +1012,14 @@ class _DictionaryLookupResultsViewState
     extends State<DictionaryLookupResultsView> {
   late Future<_LookupPayload> _future = _lookup();
   bool _exporting = false;
+  AnkiExportJobController? _activeExportJob;
+  StreamSubscription<AnkiExportJobState>? _exportJobSubscription;
+
+  @override
+  void dispose() {
+    _exportJobSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant DictionaryLookupResultsView oldWidget) {
@@ -1074,16 +1082,22 @@ class _DictionaryLookupResultsViewState
         botToast('Anki export is disabled in Dictionary settings', second: 4);
         return;
       }
-      final draft = await const AnkiCardBuilder().build(
+      final pending = await const AnkiCardBuilder().buildPending(
         result: result,
         context: widget.miningContext,
         profile: profile,
+        screenshotMode: dictionaryProfile.screenshotMode,
       );
-      final noteId =
+      _activeExportJob = pending.jobController;
+      await _exportJobSubscription?.cancel();
+      _exportJobSubscription = _activeExportJob?.states.listen((_) {
+        if (mounted) setState(() {});
+      });
+      final export =
           await AnkiConnectService(
             endpoint: await MiningPreferences.getAnkiEndpoint(),
-          ).exportDraft(
-            draft,
+          ).exportPending(
+            pending,
             duplicateCheck: profile.duplicateCheck,
             allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
             duplicateScope: profile.duplicateScope,
@@ -1095,12 +1109,20 @@ class _DictionaryLookupResultsViewState
         context: widget.miningContext,
         profile: dictionaryProfile,
       );
-      botToast('Added to Anki (#$noteId)', second: 3);
+      final warning = export.warnings.isEmpty
+          ? ''
+          : '\n${export.warnings.join('\n')}';
+      botToast('Added to Anki (#${export.noteId})$warning', second: 5);
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);
+    } on AnkiExportCancelledException {
+      botToast('Anki export cancelled', second: 2);
     } catch (error) {
       botToast('Anki export failed: $error', second: 5);
     } finally {
+      await _exportJobSubscription?.cancel();
+      _exportJobSubscription = null;
+      _activeExportJob = null;
       if (mounted) setState(() => _exporting = false);
     }
   }
@@ -1145,9 +1167,11 @@ class _DictionaryLookupResultsViewState
               preferences: payload.preferences,
               styles: payload.styles,
               exporting: _exporting,
+              cancellable: _activeExportJob?.canCancel ?? false,
               showAnkiButton: widget.showAnkiButton,
               compact: widget.compact,
               onExport: () => _export(result, payload.profile),
+              onCancel: () => _activeExportJob?.cancel(),
             );
           },
         );
@@ -1163,9 +1187,11 @@ class _LookupResultTile extends StatelessWidget {
     required this.preferences,
     required this.styles,
     required this.exporting,
+    required this.cancellable,
     required this.showAnkiButton,
     required this.compact,
     required this.onExport,
+    required this.onCancel,
   });
 
   final HoshiLookupResult result;
@@ -1173,9 +1199,11 @@ class _LookupResultTile extends StatelessWidget {
   final DictionaryPopupPreferences preferences;
   final Map<String, String> styles;
   final bool exporting;
+  final bool cancellable;
   final bool showAnkiButton;
   final bool compact;
   final VoidCallback onExport;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -1212,10 +1240,14 @@ class _LookupResultTile extends StatelessWidget {
               ),
               if (showAnkiButton)
                 IconButton(
-                  tooltip: 'Add to Anki',
-                  onPressed: exporting ? null : onExport,
+                  tooltip: cancellable ? 'Cancel preparation' : 'Add to Anki',
+                  onPressed: exporting
+                      ? (cancellable ? onCancel : null)
+                      : onExport,
                   visualDensity: VisualDensity.compact,
-                  icon: exporting
+                  icon: cancellable
+                      ? const Icon(Icons.close, size: 20)
+                      : exporting
                       ? const SizedBox(
                           width: 18,
                           height: 18,

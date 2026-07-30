@@ -1,8 +1,12 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/video.dart' as mangatan;
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/youtube/youtube_preferences.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as youtube;
 
@@ -110,6 +114,8 @@ class YouTubeService {
   }
 
   Future<int> prepareVideoForPlayback(YouTubeBrowseItem item) async {
+    final bridgeVideo = await _resolveWithBridge(item.url);
+    if (bridgeVideo != null) return _prepareBridgeVideo(bridgeVideo);
     final video = await _client.videos.get(item.id);
     return _prepareVideoForPlayback(video);
   }
@@ -119,12 +125,47 @@ class YouTubeService {
     if (videoId == null) {
       throw ArgumentError.value(url, 'url', 'Not a YouTube video URL');
     }
+    final bridgeVideo = await _resolveWithBridge(url);
+    if (bridgeVideo != null) return _prepareBridgeVideo(bridgeVideo);
     final video = await _client.videos.get(videoId);
     return _prepareVideoForPlayback(video);
   }
 
-  Future<int> _prepareVideoForPlayback(youtube.Video video) async {
-    final channelUrl = 'https://www.youtube.com/channel/${video.channelId}';
+  Future<int> _prepareBridgeVideo(_BridgeYouTubeVideo video) => _persistVideo(
+    channelUrl: video.channelUrl,
+    channelName: video.channelName,
+    channelThumbnailUrl: video.thumbnailUrl,
+    videoUrl: video.url,
+    videoTitle: video.title,
+    uploadDate: video.uploadDate,
+    thumbnailUrl: video.thumbnailUrl,
+    description: video.description,
+    duration: Duration(seconds: video.durationSeconds),
+  );
+
+  Future<int> _prepareVideoForPlayback(youtube.Video video) => _persistVideo(
+    channelUrl: 'https://www.youtube.com/channel/${video.channelId}',
+    channelName: video.author,
+    channelThumbnailUrl: video.thumbnails.highResUrl,
+    videoUrl: video.url,
+    videoTitle: video.title,
+    uploadDate: video.uploadDate,
+    thumbnailUrl: video.thumbnails.highResUrl,
+    description: video.description,
+    duration: video.duration,
+  );
+
+  Future<int> _persistVideo({
+    required String channelUrl,
+    required String channelName,
+    required String channelThumbnailUrl,
+    required String videoUrl,
+    required String videoTitle,
+    required DateTime? uploadDate,
+    required String thumbnailUrl,
+    required String description,
+    required Duration? duration,
+  }) async {
     var manga = isar.mangas
         .filter()
         .sourceEqualTo(youtubeSourceName)
@@ -137,13 +178,13 @@ class YouTubeService {
       final shouldFavorite = await YouTubePreferences.autoAddChannels();
       manga = Manga(
         source: youtubeSourceName,
-        author: video.author,
-        artist: video.author,
+        author: channelName,
+        artist: channelName,
         genre: const ['YouTube'],
-        imageUrl: video.thumbnails.highResUrl,
+        imageUrl: channelThumbnailUrl,
         lang: 'all',
         link: channelUrl,
-        name: video.author,
+        name: channelName,
         status: Status.ongoing,
         description: 'YouTube channel',
         sourceId: null,
@@ -161,17 +202,17 @@ class YouTubeService {
         .filter()
         .mangaIdEqualTo(manga.id)
         .and()
-        .urlEqualTo(video.url)
+        .urlEqualTo(videoUrl)
         .findFirstSync();
     if (chapter == null) {
       chapter = Chapter(
         mangaId: manga.id,
-        name: video.title,
-        url: video.url,
-        dateUpload: video.uploadDate?.toIso8601String() ?? '',
-        thumbnailUrl: video.thumbnails.highResUrl,
-        description: video.description,
-        duration: _formatDuration(video.duration),
+        name: videoTitle,
+        url: videoUrl,
+        dateUpload: uploadDate?.toIso8601String() ?? '',
+        thumbnailUrl: thumbnailUrl,
+        description: description,
+        duration: _formatDuration(duration),
       )..manga.value = manga;
       final createdChapter = chapter;
       isar.writeTxnSync(() {
@@ -183,6 +224,35 @@ class YouTubeService {
   }
 
   static Future<List<mangatan.Video>> resolveVideoStreams(String url) async {
+    final bridgeVideo = await _resolveWithBridge(url);
+    if (bridgeVideo != null) {
+      final preferredQuality = await YouTubePreferences.preferredQuality();
+      final preferredHeight =
+          int.tryParse(preferredQuality.replaceAll('p', '')) ?? 1080;
+      final streams = [...bridgeVideo.streams]
+        ..sort((a, b) {
+          final aDistance = ((a.height ?? 0) - preferredHeight).abs();
+          final bDistance = ((b.height ?? 0) - preferredHeight).abs();
+          return aDistance.compareTo(bDistance);
+        });
+      return [
+        for (final stream in streams)
+          mangatan.Video(
+            stream.url,
+            'YouTube - ${stream.quality}',
+            bridgeVideo.url,
+            subtitles: [
+              for (final track in stream.subtitles)
+                mangatan.Track(file: track.url, label: track.label),
+            ],
+            audios: [
+              for (final track in stream.audios)
+                mangatan.Track(file: track.url, label: track.label),
+            ],
+          ),
+      ];
+    }
+
     final client = youtube.YoutubeExplode();
     try {
       final id = youtube.VideoId.parseVideoId(url);
@@ -388,4 +458,127 @@ class YouTubeService {
         '${seconds.toString().padLeft(2, '0')}';
     return hours > 0 ? '$hours:$tail' : tail;
   }
+
+  static final Map<String, _BridgeCacheEntry> _bridgeCache = {};
+
+  static Future<_BridgeYouTubeVideo?> _resolveWithBridge(String url) async {
+    final videoId = youtube.VideoId.parseVideoId(url);
+    if (videoId == null) return null;
+    final cached = _bridgeCache[videoId];
+    if (cached != null &&
+        DateTime.now().difference(cached.fetchedAt) <
+            const Duration(minutes: 10)) {
+      return cached.video;
+    }
+
+    try {
+      final baseUrl = await prepareYouTubeResolverBridge();
+      if (baseUrl == null) return null;
+      final response = await http
+          .get(
+            Uri.parse(
+              '$baseUrl/youtube/resolve',
+            ).replace(queryParameters: {'url': url}),
+          )
+          .timeout(const Duration(seconds: 45));
+      if (response.statusCode != 200) return null;
+      final video = _BridgeYouTubeVideo.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+      _bridgeCache[videoId] = _BridgeCacheEntry(video, DateTime.now());
+      return video;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class _BridgeCacheEntry {
+  const _BridgeCacheEntry(this.video, this.fetchedAt);
+
+  final _BridgeYouTubeVideo video;
+  final DateTime fetchedAt;
+}
+
+class _BridgeYouTubeVideo {
+  const _BridgeYouTubeVideo({
+    required this.title,
+    required this.url,
+    required this.durationSeconds,
+    required this.uploadDate,
+    required this.thumbnailUrl,
+    required this.description,
+    required this.channelName,
+    required this.channelUrl,
+    required this.streams,
+  });
+
+  factory _BridgeYouTubeVideo.fromJson(Map<String, dynamic> json) =>
+      _BridgeYouTubeVideo(
+        title: json['title']?.toString() ?? '',
+        url: json['url']?.toString() ?? '',
+        durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
+        uploadDate: switch ((json['uploadDateMillis'] as num?)?.toInt()) {
+          final value? => DateTime.fromMillisecondsSinceEpoch(value),
+          null => null,
+        },
+        thumbnailUrl: json['thumbnailUrl']?.toString() ?? '',
+        description: json['description']?.toString() ?? '',
+        channelName: json['channelName']?.toString() ?? '',
+        channelUrl: json['channelUrl']?.toString() ?? '',
+        streams: [
+          for (final stream in (json['streams'] as List<dynamic>? ?? const []))
+            _BridgeYouTubeStream.fromJson(stream as Map<String, dynamic>),
+        ],
+      );
+
+  final String title;
+  final String url;
+  final int durationSeconds;
+  final DateTime? uploadDate;
+  final String thumbnailUrl;
+  final String description;
+  final String channelName;
+  final String channelUrl;
+  final List<_BridgeYouTubeStream> streams;
+}
+
+class _BridgeYouTubeStream {
+  const _BridgeYouTubeStream({
+    required this.url,
+    required this.quality,
+    required this.height,
+    required this.subtitles,
+    required this.audios,
+  });
+
+  factory _BridgeYouTubeStream.fromJson(Map<String, dynamic> json) =>
+      _BridgeYouTubeStream(
+        url: json['url']?.toString() ?? '',
+        quality: json['quality']?.toString() ?? 'Video',
+        height: (json['height'] as num?)?.toInt(),
+        subtitles: _BridgeYouTubeTrack.fromList(json['subtitles']),
+        audios: _BridgeYouTubeTrack.fromList(json['audios']),
+      );
+
+  final String url;
+  final String quality;
+  final int? height;
+  final List<_BridgeYouTubeTrack> subtitles;
+  final List<_BridgeYouTubeTrack> audios;
+}
+
+class _BridgeYouTubeTrack {
+  const _BridgeYouTubeTrack({required this.url, required this.label});
+
+  static List<_BridgeYouTubeTrack> fromList(Object? value) => [
+    for (final item in value as List<dynamic>? ?? const [])
+      _BridgeYouTubeTrack(
+        url: (item as Map<String, dynamic>)['url']?.toString() ?? '',
+        label: item['label']?.toString() ?? '',
+      ),
+  ];
+
+  final String url;
+  final String label;
 }

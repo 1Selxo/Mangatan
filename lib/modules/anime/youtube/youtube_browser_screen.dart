@@ -78,13 +78,30 @@ const youtubeInterceptScript = r'''
   function openInMangatan(rawUrl) {
     if (!playableUrl(rawUrl)) return false;
     var href = new URL(rawUrl, window.location.href).href;
-    if (window.flutter_inappwebview &&
-        window.flutter_inappwebview.callHandler) {
-      window.flutter_inappwebview.callHandler('openYouTubeVideo', href);
-    } else {
-      window.location.href =
-          'mangatan-youtube://play?url=' + encodeURIComponent(href);
+    var bridge = window.flutter_inappwebview;
+    if (!bridge || !bridge.callHandler) {
+      window.location.assign(href);
+      return true;
     }
+
+    var acknowledged = false;
+    var fallback = function() {
+      if (acknowledged) return;
+      acknowledged = true;
+      window.location.assign(href);
+    };
+    var fallbackTimer = setTimeout(fallback, 350);
+    Promise.resolve(bridge.callHandler('openYouTubeVideo', href)).then(
+      function(result) {
+        if (result === true) {
+          acknowledged = true;
+          clearTimeout(fallbackTimer);
+        } else {
+          fallback();
+        }
+      },
+      fallback
+    );
     return true;
   }
 
@@ -148,6 +165,7 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
   bool _externalWindowClosed = false;
   bool _disposing = false;
   String? _lastVideoId;
+  String? _sitePlaybackVideoId;
   DateTime? _lastLaunchAt;
 
   bool get _usesDesktopWindow => Platform.isLinux || Platform.isWindows;
@@ -188,7 +206,9 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
         ..setOnUrlRequestCallback((url) {
           final bridgedUrl = _desktopBridgeVideoUrl(url);
           final playableUrl = bridgedUrl ?? url;
-          if (directYouTubeVideoId(playableUrl) != null) {
+          final videoId = directYouTubeVideoId(playableUrl);
+          if (videoId == _sitePlaybackVideoId) return true;
+          if (videoId != null) {
             unawaited(_openVideo(playableUrl));
             return false;
           }
@@ -241,10 +261,14 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
   void _installBridge(InAppWebViewController controller) {
     controller.addJavaScriptHandler(
       handlerName: _youtubeBridgeName,
-      callback: (arguments) {
-        final url = arguments.firstOrNull?.toString();
-        if (url != null) unawaited(_openVideo(url));
-        return null;
+      callback: (JavaScriptHandlerFunctionData data) {
+        final url = data.args.firstOrNull?.toString();
+        if (url == null) return false;
+        final videoId = directYouTubeVideoId(url);
+        if (videoId == null) return false;
+        if (videoId == _sitePlaybackVideoId) return true;
+        unawaited(_openVideo(url));
+        return true;
       },
     );
   }
@@ -253,7 +277,11 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
     if (url == null) return NavigationActionPolicy.ALLOW;
     final bridgedUrl = _desktopBridgeVideoUrl(url);
     final playableUrl = bridgedUrl ?? url;
-    if (directYouTubeVideoId(playableUrl) != null) {
+    final videoId = directYouTubeVideoId(playableUrl);
+    if (videoId == _sitePlaybackVideoId) {
+      return NavigationActionPolicy.ALLOW;
+    }
+    if (videoId != null) {
       unawaited(_openVideo(playableUrl));
       return NavigationActionPolicy.CANCEL;
     }
@@ -289,6 +317,7 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
   Future<void> _openVideo(String url) async {
     final videoId = directYouTubeVideoId(url);
     if (videoId == null || _openingVideo) return;
+    if (videoId == _sitePlaybackVideoId) return;
     final now = DateTime.now();
     if (_lastVideoId == videoId &&
         _lastLaunchAt != null &&
@@ -298,8 +327,11 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
     _lastVideoId = videoId;
     _lastLaunchAt = now;
     _openingVideo = true;
+    Object? extractionError;
 
     try {
+      await _desktopWebview?.stop();
+      await _controller?.stopLoading();
       await _desktopWebview?.evaluateJavaScript(_stopYouTubePlaybackScript);
       await _controller?.evaluateJavascript(source: _stopYouTubePlaybackScript);
       if (Platform.isLinux) {
@@ -311,10 +343,16 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
       if (!mounted) return;
       await context.push('/animePlayerView', extra: chapterId);
     } catch (error) {
+      extractionError = error;
+      _sitePlaybackVideoId = videoId;
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${_friendlyError(error)} Opening it on YouTube instead.',
+            ),
+          ),
+        );
       }
     } finally {
       _openingVideo = false;
@@ -323,6 +361,13 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
         await _desktopWebview?.bringToForeground();
       } else if (Platform.isWindows && !_externalWindowClosed) {
         await _browser?.show();
+      }
+      if (extractionError != null && !_externalWindowClosed) {
+        if (Platform.isLinux) {
+          _desktopWebview?.launch(url);
+        } else {
+          await _controller?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+        }
       }
       if (_externalWindowClosed && mounted && !_disposing) {
         context.pop();
@@ -469,7 +514,8 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
           },
           onLoadStart: (_, url) async {
             final value = url?.toString();
-            if (directYouTubeVideoId(value ?? '') != null) {
+            final videoId = directYouTubeVideoId(value ?? '');
+            if (videoId != null && videoId != _sitePlaybackVideoId) {
               unawaited(_openVideo(value!));
             }
           },
@@ -478,7 +524,8 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
             _updateTitle(await controller.getTitle());
             await _injectInterception();
             final value = url?.toString();
-            if (directYouTubeVideoId(value ?? '') != null) {
+            final videoId = directYouTubeVideoId(value ?? '');
+            if (videoId != null && videoId != _sitePlaybackVideoId) {
               unawaited(_openVideo(value!));
             }
           },
@@ -487,7 +534,8 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
           onUpdateVisitedHistory: (_, url, _) async {
             await _injectInterception();
             final value = url?.toString();
-            if (directYouTubeVideoId(value ?? '') != null) {
+            final videoId = directYouTubeVideoId(value ?? '');
+            if (videoId != null && videoId != _sitePlaybackVideoId) {
               unawaited(_openVideo(value!));
             }
           },

@@ -33,6 +33,10 @@ depends=(
   'zlib-ng-compat'
 )
 
+optdepends=(
+  'mangatan-extension-server: Mihon extension support via the Mihon bridge'
+)
+
 provides=('mangatan' 'mangayomi')
 conflicts=(
   'mangatan'

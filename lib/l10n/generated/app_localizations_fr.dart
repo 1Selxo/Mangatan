@@ -2309,6 +2309,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Extension server files were linked.';
 
   @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
   String get select_extension_server_jar =>
       'Sélectionner le JAR du serveur d\'extension';
 

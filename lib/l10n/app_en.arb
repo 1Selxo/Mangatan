@@ -828,6 +828,12 @@
   "selected_folder_does_not_exist": "The selected folder does not exist.",
   "no_extension_server_files_found_in_selected_folder": "No extension server files were found in the selected folder.",
   "extension_server_files_linked": "Extension server files were linked.",
+  "extension_server_directory_is_package_managed": "The extension server folder is managed by your package manager. Installing into {fallbackDirectory} instead.",
+  "@extension_server_directory_is_package_managed": {
+    "placeholders": {
+      "fallbackDirectory": {}
+    }
+  },
   "select_extension_server_jar": "Select extension server JAR",
   "selected_file_could_not_be_accessed": "The selected file could not be accessed.",
   "extension_server_jar_imported": "Extension server JAR was imported.",

@@ -4229,6 +4229,14 @@ abstract class AppLocalizations {
   /// **'Extension server files were linked.'**
   String get extension_server_files_linked;
 
+  /// No description provided for @extension_server_directory_is_package_managed.
+  ///
+  /// In en, this message translates to:
+  /// **'The extension server folder is managed by your package manager. Installing into {fallbackDirectory} instead.'**
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  );
+
   /// No description provided for @select_extension_server_jar.
   ///
   /// In en, this message translates to:

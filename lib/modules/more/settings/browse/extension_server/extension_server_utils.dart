@@ -11,6 +11,80 @@ const extensionServerReleaseApiUrl =
 const apkBridgeReleaseUrl =
     'https://github.com/Schnitzel5/ApkBridge/releases/latest';
 
+/// Distro-managed install locations for the extension server, newest layout
+/// first. A Linux package (for example the `mangatan-extension-server` AUR
+/// package) drops `MExtensionServer-<version>.jar` plus a `jre/jre/bin/java`
+/// symlink to the system JRE here, so the bridge works without the user
+/// pointing the file picker at anything.
+///
+/// These directories are owned by the package manager. Never extract into or
+/// delete them; see [isManagedExtensionServerDirectory].
+const extensionServerSystemDirectories = <String>[
+  '/usr/share/mangatan/extension_server',
+  '/usr/lib/mangatan/extension_server',
+];
+
+/// Whether [directory] is a package-managed location that the in-app installer
+/// must not write to or wipe.
+///
+/// Matches an ancestor of a managed directory as well as the directory itself,
+/// because the installer wipes its target with `delete(recursive: true)`. The
+/// folder picker resolves the JAR recursively, so selecting `/usr/share/mangatan`
+/// — or `/usr` — yields a working configuration whose next in-app update would
+/// recursively delete everything beneath it. Subdirectories are covered too,
+/// since they are equally package-owned.
+bool isManagedExtensionServerDirectory(String directory) {
+  if (directory.isEmpty) return false;
+  // path.equals/isWithin canonicalize both sides, so a trailing separator or a
+  // `..` segment cannot slip a package-owned path past this check.
+  return extensionServerSystemDirectories.any(
+    (managed) =>
+        path.equals(managed, directory) ||
+        path.isWithin(directory, managed) ||
+        path.isWithin(managed, directory),
+  );
+}
+
+/// Finds a package-managed extension server install, or null when none is
+/// usable. Linux-only: no other platform ships a distro package.
+///
+/// A candidate only counts when it provides *both* a `java` executable and a
+/// `MExtensionServer-*.jar`, so a partially removed package is skipped rather
+/// than persisted as a broken configuration.
+///
+/// [directories] exists so tests can point at a temporary tree instead of the
+/// real `/usr` paths; production callers use the default.
+Future<SystemExtensionServerPaths?> findSystemExtensionServer({
+  List<String> directories = extensionServerSystemDirectories,
+}) async {
+  if (!Platform.isLinux) return null;
+  for (final candidate in directories) {
+    final root = Directory(candidate);
+    if (!await root.exists()) continue;
+    // Reuses the same resolution the folder picker performs. Note the packaged
+    // `java` must sit at `<root>/jre/jre/bin/java`: that preferred path is
+    // probed with File.exists(), which follows symlinks, whereas the recursive
+    // fallback lists with followLinks: false and would skip a symlink.
+    final jrePath = await findExtensionServerJavaExecutable(root);
+    if (jrePath == null) continue;
+    final jarPath = await findExtensionServerJar(root);
+    if (jarPath == null) continue;
+    return SystemExtensionServerPaths(jrePath: jrePath, jarPath: jarPath);
+  }
+  return null;
+}
+
+/// A resolved pair of paths from a package-managed extension server install.
+class SystemExtensionServerPaths {
+  final String jrePath;
+  final String jarPath;
+
+  const SystemExtensionServerPaths({
+    required this.jrePath,
+    required this.jarPath,
+  });
+}
+
 String? extensionServerDirectoryFromPaths({
   required String jrePath,
   required String extensionServerPath,

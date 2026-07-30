@@ -11,6 +11,7 @@ import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/more/settings/browse/extension_server/extension_server_utils.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -40,8 +41,26 @@ String? embeddedMihonBaseUrlFromResponse(Map<Object?, Object?>? response) {
   return 'http://127.0.0.1:$port';
 }
 
+/// Extracts the feature (major) version from `java -version` output.
+///
+/// Handles both the modern scheme (`"21.0.12"` -> 21) and the legacy `1.x`
+/// scheme (`"1.8.0_452"` -> 8). Returns null when no version is present.
+@visibleForTesting
+int? parseJreMajorVersion(String output) {
+  final match = RegExp(r'version\s+"(\d+)(?:\.(\d+))?').firstMatch(output);
+  if (match == null) return null;
+  final first = int.tryParse(match.group(1)!);
+  if (first == null) return null;
+  if (first != 1) return first;
+  return int.tryParse(match.group(2) ?? '');
+}
+
 class MExtensionServerPlatform {
   static const _unavailableBaseUrl = 'http://127.0.0.1:0';
+
+  /// The server JAR's entry point is Java 21 bytecode (class file major 65)
+  /// outside META-INF/versions, so an older runtime cannot load it at all.
+  static const _minimumJreMajorVersion = 21;
   static const _embeddedIosChannel = MethodChannel(
     'com.selxo.mangatan.embedded_mihon',
   );
@@ -334,16 +353,37 @@ class MExtensionServerPlatform {
 
       _setBaseUrl(_unavailableBaseUrl);
       final settings = isar.settings.getSync(227);
-      final jrePath = settings?.jrePath ?? '';
-      final serverJarPath = settings?.extensionServerPath ?? '';
+      var jrePath = settings?.jrePath ?? '';
+      var serverJarPath = settings?.extensionServerPath ?? '';
       if (isDesktop &&
           (!await _isFile(jrePath) || !await _isFile(serverJarPath))) {
+        // Nothing configured (or the configured files went away). A distro
+        // package may have installed the server system-wide, in which case
+        // adopt it instead of making the user pick the folder by hand.
+        final system = await findSystemExtensionServer();
+        if (system == null) {
+          _log(
+            'Mihon bridge was not started because the configured JRE or JAR '
+            'does not exist. JRE: "$jrePath", JAR: "$serverJarPath".',
+            level: LogLevel.error,
+          );
+          return;
+        }
+        jrePath = system.jrePath;
+        serverJarPath = system.jarPath;
         _log(
-          'Mihon bridge was not started because the configured JRE or JAR '
-          'does not exist. JRE: "$jrePath", JAR: "$serverJarPath".',
-          level: LogLevel.error,
+          'Adopted the package-managed Mihon extension server at '
+          '"${path.dirname(serverJarPath)}".',
         );
-        return;
+        _persistResolvedServerPaths(jrePath, serverJarPath);
+      }
+
+      if (Platform.isLinux) {
+        final incompatibility = await _describeJreIncompatibility(jrePath);
+        if (incompatibility != null) {
+          _log(incompatibility, level: LogLevel.error);
+          return;
+        }
       }
 
       for (var attempt = 1; attempt <= _launchAttempts; attempt++) {
@@ -483,6 +523,49 @@ class MExtensionServerPlatform {
 
   Future<bool> _isFile(String filePath) async {
     return filePath.isNotEmpty && await File(filePath).exists();
+  }
+
+  void _persistResolvedServerPaths(String jrePath, String serverJarPath) {
+    final settings = isar.settings.getSync(227);
+    if (settings == null) return;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings
+          ..jrePath = jrePath
+          ..extensionServerPath = serverJarPath
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
+  /// Returns an actionable error when [jrePath] is too old to run the server
+  /// JAR, or null when it looks usable (including when the version can't be
+  /// determined — never block a launch on a failed probe).
+  ///
+  /// Worth the extra process spawn on Linux: the plugin redirects the JVM's
+  /// stdout and stderr to /dev/null, so an UnsupportedClassVersionError would
+  /// otherwise surface only as three silent 20-second readiness timeouts.
+  Future<String?> _describeJreIncompatibility(String jrePath) async {
+    final version = await _readJreMajorVersion(jrePath);
+    if (version == null || version >= _minimumJreMajorVersion) return null;
+    return 'The Mihon bridge was not started because "$jrePath" is Java '
+        '$version, but the extension server requires Java '
+        '$_minimumJreMajorVersion or newer. Install a supported runtime (on '
+        'Arch Linux: pacman -S jre$_minimumJreMajorVersion-openjdk) or use '
+        'Settings > Browse > Extension server to download the bundled runtime.';
+  }
+
+  Future<int?> _readJreMajorVersion(String jrePath) async {
+    try {
+      final result = await Process.run(jrePath, [
+        '-version',
+      ]).timeout(const Duration(seconds: 10));
+      // `java -version` writes to stderr for historical reasons; older builds
+      // and some wrappers use stdout, so scan both.
+      return parseJreMajorVersion('${result.stderr}\n${result.stdout}');
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<int> _allocatePort() async {

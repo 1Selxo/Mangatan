@@ -2216,6 +2216,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extension_server_files_linked => '扩展服务器文件已链接。';
 
   @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
   String get select_extension_server_jar => '选择扩展服务器 JAR';
 
   @override

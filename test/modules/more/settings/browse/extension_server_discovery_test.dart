@@ -141,9 +141,37 @@ void main() {
         isFalse,
       );
       expect(
-        isManagedExtensionServerDirectory('/usr/share/mangatan'),
+        isManagedExtensionServerDirectory('/usr/share/fonts'),
         isFalse,
-        reason: 'only the server directory itself is package-owned',
+        reason: 'an unrelated /usr path is not the installer\'s business',
+      );
+    });
+
+    test('guards an ancestor of a managed directory', () {
+      // The folder picker resolves the JAR recursively, so an ancestor is a
+      // working selection — and the install would then delete(recursive: true)
+      // the whole subtree, taking the package-owned files with it.
+      for (final ancestor in [
+        '/usr/share/mangatan',
+        '/usr/share',
+        '/usr',
+        '/',
+      ]) {
+        expect(
+          isManagedExtensionServerDirectory(ancestor),
+          isTrue,
+          reason: 'wiping $ancestor would destroy a package-managed install',
+        );
+      }
+    });
+
+    test('guards a subdirectory of a managed directory', () {
+      expect(
+        isManagedExtensionServerDirectory(
+          '/usr/share/mangatan/extension_server/jre',
+        ),
+        isTrue,
+        reason: 'everything under the server directory is package-owned too',
       );
     });
 
@@ -281,6 +309,31 @@ void main() {
         template,
         contains(r'noextract=("${_bundle}")'),
         reason: 'the vendored JRE in the bundle must never reach the package',
+      );
+    });
+
+    test('the server package extracts exactly one JAR', () {
+      final template = read('packaging/arch/PKGBUILD-extension-server.template');
+
+      // `bsdtar --extract` exits 0 when a pattern matches two entries and
+      // concatenates them into one corrupt file, so the size floor below it
+      // cannot catch that case — the match count has to be checked up front.
+      expect(
+        template,
+        contains(
+          r"""matches=$(bsdtar --list --file "${_bundle}" 'MExtensionServer-*.jar' | wc -l)""",
+        ),
+        reason: 'a second matching entry would silently corrupt the JAR',
+      );
+      expect(
+        template,
+        contains('if (( matches != 1 )); then'),
+        reason: 'both zero and two matches must fail the build',
+      );
+      expect(
+        template.indexOf('matches=\$(bsdtar --list'),
+        lessThan(template.indexOf('bsdtar --extract')),
+        reason: 'the count must gate the extraction, not follow it',
       );
     });
   });

@@ -26,12 +26,22 @@ const extensionServerSystemDirectories = <String>[
 
 /// Whether [directory] is a package-managed location that the in-app installer
 /// must not write to or wipe.
+///
+/// Matches an ancestor of a managed directory as well as the directory itself,
+/// because the installer wipes its target with `delete(recursive: true)`. The
+/// folder picker resolves the JAR recursively, so selecting `/usr/share/mangatan`
+/// — or `/usr` — yields a working configuration whose next in-app update would
+/// recursively delete everything beneath it. Subdirectories are covered too,
+/// since they are equally package-owned.
 bool isManagedExtensionServerDirectory(String directory) {
   if (directory.isEmpty) return false;
-  // path.equals canonicalizes both sides, so a trailing separator or a `..`
-  // segment cannot slip a package-owned path past this check.
+  // path.equals/isWithin canonicalize both sides, so a trailing separator or a
+  // `..` segment cannot slip a package-owned path past this check.
   return extensionServerSystemDirectories.any(
-    (managed) => path.equals(managed, directory),
+    (managed) =>
+        path.equals(managed, directory) ||
+        path.isWithin(directory, managed) ||
+        path.isWithin(managed, directory),
   );
 }
 

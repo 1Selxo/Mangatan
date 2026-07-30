@@ -156,6 +156,38 @@ void main() {
   });
 
   test(
+    'reads update metadata and stores a safe display-name override',
+    () async {
+      final root = await Directory.systemTemp.createTemp('dictionary-storage-');
+      addTearDown(() => root.delete(recursive: true));
+      final dictionary = Directory(p.join(root.path, 'stable-storage-name'));
+      await dictionary.create();
+      await File(p.join(dictionary.path, 'index.json')).writeAsString(
+        '{"title":"Original","revision":"3.2","isUpdatable":true,'
+        '"indexUrl":"https://example.test/index.json",'
+        '"downloadUrl":"https://example.test/dictionary.zip"}',
+      );
+
+      await DictionaryStorage.instance.renameDisplayName(
+        'stable-storage-name',
+        'My preferred name',
+        root: root,
+      );
+      final installed = (await DictionaryStorage.instance.installed(
+        root: root,
+      )).single;
+
+      expect(installed.name, 'stable-storage-name');
+      expect(installed.displayName, 'My preferred name');
+      expect(installed.revision, '3.2');
+      expect(installed.isUpdatable, isTrue);
+      expect(installed.indexUrl, 'https://example.test/index.json');
+      expect(installed.downloadUrl, 'https://example.test/dictionary.zip');
+      expect(await dictionary.exists(), isTrue);
+    },
+  );
+
+  test(
     'applies profile order and enabled dictionaries without rewriting disk order',
     () async {
       final root = await Directory.systemTemp.createTemp('dictionary-storage-');

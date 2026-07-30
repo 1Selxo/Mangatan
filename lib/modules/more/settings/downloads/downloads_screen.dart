@@ -125,7 +125,10 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
               ),
             ),
             ListTile(
-              onTap: () async => ref.read(scanLocalLibraryProvider.future),
+              onTap: () async {
+                ref.invalidate(scanLocalLibraryProvider);
+                await ref.read(scanLocalLibraryProvider.future);
+              },
               title: Text(context.l10n.rescan_local_folder),
             ),
             ListTile(
@@ -133,8 +136,15 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 final result = await FilePicker.getDirectoryPath();
                 if (result != null) {
                   final temp = localFolders.toList();
-                  temp.add(result);
+                  final resultKey = localLibraryPathKey(result);
+                  if (!temp.any(
+                    (folder) => localLibraryPathKey(folder) == resultKey,
+                  )) {
+                    temp.add(result);
+                  }
                   ref.read(localFoldersStateProvider.notifier).set(temp);
+                  ref.invalidate(scanLocalLibraryProvider);
+                  await ref.read(scanLocalLibraryProvider.future);
                 }
               },
               title: Text(context.l10n.add_local_folder),

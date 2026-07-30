@@ -6,6 +6,7 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/torrent_server.dart';
+import 'package:mangayomi/services/youtube/youtube_service.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -24,6 +25,11 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
   try {
     final storageProvider = StorageProvider();
     final mpvDirectory = await storageProvider.getMpvDirectory();
+    if (episode.manga.value?.source == youtubeSourceName) {
+      final videos = await YouTubeService.resolveVideoStreams(episode.url!);
+      keepAlive.close();
+      return (videos, false, const <String>[], mpvDirectory);
+    }
     final mangaDirectory = await storageProvider.getMangaMainDirectory(episode);
     final isLocalArchive =
         episode.manga.value!.isLocalArchive! &&

@@ -49,6 +49,70 @@ void main() {
     });
   });
 
+  test('defaults to AnkiMobile and persists the selected iOS mode', () async {
+    expect(
+      await MiningPreferences.getAnkiIntegrationMode(),
+      AnkiIntegrationMode.ankiMobile,
+    );
+
+    await MiningPreferences.setAnkiIntegrationMode(
+      AnkiIntegrationMode.ankiConnect,
+    );
+    await Hive.box<dynamic>('mining_preferences').close();
+
+    expect(
+      await MiningPreferences.getAnkiIntegrationMode(),
+      AnkiIntegrationMode.ankiConnect,
+    );
+  });
+
+  test('lookup history is shared, bounded, and most-recent-first', () async {
+    expect(
+      updatedDictionaryLookupHistory(
+        const ['古い', '読む', '語'],
+        ' 読む ',
+        maximumEntries: 3,
+      ),
+      const ['読む', '古い', '語'],
+    );
+
+    await MiningPreferences.recordDictionaryLookup('読む');
+    await MiningPreferences.recordDictionaryLookup('言葉');
+    await MiningPreferences.recordDictionaryLookup('読む');
+
+    expect(await MiningPreferences.getDictionaryLookupHistory(), ['読む', '言葉']);
+    await MiningPreferences.clearDictionaryLookupHistory();
+    expect(await MiningPreferences.getDictionaryLookupHistory(), isEmpty);
+  });
+
+  test('parallel OCR limit is clamped and persisted', () async {
+    await MiningPreferences.setParallelOcrLimit(3);
+    expect(await MiningPreferences.getParallelOcrLimit(), 3);
+
+    await MiningPreferences.setParallelOcrLimit(99);
+    expect(await MiningPreferences.getParallelOcrLimit(), 4);
+
+    await MiningPreferences.setParallelOcrLimit(-2);
+    expect(await MiningPreferences.getParallelOcrLimit(), 1);
+  });
+
+  test('desktop always resolves to AnkiConnect', () {
+    expect(
+      effectiveAnkiIntegrationMode(
+        preferredMode: AnkiIntegrationMode.ankiMobile,
+        isIOS: false,
+      ),
+      AnkiIntegrationMode.ankiConnect,
+    );
+    expect(
+      effectiveAnkiIntegrationMode(
+        preferredMode: AnkiIntegrationMode.ankiMobile,
+        isIOS: true,
+      ),
+      AnkiIntegrationMode.ankiMobile,
+    );
+  });
+
   test('uses and persists ordered Japanese audio sources', () async {
     final defaults = await MiningPreferences.getAnkiAudioPreferences();
     expect(defaults.effectiveSources.map((source) => source.type), [

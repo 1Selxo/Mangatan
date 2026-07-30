@@ -7,6 +7,8 @@ import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dialog.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_history_sheet.dart';
+import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
@@ -15,6 +17,7 @@ import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
+import 'package:mangayomi/services/mining/dictionary_update_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
@@ -40,6 +43,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     name: 'Default',
   );
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
+  int _parallelOcrLimit = 1;
   bool _mokuroWebsiteOcrEnabled = true;
   String _dictionaryLanguage = 'ja';
   double _backgroundOpacity = MiningPreferences.defaultOcrBackgroundOpacity;
@@ -54,10 +58,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _screenAiAvailable = false;
   bool _loading = true;
   bool _importing = false;
+  bool _checkingDictionaryUpdates = false;
+  bool _dictionaryAutoUpdate = false;
+  int _dictionaryAutoUpdateHours = 24;
+  Map<String, DictionaryUpdateInfo> _dictionaryUpdates = const {};
   late DictionaryPopupPreferences _popupPreferences;
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
   AnkiAudioPreferences _ankiAudioPreferences = AnkiAudioPreferences.defaults;
   Uri _ankiEndpoint = Uri.parse('http://127.0.0.1:8765');
+  AnkiIntegrationMode _ankiIntegrationMode = AnkiIntegrationMode.ankiMobile;
   int? _ankiVersion;
   List<String> _ankiDecks = const [];
   List<String> _ankiModels = const [];
@@ -66,7 +75,14 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   String? _ankiError;
   bool _ankiRefreshing = false;
 
-  bool get _usesAnkiMobile => defaultTargetPlatform == TargetPlatform.iOS;
+  bool get _isIOS => defaultTargetPlatform == TargetPlatform.iOS;
+
+  bool get _usesAnkiMobile =>
+      effectiveAnkiIntegrationMode(
+        preferredMode: _ankiIntegrationMode,
+        isIOS: _isIOS,
+      ) ==
+      AnkiIntegrationMode.ankiMobile;
 
   @override
   void initState() {
@@ -96,6 +112,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getDictionaryProfiles(),
       MiningPreferences.getActiveDictionaryProfile(),
       MiningPreferences.getMokuroWebsiteOcrEnabled(),
+      MiningPreferences.getAnkiIntegrationMode(),
+      MiningPreferences.getDictionaryAutoUpdateEnabled(),
+      MiningPreferences.getDictionaryAutoUpdateIntervalHours(),
+      MiningPreferences.getParallelOcrLimit(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -122,6 +142,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _lookupTrigger = values[14] as DictionaryLookupTrigger;
       _additionalLeftClick = values[15] as bool;
       _dictionaryLanguage = values[16] as String;
+      _ankiIntegrationMode = values[20] as AnkiIntegrationMode;
+      _dictionaryAutoUpdate = values[21] as bool;
+      _dictionaryAutoUpdateHours = values[22] as int;
+      _parallelOcrLimit = values[23] as int;
       _loading = false;
     });
     if (widget.section == DictionarySettingsSection.anki && !_usesAnkiMobile) {
@@ -199,6 +223,67 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     );
     await HoshidictsLookupBackend.instance.reloadFromStorage();
     await _load();
+  }
+
+  Future<void> _renameDictionary(InstalledDictionary dictionary) async {
+    final value = await _editText(
+      title: 'Rename dictionary',
+      value: dictionary.displayName,
+      hint: dictionary.name,
+    );
+    if (value == null || value.trim().isEmpty) return;
+    try {
+      await DictionaryStorage.instance.renameDisplayName(
+        dictionary.name,
+        value,
+      );
+      await _load();
+    } catch (error) {
+      botToast('Could not rename dictionary: $error', second: 5);
+    }
+  }
+
+  Future<void> _checkDictionaryUpdates() async {
+    if (_checkingDictionaryUpdates) return;
+    setState(() => _checkingDictionaryUpdates = true);
+    try {
+      final results = await DictionaryUpdateService.instance.checkAll();
+      if (!mounted) return;
+      setState(() {
+        _dictionaryUpdates = {
+          for (final result in results) result.dictionary.name: result,
+        };
+      });
+      final available = results.where((result) => result.hasUpdate).length;
+      final failures = results.where((result) => result.error != null).length;
+      botToast(
+        available > 0
+            ? '$available dictionary update${available == 1 ? '' : 's'} available'
+            : failures > 0
+            ? 'Update check completed with $failures error${failures == 1 ? '' : 's'}'
+            : 'All dictionaries are up to date',
+        second: 4,
+      );
+    } finally {
+      if (mounted) setState(() => _checkingDictionaryUpdates = false);
+    }
+  }
+
+  Future<void> _applyDictionaryUpdate(DictionaryUpdateInfo update) async {
+    setState(() => _importing = true);
+    try {
+      final installed = await DictionaryUpdateService.instance.apply(update);
+      await _load();
+      botToast(
+        'Updated ${installed.displayName}'
+        '${installed.revision == null ? '' : ' to ${installed.revision}'}',
+        second: 5,
+      );
+    } catch (error) {
+      botToast('Dictionary update failed: $error', second: 6);
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
   }
 
   Future<void> _saveDictionaryOrder(
@@ -582,6 +667,20 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     }
   }
 
+  Future<void> _setAnkiIntegrationMode(AnkiIntegrationMode mode) async {
+    if (mode == _ankiIntegrationMode) return;
+    setState(() {
+      _ankiIntegrationMode = mode;
+      _ankiVersion = null;
+      _ankiDecks = const [];
+      _ankiModels = const [];
+      _ankiFields = const [];
+      _ankiMobileFieldsByModel = const {};
+      _ankiError = null;
+    });
+    await MiningPreferences.setAnkiIntegrationMode(mode);
+  }
+
   Future<void> _selectAnkiModel(String modelName) async {
     var fields = <String>[];
     if (_usesAnkiMobile) {
@@ -892,7 +991,20 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         ? _activeProfile.dictionaryCollapseMode
         : 'expand_all';
     return Scaffold(
-      appBar: AppBar(title: Text(widget.section.title)),
+      appBar: AppBar(
+        title: Text(widget.section.title),
+        actions: [
+          IconButton(
+            tooltip: 'Lookup history',
+            onPressed: () => DictionaryLookupHistorySheet.show(
+              context: context,
+              onSelected: (query) =>
+                  MiningLookupSheet.show(context: context, text: query),
+            ),
+            icon: const Icon(Icons.history),
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -967,6 +1079,68 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 const Divider(height: 24),
                 const _SectionHeader('Dictionaries'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.sync),
+                  title: const Text('Update dictionaries automatically'),
+                  subtitle: Text(
+                    'Check every $_dictionaryAutoUpdateHours hours while the app is running',
+                  ),
+                  value: _dictionaryAutoUpdate,
+                  onChanged: (value) {
+                    setState(() => _dictionaryAutoUpdate = value);
+                    MiningPreferences.setDictionaryAutoUpdateEnabled(value);
+                  },
+                ),
+                if (_dictionaryAutoUpdate)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _dictionaryAutoUpdateHours,
+                      decoration: const InputDecoration(
+                        labelText: 'Update check interval',
+                        prefixIcon: Icon(Icons.schedule),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 6,
+                          child: Text('Every 6 hours'),
+                        ),
+                        DropdownMenuItem(
+                          value: 12,
+                          child: Text('Every 12 hours'),
+                        ),
+                        DropdownMenuItem(value: 24, child: Text('Daily')),
+                        DropdownMenuItem(
+                          value: 72,
+                          child: Text('Every 3 days'),
+                        ),
+                        DropdownMenuItem(value: 168, child: Text('Weekly')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _dictionaryAutoUpdateHours = value);
+                        MiningPreferences.setDictionaryAutoUpdateIntervalHours(
+                          value,
+                        );
+                      },
+                    ),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.system_update_alt),
+                  title: const Text('Check for dictionary updates'),
+                  subtitle: const Text(
+                    'Uses update information embedded by compatible Yomitan dictionaries',
+                  ),
+                  trailing: _checkingDictionaryUpdates
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                  onTap: _checkingDictionaryUpdates
+                      ? null
+                      : _checkDictionaryUpdates,
+                ),
                 ListTile(
                   leading: const Icon(Icons.archive_outlined),
                   title: const Text('Import Yomitan dictionary'),
@@ -1053,6 +1227,14 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         ),
                         onMoveUp: () => _moveDictionary(index, -1),
                         onMoveDown: () => _moveDictionary(index, 1),
+                        update: _dictionaryUpdates[dictionary.name],
+                        onRename: () => _renameDictionary(dictionary),
+                        onUpdate: () {
+                          final update = _dictionaryUpdates[dictionary.name];
+                          if (update != null) {
+                            _applyDictionaryUpdate(update);
+                          }
+                        },
                         onDelete: () => _deleteDictionary(dictionary),
                       );
                     },
@@ -1356,7 +1538,30 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     onChanged: (value) async {
                       if (value == null) return;
                       setState(() => _engine = value);
-                      await MiningPreferences.setOcrEngine(value);
+                      await ReaderOcrState.setEngine(value);
+                    },
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.account_tree_outlined),
+                  title: const Text('Parallel OCR tasks'),
+                  subtitle: Text(
+                    _parallelOcrLimit == 1
+                        ? '1 task (recommended for battery and stability)'
+                        : '$_parallelOcrLimit tasks may use more power or trigger online rate limits',
+                  ),
+                  trailing: DropdownButton<int>(
+                    value: _parallelOcrLimit,
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('1')),
+                      DropdownMenuItem(value: 2, child: Text('2')),
+                      DropdownMenuItem(value: 3, child: Text('3')),
+                      DropdownMenuItem(value: 4, child: Text('4')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _parallelOcrLimit = value);
+                      unawaited(ReaderOcrState.setParallelOcrLimit(value));
                     },
                   ),
                 ),
@@ -1475,7 +1680,52 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   _DictionarySettingsGroup.anki,
                 ),
                 const Divider(height: 24),
-                _SectionHeader(_usesAnkiMobile ? 'AnkiMobile' : 'AnkiConnect'),
+                const _SectionHeader('Anki'),
+                if (_isIOS) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: DropdownButtonFormField<AnkiIntegrationMode>(
+                      key: ValueKey(_ankiIntegrationMode),
+                      initialValue: _ankiIntegrationMode,
+                      decoration: const InputDecoration(
+                        labelText: 'iOS Anki integration',
+                        prefixIcon: Icon(Icons.swap_horiz_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: AnkiIntegrationMode.ankiMobile,
+                          child: Text('AnkiMobile'),
+                        ),
+                        DropdownMenuItem(
+                          value: AnkiIntegrationMode.ankiConnect,
+                          child: Text('AnkiConnect'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          _setAnkiIntegrationMode(value);
+                        }
+                      },
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      _usesAnkiMobile
+                          ? Icons.phone_iphone_outlined
+                          : Icons.lan_outlined,
+                    ),
+                    title: Text(
+                      _usesAnkiMobile
+                          ? 'Use AnkiMobile on this iPhone'
+                          : 'Use an AnkiConnect server',
+                    ),
+                    subtitle: Text(
+                      _usesAnkiMobile
+                          ? 'Opens AnkiMobile through its iOS callback API when you mine a card.'
+                          : 'Connects over HTTP to Anki running on a reachable computer. Use its LAN address, not 127.0.0.1.',
+                    ),
+                  ),
+                ],
                 SwitchListTile(
                   secondary: const Icon(Icons.note_add_outlined),
                   title: const Text('Enable Anki export'),
@@ -1648,7 +1898,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       final endpoint = value == null
                           ? null
                           : Uri.tryParse(value.trim());
-                      if (endpoint == null || !endpoint.hasScheme) return;
+                      if (endpoint == null ||
+                          !const {'http', 'https'}.contains(endpoint.scheme) ||
+                          endpoint.host.isEmpty) {
+                        botToast(
+                          'Enter a complete http:// or https:// AnkiConnect address',
+                          second: 4,
+                        );
+                        return;
+                      }
                       setState(() => _ankiEndpoint = endpoint);
                       await MiningPreferences.setAnkiEndpoint(endpoint);
                       await _refreshAnki();
@@ -1987,6 +2245,9 @@ class _DictionaryListTile extends StatelessWidget {
     required this.onDisplayModeChanged,
     required this.onMoveUp,
     required this.onMoveDown,
+    required this.update,
+    required this.onRename,
+    required this.onUpdate,
     required this.onDelete,
   });
 
@@ -2000,15 +2261,23 @@ class _DictionaryListTile extends StatelessWidget {
   final ValueChanged<String> onDisplayModeChanged;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
+  final DictionaryUpdateInfo? update;
+  final VoidCallback onRename;
+  final VoidCallback onUpdate;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final capabilities = [
+    final details = [
       if (dictionary.hasTerms) 'Terms',
       if (dictionary.hasFrequencies) 'Frequency',
       if (dictionary.hasPitch) 'Pitch',
       if (dictionary.hasKanji) 'Kanji',
+      if (dictionary.revision?.isNotEmpty == true)
+        'Revision ${dictionary.revision}',
+      if (update?.hasUpdate == true)
+        'Update ${update!.latestRevision} available',
+      if (update?.error != null) 'Update check failed',
     ];
     return ListTile(
       leading: Row(
@@ -2026,12 +2295,14 @@ class _DictionaryListTile extends StatelessWidget {
         ],
       ),
       title: Text(
-        dictionary.name,
+        dictionary.displayName,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        capabilities.isEmpty ? 'No lookup data' : capabilities.join(' • '),
+        details.isEmpty ? 'No lookup data' : details.join(' • '),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2061,20 +2332,73 @@ class _DictionaryListTile extends StatelessWidget {
               ),
             ),
           Switch(value: enabled, onChanged: onEnabledChanged),
-          IconButton(
-            tooltip: 'Move dictionary up',
-            onPressed: canMoveUp ? onMoveUp : null,
-            icon: const Icon(Icons.keyboard_arrow_up),
-          ),
-          IconButton(
-            tooltip: 'Move dictionary down',
-            onPressed: canMoveDown ? onMoveDown : null,
-            icon: const Icon(Icons.keyboard_arrow_down),
-          ),
-          IconButton(
-            tooltip: 'Remove dictionary',
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
+          PopupMenuButton<String>(
+            tooltip: 'Dictionary actions',
+            onSelected: (action) {
+              switch (action) {
+                case 'update':
+                  onUpdate();
+                  break;
+                case 'rename':
+                  onRename();
+                  break;
+                case 'up':
+                  onMoveUp();
+                  break;
+                case 'down':
+                  onMoveDown();
+                  break;
+                case 'delete':
+                  onDelete();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              if (update?.hasUpdate == true)
+                const PopupMenuItem(
+                  value: 'update',
+                  child: ListTile(
+                    leading: Icon(Icons.system_update_alt),
+                    title: Text('Update'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'rename',
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Rename'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'up',
+                enabled: canMoveUp,
+                child: const ListTile(
+                  leading: Icon(Icons.keyboard_arrow_up),
+                  title: Text('Move up'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'down',
+                enabled: canMoveDown,
+                child: const ListTile(
+                  leading: Icon(Icons.keyboard_arrow_down),
+                  title: Text('Move down'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Remove'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),

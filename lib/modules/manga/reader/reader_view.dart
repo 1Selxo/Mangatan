@@ -16,6 +16,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
+import 'package:mangayomi/modules/manga/reader/reader_eink_state.dart';
 import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
 import 'package:mangayomi/modules/manga/reader/services/page_navigation_service.dart';
 import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
@@ -94,6 +95,7 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
         }
 
         return MangaChapterPageGallery(
+          key: ObjectKey(model),
           chapter: chapter,
           chapterUrlModel: model,
         );
@@ -182,6 +184,7 @@ class _MangaChapterPageGalleryState
 
   @override
   void dispose() {
+    ReaderEInkState.enabled.removeListener(_eInkChanged);
     _setMacosPagedWheelMode(false);
     WidgetsBinding.instance.removeObserver(this);
     _readingStopwatch.stop();
@@ -288,6 +291,8 @@ class _MangaChapterPageGalleryState
   @override
   void initState() {
     super.initState();
+    ReaderEInkState.enabled.addListener(_eInkChanged);
+    unawaited(ReaderEInkState.initialize());
     _readingStopwatch.start();
     _scaleAnimationController = AnimationController(
       duration: _doubleTapAnimationDuration(),
@@ -310,11 +315,24 @@ class _MangaChapterPageGalleryState
     _initWakelock();
   }
 
+  void _eInkChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _initWakelock() {
     final keepOn = isar.settings.getSync(227)!.keepScreenOnReader ?? true;
     if (keepOn) {
       WakelockPlus.enable();
     }
+  }
+
+  void _refreshMihonChapterPages() {
+    if (!mounted) return;
+    final chapterId = chapter.id;
+    if (chapterId == null) return;
+    _failedToLoadImage.value = false;
+    ref.invalidate(getChapterPagesProvider(chapter: chapter));
+    ref.invalidate(mangaReaderProvider(chapterId));
   }
 
   // final double _horizontalScaleValue = 1.0;
@@ -360,8 +378,9 @@ class _MangaChapterPageGalleryState
   Axis _scrollDirection = Axis.vertical;
   bool _isReverseHorizontal = false;
 
-  Color _backgroundColor(BuildContext context) =>
-      Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.9);
+  Color _backgroundColor(BuildContext context) => ReaderEInkState.enabled.value
+      ? Colors.white
+      : Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.9);
 
   Future<void> _setFullScreen({bool? value}) async {
     final target =
@@ -399,9 +418,89 @@ class _MangaChapterPageGalleryState
     );
   }
 
+  Future<void> _showPagePreviews() async {
+    final chapterPages = pages
+        .where(
+          (page) => page.chapter?.id == chapter.id && !page.isTransitionPage,
+        )
+        .toList(growable: false);
+    if (chapterPages.isEmpty || !mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 150,
+              childAspectRatio: 0.68,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: chapterPages.length,
+            itemBuilder: (context, index) {
+              final page = chapterPages[index];
+              return InkWell(
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  var target = page.pageIndex ?? index;
+                  if (_isDoublePageActive) {
+                    target = _actualToPageViewIndex(target);
+                  }
+                  navigationService.jumpToPage(
+                    index: target,
+                    readerMode: ref.read(_currentReaderMode)!,
+                  );
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        border: Border.all(
+                          color: Theme.of(context).dividerColor,
+                        ),
+                      ),
+                      child: Image(
+                        image: page.getImageProvider(ref, true),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: double.infinity,
+                        color: Colors.black.withValues(alpha: 0.68),
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Text(
+                          '${index + 1}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = ref.watch(backgroundColorStateProvider);
+    final configuredBackgroundColor = ref.watch(backgroundColorStateProvider);
+    final backgroundColor = ReaderEInkState.enabled.value
+        ? BackgroundColor.white
+        : configuredBackgroundColor;
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
     final readerMode = ref.watch(_currentReaderMode);
     final readingDirection = ref.watch(_currentReadingDirection);
@@ -492,6 +591,7 @@ class _MangaChapterPageGalleryState
                                 isHorizontalContinuous &&
                                 readingDirection.isRtl,
                             isScrolling: _isScrolling,
+                            onRefreshMihonPages: _refreshMihonChapterPages,
                           )
                         : Material(
                             color: getBackgroundColor(backgroundColor),
@@ -662,6 +762,7 @@ class _MangaChapterPageGalleryState
                           _setFullScreen(value: !fullScreen);
                         },
                       ),
+                      onPagePreviewsPressed: _showPagePreviews,
                       currentReaderModeProvider: _currentReaderMode,
                       currentReadingDirectionProvider: _currentReadingDirection,
                       currentPageListenable: _currentPageDisplayIndex,
@@ -731,6 +832,7 @@ class _MangaChapterPageGalleryState
           _failedToLoadImage.value = val;
         }
       },
+      onRefreshMihonPages: _refreshMihonChapterPages,
       onLongPressData: (data) {
         ImageActionsDialog.show(
           context: context,

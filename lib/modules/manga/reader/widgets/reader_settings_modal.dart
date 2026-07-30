@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
+import 'package:mangayomi/modules/manga/reader/reader_eink_state.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_popup_menu_button.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
@@ -13,6 +14,7 @@ import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_pr
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 
 String _navLayoutName(int index, BuildContext context) {
   final l10n = l10nLocalizations(context)!;
@@ -69,6 +71,7 @@ class ReaderSettingsModal {
 
     final l10n = l10nLocalizations(context)!;
     unawaited(ReaderOcrState.initialize());
+    unawaited(ReaderEInkState.initialize());
 
     await customDraggableTabBar(
       tabs: [
@@ -885,6 +888,20 @@ class _GeneralTab extends ConsumerWidget {
             ),
 
             // Fullscreen
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderEInkState.enabled,
+              builder: (context, eInkMode, _) => SwitchListTile(
+                value: eInkMode,
+                title: const Text('E-Ink mode'),
+                subtitle: const Text(
+                  'Uses a high-contrast white reader surface for E-Ink displays',
+                ),
+                onChanged: (value) {
+                  unawaited(ReaderEInkState.setEnabled(value));
+                },
+              ),
+            ),
+
             SwitchListTile(
               value: fullScreenReader,
               title: Text(
@@ -915,6 +932,74 @@ class _GeneralTab extends ConsumerWidget {
               ),
               onChanged: (value) {
                 ref.read(showPagesNumberStateProvider.notifier).set(value);
+              },
+            ),
+
+            ValueListenableBuilder<OcrEnginePreference>(
+              valueListenable: ReaderOcrState.engine,
+              builder: (context, engine, _) {
+                return ListTile(
+                  title: const Text('OCR engine'),
+                  subtitle: Text(switch (engine) {
+                    OcrEnginePreference.automatic =>
+                      'Automatic (Mokuro, ScreenAI, Google Lens)',
+                    OcrEnginePreference.screenAi => 'ScreenAI (local Chrome)',
+                    OcrEnginePreference.googleLens => 'Google Lens',
+                    OcrEnginePreference.mokuroOnly => 'Mokuro only',
+                  }),
+                  trailing: PopupMenuButton<OcrEnginePreference>(
+                    initialValue: engine,
+                    onSelected: (value) {
+                      unawaited(ReaderOcrState.setEngine(value));
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: OcrEnginePreference.automatic,
+                        child: Text('Automatic'),
+                      ),
+                      PopupMenuItem(
+                        value: OcrEnginePreference.screenAi,
+                        child: Text('ScreenAI'),
+                      ),
+                      PopupMenuItem(
+                        value: OcrEnginePreference.googleLens,
+                        child: Text('Google Lens'),
+                      ),
+                      PopupMenuItem(
+                        value: OcrEnginePreference.mokuroOnly,
+                        child: Text('Mokuro only'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            ValueListenableBuilder<int>(
+              valueListenable: ReaderOcrState.parallelOcrLimit,
+              builder: (context, limit, _) {
+                return ListTile(
+                  title: const Text('Parallel OCR tasks'),
+                  subtitle: Text(
+                    limit == 1
+                        ? '1 task (recommended)'
+                        : '$limit tasks (higher battery and network use)',
+                  ),
+                  trailing: DropdownButton<int>(
+                    value: limit,
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('1')),
+                      DropdownMenuItem(value: 2, child: Text('2')),
+                      DropdownMenuItem(value: 3, child: Text('3')),
+                      DropdownMenuItem(value: 4, child: Text('4')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        unawaited(ReaderOcrState.setParallelOcrLimit(value));
+                      }
+                    },
+                  ),
+                );
               },
             ),
 

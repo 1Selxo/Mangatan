@@ -24,21 +24,15 @@ void main() {
     );
     expect(postLaunchStart, greaterThan(startupErrorApp));
     final postLaunchSection = source.substring(postLaunchStart);
-    expect(
-      postLaunchSection,
-      contains('unawaited(getIsolateService.start())'),
-    );
-    expect(
-      postLaunchSection,
-      contains('unawaited(ffiImageDecoder.start())'),
-    );
+    expect(postLaunchSection, contains('unawaited(getIsolateService.start())'));
+    expect(postLaunchSection, contains('unawaited(ffiImageDecoder.start())'));
   });
 
   test('renders a startup error instead of leaving iOS without a frame', () {
     final source = File('lib/main.dart').readAsStringSync();
 
     expect(source, contains('runZonedGuarded('));
-    expect(source, contains('_handleUncaughtError,'));
+    expect(source, matches(RegExp(r'\}\s*,\s*_handleUncaughtError\s*\);')));
     expect(
       source,
       contains('runApp(_StartupErrorApp(error: error.toString()))'),

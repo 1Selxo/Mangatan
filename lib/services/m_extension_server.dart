@@ -4,11 +4,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:m_extension_server/m_extension_server.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/more/settings/browse/extension_server/extension_server_utils.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -38,8 +41,26 @@ String? embeddedMihonBaseUrlFromResponse(Map<Object?, Object?>? response) {
   return 'http://127.0.0.1:$port';
 }
 
+/// Extracts the feature (major) version from `java -version` output.
+///
+/// Handles both the modern scheme (`"21.0.12"` -> 21) and the legacy `1.x`
+/// scheme (`"1.8.0_452"` -> 8). Returns null when no version is present.
+@visibleForTesting
+int? parseJreMajorVersion(String output) {
+  final match = RegExp(r'version\s+"(\d+)(?:\.(\d+))?').firstMatch(output);
+  if (match == null) return null;
+  final first = int.tryParse(match.group(1)!);
+  if (first == null) return null;
+  if (first != 1) return first;
+  return int.tryParse(match.group(2) ?? '');
+}
+
 class MExtensionServerPlatform {
   static const _unavailableBaseUrl = 'http://127.0.0.1:0';
+
+  /// The server JAR's entry point is Java 21 bytecode (class file major 65)
+  /// outside META-INF/versions, so an older runtime cannot load it at all.
+  static const _minimumJreMajorVersion = 21;
   static const _embeddedIosChannel = MethodChannel(
     'com.selxo.mangatan.embedded_mihon',
   );
@@ -53,6 +74,7 @@ class MExtensionServerPlatform {
   static int _lifecycleGeneration = 0;
   static bool _iosAppIsForeground = true;
   static bool _iosBridgeWasRequested = false;
+  static bool _iosBridgeIsReady = false;
   static bool _iosRestartOnResume = false;
   static int? _iosResumePort;
   static int? _preferredRestartPort;
@@ -60,6 +82,7 @@ class MExtensionServerPlatform {
   static final List<DateTime> _automaticRestartHistory = [];
   static String Function()? _stableReadBaseUrl;
   static void Function(String)? _stableWriteBaseUrl;
+  static MExtensionServerPlatform? _stableInstance;
 
   late final String Function() _readBaseUrl;
   late final void Function(String) _writeBaseUrl;
@@ -75,6 +98,7 @@ class MExtensionServerPlatform {
     if (persistent) {
       _stableReadBaseUrl = _readBaseUrl;
       _stableWriteBaseUrl = _writeBaseUrl;
+      _stableInstance = this;
     }
   }
 
@@ -107,9 +131,23 @@ class MExtensionServerPlatform {
     }
   }
 
-  Future<void> startServer({int? preferredPort}) {
+  Future<void> startServer({
+    int? preferredPort,
+    bool foregroundRequest = false,
+  }) {
     if (Platform.isIOS) {
       _iosBridgeWasRequested = true;
+      final lifecycleState = WidgetsBinding.instance.lifecycleState;
+      if (foregroundRequest ||
+          lifecycleState == AppLifecycleState.resumed ||
+          lifecycleState == null) {
+        // Lifecycle notifications and image retries can race during route
+        // restoration. Trust Flutter's current state instead of a stale
+        // notification cached before the route became visible.
+        _iosAppIsForeground = true;
+      } else {
+        _iosAppIsForeground = false;
+      }
       if (!_iosAppIsForeground) {
         _iosRestartOnResume = true;
         return Future<void>.value();
@@ -144,8 +182,10 @@ class MExtensionServerPlatform {
       final runningBaseUrl = _baseUrl;
       if (_isLoopbackServer(runningBaseUrl) &&
           await _supportsMangatanMihonBridge(runningBaseUrl)) {
+        _iosBridgeIsReady = true;
         return;
       }
+      _iosBridgeIsReady = false;
 
       final runningUri = Uri.tryParse(runningBaseUrl);
       if (_isLoopbackServer(runningBaseUrl) &&
@@ -180,6 +220,7 @@ class MExtensionServerPlatform {
                 deadline: const Duration(seconds: 8),
               )) {
             _writeRuntimeBaseUrl(baseUrl);
+            _iosBridgeIsReady = true;
             _log('Embedded iPhone Mihon bridge is ready at $baseUrl.');
             return;
           }
@@ -200,6 +241,7 @@ class MExtensionServerPlatform {
         '$_embeddedIosLaunchAttempts attempts.',
       );
     } catch (error, stackTrace) {
+      _iosBridgeIsReady = false;
       _restoreSavedBaseUrl();
       if (_isLoopbackServer(_baseUrl)) {
         // A saved desktop loopback URL points back at the iPhone on iOS and
@@ -229,6 +271,7 @@ class MExtensionServerPlatform {
   Future<void> suspendEmbeddedIosBridge() {
     if (!Platform.isIOS) return Future<void>.value();
     _iosAppIsForeground = false;
+    _iosBridgeIsReady = false;
     if (!_iosBridgeWasRequested) return Future<void>.value();
     _iosRestartOnResume = true;
 
@@ -265,8 +308,14 @@ class MExtensionServerPlatform {
       final resumePort = _iosResumePort;
       _iosResumePort = null;
       await startServer(preferredPort: resumePort);
-      if (_iosAppIsForeground) {
+      final restarted =
+          _isLoopbackServer(_baseUrl) &&
+          await _supportsMangatanMihonBridge(_baseUrl);
+      _iosBridgeIsReady = restarted;
+      if (_iosAppIsForeground && restarted) {
         _iosRestartOnResume = false;
+      } else {
+        _iosRestartOnResume = true;
       }
     });
   }
@@ -304,16 +353,37 @@ class MExtensionServerPlatform {
 
       _setBaseUrl(_unavailableBaseUrl);
       final settings = isar.settings.getSync(227);
-      final jrePath = settings?.jrePath ?? '';
-      final serverJarPath = settings?.extensionServerPath ?? '';
+      var jrePath = settings?.jrePath ?? '';
+      var serverJarPath = settings?.extensionServerPath ?? '';
       if (isDesktop &&
           (!await _isFile(jrePath) || !await _isFile(serverJarPath))) {
+        // Nothing configured (or the configured files went away). A distro
+        // package may have installed the server system-wide, in which case
+        // adopt it instead of making the user pick the folder by hand.
+        final system = await findSystemExtensionServer();
+        if (system == null) {
+          _log(
+            'Mihon bridge was not started because the configured JRE or JAR '
+            'does not exist. JRE: "$jrePath", JAR: "$serverJarPath".',
+            level: LogLevel.error,
+          );
+          return;
+        }
+        jrePath = system.jrePath;
+        serverJarPath = system.jarPath;
         _log(
-          'Mihon bridge was not started because the configured JRE or JAR '
-          'does not exist. JRE: "$jrePath", JAR: "$serverJarPath".',
-          level: LogLevel.error,
+          'Adopted the package-managed Mihon extension server at '
+          '"${path.dirname(serverJarPath)}".',
         );
-        return;
+        _persistResolvedServerPaths(jrePath, serverJarPath);
+      }
+
+      if (Platform.isLinux) {
+        final incompatibility = await _describeJreIncompatibility(jrePath);
+        if (incompatibility != null) {
+          _log(incompatibility, level: LogLevel.error);
+          return;
+        }
       }
 
       for (var attempt = 1; attempt <= _launchAttempts; attempt++) {
@@ -455,6 +525,49 @@ class MExtensionServerPlatform {
     return filePath.isNotEmpty && await File(filePath).exists();
   }
 
+  void _persistResolvedServerPaths(String jrePath, String serverJarPath) {
+    final settings = isar.settings.getSync(227);
+    if (settings == null) return;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings
+          ..jrePath = jrePath
+          ..extensionServerPath = serverJarPath
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
+  /// Returns an actionable error when [jrePath] is too old to run the server
+  /// JAR, or null when it looks usable (including when the version can't be
+  /// determined — never block a launch on a failed probe).
+  ///
+  /// Worth the extra process spawn on Linux: the plugin redirects the JVM's
+  /// stdout and stderr to /dev/null, so an UnsupportedClassVersionError would
+  /// otherwise surface only as three silent 20-second readiness timeouts.
+  Future<String?> _describeJreIncompatibility(String jrePath) async {
+    final version = await _readJreMajorVersion(jrePath);
+    if (version == null || version >= _minimumJreMajorVersion) return null;
+    return 'The Mihon bridge was not started because "$jrePath" is Java '
+        '$version, but the extension server requires Java '
+        '$_minimumJreMajorVersion or newer. Install a supported runtime (on '
+        'Arch Linux: pacman -S jre$_minimumJreMajorVersion-openjdk) or use '
+        'Settings > Browse > Extension server to download the bundled runtime.';
+  }
+
+  Future<int?> _readJreMajorVersion(String jrePath) async {
+    try {
+      final result = await Process.run(jrePath, [
+        '-version',
+      ]).timeout(const Duration(seconds: 10));
+      // `java -version` writes to stderr for historical reasons; older builds
+      // and some wrappers use stdout, so scan both.
+      return parseJreMajorVersion('${result.stderr}\n${result.stdout}');
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<int> _allocatePort() async {
     final socket = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final port = socket.port;
@@ -583,6 +696,22 @@ class MExtensionServerPlatform {
     }
   }
 
+  Future<bool> _supportsYouTubeResolver(
+    String baseUrl, {
+    Duration timeout = const Duration(seconds: 2),
+  }) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/capabilities'))
+          .timeout(timeout);
+      if (response.statusCode != 200) return false;
+      final capabilities = jsonDecode(response.body) as Map<String, dynamic>;
+      return capabilities['youtubeResolver'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> _waitForMangatanMihonBridge(
     String baseUrl,
     int generation, {
@@ -628,6 +757,58 @@ class MExtensionServerPlatform {
   }
 }
 
+Future<String?> prepareYouTubeResolverBridge() async {
+  if (!isDesktop && !Platform.isIOS) return null;
+  final server = MExtensionServerPlatform._stableInstance;
+  if (server == null) return null;
+
+  await server.startServer(foregroundRequest: Platform.isIOS);
+  final baseUrl = server.baseUrl;
+  if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+      !server._isLoopbackServer(baseUrl) ||
+      !await server._supportsYouTubeResolver(baseUrl)) {
+    return null;
+  }
+  return baseUrl;
+}
+
+/// Restarts the embedded listener before a reader retries a transient Mihon
+/// image URL. Image tokens live in the retained JVM, so only the loopback
+/// origin needs to be updated if iOS could not reclaim the previous port.
+Future<String> prepareActiveIosMihonProxyUrl(String url) async {
+  if (!Platform.isIOS || !isTransientMihonImageUrl(url)) return url;
+
+  // Wake the bridge before the first restored reader request. Concurrent
+  // pages await the same pending launch; later healthy requests take this
+  // synchronous fast path and avoid per-image capability probes.
+  if (MExtensionServerPlatform._iosBridgeIsReady &&
+      !MExtensionServerPlatform._iosRestartOnResume &&
+      MExtensionServerPlatform._pendingStart == null) {
+    return url;
+  }
+  return resolveActiveIosMihonProxyUrl(url);
+}
+
+Future<String> resolveActiveIosMihonProxyUrl(String url) async {
+  if (!Platform.isIOS || !isTransientMihonImageUrl(url)) return url;
+
+  final server = MExtensionServerPlatform._stableInstance;
+  final proxyUri = Uri.tryParse(url);
+  if (server == null || proxyUri == null) return url;
+
+  await server.startServer(
+    preferredPort: proxyUri.hasPort && proxyUri.port > 0 ? proxyUri.port : null,
+    foregroundRequest: true,
+  );
+  final baseUrl = server.baseUrl;
+  if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+      !server._isLoopbackServer(baseUrl) ||
+      !await server._supportsMangatanMihonBridge(baseUrl)) {
+    return url;
+  }
+  return resolveMihonImageUrl(baseUrl, url);
+}
+
 Future<String> prepareMihonBridge(Ref ref, Source? source) async {
   final server = MExtensionServerPlatform.fromRef(ref);
   if ((isDesktop || Platform.isIOS) &&
@@ -635,9 +816,16 @@ Future<String> prepareMihonBridge(Ref ref, Source? source) async {
     await server.startServer();
   }
   final baseUrl = server.baseUrl;
-  if ((isDesktop || Platform.isIOS) &&
-      source?.sourceCodeLanguage == SourceCodeLanguage.mihon &&
-      baseUrl == MExtensionServerPlatform._unavailableBaseUrl) {
+  final requiresMihonBridge =
+      (isDesktop || Platform.isIOS) &&
+      source?.sourceCodeLanguage == SourceCodeLanguage.mihon;
+  final unusableIosLoopback =
+      Platform.isIOS &&
+      server._isLoopbackServer(baseUrl) &&
+      !await server._supportsMangatanMihonBridge(baseUrl);
+  if (requiresMihonBridge &&
+      (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
+          unusableIosLoopback)) {
     throw const MihonBridgeUnavailableException();
   }
   return baseUrl;

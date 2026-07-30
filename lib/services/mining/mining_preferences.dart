@@ -14,11 +14,44 @@ enum DictionaryThemePreference { system, light, dark, black }
 
 enum DictionaryLookupTrigger { leftClick, shift, middleClick }
 
+List<String> updatedDictionaryLookupHistory(
+  Iterable<String> existing,
+  String query, {
+  int maximumEntries = 100,
+}) {
+  final normalized = query.trim();
+  if (normalized.isEmpty || maximumEntries <= 0) return const [];
+  return [
+    normalized,
+    ...existing.where(
+      (entry) =>
+          entry.trim().isNotEmpty &&
+          entry.trim().toLowerCase() != normalized.toLowerCase(),
+    ),
+  ].take(maximumEntries).toList(growable: false);
+}
+
 DictionaryLookupTrigger dictionaryLookupTriggerFromName(String? name) {
   return DictionaryLookupTrigger.values.firstWhere(
     (value) => value.name == name,
     orElse: () => DictionaryLookupTrigger.leftClick,
   );
+}
+
+enum AnkiIntegrationMode { ankiMobile, ankiConnect }
+
+AnkiIntegrationMode ankiIntegrationModeFromName(String? name) {
+  return AnkiIntegrationMode.values.firstWhere(
+    (value) => value.name == name,
+    orElse: () => AnkiIntegrationMode.ankiMobile,
+  );
+}
+
+AnkiIntegrationMode effectiveAnkiIntegrationMode({
+  required AnkiIntegrationMode preferredMode,
+  required bool isIOS,
+}) {
+  return isIOS ? preferredMode : AnkiIntegrationMode.ankiConnect;
 }
 
 enum AnkiAudioSourceType {
@@ -282,6 +315,7 @@ class MiningPreferences {
   static const _jimakuApiKey = 'jimaku_api_key';
   static const _autoJimaku = 'auto_jimaku';
   static const _ankiEndpoint = 'anki_endpoint';
+  static const _ankiIntegrationMode = 'anki_integration_mode';
   static const _ankiProfile = 'anki_profile';
   static const _dictionaryProfiles = 'dictionary_profiles';
   static const _activeDictionaryProfileId = 'active_dictionary_profile_id';
@@ -298,6 +332,9 @@ class MiningPreferences {
   static const _ankiAudioTimeoutMs = 'anki_audio_timeout_ms';
   static const _ankiAudioLanguage = 'anki_audio_language';
   static const _ocrEngine = 'ocr_engine';
+  static const _parallelOcrLimit = 'parallel_ocr_limit';
+  static const _subtitleRegexFilters = 'subtitle_regex_filters';
+  static const _readerEInkMode = 'reader_eink_mode';
   static const _mokuroWebsiteOcrEnabled = 'mokuro_website_ocr_enabled';
   static const _ocrOverlayEnabled = 'ocr_overlay_enabled';
   static const _ocrLanguage = 'ocr_language';
@@ -315,6 +352,11 @@ class MiningPreferences {
   static const _dictionaryLookupTrigger = 'dictionary_lookup_trigger';
   static const _dictionaryAdditionalLeftClick =
       'dictionary_additional_left_click';
+  static const _dictionaryLookupHistory = 'dictionary_lookup_history';
+  static const _dictionaryAutoUpdate = 'dictionary_auto_update';
+  static const _dictionaryAutoUpdateIntervalHours =
+      'dictionary_auto_update_interval_hours';
+  static const _dictionaryLastUpdateCheck = 'dictionary_last_update_check';
   static const _dictionaryPopupHeight = 'dictionary_popup_height';
   static const _dictionaryFontSize = 'dictionary_font_size';
   static const _dictionaryTheme = 'dictionary_theme';
@@ -499,6 +541,73 @@ class MiningPreferences {
     await (await _boxOrNull())?.put(_cropImageBeforeMining, value);
   }
 
+  static Future<List<String>> getDictionaryLookupHistory() async {
+    final raw = (await _boxOrNull())?.get(
+      _dictionaryLookupHistory,
+      defaultValue: const <String>[],
+    );
+    if (raw is! Iterable) return const [];
+    return raw
+        .map((entry) => entry.toString().trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static Future<List<String>> recordDictionaryLookup(String query) async {
+    final box = await _boxOrNull();
+    if (box == null) return const [];
+    final history = updatedDictionaryLookupHistory(
+      await getDictionaryLookupHistory(),
+      query,
+    );
+    await box.put(_dictionaryLookupHistory, history);
+    return history;
+  }
+
+  static Future<void> clearDictionaryLookupHistory() async {
+    await (await _boxOrNull())?.delete(_dictionaryLookupHistory);
+  }
+
+  static Future<bool> getDictionaryAutoUpdateEnabled() async =>
+      (await _boxOrNull())?.get(_dictionaryAutoUpdate, defaultValue: false)
+          as bool? ??
+      false;
+
+  static Future<void> setDictionaryAutoUpdateEnabled(bool value) async {
+    await (await _boxOrNull())?.put(_dictionaryAutoUpdate, value);
+  }
+
+  static Future<int> getDictionaryAutoUpdateIntervalHours() async =>
+      ((await _boxOrNull())?.get(
+                    _dictionaryAutoUpdateIntervalHours,
+                    defaultValue: 24,
+                  )
+                  as int? ??
+              24)
+          .clamp(1, 168);
+
+  static Future<void> setDictionaryAutoUpdateIntervalHours(int value) async {
+    await (await _boxOrNull())?.put(
+      _dictionaryAutoUpdateIntervalHours,
+      value.clamp(1, 168),
+    );
+  }
+
+  static Future<DateTime?> getDictionaryLastUpdateCheck() async {
+    final milliseconds =
+        (await _boxOrNull())?.get(_dictionaryLastUpdateCheck) as int?;
+    return milliseconds == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(milliseconds);
+  }
+
+  static Future<void> setDictionaryLastUpdateCheck(DateTime value) async {
+    await (await _boxOrNull())?.put(
+      _dictionaryLastUpdateCheck,
+      value.millisecondsSinceEpoch,
+    );
+  }
+
   static Future<String> getJimakuApiKey({
     bool readOnly = false,
     MiningPreferencesSnapshot? snapshot,
@@ -580,6 +689,20 @@ class MiningPreferences {
 
   static Future<void> setAnkiEndpoint(Uri value) async {
     await (await _boxOrNull())?.put(_ankiEndpoint, value.toString());
+  }
+
+  static Future<AnkiIntegrationMode> getAnkiIntegrationMode() async {
+    final raw =
+        (await _boxOrNull())?.get(
+              _ankiIntegrationMode,
+              defaultValue: AnkiIntegrationMode.ankiMobile.name,
+            )
+            as String?;
+    return ankiIntegrationModeFromName(raw);
+  }
+
+  static Future<void> setAnkiIntegrationMode(AnkiIntegrationMode value) async {
+    await (await _boxOrNull())?.put(_ankiIntegrationMode, value.name);
   }
 
   static Future<AnkiMiningProfile> getAnkiProfile() async {
@@ -850,6 +973,39 @@ class MiningPreferences {
 
   static Future<void> setOcrEngine(OcrEnginePreference value) async {
     await (await _boxOrNull())?.put(_ocrEngine, value.name);
+  }
+
+  static Future<int> getParallelOcrLimit() async {
+    final value =
+        (await _boxOrNull())?.get(_parallelOcrLimit, defaultValue: 1) as int? ??
+        1;
+    return value.clamp(1, 4);
+  }
+
+  static Future<void> setParallelOcrLimit(int value) async {
+    await (await _boxOrNull())?.put(_parallelOcrLimit, value.clamp(1, 4));
+  }
+
+  static Future<Map<String, dynamic>> getSubtitleRegexFilters() async {
+    final value = (await _boxOrNull())?.get(_subtitleRegexFilters);
+    if (value is! Map) return const {};
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  static Future<void> setSubtitleRegexFilters(
+    Map<String, dynamic> value,
+  ) async {
+    await (await _boxOrNull())?.put(_subtitleRegexFilters, value);
+  }
+
+  static Future<bool> getReaderEInkMode() async {
+    return (await _boxOrNull())?.get(_readerEInkMode, defaultValue: false)
+            as bool? ??
+        false;
+  }
+
+  static Future<void> setReaderEInkMode(bool value) async {
+    await (await _boxOrNull())?.put(_readerEInkMode, value);
   }
 
   static Future<bool> getMokuroWebsiteOcrEnabled() async {

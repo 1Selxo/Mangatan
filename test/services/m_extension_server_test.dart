@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 
+String _readNormalized(String path) =>
+    File(path).readAsStringSync().replaceAll('\r\n', '\n');
+
 void main() {
   group('embedded iOS Mihon bridge response', () {
     test('accepts a valid loopback port', () {
@@ -43,37 +46,31 @@ void main() {
   });
 
   test('keeps the iOS VM outside the app launch image and UI thread', () {
-    final mainSource = File('lib/main.dart').readAsStringSync();
-    final serviceSource = File(
+    final mainSource = _readNormalized('lib/main.dart');
+    final serviceSource = _readNormalized(
       'lib/services/m_extension_server.dart',
-    ).readAsStringSync();
-    final mainScreenSource = File(
+    );
+    final mainScreenSource = _readNormalized(
       'lib/modules/main_view/main_screen.dart',
-    ).readAsStringSync();
-    final browseStateSource = File(
+    );
+    final browseStateSource = _readNormalized(
       'lib/modules/more/settings/browse/providers/browse_state_provider.dart',
-    ).readAsStringSync();
-    final nativeSource = File(
-      'ios/Runner/MihonEmbeddedBridge.mm',
-    ).readAsStringSync();
-    final appDelegateSource = File(
-      'ios/Runner/AppDelegate.swift',
-    ).readAsStringSync();
-    final runtimeBuilder = File(
-      'tool/build_lazy_openjdk_ios.sh',
-    ).readAsStringSync();
-    final openJdkWorkflow = File(
+    );
+    final nativeSource = _readNormalized('ios/Runner/MihonEmbeddedBridge.mm');
+    final appDelegateSource = _readNormalized('ios/Runner/AppDelegate.swift');
+    final runtimeBuilder = _readNormalized('tool/build_lazy_openjdk_ios.sh');
+    final openJdkWorkflow = _readNormalized(
       '.github/workflows/build-openjdk-ios13.yml',
-    ).readAsStringSync();
-    final zeroRuntimePatch = File(
+    );
+    final zeroRuntimePatch = _readNormalized(
       'tool/openjdk/ios-zero-runtime.patch',
-    ).readAsStringSync();
-    final libjavaGlobalSymbolsPatch = File(
+    );
+    final libjavaGlobalSymbolsPatch = _readNormalized(
       'tool/openjdk/ios-libjava-global-symbols.patch',
-    ).readAsStringSync();
-    final xcodeProject = File(
+    );
+    final xcodeProject = _readNormalized(
       'ios/Runner.xcodeproj/project.pbxproj',
-    ).readAsStringSync();
+    );
 
     expect(
       mainSource,
@@ -98,6 +95,16 @@ void main() {
       reason: 'native pause must begin before iOS suspends the Dart isolate',
     );
     expect(
+      appDelegateSource,
+      contains('applicationDidBecomeActive'),
+      reason: 'a listener paused natively must also resume natively',
+    );
+    expect(
+      appDelegateSource,
+      contains('MangatanEmbeddedMihonStart(port)'),
+      reason: 'existing image tokens must regain their original loopback port',
+    );
+    expect(
       serviceSource,
       contains("invokeMethod<bool>('status')"),
       reason: 'a stale native listener must be detected before restart',
@@ -106,6 +113,55 @@ void main() {
       serviceSource,
       contains("invokeMethod<void>('pause')"),
       reason: 'app suspension must preserve loaded extension instances',
+    );
+    expect(
+      serviceSource,
+      contains('Future<String> resolveActiveIosMihonProxyUrl(String url)'),
+      reason: 'reader image retries must heal a stopped loopback listener',
+    );
+    expect(
+      serviceSource,
+      contains('Future<String> prepareActiveIosMihonProxyUrl(String url)'),
+      reason: 'restored reader pages must wake the bridge before first HTTP',
+    );
+    expect(
+      serviceSource,
+      contains('WidgetsBinding.instance.lifecycleState'),
+      reason: 'a stale lifecycle notification must not block a visible reader',
+    );
+    expect(
+      serviceSource,
+      contains('foregroundRequest: true'),
+      reason: 'an active reader request must bypass stale inactive state',
+    );
+    expect(
+      serviceSource,
+      contains('MExtensionServerPlatform._iosBridgeIsReady'),
+      reason: 'a failed launch must not suppress the next reader wake-up',
+    );
+    expect(
+      serviceSource,
+      contains('!await server._supportsMangatanMihonBridge(baseUrl)'),
+      reason: 'a dead saved loopback address must never be returned as ready',
+    );
+    final imageProviderSource = _readNormalized(
+      'lib/modules/widgets/custom_extended_image_provider.dart',
+    );
+    expect(
+      imageProviderSource,
+      contains(
+        'prepareActiveIosMihonProxyUrl(\n'
+        '      resolved.toString(),',
+      ),
+      reason: 'the first restored reader request must start the bridge',
+    );
+    expect(
+      imageProviderSource,
+      contains(
+        'resolveActiveIosMihonProxyUrl(\n'
+        '          requestUri.toString(),',
+      ),
+      reason: 'transient reader images must restart the bridge before HTTP',
     );
     expect(
       nativeSource,

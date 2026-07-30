@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -559,6 +561,7 @@ class _DictionaryPopupOverlayHostState
   }) async {
     final query = selection.text.trim();
     if (query.isEmpty) return 0;
+    unawaited(MiningPreferences.recordDictionaryLookup(query));
     final generation = ++_childLookupGeneration;
     final resultsFuture = DictionaryLookupPopup.lookup(
       query,
@@ -767,6 +770,7 @@ class DictionaryLookupPopup extends StatelessWidget {
   }) async {
     final lookupText = text.trim();
     if (lookupText.isEmpty) return null;
+    unawaited(MiningPreferences.recordDictionaryLookup(lookupText));
     return _dictionaryPopupHost.show(
       context: context,
       anchor: anchor,
@@ -1082,37 +1086,61 @@ class _DictionaryLookupResultsViewState
         botToast('Anki export is disabled in Dictionary settings', second: 4);
         return;
       }
-      final pending = await const AnkiCardBuilder().buildPending(
-        result: result,
-        context: widget.miningContext,
-        profile: profile,
-        screenshotMode: dictionaryProfile.screenshotMode,
+      final preferredMode = await MiningPreferences.getAnkiIntegrationMode();
+      final integrationMode = effectiveAnkiIntegrationMode(
+        preferredMode: preferredMode,
+        isIOS: defaultTargetPlatform == TargetPlatform.iOS,
       );
-      _activeExportJob = pending.jobController;
-      await _exportJobSubscription?.cancel();
-      _exportJobSubscription = _activeExportJob?.states.listen((_) {
-        if (mounted) setState(() {});
-      });
-      final export =
-          await AnkiConnectService(
-            endpoint: await MiningPreferences.getAnkiEndpoint(),
-          ).exportPending(
-            pending,
-            duplicateCheck: profile.duplicateCheck,
-            allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
-            duplicateScope: profile.duplicateScope,
-            duplicateDeckNames: profile.duplicateDeckNames,
-            checkAllModels: profile.checkAllModels,
-            syncOnCreate: profile.syncOnCreate,
-          );
+      if (integrationMode == AnkiIntegrationMode.ankiMobile) {
+        final draft = await const AnkiCardBuilder().build(
+          result: result,
+          context: widget.miningContext,
+          profile: profile,
+          screenshotMode:
+              dictionaryProfile.screenshotMode ==
+                  AnkiScreenshotMode.noScreenshot
+              ? AnkiScreenshotMode.noScreenshot
+              : AnkiScreenshotMode.full,
+        );
+        await AnkiMobileService().exportDraft(
+          draft,
+          allowDuplicate:
+              !profile.duplicateCheck ||
+              dictionaryProfile.duplicateAction == 'allow',
+        );
+      } else {
+        final pending = await const AnkiCardBuilder().buildPending(
+          result: result,
+          context: widget.miningContext,
+          profile: profile,
+          screenshotMode: dictionaryProfile.screenshotMode,
+        );
+        _activeExportJob = pending.jobController;
+        await _exportJobSubscription?.cancel();
+        _exportJobSubscription = _activeExportJob?.states.listen((_) {
+          if (mounted) setState(() {});
+        });
+        final export =
+            await AnkiConnectService(
+              endpoint: await MiningPreferences.getAnkiEndpoint(),
+            ).exportPending(
+              pending,
+              duplicateCheck: profile.duplicateCheck,
+              allowDuplicate: dictionaryProfile.duplicateAction == 'allow',
+              duplicateScope: profile.duplicateScope,
+              duplicateDeckNames: profile.duplicateDeckNames,
+              checkAllModels: profile.checkAllModels,
+              syncOnCreate: profile.syncOnCreate,
+            );
+        final warning = export.warnings.isEmpty
+            ? ''
+            : '\n${export.warnings.join('\n')}';
+        botToast('Added to Anki (#${export.noteId})$warning', second: 5);
+      }
       await AnkiStatsRecorder.recordCard(
         context: widget.miningContext,
         profile: dictionaryProfile,
       );
-      final warning = export.warnings.isEmpty
-          ? ''
-          : '\n${export.warnings.join('\n')}';
-      botToast('Added to Anki (#${export.noteId})$warning', second: 5);
     } on AnkiDuplicateException {
       botToast('Already in Anki', second: 3);
     } on AnkiExportCancelledException {

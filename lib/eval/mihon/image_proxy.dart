@@ -8,7 +8,8 @@ bool isTransientMihonImageUrl(String url) {
     return true;
   }
 
-  return _isLoopbackMihonImageProxyUri(uri);
+  return _isLoopbackMihonImageProxyUri(uri) ||
+      _isBridgeImageProxyTokenUri(uri);
 }
 
 /// Replaces the bridge server's loopback image origin with the origin the
@@ -70,6 +71,22 @@ bool canReuseCachedMihonPageUrls(Iterable<String>? urls) {
 
 bool _isLoopbackMihonImageProxyUri(Uri uri) {
   return _isLoopbackMihonProxyUri(uri, const {'image'});
+}
+
+bool _isBridgeImageProxyTokenUri(Uri uri) {
+  if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+  if (uri.pathSegments.length != 2 ||
+      uri.pathSegments.first != 'image') {
+    return false;
+  }
+
+  // M-Extension-Server image registrations use UUID tokens. Their URLs remain
+  // valid only while the JVM process that registered them is alive, regardless
+  // of whether the bridge was reached through loopback, LAN, or hosted HTTPS.
+  return RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  ).hasMatch(uri.pathSegments.last);
 }
 
 bool _isLoopbackMihonProxyUri(Uri uri, Set<String> routeNames) {

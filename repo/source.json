@@ -25,6 +25,13 @@
       ],
       "versions": [
         {
+          "version": "1.1.0",
+          "date": "2026-07-30T01:41:43Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.1.0/Mangatan-v1.1.0-build.168-66c8c57-ios.ipa",
+          "size": 122853245
+        },
+        {
           "version": "1.0.9",
           "date": "2026-07-29T01:08:38Z",
           "localizedDescription": "What's changed\n\n\u2022 Added [Chimahon\u2022compatible immersion statistics](https://github.com/1Selxo/Mangatan/pull/65), including novel and manga reading tracking, Anki mining stats, reader statistics sheets, backup, and sync support.\n\u2022 Added Yomitan kanji dictionary imports and Yomitan\u2022style kanji lookup by selecting a kanji inside a word popup.\n\u2022 Fixed dictionary WebView refresh after theme, language, and dictionary changes.\n\u2022 Fixed marking multiple selected manga or novel chapters as unread.\n\u2022 Fixed bookmarks so they follow the chapter currently being read instead of the chapter originally opened.\n\u2022 Added the novel reader Text Size control to reader settings.\n\u2022 Added AVIF page support and preserved OCR loading progress when changing pages.\n\u2022 Improved iOS sideload and Mihon bridge compatibility, and added Linux release packaging.\n\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.0.8...v1.0.9",
@@ -36,11 +43,11 @@
         "entitlements": [],
         "privacy": []
       },
-      "version": "1.0.9",
-      "versionDate": "2026-07-29T01:08:38Z",
-      "versionDescription": "What's changed\n\n\u2022 Added [Chimahon\u2022compatible immersion statistics](https://github.com/1Selxo/Mangatan/pull/65), including novel and manga reading tracking, Anki mining stats, reader statistics sheets, backup, and sync support.\n\u2022 Added Yomitan kanji dictionary imports and Yomitan\u2022style kanji lookup by selecting a kanji inside a word popup.\n\u2022 Fixed dictionary WebView refresh after theme, language, and dictionary changes.\n\u2022 Fixed marking multiple selected manga or novel chapters as unread.\n\u2022 Fixed bookmarks so they follow the chapter currently being read instead of the chapter originally opened.\n\u2022 Added the novel reader Text Size control to reader settings.\n\u2022 Added AVIF page support and preserved OCR loading progress when changing pages.\n\u2022 Improved iOS sideload and Mihon bridge compatibility, and added Linux release packaging.\n\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.0.8...v1.0.9",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.0.9/Mangatan-v1.0.9-build.155-82df3bb-ios.ipa",
-      "size": 119491337
+      "version": "1.1.0",
+      "versionDate": "2026-07-30T01:41:43Z",
+      "versionDescription": "",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.1.0/Mangatan-v1.1.0-build.168-66c8c57-ios.ipa",
+      "size": 122853245
     }
   ],
   "news": [
@@ -54,6 +61,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.0.9"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.1.0 - 29 Jul",
+      "identifier": "release-1.1.0",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-07-29T23:13:57Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.1.0"
     }
   ]
 }

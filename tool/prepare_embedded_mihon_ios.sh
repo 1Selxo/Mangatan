@@ -9,9 +9,11 @@ lazy_framework_dir="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
-server_commit="c151cda985a5e9d9255ba8a59b9c9e4234107983"
-server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v4/MExtensionServer-ios.jar"
-server_jar_sha256="1c8c325601c540fb6453cf84db7ab747ba03c6f3e960334017d2563f543bcc5b"
+# Keep the current Mihon/TachiyomiX bytecode repairs while avoiding jdk.zipfs,
+# which is intentionally absent from the small embedded iOS JRE.
+server_commit="68645ae7a8b2ffd0954e9c6cba62427f54f95503"
+server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v7/MExtensionServer-ios.jar"
+server_jar_sha256="40f29f44014fbe1d68b9c368a7c88ab559f8de40e7554c4873389a475aee2fe0"
 openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="24589886361678b369e4703d82fcb3deff1b40728d725fef4fea7e70cb728f55"
 openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"

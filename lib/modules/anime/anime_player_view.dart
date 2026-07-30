@@ -321,6 +321,10 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _liveVideoOcrEnabled = false;
   Uint8List? _videoOcrBytes;
   Duration? _videoOcrPosition;
+  final Set<int> _videoOcrGesturePointers = {};
+  final Map<int, Offset> _videoOcrGestureStarts = {};
+  DateTime? _videoOcrGestureStartedAt;
+  bool _videoOcrGestureCandidate = false;
   List<AnimeSubtitleCue> _subtitleCues = const [];
   final Map<String, List<AnimeSubtitleCue>> _subtitleCuesByTitle = {};
   String _lastSubtitleHistoryText = '';
@@ -961,15 +965,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         await _setSubtitleTrack(track);
       } catch (_) {}
     }
-    if (_firstVid.subtitles?.isNotEmpty ?? false) {
-      if (_firstVid.audios?.isNotEmpty ?? false) {
-        try {
-          final at = _firstVid.audios!.first;
-          await _player.setAudioTrack(
-            AudioTrack.uri(at.file ?? "", title: at.label, language: at.label),
-          );
-        } catch (_) {}
-      }
+    if (_firstVid.audios?.isNotEmpty ?? false) {
+      try {
+        final at = _firstVid.audios!.first;
+        await _player.setAudioTrack(
+          AudioTrack.uri(at.file ?? "", title: at.label, language: at.label),
+        );
+      } catch (_) {}
     }
     await _autoLoadJimakuSubtitle();
   }
@@ -1841,10 +1843,12 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               tabs: [
                 Tab(text: l10n.font),
                 Tab(text: l10n.color),
+                const Tab(text: 'Filters'),
               ],
               children: [
                 FontSettingWidget(hasSubtitleTrack: hasSubtitleTrack),
                 ColorSettingWidget(hasSubtitleTrack: hasSubtitleTrack),
+                const SubtitleFilterSettingWidget(),
               ],
               context: context,
               vsync: this,
@@ -2683,157 +2687,213 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     final enableAutoSkip = ref.read(enableAutoSkipStateProvider);
     final aniSkipTimeoutLength = ref.read(aniSkipTimeoutLengthStateProvider);
     final skipIntroLength = ref.read(defaultSkipIntroLengthStateProvider);
-    return Stack(
-      children: [
-        Video(
-          subtitleViewConfiguration: SubtitleViewConfiguration(
-            visible: false,
-            style: subtileTextStyle(ref),
+    return Listener(
+      onPointerDown: _handleVideoOcrGestureDown,
+      onPointerMove: _handleVideoOcrGestureMove,
+      onPointerUp: _handleVideoOcrGestureUp,
+      onPointerCancel: _handleVideoOcrGestureCancel,
+      child: Stack(
+        children: [
+          Video(
+            subtitleViewConfiguration: SubtitleViewConfiguration(
+              visible: false,
+              style: subtileTextStyle(ref),
+            ),
+            fit: fit,
+            key: _key,
+            controls: (state) => isDesktop
+                ? DesktopControllerWidget(
+                    videoController: _controller,
+                    topButtonBarWidget: _topButtonBar(context),
+                    primaryButtonBarWidget: _primaryButtonBar(context),
+                    bottomButtonBarWidget: _desktopBottomButtonBar(context),
+                    tempDuration: (value) {
+                      _tempPosition.value = value;
+                    },
+                    doubleSpeed: (value) {
+                      _isDoubleSpeed.value = value ?? false;
+                    },
+                    defaultSkipIntroLength: skipIntroLength,
+                    desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
+                    chapterMarks: _chapterMarks,
+                    subtitleMiningContextBuilder: _subtitleMiningContext,
+                    videoOcrActive: _videoOcrBytes != null,
+                    onVideoOcrShortcut: _handleVideoOcrShortcut,
+                  )
+                : MobileControllerWidget(
+                    videoController: _controller,
+                    topButtonBarWidget: _topButtonBar(context),
+                    primaryButtonBarWidget: _primaryButtonBar(context),
+                    bottomButtonBarWidget: _mobileBottomButtonBar(context),
+                    doubleSpeed: (value) {
+                      _isDoubleSpeed.value = value ?? false;
+                    },
+                    chapterMarks: _chapterMarks,
+                    subtitleMiningContextBuilder: _subtitleMiningContext,
+                  ),
+            controller: _controller,
+            width: context.width(1),
+            height: context.height(1),
+            resumeUponEnteringForegroundMode: true,
           ),
-          fit: fit,
-          key: _key,
-          controls: (state) => isDesktop
-              ? DesktopControllerWidget(
-                  videoController: _controller,
-                  topButtonBarWidget: _topButtonBar(context),
-                  primaryButtonBarWidget: _primaryButtonBar(context),
-                  bottomButtonBarWidget: _desktopBottomButtonBar(context),
-                  tempDuration: (value) {
-                    _tempPosition.value = value;
-                  },
-                  doubleSpeed: (value) {
-                    _isDoubleSpeed.value = value ?? false;
-                  },
-                  defaultSkipIntroLength: skipIntroLength,
-                  desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-                  chapterMarks: _chapterMarks,
-                  subtitleMiningContextBuilder: _subtitleMiningContext,
-                  videoOcrActive: _videoOcrBytes != null,
-                  onVideoOcrShortcut: _handleVideoOcrShortcut,
-                )
-              : MobileControllerWidget(
-                  videoController: _controller,
-                  topButtonBarWidget: _topButtonBar(context),
-                  primaryButtonBarWidget: _primaryButtonBar(context),
-                  bottomButtonBarWidget: _mobileBottomButtonBar(context),
-                  doubleSpeed: (value) {
-                    _isDoubleSpeed.value = value ?? false;
-                  },
-                  chapterMarks: _chapterMarks,
-                  subtitleMiningContextBuilder: _subtitleMiningContext,
-                ),
-          controller: _controller,
-          width: context.width(1),
-          height: context.height(1),
-          resumeUponEnteringForegroundMode: true,
-        ),
-        Stack(
-          alignment: AlignmentDirectional.center,
-          children: [
-            Positioned(
-              top: 30,
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _isDoubleSpeed,
-                builder: (context, snapshot, _) {
-                  return Text.rich(
-                    textAlign: TextAlign.center,
-                    TextSpan(
-                      style: TextStyle(
-                        background: Paint()
-                          ..color = Theme.of(context).scaffoldBackgroundColor
-                          ..strokeWidth = 30.0
-                          ..strokeJoin = StrokeJoin.round
-                          ..style = PaintingStyle.stroke,
-                      ),
-                      children: snapshot
-                          ? [
-                              TextSpan(
-                                text: " 2X ",
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+          Stack(
+            alignment: AlignmentDirectional.center,
+            children: [
+              Positioned(
+                top: 30,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _isDoubleSpeed,
+                  builder: (context, snapshot, _) {
+                    return Text.rich(
+                      textAlign: TextAlign.center,
+                      TextSpan(
+                        style: TextStyle(
+                          background: Paint()
+                            ..color = Theme.of(context).scaffoldBackgroundColor
+                            ..strokeWidth = 30.0
+                            ..strokeJoin = StrokeJoin.round
+                            ..style = PaintingStyle.stroke,
+                        ),
+                        children: snapshot
+                            ? [
+                                TextSpan(
+                                  text: " 2X ",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: Icon(Icons.fast_forward),
-                              ),
-                            ]
-                          : [],
-                    ),
+                                WidgetSpan(
+                                  alignment: PlaceholderAlignment.middle,
+                                  child: Icon(Icons.fast_forward),
+                                ),
+                              ]
+                            : [],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          if (enableAniSkip && (_hasOpeningSkip || _hasEndingSkip))
+            Positioned(
+              right: 0,
+              bottom: 80,
+              child: ValueListenableBuilder<_AniSkipPhase>(
+                valueListenable: _skipPhase,
+                builder: (context, phase, _) {
+                  if (phase == _AniSkipPhase.none) {
+                    return const SizedBox.shrink();
+                  }
+                  final isOpening = phase == _AniSkipPhase.opening;
+                  final result = isOpening ? _openingResult! : _endingResult!;
+                  return AniSkipCountDownButton(
+                    key: Key(isOpening ? 'skip_opening' : 'skip_ending'),
+                    active: true,
+                    autoSkip: enableAutoSkip,
+                    timeoutLength: aniSkipTimeoutLength,
+                    skipTypeText: isOpening
+                        ? context.l10n.skip_opening
+                        : context.l10n.skip_ending,
+                    player: _player,
+                    aniSkipResult: result,
                   );
                 },
               ),
             ),
-          ],
-        ),
-        if (enableAniSkip && (_hasOpeningSkip || _hasEndingSkip))
-          Positioned(
-            right: 0,
-            bottom: 80,
-            child: ValueListenableBuilder<_AniSkipPhase>(
-              valueListenable: _skipPhase,
-              builder: (context, phase, _) {
-                if (phase == _AniSkipPhase.none) return const SizedBox.shrink();
-                final isOpening = phase == _AniSkipPhase.opening;
-                final result = isOpening ? _openingResult! : _endingResult!;
-                return AniSkipCountDownButton(
-                  key: Key(isOpening ? 'skip_opening' : 'skip_ending'),
-                  active: true,
-                  autoSkip: enableAutoSkip,
-                  timeoutLength: aniSkipTimeoutLength,
-                  skipTypeText: isOpening
-                      ? context.l10n.skip_opening
-                      : context.l10n.skip_ending,
-                  player: _player,
-                  aniSkipResult: result,
-                );
+          if (_showSubtitleList)
+            AnimeSubtitleListPanel(
+              cues: _subtitleCues,
+              position: _currentPosition,
+              onSelect: (cue) {
+                unawaited(_player.seek(cue.start));
+                setState(() => _showSubtitleList = false);
+              },
+              onDismiss: () => setState(() => _showSubtitleList = false),
+            ),
+          if (_videoOcrBytes case final imageBytes?)
+            VideoOcrOverlay(
+              imageBytes: imageBytes,
+              imagePosition: _videoOcrPosition,
+              fit: fit,
+              miningContextBuilder: (text, bytes, position) =>
+                  _subtitleMiningContext(
+                    text,
+                    frozenImageBytes: bytes,
+                    frozenPosition: position,
+                    ocrTiming: true,
+                  ),
+              onDismiss: _dismissVideoOcr,
+            ),
+          if (_liveVideoOcrEnabled && _videoOcrBytes == null)
+            LiveVideoOcrOverlay(
+              imageBytesLoader: _captureLiveVideoOcrFrame,
+              fit: fit,
+              miningContextBuilder: (text, bytes, position) =>
+                  _subtitleMiningContext(
+                    text,
+                    frozenImageBytes: bytes,
+                    frozenPosition: position,
+                    ocrTiming: true,
+                  ),
+              onDismiss: () {
+                DictionaryLookupPopup.dismissActive();
+                setState(() => _liveVideoOcrEnabled = false);
+                unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
               },
             ),
-          ),
-        if (_showSubtitleList)
-          AnimeSubtitleListPanel(
-            cues: _subtitleCues,
-            position: _currentPosition,
-            onSelect: (cue) {
-              unawaited(_player.seek(cue.start));
-              setState(() => _showSubtitleList = false);
-            },
-            onDismiss: () => setState(() => _showSubtitleList = false),
-          ),
-        if (_videoOcrBytes case final imageBytes?)
-          VideoOcrOverlay(
-            imageBytes: imageBytes,
-            imagePosition: _videoOcrPosition,
-            fit: fit,
-            miningContextBuilder: (text, bytes, position) =>
-                _subtitleMiningContext(
-                  text,
-                  frozenImageBytes: bytes,
-                  frozenPosition: position,
-                  ocrTiming: true,
-                ),
-            onDismiss: _dismissVideoOcr,
-          ),
-        if (_liveVideoOcrEnabled && _videoOcrBytes == null)
-          LiveVideoOcrOverlay(
-            imageBytesLoader: _captureLiveVideoOcrFrame,
-            fit: fit,
-            miningContextBuilder: (text, bytes, position) =>
-                _subtitleMiningContext(
-                  text,
-                  frozenImageBytes: bytes,
-                  frozenPosition: position,
-                  ocrTiming: true,
-                ),
-            onDismiss: () {
-              DictionaryLookupPopup.dismissActive();
-              setState(() => _liveVideoOcrEnabled = false);
-              unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
-            },
-          ),
-      ],
+        ],
+      ),
     );
+  }
+
+  void _handleVideoOcrGestureDown(PointerDownEvent event) {
+    if (isDesktop) return;
+    _videoOcrGesturePointers.add(event.pointer);
+    _videoOcrGestureStarts[event.pointer] = event.position;
+    if (_videoOcrGesturePointers.length == 2) {
+      _videoOcrGestureStartedAt = DateTime.now();
+      _videoOcrGestureCandidate = true;
+    } else if (_videoOcrGesturePointers.length > 2) {
+      _videoOcrGestureCandidate = false;
+    }
+  }
+
+  void _handleVideoOcrGestureMove(PointerMoveEvent event) {
+    if (!_videoOcrGestureCandidate) return;
+    final start = _videoOcrGestureStarts[event.pointer];
+    if (start != null && (event.position - start).distance > 24) {
+      _videoOcrGestureCandidate = false;
+    }
+  }
+
+  void _handleVideoOcrGestureUp(PointerUpEvent event) {
+    final shouldToggle =
+        _videoOcrGestureCandidate &&
+        _videoOcrGesturePointers.length == 2 &&
+        _videoOcrGestureStartedAt != null &&
+        DateTime.now().difference(_videoOcrGestureStartedAt!) <=
+            const Duration(milliseconds: 350);
+    _videoOcrGesturePointers.remove(event.pointer);
+    _videoOcrGestureStarts.remove(event.pointer);
+    if (shouldToggle) {
+      _videoOcrGestureCandidate = false;
+      unawaited(_handleVideoOcrShortcut());
+    }
+    if (_videoOcrGesturePointers.isEmpty) {
+      _videoOcrGestureCandidate = false;
+      _videoOcrGestureStartedAt = null;
+    }
+  }
+
+  void _handleVideoOcrGestureCancel(PointerCancelEvent event) {
+    _videoOcrGesturePointers.remove(event.pointer);
+    _videoOcrGestureStarts.remove(event.pointer);
+    _videoOcrGestureCandidate = false;
+    if (_videoOcrGesturePointers.isEmpty) {
+      _videoOcrGestureStartedAt = null;
+    }
   }
 
   Widget btnToShowShareScreenshot(

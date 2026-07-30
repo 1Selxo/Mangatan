@@ -13,6 +13,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/browse/extension/providers/extension_preferences_providers.dart';
 import 'package:mangayomi/modules/browse/extension/extension_package.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/source_preference_widget.dart';
+import 'package:mangayomi/modules/browse/widgets/source_extension_icon.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
@@ -27,7 +28,6 @@ import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/reconcile_mihon_sources.dart';
 import 'package:mangayomi/services/uninstall_extension.dart';
-import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -291,22 +291,12 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
                   ).secondaryHeaderColor.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: widget.source.iconUrl!.isEmpty
-                    ? const Icon(Icons.source_outlined, size: 140)
-                    : cachedNetworkImage(
-                        imageUrl: widget.source.iconUrl!,
-                        fit: BoxFit.contain,
-                        width: 140,
-                        height: 140,
-                        errorWidget: const SizedBox(
-                          width: 140,
-                          height: 140,
-                          child: Center(
-                            child: Icon(Icons.source_outlined, size: 140),
-                          ),
-                        ),
-                        headers: {},
-                      ),
+                child: SourceExtensionIcon(
+                  source: widget.source,
+                  size: 140,
+                  fallbackIcon: Icons.source_outlined,
+                  fallbackIconSize: 140,
+                ),
               ),
             ),
             Padding(

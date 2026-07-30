@@ -36,6 +36,22 @@ void main() {
       );
     });
 
+    test('recognizes bridge UUID tokens through LAN and hosted origins', () {
+      const token = '6e7a9ad0-a45a-4cb7-8b34-e83cdd38c985';
+      expect(
+        isTransientMihonImageUrl(
+          'http://192.168.2.112:8080/image/$token',
+        ),
+        isTrue,
+      );
+      expect(
+        isTransientMihonImageUrl(
+          'https://bridge.example/image/$token',
+        ),
+        isTrue,
+      );
+    });
+
     test('recognizes legacy Mokuro CBZ-entry URLs as transient', () {
       expect(
         isTransientMihonImageUrl(
@@ -81,7 +97,10 @@ void main() {
     });
 
     test('persists transient URLs for metadata but never reuses them', () {
-      final proxyUrls = ['http://127.0.0.1:39641/image/token'];
+      final proxyUrls = [
+        'http://192.168.2.112:8080/image/'
+            '6e7a9ad0-a45a-4cb7-8b34-e83cdd38c985',
+      ];
       final ordinaryUrls = ['https://cdn.example/001.jpg'];
 
       expect(canReuseCachedMihonPageUrls(proxyUrls), isFalse);

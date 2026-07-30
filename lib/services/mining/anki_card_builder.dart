@@ -17,6 +17,146 @@ class AnkiCardBuilder {
     Map<String, dynamic> renderedContent = const {},
     List<AnkiMediaFile> dictionaryMedia = const [],
     AnkiMediaFile? wordAudio,
+    AnkiScreenshotMode screenshotMode = AnkiScreenshotMode.full,
+  }) async {
+    final prepared = await _buildPrepared(
+      result: result,
+      context: context,
+      profile: profile,
+      renderedContent: renderedContent,
+      dictionaryMedia: dictionaryMedia,
+      wordAudio: wordAudio,
+      screenshotMode: screenshotMode,
+    );
+    return prepared.draft;
+  }
+
+  Future<PendingAnkiCard> buildPending({
+    required HoshiLookupResult result,
+    required MiningContext context,
+    AnkiMiningProfile profile = const AnkiMiningProfile(),
+    AnkiScreenshotMode screenshotMode = AnkiScreenshotMode.full,
+    Map<String, dynamic> renderedContent = const {},
+    Future<List<AnkiMediaFile>> Function()? dictionaryMediaLoader,
+    Future<AnkiMediaFile?> Function()? wordAudioLoader,
+  }) async {
+    final placeholder = await _buildPrepared(
+      result: result,
+      context: context.copyWith(
+        imageBytesLoader: () async => null,
+        sentenceAudioLoader: (_) async => null,
+      ),
+      profile: profile,
+      renderedContent: renderedContent,
+      screenshotMode: AnkiScreenshotMode.noScreenshot,
+    );
+    final usesScreenshot = _usesScreenshotMarker(profile.fieldMap);
+    final usesWordAudio =
+        _usesMarker(profile.fieldMap, AnkiMarker.audio) ||
+        _usesMarker(profile.fieldMap, AnkiMarker.wordAudio);
+    final requests = <AnkiMediaRequest>[
+      if (dictionaryMediaLoader != null)
+        AnkiMediaRequest(
+          marker: 'dictionary-media',
+          load: dictionaryMediaLoader,
+        ),
+      if (usesWordAudio && wordAudioLoader != null)
+        AnkiMediaRequest(marker: AnkiMarker.wordAudio, load: wordAudioLoader),
+      if (_usesMarker(profile.fieldMap, AnkiMarker.sentenceAudio) &&
+          context.sentenceAudioLoader != null)
+        AnkiMediaRequest(
+          marker: AnkiMarker.sentenceAudio,
+          load: () => Future<Object?>.value(
+            context.sentenceAudioLoader!(profile.sentenceAudioFormat),
+          ),
+        ),
+      if (usesScreenshot && screenshotMode != AnkiScreenshotMode.noScreenshot)
+        AnkiMediaRequest(
+          marker: AnkiMarker.screenshot,
+          load: () async => context.sceneCapture ?? context.imageBytesLoader,
+        ),
+    ];
+
+    return PendingAnkiCard(
+      placeholderDraft: placeholder.draft,
+      jobController: screenshotMode == AnkiScreenshotMode.animatedScene
+          ? context.sceneCapture?.jobController
+          : null,
+      mediaRequests: requests,
+      prepare: (session) async {
+        session?.registerCancel(() {});
+        session?.throwIfCancelled();
+        final dictionaryMedia = dictionaryMediaLoader == null
+            ? const <AnkiMediaFile>[]
+            : await dictionaryMediaLoader();
+        session?.throwIfCancelled();
+        final wordAudio = !usesWordAudio || wordAudioLoader == null
+            ? null
+            : await wordAudioLoader();
+        session?.throwIfCancelled();
+
+        AnkiScreenshotPreparation? animatedScreenshot;
+        final capture = context.sceneCapture;
+        if (usesScreenshot &&
+            screenshotMode == AnkiScreenshotMode.animatedScene &&
+            capture != null) {
+          if (session == null) {
+            throw StateError(
+              'Animated scene preparation requires a player job session.',
+            );
+          }
+          try {
+            animatedScreenshot = await capture.prepareAnimatedScreenshot(
+              session,
+            );
+          } on AnkiExportCancelledException {
+            rethrow;
+          } catch (_) {
+            // The normal screenshot path below is the authoritative fallback.
+          }
+        }
+        session?.throwIfCancelled();
+        var handedOff = false;
+        try {
+          final prepared = await _buildPrepared(
+            result: result,
+            context: context,
+            profile: profile,
+            renderedContent: renderedContent,
+            dictionaryMedia: dictionaryMedia,
+            wordAudio: wordAudio,
+            screenshotMode: screenshotMode,
+            screenshotOverride: animatedScreenshot,
+          );
+          handedOff = true;
+          return PreparedAnkiCard(
+            draft: prepared.draft,
+            screenshot: prepared.screenshot,
+            warnings: prepared.screenshot?.warnings ?? const [],
+          );
+        } finally {
+          if (!handedOff) {
+            await animatedScreenshot?.dispose();
+            for (final media in dictionaryMedia) {
+              await media.source.dispose();
+            }
+            await wordAudio?.source.dispose();
+          }
+        }
+      },
+    );
+  }
+
+  Future<({AnkiCardDraft draft, AnkiScreenshotPreparation? screenshot})>
+  _buildPrepared({
+    required HoshiLookupResult result,
+    required MiningContext context,
+    required AnkiMiningProfile profile,
+    required Map<String, dynamic> renderedContent,
+    List<AnkiMediaFile> dictionaryMedia = const [],
+    AnkiMediaFile? wordAudio,
+    required AnkiScreenshotMode screenshotMode,
+    AnkiScreenshotPreparation? screenshotOverride,
   }) async {
     final sentenceAudioFuture =
         _usesMarker(profile.fieldMap, AnkiMarker.sentenceAudio)
@@ -25,24 +165,43 @@ class AnkiCardBuilder {
                 context.sentenceAudioLoader?.call(profile.sentenceAudioFormat),
           )
         : Future<AnkiMediaFile?>.value();
-    final screenshotFuture = _loadScreenshot(context);
+    final screenshotFuture =
+        !_usesScreenshotMarker(profile.fieldMap) ||
+            screenshotMode == AnkiScreenshotMode.noScreenshot
+        ? Future<_ScreenshotPayload?>.value()
+        : screenshotOverride != null
+        ? Future<_ScreenshotPayload?>.value(
+            _ScreenshotPayload.fromPreparation(screenshotOverride),
+          )
+        : _loadScreenshot(context);
     final media = await Future.wait<Object?>([
       sentenceAudioFuture,
       screenshotFuture,
     ]);
     final sentenceAudio = media[0] as AnkiMediaFile?;
     final screenshot = media[1] as _ScreenshotPayload?;
-    final screenshotName = screenshot == null
+    final screenshotName =
+        screenshot?.filename ??
+        (screenshot == null
+            ? null
+            : _safeMediaName(
+                [
+                  context.sourceTitle,
+                  context.chapterTitle,
+                  result.term.expression,
+                  DateTime.now().millisecondsSinceEpoch.toString(),
+                ].where((part) => part.trim().isNotEmpty).join(' '),
+                extension: screenshot.extension,
+              ));
+    final screenshotPreparation = screenshot == null || screenshotName == null
         ? null
-        : _safeMediaName(
-            [
-              context.sourceTitle,
-              context.chapterTitle,
-              result.term.expression,
-              DateTime.now().millisecondsSinceEpoch.toString(),
-            ].where((part) => part.trim().isNotEmpty).join(' '),
-            extension: screenshot.extension,
-          );
+        : screenshot.preparation ??
+              AnkiScreenshotPreparation(
+                filename: screenshotName,
+                source: AnkiMediaSource.bytes(screenshot.bytes!),
+                fallbackFilename: screenshotName,
+                fallbackSource: AnkiMediaSource.bytes(screenshot.bytes!),
+              );
 
     final selectedGlossary = result.term.glossaries.take(1).toList();
     String rendered(String key, String fallback) {
@@ -185,20 +344,31 @@ class AnkiCardBuilder {
       return MapEntry(field, value);
     });
 
-    return AnkiCardDraft(
-      deckName: profile.deckName,
-      modelName: profile.modelName,
-      expression: result.term.expression,
-      fields: fields,
-      tags: profile.tags,
-      screenshotBytes: screenshot?.bytes,
-      screenshotFileName: screenshotName,
-      mediaFiles: [...dictionaryMedia, ?wordAudio, ?sentenceAudio],
+    return (
+      draft: AnkiCardDraft(
+        deckName: profile.deckName,
+        modelName: profile.modelName,
+        expression: result.term.expression,
+        fields: fields,
+        tags: profile.tags,
+        screenshotBytes: screenshot?.bytes,
+        screenshotSource: screenshotPreparation?.source,
+        screenshotFileName: screenshotName,
+        mediaFiles: [...dictionaryMedia, ?wordAudio, ?sentenceAudio],
+      ),
+      screenshot: screenshotPreparation,
     );
   }
 
   bool _usesMarker(Map<String, String> fieldMap, String marker) =>
       fieldMap.values.any((template) => template.contains(marker));
+
+  bool _usesScreenshotMarker(Map<String, String> fieldMap) =>
+      fieldMap.entries.any(
+        (entry) =>
+            _normalizeFieldName(entry.key) != 'definitionpicture' &&
+            entry.value.contains(AnkiMarker.screenshot),
+      );
 
   Future<_ScreenshotPayload?> _loadScreenshot(MiningContext context) async {
     final loader = context.imageBytesLoader;
@@ -536,8 +706,18 @@ Uint8List? _compressScreenshot(Uint8List bytes) {
 }
 
 class _ScreenshotPayload {
-  const _ScreenshotPayload(this.bytes, this.extension);
+  const _ScreenshotPayload(this.bytes, this.extension)
+    : filename = null,
+      preparation = null;
 
-  final Uint8List bytes;
+  _ScreenshotPayload.fromPreparation(AnkiScreenshotPreparation preparation)
+    : preparation = preparation,
+      bytes = null,
+      extension = 'avif',
+      filename = preparation.filename;
+
+  final Uint8List? bytes;
   final String extension;
+  final String? filename;
+  final AnkiScreenshotPreparation? preparation;
 }

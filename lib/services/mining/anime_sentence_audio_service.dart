@@ -2,12 +2,13 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:media_kit/media_kit.dart';
+import 'package:mangayomi/services/mining/desktop_ffmpeg.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 const _sentenceAudioPadding = Duration(milliseconds: 250);
-const _sentenceAudioMaxDuration = Duration(seconds: 35);
+const _sentenceAudioMaxDuration = Duration(seconds: 30);
 
 class SubtitleAudioTiming {
   const SubtitleAudioTiming({required this.start, required this.end});
@@ -36,6 +37,7 @@ class AnimeSentenceAudioService {
     required String fallbackSource,
     required Duration fallbackPosition,
     Duration subtitleDelay = Duration.zero,
+    double subtitleSpeed = 1,
   }) async {
     var source = fallbackSource;
     Duration? subtitleStart;
@@ -47,8 +49,8 @@ class AnimeSentenceAudioService {
       try {
         final values = await Future.wait([
           platform.getProperty('path'),
-          platform.getProperty('sub-start'),
-          platform.getProperty('sub-end'),
+          platform.getProperty('sub-start/full'),
+          platform.getProperty('sub-end/full'),
           platform.getProperty('time-pos'),
         ]);
         if (values[0].trim().isNotEmpty) source = values[0].trim();
@@ -65,6 +67,7 @@ class AnimeSentenceAudioService {
         subtitleEnd: subtitleEnd,
         currentPosition: currentPosition,
         subtitleDelay: subtitleDelay,
+        subtitleSpeed: subtitleSpeed,
       ),
     );
   }
@@ -76,14 +79,15 @@ class AnimeSentenceAudioService {
     required String sourceTitle,
     required String chapterTitle,
     Map<String, String>? headers,
+    int? audioStreamIndex,
   }) async {
-    if (!_isDesktop) {
+    if (!isDesktopPlatform) {
       throw StateError('Sentence audio export is available on desktop only.');
     }
-    final ffmpeg = await _findFfmpeg();
-    if (ffmpeg == null) {
+    final tools = await DesktopFfmpegTools.discover();
+    if (tools == null) {
       throw StateError(
-        'Sentence audio requires ffmpeg. Install it or set FFMPEG_PATH.',
+        'Sentence audio requires ffmpeg and ffprobe. Install them or set FFMPEG_PATH and FFPROBE_PATH.',
       );
     }
 
@@ -97,13 +101,14 @@ class AnimeSentenceAudioService {
     );
     try {
       final result = await Process.run(
-        ffmpeg,
+        tools.ffmpeg,
         sentenceAudioFfmpegArguments(
           source: source,
           headers: headers,
           timing: timing,
           format: format,
           outputPath: output.path,
+          audioStreamIndex: audioStreamIndex,
         ),
       );
       if (result.exitCode != 0 || !await output.exists()) {
@@ -131,10 +136,22 @@ SubtitleAudioTiming subtitleAudioTimingForCue({
   Duration? subtitleEnd,
   required Duration currentPosition,
   Duration subtitleDelay = Duration.zero,
+  double subtitleSpeed = 1,
   Duration padding = _sentenceAudioPadding,
 }) {
-  if (subtitleStart != null) subtitleStart += subtitleDelay;
-  if (subtitleEnd != null) subtitleEnd += subtitleDelay;
+  final speed = subtitleSpeed.isFinite && subtitleSpeed > 0
+      ? subtitleSpeed
+      : 1.0;
+  if (subtitleStart != null) {
+    subtitleStart =
+        Duration(microseconds: (subtitleStart.inMicroseconds * speed).round()) +
+        subtitleDelay;
+  }
+  if (subtitleEnd != null) {
+    subtitleEnd =
+        Duration(microseconds: (subtitleEnd.inMicroseconds * speed).round()) +
+        subtitleDelay;
+  }
   var start =
       subtitleStart ??
       currentPosition - const Duration(seconds: 1, milliseconds: 500);
@@ -165,6 +182,7 @@ List<String> sentenceAudioFfmpegArguments({
   required AnkiSentenceAudioFormat format,
   required String outputPath,
   Map<String, String>? headers,
+  int? audioStreamIndex,
 }) {
   final isHlsInput = _isHlsInput(source);
   final httpHeaders = _httpHeadersArgument(headers);
@@ -204,7 +222,7 @@ List<String> sentenceAudioFfmpegArguments({
     '-t',
     _seconds(timing.duration),
     '-map',
-    '0:a:0',
+    audioStreamIndex == null ? '0:a:0' : '0:$audioStreamIndex',
     '-vn',
     '-sn',
     '-dn',
@@ -242,37 +260,6 @@ bool _isHlsInput(String source) {
   final uri = Uri.tryParse(source);
   final path = uri?.path.toLowerCase() ?? source.toLowerCase();
   return path.endsWith('.m3u8') || path.endsWith('.m3u') || path == '/m3u8';
-}
-
-bool get _isDesktop =>
-    Platform.isMacOS || Platform.isWindows || Platform.isLinux;
-
-Future<String?> _findFfmpeg() async {
-  final executableName = Platform.isWindows ? 'ffmpeg.exe' : 'ffmpeg';
-  final environmentPath = Platform.environment['FFMPEG_PATH'];
-  final candidates = <String>[
-    if (environmentPath?.trim().isNotEmpty ?? false) environmentPath!,
-    path.join(path.dirname(Platform.resolvedExecutable), executableName),
-    if (Platform.isMacOS) '/opt/homebrew/bin/ffmpeg',
-    if (Platform.isMacOS) '/usr/local/bin/ffmpeg',
-    if (Platform.isMacOS) '/Applications/IINA.app/Contents/MacOS/ffmpeg',
-    if (!Platform.isWindows) '/usr/bin/ffmpeg',
-    if (!Platform.isWindows) '/usr/local/bin/ffmpeg',
-  ];
-  for (final candidate in candidates) {
-    if (await File(candidate).exists()) return candidate;
-  }
-  try {
-    final lookup = await Process.run(
-      Platform.isWindows ? 'where' : '/usr/bin/which',
-      [executableName],
-    );
-    if (lookup.exitCode == 0) {
-      final result = lookup.stdout.toString().trim().split(RegExp(r'\r?\n'));
-      if (result.isNotEmpty && result.first.isNotEmpty) return result.first;
-    }
-  } catch (_) {}
-  return null;
 }
 
 String _filename(

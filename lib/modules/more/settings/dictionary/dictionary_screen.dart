@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +36,72 @@ class DictionaryScreen extends StatefulWidget {
   State<DictionaryScreen> createState() => _DictionaryScreenState();
 }
 
+@visibleForTesting
+List<String> dictionaryZipPaths(Iterable<String> paths) => paths
+    .where((path) => path.toLowerCase().endsWith('.zip'))
+    .toList(growable: false);
+
+class DictionaryZipDropTarget extends StatefulWidget {
+  const DictionaryZipDropTarget({
+    super.key,
+    required this.enabled,
+    required this.onImport,
+    required this.child,
+  });
+
+  final bool enabled;
+  final Future<void> Function(List<String> paths) onImport;
+  final Widget child;
+
+  @override
+  State<DictionaryZipDropTarget> createState() =>
+      _DictionaryZipDropTargetState();
+}
+
+class _DictionaryZipDropTargetState extends State<DictionaryZipDropTarget> {
+  bool _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktop) return widget.child;
+    final scheme = Theme.of(context).colorScheme;
+    return DropTarget(
+      enable: widget.enabled,
+      onDragEntered: (_) {
+        if (widget.enabled) setState(() => _dragging = true);
+      },
+      onDragExited: (_) {
+        if (_dragging) setState(() => _dragging = false);
+      },
+      onDragDone: (details) async {
+        final paths = dictionaryZipPaths(
+          details.files.whereType<DropItemFile>().map((file) => file.path),
+        );
+        if (mounted) setState(() => _dragging = false);
+        if (paths.isEmpty) {
+          botToast('Drop one or more Yomitan ZIP files.');
+          return;
+        }
+        await widget.onImport(paths);
+      },
+      child: AnimatedContainer(
+        key: const ValueKey('dictionary-zip-drop-highlight'),
+        duration: const Duration(milliseconds: 120),
+        decoration: BoxDecoration(
+          color: _dragging
+              ? scheme.primaryContainer.withValues(alpha: 0.55)
+              : Colors.transparent,
+          border: _dragging
+              ? Border.all(color: scheme.primary, width: 2)
+              : null,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _DictionaryScreenState extends State<DictionaryScreen> {
   List<InstalledDictionary> _dictionaries = const [];
   List<DictionaryProfile> _profiles = const [];
@@ -47,7 +114,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _mokuroWebsiteOcrEnabled = true;
   String _dictionaryLanguage = 'ja';
   double _backgroundOpacity = MiningPreferences.defaultOcrBackgroundOpacity;
-  double _textOpacity = MiningPreferences.defaultOcrTextOpacity;
   double _boxScale = 1;
   double _boxScaleY = 1;
   bool _outlineVisible = true;
@@ -62,7 +128,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _dictionaryAutoUpdate = false;
   int _dictionaryAutoUpdateHours = 24;
   Map<String, DictionaryUpdateInfo> _dictionaryUpdates = const {};
-  bool _cropImageBeforeMining = false;
   late DictionaryPopupPreferences _popupPreferences;
   AnkiMiningProfile _ankiProfile = const AnkiMiningProfile();
   AnkiAudioPreferences _ankiAudioPreferences = AnkiAudioPreferences.defaults;
@@ -96,7 +161,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       DictionaryStorage.instance.installed(),
       MiningPreferences.getOcrEngine(),
       MiningPreferences.getOcrBackgroundOpacity(),
-      MiningPreferences.getOcrTextOpacity(),
       MiningPreferences.getOcrBoxScaleX(),
       MiningPreferences.getOcrBoxScaleY(),
       MiningPreferences.getOcrOutlineVisible(),
@@ -113,7 +177,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getDictionaryProfiles(),
       MiningPreferences.getActiveDictionaryProfile(),
       MiningPreferences.getMokuroWebsiteOcrEnabled(),
-      MiningPreferences.getCropImageBeforeMining(),
       MiningPreferences.getAnkiIntegrationMode(),
       MiningPreferences.getDictionaryAutoUpdateEnabled(),
       MiningPreferences.getDictionaryAutoUpdateIntervalHours(),
@@ -121,34 +184,32 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     ]);
     if (!mounted) return;
     setState(() {
-      _profiles = values[17] as List<DictionaryProfile>;
-      _activeProfile = values[18] as DictionaryProfile;
-      _mokuroWebsiteOcrEnabled = values[19] as bool;
+      _profiles = values[16] as List<DictionaryProfile>;
+      _activeProfile = values[17] as DictionaryProfile;
+      _mokuroWebsiteOcrEnabled = values[18] as bool;
       _dictionaries = _orderDictionaries(
         values[0] as List<InstalledDictionary>,
         _activeProfile.dictionaryOrder,
       );
       _engine = values[1] as OcrEnginePreference;
       _backgroundOpacity = values[2] as double;
-      _textOpacity = values[3] as double;
-      _boxScale = values[4] as double;
-      _boxScaleY = values[5] as double;
-      _outlineVisible = values[6] as bool;
-      _lookupOnHover = values[7] as bool;
-      _overlayEnabled = values[8] as bool;
-      _popupPreferences = values[9] as DictionaryPopupPreferences;
-      _ankiProfile = values[10] as AnkiMiningProfile;
-      _ankiAudioPreferences = values[11] as AnkiAudioPreferences;
-      _ankiEndpoint = values[12] as Uri;
-      _screenAiAvailable = values[13] as bool;
-      _lookupTrigger = values[14] as DictionaryLookupTrigger;
-      _additionalLeftClick = values[15] as bool;
-      _dictionaryLanguage = values[16] as String;
-      _cropImageBeforeMining = values[20] as bool;
-      _ankiIntegrationMode = values[21] as AnkiIntegrationMode;
-      _dictionaryAutoUpdate = values[22] as bool;
-      _dictionaryAutoUpdateHours = values[23] as int;
-      _parallelOcrLimit = values[24] as int;
+      _boxScale = values[3] as double;
+      _boxScaleY = values[4] as double;
+      _outlineVisible = values[5] as bool;
+      _lookupOnHover = values[6] as bool;
+      _overlayEnabled = values[7] as bool;
+      _popupPreferences = values[8] as DictionaryPopupPreferences;
+      _ankiProfile = values[9] as AnkiMiningProfile;
+      _ankiAudioPreferences = values[10] as AnkiAudioPreferences;
+      _ankiEndpoint = values[11] as Uri;
+      _screenAiAvailable = values[12] as bool;
+      _lookupTrigger = values[13] as DictionaryLookupTrigger;
+      _additionalLeftClick = values[14] as bool;
+      _dictionaryLanguage = values[15] as String;
+      _ankiIntegrationMode = values[19] as AnkiIntegrationMode;
+      _dictionaryAutoUpdate = values[20] as bool;
+      _dictionaryAutoUpdateHours = values[21] as int;
+      _parallelOcrLimit = values[22] as int;
       _loading = false;
     });
     if (widget.section == DictionarySettingsSection.anki && !_usesAnkiMobile) {
@@ -164,7 +225,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     );
     final paths =
         result?.files.map((file) => file.path).nonNulls.toList() ?? [];
-    if (paths.isEmpty || !mounted) return;
+    await _importDictionaryPaths(paths);
+  }
+
+  Future<void> _importDictionaryPaths(List<String> paths) async {
+    if (paths.isEmpty || !mounted || _importing) return;
     setState(() => _importing = true);
     try {
       final root = await DictionaryStorage.instance.rootDirectory;
@@ -345,9 +410,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   }
 
   Future<void> _saveAnki(AnkiMiningProfile profile) async {
+    if (!mounted) return;
+    final activeProfile = _activeProfile.copyWith(anki: profile);
     setState(() {
       _ankiProfile = profile;
-      _activeProfile = _activeProfile.copyWith(anki: profile);
+      _activeProfile = activeProfile;
+      _profiles = [
+        for (final item in _profiles)
+          item.id == activeProfile.id ? activeProfile : item,
+      ];
     });
     await MiningPreferences.setAnkiProfile(profile);
   }
@@ -597,9 +668,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
               )
             : _ankiProfile;
-        if (!identical(profile, _ankiProfile)) {
-          await MiningPreferences.setAnkiProfile(profile);
-        }
+        if (!mounted) return;
+        if (!identical(profile, _ankiProfile)) await _saveAnki(profile);
         if (!mounted) return;
         setState(() {
           _ankiProfile = profile;
@@ -637,9 +707,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               ),
             )
           : _ankiProfile;
-      if (!identical(profile, _ankiProfile)) {
-        await MiningPreferences.setAnkiProfile(profile);
-      }
+      if (!mounted) return;
+      if (!identical(profile, _ankiProfile)) await _saveAnki(profile);
       if (!mounted) return;
       setState(() {
         _ankiProfile = profile;
@@ -1144,17 +1213,23 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ? null
                       : _checkDictionaryUpdates,
                 ),
-                ListTile(
-                  leading: const Icon(Icons.archive_outlined),
-                  title: const Text('Import Yomitan dictionary'),
-                  subtitle: const Text('Select a Yomitan-format ZIP file'),
-                  trailing: _importing
-                      ? const SizedBox.square(
-                          dimension: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add),
-                  onTap: _importing ? null : _importDictionary,
+                DictionaryZipDropTarget(
+                  enabled: !_importing,
+                  onImport: _importDictionaryPaths,
+                  child: ListTile(
+                    leading: const Icon(Icons.archive_outlined),
+                    title: const Text('Import Yomitan dictionary'),
+                    subtitle: const Text(
+                      'Select or drop Yomitan-format ZIP files',
+                    ),
+                    trailing: _importing
+                        ? const SizedBox.square(
+                            dimension: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add),
+                    onTap: _importing ? null : _importDictionary,
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -1518,25 +1593,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       labelText: 'OCR engine',
                       prefixIcon: Icon(Icons.document_scanner_outlined),
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.automatic,
-                        child: Text(
-                          'Automatic (Mokuro, ScreenAI, Google Lens)',
+                    items: [
+                      for (final engine in availableOcrEngines())
+                        DropdownMenuItem(
+                          value: engine,
+                          child: Text(ocrEngineLabel(engine)),
                         ),
-                      ),
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.screenAi,
-                        child: Text('ScreenAI (local Chrome)'),
-                      ),
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.googleLens,
-                        child: Text('Google Lens'),
-                      ),
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.mokuroOnly,
-                        child: Text('Mokuro only'),
-                      ),
                     ],
                     onChanged: (value) async {
                       if (value == null) return;
@@ -1581,19 +1643,28 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     await MiningPreferences.setMokuroWebsiteOcrEnabled(value);
                   },
                 ),
-                ListTile(
-                  leading: Icon(
-                    _screenAiAvailable
-                        ? Icons.offline_bolt_outlined
-                        : Icons.download_for_offline_outlined,
+                if (currentOcrHostPlatform == OcrHostPlatform.apple)
+                  const ListTile(
+                    leading: Icon(Icons.offline_bolt_outlined),
+                    title: Text('Apple Vision OCR'),
+                    subtitle: Text(
+                      'Runs privately on device. Supported languages depend on the OS version.',
+                    ),
                   ),
-                  title: const Text('ScreenAI OCR'),
-                  subtitle: Text(
-                    _screenAiAvailable
-                        ? 'Local Chrome ScreenAI component detected. Runs on device.'
-                        : 'Local Chrome ScreenAI component was not detected.',
+                if (currentOcrHostPlatform == OcrHostPlatform.windows)
+                  ListTile(
+                    leading: Icon(
+                      _screenAiAvailable
+                          ? Icons.offline_bolt_outlined
+                          : Icons.download_for_offline_outlined,
+                    ),
+                    title: const Text('ScreenAI OCR'),
+                    subtitle: Text(
+                      _screenAiAvailable
+                          ? 'Local Chrome ScreenAI component detected. Runs on device.'
+                          : 'Local Chrome ScreenAI component was not detected.',
+                    ),
                   ),
-                ),
                 const ListTile(
                   leading: Icon(Icons.translate),
                   title: Text('OCR language follows the dictionary profile'),
@@ -1604,7 +1675,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 const SizedBox(height: 8),
                 _SliderSetting(
-                  title: 'Hovered OCR background opacity',
+                  title: 'OCR box opacity',
                   value: _backgroundOpacity,
                   min: 0,
                   max: 1,
@@ -1612,19 +1683,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   label: '${(_backgroundOpacity * 100).round()}%',
                   onChanged: (value) {
                     setState(() => _backgroundOpacity = value);
-                    unawaited(ReaderOcrState.setBackgroundOpacity(value));
-                  },
-                ),
-                _SliderSetting(
-                  title: 'Hovered OCR text opacity',
-                  value: _textOpacity,
-                  min: 0,
-                  max: 1,
-                  divisions: 20,
-                  label: '${(_textOpacity * 100).round()}%',
-                  onChanged: (value) {
-                    setState(() => _textOpacity = value);
-                    unawaited(ReaderOcrState.setTextOpacity(value));
+                    unawaited(ReaderOcrState.setBoxOpacity(value));
                   },
                 ),
                 _SliderSetting(
@@ -1953,6 +2012,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _ankiDecks.contains(_ankiProfile.deckName)
                           ? _ankiProfile.deckName
                           : null,
@@ -1960,10 +2020,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         labelText: 'Deck',
                         prefixIcon: Icon(Icons.style_outlined),
                       ),
-                      hint: Text(_ankiProfile.deckName),
+                      hint: Text(
+                        _ankiProfile.deckName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       items: [
                         for (final deck in _ankiDecks)
-                          DropdownMenuItem(value: deck, child: Text(deck)),
+                          DropdownMenuItem(
+                            value: deck,
+                            child: Text(
+                              deck,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
@@ -1993,6 +2064,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _ankiModels.contains(_ankiProfile.modelName)
                           ? _ankiProfile.modelName
                           : null,
@@ -2000,10 +2072,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         labelText: 'Note type',
                         prefixIcon: Icon(Icons.view_agenda_outlined),
                       ),
-                      hint: Text(_ankiProfile.modelName),
+                      hint: Text(
+                        _ankiProfile.modelName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       items: [
                         for (final model in _ankiModels)
-                          DropdownMenuItem(value: model, child: Text(model)),
+                          DropdownMenuItem(
+                            value: model,
+                            child: Text(
+                              model,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
@@ -2084,6 +2167,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     value: _activeProfile.duplicateAction == 'allow',
                     onChanged: (value) => _updateActiveProfile(
                       _activeProfile.copyWith(
+                        anki: _ankiProfile,
                         duplicateAction: value ? 'allow' : 'prevent',
                       ),
                     ),
@@ -2168,15 +2252,39 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
                     ),
                 ],
-                SwitchListTile(
-                  secondary: const Icon(Icons.crop_outlined),
-                  title: const Text('Crop manga image before mining'),
-                  subtitle: const Text('Manually crop the page before sending to Anki'),
-                  value: _cropImageBeforeMining,
-                  onChanged: (value) async {
-                    setState(() => _cropImageBeforeMining = value);
-                    await MiningPreferences.setCropImageBeforeMining(value);
-                  },
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<AnkiScreenshotMode>(
+                    initialValue: _activeProfile.screenshotMode,
+                    decoration: const InputDecoration(
+                      labelText: 'Screenshot',
+                      prefixIcon: Icon(Icons.photo_camera_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.full,
+                        child: Text('Full image'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.crop,
+                        child: Text('Crop manga image'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.noScreenshot,
+                        child: Text('No screenshot'),
+                      ),
+                      DropdownMenuItem(
+                        value: AnkiScreenshotMode.animatedScene,
+                        child: Text('Animated scene (desktop only)'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _updateActiveProfile(
+                        _activeProfile.copyWith(cropMode: value.wireValue),
+                      );
+                    },
+                  ),
                 ),
                 if (_usesAnkiMobile)
                   const ListTile(

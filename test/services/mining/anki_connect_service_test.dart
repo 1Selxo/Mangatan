@@ -204,6 +204,48 @@ void main() {
     },
   );
 
+  test('surfaces non-duplicate validation failures as export errors', () async {
+    final actions = <String>[];
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final action = body['action'] as String;
+      actions.add(action);
+      return switch (action) {
+        'modelFieldNames' => http.Response(
+          '{"result": ["Front", "Back"], "error": null}',
+          200,
+        ),
+        'canAddNotesWithErrorDetail' => http.Response(
+          '{"result": [{"canAdd": false, "error": "cannot create note because it is empty"}], "error": null}',
+          200,
+        ),
+        _ => throw StateError('Unexpected action: $action'),
+      };
+    });
+
+    await expectLater(
+      AnkiConnectService(client: client).exportDraft(
+        const AnkiCardDraft(
+          deckName: 'Mining',
+          modelName: 'Basic',
+          expression: '事件',
+          fields: {'Front': '', 'Back': 'event'},
+        ),
+        allowDuplicate: true,
+      ),
+      throwsA(
+        allOf(
+          isA<AnkiConnectException>(),
+          isNot(isA<AnkiDuplicateException>()),
+          predicate(
+            (error) => error.toString().contains('because it is empty'),
+          ),
+        ),
+      ),
+    );
+    expect(actions, ['modelFieldNames', 'canAddNotesWithErrorDetail']);
+  });
+
   test('blocks a pending card before running any media request', () async {
     final actions = <String>[];
     var preparations = 0;
@@ -456,7 +498,7 @@ void main() {
           case 'findNotes':
             expect(
               (body['params'] as Map<String, dynamic>)['query'],
-              '"deck:Japanese" "expression:事件"',
+              '"deck:Japanese" "note:Mining" "expression:事件"',
             );
             return http.Response('{"result": [41, 42], "error": null}', 200);
         }
@@ -500,6 +542,7 @@ void main() {
       expression: '事件',
       duplicateScope: 'decks',
       duplicateDeckNames: ['Japanese::Archive'],
+      checkAllModels: true,
     );
 
     expect(ids, [51]);

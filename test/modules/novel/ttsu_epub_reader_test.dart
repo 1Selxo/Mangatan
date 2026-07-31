@@ -493,6 +493,12 @@ void main() {
           <p id="small"><img width="96" src="data:image/png;base64,AA=="></p>
           <p id="gaiji"><img class="gaiji-line" src="data:image/png;base64,AA=="></p>
           <div id="illustration" class="illustration"><img src="data:image/png;base64,AA=="></div>
+          <div id="ebpaj-page" class="display-block vrtl">
+            <span class="valign-middle hltr width-100per"></span>
+            <div class="display-inline-block valign-middle height-100per">
+              <div><p><span class="koboSpan"><img class="fit" src="data:image/png;base64,AA=="></span></p></div>
+            </div>
+          </div>
           <h1 id="heading"><img src="data:image/png;base64,AA=="></h1>
           <div id="fixed"><svg viewBox="0 0 1434 2048"><image href="data:image/png;base64,AA=="></image></svg></div>
           <p id="page-one"><img src="data:image/png;base64,AA=="></p>
@@ -522,7 +528,13 @@ void main() {
         .toSet();
     expect(
       candidates,
-      containsAll(<String>{'standalone', 'fixed', 'page-one', 'page-two'}),
+      containsAll(<String>{
+        'standalone',
+        'ebpaj-page',
+        'fixed',
+        'page-one',
+        'page-two',
+      }),
     );
     expect(candidates, isNot(contains('inline')));
     expect(candidates, isNot(contains('direct-inline')));

@@ -230,7 +230,7 @@ String buildContinuousEpubContent(EpubNovel book) {
     if (chapter.isNavigationEntry) {
       logicalNavigationSpine = chapter.spineIndex;
     }
-    final document = parse(chapter.content);
+    final document = parse(_normalizeEpubXhtmlForHtmlParsing(chapter.content));
     final idPrefix = 'mangatan-s${chapter.spineIndex}-';
 
     for (final element in document.querySelectorAll('[id], [name]')) {
@@ -422,11 +422,128 @@ String _normalizedEpubReference(String value) {
 
 bool readerHtmlHasRenderableContent(String input) {
   if (input.trim().isEmpty) return false;
-  final document = parse(input);
+  final document = parse(_normalizeEpubXhtmlForHtmlParsing(input));
   final text = document.body?.text.trim() ?? '';
   return text.isNotEmpty ||
       document.querySelector('img, svg, image, video, audio') != null;
 }
+
+/// Preserves XML-style empty HTML containers when using an HTML5 parser.
+///
+/// XHTML permits containers such as `<script src="…"/>` and `<span/>`, but
+/// HTML5 ignores their self-closing slash. A script can consequently swallow
+/// the entire body, while an empty layout span can unexpectedly wrap its
+/// following siblings. Expand only the container forms observed to cause
+/// these failures; comments, CDATA, and raw script/style text are skipped, and
+/// SVG/MathML tags are left untouched for the parser's foreign-content rules.
+String _normalizeEpubXhtmlForHtmlParsing(String input) {
+  StringBuffer? output;
+  var copiedThrough = 0;
+  var searchFrom = 0;
+  final lower = input.toLowerCase();
+
+  while (searchFrom < input.length) {
+    final tagStart = input.indexOf('<', searchFrom);
+    if (tagStart < 0) break;
+
+    if (lower.startsWith('<!--', tagStart)) {
+      final commentEnd = lower.indexOf('-->', tagStart + 4);
+      searchFrom = commentEnd < 0 ? input.length : commentEnd + 3;
+      continue;
+    }
+    if (lower.startsWith('<![cdata[', tagStart)) {
+      final cdataEnd = lower.indexOf(']]>', tagStart + 9);
+      searchFrom = cdataEnd < 0 ? input.length : cdataEnd + 3;
+      continue;
+    }
+    if (tagStart + 1 >= input.length ||
+        input[tagStart + 1] == '/' ||
+        input[tagStart + 1] == '!' ||
+        input[tagStart + 1] == '?') {
+      searchFrom = tagStart + 1;
+      continue;
+    }
+
+    var nameEnd = tagStart + 1;
+    while (nameEnd < input.length &&
+        _isMarkupNameCharacter(input.codeUnitAt(nameEnd))) {
+      nameEnd++;
+    }
+    if (nameEnd == tagStart + 1) {
+      searchFrom = tagStart + 1;
+      continue;
+    }
+    final tagName = lower.substring(tagStart + 1, nameEnd);
+
+    final tagEnd = _findMarkupTagEnd(input, nameEnd);
+    if (tagEnd < 0) break;
+    var lastContentIndex = tagEnd - 1;
+    while (lastContentIndex >= nameEnd &&
+        _isHtmlSpace(input.codeUnitAt(lastContentIndex))) {
+      lastContentIndex--;
+    }
+
+    final selfClosing =
+        lastContentIndex >= nameEnd && input[lastContentIndex] == '/';
+    if (selfClosing && _xhtmlHtmlContainerElements.contains(tagName)) {
+      output ??= StringBuffer();
+      output
+        ..write(input.substring(copiedThrough, lastContentIndex))
+        ..write('></$tagName>');
+      copiedThrough = tagEnd + 1;
+      searchFrom = tagEnd + 1;
+      continue;
+    }
+
+    if (!selfClosing && _htmlRawTextElements.contains(tagName)) {
+      // Do not inspect raw text for tag-shaped JavaScript or CSS literals.
+      final closingTag = lower.indexOf('</$tagName', tagEnd + 1);
+      if (closingTag < 0) break;
+      final closingTagEnd = input.indexOf('>', closingTag + tagName.length + 2);
+      searchFrom = closingTagEnd < 0 ? input.length : closingTagEnd + 1;
+    } else {
+      searchFrom = tagEnd + 1;
+    }
+  }
+
+  if (output == null) return input;
+  output.write(input.substring(copiedThrough));
+  return output.toString();
+}
+
+const _htmlRawTextElements = {'script', 'style'};
+
+const _xhtmlHtmlContainerElements = {'script', 'span'};
+
+int _findMarkupTagEnd(String input, int start) {
+  int? quote;
+  for (var index = start; index < input.length; index++) {
+    final codeUnit = input.codeUnitAt(index);
+    if (quote != null) {
+      if (codeUnit == quote) quote = null;
+    } else if (codeUnit == 0x22 || codeUnit == 0x27) {
+      quote = codeUnit;
+    } else if (codeUnit == 0x3e) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+bool _isHtmlSpace(int codeUnit) =>
+    codeUnit == 0x09 ||
+    codeUnit == 0x0a ||
+    codeUnit == 0x0c ||
+    codeUnit == 0x0d ||
+    codeUnit == 0x20;
+
+bool _isMarkupNameCharacter(int codeUnit) =>
+    (codeUnit >= 0x30 && codeUnit <= 0x39) ||
+    (codeUnit >= 0x41 && codeUnit <= 0x5a) ||
+    (codeUnit >= 0x61 && codeUnit <= 0x7a) ||
+    codeUnit == 0x2d ||
+    codeUnit == 0x3a ||
+    codeUnit == 0x5f;
 
 String buildReaderHtml(String input) {
   // Decode basic escapes

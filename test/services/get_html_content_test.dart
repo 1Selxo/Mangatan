@@ -62,6 +62,96 @@ void main() {
     );
   });
 
+  test('preserves XHTML body after a self-closing Kobo script tag', () {
+    const koboBook = EpubNovel(
+      name: 'Kobo fixture',
+      chapters: [
+        EpubChapter(
+          name: '第一章',
+          content: '''<?xml version="1.0" encoding="UTF-8"?>
+            <html xmlns="http://www.w3.org/1999/xhtml">
+              <head>
+                <script type="text/javascript" src="../js/kobo.js"/>
+              </head>
+              <body><p>本文はここにあります。</p></body>
+            </html>''',
+          path: 'chapter',
+          href: 'EPUB/chapter.xhtml',
+          spineIndex: 0,
+          isNavigationEntry: true,
+        ),
+      ],
+      images: [],
+      stylesheets: [],
+    );
+
+    final content = buildContinuousEpubContent(koboBook);
+
+    expect(content, contains('本文はここにあります。'));
+    expect(readerHtmlHasRenderableContent(content), isTrue);
+  });
+
+  test('does not rewrite tag-shaped text inside a normal script body', () {
+    const scriptedBook = EpubNovel(
+      name: 'Script fixture',
+      chapters: [
+        EpubChapter(
+          name: 'Chapter',
+          content: '''<html><body>
+            <script>const marker = "<script/>";</script>
+            <p>Readable prose.</p>
+          </body></html>''',
+          path: 'chapter',
+          href: 'chapter.xhtml',
+          spineIndex: 0,
+          isNavigationEntry: true,
+        ),
+      ],
+      images: [],
+      stylesheets: [],
+    );
+
+    final document = parse(buildContinuousEpubContent(scriptedBook));
+
+    expect(document.querySelector('script')?.text, contains('"<script/>"'));
+    expect(document.body?.text, contains('Readable prose.'));
+  });
+
+  test('preserves an empty XHTML span as a sibling on an image page', () {
+    const imagePage = EpubNovel(
+      name: 'EBPAJ image fixture',
+      chapters: [
+        EpubChapter(
+          name: 'Illustration',
+          content: '''<html><body class="p-image">
+            <div class="display-block vrtl">
+              <span class="valign-middle hltr width-100per"/>
+              <div class="display-inline-block valign-middle height-100per">
+                <p><span class="koboSpan"><img class="fit" src="p055.jpg" alt=""/></span></p>
+              </div>
+            </div>
+          </body></html>''',
+          path: 'illustration',
+          href: 'EPUB/xhtml/p-005.xhtml',
+          spineIndex: 5,
+          isNavigationEntry: true,
+        ),
+      ],
+      images: [],
+      stylesheets: [],
+    );
+
+    final document = parse(buildContinuousEpubContent(imagePage));
+    final wrapper = document.querySelector('.display-block')!;
+
+    expect(wrapper.children.map((element) => element.localName), [
+      'span',
+      'div',
+    ]);
+    expect(wrapper.children.first.children, isEmpty);
+    expect(wrapper.children.last.querySelector('img'), isNotNull);
+  });
+
   test('groups physical spine files under logical TOC chapter boundaries', () {
     const grouped = EpubNovel(
       name: 'fixture',

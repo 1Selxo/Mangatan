@@ -2605,7 +2605,12 @@ bool _isHeading(dom.Element element) =>
     const {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}.contains(element.localName);
 
 bool _hasInlineMediaSignal(dom.Element element) {
-  final classNames = element.classes.join(' ').toLowerCase();
+  // EBPAJ/Kobo image pages use this generic layout utility around full-page
+  // artwork. Its `inline` component describes CSS display, not image intent.
+  final classNames = element.classes
+      .where((name) => name.toLowerCase() != 'display-inline-block')
+      .join(' ')
+      .toLowerCase();
   if (RegExp(
     r'(^|[\s_-])(gaiji(?:-line)?|inline(?:-img|-image)?|emoji|illus(?:tration)?|float[-_]?img|decorat(?:ive|ion)?)([\s_-]|$)',
   ).hasMatch(classNames)) {
@@ -2638,7 +2643,7 @@ bool _containsOnlyMediaBranch(dom.Element container, dom.Element branch) {
         .where((element) => element.querySelector('image') != null),
   ];
   return otherMedia.every(
-    (element) => identical(element, branch) || branch.contains(element),
+    (element) => identical(element, branch) || _isDescendantOf(element, branch),
   );
 }
 
@@ -2650,8 +2655,16 @@ bool _hasOtherMediaOutside(dom.Element container, dom.Element branch) {
         .where((element) => element.querySelector('image') != null),
   ];
   return media.any(
-    (element) => !identical(element, branch) && !branch.contains(element),
+    (element) =>
+        !identical(element, branch) && !_isDescendantOf(element, branch),
   );
+}
+
+bool _isDescendantOf(dom.Node node, dom.Node ancestor) {
+  for (var parent = node.parent; parent != null; parent = parent.parent) {
+    if (identical(parent, ancestor)) return true;
+  }
+  return false;
 }
 
 const _inlineMediaContextElements = {

@@ -66,3 +66,4 @@ AGENTS.override.md
 
 # Runtime mpv configuration extracted from assets/mangayomi_mpv.zip
 /mpv/
+logs.txt

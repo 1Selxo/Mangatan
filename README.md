@@ -29,8 +29,45 @@ Features include:
 
 </div>
 
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Manga Shelf</strong><br><br>
+      <img src="assets/screenshots/manga-shelf.jpg" alt="Mangatan manga shelf" width="100%">
+    </td>
+    <td width="50%" align="center">
+      <strong>Manga Lookup</strong><br><br>
+      <img src="assets/screenshots/manga-lookup.jpg" alt="Dictionary lookup while reading manga" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Anime Lookup</strong><br><br>
+      <img src="assets/screenshots/anime-lookup.jpg" alt="OCR dictionary lookup while watching anime" width="100%">
+    </td>
+    <td width="50%" align="center">
+      <strong>Novel Lookup</strong><br><br>
+      <img src="assets/screenshots/novel-lookup.jpg" alt="Dictionary lookup while reading a Japanese novel" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <strong>Dictionary</strong><br><br>
+      <img src="assets/screenshots/dictionary.jpg" alt="Mangatan dictionary search" width="75%">
+    </td>
+  </tr>
+</table>
+
 ## Download
-Get the app from our [releases page](https://github.com/1Selxo/Mangatan/releases).
+
+Get Mangatan from the [releases page](https://github.com/1Selxo/Mangatan/releases).
+
+### Android
+
+Looking for the Android version? See [Chimahon](https://github.com/sohilsayed/chimahon).
 
 ## iOS Sideloading Sources
 <a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>

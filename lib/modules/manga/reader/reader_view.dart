@@ -1132,7 +1132,7 @@ class _MangaChapterPageGalleryState
   // }
 
   Future<void> _showCurrentPageOcr() async {
-    await ReaderOcrState.toggle();
+    await ReaderOcrState.handleOcrButton();
   }
 
   /// Opens the immersion statistics sheet for this manga.

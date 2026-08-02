@@ -41,6 +41,9 @@ class ReaderOcrState {
   static final engine = ValueNotifier<OcrEnginePreference>(
     OcrEnginePreference.automatic,
   );
+  static final scanTrigger = ValueNotifier<OcrScanTrigger>(
+    OcrScanTrigger.automatic,
+  );
   static final parallelOcrLimit = ValueNotifier<int>(1);
   static bool _initialized = false;
   static Future<void>? _initializing;
@@ -82,6 +85,7 @@ class ReaderOcrState {
         MiningPreferences.getOcrLookupOnHover(),
         MiningPreferences.getOcrEngine(),
         MiningPreferences.getParallelOcrLimit(),
+        MiningPreferences.getOcrScanTrigger(),
         ReaderLookupTriggerState.initialize(),
       ]);
       enabled.value = values[0] as bool;
@@ -91,6 +95,7 @@ class ReaderOcrState {
       lookupOnHover.value = values[4] as bool;
       engine.value = values[5] as OcrEnginePreference;
       parallelOcrLimit.value = values[6] as int;
+      scanTrigger.value = values[7] as OcrScanTrigger;
       _initialized = true;
     } finally {
       _initializing = null;
@@ -115,6 +120,26 @@ class ReaderOcrState {
   }
 
   static Future<void> toggle() => setEnabled(!enabled.value);
+
+  /// Handles a tap on the reader's OCR toolbar button, honoring the configured
+  /// [scanTrigger]. In automatic mode it toggles the overlay; in manual mode it
+  /// reveals the overlay if needed and scans the current chapter on demand
+  /// (issue #35).
+  static Future<void> handleOcrButton() async {
+    await initialize();
+    switch (readerOcrButtonAction(
+      trigger: scanTrigger.value,
+      enabled: enabled.value,
+    )) {
+      case ReaderOcrButtonAction.toggleOverlay:
+        await toggle();
+      case ReaderOcrButtonAction.enableAndScan:
+        await setEnabled(true);
+        await scanCurrentChapterManually();
+      case ReaderOcrButtonAction.scan:
+        await scanCurrentChapterManually();
+    }
+  }
 
   static Future<void> setBackgroundOpacity(double value) async {
     await initialize();
@@ -169,6 +194,27 @@ class ReaderOcrState {
     final clamped = value.clamp(1, 4);
     parallelOcrLimit.value = clamped;
     await MiningPreferences.setParallelOcrLimit(clamped);
+  }
+
+  static Future<void> setScanTrigger(OcrScanTrigger value) async {
+    await initialize();
+    if (scanTrigger.value == value) return;
+    scanTrigger.value = value;
+    await MiningPreferences.setOcrScanTrigger(value);
+    // Switching back to automatic scans any pending chapter immediately;
+    // switching to manual leaves already-scanned pages untouched and simply
+    // stops future background scans.
+    if (value == OcrScanTrigger.automatic &&
+        enabled.value &&
+        _lastScanPages.isNotEmpty) {
+      unawaited(
+        scanChapter(
+          _lastScanPages,
+          startIndex: _lastStartIndex,
+          preparePage: _lastPreparePage,
+        ),
+      );
+    }
   }
 
   static bool handlePointerUp(Offset globalPosition) {
@@ -418,12 +464,23 @@ class ReaderOcrState {
     List<UChapDataPreload> pages, {
     int startIndex = 0,
     Future<void> Function(UChapDataPreload)? preparePage,
+    bool manual = false,
   }) async {
     _lastScanPages = pages;
     _lastStartIndex = startIndex;
     _lastPreparePage = preparePage;
     await initialize();
     if (!enabled.value) return;
+    // Manual trigger mode keeps OCR idle until the reader explicitly requests a
+    // scan, so it does not run constantly in the background (issue #35). The
+    // pending pages are still recorded above so a later manual request can scan
+    // them.
+    if (!readerOcrShouldAutoScan(
+      trigger: scanTrigger.value,
+      manualRequest: manual,
+    )) {
+      return;
+    }
     final scanPages = pages.where((page) => !page.isTransitionPage).toList();
     if (scanPages.isEmpty) return;
     final scanKey = readerOcrChapterScanKey(scanPages);
@@ -461,6 +518,26 @@ class ReaderOcrState {
     _activeScanKey = scanKey;
     _activeScan = scan;
     return scan;
+  }
+
+  /// Runs OCR for the pending chapter in response to an explicit user request.
+  ///
+  /// Used by the manual OCR trigger (issue #35): when [scanTrigger] is
+  /// [OcrScanTrigger.manual] the reader does not auto-scan, so this scans the
+  /// most recently opened chapter on demand. Does nothing when no chapter has
+  /// been opened yet or the overlay is disabled.
+  static Future<void> scanCurrentChapterManually() async {
+    await initialize();
+    if (!enabled.value || _lastScanPages.isEmpty) return;
+    // Allow the pending chapter to be scanned again even if it was already
+    // marked complete or is being tracked as active from a previous request.
+    _completedScanKey = null;
+    return scanChapter(
+      _lastScanPages,
+      startIndex: _lastStartIndex,
+      preparePage: _lastPreparePage,
+      manual: true,
+    );
   }
 
   static Future<void> _runChapterScan(
@@ -634,6 +711,50 @@ bool readerOcrShouldStartChapterScan({
   String? activeScanKey,
   String? completedScanKey,
 }) => activeScanKey != scanKey && completedScanKey != scanKey;
+
+/// Decides whether a chapter OCR scan should run given the configured
+/// [trigger] and whether this scan was explicitly [manualRequest]ed.
+///
+/// In [OcrScanTrigger.automatic] mode OCR always runs (the historical
+/// behavior). In [OcrScanTrigger.manual] mode background scans are suppressed
+/// so OCR does not run constantly; it runs only when the reader explicitly
+/// requests it. See issue #35.
+@visibleForTesting
+bool readerOcrShouldAutoScan({
+  required OcrScanTrigger trigger,
+  required bool manualRequest,
+}) => trigger == OcrScanTrigger.automatic || manualRequest;
+
+/// What the reader's OCR toolbar button should do when tapped.
+enum ReaderOcrButtonAction {
+  /// Show or hide the OCR overlay (automatic trigger behavior).
+  toggleOverlay,
+
+  /// Reveal the overlay and immediately scan the current page (manual trigger,
+  /// overlay currently hidden).
+  enableAndScan,
+
+  /// Scan the current page without changing overlay visibility (manual trigger,
+  /// overlay already shown).
+  scan,
+}
+
+/// Chooses the OCR toolbar button behavior for the current [trigger] and
+/// overlay [enabled] state. In automatic mode the button keeps toggling the
+/// overlay; in manual mode it launches OCR for the current page on demand so
+/// OCR does not run constantly in the background (issue #35).
+@visibleForTesting
+ReaderOcrButtonAction readerOcrButtonAction({
+  required OcrScanTrigger trigger,
+  required bool enabled,
+}) {
+  if (trigger == OcrScanTrigger.automatic) {
+    return ReaderOcrButtonAction.toggleOverlay;
+  }
+  return enabled
+      ? ReaderOcrButtonAction.scan
+      : ReaderOcrButtonAction.enableAndScan;
+}
 
 enum ReaderOcrProgressStage { recognizing, loadingMokuro, mokuro }
 

@@ -23,6 +23,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/utils/playback_media.dart';
 import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
 import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
@@ -60,6 +61,7 @@ import 'package:mangayomi/services/torrent_server.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/system_ui.dart';
 import 'package:media_kit/media_kit.dart';
@@ -339,6 +341,9 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
 
   late final StreamSubscription<Duration> _currentPositionSub;
   late final StreamSubscription<List<String>> _subtitleTextSub;
+  late final StreamSubscription<String> _playerErrorSub;
+  String? _lastPlayerError;
+  DateTime? _lastPlayerErrorAt;
 
   late final StreamSubscription<Duration> _currentTotalDurationSub = _player
       .stream
@@ -1547,6 +1552,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _unifiedPositionHandler,
     );
     _subtitleTextSub = _player.stream.subtitle.listen(_updateSubtitleHistory);
+    _playerErrorSub = _player.stream.error.listen(_reportPlaybackError);
     _completed;
     _currentTotalDurationSub;
     _loadAndroidFont().then((_) async {
@@ -1592,13 +1598,48 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
   }
 
-  Future<void> _openMedia(VideoPrefs prefs, [Duration? position]) {
-    return _player.open(
-      Media(
-        prefs.videoTrack!.id,
-        httpHeaders: prefs.headers,
-        start: position ?? _currentPosition.value,
-      ),
+  Future<void> _openMedia(VideoPrefs prefs, [Duration? position]) async {
+    try {
+      await _player.open(
+        playbackMedia(
+          prefs.videoTrack!.id,
+          isLocal: widget.isLocal,
+          httpHeaders: prefs.headers,
+          start: position ?? _currentPosition.value,
+        ),
+      );
+    } catch (error, stackTrace) {
+      _reportPlaybackError(error.toString(), stackTrace: stackTrace);
+    }
+  }
+
+  void _reportPlaybackError(String error, {StackTrace? stackTrace}) {
+    final message = error.trim();
+    if (message.isEmpty) return;
+
+    AppLogger.log(
+      'Video playback error: $message'
+      '${stackTrace == null ? '' : '\n$stackTrace'}',
+      logLevel: LogLevel.error,
+    );
+
+    final now = DateTime.now();
+    final duplicate =
+        message == _lastPlayerError &&
+        _lastPlayerErrorAt != null &&
+        now.difference(_lastPlayerErrorAt!) < const Duration(seconds: 3);
+    _lastPlayerError = message;
+    _lastPlayerErrorAt = now;
+    if (!mounted || duplicate) return;
+
+    final toastMessage = message.length > 240
+        ? '${message.substring(0, 237)}...'
+        : message;
+    BotToast.showText(
+      text: 'Playback error: $toastMessage',
+      onlyOne: true,
+      align: const Alignment(0, 0.90),
+      duration: const Duration(seconds: 5),
     );
   }
 
@@ -1658,6 +1699,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _completed.cancel();
     _currentPositionSub.cancel();
     _subtitleTextSub.cancel();
+    _playerErrorSub.cancel();
     _currentTotalDurationSub.cancel();
     _currentPosition.dispose();
     _currentTotalDuration.dispose();

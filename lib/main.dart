@@ -93,6 +93,44 @@ Uri? initialDesktopAppLinkFromArguments(
   return null;
 }
 
+/// Community extension-repo URLs carried by a `mangayomi://add-repo` deep link.
+///
+/// This is how the community-driven source-repo feature (historical issue #37)
+/// is distributed: a shared link encodes one or more repo JSON URLs per content
+/// type, and the app subscribes to them on confirmation.
+@visibleForTesting
+class CommunityRepoUrls {
+  const CommunityRepoUrls({
+    required this.mangaUrls,
+    required this.animeUrls,
+    required this.novelUrls,
+  });
+
+  final List<String> mangaUrls;
+  final List<String> animeUrls;
+  final List<String> novelUrls;
+
+  bool get isEmpty =>
+      mangaUrls.isEmpty && animeUrls.isEmpty && novelUrls.isEmpty;
+}
+
+/// Extracts the community repo URLs from an `add-repo` app link.
+///
+/// Any other deep-link host yields an empty result so unrelated links can never
+/// smuggle repo subscriptions past the confirmation dialog.
+@visibleForTesting
+CommunityRepoUrls communityRepoUrlsFromAppLink(Uri uri) {
+  if (uri.host != 'add-repo') {
+    return const CommunityRepoUrls(mangaUrls: [], animeUrls: [], novelUrls: []);
+  }
+  final params = uri.queryParametersAll;
+  return CommunityRepoUrls(
+    mangaUrls: List<String>.from(params['manga_url'] ?? const []),
+    animeUrls: List<String>.from(params['anime_url'] ?? const []),
+    novelUrls: List<String>.from(params['novel_url'] ?? const []),
+  );
+}
+
 void main(List<String> args) async {
   // Zone-level catch-all for anything that slips through both layers
   runZonedGuarded(() async {
@@ -522,9 +560,10 @@ class _MyAppState extends ConsumerState<MyApp>
       case "add-repo":
         final repoName = uri.queryParameters["repo_name"];
         final repoUrl = uri.queryParameters["repo_url"];
-        final mangaRepoUrls = uri.queryParametersAll["manga_url"];
-        final animeRepoUrls = uri.queryParametersAll["anime_url"];
-        final novelRepoUrls = uri.queryParametersAll["novel_url"];
+        final communityRepoUrls = communityRepoUrlsFromAppLink(uri);
+        final mangaRepoUrls = communityRepoUrls.mangaUrls;
+        final animeRepoUrls = communityRepoUrls.animeUrls;
+        final novelRepoUrls = communityRepoUrls.novelUrls;
         final context = navigatorKey.currentContext;
         if (context == null || !context.mounted) return;
         final l10n = context.l10n;
@@ -553,9 +592,9 @@ class _MyAppState extends ConsumerState<MyApp>
                     if (context.mounted) Navigator.of(context).pop();
 
                     final validUrls = await _checkValidUrls([
-                      ...mangaRepoUrls ?? [],
-                      ...animeRepoUrls ?? [],
-                      ...novelRepoUrls ?? [],
+                      ...mangaRepoUrls,
+                      ...animeRepoUrls,
+                      ...novelRepoUrls,
                     ]);
 
                     if (!validUrls) {
@@ -563,8 +602,8 @@ class _MyAppState extends ConsumerState<MyApp>
                       return;
                     }
 
-                    void addRepos(ItemType type, List<String>? urls) {
-                      if (urls == null) return;
+                    void addRepos(ItemType type, List<String> urls) {
+                      if (urls.isEmpty) return;
                       final current = ref.read(
                         extensionsRepoStateProvider(type),
                       );

@@ -249,14 +249,32 @@ OcrTextBlock _toBlock(List<_Line> lines, String language) {
 }
 
 List<OcrTextBlock> _readingOrder(List<OcrTextBlock> blocks, bool japanese) {
-  blocks.sort((a, b) {
-    final overlap = _overlap(a.ymin, a.ymax, b.ymin, b.ymax);
-    if (overlap > 0.2) {
-      return japanese ? b.xmin.compareTo(a.xmin) : a.xmin.compareTo(b.xmin);
-    }
-    return a.ymin.compareTo(b.ymin);
+  if (blocks.length < 2) return blocks;
+  // Group blocks into horizontal reading rows first, then order within each
+  // row by reading direction, then stack the rows top-to-bottom.
+  //
+  // A single pairwise comparator that mixes "right-to-left when the two blocks
+  // share a vertical band" with "top-to-bottom otherwise" is non-transitive
+  // for staggered layouts (A above C, but A and C each overlap a middle block
+  // B), which makes List.sort produce a corrupted order that can drop the
+  // right-most block out of first place. Banding sidesteps that: comparisons
+  // inside a row use one axis and comparisons between rows use the other, so
+  // each sort key is a proper total order.
+  final rows = _components<OcrTextBlock>(
+    blocks,
+    (a, b) => _overlap(a.ymin, a.ymax, b.ymin, b.ymax) > 0.2,
+  );
+  for (final row in rows) {
+    row.sort(
+      (a, b) => japanese ? b.xmin.compareTo(a.xmin) : a.xmin.compareTo(b.xmin),
+    );
+  }
+  rows.sort((a, b) {
+    final ay = a.map((block) => block.ymin).reduce(math.min);
+    final by = b.map((block) => block.ymin).reduce(math.min);
+    return ay.compareTo(by);
   });
-  return blocks;
+  return [for (final row in rows) ...row];
 }
 
 String _clean(String value) =>

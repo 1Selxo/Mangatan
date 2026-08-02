@@ -38,12 +38,11 @@ class _LocalFileMedia extends Media {
   final String _uri;
 
   _LocalFileMedia(
-    String resource, {
-    Map<String, String>? httpHeaders,
-    Duration? start,
+    super.resource, {
+    super.httpHeaders,
+    super.start,
     required bool windows,
-  }) : _uri = localFileUri(resource, windows: windows),
-       super(resource, httpHeaders: httpHeaders, start: start);
+  }) : _uri = localFileUri(resource, windows: windows);
 
   @override
   String get uri => _uri;

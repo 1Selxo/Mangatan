@@ -657,6 +657,94 @@ void main() {
     expect(loads, 0);
     expect(draft.fields['DefinitionPicture'], isEmpty);
   });
+
+  // Issue #36 ("Scalable screenshot"): manga mining can crop the page down to
+  // a single panel of user-chosen dimensions before export. The crop happens
+  // in the popup by overriding MiningContext.imageBytesLoader so it returns the
+  // manually cropped bytes. These regressions lock the builder's contract that
+  // makes that feature work: it must ship the exact cropped bytes it is given,
+  // and a cancelled crop must abort the whole export rather than falling back
+  // to the full page.
+  test('crop mode embeds the exact manually cropped panel bytes', () async {
+    // A small single-panel PNG the compressor cannot shrink further, so the
+    // builder must keep the cropped bytes verbatim.
+    final panel = image.Image(width: 24, height: 24);
+    for (var y = 0; y < panel.height; y++) {
+      for (var x = 0; x < panel.width; x++) {
+        panel.setPixelRgb(x, y, 10, 20, 30);
+      }
+    }
+    final croppedPng = Uint8List.fromList(image.encodePng(panel));
+
+    final draft = await const AnkiCardBuilder().build(
+      result: _simpleResult(),
+      context: MiningContext(
+        sentence: '事件が起きた。',
+        mediaType: MiningMediaType.manga,
+        // The popup's crop dialog resolves to these cropped bytes.
+        imageBytesLoader: () async => croppedPng,
+      ),
+      profile: const AnkiMiningProfile(
+        fieldMap: {'Picture': AnkiMarker.screenshot},
+      ),
+      screenshotMode: AnkiScreenshotMode.crop,
+    );
+
+    expect(draft.screenshotFileName, endsWith('.png'));
+    expect(draft.screenshotBytes, isNotNull);
+    expect(draft.screenshotBytes, orderedEquals(croppedPng));
+    expect(draft.fields['Picture'], contains('<img src="'));
+  });
+
+  test(
+    'cancelling the crop dialog aborts the export instead of using the full page',
+    () async {
+      // A cancelled crop surfaces as AnkiExportCancelledException from the
+      // overridden loader; the builder must propagate it, never silently
+      // exporting the uncropped page.
+      expect(
+        () => const AnkiCardBuilder().build(
+          result: _simpleResult(),
+          context: MiningContext(
+            mediaType: MiningMediaType.manga,
+            imageBytesLoader: () async =>
+                throw const AnkiExportCancelledException(),
+          ),
+          profile: const AnkiMiningProfile(
+            fieldMap: {'Picture': AnkiMarker.screenshot},
+          ),
+          screenshotMode: AnkiScreenshotMode.crop,
+        ),
+        throwsA(isA<AnkiExportCancelledException>()),
+      );
+    },
+  );
+
+  test(
+    'cancelling the crop during pending preparation aborts the export',
+    () async {
+      final pending = await const AnkiCardBuilder().buildPending(
+        result: _simpleResult(),
+        context: MiningContext(
+          mediaType: MiningMediaType.manga,
+          imageBytesLoader: () async =>
+              throw const AnkiExportCancelledException(),
+        ),
+        profile: const AnkiMiningProfile(
+          fieldMap: {'Picture': AnkiMarker.screenshot},
+        ),
+        screenshotMode: AnkiScreenshotMode.crop,
+      );
+
+      // The placeholder is built without the screenshot, so it is safe.
+      expect(pending.placeholderDraft.fields['Picture'], isEmpty);
+      // Preparation runs the crop loader, which cancels.
+      await expectLater(
+        pending.prepare(null),
+        throwsA(isA<AnkiExportCancelledException>()),
+      );
+    },
+  );
 }
 
 HoshiLookupResult _simpleResult() => const HoshiLookupResult(

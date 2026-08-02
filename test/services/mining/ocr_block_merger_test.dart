@@ -25,6 +25,57 @@ void main() {
 
     expect(merged.single.lines, ['right', 'left']);
   });
+
+  test(
+    'inserts a space when joining broken fragments for spaced languages',
+    () {
+      final blocks = [
+        _block('hello', 0.10, 0.10, 0.25, 0.15),
+        _block('world', 0.255, 0.10, 0.45, 0.15),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'en');
+
+      expect(merged, hasLength(1));
+      expect(merged.single.lines, ['hello world']);
+    },
+  );
+
+  group('joinOcrLines', () {
+    test('joins CJK lines without a separator', () {
+      expect(joinOcrLines(['今日は', 'いい天気'], language: 'ja'), '今日はいい天気');
+      expect(joinOcrLines(['你好', '世界'], language: 'zh'), '你好世界');
+    });
+
+    test('joins spaced-language lines with a single space', () {
+      expect(joinOcrLines(['hello', 'world'], language: 'en'), 'hello world');
+    });
+
+    test(
+      'does not add a space when a line already ends or starts with one',
+      () {
+        expect(
+          joinOcrLines(['hello ', 'world'], language: 'en'),
+          'hello world',
+        );
+        expect(
+          joinOcrLines(['hello', ' world'], language: 'en'),
+          'hello world',
+        );
+      },
+    );
+
+    test('drops empty lines without leaving stray separators', () {
+      expect(
+        joinOcrLines(['hello', '', 'world'], language: 'en'),
+        'hello world',
+      );
+    });
+
+    test('treats an unknown/empty language as spaced', () {
+      expect(joinOcrLines(['foo', 'bar'], language: ''), 'foo bar');
+    });
+  });
 }
 
 OcrTextBlock _block(

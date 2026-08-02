@@ -22,6 +22,7 @@ import 'package:mangayomi/services/mining/mokuro_parser.dart';
 import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:mangayomi/services/mining/ocr_block_merger.dart';
+import 'package:mangayomi/services/mining/ocr_block_reading.dart';
 import 'package:mangayomi/services/mining/profile_ocr_language.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
@@ -862,7 +863,7 @@ class ReaderOcrController extends ChangeNotifier {
         _paintOcrBox(
           canvas: canvas,
           rect: rect,
-          text: _orderedBlock(block),
+          text: orderedBlockSentence(block),
           vertical: block.vertical,
           active: active,
           backgroundOpacity: backgroundOpacity,
@@ -870,7 +871,7 @@ class ReaderOcrController extends ChangeNotifier {
           highlight: active
               ? _lineHighlightFor(
                   lineStart: 0,
-                  lineLength: _orderedBlock(block).length,
+                  lineLength: orderedBlockSentence(block).length,
                   rect: rect,
                   vertical: block.vertical,
                 )
@@ -1037,9 +1038,9 @@ class ReaderOcrController extends ChangeNotifier {
   }
 
   void _prefetchHit(_OcrTapHit hit) {
-    final ordered = _orderedBlock(hit.block);
+    final ordered = orderedBlockSentence(hit.block);
     if (ordered.isEmpty) return;
-    final orderedOffset = _toOrderedOffset(
+    final orderedOffset = toOrderedOffset(
       hit.block,
       hit.rawOffset,
     ).clamp(0, ordered.length - 1);
@@ -1119,9 +1120,9 @@ class ReaderOcrController extends ChangeNotifier {
       DictionaryLookupPopup.dismissActive();
       return true;
     }
-    final ordered = _orderedBlock(block);
+    final ordered = orderedBlockSentence(block);
     if (ordered.isEmpty) return true;
-    final orderedOffset = _toOrderedOffset(
+    final orderedOffset = toOrderedOffset(
       block,
       rawOffset,
     ).clamp(0, ordered.length - 1);
@@ -1640,49 +1641,6 @@ class _ReaderOcrPage {
   final double boxScaleX;
   final double boxScaleY;
   final bool usesMokuroWebsiteData;
-}
-
-List<int> _orderedLineIndices(OcrTextBlock block) {
-  final indices = List.generate(block.lines.length, (index) => index);
-  if (block.lines.length <= 1 ||
-      block.lineGeometries.length != block.lines.length) {
-    return indices;
-  }
-  if (block.vertical) {
-    indices.sort((a, b) {
-      final ax = block.lineGeometries[a].xmin + block.lineGeometries[a].xmax;
-      final bx = block.lineGeometries[b].xmin + block.lineGeometries[b].xmax;
-      return bx.compareTo(ax);
-    });
-  } else {
-    indices.sort(
-      (a, b) =>
-          block.lineGeometries[a].ymin.compareTo(block.lineGeometries[b].ymin),
-    );
-  }
-  return indices;
-}
-
-String _orderedBlock(OcrTextBlock block) =>
-    _orderedLineIndices(block).map((index) => block.lines[index]).join();
-
-int _toOrderedOffset(OcrTextBlock block, int rawOffset) {
-  var start = 0;
-  var rawLine = 0;
-  var inLine = 0;
-  for (var index = 0; index < block.lines.length; index++) {
-    if (rawOffset < start + block.lines[index].length) {
-      rawLine = index;
-      inLine = rawOffset - start;
-      break;
-    }
-    start += block.lines[index].length;
-  }
-  final order = _orderedLineIndices(block);
-  return order
-          .takeWhile((index) => index != rawLine)
-          .fold<int>(0, (sum, index) => sum + block.lines[index].length) +
-      inLine;
 }
 
 int _characterOffset(OcrTextBlock block, Offset local, Size size) {

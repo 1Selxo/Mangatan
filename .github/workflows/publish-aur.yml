@@ -131,9 +131,36 @@ jobs:
             ssh -i ~/.ssh/aur -o IdentitiesOnly=yes
             -o StrictHostKeyChecking=yes
         run: |
-          git clone \
-            ssh://aur@aur.archlinux.org/mangatan-bin.git \
-            aur-repository
+          retry() {
+            local description=$1
+            shift
+            local max_attempts=5
+            local retry_delay=30
+            local attempt
+
+            for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+              if "$@"; then
+                return 0
+              fi
+
+              if ((attempt == max_attempts)); then
+                echo "::error::$description failed after $max_attempts attempts."
+                return 1
+              fi
+
+              echo "::warning::$description failed on attempt $attempt/$max_attempts; retrying in ${retry_delay}s."
+              sleep "$retry_delay"
+            done
+          }
+
+          clone_aur_repository() {
+            rm -rf aur-repository
+            git clone \
+              ssh://aur@aur.archlinux.org/mangatan-bin.git \
+              aur-repository
+          }
+
+          retry "Clone mangatan-bin from the AUR" clone_aur_repository
 
           install -m644 aur-package/PKGBUILD aur-repository/PKGBUILD
           install -m644 aur-package/.SRCINFO aur-repository/.SRCINFO
@@ -152,7 +179,8 @@ jobs:
 
           git -C aur-repository commit \
             -m "Update to ${RELEASE_TAG#v}"
-          git -C aur-repository push origin HEAD:master
+          retry "Push mangatan-bin to the AUR" \
+            git -C aur-repository push origin HEAD:master
 
   # The extension server versions independently of Mangatan, so this usually
   # finds the AUR already up to date and exits without pushing. It runs
@@ -240,9 +268,37 @@ jobs:
             ssh -i ~/.ssh/aur -o IdentitiesOnly=yes
             -o StrictHostKeyChecking=yes
         run: |
-          git clone \
-            ssh://aur@aur.archlinux.org/mangatan-extension-server.git \
-            aur-repository
+          retry() {
+            local description=$1
+            shift
+            local max_attempts=5
+            local retry_delay=30
+            local attempt
+
+            for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+              if "$@"; then
+                return 0
+              fi
+
+              if ((attempt == max_attempts)); then
+                echo "::error::$description failed after $max_attempts attempts."
+                return 1
+              fi
+
+              echo "::warning::$description failed on attempt $attempt/$max_attempts; retrying in ${retry_delay}s."
+              sleep "$retry_delay"
+            done
+          }
+
+          clone_aur_repository() {
+            rm -rf aur-repository
+            git clone \
+              ssh://aur@aur.archlinux.org/mangatan-extension-server.git \
+              aur-repository
+          }
+
+          retry "Clone mangatan-extension-server from the AUR" \
+            clone_aur_repository
 
           install -m644 aur-package/PKGBUILD aur-repository/PKGBUILD
           install -m644 aur-package/.SRCINFO aur-repository/.SRCINFO
@@ -261,4 +317,5 @@ jobs:
 
           git -C aur-repository commit \
             -m "Update to ${SERVER_TAG#v}"
-          git -C aur-repository push origin HEAD:master
+          retry "Push mangatan-extension-server to the AUR" \
+            git -C aur-repository push origin HEAD:master

@@ -1478,8 +1478,10 @@ class ReaderOcrController extends ChangeNotifier {
     String text,
     double alpha,
   ) {
+    // Wrap the text to the box width instead of forcing a single line. A wide
+    // or merged panel (issue #39) then keeps a readable font by wrapping rather
+    // than shrinking the whole line to fit the box's aspect ratio.
     final painter = TextPainter(
-      maxLines: 1,
       text: TextSpan(
         text: text,
         style: TextStyle(
@@ -1490,10 +1492,10 @@ class ReaderOcrController extends ChangeNotifier {
       ),
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.center,
-    )..layout();
-    final scale = math.min(
-      rect.width / math.max(1, painter.width),
-      rect.height / math.max(1, painter.height),
+    )..layout(maxWidth: math.max(1, rect.width));
+    final scale = readerOcrHorizontalTextScale(
+      rect: rect.size,
+      wrappedTextSize: Size(painter.width, painter.height),
     );
     canvas.save();
     canvas.clipRect(rect);
@@ -1790,6 +1792,27 @@ bool readerOcrShouldDismissRepeatedLookup({
   required int hitOffset,
 }) =>
     popupVisible && !triggeredByHover && sameBlock && activeOffset == hitOffset;
+
+/// Chooses the paint scale for wrapped horizontal OCR text.
+///
+/// Regression guard for issue #39 ("Merged text becomes too small"). The text
+/// is laid out wrapped to the box width by the caller, so a wide/large panel no
+/// longer forces a single long line. This helper therefore only ever shrinks
+/// the wrapped block when it still overflows the box, and never enlarges past
+/// its natural size. Text that already fits renders at scale 1.0 instead of
+/// being blown up or collapsed to fit the box's aspect ratio.
+@visibleForTesting
+double readerOcrHorizontalTextScale({
+  required Size rect,
+  required Size wrappedTextSize,
+}) {
+  final scale = math.min(
+    rect.width / math.max(1, wrappedTextSize.width),
+    rect.height / math.max(1, wrappedTextSize.height),
+  );
+  if (scale.isNaN || scale <= 0) return 1.0;
+  return math.min(1.0, scale);
+}
 
 @visibleForTesting
 ({double background, double text}) readerOcrContentOpacities({

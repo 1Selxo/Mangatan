@@ -14,6 +14,9 @@
  Mangatan is an open-source desktop app for reading manga and novels, watching anime, and learning languages through dictionary lookup, OCR, subtitle mining, and Anki export.
 </div>
 
+> [!WARNING]
+> **Official Warning**: This GitHub repository ([kodjodevf/mangayomi](https://github.com/kodjodevf/mangayomi)) and our official [Discord server](https://discord.com/invite/EjfBuYahsP) are the **only official sources** for Mangayomi. Third-party websites such as `mangayomi.org` are **untrusted** and NOT affiliated with this project. Always download official releases from our GitHub repository.
+
 ## Features
 
 <div align="left">

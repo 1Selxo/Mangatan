@@ -4722,6 +4722,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next lookup'**
   String get next_lookup;
+
+  /// No description provided for @app_ui_scale.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface scale'**
+  String get app_ui_scale;
+
+  /// No description provided for @app_ui_scale_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the interface larger or smaller to suit your screen and viewing distance.'**
+  String get app_ui_scale_subtitle;
+
+  /// No description provided for @allow_concurrent_downloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow concurrent downloads'**
+  String get allow_concurrent_downloads;
+
+  /// No description provided for @allow_concurrent_downloads_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download from different sources at the same time. A single source still downloads one chapter at a time so it isn\'t overloaded. Turn off to download one at a time everywhere.'**
+  String get allow_concurrent_downloads_subtitle;
+
+  /// No description provided for @download_delay.
+  ///
+  /// In en, this message translates to:
+  /// **'Download delay'**
+  String get download_delay;
+
+  /// No description provided for @download_delay_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off. Add a wait with random jitter between chapters to be gentler on sources.'**
+  String get download_delay_subtitle;
+
+  /// No description provided for @save_search.
+  ///
+  /// In en, this message translates to:
+  /// **'Save search'**
+  String get save_search;
+
+  /// No description provided for @saved_searches.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved searches'**
+  String get saved_searches;
+
+  /// No description provided for @enter_search_to_save_first.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a search to save first'**
+  String get enter_search_to_save_first;
+
+  /// No description provided for @no_saved_searches.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved searches for this source yet.\nRun a search, then pick \"Save search\".'**
+  String get no_saved_searches;
+
+  /// No description provided for @source.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get source;
 }
 
 class _AppLocalizationsDelegate

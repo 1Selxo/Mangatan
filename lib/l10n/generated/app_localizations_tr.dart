@@ -2563,4 +2563,41 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get next_lookup => 'Next lookup';
+
+  @override
+  String get app_ui_scale => 'Interface scale';
+
+  @override
+  String get app_ui_scale_subtitle =>
+      'Make the interface larger or smaller to suit your screen and viewing distance.';
+
+  @override
+  String get allow_concurrent_downloads => 'Allow concurrent downloads';
+
+  @override
+  String get allow_concurrent_downloads_subtitle =>
+      'Download from different sources at the same time. A single source still downloads one chapter at a time so it isn\'t overloaded. Turn off to download one at a time everywhere.';
+
+  @override
+  String get download_delay => 'Download delay';
+
+  @override
+  String get download_delay_subtitle =>
+      'Off. Add a wait with random jitter between chapters to be gentler on sources.';
+
+  @override
+  String get save_search => 'Save search';
+
+  @override
+  String get saved_searches => 'Saved searches';
+
+  @override
+  String get enter_search_to_save_first => 'Enter a search to save first';
+
+  @override
+  String get no_saved_searches =>
+      'No saved searches for this source yet.\nRun a search, then pick \"Save search\".';
+
+  @override
+  String get source => 'Source';
 }

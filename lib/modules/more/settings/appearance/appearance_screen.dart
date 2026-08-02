@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_font_family.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/follow_system_theme_button.dart';
@@ -19,6 +21,8 @@ import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
+import 'package:mangayomi/modules/widgets/tv_escapable_slider.dart';
 
 final navigationItems = {
   "/MangaLibrary": "Manga",
@@ -113,6 +117,54 @@ class AppearanceScreen extends ConsumerWidget {
                     onChanged: (v) =>
                         ref.read(tvHomeStyleProvider.notifier).set(v),
                   ),
+                Builder(
+                  builder: (context) {
+                    final scale = ref
+                        .watch(appUiScaleStateProvider)
+                        .clamp(0.85, 1.25);
+                    return ListTile(
+                      leading: const Icon(Icons.aspect_ratio_outlined),
+                      title: Text(l10n.app_ui_scale),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${l10n.app_ui_scale_subtitle}  '
+                            '(${(scale * 100).round()}%)',
+                          ),
+                          TvEscapableSlider(
+                            enabled: isTv,
+                            onDecrease: () => ref
+                                .read(appUiScaleStateProvider.notifier)
+                                .set(
+                                  (scale - 0.05).clamp(0.85, 1.25),
+                                  end: true,
+                                ),
+                            onIncrease: () => ref
+                                .read(appUiScaleStateProvider.notifier)
+                                .set(
+                                  (scale + 0.05).clamp(0.85, 1.25),
+                                  end: true,
+                                ),
+                            child: Slider(
+                              min: 0.85,
+                              max: 1.25,
+                              divisions: 8,
+                              value: scale.toDouble(),
+                              label: '${(scale * 100).round()}%',
+                              onChanged: (v) => ref
+                                  .read(appUiScaleStateProvider.notifier)
+                                  .set(v),
+                              onChangeEnd: (v) => ref
+                                  .read(appUiScaleStateProvider.notifier)
+                                  .set(v, end: true),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
                 _buildLanguageTile(context, ref, l10n),
                 _buildFontTile(context, ref, l10n),
                 if (!isMobile) const AnimationSpeedSlider(),
@@ -217,15 +269,9 @@ class AppearanceScreen extends ConsumerWidget {
     WidgetRef ref,
     AppLocalizations l10n,
   ) {
-    final appFontFamily = ref.watch(appFontFamilyProvider);
-    final appFontFamilySub = appFontFamily == null
-        ? context.l10n.default0
-        : GoogleFonts.asMap().entries
-              .toList()
-              .firstWhere(
-                (element) => element.value().fontFamily! == appFontFamily,
-              )
-              .key;
+    ref.watch(appFontFamilyProvider);
+    final rawFontFamily = isar.settings.getSync(227)?.appFontFamily;
+    final appFontFamilySub = rawFontFamily ?? context.l10n.default0;
     return ListTile(
       title: Text(context.l10n.font),
       subtitle: Text(
@@ -235,6 +281,7 @@ class AppearanceScreen extends ConsumerWidget {
       onTap: () {
         String textValue = "";
         final controller = ScrollController();
+        final List<String> allFontNames = GoogleFonts.asMap().keys.toList();
         showDialog(
           context: context,
           builder: (context) {
@@ -279,10 +326,10 @@ class AppearanceScreen extends ConsumerWidget {
                         ),
                         Builder(
                           builder: (context) {
-                            List values = GoogleFonts.asMap().entries.toList();
-                            values = values
+                            final currentSelected = isar.settings.getSync(227)?.appFontFamily;
+                            final filteredFontNames = allFontNames
                                 .where(
-                                  (values) => values.key.toLowerCase().contains(
+                                  (name) => name.toLowerCase().contains(
                                     textValue.toLowerCase(),
                                   ),
                                 )
@@ -294,7 +341,7 @@ class AppearanceScreen extends ConsumerWidget {
                                 radius: const Radius.circular(10),
                                 controller: controller,
                                 child: RadioGroup<String?>(
-                                  groupValue: appFontFamily,
+                                  groupValue: currentSelected,
                                   onChanged: (value) {
                                     ref
                                         .read(appFontFamilyProvider.notifier)
@@ -303,14 +350,14 @@ class AppearanceScreen extends ConsumerWidget {
                                   },
                                   child: SuperListView.builder(
                                     controller: controller,
-                                    itemCount: values.length,
+                                    itemCount: filteredFontNames.length,
                                     itemBuilder: (context, index) {
-                                      final value = values[index];
+                                      final fontName = filteredFontNames[index];
                                       return RadioListTile<String?>(
                                         dense: true,
                                         contentPadding: const EdgeInsets.all(0),
-                                        value: value.value().fontFamily,
-                                        title: Text(value.key),
+                                        value: fontName,
+                                        title: Text(fontName),
                                       );
                                     },
                                   ),

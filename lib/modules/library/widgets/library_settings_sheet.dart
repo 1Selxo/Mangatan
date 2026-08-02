@@ -5,12 +5,14 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
+import 'package:mangayomi/modules/library/providers/library_source_badge_provider.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_filter_list_tile_widget.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_sort_list_tile_widget.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 /// Shows the library filter/sort/display settings sheet.
 void showLibrarySettingsSheet({
@@ -53,6 +55,13 @@ class _FilterTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = l10nLocalizations(context)!;
+    final sources = ref.watch(
+      mangaFilterSourceStateProvider(
+        mangaList: entries,
+        itemType: itemType,
+        settings: settings,
+      ),
+    );
     return Column(
       children: [
         ListTileChapterFilter(
@@ -181,6 +190,132 @@ class _FilterTab extends ConsumerWidget {
                 .update();
           },
         ),
+        if (sources.$1.length > 1)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) {
+                          return Consumer(
+                            builder: (context, ref, child) {
+                              final sources = ref.watch(
+                                mangaFilterSourceStateProvider(
+                                  mangaList: entries,
+                                  itemType: itemType,
+                                  settings: settings,
+                                ),
+                              );
+                              return AlertDialog(
+                                title: Text(
+                                  "${l10n.filter} "
+                                  "${itemType == ItemType.manga
+                                      ? l10n.manga_extensions
+                                      : itemType == ItemType.anime
+                                      ? l10n.anime_extensions
+                                      : l10n.novel_extensions}",
+                                ),
+                                content: SizedBox(
+                                  width: context.width(0.8),
+                                  child: SuperListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: sources.$1.length,
+                                    itemBuilder: (context, index) {
+                                      final source = sources.$1[index];
+                                      return ListTileChapterFilter(
+                                        label: source,
+                                        type: sources.$3.contains(source)
+                                            ? 1
+                                            : 0,
+                                        onTap: () {
+                                          ref
+                                              .read(
+                                                mangaFilterSourceStateProvider(
+                                                  mangaList: entries,
+                                                  itemType: itemType,
+                                                  settings: settings,
+                                                ).notifier,
+                                              )
+                                              .setFilteredList(source);
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      ref
+                                          .read(
+                                            mangaFilterSourceStateProvider(
+                                              mangaList: entries,
+                                              itemType: itemType,
+                                              settings: settings,
+                                            ).notifier,
+                                          )
+                                          .set([]);
+                                      Navigator.pop(context);
+                                    },
+                                    child: Text(
+                                      l10n.reset,
+                                      style: TextStyle(
+                                        color: context.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text(
+                                      l10n.cancel,
+                                      style: TextStyle(
+                                        color: context.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      ref
+                                          .read(
+                                            mangaFilterSourceStateProvider(
+                                              mangaList: entries,
+                                              itemType: itemType,
+                                              settings: settings,
+                                            ).notifier,
+                                          )
+                                          .set(sources.$3);
+                                      Navigator.pop(context);
+                                    },
+                                    child: Text(
+                                      l10n.filter,
+                                      style: TextStyle(
+                                        color: context.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                    child: Text(
+                      "${l10n.filter} "
+                      "${itemType == ItemType.manga
+                          ? l10n.manga_extensions
+                          : itemType == ItemType.anime
+                          ? l10n.anime_extensions
+                          : l10n.novel_extensions}",
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -293,6 +428,7 @@ class _DisplayTab extends ConsumerWidget {
     final localSource = ref.watch(
       libraryLocalSourceStateProvider(itemType: itemType, settings: settings),
     );
+    final sourceBadge = ref.watch(librarySourceBadgeProvider);
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
       child: Column(
@@ -387,6 +523,15 @@ class _DisplayTab extends ConsumerWidget {
                           ).notifier,
                         )
                         .set(!language);
+                  },
+                ),
+                ListTileChapterFilter(
+                  label: l10n.source,
+                  type: sourceBadge ? 1 : 0,
+                  onTap: () {
+                    ref
+                        .read(librarySourceBadgeProvider.notifier)
+                        .set(!sourceBadge);
                   },
                 ),
                 ListTileChapterFilter(

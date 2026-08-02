@@ -3,13 +3,13 @@ import 'dart:collection';
 import 'dart:io';
 import 'package:html/dom.dart' as dom;
 import 'package:mangayomi/src/rust/api/epub.dart';
-import 'package:path/path.dart' as p;
 import 'package:html/parser.dart';
 import 'package:mangayomi/eval/lib.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/utils/utils.dart';
+import 'package:path/path.dart' as p;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'get_html_content.g.dart';
 
@@ -141,32 +141,54 @@ Future<(String, EpubNovel?)> getHtmlContent(
         mangaMainDirectory: mangaMainDirectory,
       ))!;
 
-      final htmlPath = p.join(chapterDirectory.path, "${chapter.name}.html");
-
-      final htmlFile = File(htmlPath);
-      String? htmlContent;
-      if (await htmlFile.exists()) {
-        htmlContent = await htmlFile.readAsString();
+      // Locate the downloaded file by globbing for the single *.html in the
+      // chapter directory rather than reconstructing its name. The downloader
+      // sanitises forbidden characters to spaces while getMangaChapterDirectory
+      // uses underscores, and the old lookup used the raw chapter.name, so any
+      // title containing a colon (etc.) never matched: htmlFile.exists() was
+      // always false and offline reading fell through to the network and hung.
+      // A folder holds exactly one file, so a glob is correct regardless of
+      // which sanitiser wrote it. See #817.
+      File? localFile;
+      if (chapterDirectory.existsSync()) {
+        for (final entity in chapterDirectory.listSync()) {
+          if (entity is File && entity.path.toLowerCase().endsWith('.html')) {
+            localFile = entity;
+            break;
+          }
+        }
       }
-      final source = getSource(
-        chapter.manga.value!.lang!,
-        chapter.manga.value!.source!,
-        chapter.manga.value!.sourceId,
-      );
-      final proxyServer = ref.read(androidProxyServerStateProvider);
-      final html = await withExtensionService(source!, proxyServer, (
-        service,
-      ) async {
-        if (htmlContent != null) {
-          return await service.cleanHtmlContent(htmlContent);
-        } else {
-          return await service.getHtmlContent(
+
+      if (localFile != null) {
+        // Downloaded: render straight from disk, so it works fully offline with
+        // no extension service or network. The file holds the raw getHtmlContent
+        // output (quote-wrapped, like the network path); routing it back through
+        // cleanHtmlContent renders a blank page, so strip the outer quotes and
+        // hand it to buildReaderHtml directly.
+        final raw = await localFile.readAsString();
+        final stripped =
+            raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')
+            ? raw.substring(1, raw.length - 1)
+            : raw;
+        result = (buildReaderHtml(stripped), null);
+      } else {
+        // Not downloaded: fetch from the source (needs network).
+        final source = getSource(
+          chapter.manga.value!.lang!,
+          chapter.manga.value!.source!,
+          chapter.manga.value!.sourceId,
+        );
+        final proxyServer = ref.read(androidProxyServerStateProvider);
+        final html = await withExtensionService(
+          source!,
+          proxyServer,
+          (service) async => await service.getHtmlContent(
             chapter.manga.value!.name!,
             chapter.url!,
-          );
-        }
-      });
-      result = (buildReaderHtml(html.substring(1, html.length - 1)), null);
+          ),
+        );
+        result = (buildReaderHtml(html.substring(1, html.length - 1)), null);
+      }
     }
 
     keepAlive.close();

@@ -1599,15 +1599,27 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   Future<void> _openMedia(VideoPrefs prefs, [Duration? position]) async {
+    final start = position ?? _currentPosition.value;
     try {
       await _player.open(
         playbackMedia(
           prefs.videoTrack!.id,
           isLocal: widget.isLocal,
           httpHeaders: prefs.headers,
-          start: position ?? _currentPosition.value,
+          start: start,
         ),
       );
+      if (start > Duration.zero) {
+        // Media(start:) is unreliable for some sources. Seek again once the
+        // stream reports a duration; a redundant seek is harmless.
+        unawaited(
+          _player.stream.duration
+              .firstWhere((duration) => duration > Duration.zero)
+              .timeout(const Duration(seconds: 8))
+              .then((_) => _player.seek(start))
+              .catchError((_) {}),
+        );
+      }
     } catch (error, stackTrace) {
       _reportPlaybackError(error.toString(), stackTrace: stackTrace);
     }
@@ -3143,9 +3155,58 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   @override
   Widget build(BuildContext context) {
+    final body = _videoPlayer(context);
+    final shortcutBody = isDesktop ? body : _wrapWithPlayerShortcuts(body);
     return DesktopBackNavigationScope(
       onBack: _handleEscape,
-      child: Scaffold(body: _videoPlayer(context)),
+      child: Scaffold(body: shortcutBody),
+    );
+  }
+
+  /// Maps keyboard and TV-remote keys to player actions for non-desktop
+  /// builds. Only dedicated media keys + the usual mpv-style keys are bound
+  /// (no D-pad arrows beyond seek), so it stays additive and doesn't fight
+  /// touch input. Reuses the existing player + episode-navigation methods.
+  Widget _wrapWithPlayerShortcuts(Widget child) {
+    void seekBy(int seconds) {
+      _player.seek(_player.state.position + Duration(seconds: seconds));
+    }
+
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.space): () {
+          _player.playOrPause();
+        },
+        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): () {
+          _player.playOrPause();
+        },
+        const SingleActivator(LogicalKeyboardKey.mediaPlay): () {
+          _player.play();
+        },
+        const SingleActivator(LogicalKeyboardKey.mediaPause): () {
+          _player.pause();
+        },
+        // Seek via J/L and the dedicated media keys only. Arrow keys are left
+        // unbound so they keep driving d-pad focus traversal on Android TV
+        // (and arrow-key focus movement with a keyboard) instead of seeking.
+        const SingleActivator(LogicalKeyboardKey.keyJ): () => seekBy(-10),
+        const SingleActivator(LogicalKeyboardKey.keyL): () => seekBy(10),
+        const SingleActivator(LogicalKeyboardKey.mediaRewind): () =>
+            seekBy(-10),
+        const SingleActivator(LogicalKeyboardKey.mediaFastForward): () =>
+            seekBy(10),
+        const SingleActivator(LogicalKeyboardKey.mediaTrackNext): () {
+          if (hasNextEpisode && mounted) {
+            pushToNewEpisode(context, _streamController.getNextEpisode());
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious): () {
+          if (_streamController.hasPreviousEpisode && mounted) {
+            pushToNewEpisode(context, _streamController.getPrevEpisode());
+          }
+        },
+      },
+      child: Focus(autofocus: true, child: child),
     );
   }
 }

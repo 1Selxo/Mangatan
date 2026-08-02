@@ -122,6 +122,7 @@ final class FilteredLibraryMangaProvider
       bool downloadedOnly,
       String searchQuery,
       bool ignoreFiltersOnSearch,
+      List<String> sourceIds,
     })
     super.argument,
   }) : super(
@@ -163,6 +164,7 @@ final class FilteredLibraryMangaProvider
               bool downloadedOnly,
               String searchQuery,
               bool ignoreFiltersOnSearch,
+              List<String> sourceIds,
             });
     return filteredLibraryManga(
       ref,
@@ -177,6 +179,7 @@ final class FilteredLibraryMangaProvider
       downloadedOnly: argument.downloadedOnly,
       searchQuery: argument.searchQuery,
       ignoreFiltersOnSearch: argument.ignoreFiltersOnSearch,
+      sourceIds: argument.sourceIds,
     );
   }
 
@@ -200,7 +203,7 @@ final class FilteredLibraryMangaProvider
 }
 
 String _$filteredLibraryMangaHash() =>
-    r'0e45aaa1fcba0c0aa1c548d973390ca7b2416a01';
+    r'524aaf9905e4ddcf6c02c5413c4bdd53f4886a38';
 
 /// Filters and sorts a list of [Manga] based on library filter/sort settings.
 
@@ -220,6 +223,7 @@ final class FilteredLibraryMangaFamily extends $Family
             bool downloadedOnly,
             String searchQuery,
             bool ignoreFiltersOnSearch,
+            List<String> sourceIds,
           })
         > {
   FilteredLibraryMangaFamily._()
@@ -245,6 +249,7 @@ final class FilteredLibraryMangaFamily extends $Family
     required bool downloadedOnly,
     required String searchQuery,
     required bool ignoreFiltersOnSearch,
+    required List<String> sourceIds,
   }) => FilteredLibraryMangaProvider._(
     argument: (
       data: data,
@@ -258,6 +263,7 @@ final class FilteredLibraryMangaFamily extends $Family
       downloadedOnly: downloadedOnly,
       searchQuery: searchQuery,
       ignoreFiltersOnSearch: ignoreFiltersOnSearch,
+      sourceIds: sourceIds,
     ),
     from: this,
   );

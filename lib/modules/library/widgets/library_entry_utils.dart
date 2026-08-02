@@ -18,6 +18,7 @@ import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/headers.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
+import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 
 /// Resolves the correct [ImageProvider] for a manga entry, preferring a custom
 /// local cover over the remote URL. Remote covers are wrapped in
@@ -182,5 +183,75 @@ class DownloadCountBadge extends ConsumerWidget {
     if (count == 0) return const SizedBox.shrink();
 
     return EntryBadgeChip(label: count.toString());
+  }
+}
+
+/// A unified badge widget that combines Local, Download, and Unread counts.
+/// Only renders a non-empty widget when there is actually something to display,
+/// resolving the "0 unread" empty badge container UX bug.
+class LibraryBadgeWidget extends ConsumerWidget {
+  final Manga entry;
+  final bool showLocal;
+  final bool showDownloaded;
+
+  const LibraryBadgeWidget({
+    super.key,
+    required this.entry,
+    required this.showLocal,
+    required this.showDownloaded,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isLocalArchive = entry.isLocalArchive ?? false;
+    final hasLocal = showLocal && isLocalArchive;
+
+    int downloadCount = 0;
+    if (showDownloaded) {
+      final downloadedIds =
+          ref.watch(downloadedChapterIdsProvider).asData?.value ??
+          const <int>{};
+      for (final c in entry.chapters) {
+        if (c.id != null && downloadedIds.contains(c.id)) {
+          downloadCount++;
+        }
+      }
+    }
+
+    // Scanlator-aware: the badge count respects the per-manga scanlator filter.
+    final unreadCount = entry.unreadChaptersCount;
+
+    // If there is nothing to show (no local, no download, no unread), return empty
+    if (!hasLocal && downloadCount == 0 && unreadCount == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(3),
+        color: context.primaryColor,
+      ),
+      padding: const EdgeInsets.only(right: 5),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasLocal) const EntryBadgeChip(label: 'Local'),
+          if (downloadCount > 0)
+            EntryBadgeChip(label: downloadCount.toString()),
+          if (unreadCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 3),
+              child: Text(
+                unreadCount.toString(),
+                style: TextStyle(
+                  color: context.dynamicBlackWhiteColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

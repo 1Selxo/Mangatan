@@ -20,6 +20,7 @@ import 'package:mangayomi/services/get_filter_list.dart';
 import 'package:mangayomi/services/get_latest_updates.dart';
 import 'package:mangayomi/services/get_popular.dart';
 import 'package:mangayomi/services/get_source_baseurl.dart';
+import 'package:mangayomi/modules/manga/home/providers/saved_searches_provider.dart';
 import 'package:mangayomi/services/search.dart';
 import 'package:mangayomi/services/supports_latest.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
@@ -29,6 +30,8 @@ import 'package:mangayomi/modules/widgets/gridview_widget.dart';
 import 'package:mangayomi/modules/widgets/manga_image_card_widget.dart';
 import 'package:mangayomi/utils/global_style.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
+import 'package:mangayomi/modules/widgets/tv_menu.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:marquee/marquee.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
@@ -216,6 +219,8 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _textEditingController.dispose();
+    _searchFieldFocus.dispose();
+    _postSearchFocus.dispose();
     super.dispose();
   }
 
@@ -233,7 +238,105 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
     }
   }
 
+  void _promptSaveSearch() {
+    final query = _query.trim();
+    if (query.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.enter_search_to_save_first)),
+      );
+      return;
+    }
+    final controller = TextEditingController(text: query);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.save_search),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(labelText: context.l10n.name),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              ref
+                  .read(savedSearchesProvider.notifier)
+                  .add(source.id!, controller.text, query);
+              Navigator.pop(ctx);
+            },
+            child: Text(context.l10n.save),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSavedSearches() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Consumer(
+        builder: (ctx, ref, _) {
+          final saved =
+              ref.watch(savedSearchesProvider)[source.id] ??
+              const <SavedSearch>[];
+          if (saved.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                context.l10n.no_saved_searches,
+                textAlign: TextAlign.center,
+              ),
+            );
+          }
+          return ListView(
+            shrinkWrap: true,
+            children: [
+              for (final s in saved)
+                ListTile(
+                  leading: const Icon(Icons.bookmark_outline),
+                  title: Text(s.name),
+                  subtitle: Text(
+                    s.query,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => ref
+                        .read(savedSearchesProvider.notifier)
+                        .remove(source.id!, s.name),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _runSavedSearch(s.query);
+                  },
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _runSavedSearch(String query) {
+    _textEditingController.text = query;
+    setState(() {
+      _isSearch = true;
+      _selectedIndex = 2;
+      _query = query;
+      _resetPagination();
+    });
+  }
+
   late final _textEditingController = TextEditingController(text: widget.query);
+  // TV search focus flow: opening search puts focus on the field; submitting
+  // hands focus to the next button in the row, so it never reverts to Popular /
+  // Latest (which, on revert, would re-select and close the search field).
+  final _searchFieldFocus = FocusNode();
+  final _postSearchFocus = FocusNode();
   late String _query = widget.query;
   late bool _isSearch = widget.isSearch;
   AsyncValue<MPages?>? _getManga;
@@ -319,6 +422,13 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                       }
                       _resetPagination();
                     });
+                    // Hand focus to the next button in the row so it never
+                    // reverts to Popular / Latest.
+                    if (isTv) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) _postSearchFocus.requestFocus();
+                      });
+                    }
                   },
                   onChanged: (value) {},
                   onSuffixPressed: () {
@@ -346,6 +456,7 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                     });
                   },
                   controller: _textEditingController,
+                  focusNode: _searchFieldFocus,
                 )
               : IconButton(
                   splashRadius: 20,
@@ -353,89 +464,190 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                     setState(() {
                       _isSearch = true;
                     });
+                    // Force focus onto the field so it doesn't revert to the
+                    // previously focused pill while the search button unmounts.
+                    if (isTv) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) _searchFieldFocus.requestFocus();
+                      });
+                    }
                   },
                   icon: Icon(Icons.search, color: Theme.of(context).hintColor),
                 ),
-          PopupMenuButton(
-            popUpAnimationStyle: popupAnimationStyle,
-            icon: Icon(displayTypeIcon),
-            itemBuilder: (context) {
-              final displayType = ref.watch(mangaHomeDisplayTypeStateProvider);
-              final displayTypeNotifier = ref.read(
-                mangaHomeDisplayTypeStateProvider.notifier,
-              );
-              return [
-                PopupMenuItem<int>(
-                  value: 0,
-                  child: RadioGroup(
-                    groupValue: displayType,
-                    onChanged: (a) {
-                      context.pop();
-                      displayTypeNotifier.setMangaHomeDisplayType(a!);
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        RadioListTile(
-                          title: Text(context.l10n.comfortable_grid),
-                          value: DisplayType.comfortableGrid,
-                        ),
-                        RadioListTile(
-                          title: Text(context.l10n.compact_grid),
-                          value: DisplayType.compactGrid,
-                        ),
-                        RadioListTile(
-                          title: Text(context.l10n.list),
-                          value: DisplayType.list,
-                        ),
-                      ],
+          if (isTv)
+            IconButton(
+              focusNode: _postSearchFocus,
+              focusColor: context.primaryColor.withValues(alpha: 0.4),
+              icon: Icon(displayTypeIcon),
+              onPressed: () async {
+                const order = [
+                  DisplayType.comfortableGrid,
+                  DisplayType.compactGrid,
+                  DisplayType.list,
+                ];
+                final current = ref.read(mangaHomeDisplayTypeStateProvider);
+                final picked = await showTvMenu(
+                  context,
+                  title: context.l10n.display_mode,
+                  options: [
+                    TvMenuOption(
+                      context.l10n.comfortable_grid,
+                      selected: current == DisplayType.comfortableGrid,
                     ),
-                  ),
-                ),
-              ];
-            },
-            onSelected: (value) {},
-          ),
-          if (!isLocal)
+                    TvMenuOption(
+                      context.l10n.compact_grid,
+                      selected: current == DisplayType.compactGrid,
+                    ),
+                    TvMenuOption(
+                      context.l10n.list,
+                      selected: current == DisplayType.list,
+                    ),
+                  ],
+                );
+                if (picked != null) {
+                  ref
+                      .read(mangaHomeDisplayTypeStateProvider.notifier)
+                      .setMangaHomeDisplayType(order[picked]);
+                }
+              },
+            )
+          else
             PopupMenuButton(
               popUpAnimationStyle: popupAnimationStyle,
+              icon: Icon(displayTypeIcon),
               itemBuilder: (context) {
+                final displayType = ref.watch(
+                  mangaHomeDisplayTypeStateProvider,
+                );
+                final displayTypeNotifier = ref.read(
+                  mangaHomeDisplayTypeStateProvider.notifier,
+                );
                 return [
                   PopupMenuItem<int>(
                     value: 0,
-                    child: Text(context.l10n.open_in_browser),
-                  ),
-                  PopupMenuItem<int>(
-                    value: 1,
-                    child: Text(context.l10n.settings),
+                    child: RadioGroup(
+                      groupValue: displayType,
+                      onChanged: (value) {
+                        context.pop();
+                        displayTypeNotifier.setMangaHomeDisplayType(value!);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile(
+                            title: Text(context.l10n.comfortable_grid),
+                            value: DisplayType.comfortableGrid,
+                          ),
+                          RadioListTile(
+                            title: Text(context.l10n.compact_grid),
+                            value: DisplayType.compactGrid,
+                          ),
+                          RadioListTile(
+                            title: Text(context.l10n.list),
+                            value: DisplayType.list,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ];
               },
-              onSelected: (value) async {
-                if (value == 0) {
-                  final baseUrl = ref.watch(
-                    sourceBaseUrlProvider(source: source),
-                  );
-                  Map<String, dynamic> data = {
-                    'url': baseUrl,
-                    'sourceId': source.id.toString(),
-                    'title': '',
-                  };
-                  context.push("/mangawebview", extra: data);
-                } else {
-                  final res = await context.push(
-                    '/extension_detail',
-                    extra: source,
-                  );
-                  if (res != null && mounted) {
-                    setState(() {
-                      source = res as Source;
-                      _resetPagination();
-                    });
-                  }
-                }
-              },
+              onSelected: (_) {},
             ),
+          if (!isLocal)
+            if (isTv)
+              IconButton(
+                focusColor: context.primaryColor.withValues(alpha: 0.4),
+                icon: const Icon(Icons.more_vert),
+                onPressed: () async {
+                  final picked = await showTvMenu(
+                    context,
+                    title: source.name ?? '',
+                    options: [
+                      TvMenuOption(context.l10n.open_in_browser),
+                      TvMenuOption(context.l10n.settings),
+                      TvMenuOption(context.l10n.save_search),
+                      TvMenuOption(context.l10n.saved_searches),
+                    ],
+                  );
+                  if (picked == null || !context.mounted) return;
+                  if (picked == 0) {
+                    final baseUrl = ref.read(
+                      sourceBaseUrlProvider(source: source),
+                    );
+                    context.push(
+                      "/mangawebview",
+                      extra: {
+                        'url': baseUrl,
+                        'sourceId': source.id.toString(),
+                        'title': '',
+                      },
+                    );
+                  } else if (picked == 1) {
+                    final result = await context.push(
+                      '/extension_detail',
+                      extra: source,
+                    );
+                    if (result != null && context.mounted) {
+                      setState(() {
+                        source = result as Source;
+                        _resetPagination();
+                      });
+                    }
+                  } else if (picked == 2) {
+                    _promptSaveSearch();
+                  } else {
+                    _showSavedSearches();
+                  }
+                },
+              )
+            else
+              PopupMenuButton<int>(
+                popUpAnimationStyle: popupAnimationStyle,
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 0,
+                    child: Text(context.l10n.open_in_browser),
+                  ),
+                  PopupMenuItem(value: 1, child: Text(context.l10n.settings)),
+                  PopupMenuItem(
+                    value: 2,
+                    child: Text(context.l10n.save_search),
+                  ),
+                  PopupMenuItem(
+                    value: 3,
+                    child: Text(context.l10n.saved_searches),
+                  ),
+                ],
+                onSelected: (value) async {
+                  if (value == 0) {
+                    final baseUrl = ref.read(
+                      sourceBaseUrlProvider(source: source),
+                    );
+                    Map<String, dynamic> data = {
+                      'url': baseUrl,
+                      'sourceId': source.id.toString(),
+                      'title': '',
+                    };
+                    context.push("/mangawebview", extra: data);
+                  } else if (value == 1) {
+                    final res = await context.push(
+                      '/extension_detail',
+                      extra: source,
+                    );
+                    if (res != null && mounted) {
+                      setState(() {
+                        source = res as Source;
+                        _resetPagination();
+                      });
+                    }
+                  } else if (value == 2) {
+                    _promptSaveSearch();
+                  } else {
+                    _showSavedSearches();
+                  }
+                },
+              ),
         ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(AppBar().preferredSize.height * 0.8),

@@ -4,6 +4,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
+import 'package:mangayomi/modules/library/providers/library_source_badge_provider.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/modules/library/widgets/library_gridview_widget.dart';
 import 'package:mangayomi/modules/library/widgets/library_listview_widget.dart';
@@ -37,6 +38,7 @@ class LibraryBody extends ConsumerWidget {
   final bool downloadedOnly;
   final String searchQuery;
   final bool ignoreFiltersOnSearch;
+  final List<String> sourceIds;
 
   const LibraryBody({
     super.key,
@@ -59,6 +61,7 @@ class LibraryBody extends ConsumerWidget {
     required this.downloadedOnly,
     required this.searchQuery,
     required this.ignoreFiltersOnSearch,
+    required this.sourceIds,
   });
 
   @override
@@ -70,6 +73,7 @@ class LibraryBody extends ConsumerWidget {
         )
         .index;
     final mangaIdsList = ref.watch(mangasListStateProvider);
+    final sourceBadge = ref.watch(librarySourceBadgeProvider);
 
     // Watch the global manga stream and filter by category in-memory,
     // avoiding N+1 active Isar database stream connections.
@@ -106,6 +110,7 @@ class LibraryBody extends ConsumerWidget {
             downloadedOnly: downloadedOnly,
             searchQuery: searchQuery,
             ignoreFiltersOnSearch: ignoreFiltersOnSearch,
+            sourceIds: sourceIds,
           ),
         );
 
@@ -139,6 +144,7 @@ class LibraryBody extends ConsumerWidget {
                   continueReaderBtn: continueReaderBtn,
                   downloadedChapter: downloadedChapter,
                   language: language,
+                  sourceBadge: sourceBadge,
                   mangaIdsList: mangaIdsList,
                   localSource: localSource,
                   itemType: itemType,
@@ -168,6 +174,7 @@ class CategoryBadge extends ConsumerWidget {
   final bool downloadedOnly;
   final String searchQuery;
   final bool ignoreFiltersOnSearch;
+  final List<String> sourceIds;
 
   const CategoryBadge({
     super.key,
@@ -183,6 +190,7 @@ class CategoryBadge extends ConsumerWidget {
     required this.downloadedOnly,
     required this.searchQuery,
     required this.ignoreFiltersOnSearch,
+    required this.sourceIds,
   });
 
   @override
@@ -214,6 +222,7 @@ class CategoryBadge extends ConsumerWidget {
             downloadedOnly: downloadedOnly,
             searchQuery: searchQuery,
             ignoreFiltersOnSearch: ignoreFiltersOnSearch,
+            sourceIds: sourceIds,
           ),
         );
         return CircleAvatar(

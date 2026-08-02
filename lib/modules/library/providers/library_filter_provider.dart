@@ -1,4 +1,5 @@
 import 'package:isar_community/isar.dart';
+import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -40,6 +41,7 @@ List<Manga> filteredLibraryManga(
   required bool downloadedOnly,
   required String searchQuery,
   required bool ignoreFiltersOnSearch,
+  required List<String> sourceIds,
 }) {
   final downloadedIds =
       ref.watch(downloadedChapterIdsProvider).asData?.value ?? const <int>{};
@@ -104,6 +106,13 @@ List<Manga> filteredLibraryManga(
         }
       }
 
+      // Filter by source
+      if (sourceIds.isNotEmpty) {
+        if (element.source == null || !sourceIds.contains(element.source)) {
+          return false;
+        }
+      }
+
       // Search filter
       if (searchQuery.isNotEmpty) {
         if (!_matchesSearchQuery(element, searchQuery)) return false;
@@ -114,33 +123,52 @@ List<Manga> filteredLibraryManga(
   }
 
   // Sort
-  mangas.sort((a, b) {
-    switch (sortType) {
-      case 0:
-        return a.name!.compareTo(b.name!);
-      case 1:
-        return a.lastRead!.compareTo(b.lastRead!);
-      case 2:
-        return a.lastUpdate?.compareTo(b.lastUpdate ?? 0) ?? 0;
-      case 3:
-        return userFacingChapters(a)
-            .where((e) => !e.isRead!)
-            .length
-            .compareTo(userFacingChapters(b).where((e) => !e.isRead!).length);
-      case 4:
-        return userFacingChapters(
-          a,
-        ).length.compareTo(userFacingChapters(b).length);
-      case 5:
-        return (userFacingChapters(a).lastOrNull?.dateUpload ?? "").compareTo(
-          userFacingChapters(b).lastOrNull?.dateUpload ?? "",
-        );
-      case 6:
-        return a.dateAdded?.compareTo(b.dateAdded ?? 0) ?? 0;
-      default:
-        return 0;
+  if (mangas.isNotEmpty) {
+    if (sortType == 3) {
+      final unreadCounts = <int, int>{};
+      for (final manga in mangas) {
+        if (manga.id != null) {
+          // Scanlator-aware unread count (respects the per-manga filter).
+          unreadCounts[manga.id!] = manga.unreadChaptersCount;
+        }
+      }
+      mangas.sort((a, b) {
+        final aVal = a.id != null ? (unreadCounts[a.id] ?? 0) : 0;
+        final bVal = b.id != null ? (unreadCounts[b.id] ?? 0) : 0;
+        return aVal.compareTo(bVal);
+      });
+    } else if (sortType == 4) {
+      final totalCounts = <int, int>{};
+      for (final manga in mangas) {
+        if (manga.id != null) {
+          totalCounts[manga.id!] = userFacingChapters(manga).length;
+        }
+      }
+      mangas.sort((a, b) {
+        final aVal = a.id != null ? (totalCounts[a.id] ?? 0) : 0;
+        final bVal = b.id != null ? (totalCounts[b.id] ?? 0) : 0;
+        return aVal.compareTo(bVal);
+      });
+    } else {
+      mangas.sort((a, b) {
+        switch (sortType) {
+          case 0:
+            return a.name!.compareTo(b.name!);
+          case 1:
+            return a.lastRead!.compareTo(b.lastRead!);
+          case 2:
+            return a.lastUpdate?.compareTo(b.lastUpdate ?? 0) ?? 0;
+          case 5:
+            return (userFacingChapters(a).lastOrNull?.dateUpload ?? "")
+                .compareTo(userFacingChapters(b).lastOrNull?.dateUpload ?? "");
+          case 6:
+            return a.dateAdded?.compareTo(b.dateAdded ?? 0) ?? 0;
+          default:
+            return 0;
+        }
+      });
     }
-  });
+  }
 
   return mangas;
 }

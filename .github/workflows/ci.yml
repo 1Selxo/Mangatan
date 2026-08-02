@@ -1,8 +1,6 @@
 name: CI
 
-# Build/compile checks for pull requests and main. The release workflow only
-# runs on version tags, so without this nothing verifies that a PR (or main)
-# actually compiles until a release is cut. This catches that earlier.
+# Build/compile checks for pull requests and main branch for Android & Windows in debug mode.
 on:
   workflow_dispatch:
   pull_request:
@@ -77,10 +75,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # Debug build: needs no signing secrets, so it also runs on fork PRs,
-      # while still compiling the full Dart + Kotlin + Rust bridge.
       - name: Build debug APK
         run: flutter build apk --debug
+
+      - name: Upload Android debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mangatan-android-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
 
   desktop-scene-mining:
     name: Desktop scene mining (Linux)
@@ -143,3 +145,36 @@ jobs:
 
       - name: Build Linux debug
         run: flutter build linux --debug
+
+  build-windows:
+    name: Build (Windows debug)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          cache: true
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install 'flutter_rust_bridge_codegen'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build debug Windows
+        run: flutter build windows --debug
+
+      - name: Upload Windows debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mangatan-windows-debug
+          path: build/windows/x64/runner/Debug/

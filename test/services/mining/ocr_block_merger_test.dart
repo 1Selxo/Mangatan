@@ -25,6 +25,26 @@ void main() {
 
     expect(merged.single.lines, ['right', 'left']);
   });
+
+  test('orders vertically staggered Japanese speech bubbles right to left', () {
+    // Two separate bubbles that do not vertically overlap: the left-hand
+    // bubble sits higher on the page than the right-hand one. Japanese
+    // reading order is right-to-left regardless of the vertical stagger,
+    // so the right bubble's sentence must come first. This reproduces the
+    // "order was mixed" report from issue #34.
+    final blocks = [
+      _block('leftbubble', 0.20, 0.10, 0.30, 0.35, vertical: true),
+      _block('rightbubble', 0.60, 0.40, 0.70, 0.65, vertical: true),
+    ];
+
+    final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+    expect(merged, hasLength(2));
+    expect(merged.map((block) => block.text).toList(), [
+      'rightbubble',
+      'leftbubble',
+    ]);
+  });
 }
 
 OcrTextBlock _block(

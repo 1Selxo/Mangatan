@@ -250,9 +250,22 @@ OcrTextBlock _toBlock(List<_Line> lines, String language) {
 
 List<OcrTextBlock> _readingOrder(List<OcrTextBlock> blocks, bool japanese) {
   blocks.sort((a, b) {
-    final overlap = _overlap(a.ymin, a.ymax, b.ymin, b.ymax);
-    if (overlap > 0.2) {
-      return japanese ? b.xmin.compareTo(a.xmin) : a.xmin.compareTo(b.xmin);
+    if (japanese) {
+      // Japanese manga reads right-to-left. When two blocks share a column
+      // band (they overlap horizontally) the upper one comes first; otherwise
+      // the right-hand block's sentence is read before the left-hand one,
+      // regardless of any vertical stagger between separate speech bubbles.
+      final horizontalOverlap = _overlap(a.xmin, a.xmax, b.xmin, b.xmax);
+      if (horizontalOverlap > 0.2) {
+        return a.ymin.compareTo(b.ymin);
+      }
+      return b.xmin.compareTo(a.xmin);
+    }
+    // Left-to-right scripts: blocks sharing a line band read left-to-right,
+    // otherwise top-to-bottom.
+    final verticalOverlap = _overlap(a.ymin, a.ymax, b.ymin, b.ymax);
+    if (verticalOverlap > 0.2) {
+      return a.xmin.compareTo(b.xmin);
     }
     return a.ymin.compareTo(b.ymin);
   });

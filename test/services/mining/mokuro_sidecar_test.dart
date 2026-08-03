@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -132,6 +134,57 @@ void main() {
     store.close();
   });
 
+  test(
+    'bulk downloads dedupe one volume to a single fetch across stores',
+    () async {
+      // Bulk caching (issue #47) creates a fresh MokuroSidecarStore per
+      // queued chapter. When several of those chapters resolve to the same
+      // Mokuro volume and race before any sidecar is on disk, the shared
+      // in-memory volume cache must collapse them to a single network fetch
+      // so a bulk "download all" cannot hammer the Mokuro server.
+      var requests = 0;
+      final completer = Completer<void>();
+      http.Client makeClient() => MockClient((_) async {
+        requests++;
+        await completer.future;
+        return _volumeResponse();
+      });
+
+      final artifacts = List.generate(
+        5,
+        (index) => File(p.join(temporaryDirectory.path, 'Volume $index.cbz')),
+      );
+      for (final artifact in artifacts) {
+        await artifact.writeAsBytes(const [1]);
+      }
+
+      final stores = [
+        for (var i = 0; i < artifacts.length; i++)
+          MokuroSidecarStore(client: makeClient()),
+      ];
+      final pending = [
+        for (var i = 0; i < artifacts.length; i++)
+          stores[i].ensureDownloaded(
+            sourceName: 'Mokuro',
+            chapterUrl: 'series|volume',
+            artifact: artifacts[i],
+          ),
+      ];
+
+      completer.complete();
+      final results = await Future.wait(pending);
+
+      expect(results, everyElement(isTrue));
+      expect(requests, 1);
+      for (final artifact in artifacts) {
+        expect(await mokuroSidecarFor(artifact).readAsBytes(), _volumeBytes);
+      }
+      for (final store in stores) {
+        store.close();
+      }
+    },
+  );
+
   test('does nothing for chapters outside the Mokuro extension', () async {
     var requests = 0;
     final store = MokuroSidecarStore(
@@ -165,7 +218,11 @@ const _volumeJson = {
 };
 
 http.Response _volumeResponse() => http.Response.bytes(
-  utf8.encode(jsonEncode(_volumeJson)),
+  _volumeBytes,
   200,
   headers: const {'content-type': 'application/octet-stream'},
+);
+
+final Uint8List _volumeBytes = Uint8List.fromList(
+  utf8.encode(jsonEncode(_volumeJson)),
 );

@@ -36,4 +36,13 @@ class OcrTextBlock {
   });
 
   String get text => lines.where((line) => line.trim().isNotEmpty).join('\n');
+
+  /// The block's lines joined into a single continuous sentence.
+  ///
+  /// Unlike [text], this never inserts a hard newline between merged OCR
+  /// lines. A raw `\n` between auto-merged fragments makes downstream
+  /// sentence extraction (Yomitan) stop at the first line and produces an
+  /// incomplete Anki sentence field. Use this whenever a block is handed to a
+  /// dictionary popup or mining context as the example sentence.
+  String get sentence => lines.where((line) => line.trim().isNotEmpty).join();
 }

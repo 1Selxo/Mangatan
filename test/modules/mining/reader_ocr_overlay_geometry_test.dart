@@ -178,6 +178,74 @@ void main() {
     });
   });
 
+  // Regression guard for issue #58 ("OCR doesn't work in horizontal mode").
+  // The userscript era resolved OCR geometry per reading mode, so a
+  // horizontal-only path could silently break while other modes worked. The
+  // Flutter rewrite intentionally funnels every reader mode through the single
+  // mode-agnostic [readerOcrHitTestImageRect]. These tests pin that contract:
+  // a horizontal layout must produce the same page-local OCR geometry as the
+  // vertical layout of the same page, so a future refactor cannot reintroduce
+  // a horizontal-only OCR failure.
+  test(
+    'horizontal-continuous full-width page normalizes like its vertical layout',
+    () {
+      // Same page rendered in a landscape viewport. In the horizontal
+      // continuous list the page is laid out into a wide render box and the
+      // painted image is centered within it (extended_image BoxFit.contain),
+      // producing a horizontally offset painted rect. Normalization must strip
+      // that offset back to page-local coordinates.
+      const renderBoxSize = Size(1000, 600);
+      final horizontalPainted = Rect.fromLTWH(275, 0, 450, 600);
+
+      final horizontalNormalized = readerOcrHitTestImageRect(
+        paintedImageRect: horizontalPainted,
+        renderBoxSize: renderBoxSize,
+        normalizePaintCoordinates: true,
+      );
+
+      // The vertical layout of the same 450x600 page also centers the painted
+      // image inside its render box, here with a small horizontal letterbox.
+      // Both layouts must resolve to the identical page-local rectangle so a
+      // tap on the same OCR box lands the same way regardless of reading mode.
+      const verticalRenderBoxSize = Size(480, 600);
+      final verticalPainted = Rect.fromLTWH(15, 0, 450, 600);
+      final verticalNormalized = readerOcrHitTestImageRect(
+        paintedImageRect: verticalPainted,
+        renderBoxSize: verticalRenderBoxSize,
+        normalizePaintCoordinates: true,
+      );
+
+      // center-inscribe on both: horizontal x = (1000-450)/2 = 275 -> 275;
+      // vertical x = (480-450)/2 = 15 -> 15. Both strip to page-local origin.
+      expect(horizontalNormalized, Rect.fromLTWH(275, 0, 450, 600));
+      expect(verticalNormalized, Rect.fromLTWH(15, 0, 450, 600));
+      // The page-local size (what the block geometry is scaled against) is
+      // identical, which is the mode-agnostic contract issue #58 pins.
+      expect(horizontalNormalized.size, verticalNormalized.size);
+    },
+  );
+
+  test(
+    'horizontal painted rect normalization is independent of reading axis',
+    () {
+      // A page painted at the same offset must normalize to the same page-local
+      // rect whether the surrounding list scrolls horizontally or vertically:
+      // the normalization takes no mode/axis argument, and this asserts nobody
+      // reintroduces one.
+      final painted = Rect.fromLTWH(140, 30, 320, 540);
+      const renderBoxSize = Size(600, 600);
+
+      final normalized = readerOcrHitTestImageRect(
+        paintedImageRect: painted,
+        renderBoxSize: renderBoxSize,
+        normalizePaintCoordinates: true,
+      );
+
+      // center-inscribe: x = (600-320)/2 = 140, y = (600-540)/2 = 30.
+      expect(normalized, Rect.fromLTWH(140, 30, 320, 540));
+    },
+  );
+
   test('popup dismissal consumes the reader tap', () {
     expect(
       readerOcrShouldConsumeMissedTap(

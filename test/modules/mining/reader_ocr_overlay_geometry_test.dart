@@ -85,6 +85,99 @@ void main() {
     expect(normalized, Rect.fromLTWH(40, 0, 320, 600));
   });
 
+  group('OCR bounding box scaling (issue #26)', () {
+    final imageRect = Rect.fromLTWH(0, 0, 400, 600);
+
+    test('unscaled box maps normalized coords straight onto the image', () {
+      final rect = readerOcrScaledBlockRect(
+        xmin: 0.25,
+        ymin: 0.5,
+        xmax: 0.75,
+        ymax: 0.75,
+        imageRect: imageRect,
+        scaleX: 1.0,
+        scaleY: 1.0,
+      );
+
+      expect(rect.left, closeTo(100, 1e-6));
+      expect(rect.top, closeTo(300, 1e-6));
+      expect(rect.width, closeTo(200, 1e-6));
+      expect(rect.height, closeTo(150, 1e-6));
+    });
+
+    test('enlarges the box about its center so bigger text fits', () {
+      final rect = readerOcrScaledBlockRect(
+        xmin: 0.25,
+        ymin: 0.5,
+        xmax: 0.75,
+        ymax: 0.75,
+        imageRect: imageRect,
+        scaleX: 1.4,
+        scaleY: 1.2,
+      );
+
+      // Center is preserved: ((0.25+0.75)/2*400, (0.5+0.75)/2*600) = (200, 375).
+      expect(rect.center.dx, closeTo(200, 1e-6));
+      expect(rect.center.dy, closeTo(375, 1e-6));
+      // Width/height grow by the respective scale factors.
+      expect(rect.width, closeTo(200 * 1.4, 1e-6));
+      expect(rect.height, closeTo(150 * 1.2, 1e-6));
+    });
+
+    test('shrinks the box symmetrically when scaled below 1', () {
+      final rect = readerOcrScaledBlockRect(
+        xmin: 0.25,
+        ymin: 0.5,
+        xmax: 0.75,
+        ymax: 0.75,
+        imageRect: imageRect,
+        scaleX: 0.8,
+        scaleY: 0.8,
+      );
+
+      expect(rect.center.dx, closeTo(200, 1e-6));
+      expect(rect.center.dy, closeTo(375, 1e-6));
+      expect(rect.width, closeTo(200 * 0.8, 1e-6));
+      expect(rect.height, closeTo(150 * 0.8, 1e-6));
+    });
+
+    test('clips an enlarged box to the image bounds', () {
+      // A box hugging the right edge, enlarged horizontally, must not spill
+      // outside the image; it is clamped by the image rect.
+      final rect = readerOcrScaledBlockRect(
+        xmin: 0.8,
+        ymin: 0.0,
+        xmax: 1.0,
+        ymax: 0.2,
+        imageRect: imageRect,
+        scaleX: 1.5,
+        scaleY: 1.5,
+      );
+
+      expect(rect.right, lessThanOrEqualTo(imageRect.right + 1e-6));
+      expect(rect.top, greaterThanOrEqualTo(imageRect.top - 1e-6));
+      expect(rect.left, greaterThanOrEqualTo(imageRect.left - 1e-6));
+    });
+
+    test('honors the image rect origin offset', () {
+      final offsetImage = Rect.fromLTWH(50, 30, 400, 600);
+      final rect = readerOcrScaledBlockRect(
+        xmin: 0.0,
+        ymin: 0.0,
+        xmax: 0.5,
+        ymax: 0.5,
+        imageRect: offsetImage,
+        scaleX: 1.0,
+        scaleY: 1.0,
+      );
+
+      expect(rect.left, closeTo(50, 1e-6));
+      expect(rect.top, closeTo(30, 1e-6));
+      expect(rect.width, closeTo(200, 1e-6));
+      expect(rect.height, closeTo(300, 1e-6));
+    });
+  });
+
   test('popup dismissal consumes the reader tap', () {
     expect(
       readerOcrShouldConsumeMissedTap(

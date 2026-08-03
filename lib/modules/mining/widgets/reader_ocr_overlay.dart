@@ -22,6 +22,7 @@ import 'package:mangayomi/services/mining/mokuro_parser.dart';
 import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:mangayomi/services/mining/ocr_block_merger.dart';
+import 'package:mangayomi/services/mining/ocr_block_reading.dart';
 import 'package:mangayomi/services/mining/profile_ocr_language.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
@@ -862,7 +863,7 @@ class ReaderOcrController extends ChangeNotifier {
         _paintOcrBox(
           canvas: canvas,
           rect: rect,
-          text: _orderedBlock(block),
+          text: orderedBlockSentence(block),
           vertical: block.vertical,
           active: active,
           backgroundOpacity: backgroundOpacity,
@@ -870,7 +871,7 @@ class ReaderOcrController extends ChangeNotifier {
           highlight: active
               ? _lineHighlightFor(
                   lineStart: 0,
-                  lineLength: _orderedBlock(block).length,
+                  lineLength: orderedBlockSentence(block).length,
                   rect: rect,
                   vertical: block.vertical,
                 )
@@ -1037,9 +1038,9 @@ class ReaderOcrController extends ChangeNotifier {
   }
 
   void _prefetchHit(_OcrTapHit hit) {
-    final ordered = _orderedBlock(hit.block);
+    final ordered = orderedBlockSentence(hit.block);
     if (ordered.isEmpty) return;
-    final orderedOffset = _toOrderedOffset(
+    final orderedOffset = toOrderedOffset(
       hit.block,
       hit.rawOffset,
     ).clamp(0, ordered.length - 1);
@@ -1119,9 +1120,9 @@ class ReaderOcrController extends ChangeNotifier {
       DictionaryLookupPopup.dismissActive();
       return true;
     }
-    final ordered = _orderedBlock(block);
+    final ordered = orderedBlockSentence(block);
     if (ordered.isEmpty) return true;
-    final orderedOffset = _toOrderedOffset(
+    final orderedOffset = toOrderedOffset(
       block,
       rawOffset,
     ).clamp(0, ordered.length - 1);
@@ -1399,19 +1400,15 @@ class ReaderOcrController extends ChangeNotifier {
     double scaleX,
     double scaleY,
   ) {
-    final center = Offset(
-      imageRect.left + (block.xmin + block.xmax) * imageRect.width / 2,
-      imageRect.top + (block.ymin + block.ymax) * imageRect.height / 2,
+    return readerOcrScaledBlockRect(
+      xmin: block.xmin,
+      ymin: block.ymin,
+      xmax: block.xmax,
+      ymax: block.ymax,
+      imageRect: imageRect,
+      scaleX: scaleX,
+      scaleY: scaleY,
     );
-    final size = Size(
-      (block.xmax - block.xmin) * imageRect.width * scaleX,
-      (block.ymax - block.ymin) * imageRect.height * scaleY,
-    );
-    return Rect.fromCenter(
-      center: center,
-      width: size.width,
-      height: size.height,
-    ).intersect(imageRect);
   }
 
   void _paintOcrBox({
@@ -1478,8 +1475,10 @@ class ReaderOcrController extends ChangeNotifier {
     String text,
     double alpha,
   ) {
+    // Wrap the text to the box width instead of forcing a single line. A wide
+    // or merged panel (issue #39) then keeps a readable font by wrapping rather
+    // than shrinking the whole line to fit the box's aspect ratio.
     final painter = TextPainter(
-      maxLines: 1,
       text: TextSpan(
         text: text,
         style: TextStyle(
@@ -1490,10 +1489,10 @@ class ReaderOcrController extends ChangeNotifier {
       ),
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.center,
-    )..layout();
-    final scale = math.min(
-      rect.width / math.max(1, painter.width),
-      rect.height / math.max(1, painter.height),
+    )..layout(maxWidth: math.max(1, rect.width));
+    final scale = readerOcrHorizontalTextScale(
+      rect: rect.size,
+      wrappedTextSize: Size(painter.width, painter.height),
     );
     canvas.save();
     canvas.clipRect(rect);
@@ -1642,49 +1641,6 @@ class _ReaderOcrPage {
   final bool usesMokuroWebsiteData;
 }
 
-List<int> _orderedLineIndices(OcrTextBlock block) {
-  final indices = List.generate(block.lines.length, (index) => index);
-  if (block.lines.length <= 1 ||
-      block.lineGeometries.length != block.lines.length) {
-    return indices;
-  }
-  if (block.vertical) {
-    indices.sort((a, b) {
-      final ax = block.lineGeometries[a].xmin + block.lineGeometries[a].xmax;
-      final bx = block.lineGeometries[b].xmin + block.lineGeometries[b].xmax;
-      return bx.compareTo(ax);
-    });
-  } else {
-    indices.sort(
-      (a, b) =>
-          block.lineGeometries[a].ymin.compareTo(block.lineGeometries[b].ymin),
-    );
-  }
-  return indices;
-}
-
-String _orderedBlock(OcrTextBlock block) =>
-    _orderedLineIndices(block).map((index) => block.lines[index]).join();
-
-int _toOrderedOffset(OcrTextBlock block, int rawOffset) {
-  var start = 0;
-  var rawLine = 0;
-  var inLine = 0;
-  for (var index = 0; index < block.lines.length; index++) {
-    if (rawOffset < start + block.lines[index].length) {
-      rawLine = index;
-      inLine = rawOffset - start;
-      break;
-    }
-    start += block.lines[index].length;
-  }
-  final order = _orderedLineIndices(block);
-  return order
-          .takeWhile((index) => index != rawLine)
-          .fold<int>(0, (sum, index) => sum + block.lines[index].length) +
-      inLine;
-}
-
 int _characterOffset(OcrTextBlock block, Offset local, Size size) {
   if (block.lines.isEmpty) return 0;
   if (block.vertical) {
@@ -1791,6 +1747,27 @@ bool readerOcrShouldDismissRepeatedLookup({
 }) =>
     popupVisible && !triggeredByHover && sameBlock && activeOffset == hitOffset;
 
+/// Chooses the paint scale for wrapped horizontal OCR text.
+///
+/// Regression guard for issue #39 ("Merged text becomes too small"). The text
+/// is laid out wrapped to the box width by the caller, so a wide/large panel no
+/// longer forces a single long line. This helper therefore only ever shrinks
+/// the wrapped block when it still overflows the box, and never enlarges past
+/// its natural size. Text that already fits renders at scale 1.0 instead of
+/// being blown up or collapsed to fit the box's aspect ratio.
+@visibleForTesting
+double readerOcrHorizontalTextScale({
+  required Size rect,
+  required Size wrappedTextSize,
+}) {
+  final scale = math.min(
+    rect.width / math.max(1, wrappedTextSize.width),
+    rect.height / math.max(1, wrappedTextSize.height),
+  );
+  if (scale.isNaN || scale <= 0) return 1.0;
+  return math.min(1.0, scale);
+}
+
 @visibleForTesting
 ({double background, double text}) readerOcrContentOpacities({
   required double backgroundOpacity,
@@ -1802,6 +1779,38 @@ bool readerOcrShouldDismissRepeatedLookup({
     background: backgroundOpacity.clamp(0.0, 1.0).toDouble(),
     text: textOpacity.clamp(0.0, 1.0).toDouble(),
   );
+}
+
+/// Maps a block's normalized OCR coordinates onto [imageRect], scaling the box
+/// about its center by [scaleX]/[scaleY] before clamping it to the image.
+///
+/// Enlarging the box (scale > 1) is how the reader gives clipped OCR text more
+/// room so a larger fitted font no longer overflows the bubble (issue #26);
+/// the result is intersected with [imageRect] so an enlarged box never spills
+/// past the page edges.
+@visibleForTesting
+Rect readerOcrScaledBlockRect({
+  required double xmin,
+  required double ymin,
+  required double xmax,
+  required double ymax,
+  required Rect imageRect,
+  required double scaleX,
+  required double scaleY,
+}) {
+  final center = Offset(
+    imageRect.left + (xmin + xmax) * imageRect.width / 2,
+    imageRect.top + (ymin + ymax) * imageRect.height / 2,
+  );
+  final size = Size(
+    (xmax - xmin) * imageRect.width * scaleX,
+    (ymax - ymin) * imageRect.height * scaleY,
+  );
+  return Rect.fromCenter(
+    center: center,
+    width: size.width,
+    height: size.height,
+  ).intersect(imageRect);
 }
 
 class _OcrLineBox {

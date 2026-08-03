@@ -524,7 +524,16 @@ int compareVersions(String version1, String version2) {
   return v1Parts.length.compareTo(v2Parts.length);
 }
 
-int _parseVersionPart(String part) => part.isEmpty ? 0 : int.parse(part);
+int _parseVersionPart(String part) {
+  if (part.isEmpty) return 0;
+  // Version components can carry non-numeric suffixes (pre-release/build tags
+  // like "1727-r1234" or "0-beta") when they arrive unsanitised from external
+  // source.json (appMinVerReq / version) or server release tags. Parse the
+  // leading numeric run and ignore the rest instead of throwing
+  // FormatException, which would break source listing and the update check.
+  final match = RegExp(r'^\d+').firstMatch(part);
+  return match == null ? 0 : int.parse(match.group(0)!);
+}
 
 Future<Map<String, String>> fetchHeadersDalvik(
   InterceptedClient client,

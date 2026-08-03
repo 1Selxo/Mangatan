@@ -26,6 +26,74 @@ void main() {
     expect(merged.single.lines, ['right', 'left']);
   });
 
+  test('merged multi-line block yields a newline-free sentence', () {
+    // Regression for issue #45: auto-merged OCR lines produced a sentence with
+    // a hard newline between them, so Yomitan / Anki received an incomplete
+    // sentence. The merged block's `sentence` must be one continuous string.
+    final blocks = [
+      _block('これは', 0.30, 0.10, 0.35, 0.40, vertical: true),
+      _block('文です', 0.24, 0.10, 0.29, 0.40, vertical: true),
+    ];
+
+    final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+    expect(merged, hasLength(1));
+    expect(merged.single.lines.length, greaterThan(1));
+    expect(merged.single.sentence, 'これは文です');
+    expect(merged.single.sentence.contains('\n'), isFalse);
+  });
+
+  test(
+    'inserts a space when joining broken fragments for spaced languages',
+    () {
+      final blocks = [
+        _block('hello', 0.10, 0.10, 0.25, 0.15),
+        _block('world', 0.255, 0.10, 0.45, 0.15),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'en');
+
+      expect(merged, hasLength(1));
+      expect(merged.single.lines, ['hello world']);
+    },
+  );
+
+  group('joinOcrLines', () {
+    test('joins CJK lines without a separator', () {
+      expect(joinOcrLines(['今日は', 'いい天気'], language: 'ja'), '今日はいい天気');
+      expect(joinOcrLines(['你好', '世界'], language: 'zh'), '你好世界');
+    });
+
+    test('joins spaced-language lines with a single space', () {
+      expect(joinOcrLines(['hello', 'world'], language: 'en'), 'hello world');
+    });
+
+    test(
+      'does not add a space when a line already ends or starts with one',
+      () {
+        expect(
+          joinOcrLines(['hello ', 'world'], language: 'en'),
+          'hello world',
+        );
+        expect(
+          joinOcrLines(['hello', ' world'], language: 'en'),
+          'hello world',
+        );
+      },
+    );
+
+    test('drops empty lines without leaving stray separators', () {
+      expect(
+        joinOcrLines(['hello', '', 'world'], language: 'en'),
+        'hello world',
+      );
+    });
+
+    test('treats an unknown/empty language as spaced', () {
+      expect(joinOcrLines(['foo', 'bar'], language: ''), 'foo bar');
+    });
+  });
+
   // Regression guard for issue #27 (merge close bounding boxes). Two separate
   // columns whose gap is wider than the per-line same-paragraph threshold must
   // still collapse into a single linked block/bounding box when they sit within

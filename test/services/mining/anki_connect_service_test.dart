@@ -519,4 +519,85 @@ void main() {
 
     expect(cards, [101, 102]);
   });
+
+  // Regression for issue #42: "Screenshot | Anki image export Failure".
+  //
+  // When Suwayomi/OCR is self-hosted behind a Cloudflare Zero Trust custom
+  // domain, non-host devices cannot let the AnkiConnect server *fetch* an image
+  // by URL: the fetch hits the auth wall and AnkiConnect reports "Failure to
+  // load image". storeMediaFile MUST embed the raw bytes as base64 `data` so
+  // the image travels inside the request and never depends on the server
+  // reaching back out over the network. It must never send a `url` (or `path`)
+  // that would delegate the download to AnkiConnect.
+  test('storeMediaFile embeds bytes as base64 data, never a url', () async {
+    final bytes = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+    Map<String, dynamic>? storeParams;
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      expect(body['action'], 'storeMediaFile');
+      storeParams = body['params'] as Map<String, dynamic>;
+      return http.Response('{"result": "shot.png", "error": null}', 200);
+    });
+
+    final stored = await AnkiConnectService(
+      client: client,
+    ).storeMediaFile(filename: 'shot.png', data: bytes);
+
+    expect(stored, 'shot.png');
+    expect(storeParams, isNotNull);
+    expect(storeParams!['filename'], 'shot.png');
+    expect(storeParams!['data'], base64Encode(bytes));
+    // The URL/path fetch modes are exactly what broke behind Cloudflare Zero
+    // Trust; they must never be used for locally captured screenshots.
+    expect(storeParams!.containsKey('url'), isFalse);
+    expect(storeParams!.containsKey('path'), isFalse);
+  });
+
+  test(
+    'exports a screenshot as base64 data so a remote host is never fetched',
+    () async {
+      final screenshotBytes = Uint8List.fromList([1, 2, 3, 4, 5]);
+      final storeRequests = <Map<String, dynamic>>[];
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        switch (body['action']) {
+          case 'modelFieldNames':
+            return http.Response(
+              '{"result": ["Front", "Back"], "error": null}',
+              200,
+            );
+          case 'canAddNotesWithErrorDetail':
+            return http.Response(
+              '{"result": [{"canAdd": true, "error": null}], "error": null}',
+              200,
+            );
+          case 'storeMediaFile':
+            storeRequests.add(body['params'] as Map<String, dynamic>);
+            return http.Response('{"result": "shot.png", "error": null}', 200);
+          case 'addNote':
+            return http.Response('{"result": 99, "error": null}', 200);
+        }
+        fail('Unexpected action: ${body['action']}');
+      });
+
+      final noteId = await AnkiConnectService(client: client).exportDraft(
+        AnkiCardDraft(
+          deckName: 'Mining',
+          modelName: 'Basic',
+          expression: '猫',
+          fields: const {'Front': '猫', 'Back': '<img src="shot.png">'},
+          screenshotFileName: 'shot.png',
+          screenshotBytes: screenshotBytes,
+        ),
+      );
+
+      expect(noteId, 99);
+      expect(storeRequests, hasLength(1));
+      final params = storeRequests.single;
+      expect(params['filename'], 'shot.png');
+      expect(params['data'], base64Encode(screenshotBytes));
+      expect(params.containsKey('url'), isFalse);
+      expect(params.containsKey('path'), isFalse);
+    },
+  );
 }

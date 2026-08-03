@@ -26,6 +26,66 @@ class DictionaryPopupHandle {
   final Future<void> dismissed;
 }
 
+@visibleForTesting
+bool dictionaryPopupUsesNativeRenderer(TargetPlatform platform) =>
+    platform == TargetPlatform.linux;
+
+Widget _dictionaryPopupRenderer({
+  Key? key,
+  required String text,
+  required FutureOr<MiningContext?> miningContext,
+  required DictionaryProfile? profile,
+  required Future<List<HoshiLookupResult>>? initialResults,
+  required DictionaryPopupPreferences preferences,
+  required ValueChanged<int> onMatchChanged,
+  required VoidCallback onDismiss,
+  HoshiDictionaryPopupController? controller,
+  FutureOr<int> Function(HoshiDictionaryTextSelection selection)?
+  onTextSelected,
+  VoidCallback? onTapOutside,
+}) {
+  if (!dictionaryPopupUsesNativeRenderer(defaultTargetPlatform)) {
+    return HoshiDictionaryPopup(
+      key: key,
+      controller: controller,
+      text: text,
+      profile: profile,
+      miningContext: miningContext,
+      initialResults: initialResults,
+      preferences: preferences,
+      onMatchChanged: onMatchChanged,
+      onDismiss: onDismiss,
+      onTextSelected: onTextSelected,
+      onTapOutside: onTapOutside,
+    );
+  }
+
+  Widget buildNative(MiningContext context) => DictionaryLookupResultsView(
+    key: key,
+    text: text,
+    miningContext: context,
+    profile: profile,
+    initialResults: initialResults,
+    preferences: preferences,
+    onMatchChanged: onMatchChanged,
+    compact: true,
+    maxResults: hoshiPopupMaxResults,
+    scanLength: hoshiPopupScanLength,
+  );
+
+  if (miningContext is MiningContext) return buildNative(miningContext);
+  return FutureBuilder<MiningContext?>(
+    future: Future<MiningContext?>.value(miningContext),
+    builder: (context, snapshot) {
+      final resolved = snapshot.data;
+      if (resolved == null) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return buildNative(resolved);
+    },
+  );
+}
+
 /// A lookup Future coupled to the exact profile that produced it.
 ///
 /// Keeping these together prevents an override change between hover-prefetch
@@ -654,7 +714,7 @@ class _DictionaryPopupOverlayHostState
                       _preferences.eInkMode ? 0 : 8,
                     ),
                     color: popupTheme.colorScheme.surface,
-                    child: HoshiDictionaryPopup(
+                    child: _dictionaryPopupRenderer(
                       controller: _rootController,
                       text: request.text,
                       profile: request.profile,
@@ -706,7 +766,7 @@ class _DictionaryPopupOverlayHostState
                     _preferences.eInkMode ? 0 : 8,
                   ),
                   color: popupTheme.colorScheme.surface,
-                  child: HoshiDictionaryPopup(
+                  child: _dictionaryPopupRenderer(
                     controller: indexed.$2.controller,
                     text: indexed.$2.request.text,
                     profile: indexed.$2.request.profile,
@@ -867,9 +927,11 @@ class DictionaryLookupPopup extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         borderRadius: BorderRadius.circular(preferences.eInkMode ? 0 : 8),
         color: popupTheme.colorScheme.surface,
-        child: HoshiDictionaryPopup(
+        child: _dictionaryPopupRenderer(
           text: text,
           miningContext: miningContext,
+          profile: null,
+          initialResults: null,
           preferences: preferences,
           onMatchChanged: onMatchChanged,
           onDismiss: onClose,
@@ -978,6 +1040,8 @@ class DictionaryLookupResultsView extends StatefulWidget {
     super.key,
     required this.text,
     required this.miningContext,
+    this.profile,
+    this.initialResults,
     this.preferences,
     this.onMatchChanged,
     this.physics,
@@ -991,6 +1055,8 @@ class DictionaryLookupResultsView extends StatefulWidget {
 
   final String text;
   final MiningContext miningContext;
+  final DictionaryProfile? profile;
+  final Future<List<HoshiLookupResult>>? initialResults;
   final DictionaryPopupPreferences? preferences;
   final ValueChanged<int>? onMatchChanged;
   final ScrollPhysics? physics;
@@ -1029,6 +1095,8 @@ class _DictionaryLookupResultsViewState
   void didUpdateWidget(covariant DictionaryLookupResultsView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text != widget.text ||
+        oldWidget.profile != widget.profile ||
+        oldWidget.initialResults != widget.initialResults ||
         oldWidget.maxResults != widget.maxResults ||
         oldWidget.scanLength != widget.scanLength ||
         oldWidget.preferences != widget.preferences ||
@@ -1041,9 +1109,11 @@ class _DictionaryLookupResultsViewState
   }
 
   Future<_LookupPayload> _lookup() async {
-    final profile = await DictionaryProfileResolver.resolveMiningContext(
-      widget.miningContext,
-    );
+    final profile =
+        widget.profile ??
+        await DictionaryProfileResolver.resolveMiningContext(
+          widget.miningContext,
+        );
     final preferences =
         widget.preferences ??
         await MiningPreferences.getDictionaryPopupPreferences();
@@ -1052,12 +1122,13 @@ class _DictionaryLookupResultsViewState
       return _LookupPayload.empty(preferences, profile);
     }
     final values = await Future.wait<dynamic>([
-      HoshidictsLookupBackend.instance.lookup(
-        lookupText,
-        maxResults: widget.maxResults,
-        scanLength: widget.scanLength,
-        profile: profile,
-      ),
+      widget.initialResults ??
+          HoshidictsLookupBackend.instance.lookup(
+            lookupText,
+            maxResults: widget.maxResults,
+            scanLength: widget.scanLength,
+            profile: profile,
+          ),
       HoshidictsLookupBackend.instance
           .getStyles(profile: profile)
           .catchError((_) => <HoshiDictionaryStyle>[]),

@@ -29,12 +29,21 @@ repo_dir=$(cd -- "$script_dir/.." && pwd)
 server_dir="$repo_dir/third_party/mihon_server"
 output=$(mkdir -p "$output" && cd "$output" && pwd)
 
+# The revision upstream's own release named MExtensionServer-v1.0.6.0-r1.jar.
+# Bump this when re-vendoring; see the ProductRevision comment below for why it
+# is pinned here and why it must stay numeric.
+vendored_revision="r1"
+
 if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/java" ]]; then
   echo "JAVA_HOME must point to JDK 21 or newer." >&2
   exit 1
 fi
+# Match the first line that actually carries `version "…"` rather than line 1.
+# With JAVA_TOOL_OPTIONS or _JAVA_OPTIONS exported, the JVM prints
+# `Picked up JAVA_TOOL_OPTIONS: …` first, and anchoring to line 1 rejected a
+# valid JDK 21 with "found unknown".
 java_major=$("$JAVA_HOME/bin/java" -version 2>&1 |
-  sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')
+  sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)
 if [[ -z "$java_major" || "$java_major" -lt 21 ]]; then
   echo "JDK 21 or newer is required; found ${java_major:-unknown}." >&2
   exit 1
@@ -50,9 +59,16 @@ gradle_args=(
 if $ios_runtime; then
   gradle_args+=("-PiosRuntime=true")
 fi
+# Pin the build revision. Upstream's build.gradle.kts derives it from
+# `git rev-list HEAD --count`, which inside this tree counts *Mangatan's*
+# history: the JAR name, its manifest and the version code extensions read
+# through `AppInfo.getVersionCode()` would all change on every unrelated commit,
+# and collapse to 1 under CI's shallow checkout. Must stay numeric — the server
+# does `REVISION.trimStart('r').toInt()` at class-init, so a commit hash here
+# throws NumberFormatException on startup.
 (
   cd "$server_dir"
-  ./gradlew "${gradle_args[@]}"
+  ProductRevision="$vendored_revision" ./gradlew "${gradle_args[@]}"
 )
 
 shopt -s nullglob
@@ -79,7 +95,14 @@ cp "$repo_dir/third_party/newpipe_extractor/VENDORED.md" \
 cp "$server_dir/BUNDLED_NOTICES.md" "$output/THIRD_PARTY_NOTICES.md"
 
 if ! $ios_runtime; then
-  modules='java.base,java.compiler,java.datatransfer,java.desktop,java.instrument,java.logging,java.management,java.naming,java.prefs,java.scripting,java.se,java.security.jgss,java.security.sasl,java.sql,java.transaction.xa,java.xml,jdk.attach,jdk.crypto.ec,jdk.jdi,jdk.management,jdk.net,jdk.unsupported,jdk.unsupported.desktop,jdk.zipfs,jdk.accessibility'
+  # `jdk.localedata` is a deliberate addition to upstream's module list (see
+  # third_party/mihon_server/build_jre.sh), not an accident to be tidied away on
+  # the next re-vendor. Without it the image resolves 5 locales instead of ~1069,
+  # so `DateTimeFormatter.ofPattern("d MMMM yyyy", es)` formats "15 Jan 2024" and
+  # fails to parse "15 enero 2024". Extension `SimpleDateFormat` calls are
+  # bytecode-rewritten onto ICU4J and unaffected, but anything reaching for
+  # java.time or DateFormatSymbols with a non-root locale is not. Costs ~11 MiB.
+  modules='java.base,java.compiler,java.datatransfer,java.desktop,java.instrument,java.logging,java.management,java.naming,java.prefs,java.scripting,java.se,java.security.jgss,java.security.sasl,java.sql,java.transaction.xa,java.xml,jdk.attach,jdk.crypto.ec,jdk.jdi,jdk.localedata,jdk.management,jdk.net,jdk.unsupported,jdk.unsupported.desktop,jdk.zipfs,jdk.accessibility'
   "$JAVA_HOME/bin/jlink" \
     --add-modules "$modules" \
     --output "$output/jre" \

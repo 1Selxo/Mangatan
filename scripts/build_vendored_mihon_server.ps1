@@ -14,7 +14,12 @@ $jlink = Join-Path $env:JAVA_HOME 'bin\jlink.exe'
 if (-not (Test-Path $java) -or -not (Test-Path $jlink)) {
     throw 'JAVA_HOME must provide java.exe and jlink.exe.'
 }
-$versionText = (& $java -version 2>&1 | Select-Object -First 1) -join ''
+# Match the line carrying `version "…"` rather than the first line of output:
+# with JAVA_TOOL_OPTIONS/_JAVA_OPTIONS set, `Picked up ...` comes first and the
+# regex below would reject a valid JDK 21.
+$versionText = (& $java -version 2>&1 |
+    Select-String -Pattern 'version "' |
+    Select-Object -First 1) -join ''
 if ($versionText -notmatch 'version "(?<major>\d+)') {
     throw "Could not determine Java version from: $versionText"
 }
@@ -26,11 +31,19 @@ $outputPath = [IO.Path]::GetFullPath((Join-Path (Get-Location) $Output))
 if (Test-Path $outputPath) { Remove-Item -Recurse -Force $outputPath }
 New-Item -ItemType Directory -Force $outputPath | Out-Null
 
+# Pin the build revision; see the matching comment in the bash script. Upstream
+# derives it from `git rev-list HEAD --count`, which here counts Mangatan's
+# history and collapses to 1 under a shallow CI checkout. Must stay numeric.
+$vendoredRevision = 'r1'
+
 Push-Location $server
+$previousRevision = $env:ProductRevision
 try {
+    $env:ProductRevision = $vendoredRevision
     & .\gradlew.bat :server:clean :server:shadowJar --no-daemon --stacktrace
     if ($LASTEXITCODE -ne 0) { throw "Gradle failed with exit code $LASTEXITCODE" }
 } finally {
+    $env:ProductRevision = $previousRevision
     Pop-Location
 }
 
@@ -51,12 +64,15 @@ Copy-Item (Join-Path $newPipe 'VENDORED.md') (Join-Path $outputPath 'NewPipe-Ext
 # MPL/GPL code, and logback ships no license text of its own.
 Copy-Item (Join-Path $server 'BUNDLED_NOTICES.md') (Join-Path $outputPath 'THIRD_PARTY_NOTICES.md')
 
+# Keep this list identical to the bash script's; vendored_mihon_source_test.dart
+# asserts the two match. See that script for why `jdk.localedata` is a deliberate
+# addition to upstream's module list.
 $modules = @(
     'java.base','java.compiler','java.datatransfer','java.desktop','java.instrument',
     'java.logging','java.management','java.naming','java.prefs','java.scripting','java.se',
     'java.security.jgss','java.security.sasl','java.sql','java.transaction.xa','java.xml',
-    'jdk.attach','jdk.crypto.ec','jdk.jdi','jdk.management','jdk.net','jdk.unsupported',
-    'jdk.unsupported.desktop','jdk.zipfs','jdk.accessibility'
+    'jdk.attach','jdk.crypto.ec','jdk.jdi','jdk.localedata','jdk.management','jdk.net',
+    'jdk.unsupported','jdk.unsupported.desktop','jdk.zipfs','jdk.accessibility'
 ) -join ','
 & $jlink --add-modules $modules --output (Join-Path $outputPath 'jre') `
     --strip-debug --no-man-pages --no-header-files --compress=zip-6

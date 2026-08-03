@@ -19,8 +19,10 @@ if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/javac" ]]; then
   exit 1
 fi
 
+# See build_vendored_mihon_server.sh: match the line carrying `version "…"`
+# rather than line 1, which a `Picked up JAVA_TOOL_OPTIONS:` notice displaces.
 java_major=$("$JAVA_HOME/bin/java" -version 2>&1 |
-  sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')
+  sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)
 if [[ -z "$java_major" || "$java_major" -lt 21 ]]; then
   echo "JDK 21 or newer is required; found ${java_major:-unknown}." >&2
   exit 1

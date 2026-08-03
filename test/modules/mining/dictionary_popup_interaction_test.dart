@@ -14,6 +14,12 @@ class _UnusedBuildContext implements BuildContext {
 }
 
 void main() {
+  test('Linux overlay popups use the native dictionary renderer', () {
+    expect(dictionaryPopupUsesNativeRenderer(TargetPlatform.linux), isTrue);
+    expect(dictionaryPopupUsesNativeRenderer(TargetPlatform.windows), isFalse);
+    expect(dictionaryPopupUsesNativeRenderer(TargetPlatform.macOS), isFalse);
+  });
+
   test('route changes dismiss any root-overlay dictionary popup', () {
     var dismissals = 0;
     final observer = DictionaryPopupDismissNavigatorObserver(

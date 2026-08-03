@@ -105,9 +105,22 @@ jobs:
                 echo "No listening socket found on port $port." >&2
                 exit 1
               fi
-              grep -q "127\.0\.0\.1:$port" <<<"$listener"
-              [[ "$listener" != *"0.0.0.0:$port"* ]]
-              [[ "$listener" != *"[::]:$port"* ]]
+              # A Java ServerSocket bound to 127.0.0.1 on a dual-stack host is
+              # reported by `ss` as the IPv4-mapped `[::ffff:127.0.0.1]:PORT`,
+              # not as a bare `127.0.0.1:PORT`. Accept either rendering plus
+              # IPv6 loopback, while still anchoring to this port so a match
+              # cannot come from an unrelated socket.
+              if ! grep -Eq \
+                "(^|[^0-9.])((\[::ffff:)?127\.0\.0\.1|\[::1)\]?:$port" \
+                <<<"$listener"; then
+                echo "Server is not bound to loopback: $listener" >&2
+                exit 1
+              fi
+              if [[ "$listener" == *"0.0.0.0:$port"* \
+                || "$listener" == *"[::]:$port"* ]]; then
+                echo "Server is bound to every interface: $listener" >&2
+                exit 1
+              fi
               curl --fail --silent "http://127.0.0.1:$port/stop" >/dev/null
               wait "$server_pid"
               exit 0

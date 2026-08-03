@@ -23,6 +23,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/utils/playback_error_report.dart';
 import 'package:mangayomi/modules/anime/utils/playback_media.dart';
 import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
 import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
@@ -1636,19 +1637,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
 
     final now = DateTime.now();
-    final duplicate =
-        message == _lastPlayerError &&
-        _lastPlayerErrorAt != null &&
-        now.difference(_lastPlayerErrorAt!) < const Duration(seconds: 3);
+    final shouldReport = shouldReportPlaybackError(
+      message: message,
+      lastMessage: _lastPlayerError,
+      lastReportedAt: _lastPlayerErrorAt,
+      now: now,
+    );
     _lastPlayerError = message;
     _lastPlayerErrorAt = now;
-    if (!mounted || duplicate) return;
+    if (!mounted || !shouldReport) return;
 
-    final toastMessage = message.length > 240
-        ? '${message.substring(0, 237)}...'
-        : message;
     BotToast.showText(
-      text: 'Playback error: $toastMessage',
+      text: 'Playback error: ${formatPlaybackErrorToast(message)}',
       onlyOne: true,
       align: const Alignment(0, 0.90),
       duration: const Duration(seconds: 5),

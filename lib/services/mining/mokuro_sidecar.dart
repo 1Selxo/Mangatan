@@ -7,6 +7,16 @@ import 'package:mangayomi/services/mining/mokuro_parser.dart';
 import 'package:mangayomi/services/mining/mokuro_sidecar_path.dart';
 import 'package:path/path.dart' as p;
 
+/// Persists the pre-generated Mokuro OCR sidecar next to a downloaded chapter.
+///
+/// This is what makes bulk caching (issue #47) safe: downloading chapters in
+/// bulk fetches only the pre-generated `.mokuro` OCR published by the Mokuro
+/// extension, never the live Google Lens endpoint, so a "download all" cannot
+/// abuse that API. Because the download queue constructs a fresh store per
+/// chapter, the in-flight write map is [static]: concurrent downloads that
+/// target the same sidecar collapse to one write, and the underlying
+/// [MokuroExtensionOcrClient] volume cache collapses many chapters of one
+/// volume to a single network fetch.
 class MokuroSidecarStore {
   MokuroSidecarStore({http.Client? client})
     : _client = MokuroExtensionOcrClient(client: client);

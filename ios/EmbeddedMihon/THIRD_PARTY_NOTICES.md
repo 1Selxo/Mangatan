@@ -8,8 +8,12 @@ Mangatan's optional embedded Mihon-extension runtime contains:
   <https://github.com/openjdk-mobile/ios-tools>.
 - M-Extension-Server, distributed under the Mozilla Public License 2.0. The
   exact bundled source revision is
-  `a414ab7db1d78ab1362ef53cb036c57371663c55` at
-  <https://github.com/1Selxo/M-Extension-Server>.
+  `68645ae7a8b2ffd0954e9c6cba62427f54f95503`, vendored in this Mangatan
+  source tree at `third_party/mihon_server`.
+- NewPipe Extractor, distributed under GPL-3.0-or-later and linked into the
+  server JAR. Its corresponding production source for release `v0.26.3`,
+  commit `caae86c943857cc6e1a762e3488d6a14e9cf7800`, is vendored at
+  `third_party/newpipe_extractor`.
 
-The server archive also includes the notices supplied by its dependencies.
-These components are provided without warranty.
+Desktop bundles also carry the server and NewPipe license/source notices next
+to the JAR. These components are provided without warranty.

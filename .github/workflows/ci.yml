@@ -31,11 +31,70 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Test bundled Mihon integration
+        run: |
+          flutter test \
+            test/modules/more/settings/browse/extension_server_discovery_test.dart \
+            test/services/vendored_mihon_source_test.dart
+
       # Generated files (frb_generated.dart, *.g.dart, l10n) are committed, so
       # analyze runs without the Rust/codegen toolchain. Fail only on errors
       # (e.g. undefined symbols / type errors), not pre-existing infos/warnings.
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+  vendored-mihon-server:
+    name: Vendored Mihon server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: |
+            third_party/mihon_server/*.gradle.kts
+            third_party/mihon_server/gradle/**/*.toml
+            third_party/mihon_server/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Run vendored server tests
+        working-directory: third_party/mihon_server
+        run: ./gradlew test --no-daemon --stacktrace
+
+      - name: Build bundled Mihon server
+        run: scripts/build_vendored_mihon_server.sh --output "$RUNNER_TEMP/mihon_server"
+
+      - name: Smoke-test bundled runtime and server
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/mihon_server"
+          port=47831
+          mkdir -p "$RUNNER_TEMP/mihon-home"
+          HOME="$RUNNER_TEMP/mihon-home" \
+            "$bundle/jre/bin/java" -jar "$bundle/MExtensionServer.jar" "$port" \
+            >"$RUNNER_TEMP/mihon.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/mihon.log"' EXIT
+          for _ in {1..80}; do
+            if capabilities=$(curl --fail --silent "http://127.0.0.1:$port/capabilities"); then
+              grep -q '"mangatanMihonBridge":1' <<<"$capabilities"
+              grep -q '"sourceFactory":true' <<<"$capabilities"
+              listener=$(ss -ltnp "sport = :$port")
+              [[ "$listener" == *"127.0.0.1"* ]]
+              [[ "$listener" != *"0.0.0.0:$port"* ]]
+              [[ "$listener" != *"[::]:$port"* ]]
+              curl --fail --silent "http://127.0.0.1:$port/stop" >/dev/null
+              wait "$server_pid"
+              exit 0
+            fi
+            sleep 0.25
+          done
+          exit 1
 
   build-android:
     name: Build (Android debug)

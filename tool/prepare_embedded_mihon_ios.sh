@@ -9,11 +9,6 @@ lazy_framework_dir="$repo_dir/ios/Frameworks/OpenJDKRuntime.framework"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/mangatan-embedded-mihon.XXXXXX")
 trap 'find "$work_dir" -depth -delete' EXIT
 
-# Keep the current Mihon/TachiyomiX bytecode repairs while avoiding jdk.zipfs,
-# which is intentionally absent from the small embedded iOS JRE.
-server_commit="68645ae7a8b2ffd0954e9c6cba62427f54f95503"
-server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v7/MExtensionServer-ios.jar"
-server_jar_sha256="40f29f44014fbe1d68b9c368a7c88ab559f8de40e7554c4873389a475aee2fe0"
 openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="24589886361678b369e4703d82fcb3deff1b40728d725fef4fea7e70cb728f55"
 openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"
@@ -43,9 +38,12 @@ download_and_verify() {
   )
 }
 
-echo "Downloading pinned M-Extension-Server $server_commit"
-server_jar="$work_dir/MExtensionServer-ios.jar"
-download_and_verify "$server_jar_url" "$server_jar_sha256" "$server_jar"
+echo "Building the vendored M-Extension-Server source for iOS"
+server_bundle="$work_dir/server"
+"$repo_dir/scripts/build_vendored_mihon_server.sh" \
+  --ios \
+  --output "$server_bundle"
+server_jar="$server_bundle/MExtensionServer.jar"
 if "$JAVA_HOME/bin/jar" tf "$server_jar" |
   grep -Eq '^(ch/qos/logback|org/cef|dev/datlag/kcef)/'; then
   echo "The iOS server JAR contains excluded desktop runtime classes." >&2
@@ -125,6 +123,12 @@ cp -R "$work_dir/java-bundle/java_bundle-device/conf" \
 cp "$work_dir/java-bundle/java_bundle-device/release" \
   "$generated_dir/release"
 cp "$server_jar" "$generated_dir/MExtensionServer.jar"
+cp "$server_bundle/M-Extension-Server-LICENSE.txt" \
+  "$generated_dir/M-Extension-Server-LICENSE.txt"
+cp "$server_bundle/NewPipe-Extractor-LICENSE.txt" \
+  "$generated_dir/NewPipe-Extractor-LICENSE.txt"
+cp "$server_bundle/NewPipe-Extractor-SOURCE.txt" \
+  "$generated_dir/NewPipe-Extractor-SOURCE.txt"
 cp "$work_dir/java-logging-shim.jar" \
   "$generated_dir/java-logging-shim.jar"
 cp "$repo_dir/ios/EmbeddedMihon/THIRD_PARTY_NOTICES.md" \

@@ -357,23 +357,32 @@ class MExtensionServerPlatform {
       var serverJarPath = settings?.extensionServerPath ?? '';
       if (isDesktop &&
           (!await _isFile(jrePath) || !await _isFile(serverJarPath))) {
-        // Nothing configured (or the configured files went away). A distro
-        // package may have installed the server system-wide, in which case
-        // adopt it instead of making the user pick the folder by hand.
-        final system = await findSystemExtensionServer();
-        if (system == null) {
+        // Prefer the server and JRE embedded in Mangatan release artifacts.
+        // Distro-managed installs remain a fallback for development builds and
+        // packages that intentionally omit the portable runtime.
+        final bundled = await findBundledExtensionServer();
+        var resolved = bundled;
+        if (resolved == null) {
+          final system = await findSystemExtensionServer();
+          resolved = system;
+        }
+        if (resolved == null) {
           _log(
             'Mihon bridge was not started because the configured JRE or JAR '
-            'does not exist. JRE: "$jrePath", JAR: "$serverJarPath".',
+            'does not exist and this build has no bundled server. JRE: '
+            '"$jrePath", JAR: "$serverJarPath".',
             level: LogLevel.error,
           );
           return;
         }
-        jrePath = system.jrePath;
-        serverJarPath = system.jarPath;
+        jrePath = resolved.jrePath;
+        serverJarPath = resolved.jarPath;
         _log(
-          'Adopted the package-managed Mihon extension server at '
-          '"${path.dirname(serverJarPath)}".',
+          bundled == null
+              ? 'Adopted the package-managed Mihon extension server at '
+                    '"${path.dirname(serverJarPath)}".'
+              : 'Using Mangatan\'s bundled Mihon extension server at '
+                    '"${path.dirname(serverJarPath)}".',
         );
         _persistResolvedServerPaths(jrePath, serverJarPath);
       }

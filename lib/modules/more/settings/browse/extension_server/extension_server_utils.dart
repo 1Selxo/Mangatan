@@ -5,7 +5,7 @@ import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path/path.dart' as path;
 
 const extensionServerFallbackVersion = '1.0.0';
-const extensionServerJarPrefix = 'MExtensionServer-';
+const extensionServerJarPrefix = 'MExtensionServer';
 const extensionServerReleaseApiUrl =
     'https://api.github.com/repos/1Selxo/M-Extension-Server/releases?page=1&per_page=10';
 const apkBridgeReleaseUrl =
@@ -23,6 +23,22 @@ const extensionServerSystemDirectories = <String>[
   '/usr/share/mangatan/extension_server',
   '/usr/lib/mangatan/extension_server',
 ];
+
+/// Locations where release packaging embeds Mangatan's own Mihon server.
+///
+/// Linux and Windows keep the bundle beside the executable. macOS executables
+/// live in `Contents/MacOS`, while bundled data belongs in
+/// `Contents/Resources`.
+List<String> bundledExtensionServerDirectories({
+  required String resolvedExecutable,
+  required bool macos,
+}) {
+  final executableDirectory = path.dirname(resolvedExecutable);
+  final bundleRoot = macos
+      ? path.normalize(path.join(executableDirectory, '..', 'Resources'))
+      : executableDirectory;
+  return [path.join(bundleRoot, 'mihon_server')];
+}
 
 /// Whether [directory] is a package-managed location that the in-app installer
 /// must not write to or wipe.
@@ -58,6 +74,31 @@ Future<SystemExtensionServerPaths?> findSystemExtensionServer({
   List<String> directories = extensionServerSystemDirectories,
 }) async {
   if (!Platform.isLinux) return null;
+  return _findExtensionServerInDirectories(directories);
+}
+
+/// Finds the JRE and server JAR shipped inside the Mangatan desktop bundle.
+///
+/// Release artifacts include these files, so a fresh install works offline and
+/// does not require a separately downloaded M-Extension-Server package.
+Future<SystemExtensionServerPaths?> findBundledExtensionServer({
+  List<String>? directories,
+}) async {
+  if (!Platform.isLinux && !Platform.isWindows && !Platform.isMacOS) {
+    return null;
+  }
+  final candidates =
+      directories ??
+      bundledExtensionServerDirectories(
+        resolvedExecutable: Platform.resolvedExecutable,
+        macos: Platform.isMacOS,
+      );
+  return _findExtensionServerInDirectories(candidates);
+}
+
+Future<SystemExtensionServerPaths?> _findExtensionServerInDirectories(
+  List<String> directories,
+) async {
   for (final candidate in directories) {
     final root = Directory(candidate);
     if (!await root.exists()) continue;

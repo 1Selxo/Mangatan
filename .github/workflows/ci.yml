@@ -97,8 +97,15 @@ jobs:
             if capabilities=$(curl --fail --silent "http://127.0.0.1:$port/capabilities"); then
               grep -q '"mangatanMihonBridge":1' <<<"$capabilities"
               grep -q '"sourceFactory":true' <<<"$capabilities"
-              listener=$(ss -ltnp "sport = :$port")
-              [[ "$listener" == *"127.0.0.1"* ]]
+              # Assert the listening socket exists BEFORE the negative checks:
+              # `ss` prints only a header when nothing matches, which would make
+              # the three assertions below pass vacuously.
+              listener=$(ss -ltnH "sport = :$port")
+              if [[ -z "${listener//[[:space:]]/}" ]]; then
+                echo "No listening socket found on port $port." >&2
+                exit 1
+              fi
+              grep -q "127\.0\.0\.1:$port" <<<"$listener"
               [[ "$listener" != *"0.0.0.0:$port"* ]]
               [[ "$listener" != *"[::]:$port"* ]]
               curl --fail --silent "http://127.0.0.1:$port/stop" >/dev/null

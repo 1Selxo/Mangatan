@@ -2,6 +2,47 @@ import 'dart:math' as math;
 
 import 'package:mangayomi/services/mining/ocr_models.dart';
 
+/// Languages whose scripts do not use spaces between words.
+///
+/// OCR reconstructs a block as a list of lines. For these scripts the lines
+/// must be concatenated with no separator; for every other language the lines
+/// are separate words/phrases and need a single space, otherwise the mined
+/// sentence runs words together (Mangatan issue #30).
+bool ocrLanguageUsesSpaces(String language) {
+  final code = language.trim().toLowerCase();
+  if (code.isEmpty) return true;
+  // Japanese, Chinese (all variants), and other spaceless CJK scripts.
+  const spaceless = ['ja', 'zh', 'yue', 'wuu', 'hak', 'nan', 'lzh', 'cmn'];
+  for (final prefix in spaceless) {
+    if (code == prefix ||
+        code.startsWith('$prefix-') ||
+        code.startsWith('${prefix}_')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Joins OCR lines of a single block into one readable string.
+///
+/// Spaced languages get a single space between lines, collapsing any spacing
+/// the fragments already carry so a line ending or starting with whitespace is
+/// not doubled. CJK/spaceless languages are concatenated verbatim.
+String joinOcrLines(Iterable<String> lines, {required String language}) {
+  final parts = lines.where((line) => line.isNotEmpty).toList();
+  if (parts.isEmpty) return '';
+  if (!ocrLanguageUsesSpaces(language)) return parts.join();
+  final buffer = StringBuffer(parts.first);
+  for (var i = 1; i < parts.length; i++) {
+    final previous = parts[i - 1];
+    final current = parts[i];
+    final needsSpace = !previous.endsWith(' ') && !current.startsWith(' ');
+    if (needsSpace) buffer.write(' ');
+    buffer.write(current);
+  }
+  return buffer.toString();
+}
+
 /// Reconstructs OCR engine line fragments into readable text blocks.
 ///
 /// This follows Chimahon's OwOCR stages: fragment joining, furigana filtering,
@@ -15,7 +56,7 @@ List<OcrTextBlock> mergeOcrBlocks(
   var lines = _flatten(blocks);
   if (lines.isEmpty) return const [];
   lines = _deduplicate(lines);
-  lines = _mergeBrokenFragments(lines);
+  lines = _mergeBrokenFragments(lines, language);
   if (language.startsWith('ja')) lines = _filterFurigana(lines);
   var groups = _components(lines, _sameParagraph);
   groups = _mergeCloseGroups(groups);
@@ -71,7 +112,7 @@ List<_Line> _deduplicate(List<_Line> lines) {
   return kept;
 }
 
-List<_Line> _mergeBrokenFragments(List<_Line> lines) {
+List<_Line> _mergeBrokenFragments(List<_Line> lines, String language) {
   final remaining = [...lines];
   final output = <_Line>[];
   while (remaining.isNotEmpty) {
@@ -89,7 +130,9 @@ List<_Line> _mergeBrokenFragments(List<_Line> lines) {
         }
       }
     }
-    output.add(group.length == 1 ? seed : _joinLine(group, seed.vertical));
+    output.add(
+      group.length == 1 ? seed : _joinLine(group, seed.vertical, language),
+    );
   }
   return output;
 }
@@ -107,14 +150,14 @@ bool _brokenPair(_Line a, _Line b) {
           math.max(a.charSize, b.charSize) * 0.5;
 }
 
-_Line _joinLine(List<_Line> lines, bool vertical) {
+_Line _joinLine(List<_Line> lines, bool vertical, String language) {
   lines.sort(
     (a, b) => vertical
         ? a.centerY.compareTo(b.centerY)
         : a.centerX.compareTo(b.centerX),
   );
   return _Line(
-    _clean(lines.map((line) => line.text).join()),
+    _clean(joinOcrLines(lines.map((line) => line.text), language: language)),
     _union(lines.map((line) => line.box)),
     vertical,
     lines.first.language,

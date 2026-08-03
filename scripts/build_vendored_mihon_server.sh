@@ -78,7 +78,7 @@ if ! $ios_runtime; then
     --strip-debug \
     --no-man-pages \
     --no-header-files \
-    --compress=2
+    --compress=zip-6
   test -x "$output/jre/bin/java"
 fi
 

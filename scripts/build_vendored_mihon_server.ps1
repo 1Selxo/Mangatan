@@ -53,7 +53,7 @@ $modules = @(
     'jdk.unsupported.desktop','jdk.zipfs','jdk.accessibility'
 ) -join ','
 & $jlink --add-modules $modules --output (Join-Path $outputPath 'jre') `
-    --strip-debug --no-man-pages --no-header-files --compress=2
+    --strip-debug --no-man-pages --no-header-files --compress=zip-6
 if ($LASTEXITCODE -ne 0) { throw "jlink failed with exit code $LASTEXITCODE" }
 if (-not (Test-Path (Join-Path $outputPath 'jre\bin\java.exe'))) {
     throw 'The bundled JRE is missing java.exe.'

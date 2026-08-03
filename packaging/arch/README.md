@@ -12,6 +12,28 @@ The workflow still maintains the legacy `mangatan-extension-server` package for
 older Mangatan releases that did not bundle the bridge. It is no longer an
 `optdepends` of current `mangatan-bin` packages.
 
+## Server detection constraints
+
+These constraints apply to both the bundled server and the legacy package, and
+will silently break detection if changed. They are enforced by
+`test/services/vendored_mihon_source_test.dart` and
+`test/modules/more/settings/browse/extension_server_discovery_test.dart`.
+
+- The JAR must keep the `MExtensionServer-` prefix and a `.jar` suffix
+  (`extensionServerJarPrefix`).
+- The JAR must retain a parseable `vX.Y.Z` in its basename. Without one the app
+  reports the `1.0.0` fallback and offers a perpetual bogus update that, if
+  taken, overwrites the install with whatever upstream last released. This is
+  why the build scripts keep Gradle's versioned archive name rather than
+  flattening it to `MExtensionServer.jar`.
+- The bundled layout puts `java` at `<server dir>/jre/bin/java` (a `jlink`
+  image). The legacy package instead symlinks the system JRE at exactly
+  `<server dir>/jre/jre/bin/java`; that path is probed with `File.exists()`,
+  which follows symlinks, whereas the recursive fallback does not.
+- Neither location may be the target of an in-app download. The installer
+  clears its target directory first, so `isManagedExtensionServerDirectory`
+  rejects the `/usr` locations *and* the bundle inside the running app.
+
 ## One-time setup
 
 1. Create or sign in to an AUR account.

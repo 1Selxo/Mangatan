@@ -1399,19 +1399,15 @@ class ReaderOcrController extends ChangeNotifier {
     double scaleX,
     double scaleY,
   ) {
-    final center = Offset(
-      imageRect.left + (block.xmin + block.xmax) * imageRect.width / 2,
-      imageRect.top + (block.ymin + block.ymax) * imageRect.height / 2,
+    return readerOcrScaledBlockRect(
+      xmin: block.xmin,
+      ymin: block.ymin,
+      xmax: block.xmax,
+      ymax: block.ymax,
+      imageRect: imageRect,
+      scaleX: scaleX,
+      scaleY: scaleY,
     );
-    final size = Size(
-      (block.xmax - block.xmin) * imageRect.width * scaleX,
-      (block.ymax - block.ymin) * imageRect.height * scaleY,
-    );
-    return Rect.fromCenter(
-      center: center,
-      width: size.width,
-      height: size.height,
-    ).intersect(imageRect);
   }
 
   void _paintOcrBox({
@@ -1825,6 +1821,38 @@ double readerOcrHorizontalTextScale({
     background: backgroundOpacity.clamp(0.0, 1.0).toDouble(),
     text: textOpacity.clamp(0.0, 1.0).toDouble(),
   );
+}
+
+/// Maps a block's normalized OCR coordinates onto [imageRect], scaling the box
+/// about its center by [scaleX]/[scaleY] before clamping it to the image.
+///
+/// Enlarging the box (scale > 1) is how the reader gives clipped OCR text more
+/// room so a larger fitted font no longer overflows the bubble (issue #26);
+/// the result is intersected with [imageRect] so an enlarged box never spills
+/// past the page edges.
+@visibleForTesting
+Rect readerOcrScaledBlockRect({
+  required double xmin,
+  required double ymin,
+  required double xmax,
+  required double ymax,
+  required Rect imageRect,
+  required double scaleX,
+  required double scaleY,
+}) {
+  final center = Offset(
+    imageRect.left + (xmin + xmax) * imageRect.width / 2,
+    imageRect.top + (ymin + ymax) * imageRect.height / 2,
+  );
+  final size = Size(
+    (xmax - xmin) * imageRect.width * scaleX,
+    (ymax - ymin) * imageRect.height * scaleY,
+  );
+  return Rect.fromCenter(
+    center: center,
+    width: size.width,
+    height: size.height,
+  ).intersect(imageRect);
 }
 
 class _OcrLineBox {

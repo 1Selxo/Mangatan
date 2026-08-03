@@ -13,8 +13,6 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/more/settings/browse/extension_server/extension_server_utils.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
-import 'package:mangayomi/providers/storage_provider.dart';
-import 'package:mangayomi/services/extension_server_auto_installer.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as path;
@@ -359,54 +357,25 @@ class MExtensionServerPlatform {
       var serverJarPath = settings?.extensionServerPath ?? '';
       if (isDesktop &&
           (!await _isFile(jrePath) || !await _isFile(serverJarPath))) {
-        // Prefer a distro-managed server, then install the matching desktop
-        // bundle into app storage. Failures persist no completion marker, so
-        // the next launch remains eligible to try again.
-        http.Client? installerClient;
-        try {
-          final resolved = await resolveDesktopExtensionServerPaths(
-            configuredJrePath: jrePath,
-            configuredJarPath: serverJarPath,
-            findSystemInstall: findSystemExtensionServer,
-            autoInstall: () async {
-              final assetName = extensionServerAssetNameForCurrentPlatform();
-              if (assetName == null) {
-                throw UnsupportedError(
-                  'No Mihon proxy server bundle supports this desktop.',
-                );
-              }
-              final installDirectory = await StorageProvider()
-                  .getExtensionServerDirectory();
-              if (installDirectory == null) {
-                throw StateError(
-                  'Could not resolve the Mihon proxy server install directory.',
-                );
-              }
-              installerClient = http.Client();
-              return ExtensionServerAutoInstaller(
-                client: installerClient!,
-                assetName: assetName,
-              ).ensureInstalled(installDirectory);
-            },
-          );
-          if (_isCancelled(generation)) return;
-          jrePath = resolved.jrePath;
-          serverJarPath = resolved.jarPath;
-          _persistResolvedServerPaths(jrePath, serverJarPath);
+        // Nothing configured (or the configured files went away). A distro
+        // package may have installed the server system-wide, in which case
+        // adopt it instead of making the user pick the folder by hand.
+        final system = await findSystemExtensionServer();
+        if (system == null) {
           _log(
-            'Resolved the desktop Mihon proxy server at '
-            '"${path.dirname(serverJarPath)}".',
-          );
-        } catch (error, stackTrace) {
-          _log(
-            'Automatic Mihon proxy server setup failed; Mangatan will retry '
-            'on the next launch: $error\n$stackTrace',
-            level: LogLevel.warning,
+            'Mihon bridge was not started because the configured JRE or JAR '
+            'does not exist. JRE: "$jrePath", JAR: "$serverJarPath".',
+            level: LogLevel.error,
           );
           return;
-        } finally {
-          installerClient?.close();
         }
+        jrePath = system.jrePath;
+        serverJarPath = system.jarPath;
+        _log(
+          'Adopted the package-managed Mihon extension server at '
+          '"${path.dirname(serverJarPath)}".',
+        );
+        _persistResolvedServerPaths(jrePath, serverJarPath);
       }
 
       if (Platform.isLinux) {

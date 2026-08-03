@@ -250,13 +250,23 @@ void main() {
       );
       expect(
         serviceSource,
-        contains('final system = await findSystemExtensionServer();'),
-        reason: 'an unconfigured desktop must adopt a distro install',
+        contains('findSystemInstall: findSystemExtensionServer,'),
+        reason: 'an unconfigured desktop must adopt a distro install first',
+      );
+      expect(
+        serviceSource,
+        contains('.ensureInstalled(installDirectory)'),
+        reason: 'a desktop without packaged files must install its own bundle',
+      );
+      expect(
+        serviceSource,
+        contains('Mangatan will retry \'\n            \'on the next launch'),
+        reason: 'an offline first launch must not suppress the next attempt',
       );
       expect(
         serviceSource,
         contains('_persistResolvedServerPaths(jrePath, serverJarPath);'),
-        reason: 'the Settings screen must reflect the adopted paths',
+        reason: 'the Settings screen must reflect the resolved paths',
       );
     });
   });

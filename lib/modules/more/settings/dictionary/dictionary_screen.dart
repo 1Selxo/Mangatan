@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -33,6 +34,72 @@ class DictionaryScreen extends StatefulWidget {
 
   @override
   State<DictionaryScreen> createState() => _DictionaryScreenState();
+}
+
+@visibleForTesting
+List<String> dictionaryZipPaths(Iterable<String> paths) => paths
+    .where((path) => path.toLowerCase().endsWith('.zip'))
+    .toList(growable: false);
+
+class DictionaryZipDropTarget extends StatefulWidget {
+  const DictionaryZipDropTarget({
+    super.key,
+    required this.enabled,
+    required this.onImport,
+    required this.child,
+  });
+
+  final bool enabled;
+  final Future<void> Function(List<String> paths) onImport;
+  final Widget child;
+
+  @override
+  State<DictionaryZipDropTarget> createState() =>
+      _DictionaryZipDropTargetState();
+}
+
+class _DictionaryZipDropTargetState extends State<DictionaryZipDropTarget> {
+  bool _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktop) return widget.child;
+    final scheme = Theme.of(context).colorScheme;
+    return DropTarget(
+      enable: widget.enabled,
+      onDragEntered: (_) {
+        if (widget.enabled) setState(() => _dragging = true);
+      },
+      onDragExited: (_) {
+        if (_dragging) setState(() => _dragging = false);
+      },
+      onDragDone: (details) async {
+        final paths = dictionaryZipPaths(
+          details.files.whereType<DropItemFile>().map((file) => file.path),
+        );
+        if (mounted) setState(() => _dragging = false);
+        if (paths.isEmpty) {
+          botToast('Drop one or more Yomitan ZIP files.');
+          return;
+        }
+        await widget.onImport(paths);
+      },
+      child: AnimatedContainer(
+        key: const ValueKey('dictionary-zip-drop-highlight'),
+        duration: const Duration(milliseconds: 120),
+        decoration: BoxDecoration(
+          color: _dragging
+              ? scheme.primaryContainer.withValues(alpha: 0.55)
+              : Colors.transparent,
+          border: _dragging
+              ? Border.all(color: scheme.primary, width: 2)
+              : null,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: widget.child,
+      ),
+    );
+  }
 }
 
 class _DictionaryScreenState extends State<DictionaryScreen> {
@@ -161,7 +228,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     );
     final paths =
         result?.files.map((file) => file.path).nonNulls.toList() ?? [];
-    if (paths.isEmpty || !mounted) return;
+    await _importDictionaryPaths(paths);
+  }
+
+  Future<void> _importDictionaryPaths(List<String> paths) async {
+    if (paths.isEmpty || !mounted || _importing) return;
     setState(() => _importing = true);
     try {
       final root = await DictionaryStorage.instance.rootDirectory;
@@ -1141,17 +1212,23 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ? null
                       : _checkDictionaryUpdates,
                 ),
-                ListTile(
-                  leading: const Icon(Icons.archive_outlined),
-                  title: const Text('Import Yomitan dictionary'),
-                  subtitle: const Text('Select a Yomitan-format ZIP file'),
-                  trailing: _importing
-                      ? const SizedBox.square(
-                          dimension: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add),
-                  onTap: _importing ? null : _importDictionary,
+                DictionaryZipDropTarget(
+                  enabled: !_importing,
+                  onImport: _importDictionaryPaths,
+                  child: ListTile(
+                    leading: const Icon(Icons.archive_outlined),
+                    title: const Text('Import Yomitan dictionary'),
+                    subtitle: const Text(
+                      'Select or drop Yomitan-format ZIP files',
+                    ),
+                    trailing: _importing
+                        ? const SizedBox.square(
+                            dimension: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add),
+                    onTap: _importing ? null : _importDictionary,
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),

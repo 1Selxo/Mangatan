@@ -26,6 +26,23 @@ void main() {
     expect(merged.single.lines, ['right', 'left']);
   });
 
+  test('merged multi-line block yields a newline-free sentence', () {
+    // Regression for issue #45: auto-merged OCR lines produced a sentence with
+    // a hard newline between them, so Yomitan / Anki received an incomplete
+    // sentence. The merged block's `sentence` must be one continuous string.
+    final blocks = [
+      _block('これは', 0.30, 0.10, 0.35, 0.40, vertical: true),
+      _block('文です', 0.24, 0.10, 0.29, 0.40, vertical: true),
+    ];
+
+    final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+    expect(merged, hasLength(1));
+    expect(merged.single.lines.length, greaterThan(1));
+    expect(merged.single.sentence, 'これは文です');
+    expect(merged.single.sentence.contains('\n'), isFalse);
+  });
+
   test(
     'inserts a space when joining broken fragments for spaced languages',
     () {

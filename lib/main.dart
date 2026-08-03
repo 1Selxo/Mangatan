@@ -265,6 +265,7 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   }
   Hive.registerAdapter(TrackSearchAdapter());
   YouTubePreferences.markStorageReady();
+  unawaited(DictionaryUpdateService.instance.runAutomaticIfDue());
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");
     await discordRpc?.initialize();
@@ -318,8 +319,6 @@ class _MyAppState extends ConsumerState<MyApp>
     _initDeepLinks();
     _setupMpvConfig();
     unawaited(ref.read(scanLocalLibraryProvider.future));
-    unawaited(DictionaryUpdateService.instance.runAutomaticIfDue());
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // OpenJDK Mobile initialization is intentionally lazy on iOS. Starting
       // a full embedded VM during the first frame can terminate the app before

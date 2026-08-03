@@ -355,8 +355,21 @@ class MExtensionServerPlatform {
       final settings = isar.settings.getSync(227);
       var jrePath = settings?.jrePath ?? '';
       var serverJarPath = settings?.extensionServerPath ?? '';
+      // Re-resolve when the configured files are gone, and also when they point
+      // at *another* installation's bundle: a side-by-side upgrade (a second
+      // tarball, or an .app moved to a new path) leaves those files existing but
+      // stale, and launching the previous version's JAR against the new app is
+      // silently wrong. A directory the user picked themselves is never stale.
+      final configuredIsStaleBundle =
+          isDesktop &&
+          isStaleBundledExtensionServerPath(
+            jrePath: jrePath,
+            serverJarPath: serverJarPath,
+          );
       if (isDesktop &&
-          (!await _isFile(jrePath) || !await _isFile(serverJarPath))) {
+          (configuredIsStaleBundle ||
+              !await _isFile(jrePath) ||
+              !await _isFile(serverJarPath))) {
         // Prefer the server and JRE embedded in Mangatan release artifacts.
         // Distro-managed installs remain a fallback for development builds and
         // packages that intentionally omit the portable runtime.

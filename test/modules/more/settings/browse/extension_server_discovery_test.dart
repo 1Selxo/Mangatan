@@ -143,6 +143,112 @@ void main() {
       },
       skip: !Platform.isLinux,
     );
+
+    test('treats another installation\'s bundle as stale', () {
+      final current = [path.join('/opt', 'Mangatan-1.3.0', 'mihon_server')];
+
+      // Same app, previous side-by-side unpack: exists on disk, wrong version.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: path.join(
+            '/opt',
+            'Mangatan-1.2.0',
+            'mihon_server',
+            'jre',
+            'bin',
+            'java',
+          ),
+          serverJarPath: path.join(
+            '/opt',
+            'Mangatan-1.2.0',
+            'mihon_server',
+            'MExtensionServer-v1.0.6.0.jar',
+          ),
+          bundledDirectories: current,
+        ),
+        isTrue,
+      );
+
+      // This installation's own bundle is current, not stale.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: path.join(current.single, 'jre', 'bin', 'java'),
+          serverJarPath: path.join(
+            current.single,
+            'MExtensionServer-v1.0.6.0.jar',
+          ),
+          bundledDirectories: current,
+        ),
+        isFalse,
+      );
+
+      // A directory the user picked themselves is never second-guessed.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: path.join('/home', 'u', 'server', 'jre', 'bin', 'java'),
+          serverJarPath: path.join(
+            '/home',
+            'u',
+            'server',
+            'MExtensionServer-v1.0.6.0.jar',
+          ),
+          bundledDirectories: current,
+        ),
+        isFalse,
+      );
+
+      // Nothing configured yet must not read as stale.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: '',
+          serverJarPath: '',
+          bundledDirectories: current,
+        ),
+        isFalse,
+      );
+    });
+
+    test('refuses to wipe the bundle shipped inside this installation', () {
+      final bundle = path.join(
+        '/Applications',
+        'Mangatan.app',
+        'Contents',
+        'Resources',
+        'mihon_server',
+      );
+
+      // The installer clears its target first, so aiming an update at the
+      // bundle would delete the shipped JRE, JAR and license notices out of
+      // the running app and invalidate its code signature.
+      expect(
+        isManagedExtensionServerDirectory(bundle, bundledDirectories: [bundle]),
+        isTrue,
+      );
+      // Ancestors too: the picker resolves the JAR recursively, so selecting
+      // the .app (or /Applications) yields a config whose next update wipes it.
+      expect(
+        isManagedExtensionServerDirectory(
+          path.join('/Applications', 'Mangatan.app'),
+          bundledDirectories: [bundle],
+        ),
+        isTrue,
+      );
+      expect(
+        isManagedExtensionServerDirectory(
+          path.join(bundle, 'jre'),
+          bundledDirectories: [bundle],
+        ),
+        isTrue,
+      );
+      // An unrelated directory stays writable.
+      expect(
+        isManagedExtensionServerDirectory(
+          path.join('/home', 'u', 'server'),
+          bundledDirectories: [bundle],
+        ),
+        isFalse,
+      );
+    });
   });
 
   group('package-managed extension server discovery', () {

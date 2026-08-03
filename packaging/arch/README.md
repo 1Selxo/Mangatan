@@ -62,10 +62,16 @@ The `publish` job downloads `SHA256SUMS-linux.txt` from the GitHub release,
 renders `PKGBUILD.template`, and fetches checksums for the tagged desktop file
 and license. The release archive already contains the server and JRE.
 
-The `publish-extension-server` job is retained only for backwards compatibility
-and renders `PKGBUILD-extension-server.template` from a stable historical
-M-Extension-Server release. Both jobs generate `.SRCINFO` with the current Arch
-`makepkg` and push only `PKGBUILD`, `.SRCINFO`, and the 0BSD packaging license.
+The `publish-extension-server` job is retained only for backwards compatibility.
+It renders `PKGBUILD-extension-server.template` against the `extension_server_tag`
+input, or — when that is blank — against whatever M-Extension-Server's
+`/releases/latest` currently resolves to. That endpoint excludes prereleases,
+which is what keeps this repository's `ios-runtime-vN` tags out of the AUR. The
+extension server versions independently of Mangatan, so this job usually finds
+the AUR already up to date and exits without pushing; a genuine upstream release
+does republish the legacy package. Both jobs generate `.SRCINFO` with the current
+Arch `makepkg` and push only `PKGBUILD`, `.SRCINFO`, and the 0BSD packaging
+license.
 
 `.SRCINFO` generation runs `makepkg --printsrcinfo`, which does **not** download
 sources, so CI cannot catch a wrong checksum. The render scripts therefore use

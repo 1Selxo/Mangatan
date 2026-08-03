@@ -520,5 +520,66 @@ void main() {
         reason: 'the whole self-contained release bundle must be installed',
       );
     });
+
+    // The app package no longer depends on the separate server package, but
+    // publish-aur.yml still renders and publishes it, so its contract with the
+    // discovery code below still has to hold.
+    test('the server package installs the layout the app probes', () {
+      final template = read(
+        'packaging/arch/PKGBUILD-extension-server.template',
+      );
+
+      expect(
+        template,
+        contains(r'_jar="MExtensionServer-v${pkgver}.jar"'),
+        reason:
+            'detection requires the MExtensionServer- prefix, a .jar suffix, '
+            'and a parseable version in the basename',
+      );
+      expect(
+        template,
+        contains(r'"${pkgdir}/${_serverdir}/jre/jre/bin/java"'),
+        reason: 'findExtensionServerJavaExecutable only probes this path first',
+      );
+      expect(
+        template,
+        contains("depends=('jre21-openjdk')"),
+        reason:
+            'java-runtime>=21 can be satisfied by a newer JVM installed at a '
+            'different prefix, which would dangle the symlink above',
+      );
+      expect(
+        template,
+        contains(r'noextract=("${_bundle}")'),
+        reason: 'the vendored JRE in the bundle must never reach the package',
+      );
+    });
+
+    test('the server package extracts exactly one JAR', () {
+      final template = read(
+        'packaging/arch/PKGBUILD-extension-server.template',
+      );
+
+      // `bsdtar --extract` exits 0 when a pattern matches two entries and
+      // concatenates them into one corrupt file, so the size floor below it
+      // cannot catch that case — the match count has to be checked up front.
+      expect(
+        template,
+        contains(
+          r"""matches=$(bsdtar --list --file "${_bundle}" 'MExtensionServer-*.jar' | wc -l)""",
+        ),
+        reason: 'a second matching entry would silently corrupt the JAR',
+      );
+      expect(
+        template,
+        contains('if (( matches != 1 )); then'),
+        reason: 'both zero and two matches must fail the build',
+      );
+      expect(
+        template.indexOf('matches=\$(bsdtar --list'),
+        lessThan(template.indexOf('bsdtar --extract')),
+        reason: 'the count must gate the extraction, not follow it',
+      );
+    });
   });
 }

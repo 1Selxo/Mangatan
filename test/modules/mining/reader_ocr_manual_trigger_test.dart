@@ -79,6 +79,58 @@ void main() {
     });
   });
 
+  group('readerOcrCurrentScanPage', () {
+    UChapDataPreload page(int index, {bool isTransitionPage = false}) =>
+        UChapDataPreload(
+          null,
+          null,
+          null,
+          !isTransitionPage,
+          null,
+          index,
+          null,
+          index,
+          isTransitionPage: isTransitionPage,
+          localArtifactPath: 'current-page/page-$index.avif',
+        );
+
+    test('returns the page at the current start index only', () {
+      final pages = [page(0), page(1), page(2)];
+      expect(
+        readerOcrCurrentScanPage(pages, startIndex: 1)?.pageIndex,
+        1,
+        reason: 'a manual scan must target the current page, not the chapter',
+      );
+    });
+
+    test('defaults to the first page when no index is given', () {
+      final pages = [page(5), page(6)];
+      expect(readerOcrCurrentScanPage(pages)?.pageIndex, 5);
+    });
+
+    test('clamps an out-of-range index to the last page', () {
+      final pages = [page(0), page(1)];
+      expect(readerOcrCurrentScanPage(pages, startIndex: 99)?.pageIndex, 1);
+    });
+
+    test('skips a transition current page to the next real page', () {
+      final pages = [page(0), page(1, isTransitionPage: true), page(2)];
+      expect(readerOcrCurrentScanPage(pages, startIndex: 1)?.pageIndex, 2);
+    });
+
+    test('returns null when every page is a transition page', () {
+      final pages = [
+        page(0, isTransitionPage: true),
+        page(1, isTransitionPage: true),
+      ];
+      expect(readerOcrCurrentScanPage(pages, startIndex: 0), isNull);
+    });
+
+    test('returns null for an empty page list', () {
+      expect(readerOcrCurrentScanPage(const [], startIndex: 0), isNull);
+    });
+  });
+
   group('OcrScanTrigger preference', () {
     late Directory tempDirectory;
 
@@ -183,26 +235,30 @@ void main() {
       );
     });
 
-    test('manual request scans the pending chapter on demand', () async {
+    test('manual request scans only the current page on demand', () async {
       await MiningPreferences.setOcrScanTrigger(OcrScanTrigger.manual);
-      var prepared = 0;
+      final prepared = <int>[];
 
-      // Opening the chapter stores the pending pages without scanning.
+      // Opening the chapter at page index 11 (the second of three) stores the
+      // pending pages without scanning anything.
       await ReaderOcrState.scanChapter(
-        [page(10), page(11)],
-        preparePage: (_) async {
-          prepared++;
+        [page(10), page(11), page(12)],
+        startIndex: 1,
+        preparePage: (target) async {
+          prepared.add(target.pageIndex ?? -1);
           throw StateError('stop before real OCR');
         },
       );
-      expect(prepared, 0);
+      expect(prepared, isEmpty);
 
-      // An explicit user request now runs OCR for the pending chapter.
-      await ReaderOcrState.scanCurrentChapterManually();
+      // An explicit user request now runs OCR for ONLY the current page (11),
+      // not the whole chapter — this is the issue #35 on-click behavior.
+      await ReaderOcrState.scanCurrentPageManually();
       expect(
         prepared,
-        greaterThan(0),
-        reason: 'a manual request must scan the pending chapter',
+        [11],
+        reason:
+            'a manual request must scan only the current page, not the chapter',
       );
     });
   });

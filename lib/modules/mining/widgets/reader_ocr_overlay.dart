@@ -123,7 +123,7 @@ class ReaderOcrState {
 
   /// Handles a tap on the reader's OCR toolbar button, honoring the configured
   /// [scanTrigger]. In automatic mode it toggles the overlay; in manual mode it
-  /// reveals the overlay if needed and scans the current chapter on demand
+  /// reveals the overlay if needed and scans the current page on demand
   /// (issue #35).
   static Future<void> handleOcrButton() async {
     await initialize();
@@ -135,9 +135,9 @@ class ReaderOcrState {
         await toggle();
       case ReaderOcrButtonAction.enableAndScan:
         await setEnabled(true);
-        await scanCurrentChapterManually();
+        await scanCurrentPageManually();
       case ReaderOcrButtonAction.scan:
-        await scanCurrentChapterManually();
+        await scanCurrentPageManually();
     }
   }
 
@@ -520,24 +520,26 @@ class ReaderOcrState {
     return scan;
   }
 
-  /// Runs OCR for the pending chapter in response to an explicit user request.
+  /// Runs OCR for the current page in response to an explicit user request.
   ///
   /// Used by the manual OCR trigger (issue #35): when [scanTrigger] is
-  /// [OcrScanTrigger.manual] the reader does not auto-scan, so this scans the
-  /// most recently opened chapter on demand. Does nothing when no chapter has
-  /// been opened yet or the overlay is disabled.
-  static Future<void> scanCurrentChapterManually() async {
+  /// [OcrScanTrigger.manual] the reader does not auto-scan, so tapping the OCR
+  /// button scans only the page currently shown — not the whole chapter — so
+  /// OCR runs on demand for the current page instead of constantly in the
+  /// background. Does nothing when no chapter has been opened yet, the overlay
+  /// is disabled, or the current page has no scannable content.
+  static Future<void> scanCurrentPageManually() async {
     await initialize();
     if (!enabled.value || _lastScanPages.isEmpty) return;
-    // Allow the pending chapter to be scanned again even if it was already
-    // marked complete or is being tracked as active from a previous request.
-    _completedScanKey = null;
-    return scanChapter(
+    final page = readerOcrCurrentScanPage(
       _lastScanPages,
       startIndex: _lastStartIndex,
-      preparePage: _lastPreparePage,
-      manual: true,
     );
+    if (page == null) return;
+    // Allow the current page to be scanned again even if it was already marked
+    // complete or is being tracked as active from a previous request.
+    _completedScanKey = null;
+    return scanChapter([page], preparePage: _lastPreparePage, manual: true);
   }
 
   static Future<void> _runChapterScan(
@@ -754,6 +756,28 @@ ReaderOcrButtonAction readerOcrButtonAction({
   return enabled
       ? ReaderOcrButtonAction.scan
       : ReaderOcrButtonAction.enableAndScan;
+}
+
+/// Selects the single page a manual OCR request should scan.
+///
+/// Issue #35 asks for on-click OCR of the *current page* rather than a
+/// whole-chapter background scan, so a manual request must OCR exactly the page
+/// the reader is currently showing (identified by [startIndex] within
+/// [pages]). Transition pages carry no OCR content, so if the current page is a
+/// transition page the nearest following real page (wrapping to earlier pages)
+/// is chosen instead. Returns `null` when there is no scannable page.
+@visibleForTesting
+UChapDataPreload? readerOcrCurrentScanPage(
+  List<UChapDataPreload> pages, {
+  int startIndex = 0,
+}) {
+  if (pages.isEmpty) return null;
+  final start = startIndex.clamp(0, pages.length - 1).toInt();
+  for (var offset = 0; offset < pages.length; offset++) {
+    final page = pages[(start + offset) % pages.length];
+    if (!page.isTransitionPage) return page;
+  }
+  return null;
 }
 
 enum ReaderOcrProgressStage { recognizing, loadingMokuro, mokuro }

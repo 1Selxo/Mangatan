@@ -73,6 +73,10 @@ cp "$repo_dir/third_party/newpipe_extractor/LICENSE" \
   "$output/NewPipe-Extractor-LICENSE.txt"
 cp "$repo_dir/third_party/newpipe_extractor/VENDORED.md" \
   "$output/NewPipe-Extractor-SOURCE.txt"
+# The JAR is shaded, so it carries more than MPL/GPL code. Most components keep
+# their own notices inside the JAR; this file accounts for all of them and for
+# logback, which ships none.
+cp "$server_dir/BUNDLED_NOTICES.md" "$output/THIRD_PARTY_NOTICES.md"
 
 if ! $ios_runtime; then
   modules='java.base,java.compiler,java.datatransfer,java.desktop,java.instrument,java.logging,java.management,java.naming,java.prefs,java.scripting,java.se,java.security.jgss,java.security.sasl,java.sql,java.transaction.xa,java.xml,jdk.attach,jdk.crypto.ec,jdk.jdi,jdk.management,jdk.net,jdk.unsupported,jdk.unsupported.desktop,jdk.zipfs,jdk.accessibility'

@@ -138,6 +138,8 @@ cp "$server_bundle/NewPipe-Extractor-LICENSE.txt" \
   "$generated_dir/NewPipe-Extractor-LICENSE.txt"
 cp "$server_bundle/NewPipe-Extractor-SOURCE.txt" \
   "$generated_dir/NewPipe-Extractor-SOURCE.txt"
+cp "$server_bundle/THIRD_PARTY_NOTICES.md" \
+  "$generated_dir/MExtensionServer-THIRD_PARTY_NOTICES.md"
 cp "$work_dir/java-logging-shim.jar" \
   "$generated_dir/java-logging-shim.jar"
 cp "$repo_dir/ios/EmbeddedMihon/THIRD_PARTY_NOTICES.md" \

@@ -15,5 +15,10 @@ Mangatan's optional embedded Mihon-extension runtime contains:
   commit `caae86c943857cc6e1a762e3488d6a14e9cf7800`, is vendored at
   `third_party/newpipe_extractor`.
 
-Desktop bundles also carry the server and NewPipe license/source notices next
-to the JAR. These components are provided without warranty.
+The server JAR is shaded, so it also contains the third-party libraries
+M-Extension-Server depends on. They are itemised in
+`third_party/mihon_server/BUNDLED_NOTICES.md`, which
+`tool/prepare_embedded_mihon_ios.sh` copies into the app bundle as
+`MExtensionServer-THIRD_PARTY_NOTICES.md`; note that the iOS build excludes
+logback (substituting SLF4J Simple) and KCEF. Desktop bundles carry the same
+file next to the JAR. These components are provided without warranty.

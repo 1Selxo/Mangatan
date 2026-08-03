@@ -47,6 +47,9 @@ Copy-Item (Join-Path $server 'README.md') (Join-Path $outputPath 'M-Extension-Se
 $newPipe = Join-Path $repo 'third_party\newpipe_extractor'
 Copy-Item (Join-Path $newPipe 'LICENSE') (Join-Path $outputPath 'NewPipe-Extractor-LICENSE.txt')
 Copy-Item (Join-Path $newPipe 'VENDORED.md') (Join-Path $outputPath 'NewPipe-Extractor-SOURCE.txt')
+# See the matching comment in the bash script: the shaded JAR carries more than
+# MPL/GPL code, and logback ships no license text of its own.
+Copy-Item (Join-Path $server 'BUNDLED_NOTICES.md') (Join-Path $outputPath 'THIRD_PARTY_NOTICES.md')
 
 $modules = @(
     'java.base','java.compiler','java.datatransfer','java.desktop','java.instrument',

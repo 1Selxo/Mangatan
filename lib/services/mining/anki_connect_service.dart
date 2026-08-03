@@ -148,6 +148,15 @@ class AnkiConnectService {
     return (result as List).map((item) => item as int).toList();
   }
 
+  /// Uploads media by embedding the raw bytes as base64 `data`.
+  ///
+  /// Regression guard for issue #42 ("Screenshot | Anki image export
+  /// Failure"): never switch this to AnkiConnect's `url`/`path` fetch modes.
+  /// When Suwayomi/OCR is self-hosted behind a Cloudflare Zero Trust (or any
+  /// authenticated) custom domain, a non-host device cannot make the
+  /// AnkiConnect server fetch the image itself — the server hits the auth wall
+  /// and Anki reports "Failure to load image". Embedding `data` keeps the image
+  /// inside the request so export works regardless of where the server runs.
   Future<String?> storeMediaFile({
     required String filename,
     required Uint8List data,

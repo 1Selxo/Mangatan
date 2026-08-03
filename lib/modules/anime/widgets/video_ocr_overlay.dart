@@ -170,9 +170,9 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
     _popup?.dismiss();
     setState(() => _selection = selection);
     final resolvedMiningContext =
-        _frameMiningContext?.copyWith(sentence: block.text) ??
+        _frameMiningContext?.copyWith(sentence: block.sentence) ??
         await widget.miningContextBuilder(
-          block.text,
+          block.sentence,
           widget.imageBytes,
           widget.imagePosition,
         );
@@ -491,9 +491,9 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
     final frame = _recognizedFrame;
     if (frame == null) return;
     final resolvedMiningContext =
-        _recognizedMiningContext?.copyWith(sentence: block.text) ??
+        _recognizedMiningContext?.copyWith(sentence: block.sentence) ??
         await widget.miningContextBuilder(
-          block.text,
+          block.sentence,
           frame.bytes,
           frame.position,
         );
@@ -759,7 +759,7 @@ _VideoOcrSelection _videoOcrSelectionAtPosition(
   Rect rect,
   Offset globalPosition,
 ) {
-  final text = block.text.replaceAll('\n', '');
+  final text = block.sentence;
   if (text.isEmpty || rect.isEmpty) {
     return _VideoOcrSelection(block: block, text: '', offset: 0);
   }

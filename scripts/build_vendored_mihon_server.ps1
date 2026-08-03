@@ -38,7 +38,10 @@ $jars = @(Get-ChildItem (Join-Path $server 'server\build\MExtensionServer-*.jar'
 if ($jars.Count -ne 1) {
     throw "Expected exactly one server JAR, found $($jars.Count)."
 }
-Copy-Item $jars[0].FullName (Join-Path $outputPath 'MExtensionServer.jar')
+# Keep the Gradle archive name; see the matching comment in the bash script. The
+# `vX.Y.Z` in the basename is what the app parses for the installed version.
+$serverJar = Join-Path $outputPath $jars[0].Name
+Copy-Item $jars[0].FullName $serverJar
 Copy-Item (Join-Path $server 'LICENSE') (Join-Path $outputPath 'M-Extension-Server-LICENSE.txt')
 Copy-Item (Join-Path $server 'README.md') (Join-Path $outputPath 'M-Extension-Server-README.md')
 $newPipe = Join-Path $repo 'third_party\newpipe_extractor'
@@ -59,3 +62,4 @@ if (-not (Test-Path (Join-Path $outputPath 'jre\bin\java.exe'))) {
     throw 'The bundled JRE is missing java.exe.'
 }
 Write-Host "Built vendored Mihon server bundle at $outputPath"
+Write-Host "Server JAR: $serverJar"

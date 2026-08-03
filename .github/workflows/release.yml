@@ -100,10 +100,13 @@ jobs:
 
       - name: Build bundled Mihon server
         run: |
-          scripts/build_vendored_mihon_server.sh \
-            --output build/macos/Build/Products/Release/Mangatan.app/Contents/Resources/mihon_server
-          test -x build/macos/Build/Products/Release/Mangatan.app/Contents/Resources/mihon_server/jre/bin/java
-          test -s build/macos/Build/Products/Release/Mangatan.app/Contents/Resources/mihon_server/MExtensionServer.jar
+          set -euo pipefail
+          bundle=build/macos/Build/Products/Release/Mangatan.app/Contents/Resources/mihon_server
+          scripts/build_vendored_mihon_server.sh --output "$bundle"
+          test -x "$bundle/jre/bin/java"
+          # Versioned name: the app parses the installed version from the basename.
+          test "$(ls "$bundle"/MExtensionServer-*.jar | wc -l)" -eq 1
+          test -s "$(ls "$bundle"/MExtensionServer-*.jar)"
 
       - name: Re-sign complete macOS app bundle
         run: |
@@ -175,10 +178,12 @@ jobs:
         working-directory: C:\m
         shell: pwsh
         run: |
-          scripts\build_vendored_mihon_server.ps1 `
-            -Output build\windows\x64\runner\Release\mihon_server
-          if (-not (Test-Path build\windows\x64\runner\Release\mihon_server\jre\bin\java.exe)) { throw 'Bundled Java runtime missing' }
-          if (-not (Test-Path build\windows\x64\runner\Release\mihon_server\MExtensionServer.jar)) { throw 'Bundled server JAR missing' }
+          $bundle = 'build\windows\x64\runner\Release\mihon_server'
+          scripts\build_vendored_mihon_server.ps1 -Output $bundle
+          if (-not (Test-Path (Join-Path $bundle 'jre\bin\java.exe'))) { throw 'Bundled Java runtime missing' }
+          # Versioned name: the app parses the installed version from the basename.
+          $jars = @(Get-ChildItem (Join-Path $bundle 'MExtensionServer-*.jar') -File)
+          if ($jars.Count -ne 1) { throw "Expected one bundled server JAR, found $($jars.Count)" }
 
       - name: build Windows installer
         working-directory: C:\m
@@ -276,10 +281,13 @@ jobs:
 
       - name: Build bundled Mihon server
         run: |
-          scripts/build_vendored_mihon_server.sh \
-            --output build/linux/x64/release/bundle/mihon_server
-          test -x build/linux/x64/release/bundle/mihon_server/jre/bin/java
-          test -s build/linux/x64/release/bundle/mihon_server/MExtensionServer.jar
+          set -euo pipefail
+          bundle=build/linux/x64/release/bundle/mihon_server
+          scripts/build_vendored_mihon_server.sh --output "$bundle"
+          test -x "$bundle/jre/bin/java"
+          # Versioned name: the app parses the installed version from the basename.
+          test "$(ls "$bundle"/MExtensionServer-*.jar | wc -l)" -eq 1
+          test -s "$(ls "$bundle"/MExtensionServer-*.jar)"
 
       - name: package Linux archive
         shell: bash

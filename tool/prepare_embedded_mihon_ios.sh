@@ -43,7 +43,16 @@ server_bundle="$work_dir/server"
 "$repo_dir/scripts/build_vendored_mihon_server.sh" \
   --ios \
   --output "$server_bundle"
-server_jar="$server_bundle/MExtensionServer.jar"
+# The build script keeps Gradle's versioned archive name so the desktop app can
+# parse the version out of it. iOS loads the JAR by a fixed name from the app
+# bundle (ios/Runner/MihonEmbeddedBridge.mm), so resolve the glob here.
+shopt -s nullglob
+server_jars=("$server_bundle"/MExtensionServer-*.jar)
+if ((${#server_jars[@]} != 1)); then
+  echo "Expected exactly one built server JAR, found ${#server_jars[@]}." >&2
+  exit 1
+fi
+server_jar=${server_jars[0]}
 if "$JAVA_HOME/bin/jar" tf "$server_jar" |
   grep -Eq '^(ch/qos/logback|org/cef|dev/datlag/kcef)/'; then
   echo "The iOS server JAR contains excluded desktop runtime classes." >&2

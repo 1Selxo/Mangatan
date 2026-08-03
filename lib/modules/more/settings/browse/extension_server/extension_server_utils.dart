@@ -5,7 +5,7 @@ import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path/path.dart' as path;
 
 const extensionServerFallbackVersion = '1.0.0';
-const extensionServerJarPrefix = 'MExtensionServer';
+const extensionServerJarPrefix = 'MExtensionServer-';
 const extensionServerReleaseApiUrl =
     'https://api.github.com/repos/1Selxo/M-Extension-Server/releases?page=1&per_page=10';
 const apkBridgeReleaseUrl =

@@ -73,10 +73,23 @@ jobs:
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/mihon_server"
+          shopt -s nullglob
+          jars=("$bundle"/MExtensionServer-*.jar)
+          if ((${#jars[@]} != 1)); then
+            echo "Expected exactly one bundled server JAR, found ${#jars[@]}." >&2
+            printf '  %s\n' "${jars[@]}" >&2
+            exit 1
+          fi
+          # The app parses the installed version out of this basename, so assert
+          # the bundle ships a parseable `vX.Y.Z` rather than a flattened name.
+          if [[ ! "$(basename "${jars[0]}")" =~ MExtensionServer-v?[0-9]+(\.[0-9]+)+ ]]; then
+            echo "Bundled JAR has no parseable version: ${jars[0]}" >&2
+            exit 1
+          fi
           port=47831
           mkdir -p "$RUNNER_TEMP/mihon-home"
           HOME="$RUNNER_TEMP/mihon-home" \
-            "$bundle/jre/bin/java" -jar "$bundle/MExtensionServer.jar" "$port" \
+            "$bundle/jre/bin/java" -jar "${jars[0]}" "$port" \
             >"$RUNNER_TEMP/mihon.log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/mihon.log"' EXIT

@@ -62,7 +62,11 @@ if ((${#jars[@]} != 1)); then
   printf '  %s\n' "${jars[@]}" >&2
   exit 1
 fi
-cp "${jars[0]}" "$output/MExtensionServer.jar"
+# Keep the Gradle archive name. It carries the `vX.Y.Z` the app parses out of the
+# basename (findExtensionServerJar / extractExtensionServerVersion); flattening it
+# to a bare `MExtensionServer.jar` makes Settings report the 1.0.0 fallback and
+# offer a perpetual bogus update against upstream's GitHub releases.
+cp "${jars[0]}" "$output/$(basename "${jars[0]}")"
 cp "$server_dir/LICENSE" "$output/M-Extension-Server-LICENSE.txt"
 cp "$server_dir/README.md" "$output/M-Extension-Server-README.md"
 cp "$repo_dir/third_party/newpipe_extractor/LICENSE" \
@@ -82,5 +86,7 @@ if ! $ios_runtime; then
   test -x "$output/jre/bin/java"
 fi
 
-test -s "$output/MExtensionServer.jar"
+server_jar="$output/$(basename "${jars[0]}")"
+test -s "$server_jar"
 echo "Built vendored Mihon server bundle at $output"
+echo "Server JAR: $server_jar"

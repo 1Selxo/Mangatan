@@ -31,6 +31,33 @@ Future<Directory> _writeManagedInstall(
   return root;
 }
 
+/// Builds the layout the release bundle actually ships: `jlink` puts `java` at
+/// `jre/bin/java` (one level shallower than the distro package's
+/// `jre/jre/bin/java`), and the build scripts keep Gradle's versioned archive
+/// name so the app can parse the installed version out of the basename.
+Future<_BundledInstall> _writeBundledInstall(Directory parent) async {
+  final root = Directory(path.join(parent.path, 'mihon_server'));
+  final bin = Directory(path.join(root.path, 'jre', 'bin'));
+  await bin.create(recursive: true);
+  final java = File(path.join(bin.path, 'java'));
+  await java.writeAsString('#!/bin/sh\n');
+  final jar = File(path.join(root.path, 'MExtensionServer-v1.0.6.0-r1234.jar'));
+  await jar.writeAsString('jar');
+  return _BundledInstall(root: root, java: java, jar: jar);
+}
+
+class _BundledInstall {
+  final Directory root;
+  final File java;
+  final File jar;
+
+  const _BundledInstall({
+    required this.root,
+    required this.java,
+    required this.jar,
+  });
+}
+
 void main() {
   group('bundled extension server discovery', () {
     test('resolves the bundle beside a Linux or Windows executable', () {
@@ -74,21 +101,45 @@ void main() {
         addTearDown(() async {
           if (await temp.exists()) await temp.delete(recursive: true);
         });
-        final root = Directory(path.join(temp.path, 'mihon_server'));
-        final bin = Directory(path.join(root.path, 'jre', 'bin'));
-        await bin.create(recursive: true);
-        final java = File(path.join(bin.path, 'java'));
-        await java.writeAsString('#!/bin/sh\n');
-        final jar = File(path.join(root.path, 'MExtensionServer.jar'));
-        await jar.writeAsString('jar');
+        final bundle = await _writeBundledInstall(temp);
 
         final resolved = await findBundledExtensionServer(
-          directories: [root.path],
+          directories: [bundle.root.path],
         );
 
         expect(resolved, isNotNull);
-        expect(resolved!.jrePath, java.path);
-        expect(resolved.jarPath, jar.path);
+        expect(resolved!.jrePath, bundle.java.path);
+        expect(resolved.jarPath, bundle.jar.path);
+      },
+      skip: !Platform.isLinux,
+    );
+
+    test(
+      'reports the bundled version instead of offering a bogus update',
+      () async {
+        final temp = await Directory.systemTemp.createTemp('bundled-version-');
+        addTearDown(() async {
+          if (await temp.exists()) await temp.delete(recursive: true);
+        });
+        final bundle = await _writeBundledInstall(temp);
+
+        final resolved = await findBundledExtensionServer(
+          directories: [bundle.root.path],
+        );
+
+        // The build scripts keep Gradle's versioned archive name precisely so
+        // this resolves to the real version. A bare `MExtensionServer.jar`
+        // would fall back to '1.0.0' and make every upstream release look
+        // newer, offering a permanent "Update files" that overwrites the
+        // bundle with an older server.
+        expect(
+          resolveInstalledExtensionServerVersion(resolved!.jarPath),
+          '1.0.6.0',
+        );
+        expect(
+          resolveInstalledExtensionServerVersion(resolved.jarPath),
+          isNot(extensionServerFallbackVersion),
+        );
       },
       skip: !Platform.isLinux,
     );

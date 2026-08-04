@@ -25,6 +25,7 @@ import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 import 'package:mangayomi/modules/anime/utils/playback_error_report.dart';
 import 'package:mangayomi/modules/anime/utils/playback_media.dart';
+import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
 import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
 import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
@@ -315,6 +316,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _hasEndingSkip = false;
   bool _initSubtitleAndAudio = true;
   bool _includeSubtitles = false;
+  bool _bitmapSubtitleActive = false;
   bool _jimakuAutoLoadAttempted = false;
   bool _jimakuLoading = false;
   final List<SubtitleTrack> _jimakuSubtitleTracks = [];
@@ -342,6 +344,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
 
   late final StreamSubscription<Duration> _currentPositionSub;
   late final StreamSubscription<List<String>> _subtitleTextSub;
+  late final StreamSubscription<Track> _selectedTrackSub;
   late final StreamSubscription<String> _playerErrorSub;
   String? _lastPlayerError;
   DateTime? _lastPlayerErrorAt;
@@ -783,7 +786,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     await _player.setSubtitleTrack(track);
     _activeJimakuSubtitlePath = _jimakuSubtitlePathFor(track);
     _activateSubtitleCuesForTrack(track);
-    _hideNativeSubtitlePaintSoon();
+    _syncNativeSubtitlePaintSoon();
   }
 
   String? _jimakuSubtitlePathFor(SubtitleTrack track) {
@@ -864,9 +867,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     await _player.pause();
     try {
       final position = _currentPosition.value;
+      final bitmapSubtitleActive = await _syncNativeSubtitlePaint();
       final bytes = await _player.screenshot(
         format: 'image/png',
-        includeLibassSubtitles: _includeSubtitles,
+        includeLibassSubtitles: _includeSubtitles || bitmapSubtitleActive,
       );
       if (!mounted) return;
       if (bytes == null || bytes.isEmpty) {
@@ -919,30 +923,32 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   Future<VideoOcrFrame?> _captureLiveVideoOcrFrame() async {
     final position = _currentPosition.value;
+    final bitmapSubtitleActive = await _syncNativeSubtitlePaint();
     final bytes = await _player.screenshot(
       format: 'image/png',
-      includeLibassSubtitles: _includeSubtitles,
+      includeLibassSubtitles: _includeSubtitles || bitmapSubtitleActive,
     );
     if (bytes == null || bytes.isEmpty) return null;
     return VideoOcrFrame(bytes: bytes, position: position);
   }
 
-  void _hideNativeSubtitlePaintSoon() {
-    unawaited(_hideNativeSubtitlePaint());
+  void _syncNativeSubtitlePaintSoon() {
+    unawaited(_syncNativeSubtitlePaint());
     _nativeSubtitlePaintTimer?.cancel();
     _nativeSubtitlePaintTimer = Timer(
       const Duration(milliseconds: 250),
-      () => unawaited(_hideNativeSubtitlePaint()),
+      () => unawaited(_syncNativeSubtitlePaint()),
     );
   }
 
-  Future<void> _hideNativeSubtitlePaint() async {
+  Future<bool> _syncNativeSubtitlePaint() async {
     try {
-      final platform = _player.platform;
-      if (platform is NativePlayer) {
-        await platform.setProperty('sub-visibility', 'no');
-      }
-    } catch (_) {}
+      final active = await updateNativeSubtitleVisibility(_player);
+      _bitmapSubtitleActive = active;
+      return active;
+    } catch (_) {
+      return _bitmapSubtitleActive;
+    }
   }
 
   void _setCurrentAudSub(Duration position, int secs) {
@@ -1553,6 +1559,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _unifiedPositionHandler,
     );
     _subtitleTextSub = _player.stream.subtitle.listen(_updateSubtitleHistory);
+    _selectedTrackSub = _player.stream.track.listen((_) {
+      _syncNativeSubtitlePaintSoon();
+    });
     _playerErrorSub = _player.stream.error.listen(_reportPlaybackError);
     _completed;
     _currentTotalDurationSub;
@@ -1711,6 +1720,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _completed.cancel();
     _currentPositionSub.cancel();
     _subtitleTextSub.cancel();
+    _selectedTrackSub.cancel();
     _playerErrorSub.cancel();
     _currentTotalDurationSub.cancel();
     _currentPosition.dispose();

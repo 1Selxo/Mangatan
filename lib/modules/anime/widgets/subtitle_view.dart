@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
+import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/subtitles/subtitle_regex_filters.dart';
@@ -74,11 +75,10 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     super.initState();
     SubtitleRegexFilterState.options.addListener(_filtersChanged);
     unawaited(SubtitleRegexFilterState.initialize());
-    _hideNativeSubtitlePaintSoon();
+    _syncNativeSubtitlePaintSoon();
     _subtitleSubscription = widget.controller.player.stream.subtitle.listen((
       value,
     ) {
-      _hideNativeSubtitlePaintSoon();
       final text = value
           .map((line) => line.trim())
           .where((line) => line.isNotEmpty)
@@ -91,7 +91,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       _dismissHoverLookup(resume: true);
     });
     _trackSubscription = widget.controller.player.stream.track.listen((_) {
-      _hideNativeSubtitlePaintSoon();
+      _syncNativeSubtitlePaintSoon();
     });
   }
 
@@ -176,23 +176,20 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     });
   }
 
-  void _hideNativeSubtitlePaintSoon() {
+  void _syncNativeSubtitlePaintSoon() {
     if (!widget.paintSubtitle) return;
-    unawaited(_disableNativeSubtitlePaint());
+    unawaited(_syncNativeSubtitlePaint());
     _nativeSubtitlePaintTimer?.cancel();
     _nativeSubtitlePaintTimer = Timer(
       const Duration(milliseconds: 250),
-      () => unawaited(_disableNativeSubtitlePaint()),
+      () => unawaited(_syncNativeSubtitlePaint()),
     );
   }
 
-  Future<void> _disableNativeSubtitlePaint() async {
+  Future<void> _syncNativeSubtitlePaint() async {
     if (!widget.paintSubtitle) return;
     try {
-      final platform = widget.controller.player.platform;
-      if (platform is NativePlayer) {
-        await platform.setProperty('sub-visibility', 'no');
-      }
+      await updateNativeSubtitleVisibility(widget.controller.player);
     } catch (_) {}
   }
 

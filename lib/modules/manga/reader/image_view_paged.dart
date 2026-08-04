@@ -154,7 +154,12 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
           handleLoadingProgress: true,
           loadStateChanged: (state) {
             if (state.extendedImageLoadState == LoadState.completed) {
-              _ocr.load();
+              // ExtendedImage invokes this callback while it is building.
+              // Starting OCR synchronously notifies this widget that loading
+              // began, which would call setState during that same build.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _ocr.load();
+              });
             }
             return widget.loadStateChanged(state);
           },

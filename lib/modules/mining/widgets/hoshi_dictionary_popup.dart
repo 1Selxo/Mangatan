@@ -1430,13 +1430,38 @@ class _HoshiPopupData {
   final String html;
 }
 
+/// Default crop window seeded by the screenshot crop dialog and restored by the
+/// free/square aspect presets: a centered 80% rectangle of the source panel.
+///
+/// Issue #36 ("[Feature request] Scalable screenshot") asked for exporting an
+/// adjustable single-panel region instead of the whole page. Seeding the crop
+/// to a sub-rect (not `0..1`) is what makes the default export smaller than the
+/// full page; a regression to a full-page default would silently re-export the
+/// whole page.
+const Rect kAnkiCropDefaultRect = Rect.fromLTRB(0.1, 0.1, 0.9, 0.9);
+
+/// Renders the region currently selected on [controller] to PNG bytes — the
+/// exact step the crop dialog's "Crop" button performs before the manually
+/// cropped panel is handed back to the Anki export via
+/// [MiningContext.imageBytesLoader].
+///
+/// The output pixel dimensions are the chosen crop rect scaled by the source
+/// bitmap (`crop.width * image.width` x `crop.height * image.height` for an
+/// unrotated panel), so the exported image is the user's chosen sub-rect, not
+/// the full captured page. Returns `null` when the raster produced no bytes.
+Future<Uint8List?> cropControllerToPngBytes(CropController controller) async {
+  final ui.Image bitmap = await controller.croppedBitmap();
+  final byteData = await bitmap.toByteData(format: ui.ImageByteFormat.png);
+  return byteData?.buffer.asUint8List();
+}
+
 Future<Uint8List?> _showCropDialog({
   required BuildContext context,
   required Uint8List imageBytes,
 }) async {
   final controller = CropController(
     aspectRatio: null, // Free crop by default
-    defaultCrop: const Rect.fromLTRB(0.1, 0.1, 0.9, 0.9),
+    defaultCrop: kAnkiCropDefaultRect,
   );
 
   final theme = Theme.of(context);
@@ -1459,13 +1484,10 @@ Future<Uint8List?> _showCropDialog({
           Future<void> handleCrop() async {
             setState(() => cropping = true);
             try {
-              final ui.Image bitmap = await controller.croppedBitmap();
-              final byteData = await bitmap.toByteData(
-                format: ui.ImageByteFormat.png,
-              );
+              final bytes = await cropControllerToPngBytes(controller);
               if (!context.mounted) return;
-              if (byteData != null) {
-                Navigator.pop(context, byteData.buffer.asUint8List());
+              if (bytes != null) {
+                Navigator.pop(context, bytes);
               } else {
                 botToast('Could not crop image: empty result', second: 4);
                 setState(() => cropping = false);
@@ -1533,12 +1555,7 @@ Future<Uint8List?> _showCropDialog({
                               selected: aspectMode == _CropAspectMode.free,
                               onPressed: () {
                                 controller.aspectRatio = null;
-                                controller.crop = const Rect.fromLTRB(
-                                  0.1,
-                                  0.1,
-                                  0.9,
-                                  0.9,
-                                );
+                                controller.crop = kAnkiCropDefaultRect;
                                 setState(
                                   () => aspectMode = _CropAspectMode.free,
                                 );
@@ -1551,12 +1568,7 @@ Future<Uint8List?> _showCropDialog({
                               selected: aspectMode == _CropAspectMode.square,
                               onPressed: () {
                                 controller.aspectRatio = 1.0;
-                                controller.crop = const Rect.fromLTRB(
-                                  0.1,
-                                  0.1,
-                                  0.9,
-                                  0.9,
-                                );
+                                controller.crop = kAnkiCropDefaultRect;
                                 setState(
                                   () => aspectMode = _CropAspectMode.square,
                                 );
@@ -1650,12 +1662,7 @@ class _CropToolbarState extends State<_CropToolbar> {
               selected: _mode == _CropAspectMode.free,
               onPressed: () {
                 widget.controller.aspectRatio = null;
-                widget.controller.crop = const Rect.fromLTRB(
-                  0.1,
-                  0.1,
-                  0.9,
-                  0.9,
-                );
+                widget.controller.crop = kAnkiCropDefaultRect;
                 setState(() => _mode = _CropAspectMode.free);
               },
             ),
@@ -1666,12 +1673,7 @@ class _CropToolbarState extends State<_CropToolbar> {
               selected: _mode == _CropAspectMode.square,
               onPressed: () {
                 widget.controller.aspectRatio = 1.0;
-                widget.controller.crop = const Rect.fromLTRB(
-                  0.1,
-                  0.1,
-                  0.9,
-                  0.9,
-                );
+                widget.controller.crop = kAnkiCropDefaultRect;
                 setState(() => _mode = _CropAspectMode.square);
               },
             ),
@@ -1715,11 +1717,10 @@ class _CropActionsRowState extends State<_CropActionsRow> {
   Future<void> _handleCrop() async {
     setState(() => _cropping = true);
     try {
-      final ui.Image bitmap = await widget.controller.croppedBitmap();
-      final byteData = await bitmap.toByteData(format: ui.ImageByteFormat.png);
+      final bytes = await cropControllerToPngBytes(widget.controller);
       if (!mounted) return;
-      if (byteData != null) {
-        Navigator.pop(context, byteData.buffer.asUint8List());
+      if (bytes != null) {
+        Navigator.pop(context, bytes);
         return;
       }
       botToast('Could not crop image: empty result', second: 4);

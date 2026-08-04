@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.2.1+172 - 2026-08-04
+
+- Rebased Mangatan on Mangayomi 0.8.2, including its player layout, font CPU,
+  MPV configuration, source-catalog, and repository safety updates.
+- Added Mihon v2 extension repository support, including gzip-compressed
+  protobuf indexes, repository pointers, and direct APK and icon URLs.
+
 - Added a manual OCR trigger option to the reader: with "OCR trigger" set to
   Manual, OCR no longer runs constantly in the background and instead scans the
   current page on demand when you tap the reader's OCR button. Automatic remains

@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'package:http/http.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/services/extension_repository_catalog.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -200,11 +199,20 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
 
   Map<String, dynamic> infos = {};
   final match = RegExp(r'^(.*)/[^/]+\.json$').firstMatch(jsonUrl);
-
-  final res = await http.get(Uri.parse(jsonUrl));
-  if (!_checkValidUrl(res)) {
-    return null;
-  }
+  final catalog = await loadExtensionRepositoryCatalog(Uri.parse(jsonUrl), (
+    uri,
+  ) async {
+    final response = await http.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'Extension repository returned HTTP ${response.statusCode}.',
+      );
+    }
+    return response.bodyBytes;
+  });
+  if (catalog.entries.isEmpty) return null;
+  if (catalog.name?.isNotEmpty == true) infos['name'] = catalog.name;
+  if (catalog.website?.isNotEmpty == true) infos['website'] = catalog.website;
 
   if (match != null) {
     String url = match.group(1)!;
@@ -216,18 +224,4 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
 
   infos["jsonUrl"] = jsonUrl;
   return Repo.fromJson(infos);
-}
-
-bool _checkValidUrl(Response res) {
-  try {
-    final sourceList = (jsonDecode(res.body) as List).map(
-      (e) => Source.fromJson(e),
-    );
-    if (sourceList.firstOrNull?.name == null) {
-      return false;
-    }
-  } catch (err) {
-    return false;
-  }
-  return true;
 }

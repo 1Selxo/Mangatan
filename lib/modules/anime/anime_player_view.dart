@@ -2413,52 +2413,61 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               ),
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_subtitleCues.isNotEmpty ||
-                  _player.platform is NativePlayer) ...[
-                IconButton(
-                  tooltip: 'Snap delay to previous subtitle',
-                  icon: const Icon(Icons.skip_previous_rounded),
-                  color: Colors.white,
-                  onPressed: () => unawaited(_snapSubtitleDelay(next: false)),
-                ),
-                IconButton(
-                  tooltip: 'Snap delay to next subtitle',
-                  icon: const Icon(Icons.skip_next_rounded),
-                  color: Colors.white,
-                  onPressed: () => unawaited(_snapSubtitleDelay(next: true)),
-                ),
-              ],
-              _seekToWidget(),
-              if (isDesktop && useMpvConfig)
-                ..._buildMpvSettingsButton(context),
-              IconButton(
-                tooltip: 'Aspect ratio',
-                icon: const Icon(Icons.aspect_ratio_rounded),
-                color: Colors.white,
-                onPressed: () => _changeFitLabel(ref),
-              ),
-              if (isDesktop)
-                CustomMaterialDesktopFullscreenButton(
-                  controller: _controller,
-                  desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-                )
-              else
-                IconButton(
-                  tooltip: isFullScreen ? 'Exit fullscreen' : 'Fullscreen',
-                  icon: Icon(
-                    isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_subtitleCues.isNotEmpty ||
+                      _player.platform is NativePlayer) ...[
+                    IconButton(
+                      tooltip: 'Snap delay to previous subtitle',
+                      icon: const Icon(Icons.skip_previous_rounded),
+                      color: Colors.white,
+                      onPressed: () =>
+                          unawaited(_snapSubtitleDelay(next: false)),
+                    ),
+                    IconButton(
+                      tooltip: 'Snap delay to next subtitle',
+                      icon: const Icon(Icons.skip_next_rounded),
+                      color: Colors.white,
+                      onPressed: () =>
+                          unawaited(_snapSubtitleDelay(next: true)),
+                    ),
+                  ],
+                  _seekToWidget(),
+                  if (isDesktop && useMpvConfig)
+                    ..._buildMpvSettingsButton(context),
+                  IconButton(
+                    tooltip: 'Aspect ratio',
+                    icon: const Icon(Icons.aspect_ratio_rounded),
+                    color: Colors.white,
+                    onPressed: () => _changeFitLabel(ref),
                   ),
-                  color: Colors.white,
-                  onPressed: () {
-                    _setLandscapeMode(!isFullScreen);
-                    ref.read(fullscreenProvider.notifier).state = !isFullScreen;
-                    widget.desktopFullScreenPlayer(!isFullScreen);
-                  },
-                ),
-            ],
+                  if (isDesktop)
+                    CustomMaterialDesktopFullscreenButton(
+                      controller: _controller,
+                      desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
+                    )
+                  else
+                    IconButton(
+                      tooltip: isFullScreen ? 'Exit fullscreen' : 'Fullscreen',
+                      icon: Icon(
+                        isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                      ),
+                      color: Colors.white,
+                      onPressed: () {
+                        _setLandscapeMode(!isFullScreen);
+                        ref.read(fullscreenProvider.notifier).state =
+                            !isFullScreen;
+                        widget.desktopFullScreenPlayer(!isFullScreen);
+                      },
+                    ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

@@ -5,7 +5,6 @@ import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
@@ -609,9 +608,8 @@ class _DownloadedOnlyBar extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               child: Text(
                 l10n.downloaded_only,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: GoogleFonts.aBeeZee().fontFamily,
                   fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),
@@ -649,9 +647,8 @@ class _IncognitoModeBar extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               child: Text(
                 l10n.incognito_mode,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: GoogleFonts.aBeeZee().fontFamily,
                   fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),

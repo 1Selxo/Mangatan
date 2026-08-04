@@ -12,6 +12,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/services/extension_catalog_reconciler.dart';
+import 'package:mangayomi/services/extension_repository_catalog.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/utils/extension_language_defaults.dart';
@@ -29,10 +30,21 @@ Future<void> fetchSourcesList({
   final url = repo?.jsonUrl;
   if (url == null) return;
 
-  final req = await http.get(Uri.parse(url));
+  final catalog = await loadExtensionRepositoryCatalog(Uri.parse(url), (
+    uri,
+  ) async {
+    final response = await http.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw HttpException(
+        'Extension repository returned HTTP ${response.statusCode}.',
+        uri: uri,
+      );
+    }
+    return response.bodyBytes;
+  });
   final info = await PackageInfo.fromPlatform();
 
-  final sourceList = (jsonDecode(req.body) as List)
+  final sourceList = catalog.entries
       .expand((e) sync* {
         if (e['name'] != null &&
             e['pkg'] != null &&
@@ -42,7 +54,10 @@ Future<void> fetchSourcesList({
             e['nsfw'] != null &&
             e['sources'] != null &&
             e['apk'] != null) {
-          final repoUrl = url.replaceAll("/index.min.json", "");
+          final repoUrl = catalog.indexUri
+              .resolve('.')
+              .toString()
+              .replaceFirst(RegExp(r'/$'), '');
           final sources = e['sources'] as List;
           for (final source in sources) {
             final src = Source.fromJson(e)
@@ -66,7 +81,8 @@ Future<void> fetchSourcesList({
               ..name = source['name']
               ..lang = source['lang']
               ..baseUrl = source['baseUrl']
-              ..sourceCodeUrl = "$repoUrl/apk/${e['apk']}"
+              ..sourceCodeUrl =
+                  e['_apkUrl']?.toString() ?? "$repoUrl/apk/${e['apk']}"
               ..sourceCodeLanguage = SourceCodeLanguage.mihon
               ..repo = repo
               ..additionalParams = encodeMihonSourceMetadata(
@@ -84,7 +100,8 @@ Future<void> fetchSourcesList({
                   )
                   ? ItemType.anime
                   : ItemType.manga
-              ..iconUrl = "$repoUrl/icon/${e['pkg']}.png"
+              ..iconUrl =
+                  e['_iconUrl']?.toString() ?? "$repoUrl/icon/${e['pkg']}.png"
               ..notes = Platform.isAndroid
                   ? null
                   : "Requires Android Proxy Server (ApkBridge) for installing and using the extensions!";

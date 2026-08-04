@@ -326,7 +326,9 @@ class AppearanceScreen extends ConsumerWidget {
                         ),
                         Builder(
                           builder: (context) {
-                            final currentSelected = isar.settings.getSync(227)?.appFontFamily;
+                            final currentSelected = isar.settings
+                                .getSync(227)
+                                ?.appFontFamily;
                             final filteredFontNames = allFontNames
                                 .where(
                                   (name) => name.toLowerCase().contains(

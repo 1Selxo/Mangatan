@@ -352,6 +352,8 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
           child: StatefulBuilder(
             builder: (context, setState) {
               final l10n = context.l10n;
+              final supportedRepoUrlHint = l10n.url_must_end_with_dot_json
+                  .replaceFirst('.json', '.json or .pb');
               return AlertDialog(
                 title: Text(l10n.add_extensions_repo),
                 content: TextFormField(
@@ -368,8 +370,8 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                     if (value == null || value.isEmpty) {
                       return l10n.url_cannot_be_empty;
                     }
-                    if (!value.endsWith('.json')) {
-                      return l10n.url_must_end_with_dot_json;
+                    if (!value.endsWith('.json') && !value.endsWith('.pb')) {
+                      return supportedRepoUrlHint;
                     }
                     try {
                       final uri = Uri.parse(value);
@@ -383,7 +385,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                   },
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   decoration: InputDecoration(
-                    hintText: l10n.url_must_end_with_dot_json,
+                    hintText: supportedRepoUrlHint,
                     filled: false,
                     contentPadding: const EdgeInsets.all(12),
                     enabledBorder: OutlineInputBorder(
@@ -416,7 +418,8 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                           return TextButton(
                             onPressed:
                                 controller.text.isEmpty ||
-                                    !controller.text.endsWith(".json")
+                                    (!controller.text.endsWith(".json") &&
+                                        !controller.text.endsWith(".pb"))
                                 ? null
                                 : () async {
                                     setState(() => isLoading = true);

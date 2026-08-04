@@ -307,6 +307,61 @@ void main() {
     );
   });
 
+  group('vertical OCR text never clips its box', () {
+    test('a small mobile box keeps the glyph column inside the box height', () {
+      // A tall, narrow vertical block on a phone: 9 characters in a box only
+      // 40px high. The legacy 8.0px font floor forced 8*9 = 72px of glyphs
+      // into a 40px box, clipping the bottom characters off screen.
+      const box = Rect.fromLTWH(0, 0, 18, 40);
+      const glyphCount = 9;
+
+      final fontSize = readerOcrVerticalFontSize(
+        boxWidth: box.width,
+        boxHeight: box.height,
+        glyphCount: glyphCount,
+      );
+
+      // Stacked glyphs must fit the box height, otherwise text clips.
+      expect(
+        fontSize * glyphCount,
+        lessThanOrEqualTo(box.height + 0.001),
+        reason: 'stacked glyph column must not exceed the box height',
+      );
+      // And a single glyph must fit the box width.
+      expect(
+        fontSize,
+        lessThanOrEqualTo(box.width + 0.001),
+        reason: 'a glyph must not exceed the box width',
+      );
+    });
+
+    test('a roomy box still scales the font up to fill the rows', () {
+      const box = Rect.fromLTWH(0, 0, 60, 400);
+      const glyphCount = 8;
+
+      final fontSize = readerOcrVerticalFontSize(
+        boxWidth: box.width,
+        boxHeight: box.height,
+        glyphCount: glyphCount,
+      );
+
+      // rowHeight = 400/8 = 50; width 60. The font should track the smaller
+      // dimension and stay well above the old 8px floor, but never overflow.
+      expect(fontSize, greaterThan(8.0));
+      expect(fontSize * glyphCount, lessThanOrEqualTo(box.height + 0.001));
+      expect(fontSize, lessThanOrEqualTo(box.width + 0.001));
+    });
+
+    test('an empty block yields a safe non-negative font size', () {
+      final fontSize = readerOcrVerticalFontSize(
+        boxWidth: 10,
+        boxHeight: 10,
+        glyphCount: 0,
+      );
+      expect(fontSize, greaterThanOrEqualTo(0.0));
+    });
+  });
+
   test('matches either Shift key on key down and key up', () {
     for (final keys in [
       (PhysicalKeyboardKey.shiftLeft, LogicalKeyboardKey.shiftLeft),

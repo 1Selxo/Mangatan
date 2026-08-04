@@ -348,10 +348,10 @@ void main() {
         codec.encode('pref_ocr_engine', 'local'),
         codec.encode('pref_ocr_box_scale', 1.3),
       ]);
-      expect(
-        await MiningPreferences.getOcrEngine(),
-        OcrEnginePreference.screenAi,
+      final expectedLocalEngine = localOcrEngineForPlatform(
+        currentOcrHostPlatform,
       );
+      expect(await MiningPreferences.getOcrEngine(), expectedLocalEngine);
       expect(await MiningPreferences.getOcrBoxScaleX(), closeTo(1.3, 0.000001));
       expect(await MiningPreferences.getOcrBoxScaleY(), closeTo(1.3, 0.000001));
 
@@ -364,10 +364,7 @@ void main() {
         codec.encode('pref_ocr_box_opacity', -0.1),
         codec.encode('pref_dictionary_theme_mode', 'future-theme'),
       ]);
-      expect(
-        await MiningPreferences.getOcrEngine(),
-        OcrEnginePreference.screenAi,
-      );
+      expect(await MiningPreferences.getOcrEngine(), expectedLocalEngine);
       expect(await MiningPreferences.getOcrBoxScaleX(), closeTo(1.3, 0.000001));
       expect(
         await MiningPreferences.getOcrBackgroundOpacity(),

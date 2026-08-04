@@ -989,37 +989,6 @@ class _GeneralTab extends ConsumerWidget {
               },
             ),
 
-            ValueListenableBuilder<OcrScanTrigger>(
-              valueListenable: ReaderOcrState.scanTrigger,
-              builder: (context, trigger, _) {
-                return ListTile(
-                  title: const Text('OCR trigger'),
-                  subtitle: Text(switch (trigger) {
-                    OcrScanTrigger.automatic =>
-                      'Automatic (scans pages in the background)',
-                    OcrScanTrigger.manual =>
-                      'Manual (tap the OCR button to scan the current page)',
-                  }),
-                  trailing: PopupMenuButton<OcrScanTrigger>(
-                    initialValue: trigger,
-                    onSelected: (value) {
-                      unawaited(ReaderOcrState.setScanTrigger(value));
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: OcrScanTrigger.automatic,
-                        child: Text('Automatic'),
-                      ),
-                      PopupMenuItem(
-                        value: OcrScanTrigger.manual,
-                        child: Text('Manual'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
             ValueListenableBuilder<int>(
               valueListenable: ReaderOcrState.parallelOcrLimit,
               builder: (context, limit, _) {

@@ -3,14 +3,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
-import 'package:mangayomi/services/mining/chrome_lens_ocr.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/mining/generated_ocr.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
-import 'package:mangayomi/services/mining/ocr_block_merger.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:mangayomi/services/mining/profile_ocr_language.dart';
-import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 
 class VideoOcrResult {
   const VideoOcrResult({
@@ -46,42 +44,21 @@ Future<VideoOcrResult> recognizeVideoFrame(
   final effectiveLanguage =
       language ?? await MiningPreferences.getOcrLanguage();
 
-  final tryScreenAi =
-      engine == OcrEnginePreference.screenAi ||
-      (engine == OcrEnginePreference.automatic &&
-          await ScreenAiOcrClient.isAvailable());
-  if (tryScreenAi) {
-    final client = ScreenAiOcrClient();
-    try {
-      final result = await client.recognize(bytes);
-      if (result.blocks.isNotEmpty || engine == OcrEnginePreference.screenAi) {
-        return VideoOcrResult(
-          imageWidth: result.imageWidth,
-          imageHeight: result.imageHeight,
-          blocks: mergeOcrBlocks(result.blocks, language: effectiveLanguage),
-        );
-      }
-    } catch (_) {
-      if (engine == OcrEnginePreference.screenAi) rethrow;
-    } finally {
-      client.close();
-    }
-  }
-
   if (engine == OcrEnginePreference.mokuroOnly) {
-    throw StateError('Video OCR requires ScreenAI or Google Lens');
-  }
-  final client = ChromeLensOcrClient();
-  try {
-    final result = await client.recognize(bytes, language: effectiveLanguage);
-    return VideoOcrResult(
-      imageWidth: result.imageWidth,
-      imageHeight: result.imageHeight,
-      blocks: mergeOcrBlocks(result.blocks, language: effectiveLanguage),
+    throw StateError(
+      'Video OCR requires Apple Vision, ScreenAI, or Google Lens',
     );
-  } finally {
-    client.close();
   }
+  final result = await recognizeGeneratedOcr(
+    bytes,
+    engine: engine,
+    language: effectiveLanguage,
+  );
+  return VideoOcrResult(
+    imageWidth: result.imageWidth,
+    imageHeight: result.imageHeight,
+    blocks: result.blocks,
+  );
 }
 
 class VideoOcrOverlay extends StatefulWidget {

@@ -12,19 +12,17 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
-import 'package:mangayomi/services/mining/chrome_lens_ocr.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/mining/generated_ocr.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/mokuro_extension_ocr.dart';
 import 'package:mangayomi/services/mining/mokuro_parser.dart';
 import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
-import 'package:mangayomi/services/mining/ocr_block_merger.dart';
 import 'package:mangayomi/services/mining/ocr_block_reading.dart';
 import 'package:mangayomi/services/mining/profile_ocr_language.dart';
-import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 
 class ReaderOcrState {
@@ -1443,7 +1441,8 @@ class ReaderOcrController extends ChangeNotifier {
 
     const parser = MokuroParser();
     if (engine != OcrEnginePreference.googleLens &&
-        engine != OcrEnginePreference.screenAi) {
+        engine != OcrEnginePreference.screenAi &&
+        engine != OcrEnginePreference.appleVision) {
       final volume = await parser.findForReaderPage(data);
       final mokuroPage = volume == null
           ? null
@@ -1460,7 +1459,10 @@ class ReaderOcrController extends ChangeNotifier {
       }
     }
 
-    if (useMokuroWebsiteOcr) {
+    if (useMokuroWebsiteOcr &&
+        engine != OcrEnginePreference.googleLens &&
+        engine != OcrEnginePreference.screenAi &&
+        engine != OcrEnginePreference.appleVision) {
       final client = MokuroExtensionOcrClient();
       try {
         final volume = await client.fetchVolume(
@@ -1501,42 +1503,16 @@ class ReaderOcrController extends ChangeNotifier {
       bytes = data.cropImage ?? await data.getImageBytes;
     }
     if (bytes == null) throw StateError('Page image is not cached yet');
-    final shouldTryScreenAi =
-        engine == OcrEnginePreference.screenAi ||
-        (engine == OcrEnginePreference.automatic &&
-            await ScreenAiOcrClient.isAvailable());
-    if (shouldTryScreenAi) {
-      try {
-        final client = ScreenAiOcrClient();
-        try {
-          final result = await client.recognize(bytes);
-          if (result.blocks.isNotEmpty ||
-              engine == OcrEnginePreference.screenAi) {
-            return _ReaderOcrPage(
-              blocks: mergeOcrBlocks(result.blocks, language: language),
-              boxScaleX: boxScaleX,
-              boxScaleY: boxScaleY,
-            );
-          }
-        } finally {
-          client.close();
-        }
-      } catch (_) {
-        if (engine == OcrEnginePreference.screenAi) rethrow;
-      }
-    }
-
-    final client = ChromeLensOcrClient();
-    try {
-      final result = await client.recognize(bytes, language: language);
-      return _ReaderOcrPage(
-        blocks: mergeOcrBlocks(result.blocks, language: language),
-        boxScaleX: boxScaleX,
-        boxScaleY: boxScaleY,
-      );
-    } finally {
-      client.close();
-    }
+    final result = await recognizeGeneratedOcr(
+      bytes,
+      engine: engine,
+      language: language,
+    );
+    return _ReaderOcrPage(
+      blocks: result.blocks,
+      boxScaleX: boxScaleX,
+      boxScaleY: boxScaleY,
+    );
   }
 
   Rect _blockRect(

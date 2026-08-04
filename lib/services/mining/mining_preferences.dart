@@ -8,7 +8,61 @@ import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:path/path.dart' as p;
 
-enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }
+enum OcrEnginePreference {
+  automatic,
+  appleVision,
+  screenAi,
+  googleLens,
+  mokuroOnly,
+}
+
+enum OcrHostPlatform { apple, windows, other }
+
+OcrHostPlatform get currentOcrHostPlatform {
+  if (Platform.isMacOS || Platform.isIOS) return OcrHostPlatform.apple;
+  if (Platform.isWindows) return OcrHostPlatform.windows;
+  return OcrHostPlatform.other;
+}
+
+List<OcrEnginePreference> availableOcrEngines({OcrHostPlatform? platform}) {
+  final host = platform ?? currentOcrHostPlatform;
+  return [
+    OcrEnginePreference.automatic,
+    if (host == OcrHostPlatform.apple) OcrEnginePreference.appleVision,
+    if (host == OcrHostPlatform.windows) OcrEnginePreference.screenAi,
+    OcrEnginePreference.googleLens,
+    OcrEnginePreference.mokuroOnly,
+  ];
+}
+
+OcrEnginePreference normalizeOcrEngine(
+  OcrEnginePreference engine, {
+  OcrHostPlatform? platform,
+}) {
+  return availableOcrEngines(platform: platform).contains(engine)
+      ? engine
+      : OcrEnginePreference.automatic;
+}
+
+OcrEnginePreference localOcrEngineForPlatform(OcrHostPlatform platform) {
+  return switch (platform) {
+    OcrHostPlatform.apple => OcrEnginePreference.appleVision,
+    OcrHostPlatform.windows => OcrEnginePreference.screenAi,
+    OcrHostPlatform.other => OcrEnginePreference.automatic,
+  };
+}
+
+String ocrEngineLabel(OcrEnginePreference engine) => switch (engine) {
+  OcrEnginePreference.automatic => switch (currentOcrHostPlatform) {
+    OcrHostPlatform.apple => 'Automatic (Mokuro, Google Lens, Apple Vision)',
+    OcrHostPlatform.windows => 'Automatic (Mokuro, Google Lens, ScreenAI)',
+    OcrHostPlatform.other => 'Automatic (Mokuro, Google Lens)',
+  },
+  OcrEnginePreference.appleVision => 'Apple Vision (on device)',
+  OcrEnginePreference.screenAi => 'ScreenAI (local Chrome)',
+  OcrEnginePreference.googleLens => 'Google Lens',
+  OcrEnginePreference.mokuroOnly => 'Mokuro only',
+};
 
 /// Controls when reader OCR runs.
 ///
@@ -974,14 +1028,15 @@ class MiningPreferences {
             )
             as String? ??
         OcrEnginePreference.automatic.name;
-    return OcrEnginePreference.values.firstWhere(
+    final engine = OcrEnginePreference.values.firstWhere(
       (value) => value.name == name,
       orElse: () => OcrEnginePreference.automatic,
     );
+    return normalizeOcrEngine(engine);
   }
 
   static Future<void> setOcrEngine(OcrEnginePreference value) async {
-    await (await _boxOrNull())?.put(_ocrEngine, value.name);
+    await (await _boxOrNull())?.put(_ocrEngine, normalizeOcrEngine(value).name);
   }
 
   static Future<OcrScanTrigger> getOcrScanTrigger({

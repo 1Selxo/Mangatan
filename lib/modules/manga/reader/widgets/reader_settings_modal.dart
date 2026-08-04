@@ -940,35 +940,18 @@ class _GeneralTab extends ConsumerWidget {
               builder: (context, engine, _) {
                 return ListTile(
                   title: const Text('OCR engine'),
-                  subtitle: Text(switch (engine) {
-                    OcrEnginePreference.automatic =>
-                      'Automatic (Mokuro, ScreenAI, Google Lens)',
-                    OcrEnginePreference.screenAi => 'ScreenAI (local Chrome)',
-                    OcrEnginePreference.googleLens => 'Google Lens',
-                    OcrEnginePreference.mokuroOnly => 'Mokuro only',
-                  }),
+                  subtitle: Text(ocrEngineLabel(engine)),
                   trailing: PopupMenuButton<OcrEnginePreference>(
                     initialValue: engine,
                     onSelected: (value) {
                       unawaited(ReaderOcrState.setEngine(value));
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: OcrEnginePreference.automatic,
-                        child: Text('Automatic'),
-                      ),
-                      PopupMenuItem(
-                        value: OcrEnginePreference.screenAi,
-                        child: Text('ScreenAI'),
-                      ),
-                      PopupMenuItem(
-                        value: OcrEnginePreference.googleLens,
-                        child: Text('Google Lens'),
-                      ),
-                      PopupMenuItem(
-                        value: OcrEnginePreference.mokuroOnly,
-                        child: Text('Mokuro only'),
-                      ),
+                    itemBuilder: (context) => [
+                      for (final option in availableOcrEngines())
+                        PopupMenuItem(
+                          value: option,
+                          child: Text(ocrEngineLabel(option)),
+                        ),
                     ],
                   ),
                 );

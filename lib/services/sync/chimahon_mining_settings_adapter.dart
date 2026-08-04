@@ -9,6 +9,21 @@ import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/sync/chimahon_preferences.dart';
 
+String? exportChimahonOcrEngine(OcrEnginePreference engine) => switch (engine) {
+  OcrEnginePreference.googleLens => 'cloud',
+  OcrEnginePreference.appleVision || OcrEnginePreference.screenAi => 'local',
+  OcrEnginePreference.automatic || OcrEnginePreference.mokuroOnly => null,
+};
+
+OcrEnginePreference? importChimahonOcrEngine(
+  Object? engine, {
+  required OcrHostPlatform platform,
+}) => switch (engine) {
+  'cloud' => OcrEnginePreference.googleLens,
+  'local' => localOcrEngineForPlatform(platform),
+  _ => null,
+};
+
 class ChimahonMiningSettingsProjection {
   ChimahonMiningSettingsProjection({
     required Iterable<BackupPreference> preferences,
@@ -25,9 +40,11 @@ class ChimahonMiningSettingsProjection {
 class ChimahonMiningSettingsAdapter {
   const ChimahonMiningSettingsAdapter({
     this.codec = const ChimahonPreferenceCodec(),
+    this.ocrHostPlatform,
   });
 
   final ChimahonPreferenceCodec codec;
+  final OcrHostPlatform? ocrHostPlatform;
 
   Future<List<BackupPreference>> export({
     DictionaryStorage? dictionaryStorage,
@@ -402,17 +419,14 @@ class ChimahonMiningSettingsAdapter {
     _ => null,
   };
 
-  String? _exportOcrEngine(OcrEnginePreference engine) => switch (engine) {
-    OcrEnginePreference.googleLens => 'cloud',
-    OcrEnginePreference.screenAi => 'local',
-    OcrEnginePreference.automatic || OcrEnginePreference.mokuroOnly => null,
-  };
+  String? _exportOcrEngine(OcrEnginePreference engine) =>
+      exportChimahonOcrEngine(engine);
 
-  OcrEnginePreference? _importOcrEngine(Object? engine) => switch (engine) {
-    'cloud' => OcrEnginePreference.googleLens,
-    'local' => OcrEnginePreference.screenAi,
-    _ => null,
-  };
+  OcrEnginePreference? _importOcrEngine(Object? engine) =>
+      importChimahonOcrEngine(
+        engine,
+        platform: ocrHostPlatform ?? currentOcrHostPlatform,
+      );
 
   ChimahonLanguageProfile _exportProfile(
     DictionaryProfile profile, {

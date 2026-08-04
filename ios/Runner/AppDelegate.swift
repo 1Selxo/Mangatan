@@ -134,6 +134,8 @@ import Libmtorrentserver
           }
       })
 
+      AppleVisionOcrPlugin.register(binaryMessenger: controller.binaryMessenger)
+
     GeneratedPluginRegistrant.register(with: self)
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

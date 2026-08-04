@@ -1592,25 +1592,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       labelText: 'OCR engine',
                       prefixIcon: Icon(Icons.document_scanner_outlined),
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.automatic,
-                        child: Text(
-                          'Automatic (Mokuro, ScreenAI, Google Lens)',
+                    items: [
+                      for (final engine in availableOcrEngines())
+                        DropdownMenuItem(
+                          value: engine,
+                          child: Text(ocrEngineLabel(engine)),
                         ),
-                      ),
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.screenAi,
-                        child: Text('ScreenAI (local Chrome)'),
-                      ),
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.googleLens,
-                        child: Text('Google Lens'),
-                      ),
-                      DropdownMenuItem(
-                        value: OcrEnginePreference.mokuroOnly,
-                        child: Text('Mokuro only'),
-                      ),
                     ],
                     onChanged: (value) async {
                       if (value == null) return;
@@ -1655,19 +1642,28 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     await MiningPreferences.setMokuroWebsiteOcrEnabled(value);
                   },
                 ),
-                ListTile(
-                  leading: Icon(
-                    _screenAiAvailable
-                        ? Icons.offline_bolt_outlined
-                        : Icons.download_for_offline_outlined,
+                if (currentOcrHostPlatform == OcrHostPlatform.apple)
+                  const ListTile(
+                    leading: Icon(Icons.offline_bolt_outlined),
+                    title: Text('Apple Vision OCR'),
+                    subtitle: Text(
+                      'Runs privately on device. Supported languages depend on the OS version.',
+                    ),
                   ),
-                  title: const Text('ScreenAI OCR'),
-                  subtitle: Text(
-                    _screenAiAvailable
-                        ? 'Local Chrome ScreenAI component detected. Runs on device.'
-                        : 'Local Chrome ScreenAI component was not detected.',
+                if (currentOcrHostPlatform == OcrHostPlatform.windows)
+                  ListTile(
+                    leading: Icon(
+                      _screenAiAvailable
+                          ? Icons.offline_bolt_outlined
+                          : Icons.download_for_offline_outlined,
+                    ),
+                    title: const Text('ScreenAI OCR'),
+                    subtitle: Text(
+                      _screenAiAvailable
+                          ? 'Local Chrome ScreenAI component detected. Runs on device.'
+                          : 'Local Chrome ScreenAI component was not detected.',
+                    ),
                   ),
-                ),
                 const ListTile(
                   leading: Icon(Icons.translate),
                   title: Text('OCR language follows the dictionary profile'),

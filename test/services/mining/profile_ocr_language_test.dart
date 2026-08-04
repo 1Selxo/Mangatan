@@ -8,6 +8,11 @@ void main() {
     expect(profileOcrLanguage('', fallback: 'en'), 'en');
   });
 
+  test('preserves explicit BCP-47 variants for supported base languages', () {
+    expect(profileOcrLanguage('zh_Hant'), 'zh-hant');
+    expect(profileOcrLanguage('en-US'), 'en-us');
+  });
+
   test('source and profile guard matches Chimahon base-language rules', () {
     expect(
       isProfileOcrAllowed(sourceLanguage: 'ja-JP', profileLanguage: 'ja'),

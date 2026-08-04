@@ -68,6 +68,9 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     flutterViewController.configurePagedWheelChannel()
+    AppleVisionOcrPlugin.register(
+      binaryMessenger: flutterViewController.engine.binaryMessenger
+    )
 
     super.awakeFromNib()
   }

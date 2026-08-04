@@ -50,12 +50,17 @@ const profileOcrLanguages = <String>{
 /// does not support. Mangatan retains its existing OCR preference as an
 /// optional fallback for callers that explicitly provide it.
 String profileOcrLanguage(String profileLanguage, {String fallback = 'ja'}) {
-  final normalized = profileLanguage.toLowerCase();
-  if (profileOcrLanguages.contains(normalized)) return normalized;
-  final normalizedFallback = fallback.trim().toLowerCase();
-  return profileOcrLanguages.contains(normalizedFallback)
+  final normalized = profileLanguage.trim().replaceAll('_', '-').toLowerCase();
+  if (_isSupportedOcrLanguage(normalized)) return normalized;
+  final normalizedFallback = fallback.trim().replaceAll('_', '-').toLowerCase();
+  return _isSupportedOcrLanguage(normalizedFallback)
       ? normalizedFallback
       : 'ja';
+}
+
+bool _isSupportedOcrLanguage(String language) {
+  if (language.isEmpty) return false;
+  return profileOcrLanguages.contains(language.split('-').first);
 }
 
 /// Mirrors Chimahon's source/profile language guard. Mixed or unknown values

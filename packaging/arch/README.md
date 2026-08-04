@@ -1,31 +1,38 @@
 # AUR publishing
 
-Each successful stable Mangatan release publishes two AUR packages. Private and
-prerelease releases are excluded.
+Each successful stable Mangatan release publishes the self-contained
+`mangatan-bin` package. Private and prerelease releases are excluded.
 
-| Package | Template | Versioned by |
-| --- | --- | --- |
-| `mangatan-bin` | `PKGBUILD.template` | the Mangatan release tag |
-| `mangatan-extension-server` | `PKGBUILD-extension-server.template` | the latest stable [M-Extension-Server](https://github.com/1Selxo/M-Extension-Server) tag |
+The package installs the complete Linux release archive, including the Mihon
+extension-server JAR and portable Java runtime built from Mangatan's vendored
+server source. Users do not need `mangatan-extension-server`, a system JRE, or a
+manual download through Settings.
 
-`mangatan-extension-server` is an `optdepends` of `mangatan-bin`: it provides
-Mihon extension support (the "Mihon bridge") and is not needed to read local or
-Mangayomi-sourced content. Installing it means the bridge works with no trip
-through Settings, because Mangatan discovers
-`/usr/share/mangatan/extension_server` on startup.
+The workflow still maintains the legacy `mangatan-extension-server` package for
+older Mangatan releases that did not bundle the bridge. It is no longer an
+`optdepends` of current `mangatan-bin` packages.
 
-It carries only the ~100 MiB server JAR and depends on `jre21-openjdk` rather
-than vendoring the ~135 MiB JRE that upstream's bundle ships. The JAR is
-byte-identical across upstream's Linux, macOS and Windows bundles and contains
-JNI natives for every architecture, so the package is `arch=any` — which also
-makes the bridge available on aarch64, where the in-app download has no asset.
+## Server detection constraints
 
-Two naming constraints are load-bearing and will silently break detection if
-changed: the installed JAR must keep the `MExtensionServer-` prefix with a `.jar`
-suffix, and must retain a parseable `vX.Y.Z` in its basename or the app reports
-version `1.0.0` and offers a perpetual bogus update. The `java` symlink must sit
-at exactly `jre/jre/bin/java` under the server directory, mirroring the layout of
-the bundle the app would otherwise download.
+These constraints apply to both the bundled server and the legacy package, and
+will silently break detection if changed. They are enforced by
+`test/services/vendored_mihon_source_test.dart` and
+`test/modules/more/settings/browse/extension_server_discovery_test.dart`.
+
+- The JAR must keep the `MExtensionServer-` prefix and a `.jar` suffix
+  (`extensionServerJarPrefix`).
+- The JAR must retain a parseable `vX.Y.Z` in its basename. Without one the app
+  reports the `1.0.0` fallback and offers a perpetual bogus update that, if
+  taken, overwrites the install with whatever upstream last released. This is
+  why the build scripts keep Gradle's versioned archive name rather than
+  flattening it to `MExtensionServer.jar`.
+- The bundled layout puts `java` at `<server dir>/jre/bin/java` (a `jlink`
+  image). The legacy package instead symlinks the system JRE at exactly
+  `<server dir>/jre/jre/bin/java`; that path is probed with `File.exists()`,
+  which follows symlinks, whereas the recursive fallback does not.
+- Neither location may be the target of an in-app download. The installer
+  clears its target directory first, so `isManagedExtensionServerDirectory`
+  rejects the `/usr` locations *and* the bundle inside the running app.
 
 ## One-time setup
 
@@ -41,34 +48,36 @@ the bundle the app would otherwise download.
    `AUR_SSH_PRIVATE_KEY`.
 5. Delete both local key files after storing the private key somewhere secure,
    or retain them in a password manager for recovery.
-
 6. Register both package bases on the AUR. The workflow pushes to existing
    repositories and does not create them.
 
-The next stable release will update both AUR repositories. To publish an
-existing release without rebuilding Mangatan, run the `Publish AUR package`
-workflow manually. Leave a tag blank for the latest stable release, or enter one
-such as `v1.0.9`; the two tags are independent.
+The next stable release updates `mangatan-bin`. To publish an existing release
+without rebuilding Mangatan, run the `Publish AUR package` workflow manually.
+Leave the Mangatan tag blank for the latest stable release, or enter one such as
+`v1.0.9`.
 
 ## What the workflow does
 
 The `publish` job downloads `SHA256SUMS-linux.txt` from the GitHub release,
 renders `PKGBUILD.template`, and fetches checksums for the tagged desktop file
-and license. The `publish-extension-server` job resolves the latest stable
-M-Extension-Server release and renders
-`PKGBUILD-extension-server.template`, hashing the bundle in-flight because
-upstream publishes no checksum asset. Both then generate `.SRCINFO` with the
-current Arch `makepkg` and push only `PKGBUILD`, `.SRCINFO`, and the 0BSD
-packaging license.
+and license. The release archive already contains the server and JRE.
 
-Because the server versions independently of the app, its job normally finds the
-AUR already up to date and exits without pushing.
+The `publish-extension-server` job is retained only for backwards compatibility.
+It renders `PKGBUILD-extension-server.template` against the `extension_server_tag`
+input, or — when that is blank — against whatever M-Extension-Server's
+`/releases/latest` currently resolves to. That endpoint excludes prereleases,
+which is what keeps this repository's `ios-runtime-vN` tags out of the AUR. The
+extension server versions independently of Mangatan, so this job usually finds
+the AUR already up to date and exits without pushing; a genuine upstream release
+does republish the legacy package. Both jobs generate `.SRCINFO` with the current
+Arch `makepkg` and push only `PKGBUILD`, `.SRCINFO`, and the 0BSD packaging
+license.
 
-Note that `.SRCINFO` generation runs `makepkg --printsrcinfo`, which does **not**
-download sources, so CI cannot catch a wrong checksum — only users can. Both
-render scripts therefore compute checksums from the live release rather than
-accepting a hand-copied value. `pkgrel` is hardcoded to `1`; bump it in the
-template when packaging changes without a version change, or the push is a no-op.
+`.SRCINFO` generation runs `makepkg --printsrcinfo`, which does **not** download
+sources, so CI cannot catch a wrong checksum. The render scripts therefore use
+checksums from release sources rather than accepting hand-copied values.
+`pkgrel` is hardcoded to `1`; bump it in the template when packaging changes
+without a version change, or the push is a no-op.
 
 To inspect the rendered packages locally:
 
@@ -78,6 +87,7 @@ scripts/render_aur_package.sh \
   SHA256SUMS-linux.txt \
   /tmp/mangatan-aur
 
+# Legacy package for older Mangatan releases only:
 scripts/render_aur_extension_server.sh \
   v1.0.6.0 \
   /tmp/mangatan-extension-server-aur

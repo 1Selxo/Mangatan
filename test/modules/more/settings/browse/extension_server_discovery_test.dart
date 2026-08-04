@@ -31,7 +31,226 @@ Future<Directory> _writeManagedInstall(
   return root;
 }
 
+/// Builds the layout the release bundle actually ships: `jlink` puts `java` at
+/// `jre/bin/java` (one level shallower than the distro package's
+/// `jre/jre/bin/java`), and the build scripts keep Gradle's versioned archive
+/// name so the app can parse the installed version out of the basename.
+Future<_BundledInstall> _writeBundledInstall(Directory parent) async {
+  final root = Directory(path.join(parent.path, 'mihon_server'));
+  final bin = Directory(path.join(root.path, 'jre', 'bin'));
+  await bin.create(recursive: true);
+  final java = File(path.join(bin.path, 'java'));
+  await java.writeAsString('#!/bin/sh\n');
+  final jar = File(path.join(root.path, 'MExtensionServer-v1.0.6.0-r1234.jar'));
+  await jar.writeAsString('jar');
+  return _BundledInstall(root: root, java: java, jar: jar);
+}
+
+class _BundledInstall {
+  final Directory root;
+  final File java;
+  final File jar;
+
+  const _BundledInstall({
+    required this.root,
+    required this.java,
+    required this.jar,
+  });
+}
+
 void main() {
+  group('bundled extension server discovery', () {
+    test('resolves the bundle beside a Linux or Windows executable', () {
+      expect(
+        bundledExtensionServerDirectories(
+          resolvedExecutable: path.join('/opt', 'Mangatan', 'mangayomi'),
+          macos: false,
+        ),
+        [path.join('/opt', 'Mangatan', 'mihon_server')],
+      );
+    });
+
+    test('resolves the bundle from macOS app resources', () {
+      expect(
+        bundledExtensionServerDirectories(
+          resolvedExecutable: path.join(
+            '/Applications',
+            'Mangatan.app',
+            'Contents',
+            'MacOS',
+            'Mangatan',
+          ),
+          macos: true,
+        ),
+        [
+          path.join(
+            '/Applications',
+            'Mangatan.app',
+            'Contents',
+            'Resources',
+            'mihon_server',
+          ),
+        ],
+      );
+    });
+
+    test(
+      'finds the embedded JRE and JAR without user configuration',
+      () async {
+        final temp = await Directory.systemTemp.createTemp('bundled-server-');
+        addTearDown(() async {
+          if (await temp.exists()) await temp.delete(recursive: true);
+        });
+        final bundle = await _writeBundledInstall(temp);
+
+        final resolved = await findBundledExtensionServer(
+          directories: [bundle.root.path],
+        );
+
+        expect(resolved, isNotNull);
+        expect(resolved!.jrePath, bundle.java.path);
+        expect(resolved.jarPath, bundle.jar.path);
+      },
+      skip: !Platform.isLinux,
+    );
+
+    test(
+      'reports the bundled version instead of offering a bogus update',
+      () async {
+        final temp = await Directory.systemTemp.createTemp('bundled-version-');
+        addTearDown(() async {
+          if (await temp.exists()) await temp.delete(recursive: true);
+        });
+        final bundle = await _writeBundledInstall(temp);
+
+        final resolved = await findBundledExtensionServer(
+          directories: [bundle.root.path],
+        );
+
+        // The build scripts keep Gradle's versioned archive name precisely so
+        // this resolves to the real version. A bare `MExtensionServer.jar`
+        // would fall back to '1.0.0' and make every upstream release look
+        // newer, offering a permanent "Update files" that overwrites the
+        // bundle with an older server.
+        expect(
+          resolveInstalledExtensionServerVersion(resolved!.jarPath),
+          '1.0.6.0',
+        );
+        expect(
+          resolveInstalledExtensionServerVersion(resolved.jarPath),
+          isNot(extensionServerFallbackVersion),
+        );
+      },
+      skip: !Platform.isLinux,
+    );
+
+    test('treats another installation\'s bundle as stale', () {
+      final current = [path.join('/opt', 'Mangatan-1.3.0', 'mihon_server')];
+
+      // Same app, previous side-by-side unpack: exists on disk, wrong version.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: path.join(
+            '/opt',
+            'Mangatan-1.2.0',
+            'mihon_server',
+            'jre',
+            'bin',
+            'java',
+          ),
+          serverJarPath: path.join(
+            '/opt',
+            'Mangatan-1.2.0',
+            'mihon_server',
+            'MExtensionServer-v1.0.6.0.jar',
+          ),
+          bundledDirectories: current,
+        ),
+        isTrue,
+      );
+
+      // This installation's own bundle is current, not stale.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: path.join(current.single, 'jre', 'bin', 'java'),
+          serverJarPath: path.join(
+            current.single,
+            'MExtensionServer-v1.0.6.0.jar',
+          ),
+          bundledDirectories: current,
+        ),
+        isFalse,
+      );
+
+      // A directory the user picked themselves is never second-guessed.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: path.join('/home', 'u', 'server', 'jre', 'bin', 'java'),
+          serverJarPath: path.join(
+            '/home',
+            'u',
+            'server',
+            'MExtensionServer-v1.0.6.0.jar',
+          ),
+          bundledDirectories: current,
+        ),
+        isFalse,
+      );
+
+      // Nothing configured yet must not read as stale.
+      expect(
+        isStaleBundledExtensionServerPath(
+          jrePath: '',
+          serverJarPath: '',
+          bundledDirectories: current,
+        ),
+        isFalse,
+      );
+    });
+
+    test('refuses to wipe the bundle shipped inside this installation', () {
+      final bundle = path.join(
+        '/Applications',
+        'Mangatan.app',
+        'Contents',
+        'Resources',
+        'mihon_server',
+      );
+
+      // The installer clears its target first, so aiming an update at the
+      // bundle would delete the shipped JRE, JAR and license notices out of
+      // the running app and invalidate its code signature.
+      expect(
+        isManagedExtensionServerDirectory(bundle, bundledDirectories: [bundle]),
+        isTrue,
+      );
+      // Ancestors too: the picker resolves the JAR recursively, so selecting
+      // the .app (or /Applications) yields a config whose next update wipes it.
+      expect(
+        isManagedExtensionServerDirectory(
+          path.join('/Applications', 'Mangatan.app'),
+          bundledDirectories: [bundle],
+        ),
+        isTrue,
+      );
+      expect(
+        isManagedExtensionServerDirectory(
+          path.join(bundle, 'jre'),
+          bundledDirectories: [bundle],
+        ),
+        isTrue,
+      );
+      // An unrelated directory stays writable.
+      expect(
+        isManagedExtensionServerDirectory(
+          path.join('/home', 'u', 'server'),
+          bundledDirectories: [bundle],
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('package-managed extension server discovery', () {
     late Directory temp;
 
@@ -43,58 +262,68 @@ void main() {
       if (await temp.exists()) await temp.delete(recursive: true);
     });
 
-    test('resolves a JAR and a symlinked java from a packaged layout', () async {
-      final root = await _writeManagedInstall(temp);
+    test(
+      'resolves a JAR and a symlinked java from a packaged layout',
+      () async {
+        final root = await _writeManagedInstall(temp);
 
-      final resolved = await findSystemExtensionServer(
-        directories: [root.path],
-      );
+        final resolved = await findSystemExtensionServer(
+          directories: [root.path],
+        );
 
-      expect(resolved, isNotNull);
-      expect(
-        resolved!.jrePath,
-        path.join(root.path, 'jre', 'jre', 'bin', 'java'),
-        reason: 'the packaged java lives at the preferred path, as a symlink',
-      );
-      expect(
-        resolved.jarPath,
-        path.join(root.path, 'MExtensionServer-v1.0.6.0.jar'),
-      );
-    }, skip: !Platform.isLinux);
+        expect(resolved, isNotNull);
+        expect(
+          resolved!.jrePath,
+          path.join(root.path, 'jre', 'jre', 'bin', 'java'),
+          reason: 'the packaged java lives at the preferred path, as a symlink',
+        );
+        expect(
+          resolved.jarPath,
+          path.join(root.path, 'MExtensionServer-v1.0.6.0.jar'),
+        );
+      },
+      skip: !Platform.isLinux,
+    );
 
-    test('reports the packaged version rather than the fallback', () async {
-      final root = await _writeManagedInstall(temp);
-      final resolved = await findSystemExtensionServer(
-        directories: [root.path],
-      );
+    test(
+      'reports the packaged version rather than the fallback',
+      () async {
+        final root = await _writeManagedInstall(temp);
+        final resolved = await findSystemExtensionServer(
+          directories: [root.path],
+        );
 
-      expect(
-        resolveInstalledExtensionServerVersion(resolved!.jarPath),
-        '1.0.6.0',
-        reason: 'a basename without a parseable version offers a bogus update',
-      );
-    }, skip: !Platform.isLinux);
+        expect(
+          resolveInstalledExtensionServerVersion(resolved!.jarPath),
+          '1.0.6.0',
+          reason:
+              'a basename without a parseable version offers a bogus update',
+        );
+      },
+      skip: !Platform.isLinux,
+    );
 
-    test('skips a partially removed package instead of half-adopting it', () async {
-      final noJar = await _writeManagedInstall(
-        temp,
-        withJar: false,
-      );
-      expect(
-        await findSystemExtensionServer(directories: [noJar.path]),
-        isNull,
-      );
+    test(
+      'skips a partially removed package instead of half-adopting it',
+      () async {
+        final noJar = await _writeManagedInstall(temp, withJar: false);
+        expect(
+          await findSystemExtensionServer(directories: [noJar.path]),
+          isNull,
+        );
 
-      final other = await Directory.systemTemp.createTemp('managed-nojre-');
-      addTearDown(() async {
-        if (await other.exists()) await other.delete(recursive: true);
-      });
-      final noJava = await _writeManagedInstall(other, withJava: false);
-      expect(
-        await findSystemExtensionServer(directories: [noJava.path]),
-        isNull,
-      );
-    }, skip: !Platform.isLinux);
+        final other = await Directory.systemTemp.createTemp('managed-nojre-');
+        addTearDown(() async {
+          if (await other.exists()) await other.delete(recursive: true);
+        });
+        final noJava = await _writeManagedInstall(other, withJava: false);
+        expect(
+          await findSystemExtensionServer(directories: [noJava.path]),
+          isNull,
+        );
+      },
+      skip: !Platform.isLinux,
+    );
 
     test('falls through to a later candidate directory', () async {
       final root = await _writeManagedInstall(temp);
@@ -137,7 +366,9 @@ void main() {
     test('leaves user-chosen directories writable', () {
       expect(isManagedExtensionServerDirectory(''), isFalse);
       expect(
-        isManagedExtensionServerDirectory('/home/user/Mangatan/extension_server'),
+        isManagedExtensionServerDirectory(
+          '/home/user/Mangatan/extension_server',
+        ),
         isFalse,
       );
       expect(
@@ -220,10 +451,7 @@ void main() {
         17,
       );
       // The legacy scheme puts the feature version second: 1.8 means Java 8.
-      expect(
-        parseJreMajorVersion('java version "1.8.0_452"'),
-        8,
-      );
+      expect(parseJreMajorVersion('java version "1.8.0_452"'), 8);
     });
 
     test('returns null on unparseable output so a probe never blocks', () {
@@ -250,8 +478,13 @@ void main() {
       );
       expect(
         serviceSource,
+        contains('final bundled = await findBundledExtensionServer();'),
+        reason: 'release builds must use the server shipped with Mangatan',
+      );
+      expect(
+        serviceSource,
         contains('final system = await findSystemExtensionServer();'),
-        reason: 'an unconfigured desktop must adopt a distro install',
+        reason: 'an unconfigured desktop may still adopt a distro install',
       );
       expect(
         serviceSource,
@@ -265,7 +498,7 @@ void main() {
     String read(String relativePath) =>
         File(relativePath).readAsStringSync().replaceAll('\r\n', '\n');
 
-    test('the app package pulls in the startup dependency', () {
+    test('the app package is self-contained', () {
       final template = read('packaging/arch/PKGBUILD.template');
 
       expect(
@@ -278,13 +511,23 @@ void main() {
       );
       expect(
         template,
-        contains('mangatan-extension-server: '),
-        reason: 'the bridge must be discoverable but stay optional',
+        isNot(contains('mangatan-extension-server')),
+        reason: 'the release archive already includes the bridge and JRE',
+      );
+      expect(
+        template,
+        contains(r'cp -a "${bundle}/." "${pkgdir}/usr/lib/${_pkgname}/"'),
+        reason: 'the whole self-contained release bundle must be installed',
       );
     });
 
+    // The app package no longer depends on the separate server package, but
+    // publish-aur.yml still renders and publishes it, so its contract with the
+    // discovery code below still has to hold.
     test('the server package installs the layout the app probes', () {
-      final template = read('packaging/arch/PKGBUILD-extension-server.template');
+      final template = read(
+        'packaging/arch/PKGBUILD-extension-server.template',
+      );
 
       expect(
         template,
@@ -313,7 +556,9 @@ void main() {
     });
 
     test('the server package extracts exactly one JAR', () {
-      final template = read('packaging/arch/PKGBUILD-extension-server.template');
+      final template = read(
+        'packaging/arch/PKGBUILD-extension-server.template',
+      );
 
       // `bsdtar --extract` exits 0 when a pattern matches two entries and
       // concatenates them into one corrupt file, so the size floor below it

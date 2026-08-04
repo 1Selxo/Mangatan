@@ -1,0 +1,3 @@
+# Preserve imported source byte-for-byte; upstream contains historical whitespace.
+third_party/mihon_server/** whitespace=-trailing-space,-blank-at-eof
+third_party/newpipe_extractor/** whitespace=-trailing-space,-blank-at-eof

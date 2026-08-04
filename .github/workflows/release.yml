@@ -81,6 +81,12 @@ jobs:
         with:
           flutter-version: "3.44.4"
 
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -90,8 +96,27 @@ jobs:
         run: flutter pub get
 
       - name: build macos
+        run: flutter build macos --release --verbose
+
+      - name: Build bundled Mihon server
         run: |
-          flutter build macos --release --verbose
+          set -euo pipefail
+          bundle=build/macos/Build/Products/Release/Mangatan.app/Contents/Resources/mihon_server
+          scripts/build_vendored_mihon_server.sh --output "$bundle"
+          test -x "$bundle/jre/bin/java"
+          # Versioned name: the app parses the installed version from the basename.
+          test "$(ls "$bundle"/MExtensionServer-*.jar | wc -l)" -eq 1
+          test -s "$(ls "$bundle"/MExtensionServer-*.jar)"
+
+      - name: Re-sign complete macOS app bundle
+        run: |
+          codesign --force --deep --sign - \
+            build/macos/Build/Products/Release/Mangatan.app
+          codesign --verify --deep --strict --verbose=2 \
+            build/macos/Build/Products/Release/Mangatan.app
+
+      - name: Package macOS DMG
+        run: |
           brew install create-dmg
           create-dmg --volname Mangatan-${{ env.RELEASE_TAG }}-macos-arm64 --window-pos 200 120 --window-size 800 450 --icon-size 100 --app-drop-link 600 185 Mangatan-${{ env.RELEASE_TAG }}-macos-arm64.dmg build/macos/Build/Products/Release/Mangatan.app
 
@@ -119,6 +144,12 @@ jobs:
         with:
           flutter-version: "3.44.4"
 
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -142,6 +173,17 @@ jobs:
         working-directory: C:\m
         run: |
           dart run inno_bundle:build --release --no-installer
+
+      - name: Build bundled Mihon server
+        working-directory: C:\m
+        shell: pwsh
+        run: |
+          $bundle = 'build\windows\x64\runner\Release\mihon_server'
+          scripts\build_vendored_mihon_server.ps1 -Output $bundle
+          if (-not (Test-Path (Join-Path $bundle 'jre\bin\java.exe'))) { throw 'Bundled Java runtime missing' }
+          # Versioned name: the app parses the installed version from the basename.
+          $jars = @(Get-ChildItem (Join-Path $bundle 'MExtensionServer-*.jar') -File)
+          if ($jars.Count -ne 1) { throw "Expected one bundled server JAR, found $($jars.Count)" }
 
       - name: build Windows installer
         working-directory: C:\m
@@ -222,6 +264,12 @@ jobs:
         with:
           flutter-version: "3.44.4"
 
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -230,6 +278,16 @@ jobs:
 
       - name: build linux
         run: flutter build linux --release --verbose
+
+      - name: Build bundled Mihon server
+        run: |
+          set -euo pipefail
+          bundle=build/linux/x64/release/bundle/mihon_server
+          scripts/build_vendored_mihon_server.sh --output "$bundle"
+          test -x "$bundle/jre/bin/java"
+          # Versioned name: the app parses the installed version from the basename.
+          test "$(ls "$bundle"/MExtensionServer-*.jar | wc -l)" -eq 1
+          test -s "$(ls "$bundle"/MExtensionServer-*.jar)"
 
       - name: package Linux archive
         shell: bash

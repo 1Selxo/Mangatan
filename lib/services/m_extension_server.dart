@@ -355,25 +355,47 @@ class MExtensionServerPlatform {
       final settings = isar.settings.getSync(227);
       var jrePath = settings?.jrePath ?? '';
       var serverJarPath = settings?.extensionServerPath ?? '';
+      // Re-resolve when the configured files are gone, and also when they point
+      // at *another* installation's bundle: a side-by-side upgrade (a second
+      // tarball, or an .app moved to a new path) leaves those files existing but
+      // stale, and launching the previous version's JAR against the new app is
+      // silently wrong. A directory the user picked themselves is never stale.
+      final configuredIsStaleBundle =
+          isDesktop &&
+          isStaleBundledExtensionServerPath(
+            jrePath: jrePath,
+            serverJarPath: serverJarPath,
+          );
       if (isDesktop &&
-          (!await _isFile(jrePath) || !await _isFile(serverJarPath))) {
-        // Nothing configured (or the configured files went away). A distro
-        // package may have installed the server system-wide, in which case
-        // adopt it instead of making the user pick the folder by hand.
-        final system = await findSystemExtensionServer();
-        if (system == null) {
+          (configuredIsStaleBundle ||
+              !await _isFile(jrePath) ||
+              !await _isFile(serverJarPath))) {
+        // Prefer the server and JRE embedded in Mangatan release artifacts.
+        // Distro-managed installs remain a fallback for development builds and
+        // packages that intentionally omit the portable runtime.
+        final bundled = await findBundledExtensionServer();
+        var resolved = bundled;
+        if (resolved == null) {
+          final system = await findSystemExtensionServer();
+          resolved = system;
+        }
+        if (resolved == null) {
           _log(
             'Mihon bridge was not started because the configured JRE or JAR '
-            'does not exist. JRE: "$jrePath", JAR: "$serverJarPath".',
+            'does not exist and this build has no bundled server. JRE: '
+            '"$jrePath", JAR: "$serverJarPath".',
             level: LogLevel.error,
           );
           return;
         }
-        jrePath = system.jrePath;
-        serverJarPath = system.jarPath;
+        jrePath = resolved.jrePath;
+        serverJarPath = resolved.jarPath;
         _log(
-          'Adopted the package-managed Mihon extension server at '
-          '"${path.dirname(serverJarPath)}".',
+          bundled == null
+              ? 'Adopted the package-managed Mihon extension server at '
+                    '"${path.dirname(serverJarPath)}".'
+              : 'Using Mangatan\'s bundled Mihon extension server at '
+                    '"${path.dirname(serverJarPath)}".',
         );
         _persistResolvedServerPaths(jrePath, serverJarPath);
       }

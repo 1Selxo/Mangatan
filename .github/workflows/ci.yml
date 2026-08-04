@@ -143,6 +143,11 @@ jobs:
             test/services/mining/anki_card_builder_test.dart \
             test/services/mining/anime_sentence_audio_service_test.dart
 
+      - name: Test community extension-repo subscription persistence (issue #37)
+        run: |
+          flutter test --concurrency=1 \
+            test/services/community_repo_subscription_test.dart
+
       - name: Build Linux debug
         run: flutter build linux --debug
 

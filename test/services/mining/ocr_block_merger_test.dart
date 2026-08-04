@@ -146,9 +146,10 @@ void main() {
       // six). This is the multi-row adversarial layout PR #79's
       // overlap-conditional comparator got wrong: its non-transitive relation
       // produced order [B4, B0, B2, B1, B5, B3] — B1 (y=0.672..0.917) sorted
-      // ahead of the higher B5 (y=0.610..0.688). The banded total ordering
-      // reads top band to bottom band, right-to-left within each band, giving
-      // the correct [B4, B0, B2, B5, B3, B1].
+      // ahead of the higher B5 (y=0.610..0.688). The issue #44 banding reads
+      // the top-right pair first (B4 above B0 in the right column), then sweeps
+      // the lower cluster right-to-left / top-to-bottom, giving the
+      // deterministic total order [B4, B0, B3, B2, B1, B5].
       List<OcrTextBlock> layout() => [
         _sep('B0', 0.843, 0.096, 0.976, 0.414),
         _sep('B1', 0.164, 0.672, 0.268, 0.917),
@@ -163,10 +164,10 @@ void main() {
       expect(merged.map((block) => block.lines.single).toList(), [
         'B4',
         'B0',
-        'B2',
-        'B5',
         'B3',
+        'B2',
         'B1',
+        'B5',
       ]);
     });
 
@@ -234,9 +235,11 @@ void main() {
       // merged) for this to exercise the comparator.
       expect(order(triple()), hasLength(3));
 
-      // Full expected reading order: P0 and P1 share the upper band (read
-      // right-to-left: P0 then P1), P2 is the lower band.
-      const expected = ['P0', 'P1', 'P2'];
+      // Full expected reading order under the issue #44 banding: P2 is the
+      // right-most bubble and sits within one line-height of P0's sweep, so all
+      // three share one reading band and are read right-to-left: P2, then P0,
+      // then P1.
+      const expected = ['P2', 'P0', 'P1'];
       expect(order(triple()), expected);
 
       // Deterministic across many shuffles — no dependence on input order.
@@ -268,6 +271,132 @@ void main() {
         'r2c2',
       ]);
     });
+  });
+
+  // Regression suite for issue #44: the auto-merger emitted Japanese text
+  // left-to-right instead of right-to-left. PR #89's row banding removed the
+  // non-transitive comparator but still split vertically-separated staggered
+  // bubbles into separate bands, so the higher (left) bubble won and the
+  // maintainer's adversarial fixture read [left, right] instead of the correct
+  // [right, left]. These tests pin the staggered right-to-left sweep, the
+  // multi-band grid traversal, and determinism.
+  group('issue #44 right-to-left staggered ordering', () {
+    test("maintainer counterexample: vertically separated staggered bubbles "
+        'read right-to-left', () {
+      // The exact failure the maintainer demonstrated when closing PR #89: two
+      // bubbles that are BOTH horizontally offset AND vertically separated (no
+      // vertical overlap), with the left bubble sitting higher. A human reads
+      // the right bubble first; the pre-fix banding put the higher-left bubble
+      // in an earlier band and emitted [left, right].
+      final blocks = [
+        _sep('left', 0.05, 0.05, 0.25, 0.20),
+        _sep('right', 0.60, 0.30, 0.80, 0.45),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'right',
+        'left',
+      ]);
+    });
+
+    test('vertically separated staggered bubbles read right-to-left with the '
+        'right bubble higher', () {
+      // The mirror image of the maintainer fixture: the right bubble is higher
+      // and the left lower, still vertically separated. Right must still read
+      // first, so the assertion is symmetric with the previous test and does
+      // not merely depend on which bubble happens to be higher.
+      final blocks = [
+        _sep('left', 0.05, 0.30, 0.25, 0.45),
+        _sep('right', 0.60, 0.05, 0.80, 0.20),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'right',
+        'left',
+      ]);
+    });
+
+    test('vertically stacked column still splits into separate rows', () {
+      // Negative case pinning the other side of the band-assignment rule:
+      // boxes that horizontally overlap (a genuine column) with a vertical gap
+      // must NOT be swept into one right-to-left band — the upper box reads
+      // first, top-to-bottom, so the fix does not collapse real rows.
+      final blocks = [
+        _sep('top', 0.40, 0.05, 0.60, 0.18),
+        _sep('middle', 0.40, 0.35, 0.60, 0.48),
+        _sep('bottom', 0.40, 0.65, 0.60, 0.78),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'top',
+        'middle',
+        'bottom',
+      ]);
+    });
+
+    test('multi-band grid is traversed top-to-bottom, right-to-left in each '
+        'band', () {
+      // A 3-column x 2-row grid whose rows are cleanly separated: bands must be
+      // read top row before bottom row, and right-to-left within each row. This
+      // proves the staggered-sweep relaxation did not merge distinct grid rows
+      // into one band.
+      final blocks = [
+        _sep('r1L', 0.05, 0.05, 0.25, 0.18),
+        _sep('r1M', 0.40, 0.05, 0.60, 0.18),
+        _sep('r1R', 0.75, 0.05, 0.95, 0.18),
+        _sep('r2L', 0.05, 0.60, 0.25, 0.73),
+        _sep('r2M', 0.40, 0.60, 0.60, 0.73),
+        _sep('r2R', 0.75, 0.60, 0.95, 0.73),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'r1R',
+        'r1M',
+        'r1L',
+        'r2R',
+        'r2M',
+        'r2L',
+      ]);
+    });
+
+    test(
+      'staggered right-to-left order is deterministic under shuffled input',
+      () {
+        // The reading order must be a valid total ordering: independent of the
+        // order the blocks arrive in. Shuffle the maintainer's staggered fixture
+        // (plus an extra staggered bubble) many times and require an identical
+        // result every time.
+        List<OcrTextBlock> layout() => [
+          _sep('left', 0.05, 0.05, 0.25, 0.20),
+          _sep('mid', 0.35, 0.18, 0.55, 0.33),
+          _sep('right', 0.70, 0.30, 0.90, 0.45),
+        ];
+
+        List<String> order(List<OcrTextBlock> blocks) => mergeOcrBlocks(
+          blocks,
+          language: 'ja',
+        ).map((block) => block.lines.single).toList();
+
+        const expected = ['right', 'mid', 'left'];
+        expect(order(layout()), expected);
+
+        final random = Random(44);
+        for (var i = 0; i < 100; i++) {
+          expect(order(layout()..shuffle(random)), expected);
+        }
+
+        // Idempotent: re-sorting the produced order is a fixed point.
+        expect(order(mergeOcrBlocks(layout(), language: 'ja')), expected);
+      },
+    );
   });
 }
 

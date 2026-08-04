@@ -300,10 +300,10 @@ OcrTextBlock _toBlock(List<_Line> lines, String language) {
 /// can contradict, so [List.sort] produced order-dependent, inconsistent
 /// results and mis-ordered multi-row grids.
 ///
-/// Instead, rows ("bands") are computed once up front by clustering blocks on
-/// their vertical extent, giving every block a single integer band index. The
-/// blocks are then sorted by a fixed lexicographic key derived only from that
-/// precomputed index and the block's own coordinates:
+/// Instead, rows ("bands") are computed once up front (see [_rowBands]), giving
+/// every block a single integer band index. The blocks are then sorted by a
+/// fixed lexicographic key derived only from that precomputed index and the
+/// block's own coordinates:
 ///
 ///   (bandIndex, reading-x, ymin, xmin)
 ///
@@ -328,43 +328,129 @@ List<OcrTextBlock> _readingOrder(List<OcrTextBlock> blocks, bool japanese) {
   return blocks;
 }
 
-/// Assigns every block a row-band index, computed once.
+/// Assigns every block a reading-row ("band") index, computed once.
 ///
-/// Blocks are swept top-to-bottom and greedily clustered into bands. A block
-/// joins the current band when its vertical extent overlaps the band's running
-/// vertical extent by more than [_bandOverlap]; otherwise it opens a new band.
-/// The running extent is intersected (not unioned) as members are added so a
-/// tall outlier cannot chain unrelated rows together. The returned map is keyed
-/// by block identity, giving each block a stable integer index in reading order
-/// of rows (top-most band == 0).
+/// Bands model horizontal reading rows so that right-to-left ordering can run
+/// *within* a row while rows are still traversed top-to-bottom. The subtlety
+/// (Mangatan issue #44, PR #89 counterexample) is that two speech bubbles a
+/// human reads as one right-to-left sweep must stay in the SAME band even when
+/// they are vertically staggered — otherwise the higher bubble's band wins and
+/// a wrong left-then-right order is emitted. Conversely, two boxes genuinely
+/// stacked in a column must land in DIFFERENT bands so the upper one reads
+/// first, and a distant lower row must not be pulled up into the top band.
+///
+/// A block joins an existing band when, against that band's members, it is
+/// either
+///   * vertically overlapping some member (clearly the same row, Rule 1's
+///     right-to-left companions can then be ordered within the band), or
+///   * horizontally disjoint from every member AND vertically near it (gap no
+///     larger than [_bandGapRatio] times the shorter box height) — a
+///     side-by-side staggered bubble in the same reading sweep.
+/// It is refused a band when it horizontally overlaps a member with no vertical
+/// overlap (it is stacked beneath that row) unless it also shares a row with
+/// another member. When it can join no band it opens a new one.
+///
+/// The sweep runs strictly top-to-bottom in a canonical order independent of
+/// input order, and band membership is decided only against already-placed
+/// blocks, so the per-block index is a pure, deterministic function of the
+/// block set. Bands are finally renumbered by their top edge so the index is
+/// monotonic in vertical reading position. Feeding this index into the pure
+/// lexicographic sort key keeps the reading order a valid total ordering.
 Map<OcrTextBlock, int> _rowBands(List<OcrTextBlock> blocks) {
   final ordered = [...blocks]
     ..sort((a, b) {
       final y = a.ymin.compareTo(b.ymin);
       if (y != 0) return y;
-      return a.ymax.compareTo(b.ymax);
+      final ymax = a.ymax.compareTo(b.ymax);
+      if (ymax != 0) return ymax;
+      final x = a.xmin.compareTo(b.xmin);
+      if (x != 0) return x;
+      return a.xmax.compareTo(b.xmax);
+    });
+  final bands = <List<OcrTextBlock>>[];
+  for (final block in ordered) {
+    final blockHeight = block.ymax - block.ymin;
+    var placed = -1;
+    for (var i = 0; i < bands.length; i++) {
+      var canJoin = false;
+      var sameRow = false;
+      var stackedBelow = false;
+      for (final member in bands[i]) {
+        final vertical = _overlap(
+          member.ymin,
+          member.ymax,
+          block.ymin,
+          block.ymax,
+        );
+        final horizontal = _overlap(
+          member.xmin,
+          member.xmax,
+          block.xmin,
+          block.xmax,
+        );
+        if (vertical > _bandOverlap) {
+          sameRow = true;
+          canJoin = true;
+        } else if (horizontal <= _bandOverlap) {
+          final gap = _distance(
+            member.ymin,
+            member.ymax,
+            block.ymin,
+            block.ymax,
+          );
+          final memberHeight = member.ymax - member.ymin;
+          if (gap <= _bandGapRatio * math.min(blockHeight, memberHeight)) {
+            canJoin = true;
+          }
+        }
+        if (horizontal > _bandOverlap && vertical <= _bandOverlap) {
+          stackedBelow = true;
+        }
+      }
+      // A vertical overlap proves the same row even if the block also stacks
+      // beneath another member; a pure stack with no shared row pushes it down.
+      if (stackedBelow && !sameRow) continue;
+      if (!canJoin) continue;
+      placed = i;
+      break;
+    }
+    if (placed < 0) {
+      bands.add([block]);
+    } else {
+      bands[placed].add(block);
+    }
+  }
+  // Renumber bands by their top edge (then leftmost) so the band index is
+  // monotonic in vertical reading position regardless of creation order.
+  final rank = [...Iterable<int>.generate(bands.length)]
+    ..sort((a, b) {
+      final top = _bandTop(bands[a]).compareTo(_bandTop(bands[b]));
+      if (top != 0) return top;
+      return _bandLeft(bands[a]).compareTo(_bandLeft(bands[b]));
     });
   final result = <OcrTextBlock, int>{};
-  var band = -1;
-  var bandMin = 0.0;
-  var bandMax = 0.0;
-  for (final block in ordered) {
-    if (band < 0 ||
-        _overlap(bandMin, bandMax, block.ymin, block.ymax) <= _bandOverlap) {
-      band++;
-      bandMin = block.ymin;
-      bandMax = block.ymax;
-    } else {
-      bandMin = math.max(bandMin, block.ymin);
-      bandMax = math.min(bandMax, block.ymax);
+  for (var index = 0; index < rank.length; index++) {
+    for (final block in bands[rank[index]]) {
+      result[block] = index;
     }
-    result[block] = band;
   }
   return result;
 }
 
-/// Minimum vertical overlap fraction for two blocks to share a reading row.
+double _bandTop(List<OcrTextBlock> band) =>
+    band.map((block) => block.ymin).reduce(math.min);
+double _bandLeft(List<OcrTextBlock> band) =>
+    band.map((block) => block.xmin).reduce(math.min);
+
+/// Minimum overlap fraction (horizontal or vertical) for two blocks to be
+/// treated as sharing a reading row / stacked in a column.
 const double _bandOverlap = 0.2;
+
+/// Maximum vertical gap, as a multiple of the shorter block height, for two
+/// horizontally-disjoint blocks to still belong to the same right-to-left
+/// reading sweep. Beyond this they are treated as separate rows so a distant
+/// lower bubble is not swept up into the top band.
+const double _bandGapRatio = 1.0;
 
 String _clean(String value) =>
     value.replaceAll(RegExp(r'[\r\n\t]+'), '').trim();

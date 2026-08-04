@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/services/mining/ocr_block_merger.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
@@ -129,6 +131,144 @@ void main() {
     // Boxes far outside the close radius must not be merged.
     expect(merged, hasLength(2));
   });
+
+  // Regression suite for issue #34: the cross-box Japanese reading order must
+  // be a mathematically valid total ordering. PR #79's comparator mixed an
+  // overlap-conditional axis flip (compare on x when two boxes shared a row,
+  // else on y), which is not transitive and mis-ordered multi-row grids. These
+  // tests pin the full expected order for a grid, the original staggered-bubble
+  // case, and determinism under shuffling.
+  group('issue #34 reading order (valid total ordering)', () {
+    test('orders a >=6-box multi-row Japanese layout the old comparator '
+        'mis-sorted', () {
+      // Six separated blocks (they survive paragraph/close-group merging as
+      // distinct blocks, so the reading-order comparator is exercised on all
+      // six). This is the multi-row adversarial layout PR #79's
+      // overlap-conditional comparator got wrong: its non-transitive relation
+      // produced order [B4, B0, B2, B1, B5, B3] — B1 (y=0.672..0.917) sorted
+      // ahead of the higher B5 (y=0.610..0.688). The banded total ordering
+      // reads top band to bottom band, right-to-left within each band, giving
+      // the correct [B4, B0, B2, B5, B3, B1].
+      List<OcrTextBlock> layout() => [
+        _sep('B0', 0.843, 0.096, 0.976, 0.414),
+        _sep('B1', 0.164, 0.672, 0.268, 0.917),
+        _sep('B2', 0.381, 0.476, 0.522, 0.645),
+        _sep('B3', 0.749, 0.703, 0.858, 0.895),
+        _sep('B4', 0.788, 0.011, 0.919, 0.096),
+        _sep('B5', 0.006, 0.610, 0.091, 0.688),
+      ];
+
+      final merged = mergeOcrBlocks(layout(), language: 'ja');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'B4',
+        'B0',
+        'B2',
+        'B5',
+        'B3',
+        'B1',
+      ]);
+    });
+
+    test('orders a clean 3-column x 2-row Japanese grid right-to-left', () {
+      // A textbook clean grid: two well-separated rows of three columns each.
+      // Japanese reads each row right-to-left, top row before bottom row.
+      final blocks = [
+        _sep('r1c1', 0.05, 0.05, 0.20, 0.15),
+        _sep('r1c2', 0.42, 0.05, 0.57, 0.15),
+        _sep('r1c3', 0.80, 0.05, 0.95, 0.15),
+        _sep('r2c1', 0.05, 0.55, 0.20, 0.65),
+        _sep('r2c2', 0.42, 0.55, 0.57, 0.65),
+        _sep('r2c3', 0.80, 0.55, 0.95, 0.65),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'r1c3',
+        'r1c2',
+        'r1c1',
+        'r2c3',
+        'r2c2',
+        'r2c1',
+      ]);
+    });
+
+    test('orders two staggered Japanese bubbles right-to-left', () {
+      // The original narrow two-bubble fixture PR #79 was built around: two
+      // vertically-staggered bubbles that still share the same reading row, so
+      // the right one is read first under right-to-left Japanese order.
+      final blocks = [
+        _sep('left', 0.05, 0.12, 0.25, 0.30),
+        _sep('right', 0.60, 0.08, 0.80, 0.26),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'ja');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'right',
+        'left',
+      ]);
+    });
+
+    test('sorting is deterministic and consistent under shuffled input', () {
+      // Three separated blocks whose vertical extents form the exact
+      // non-transitive triple that PR #79's overlap-flip comparator mis-sorts:
+      // P0/P1 share a row band while P2 does not overlap P0, so the old
+      // pairwise relation had cmp(P0,P1)<0, cmp(P1,P2)<0 but cmp(P0,P2)>0 — a
+      // cycle. Fed to List.sort that yields input-order-dependent output. The
+      // banded key is a valid total ordering, so every permutation must yield
+      // the identical reading order.
+      List<OcrTextBlock> triple() => [
+        _sep('P0', 0.583, 0.507, 0.678, 0.907),
+        _sep('P1', 0.347, 0.481, 0.537, 0.592),
+        _sep('P2', 0.701, 0.692, 0.807, 0.748),
+      ];
+
+      List<String> order(List<OcrTextBlock> blocks) => mergeOcrBlocks(
+        blocks,
+        language: 'ja',
+      ).map((block) => block.lines.single).toList();
+
+      // The fixture must reach reading order as three distinct blocks (not
+      // merged) for this to exercise the comparator.
+      expect(order(triple()), hasLength(3));
+
+      // Full expected reading order: P0 and P1 share the upper band (read
+      // right-to-left: P0 then P1), P2 is the lower band.
+      const expected = ['P0', 'P1', 'P2'];
+      expect(order(triple()), expected);
+
+      // Deterministic across many shuffles — no dependence on input order.
+      final random = Random(1234);
+      for (var i = 0; i < 100; i++) {
+        expect(order(triple()..shuffle(random)), expected);
+      }
+
+      // Idempotent: sorting the produced order again is a fixed point.
+      expect(order(mergeOcrBlocks(triple(), language: 'ja')), expected);
+    });
+
+    test('left-to-right (non-Japanese) grid reads rows left-to-right', () {
+      final blocks = [
+        _sep('r1c1', 0.05, 0.05, 0.20, 0.15),
+        _sep('r1c2', 0.42, 0.05, 0.57, 0.15),
+        _sep('r1c3', 0.80, 0.05, 0.95, 0.15),
+        _sep('r2c1', 0.05, 0.55, 0.20, 0.65),
+        _sep('r2c2', 0.42, 0.55, 0.57, 0.65),
+      ];
+
+      final merged = mergeOcrBlocks(blocks, language: 'en');
+
+      expect(merged.map((block) => block.lines.single).toList(), [
+        'r1c1',
+        'r1c2',
+        'r1c3',
+        'r2c1',
+        'r2c2',
+      ]);
+    });
+  });
 }
 
 OcrTextBlock _block(
@@ -152,6 +292,35 @@ OcrTextBlock _block(
     ymax: bottom,
     lines: [text],
     vertical: vertical,
+    lineGeometries: [geometry],
+    language: 'ja',
+  );
+}
+
+/// A single separated (non-merging) block for reading-order tests.
+///
+/// Reading order runs on the blocks that survive paragraph/close-group
+/// merging, so these fixtures are spaced far enough apart to stay distinct and
+/// exercise the comparator directly on every box.
+OcrTextBlock _sep(
+  String text,
+  double left,
+  double top,
+  double right,
+  double bottom,
+) {
+  final geometry = OcrLineGeometry(
+    xmin: left,
+    ymin: top,
+    xmax: right,
+    ymax: bottom,
+  );
+  return OcrTextBlock(
+    xmin: left,
+    ymin: top,
+    xmax: right,
+    ymax: bottom,
+    lines: [text],
     lineGeometries: [geometry],
     language: 'ja',
   );

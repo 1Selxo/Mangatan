@@ -291,16 +291,80 @@ OcrTextBlock _toBlock(List<_Line> lines, String language) {
   );
 }
 
+/// Orders reading blocks with a mathematically valid total ordering.
+///
+/// The previous implementation compared pairs of blocks with an
+/// overlap-conditional axis flip (compare on x when the two boxes share a row,
+/// otherwise on y). That relation is not transitive: for three boxes A, B, C
+/// where A/B and B/C each share a row but A/C do not, the pairwise decisions
+/// can contradict, so [List.sort] produced order-dependent, inconsistent
+/// results and mis-ordered multi-row grids.
+///
+/// Instead, rows ("bands") are computed once up front by clustering blocks on
+/// their vertical extent, giving every block a single integer band index. The
+/// blocks are then sorted by a fixed lexicographic key derived only from that
+/// precomputed index and the block's own coordinates:
+///
+///   (bandIndex, reading-x, ymin, xmin)
+///
+/// where reading-x runs right-to-left for vertical Japanese and left-to-right
+/// otherwise. Because the key is a pure function of each block (never of the
+/// pair being compared), the comparator is antisymmetric and transitive — a
+/// valid total ordering — and the final `ymin`/`xmin` tie-breakers make it a
+/// strict order, so sorting is deterministic regardless of input order.
 List<OcrTextBlock> _readingOrder(List<OcrTextBlock> blocks, bool japanese) {
+  if (blocks.length < 2) return blocks;
+  final bands = _rowBands(blocks);
+  double readingX(OcrTextBlock block) => japanese ? -block.xmin : block.xmin;
   blocks.sort((a, b) {
-    final overlap = _overlap(a.ymin, a.ymax, b.ymin, b.ymax);
-    if (overlap > 0.2) {
-      return japanese ? b.xmin.compareTo(a.xmin) : a.xmin.compareTo(b.xmin);
-    }
-    return a.ymin.compareTo(b.ymin);
+    final band = bands[a]!.compareTo(bands[b]!);
+    if (band != 0) return band;
+    final x = readingX(a).compareTo(readingX(b));
+    if (x != 0) return x;
+    final y = a.ymin.compareTo(b.ymin);
+    if (y != 0) return y;
+    return a.xmin.compareTo(b.xmin);
   });
   return blocks;
 }
+
+/// Assigns every block a row-band index, computed once.
+///
+/// Blocks are swept top-to-bottom and greedily clustered into bands. A block
+/// joins the current band when its vertical extent overlaps the band's running
+/// vertical extent by more than [_bandOverlap]; otherwise it opens a new band.
+/// The running extent is intersected (not unioned) as members are added so a
+/// tall outlier cannot chain unrelated rows together. The returned map is keyed
+/// by block identity, giving each block a stable integer index in reading order
+/// of rows (top-most band == 0).
+Map<OcrTextBlock, int> _rowBands(List<OcrTextBlock> blocks) {
+  final ordered = [...blocks]
+    ..sort((a, b) {
+      final y = a.ymin.compareTo(b.ymin);
+      if (y != 0) return y;
+      return a.ymax.compareTo(b.ymax);
+    });
+  final result = <OcrTextBlock, int>{};
+  var band = -1;
+  var bandMin = 0.0;
+  var bandMax = 0.0;
+  for (final block in ordered) {
+    if (band < 0 ||
+        _overlap(bandMin, bandMax, block.ymin, block.ymax) <= _bandOverlap) {
+      band++;
+      bandMin = block.ymin;
+      bandMax = block.ymax;
+    } else {
+      bandMin = math.max(bandMin, block.ymin);
+      bandMax = math.min(bandMax, block.ymax);
+    }
+    result[block] = band;
+  }
+  return result;
+}
+
+/// Minimum vertical overlap fraction for two blocks to share a reading row.
+const double _bandOverlap = 0.2;
 
 String _clean(String value) =>
     value.replaceAll(RegExp(r'[\r\n\t]+'), '').trim();

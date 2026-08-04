@@ -7,6 +7,7 @@ import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.d
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/webview_url.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -139,16 +140,26 @@ class ReaderAppBar extends ConsumerWidget {
   List<Widget> _buildActions(BuildContext context, bool isLocalArchive) {
     return [
       if (onOcrPressed != null)
-        ValueListenableBuilder<bool>(
-          valueListenable: ReaderOcrState.enabled,
-          builder: (context, enabled, _) => IconButton(
-            tooltip: enabled ? 'Hide OCR overlay' : 'Show OCR overlay',
-            onPressed: onOcrPressed,
-            icon: Icon(
-              enabled
-                  ? Icons.document_scanner
-                  : Icons.document_scanner_outlined,
-            ),
+        ValueListenableBuilder<OcrScanTrigger>(
+          valueListenable: ReaderOcrState.scanTrigger,
+          builder: (context, trigger, _) => ValueListenableBuilder<bool>(
+            valueListenable: ReaderOcrState.enabled,
+            builder: (context, enabled, _) {
+              final manual = trigger == OcrScanTrigger.manual;
+              return IconButton(
+                tooltip: manual
+                    ? 'Run OCR on this page'
+                    : (enabled ? 'Hide OCR overlay' : 'Show OCR overlay'),
+                onPressed: onOcrPressed,
+                icon: Icon(
+                  manual
+                      ? Icons.document_scanner_outlined
+                      : (enabled
+                            ? Icons.document_scanner
+                            : Icons.document_scanner_outlined),
+                ),
+              );
+            },
           ),
         ),
 

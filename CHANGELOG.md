@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a manual OCR trigger option to the reader: with "OCR trigger" set to
+  Manual, OCR no longer runs constantly in the background and instead scans the
+  current page on demand when you tap the reader's OCR button. Automatic remains
+  the default and is unchanged. (#35)
+
 ## 1.1.0+166 - 2026-07-30
 
 - Added shared dictionary lookup history to manual, recursive, subtitle, and

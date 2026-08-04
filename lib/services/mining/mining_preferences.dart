@@ -10,6 +10,14 @@ import 'package:path/path.dart' as p;
 
 enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }
 
+/// Controls when reader OCR runs.
+///
+/// [automatic] scans the whole chapter in the background as soon as it opens
+/// (the historical default). [manual] leaves OCR idle until the reader
+/// explicitly requests a scan, so it does not run constantly in the
+/// background. See issue #35.
+enum OcrScanTrigger { automatic, manual }
+
 enum DictionaryThemePreference { system, light, dark, black }
 
 enum DictionaryLookupTrigger { leftClick, shift, middleClick }
@@ -332,6 +340,7 @@ class MiningPreferences {
   static const _ankiAudioTimeoutMs = 'anki_audio_timeout_ms';
   static const _ankiAudioLanguage = 'anki_audio_language';
   static const _ocrEngine = 'ocr_engine';
+  static const _ocrScanTrigger = 'ocr_scan_trigger';
   static const _parallelOcrLimit = 'parallel_ocr_limit';
   static const _subtitleRegexFilters = 'subtitle_regex_filters';
   static const _readerEInkMode = 'reader_eink_mode';
@@ -973,6 +982,27 @@ class MiningPreferences {
 
   static Future<void> setOcrEngine(OcrEnginePreference value) async {
     await (await _boxOrNull())?.put(_ocrEngine, value.name);
+  }
+
+  static Future<OcrScanTrigger> getOcrScanTrigger({
+    bool readOnly = false,
+    MiningPreferencesSnapshot? snapshot,
+  }) async {
+    final name =
+        (await _reader(readOnly: readOnly, snapshot: snapshot))?.get(
+              _ocrScanTrigger,
+              defaultValue: OcrScanTrigger.automatic.name,
+            )
+            as String? ??
+        OcrScanTrigger.automatic.name;
+    return OcrScanTrigger.values.firstWhere(
+      (value) => value.name == name,
+      orElse: () => OcrScanTrigger.automatic,
+    );
+  }
+
+  static Future<void> setOcrScanTrigger(OcrScanTrigger value) async {
+    await (await _boxOrNull())?.put(_ocrScanTrigger, value.name);
   }
 
   static Future<int> getParallelOcrLimit() async {

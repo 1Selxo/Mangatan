@@ -63,7 +63,16 @@ Features include:
 
 ## Download
 
-Get Mangatan from the [releases page](https://github.com/1Selxo/Mangatan/releases).
+Get Mangatan from the [releases page](https://github.com/1Selxo/Mangatan/releases),
+then download the asset that matches your platform:
+
+- **Windows** — `Mangatan-<version>-windows.exe` (installer) or
+  `Mangatan-<version>-windows.zip` (portable).
+- **macOS** — `Mangatan-<version>-macos-arm64.dmg` (Apple Silicon).
+- **Linux** — `Mangatan-<version>-linux-x86_64.tar.gz`.
+
+See the [desktop install guide](docs/desktop_install.md) for the full
+download-and-run steps on each platform.
 
 ### Android
 

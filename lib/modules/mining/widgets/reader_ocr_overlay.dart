@@ -1507,10 +1507,13 @@ class ReaderOcrController extends ChangeNotifier {
 
   void _paintVerticalText(Canvas canvas, Rect rect, String text, double alpha) {
     final rowHeight = rect.height / math.max(1, text.length);
-    final fontSize = math.max(
-      8.0,
-      math.min(rect.width * 0.82, rowHeight * 0.95),
+    final fontSize = readerOcrVerticalFontSize(
+      boxWidth: rect.width,
+      boxHeight: rect.height,
+      glyphCount: text.length,
     );
+    canvas.save();
+    canvas.clipRect(rect);
     for (var index = 0; index < text.length; index++) {
       final painter = TextPainter(
         maxLines: 1,
@@ -1533,6 +1536,7 @@ class ReaderOcrController extends ChangeNotifier {
         ),
       );
     }
+    canvas.restore();
   }
 
   Rect? _lineHighlightFor({
@@ -1766,6 +1770,36 @@ double readerOcrHorizontalTextScale({
   );
   if (scale.isNaN || scale <= 0) return 1.0;
   return math.min(1.0, scale);
+}
+
+/// Font size for a vertical (top-to-bottom) OCR line so its glyph column
+/// always fits inside its box.
+///
+/// Fixes issue #49: the previous implementation applied a hard `8.0` px floor
+/// after fitting to the box, so on small boxes (common on mobile) the stacked
+/// glyphs — `fontSize * glyphCount` — exceeded the box height and clipped off
+/// the bottom characters. The size now tracks the smaller of the per-row height
+/// and the box width and is clamped so the whole column stays inside the box in
+/// both dimensions; a floor is only applied when it does not force overflow.
+@visibleForTesting
+double readerOcrVerticalFontSize({
+  required double boxWidth,
+  required double boxHeight,
+  required int glyphCount,
+}) {
+  if (glyphCount <= 0 || boxWidth <= 0 || boxHeight <= 0) return 0.0;
+  final rowHeight = boxHeight / glyphCount;
+  // Track the tighter of the two axes: a glyph must fit both the per-character
+  // row height and the box width.
+  var fontSize = math.min(boxWidth * 0.95, rowHeight * 0.95);
+  // Only raise toward a comfortable minimum when doing so still keeps the whole
+  // column inside the box; never let the floor reintroduce clipping.
+  const desiredMin = 8.0;
+  final maxFit = math.min(rowHeight, boxWidth);
+  if (fontSize < desiredMin) {
+    fontSize = math.min(desiredMin, maxFit);
+  }
+  return fontSize;
 }
 
 @visibleForTesting

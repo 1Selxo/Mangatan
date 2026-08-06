@@ -188,9 +188,6 @@ class _MangaChapterPageGalleryState
     _setMacosPagedWheelMode(false);
     WidgetsBinding.instance.removeObserver(this);
     _readingStopwatch.stop();
-    _readerController.setHistoryUpdate(
-      elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
-    );
     _rebuildDetail.close();
     _animation.removeListener(_scaleAnimationListener);
     _scaleAnimationController.dispose();
@@ -218,11 +215,18 @@ class _MangaChapterPageGalleryState
     final actualIdx = _pageViewToActualIndexSync(_currentIndex!);
     final index = pages[actualIdx].index;
     if (index != null) {
+      // Persist the final page before starting the asynchronous history write.
+      // Isar does not allow this synchronous write to overlap that transaction.
       _readerController.setPageIndex(
         _isDoublePageActiveSync ? index : _geCurrentIndex(index),
         true,
       );
     }
+    unawaited(
+      _readerController.setHistoryUpdate(
+        elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
+      ),
+    );
     disposePreloadManager();
     // Attribute the page still on screen before the OCR cache goes away.
     unawaited(
@@ -1240,7 +1244,7 @@ class _MangaChapterPageGalleryState
     // proactively start loading adjacent chapters in background
     _proactivePreload();
 
-    _readerController.setHistoryUpdate();
+    await _readerController.setHistoryUpdate();
     // Use post-frame callback instead of Future.delayed(1ms) timing hack
     await Future(() {});
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
@@ -1260,7 +1264,7 @@ class _MangaChapterPageGalleryState
         _pageMode = _readerController.getPageMode();
       });
     }
-    _setReaderMode(readerMode, ref);
+    _setReaderMode(readerMode, ref, persist: false);
 
     if (!readerMode.isVerticalContinuous) {
       _autoScroll.value = false;
@@ -1543,7 +1547,11 @@ class _MangaChapterPageGalleryState
     }
   }
 
-  void _setReaderMode(ReaderMode value, WidgetRef ref) async {
+  void _setReaderMode(
+    ReaderMode value,
+    WidgetRef ref, {
+    bool persist = true,
+  }) async {
     _setMacosPagedWheelMode(!value.isContinuous);
     if (!value.isVerticalContinuous) {
       _autoScroll.value = false;
@@ -1553,7 +1561,7 @@ class _MangaChapterPageGalleryState
     }
 
     _failedToLoadImage.value = false;
-    _readerController.setReaderMode(value);
+    if (persist) _readerController.setReaderMode(value);
 
     // Cache the reader mode for safe access in dispose
     _cachedReaderMode = value;

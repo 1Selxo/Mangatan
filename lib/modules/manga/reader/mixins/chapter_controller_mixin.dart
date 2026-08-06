@@ -98,45 +98,46 @@ mixin ChapterControllerMixin {
   ///
   /// [elapsedSeconds] accumulates watch/reading time; pass 0 to skip that
   /// field (the caller is responsible for tracking wall-clock deltas).
-  void setHistoryUpdate({int elapsedSeconds = 0}) {
+  Future<void> setHistoryUpdate({int elapsedSeconds = 0}) async {
     if (incognitoMode) return;
-    final manga = getManga();
+    final mangaId = chapter.mangaId ?? getManga().id;
+    final chapterId = chapter.id;
+    if (mangaId == null || chapterId == null) return;
 
-    isar.writeTxnSync(() {
-      final m = chapter.manga.value!;
-      m.lastRead = DateTime.now().millisecondsSinceEpoch;
-      m.updatedAt = DateTime.now().millisecondsSinceEpoch;
-      isar.mangas.putSync(m);
-    });
+    // Async Isar transactions queue behind an authoritative sync restore.
+    // A synchronous transaction here throws when the reader opens while sync
+    // already owns the isolate's write transaction.
+    await isar.writeTxn(() async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final manga = await isar.mangas.get(mangaId);
+      final persistedChapter = await isar.chapters.get(chapterId);
+      // An authoritative restore may have removed this portable row while the
+      // reader was waiting. Do not resurrect it from a detached widget model.
+      if (manga == null || persistedChapter == null) return;
+      manga
+        ..lastRead = now
+        ..updatedAt = now;
+      await isar.mangas.put(manga);
 
-    final isEmpty = isar.historys
-        .filter()
-        .mangaIdEqualTo(manga.id)
-        .isEmptySync();
-
-    final History history;
-    if (isEmpty) {
-      history = History(
-        mangaId: manga.id,
-        date: DateTime.now().millisecondsSinceEpoch.toString(),
-        itemType: manga.itemType,
-        chapterId: chapter.id,
-      )..chapter.value = chapter;
-    } else {
-      history = isar.historys.filter().mangaIdEqualTo(manga.id).findFirstSync()!
-        ..chapterId = chapter.id
-        ..chapter.value = chapter
-        ..date = DateTime.now().millisecondsSinceEpoch.toString();
-    }
-
-    isar.writeTxnSync(() {
-      history.updatedAt = DateTime.now().millisecondsSinceEpoch;
+      final history =
+          await isar.historys.filter().mangaIdEqualTo(mangaId).findFirst() ??
+          History(
+            mangaId: mangaId,
+            date: now.toString(),
+            itemType: manga.itemType,
+            chapterId: chapterId,
+          );
+      history
+        ..chapterId = chapterId
+        ..date = now.toString()
+        ..chapter.value = persistedChapter
+        ..updatedAt = now;
       if (elapsedSeconds > 0) {
         history.readingTimeSeconds =
             (history.readingTimeSeconds ?? 0) + elapsedSeconds;
       }
-      isar.historys.putSync(history);
-      history.chapter.saveSync();
+      await isar.historys.put(history);
+      await history.chapter.save();
     });
   }
 }

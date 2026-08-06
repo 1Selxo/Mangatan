@@ -472,8 +472,10 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     WidgetsBinding.instance.removeObserver(this);
     if (!_epubPositionLocked) {
       _persistProgress();
-      _readerController.setHistoryUpdate(
-        elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
+      unawaited(
+        _readerController.setHistoryUpdate(
+          elapsedSeconds: _readingStopwatch.elapsed.inSeconds,
+        ),
       );
     }
     final statsTracker = _statsTracker;
@@ -857,7 +859,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         _readingStopwatch.stop();
         final elapsed = _readingStopwatch.elapsed.inSeconds;
         if (elapsed > 0) {
-          _readerController.setHistoryUpdate(elapsedSeconds: elapsed);
+          unawaited(
+            _readerController.setHistoryUpdate(elapsedSeconds: elapsed),
+          );
         }
         _readingStopwatch.reset();
         _epubExploring = true;

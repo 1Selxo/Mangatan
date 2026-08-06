@@ -1754,8 +1754,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _currentTotalDuration.value,
       save: save,
     );
-    _streamController.setHistoryUpdate(
-      elapsedSeconds: saveWatchTime ? _watchStopwatch.elapsed.inSeconds : 0,
+    unawaited(
+      _streamController.setHistoryUpdate(
+        elapsedSeconds: saveWatchTime ? _watchStopwatch.elapsed.inSeconds : 0,
+      ),
     );
   }
 

@@ -103,7 +103,7 @@ abstract final class ChimahonMediaChildProjectionProof {
       local.scanlator == remote.scanlator &&
       local.read == remote.read &&
       local.bookmark == remote.bookmark &&
-      local.lastPageRead == remote.lastPageRead &&
+      _sentinelProgressEqual(local.lastPageRead, remote.lastPageRead) &&
       local.dateUpload == remote.dateUpload &&
       local.chapterNumber == remote.chapterNumber;
 
@@ -116,7 +116,7 @@ abstract final class ChimahonMediaChildProjectionProof {
       local.scanlator == remote.scanlator &&
       local.seen == remote.seen &&
       local.bookmark == remote.bookmark &&
-      local.lastSecondSeen == remote.lastSecondSeen &&
+      _sentinelProgressEqual(local.lastSecondSeen, remote.lastSecondSeen) &&
       local.dateUpload == remote.dateUpload &&
       local.episodeNumber == remote.episodeNumber &&
       (local.totalSeconds == Int64.ZERO ||
@@ -189,6 +189,13 @@ abstract final class ChimahonMediaChildProjectionProof {
     }
     return true;
   }
+
+  /// Mangatan historically stores `1` as its no-resume sentinel, while
+  /// Chimahon uses `0`. Treat those two wire projections as equivalent so a
+  /// clock-only local refresh retains the exact remote value. Any meaningful
+  /// progress above the first page/millisecond remains a real conflict.
+  static bool _sentinelProgressEqual(Int64 left, Int64 right) =>
+      left == right || (left <= Int64.ONE && right <= Int64.ONE);
 
   static bool _chapterIdentityEqual(BackupChapter left, BackupChapter right) =>
       left.url == right.url &&

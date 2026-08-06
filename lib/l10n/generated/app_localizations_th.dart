@@ -983,7 +983,7 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      'การดำเนินการนี้จะแทนที่ข้อมูลในเครื่องด้วยข้อมูลระยะไกลทั้งหมด!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => 'เปิดการซิงค์';

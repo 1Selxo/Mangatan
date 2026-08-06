@@ -35,6 +35,8 @@ import 'package:mangayomi/services/sync/chimahon_manga_title_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/services/statistics/immersion_stats_models.dart';
 import 'package:mangayomi/services/statistics/immersion_stats_storage.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/reconcile_mihon_sources.dart';
 import 'package:mangayomi/services/sync/chimahon_stats_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_importer.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
@@ -857,7 +859,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
     isar.downloads.clearSync();
     isar.updates.clearSync();
   });
-  await _importChimahonSettings(backup);
+  await _importChimahonSettings(ref, backup);
   await _importImmersionStats(backup, replace: true);
   _importChimahonMediaSelection(backup);
   ref.invalidate(synchingProvider(syncId: 1));
@@ -958,58 +960,96 @@ void _importChimahonMediaSelection(BackupMihon backup) {
   });
 }
 
-/// Applies a Chimahon sync payload incrementally.
+/// Applies a Chimahon sync payload while preserving device-only artifacts.
 ///
-/// Unlike an explicitly requested backup restore, routine sync must preserve
-/// local cache rows, downloads, updates, tracker state, local archives, and
-/// novel library organization. The database importer never deletes by remote
-/// absence and keeps matching Manga/Chapter IDs stable.
-Future<void> restoreChimahonSyncData(Ref ref, BackupMihon backup) async {
-  const ChimahonSyncImporter().apply(database: isar, backup: backup);
-  await _importChimahonSettings(
+/// Routine merge sync is incremental. Passing [authoritativeSelection] makes
+/// the enabled media scopes remote-authoritative while retaining downloads,
+/// manual chapters, archives, EPUB files, and disabled scopes. Matching title
+/// and chapter IDs remain stable in both modes.
+Future<ChimahonSyncImportResult> restoreChimahonSyncData(
+  Ref ref,
+  BackupMihon backup, {
+  ChimahonMediaSyncSelection? authoritativeSelection,
+}) async {
+  var result = const ChimahonSyncImporter().apply(
+    database: isar,
+    backup: backup,
+    authoritativeSelection: authoritativeSelection,
+  );
+  final factoryRefresh = await _importChimahonSettings(
+    ref,
     backup,
     preserveUnrepresentableLocalSettings: true,
   );
+  result = result.withSourceReconciliation(
+    rebound: factoryRefresh.reconciliation.rebound,
+    unavailable: factoryRefresh.reconciliation.unavailable,
+    unresolved: factoryRefresh.unresolvedGroups,
+  );
   await _importImmersionStats(backup, replace: false);
   _invalidateCommonState(ref);
+  return result;
 }
 
-Future<void> _importChimahonSettings(
+Future<MihonFactoryRefreshResult> _importChimahonSettings(
+  Ref ref,
   BackupMihon backup, {
   bool preserveUnrepresentableLocalSettings = false,
 }) async {
-  isar.writeTxnSync(() {
-    final settings = isar.settings.getSync(227);
-    if (settings != null) {
-      const adapter = ChimahonAppSettingsAdapter();
-      final preserveLocalKeys = preserveUnrepresentableLocalSettings
-          ? adapter.project(settings).unrepresentableKeys
-          : const <String>{};
-      adapter.importInto(
-        settings,
-        backup.backupPreferences,
-        preserveLocalKeys: preserveLocalKeys,
-      );
-      isar.settings.putSync(settings);
-    }
-  });
-  const ChimahonSourcePreferencesAdapter().importInto(
-    database: isar,
-    sourcePreferences: backup.backupSourcePreferences,
+  final miningSnapshot = await MiningPreferences.writableSnapshot();
+  try {
+    isar.writeTxnSync(() {
+      final settings = isar.settings.getSync(227);
+      if (settings != null) {
+        const adapter = ChimahonAppSettingsAdapter();
+        final preserveLocalKeys = preserveUnrepresentableLocalSettings
+            ? adapter.project(settings).unrepresentableKeys
+            : const <String>{};
+        adapter.importInto(
+          settings,
+          backup.backupPreferences,
+          preserveLocalKeys: preserveLocalKeys,
+        );
+        isar.settings.putSync(settings);
+      }
+    });
+    const sourcePreferencesAdapter = ChimahonSourcePreferencesAdapter();
+    sourcePreferencesAdapter.importInto(
+      database: isar,
+      sourcePreferences: backup.backupSourcePreferences,
+    );
+    final sources = isar.sources.filter().idIsNotNull().findAllSync();
+    const miningAdapter = ChimahonMiningSettingsAdapter();
+    final portableSourceIds = chimahonPortableSourceOverrideIds(sources);
+    final preserveLocalMiningKeys = preserveUnrepresentableLocalSettings
+        ? (await miningAdapter.project(
+            portableSourceIds: portableSourceIds,
+          )).unrepresentableKeys
+        : const <String>{};
+    await miningAdapter.import(
+      backup.backupPreferences,
+      portableSourceIds: portableSourceIds,
+      preserveLocalKeys: preserveLocalMiningKeys,
+    );
+  } catch (_) {
+    await MiningPreferences.restoreSnapshot(miningSnapshot);
+    rethrow;
+  }
+  // JVM discovery is deliberately outside the settings rollback boundary.
+  // A missing bridge leaves native IDs unresolved and retryable; it must not
+  // revert an otherwise successful authoritative settings import.
+  final factoryRefresh = await refreshInstalledMihonFactorySources(
+    ref,
+    remoteSourcePreferences: backup.backupSourcePreferences,
+    replacePresentPreferences: true,
   );
-  final sources = isar.sources.filter().idIsNotNull().findAllSync();
-  const miningAdapter = ChimahonMiningSettingsAdapter();
-  final portableSourceIds = chimahonPortableSourceOverrideIds(sources);
-  final preserveLocalMiningKeys = preserveUnrepresentableLocalSettings
-      ? (await miningAdapter.project(
-          portableSourceIds: portableSourceIds,
-        )).unrepresentableKeys
-      : const <String>{};
-  await miningAdapter.import(
-    backup.backupPreferences,
-    portableSourceIds: portableSourceIds,
-    preserveLocalKeys: preserveLocalMiningKeys,
-  );
+  if (factoryRefresh.groupsReconciled > 0) {
+    const ChimahonSourcePreferencesAdapter().importInto(
+      database: isar,
+      sourcePreferences: backup.backupSourcePreferences,
+    );
+  }
+  return factoryRefresh;
 }
 
 int _protoInt(Object value) {

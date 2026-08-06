@@ -26,6 +26,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTr
 import 'package:mangayomi/services/sync/chimahon_sync_importer.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
+import 'package:mangayomi/services/sync/chimahon_media_sync_selection.dart';
 import 'package:mangayomi/services/sync/mihon_backup_exporter.dart';
 import 'package:protobuf/protobuf.dart';
 
@@ -354,7 +355,8 @@ void main() {
         ),
       );
 
-      expect(result.titlesUpdated, 2);
+      expect(result.titlesUpdated, 1);
+      expect(result.titlesCreated, 1);
       expect(result.chaptersCreated, 1);
       expect(result.chaptersUpdated, 1);
       expect(result.novelsUpdated, 1);
@@ -449,11 +451,15 @@ void main() {
 
       expect(database.mangas.getSync(cached.id!)?.name, 'Cached only');
       final restoredUnexportable = database.mangas.getSync(unexportable.id!);
-      expect(restoredUnexportable?.sourceId, 42);
-      expect(restoredUnexportable?.categories?.toSet(), {
-        archiveCategory.id!,
-        syncedCategory.id!,
-      });
+      expect(restoredUnexportable?.sourceId, isNull);
+      expect(restoredUnexportable?.categories, [archiveCategory.id]);
+      final resolvedRemoteCopy = database.mangas
+          .filter()
+          .mihonSourceIdEqualTo('9001')
+          .linkEqualTo('/unexportable')
+          .findFirstSync();
+      expect(resolvedRemoteCopy?.sourceId, 42);
+      expect(resolvedRemoteCopy?.categories, [syncedCategory.id]);
       expect(database.mangas.getSync(archive.id!)?.categories, [
         archiveCategory.id,
       ]);
@@ -1555,6 +1561,144 @@ void main() {
     restoredUpdate.chapter.loadSync();
     expect(restoredUpdate.chapter.value?.id, survivor.id);
   });
+
+  test(
+    'authoritative download repairs aliases, removes stale rows, and is idempotent',
+    () async {
+      late Manga canonical;
+      late Manga duplicate;
+      late Manga stale;
+      late Manga retainedOverlay;
+      late Manga disabledAnime;
+      late Category localDefault;
+      database.writeTxnSync(() {
+        database.sources.putSync(_source());
+        localDefault = Category(
+          name: 'Default',
+          forItemType: ItemType.manga,
+          pos: 0,
+        );
+        database.categorys.putSync(localDefault);
+        canonical = _manga(
+          name: 'Remote title',
+          sourceTitle: 'Remote title',
+          link: '/remote',
+          sourceId: 42,
+          categories: [localDefault.id!],
+        )..mihonSourceId = '9001';
+        duplicate =
+            _manga(
+                name: 'Remote title',
+                sourceTitle: 'Remote title',
+                link: '/remote',
+                sourceId: null,
+                categories: [localDefault.id!],
+              )
+              ..source = 'Unknown'
+              ..mihonSourceId = '9001';
+        stale = _manga(
+          name: 'Stale',
+          sourceTitle: 'Stale',
+          link: '/stale',
+          sourceId: 42,
+        )..mihonSourceId = '9001';
+        retainedOverlay = _manga(
+          name: 'Local overlay',
+          sourceTitle: 'Local overlay',
+          link: '/overlay',
+          sourceId: 42,
+        )..mihonSourceId = '9001';
+        disabledAnime = _manga(
+          name: 'Local anime',
+          sourceTitle: 'Local anime',
+          link: '/anime',
+          sourceId: 42,
+          itemType: ItemType.anime,
+        )..mihonSourceId = '9001';
+        database.mangas.putAllSync([
+          canonical,
+          duplicate,
+          stale,
+          retainedOverlay,
+          disabledAnime,
+        ]);
+        final manual = _chapter(
+          retainedOverlay,
+          name: 'Manual',
+          url: '/manual',
+          archivePath: '/device/manual.cbz',
+        );
+        database.chapters.putSync(manual);
+        manual.manga.saveSync();
+      });
+
+      final remote = BackupMihon(
+        backupSources: [
+          BackupSource(sourceId: Int64(9001), name: 'Chimahon source'),
+        ],
+        backupManga: [
+          BackupManga(
+            source: Int64(9001),
+            url: '/remote',
+            title: 'Remote title',
+            author: 'Local author',
+            favorite: true,
+            lastModifiedAt: Int64(100),
+          ),
+        ],
+      );
+      const selection = ChimahonMediaSyncSelection(
+        manga: true,
+        anime: false,
+        novels: false,
+      );
+
+      final first = const ChimahonSyncImporter().apply(
+        database: database,
+        backup: remote,
+        authoritativeSelection: selection,
+      );
+      final afterFirst = database.mangas.where().findAllSync();
+      final restored = afterFirst.singleWhere(
+        (manga) => manga.link == '/remote',
+      );
+      expect(restored.id, canonical.id);
+      expect(restored.mihonSourceId, '9001');
+      expect(restored.categories, isEmpty);
+      expect(afterFirst.any((manga) => manga.id == duplicate.id), isFalse);
+      expect(afterFirst.any((manga) => manga.id == stale.id), isFalse);
+      expect(
+        afterFirst
+            .singleWhere((manga) => manga.id == retainedOverlay.id)
+            .favorite,
+        isFalse,
+      );
+      expect(
+        afterFirst
+            .singleWhere((manga) => manga.id == retainedOverlay.id)
+            .categories,
+        isEmpty,
+      );
+      expect(afterFirst.any((manga) => manga.id == disabledAnime.id), isTrue);
+      expect(database.categorys.getSync(localDefault.id!), isNull);
+      expect(first.duplicatesRepaired, 1);
+      expect(first.titlesRemoved, 2);
+      expect(first.ambiguousRowsRetained, 1);
+
+      final stableIds = afterFirst.map((manga) => manga.id).toSet();
+      final second = const ChimahonSyncImporter().apply(
+        database: database,
+        backup: remote,
+        authoritativeSelection: selection,
+      );
+      expect(
+        database.mangas.where().findAllSync().map((manga) => manga.id).toSet(),
+        stableIds,
+      );
+      expect(second.titlesRemoved, 0);
+      expect(second.duplicatesRepaired, 0);
+    },
+  );
 }
 
 BackupMihon _exportProjection(Isar database) =>

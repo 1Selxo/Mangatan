@@ -7,9 +7,11 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/update.dart';
@@ -27,6 +29,8 @@ import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
 import 'package:mangayomi/services/sync/chimahon_local_sync_projection_service.dart';
 import 'package:mangayomi/services/sync/chimahon_media_sync_selection.dart';
+import 'package:mangayomi/services/sync/chimahon_download_plan.dart';
+import 'package:mangayomi/services/sync/chimahon_local_revision.dart';
 import 'package:mangayomi/services/sync/chimahon_pre_upload_safety_gate.dart';
 import 'package:mangayomi/services/sync/chimahon_preference_three_way_merger.dart';
 import 'package:mangayomi/services/sync/chimahon_queued_sync_gate.dart';
@@ -47,6 +51,10 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 part 'sync_server.g.dart';
+
+class _ChimahonDownloadCancelled implements Exception {
+  const _ChimahonDownloadCancelled();
+}
 
 @riverpod
 class SyncServer extends _$SyncServer {
@@ -109,6 +117,7 @@ class SyncServer extends _$SyncServer {
     bool silent, {
     bool upload = false,
     bool download = false,
+    Future<bool> Function(ChimahonDownloadPlan plan)? confirmChimahonDownload,
   }) async {
     if (!_syncsInProgress.add(syncId)) {
       if (!silent) {
@@ -133,6 +142,7 @@ class SyncServer extends _$SyncServer {
               : () => botToast(l10n.sync_starting, second: 500),
           upload: upload,
           download: download,
+          confirmDownload: confirmChimahonDownload,
         );
         if (!ran) return true;
         ref.invalidate(synchingProvider(syncId: syncId));
@@ -194,6 +204,8 @@ class SyncServer extends _$SyncServer {
         botToast(l10n.sync_finished, second: 2);
       }
       return true;
+    } on _ChimahonDownloadCancelled {
+      return true;
     } catch (error) {
       if (!silent) botToast(safeSyncUserMessage(error), second: 5);
       return false;
@@ -207,6 +219,7 @@ class SyncServer extends _$SyncServer {
     required void Function()? onStarting,
     bool upload = false,
     bool download = false,
+    Future<bool> Function(ChimahonDownloadPlan plan)? confirmDownload,
   }) => runQueuedChimahonSync(
     coordinator: ChimahonRestoreSyncCoordinator.shared,
     readCurrentPreference: () => ref.read(synchingProvider(syncId: syncId)),
@@ -218,6 +231,7 @@ class SyncServer extends _$SyncServer {
         silent: silent,
         upload: upload,
         download: download,
+        confirmDownload: confirmDownload,
       );
     },
   );
@@ -227,6 +241,7 @@ class SyncServer extends _$SyncServer {
     required bool silent,
     bool upload = false,
     bool download = false,
+    Future<bool> Function(ChimahonDownloadPlan plan)? confirmDownload,
   }) async {
     final pendingManualRestoreStore =
         await defaultChimahonPendingManualRestoreStore();
@@ -252,7 +267,9 @@ class SyncServer extends _$SyncServer {
         final refreshToken = await tokenStore.readRefreshToken();
         if (refreshToken == null) {
           _currentSyncNotifier.setGoogleDriveConnected(false);
-          throw const SyncStorageException('Google Drive is not connected');
+          throw const SyncCredentialAccessException(
+            SyncCredentialAccessFailureReason.missing,
+          );
         }
         final deviceId = _currentSyncNotifier.ensureChimahonDeviceId();
         final oauth = GoogleDriveOAuthClient();
@@ -344,6 +361,10 @@ class SyncServer extends _$SyncServer {
       final accountDeferredStore = await defaultChimahonDeferredPayloadStore(
         scopeKey: deferredPayloadScope,
       );
+      final authoritativeDownloadStage =
+          await defaultChimahonAuthoritativeDownloadStageStore(
+            scopeKey: deferredPayloadScope,
+          );
       await _migrateLegacyChimahonSidecars(
         target: accountDeferredStore,
         legacyScopeKeys: legacyDeferredPayloadScopes.where(
@@ -384,15 +405,16 @@ class SyncServer extends _$SyncServer {
           preferences: backup.backupPreferences,
           current: mediaSelectionBeforeDownload,
         );
-        final downloadedSelectionPresent =
-            ChimahonMediaSyncSelection.hasAnyPreference(
+        final downloadedSelectionMalformed =
+            ChimahonMediaSyncSelection.hasMalformedPreference(
               backup.backupPreferences,
             );
-        final downloadedSelectionCanInitialize =
-            downloadedSelectionPresent &&
-            !ChimahonMediaSyncSelection.hasMalformedPreference(
-              backup.backupPreferences,
-            );
+        if (downloadedSelectionMalformed) {
+          throw const SyncStorageException(
+            'Remote Chimahon media selection is malformed; local data was not changed',
+          );
+        }
+        final downloadedSelectionCanInitialize = !downloadedSelectionMalformed;
         localProjection = await localProjectionService.createSnapshot();
         if (!_sameChimahonBackup(localBeforeDownload, localProjection.backup) ||
             localProjection.persistedMediaSelectionState !=
@@ -402,7 +424,64 @@ class SyncServer extends _$SyncServer {
             'download again to avoid overwriting the newer local state',
           );
         }
-        await restoreChimahonSyncData(ref, backup);
+        var localRevision = await ChimahonLocalRevision.capture(
+          isar,
+          localProjection.backup,
+        );
+        final downloadPlan = ChimahonDownloadPlan(
+          backup: backup,
+          selection: downloadedSelection,
+          localProjection: localProjection.backup,
+          localMangas: isar.mangas.where().findAllSync(),
+          localChapters: isar.chapters.where().findAllSync(),
+          localSources: isar.sources.where().findAllSync(),
+          downloadedChapterIds: isar.downloads
+              .where()
+              .findAllSync()
+              .map((download) => download.id)
+              .nonNulls
+              .toSet(),
+          localRevision: localRevision,
+        );
+        if (confirmDownload != null && !await confirmDownload(downloadPlan)) {
+          throw const _ChimahonDownloadCancelled();
+        }
+        localProjection = await localProjectionService.createSnapshot();
+        localRevision = await ChimahonLocalRevision.capture(
+          isar,
+          localProjection.backup,
+        );
+        if (!downloadPlan.matchesLocalRevision(localRevision) ||
+            localProjection.persistedMediaSelectionState !=
+                mediaSelectionStateBeforeDownload) {
+          throw const SyncStorageException(
+            'Local data changed after the Chimahon download preview; '
+            'download again to review the new plan',
+          );
+        }
+        await authoritativeDownloadStage.begin(downloadPlan.backup);
+        localProjection = await localProjectionService.createSnapshot();
+        localRevision = await ChimahonLocalRevision.capture(
+          isar,
+          localProjection.backup,
+        );
+        if (!downloadPlan.matchesLocalRevision(localRevision) ||
+            localProjection.persistedMediaSelectionState !=
+                mediaSelectionStateBeforeDownload) {
+          throw const SyncStorageException(
+            'Local data changed while staging the Chimahon download; '
+            'download again to review the new plan',
+          );
+        }
+        final importResult = await restoreChimahonSyncData(
+          ref,
+          downloadPlan.backup,
+          authoritativeSelection: downloadedSelection,
+        );
+        final downloadResult = downloadPlan.complete(importResult);
+        if (!silent) {
+          botToast(downloadResult.summary, second: 5);
+        }
         if (storage case MangatanEpubBlobStorage epubStorage) {
           final epubResult = await MangatanEpubSyncService(
             database: isar,
@@ -416,9 +495,8 @@ class SyncServer extends _$SyncServer {
             );
           }
         }
-        // A download is not evidence that the pending manual restore reached
-        // the remote backend, so only update this account's cache here.
-        await accountDeferredStore.save(backup);
+        // A download is not evidence that a pending manual restore reached the
+        // remote backend; only the account cache staged above was updated.
         localProjection = await ChimahonLocalSyncProjectionService(
           database: isar,
           mediaSelection: downloadedSelection,
@@ -438,7 +516,7 @@ class SyncServer extends _$SyncServer {
         await accountDeferredStore.saveLocalPreferenceBaseline(
           const ChimahonPreferenceThreeWayMerger().baselineForProjection(
             local: localAfterImport.backupPreferences,
-            raw: backup.backupPreferences,
+            raw: downloadPlan.backup.backupPreferences,
             locallyUnrepresentableKeys:
                 localProjection.unrepresentablePreferenceKeys,
           ),
@@ -453,7 +531,13 @@ class SyncServer extends _$SyncServer {
             updatedScopeToken: activeMediaSelectionScopeToken,
           );
         }
+        // Activate the exact remote envelope only after media, settings, and
+        // companion baselines have all succeeded. The stage blocks uploads if
+        // the process exits anywhere before this point.
+        await accountDeferredStore.save(downloadPlan.backup);
+        await authoritativeDownloadStage.clear();
       } else {
+        await authoritativeDownloadStage.ensureNoIncompleteDownload();
         // Rebuild the engine and tombstone snapshot if a local edit lands
         // during network I/O. This lets one automatic retry include a tracker
         // deletion or chapter update that the first snapshot could not see.

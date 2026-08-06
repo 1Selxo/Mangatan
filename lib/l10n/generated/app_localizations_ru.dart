@@ -999,7 +999,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      'Эта операция полностью заменит локальные данные удаленными данными!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => 'Включить синхронизацию';

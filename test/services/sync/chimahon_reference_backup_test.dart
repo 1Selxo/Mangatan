@@ -47,7 +47,7 @@ void main() {
       expect(backup.backupSources, hasLength(45));
       expect(backup.backupPreferences, hasLength(182));
       expect(backup.backupSourcePreferences, hasLength(4));
-      expect(backup.backupExtensionRepo, hasLength(1));
+      expect(backup.backupExtensionStores, hasLength(1));
       expect(backup.backupAnime, hasLength(5));
       expect(backup.backupAnimeCategories, hasLength(2));
       expect(backup.backupAnimeSources, hasLength(3));

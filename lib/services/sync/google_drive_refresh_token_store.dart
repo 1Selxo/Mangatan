@@ -1,4 +1,15 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart';
+
+enum SyncCredentialAccessFailureReason { denied, locked, missing, unavailable }
+
+/// Sanitized credential-store failure which never includes secret values or
+/// platform exception details.
+class SyncCredentialAccessException implements Exception {
+  const SyncCredentialAccessException(this.reason);
+
+  final SyncCredentialAccessFailureReason reason;
+}
 
 /// Persistence contract for the long-lived Google Drive credential.
 ///
@@ -89,19 +100,23 @@ class SecureGoogleDriveRefreshTokenStore
 
   @override
   Future<String?> readRefreshToken() async {
-    final current = _usableToken(await backend.read(key: storageKey));
-    if (current != null) return current;
-    for (final legacyKey in legacyStorageKeys) {
-      if (legacyKey == storageKey) continue;
-      final legacy = _usableToken(await backend.read(key: legacyKey));
-      if (legacy == null) continue;
-      // Create the friendly, labelled item before using it. Keep the legacy
-      // item until explicit disconnect so this one-time migration cannot add
-      // a second Keychain authorization prompt or lose the only credential.
-      await backend.write(key: storageKey, value: legacy);
-      return legacy;
+    try {
+      final current = _usableToken(await backend.read(key: storageKey));
+      if (current != null) return current;
+      for (final legacyKey in legacyStorageKeys) {
+        if (legacyKey == storageKey) continue;
+        final legacy = _usableToken(await backend.read(key: legacyKey));
+        if (legacy == null) continue;
+        // Create the friendly, labelled item before using it. Keep the legacy
+        // item until explicit disconnect so this one-time migration cannot add
+        // a second Keychain authorization prompt or lose the only credential.
+        await backend.write(key: storageKey, value: legacy);
+        return legacy;
+      }
+      return null;
+    } catch (error) {
+      throw _credentialAccessException(error);
     }
-    return null;
   }
 
   @override
@@ -113,17 +128,91 @@ class SecureGoogleDriveRefreshTokenStore
         'Refresh token must not be blank',
       );
     }
-    return backend.write(key: storageKey, value: refreshToken);
+    return _write(refreshToken);
+  }
+
+  Future<void> _write(String refreshToken) async {
+    try {
+      await backend.write(key: storageKey, value: refreshToken);
+    } catch (error) {
+      throw _credentialAccessException(error);
+    }
   }
 
   @override
   Future<void> clearRefreshToken() async {
-    await backend.delete(key: storageKey);
-    for (final legacyKey in legacyStorageKeys) {
-      if (legacyKey != storageKey) await backend.delete(key: legacyKey);
+    try {
+      await backend.delete(key: storageKey);
+      for (final legacyKey in legacyStorageKeys) {
+        if (legacyKey != storageKey) await backend.delete(key: legacyKey);
+      }
+    } catch (error) {
+      throw _credentialAccessException(error);
     }
   }
 
   String? _usableToken(String? value) =>
       value == null || value.trim().isEmpty ? null : value;
+
+  SyncCredentialAccessException _credentialAccessException(Object error) {
+    if (error is SyncCredentialAccessException) return error;
+    if (error is! PlatformException) {
+      return const SyncCredentialAccessException(
+        SyncCredentialAccessFailureReason.unavailable,
+      );
+    }
+    final markers = <String>{error.code.trim().toLowerCase()};
+    void addMarker(Object? value) {
+      if (value is String || value is num) {
+        markers.add(value.toString().trim().toLowerCase());
+      }
+    }
+
+    final details = error.details;
+    if (details is Map) {
+      for (final entry in details.entries) {
+        addMarker(entry.key);
+        addMarker(entry.value);
+      }
+    } else {
+      addMarker(details);
+    }
+    if (markers.any(
+      (marker) =>
+          marker == '-25293' ||
+          marker == 'errsecauthfailed' ||
+          marker == 'authfailed' ||
+          marker == 'cssmerr_csp_operation_auth_denied' ||
+          marker == 'authorization_denied',
+    )) {
+      return const SyncCredentialAccessException(
+        SyncCredentialAccessFailureReason.denied,
+      );
+    }
+    if (markers.any(
+      (marker) =>
+          marker == '-25308' ||
+          marker == 'errsecinteractionnotallowed' ||
+          marker == 'interactionnotallowed' ||
+          marker == 'interaction_not_allowed' ||
+          marker == 'keychain_locked',
+    )) {
+      return const SyncCredentialAccessException(
+        SyncCredentialAccessFailureReason.locked,
+      );
+    }
+    if (markers.any(
+      (marker) =>
+          marker == '-25300' ||
+          marker == 'errsecitemnotfound' ||
+          marker == 'item_not_found',
+    )) {
+      return const SyncCredentialAccessException(
+        SyncCredentialAccessFailureReason.missing,
+      );
+    }
+    return const SyncCredentialAccessException(
+      SyncCredentialAccessFailureReason.unavailable,
+    );
+  }
 }

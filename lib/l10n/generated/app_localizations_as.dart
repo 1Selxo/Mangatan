@@ -984,7 +984,7 @@ class AppLocalizationsAs extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      'এই অপাৰেশনে ল\'কেল ডাটা সম্পূৰ্ণৰূপে ৰিম\'ট ডাটাৰ সৈতে প্ৰতিস্থাপন কৰিব!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => 'সিংক সক্ষম কৰক';

@@ -2,6 +2,7 @@ import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
 import 'package:mangayomi/services/sync/chimahon_pre_upload_safety_gate.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
 import 'package:mangayomi/services/sync/google_drive_oauth.dart';
+import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
 
 enum SyncUserMessageContext {
   synchronization,
@@ -38,6 +39,18 @@ String safeSyncUserMessage(
       _ => 'Google Drive sign-in failed. Try again.',
     };
   }
+  if (error is SyncCredentialAccessException) {
+    return switch (error.reason) {
+      SyncCredentialAccessFailureReason.denied =>
+        'macOS Keychain access was denied. Restart Mangatan, retry, and approve the Keychain prompt.',
+      SyncCredentialAccessFailureReason.locked =>
+        'The system credential store is locked. Unlock it and try syncing again.',
+      SyncCredentialAccessFailureReason.missing =>
+        'Google Drive is not connected. Connect it again before syncing.',
+      SyncCredentialAccessFailureReason.unavailable =>
+        'The system credential store is unavailable. Try again after restarting Mangatan.',
+    };
+  }
   if (error is SyncConflictException) {
     return 'Sync data changed on another device. Try syncing again.';
   }
@@ -48,6 +61,10 @@ String safeSyncUserMessage(
       error is ChimahonPendingManualRestoreIncompleteException) {
     return 'Chimahon restore data is incomplete. Restore the original backup '
         'again before syncing.';
+  }
+  if (error is ChimahonAuthoritativeDownloadIncompleteException) {
+    return 'A previous Download-only restore did not finish. Retry Download '
+        'only before uploading or running two-way sync.';
   }
   if (error is SyncStorageException) {
     return context == SyncUserMessageContext.googleDriveConnection

@@ -4,7 +4,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAn
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
-import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionRepos.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionStore.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupFeed.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
@@ -1260,6 +1260,7 @@ void main() {
             viewerFlags: 9,
             updateStrategy: 2,
             notes: 'Chimahon note',
+            memo: const [1, 2, 3],
             initialized: false,
             excludedScanlators: const ['Group'],
             lastModifiedAt: Int64(200),
@@ -1271,6 +1272,7 @@ void main() {
                 chapterNumber: 32,
                 dateFetch: Int64(123),
                 sourceOrder: Int64(456),
+                memo: const [4, 5],
                 lastModifiedAt: Int64(200),
                 version: Int64(6),
               ),
@@ -1287,6 +1289,7 @@ void main() {
     expect(manga.viewerFlags, 9);
     expect(manga.updateStrategy, 2);
     expect(manga.notes, 'Chimahon note');
+    expect(manga.memo, [1, 2, 3]);
     expect(manga.hasInitialized(), isTrue);
     expect(manga.initialized, isFalse);
     expect(manga.excludedScanlators, ['Group']);
@@ -1294,6 +1297,7 @@ void main() {
     expect(manga.chapters.single.chapterNumber, 32);
     expect(manga.chapters.single.dateFetch, Int64(123));
     expect(manga.chapters.single.sourceOrder, Int64(456));
+    expect(manga.chapters.single.memo, [4, 5]);
   });
 
   test('preserves Chimahon category flags and identity on an order tie', () {
@@ -1529,9 +1533,9 @@ void main() {
             33,
           ),
         ],
-        backupExtensionRepo: [
+        backupExtensionStores: [
           _withUnknownMarker(
-            BackupExtensionRepos(baseUrl: 'https://repo', name: 'Local'),
+            BackupExtensionStore(indexUrl: 'https://repo', name: 'Local'),
             35,
           ),
         ],
@@ -1556,9 +1560,9 @@ void main() {
             34,
           ),
         ],
-        backupExtensionRepo: [
+        backupExtensionStores: [
           _withUnknownMarker(
-            BackupExtensionRepos(baseUrl: 'https://repo', name: 'Remote'),
+            BackupExtensionStore(indexUrl: 'https://repo', name: 'Remote'),
             36,
           ),
         ],
@@ -1582,8 +1586,8 @@ void main() {
       Int64(34),
       Int64(33),
     ]);
-    expect(merged.backupExtensionRepo.single.name, 'Local');
-    expect(_unknownMarkers(merged.backupExtensionRepo.single), [
+    expect(merged.backupExtensionStores.single.name, 'Local');
+    expect(_unknownMarkers(merged.backupExtensionStores.single), [
       Int64(36),
       Int64(35),
     ]);
@@ -2189,13 +2193,25 @@ void main() {
     final merged = merger.merge(
       local: BackupMihon(
         backupMangaStats: [
-          BackupMangaStats(dateKey: '2026-07-10', mangaId: Int64(1), charactersRead: 10),
-          BackupMangaStats(dateKey: '2026-07-11', mangaId: Int64(1), charactersRead: 20),
+          BackupMangaStats(
+            dateKey: '2026-07-10',
+            mangaId: Int64(1),
+            charactersRead: 10,
+          ),
+          BackupMangaStats(
+            dateKey: '2026-07-11',
+            mangaId: Int64(1),
+            charactersRead: 20,
+          ),
         ],
       ),
       remote: BackupMihon(
         backupMangaStats: [
-          BackupMangaStats(dateKey: '2026-07-10', mangaId: Int64(2), charactersRead: 30),
+          BackupMangaStats(
+            dateKey: '2026-07-10',
+            mangaId: Int64(2),
+            charactersRead: 30,
+          ),
         ],
       ),
     );

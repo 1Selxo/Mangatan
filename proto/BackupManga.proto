@@ -30,6 +30,7 @@ message BackupManga {
     int64 version = 109;
     string notes = 110;
     bool initialized = 111;
+    bytes memo = 112;
 
     // J2K/Chimahon custom manga info represented by Mangatan.
     optional string customTitle = 800;

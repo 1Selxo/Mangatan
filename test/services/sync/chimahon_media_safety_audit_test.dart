@@ -34,6 +34,26 @@ void main() {
         final values = affected.toList();
         if (values.isNotEmpty) result[code] = values;
       },
+      observe: (_, _) {},
+    );
+    return result;
+  }
+
+  Map<String, List<String>> observations({
+    required BackupMihon remote,
+    required BackupMihon local,
+    required BackupMihon proposed,
+  }) {
+    final result = <String, List<String>>{};
+    audit.audit(
+      remote: remote,
+      local: local,
+      proposed: proposed,
+      fail: (_, _) {},
+      observe: (code, affected) {
+        final values = affected.toList();
+        if (values.isNotEmpty) result[code] = values;
+      },
     );
     return result;
   }
@@ -490,6 +510,26 @@ void main() {
     );
   });
 
+  test('grandfathers only an unchanged legacy unclocked tombstone', () {
+    final legacy = BackupMihon(
+      backupAnime: [anime(favorite: false, favoriteClock: null)],
+    );
+    expect(
+      failures(
+        remote: legacy,
+        local: BackupMihon(),
+        proposed: legacy.deepCopy(),
+      ),
+      isEmpty,
+    );
+
+    final resurrected = legacy.deepCopy()..backupAnime.single.favorite = true;
+    expect(
+      failures(remote: legacy, local: BackupMihon(), proposed: resurrected),
+      contains('remote_anime_invalid_tombstone_resurrection'),
+    );
+  });
+
   test('accepts an explicitly recorded local portable-tracker deletion', () {
     final remoteManga = manga(tracking: [BackupTracking(syncId: 2)]);
     final localManga = manga();
@@ -529,7 +569,7 @@ void main() {
     );
   });
 
-  test('fails closed on duplicate parent and nested media identities', () {
+  test('only canonical remote child duplicates are observations', () {
     final chapter = BackupChapter(
       url: '/chapter',
       name: 'Chapter',
@@ -575,12 +615,105 @@ void main() {
       result.keys,
       containsAll({
         'remote_manga_duplicate_identity',
-        'remote_manga_chapter_duplicate_identity',
-        'remote_anime_episode_duplicate_identity',
         'remote_anime_history_duplicate_identity',
         'remote_anime_tracking_duplicate_identity',
       }),
     );
+    expect(result, isNot(contains('remote_manga_chapter_duplicate_identity')));
+    expect(result, isNot(contains('remote_anime_episode_duplicate_identity')));
+
+    final observed = observations(
+      remote: BackupMihon(
+        backupManga: [remoteManga, remoteManga.deepCopy()],
+        backupAnime: [remoteAnime],
+      ),
+      local: BackupMihon(),
+      proposed: BackupMihon(
+        backupManga: [
+          manga(chapters: [chapter]),
+        ],
+        backupAnime: [
+          anime(
+            episodes: [episode],
+            history: [BackupHistory(url: '/episode', lastRead: Int64(10))],
+            tracking: [BackupTracking(syncId: 2)],
+          ),
+        ],
+      ),
+    );
+    expect(observed, contains('remote_manga_chapter_duplicate_identity'));
+    expect(observed, contains('remote_anime_episode_duplicate_identity'));
+  });
+
+  test('local and proposed child duplicates remain hard failures', () {
+    final chapter = BackupChapter(
+      url: '/chapter',
+      name: 'Chapter',
+      chapterNumber: 1,
+      version: Int64(1),
+    );
+    final duplicate = manga(chapters: [chapter, chapter.deepCopy()]);
+
+    expect(
+      failures(
+        remote: BackupMihon(),
+        local: BackupMihon(backupManga: [duplicate]),
+        proposed: BackupMihon(
+          backupManga: [
+            manga(chapters: [chapter]),
+          ],
+        ),
+      ),
+      contains('local_manga_chapter_duplicate_identity'),
+    );
+    expect(
+      failures(
+        remote: BackupMihon(
+          backupManga: [
+            manga(chapters: [chapter]),
+          ],
+        ),
+        local: BackupMihon(),
+        proposed: BackupMihon(backupManga: [duplicate]),
+      ),
+      contains('proposed_manga_chapter_duplicate_identity'),
+    );
+  });
+
+  test('lossy repair of remote child duplicates still fails closed', () {
+    final older = BackupChapter(
+      url: '/chapter',
+      name: 'Chapter',
+      chapterNumber: 1,
+      version: Int64(1),
+      lastModifiedAt: Int64(10),
+      lastPageRead: Int64(7),
+      bookmark: true,
+    );
+    final newer = BackupChapter(
+      url: '/chapter',
+      name: 'Chapter',
+      chapterNumber: 1,
+      version: Int64(2),
+      lastModifiedAt: Int64(20),
+      lastPageRead: Int64(3),
+    );
+
+    final result = failures(
+      remote: BackupMihon(
+        backupManga: [
+          manga(chapters: [older, newer]),
+        ],
+      ),
+      local: BackupMihon(),
+      proposed: BackupMihon(
+        backupManga: [
+          manga(chapters: [newer]),
+        ],
+      ),
+    );
+
+    expect(result, contains('remote_manga_chapter_portable_values_changed'));
   });
 
   test('fails an unversioned timestamp regression after promotion', () {
@@ -823,6 +956,98 @@ void main() {
       );
     },
   );
+
+  test('accepts preserved opaque memo bytes on local media winners', () {
+    final remoteChapter = BackupChapter(
+      url: '/chapter',
+      name: 'Chapter 54',
+      chapterNumber: 54,
+      read: false,
+      lastPageRead: Int64(3),
+      dateFetch: Int64(50),
+      sourceOrder: Int64(9),
+      memo: const [123, 125],
+      lastModifiedAt: Int64(100),
+      version: Int64(22),
+    );
+    final localChapter = BackupChapter(
+      url: '/chapter',
+      name: 'Chapter 54',
+      chapterNumber: 54,
+      read: true,
+      lastPageRead: Int64.ZERO,
+      lastModifiedAt: Int64(200),
+      version: Int64.ZERO,
+    );
+    final remoteManga =
+        manga(modifiedAt: 100, version: 649, chapters: [remoteChapter])
+          ..description = 'Remote metadata'
+          ..memo = const [123, 125];
+    final localManga = manga(
+      modifiedAt: 200,
+      version: 0,
+      chapters: [localChapter],
+    )..description = 'New local metadata';
+    final remote = BackupMihon(backupManga: [remoteManga]);
+    final local = BackupMihon(backupManga: [localManga]);
+    final proposed = const ChimahonSyncMerger().merge(
+      local: local,
+      remote: remote,
+      remoteWinsProjectionTies: true,
+    );
+
+    expect(proposed.backupManga.single.memo, [123, 125]);
+    expect(proposed.backupManga.single.chapters.single.memo, [123, 125]);
+    expect(
+      failures(
+        remote: remote,
+        local: local,
+        proposed: proposed,
+        remoteWinsTies: true,
+      ),
+      isEmpty,
+    );
+  });
+
+  test('retains exact remote page one over Mangatan sentinel zero', () {
+    final remoteChapter = BackupChapter(
+      url: '/chapter',
+      name: 'Chapter 1',
+      chapterNumber: 1,
+      lastPageRead: Int64.ONE,
+      lastModifiedAt: Int64.ZERO,
+      version: Int64.ZERO,
+    );
+    final localChapter = remoteChapter.deepCopy()
+      ..lastPageRead = Int64.ZERO
+      ..lastModifiedAt = Int64(2);
+    final remote = BackupMihon(
+      backupManga: [
+        manga(chapters: [remoteChapter]),
+      ],
+    );
+    final local = BackupMihon(
+      backupManga: [
+        manga(chapters: [localChapter]),
+      ],
+    );
+    final proposed = const ChimahonSyncMerger().merge(
+      local: local,
+      remote: remote,
+      remoteWinsProjectionTies: true,
+    );
+
+    expect(proposed.backupManga.single.chapters.single.lastPageRead, Int64.ONE);
+    expect(
+      failures(
+        remote: remote,
+        local: local,
+        proposed: proposed,
+        remoteWinsTies: true,
+      ),
+      isEmpty,
+    );
+  });
 
   test('audits the same proven legacy chapter-number rebase as the merger', () {
     final remoteChapter = BackupChapter(

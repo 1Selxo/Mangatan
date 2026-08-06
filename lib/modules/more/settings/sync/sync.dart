@@ -613,7 +613,7 @@ class SyncScreen extends ConsumerWidget {
                         IconButton(
                           onPressed: !syncPreference.syncOn || !isLogged
                               ? null
-                              : () => _showConfirmDialog(context, ref, false),
+                              : () => _startDownloadWithPreview(context, ref),
                           icon: Icon(
                             Icons.file_download_outlined,
                             color: !syncPreference.syncOn || !isLogged
@@ -679,6 +679,42 @@ class SyncScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _startDownloadWithPreview(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    await ref
+        .read(syncServerProvider(syncId: 1).notifier)
+        .startSync(
+          context.l10n,
+          false,
+          download: true,
+          confirmChimahonDownload: (plan) async {
+            if (!context.mounted) return false;
+            return await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    content: Text(
+                      plan.confirmationSummary,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: Text(dialogContext.l10n.cancel),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        child: Text(dialogContext.l10n.dialog_confirm),
+                      ),
+                    ],
+                  ),
+                ) ??
+                false;
+          },
+        );
   }
 
   void _showDialogLogin(

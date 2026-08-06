@@ -706,7 +706,6 @@
   "sync_button_upload": "Nur hochladen",
   "sync_button_upload_info": "Dieser Vorgang ersetzt die Remote-Daten vollständig durch die lokalen Daten!",
   "sync_button_download": "Nur herunterladen",
-  "sync_button_download_info": "Dieser Vorgang ersetzt die lokalen Daten vollständig durch die Remote-Daten!",
   "extension_settings": "Erweiterungseinstellungen",
   "video_audio_info": "Bevorzugte Sprachen, Tonhöhenkorrektur, Audiokanäle",
   "all_chapters": "Alle Kapitel",

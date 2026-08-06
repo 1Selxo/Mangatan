@@ -973,7 +973,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sync_button_download => 'ダウンロードのみ';
 
   @override
-  String get sync_button_download_info => 'この操作はローカルデータを完全にリモートデータで置き換えます！';
+  String get sync_button_download_info =>
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => '同期を有効化';

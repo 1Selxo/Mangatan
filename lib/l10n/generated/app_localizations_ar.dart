@@ -994,7 +994,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      'ستستبدل هذه العملية البيانات المحلية بالكامل بالبيانات البعيدة!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => 'تمكين المزامنة';

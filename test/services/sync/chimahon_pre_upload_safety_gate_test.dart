@@ -115,7 +115,17 @@ void main() {
       );
       final remoteBytes = codec.encode(remote);
       final local = remote.deepCopy()
-        ..unknownFields.mergeVarintField(700, Int64(1));
+        ..unknownFields.mergeVarintField(700, Int64(1))
+        ..backupManga.add(
+          BackupManga(
+            source: Int64(42),
+            url: '/local-unclocked-tombstone',
+            title: 'Local deleted title',
+            favorite: false,
+            version: Int64(1),
+            lastModifiedAt: Int64(1),
+          ),
+        );
       final storage = _GateStorage(
         RemoteSyncSnapshot(
           bytes: remoteBytes,
@@ -144,11 +154,7 @@ void main() {
       expect(safeFailure.code, 'unsafe_proposed_payload');
       expect(
         safeFailure.failureCounts,
-        containsPair('remote_tombstone_deletion_clock_missing', 1),
-      );
-      expect(
-        safeFailure.failureCounts,
-        containsPair('remote_tombstone_not_preserved', 1),
+        containsPair('local_manga_tombstone_deletion_clock_missing', 1),
       );
       expect(safeFailure.toString(), isNot(contains(secretTitle)));
       expect(safeFailure.toString(), isNot(contains(secretUrl)));

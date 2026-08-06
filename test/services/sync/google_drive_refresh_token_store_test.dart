@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
 
@@ -106,6 +107,85 @@ void main() {
     expect(backend.values[legacyKey], isNull);
     expect(backend.values['unrelated-key'], 'keep-me');
   });
+
+  test('classifies Keychain authorization denial without exposing details', () {
+    store = SecureGoogleDriveRefreshTokenStore(
+      backend: _ThrowingSecureValueStoreBackend(
+        PlatformException(code: 'CSSMERR_CSP_OPERATION_AUTH_DENIED'),
+      ),
+    );
+
+    expect(
+      store.readRefreshToken(),
+      throwsA(
+        isA<SyncCredentialAccessException>().having(
+          (error) => error.reason,
+          'reason',
+          SyncCredentialAccessFailureReason.denied,
+        ),
+      ),
+    );
+  });
+
+  for (final entry in const {
+    'errSecInteractionNotAllowed': SyncCredentialAccessFailureReason.locked,
+    'errSecItemNotFound': SyncCredentialAccessFailureReason.missing,
+    'plugin_unavailable': SyncCredentialAccessFailureReason.unavailable,
+  }.entries) {
+    test('classifies structured credential failure ${entry.key}', () {
+      store = SecureGoogleDriveRefreshTokenStore(
+        backend: _ThrowingSecureValueStoreBackend(
+          PlatformException(code: entry.key),
+        ),
+      );
+
+      expect(
+        store.writeRefreshToken('token'),
+        throwsA(
+          isA<SyncCredentialAccessException>().having(
+            (error) => error.reason,
+            'reason',
+            entry.value,
+          ),
+        ),
+      );
+    });
+  }
+
+  test('classifies a structured macOS status value', () {
+    store = SecureGoogleDriveRefreshTokenStore(
+      backend: _ThrowingSecureValueStoreBackend(
+        PlatformException(code: 'keychain_error', details: -25293),
+      ),
+    );
+
+    expect(
+      store.clearRefreshToken(),
+      throwsA(
+        isA<SyncCredentialAccessException>().having(
+          (error) => error.reason,
+          'reason',
+          SyncCredentialAccessFailureReason.denied,
+        ),
+      ),
+    );
+  });
+}
+
+class _ThrowingSecureValueStoreBackend implements SecureValueStoreBackend {
+  const _ThrowingSecureValueStoreBackend(this.message);
+
+  final Object message;
+
+  @override
+  Future<String?> read({required String key}) => throw message;
+
+  @override
+  Future<void> write({required String key, required String value}) =>
+      throw message;
+
+  @override
+  Future<void> delete({required String key}) => throw message;
 }
 
 class _MemorySecureValueStoreBackend implements SecureValueStoreBackend {

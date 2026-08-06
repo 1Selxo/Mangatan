@@ -307,7 +307,6 @@
   "sync_button_upload": "アップロードのみ",
   "sync_button_upload_info": "この操作はリモートデータを完全にローカルデータで置き換えます！",
   "sync_button_download": "ダウンロードのみ",
-  "sync_button_download_info": "この操作はローカルデータを完全にリモートデータで置き換えます！",
   "sync_on": "同期を有効化",
   "sync_auto": "自動同期",
   "sync_auto_warning": "自動同期は現在実験的な機能です！",

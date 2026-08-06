@@ -33,10 +33,30 @@ class ChimahonMediaSafetyAudit {
     Set<ChimahonTrackingDeletionKey> localTrackingDeletions = const {},
     bool remoteWinsTies = false,
     required void Function(String, Iterable<String>) fail,
+    required void Function(String, Iterable<String>) observe,
   }) {
-    _auditDuplicateIdentities(label: 'remote', backup: remote, fail: fail);
-    _auditDuplicateIdentities(label: 'local', backup: local, fail: fail);
-    _auditDuplicateIdentities(label: 'proposed', backup: proposed, fail: fail);
+    _auditDuplicateIdentities(
+      label: 'remote',
+      backup: remote,
+      allowCanonicalChildRepair: true,
+      fail: fail,
+      observe: observe,
+    );
+    _auditDuplicateIdentities(
+      label: 'local',
+      backup: local,
+      allowCanonicalChildRepair: false,
+      fail: fail,
+      observe: observe,
+    );
+    _auditDuplicateIdentities(
+      label: 'proposed',
+      backup: proposed,
+      allowCanonicalChildRepair: false,
+      fail: fail,
+      observe: observe,
+    );
+    _auditLocalTombstoneClocks(remote: remote, local: local, fail: fail);
     _auditExpectedMediaIdentityUnion(
       local: local,
       remote: remote,
@@ -99,14 +119,72 @@ class ChimahonMediaSafetyAudit {
     );
   }
 
-  /// The merger intentionally indexes media rows by their Chimahon identity.
-  /// An exact duplicate would otherwise be collapsed before the preservation
-  /// checks below, allowing one proposed row to satisfy multiple input rows.
-  /// Refuse the ambiguous input instead of guessing which duplicate was meant.
+  /// A clockless tombstone is tolerated only as an unchanged legacy row that
+  /// already exists remotely. Newly-created local deletions need an explicit
+  /// favorite-state clock so another device can order them safely.
+  void _auditLocalTombstoneClocks({
+    required BackupMihon remote,
+    required BackupMihon local,
+    required void Function(String, Iterable<String>) fail,
+  }) {
+    final remoteLegacyMangaBytes = {
+      for (final manga in remote.backupManga)
+        if (_isLegacyMangaTombstone(manga)) base64Encode(manga.writeToBuffer()),
+    };
+    fail(
+      'local_manga_tombstone_deletion_clock_missing',
+      local.backupManga
+          .where(_isLegacyMangaTombstone)
+          .where(
+            (manga) => !remoteLegacyMangaBytes.contains(
+              base64Encode(manga.writeToBuffer()),
+            ),
+          )
+          .map(mangaIdentity),
+    );
+
+    final remoteLegacyAnimeBytes = {
+      for (final anime in remote.backupAnime)
+        if (_isLegacyAnimeTombstone(anime)) base64Encode(anime.writeToBuffer()),
+    };
+    fail(
+      'local_anime_tombstone_deletion_clock_missing',
+      local.backupAnime
+          .where(_isLegacyAnimeTombstone)
+          .where(
+            (anime) => !remoteLegacyAnimeBytes.contains(
+              base64Encode(anime.writeToBuffer()),
+            ),
+          )
+          .map(animeIdentity),
+    );
+  }
+
+  bool _isLegacyMangaTombstone(BackupManga manga) =>
+      manga.hasFavorite() &&
+      !manga.favorite &&
+      (!manga.hasFavoriteModifiedAt() ||
+          manga.favoriteModifiedAt <= Int64.ZERO);
+
+  bool _isLegacyAnimeTombstone(BackupAnime anime) =>
+      anime.hasFavorite() &&
+      !anime.favorite &&
+      (!anime.hasFavoriteModifiedAt() ||
+          anime.favoriteModifiedAt <= Int64.ZERO);
+
+  /// Parent, history, and tracking duplicates remain ambiguous and are always
+  /// rejected. Existing remote chapter/episode duplicates can be normalized
+  /// by the deterministic child canonicalizer; the transition audits below
+  /// still require the resulting clock, portable state, and unknown fields to
+  /// preserve that complete canonical projection. Local and proposed
+  /// duplicates remain hard failures so Mangatan never creates or uploads new
+  /// ambiguity.
   void _auditDuplicateIdentities({
     required String label,
     required BackupMihon backup,
+    required bool allowCanonicalChildRepair,
     required void Function(String, Iterable<String>) fail,
+    required void Function(String, Iterable<String>) observe,
   }) {
     fail(
       '${label}_manga_duplicate_identity',
@@ -133,7 +211,11 @@ class ChimahonMediaSafetyAudit {
         ).map((key) => _join([parentKey, key])),
       );
     }
-    fail('${label}_manga_chapter_duplicate_identity', duplicateChapters);
+    final reportChildDuplicate = allowCanonicalChildRepair ? observe : fail;
+    reportChildDuplicate(
+      '${label}_manga_chapter_duplicate_identity',
+      duplicateChapters,
+    );
     fail('${label}_manga_history_duplicate_identity', duplicateMangaHistory);
     fail('${label}_manga_tracking_duplicate_identity', duplicateMangaTracking);
 
@@ -162,7 +244,10 @@ class ChimahonMediaSafetyAudit {
         ).map((key) => _join([parentKey, key])),
       );
     }
-    fail('${label}_anime_episode_duplicate_identity', duplicateEpisodes);
+    reportChildDuplicate(
+      '${label}_anime_episode_duplicate_identity',
+      duplicateEpisodes,
+    );
     fail('${label}_anime_history_duplicate_identity', duplicateAnimeHistory);
     fail('${label}_anime_tracking_duplicate_identity', duplicateAnimeTracking);
   }
@@ -1748,6 +1833,12 @@ class ChimahonMediaSafetyAudit {
         (value) => expected.initialized = value,
         expected.clearInitialized,
       );
+      _copyOptionalBytes(
+        remote.hasMemo(),
+        remote.memo,
+        (value) => expected.memo = value,
+        expected.clearMemo,
+      );
     }
     return _mangaPortableProjection(expected);
   }
@@ -1901,6 +1992,12 @@ class ChimahonMediaSafetyAudit {
         remote.sourceOrder,
         (value) => expected.sourceOrder = value,
         expected.clearSourceOrder,
+      );
+      _copyOptionalBytes(
+        remote.hasMemo(),
+        remote.memo,
+        (value) => expected.memo = value,
+        expected.clearMemo,
       );
     }
     return _chapterPortableProjection(expected);
@@ -2329,6 +2426,13 @@ class ChimahonMediaSafetyAudit {
     void Function() clear,
   ) => present ? set(value) : clear();
 
+  void _copyOptionalBytes(
+    bool present,
+    List<int> value,
+    void Function(List<int>) set,
+    void Function() clear,
+  ) => present ? set(List<int>.of(value)) : clear();
+
   void _auditMembership({
     required String parentKey,
     required Iterable<Int64> sourceOrders,
@@ -2555,9 +2659,18 @@ class ChimahonMediaSafetyAudit {
   }) {
     final failures = <_FavoriteFailure>{};
     if (baseline.isTombstone && !baseline.hasPositiveClock) {
-      failures
-        ..add(_FavoriteFailure.tombstoneClockMissing)
-        ..add(_FavoriteFailure.tombstoneNotPreserved);
+      final preservedLegacyTombstone =
+          proposed.hasFavoriteField == baseline.hasFavoriteField &&
+          proposed.favorite == baseline.favorite &&
+          proposed.modifiedAt == baseline.modifiedAt;
+      if (!preservedLegacyTombstone) {
+        failures
+          ..add(_FavoriteFailure.tombstoneClockMissing)
+          ..add(_FavoriteFailure.tombstoneNotPreserved);
+        if (proposed.semanticFavorite) {
+          failures.add(_FavoriteFailure.invalidTombstoneResurrection);
+        }
+      }
     }
     if (expected == null) {
       failures.add(_FavoriteFailure.favoriteClockRegressed);

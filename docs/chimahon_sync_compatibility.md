@@ -32,16 +32,44 @@ platform-specific layers. Linux is currently x86-64 only because the tracked
 - Chimahon application preferences and source preferences that Mangatan can
   represent, including the backed media selectors `library_entries`,
   `anime_entries`, and `sync_novels`.
-- Source maps, extension repositories, saved searches, and feeds already in
-  the remote payload are retained through Mangatan merges.
-- Manga, anime, and novel category wire records are represented. The complete
-  Chimahon-style category editor and library behavior are intentionally a
-  later UI/functional task.
+- Source maps, extension stores (including signing-key metadata), legacy
+  extension repositories, manga/chapter memo bytes, search history, saved
+  searches, and feeds already in the remote payload are retained through
+  Mangatan merges. Extension stores are portable data only: Mangatan does not
+  install them automatically because it cannot enforce Chimahon's trust model.
+- Manga, anime, and novel category wire records are represented. Download-only
+  treats their enabled media scope and memberships as authoritative, including
+  an explicitly empty membership.
 
 Unknown protobuf fields and unsupported preference values are retained as
 opaque data. A no-edit remote -> Mangatan -> Chimahon round trip therefore does
 not erase future fields merely because this Mangatan build cannot display
 them. Explicit local edits replace only the fields Mangatan owns.
+
+## Download-only behavior
+
+Download-only previews the exact remote counts and projected removals before
+writing. Enabled media scopes are remote-authoritative; disabled scopes are
+untouched. A second identical download is idempotent and reuses existing title
+and chapter IDs.
+
+Remote-absent source entries are removed unless they carry device-only data.
+Archives, EPUB files, downloaded/manual chapters, and their dependent local
+history remain on the device. A retained source-backed overlay becomes
+uncategorized so a stale or synthetic `Default` membership cannot survive the
+authoritative restore. Local archive categories remain local.
+
+The complete protobuf is staged separately before the restore. It becomes the
+active remote baseline only after media, settings, preference baselines, and
+media-selection state succeed. If the operation is interrupted, upload and
+two-way sync remain blocked until Download-only is retried; the staged payload
+is never interpreted as upload intent.
+
+Mihon factory sources such as Jellyfin are reconciled by native source ID.
+Synced preference values replace stale bridge values for keys present in the
+remote store, factory children are rediscovered, and newly revealed children
+receive their own deferred preference stores. Display names are advisory and
+are never used as identity.
 
 ## Novel file limitation
 
@@ -78,6 +106,9 @@ payload:
   window/UI state, and other preferences with no Chimahon key. They are not
   emitted into a Chimahon backup and importing Chimahon data does not delete
   them.
+- Chimahon's `fullscreen` and `player_fullscreen` values remain opaque on the
+  wire. They control Android system bars and are not equivalent to Mangatan's
+  desktop window-fullscreen settings, which stay device-local.
 - Category UI state which Chimahon cannot encode, such as Mangatan's
   `shouldUpdate` value. The wire adapters retain it locally.
 

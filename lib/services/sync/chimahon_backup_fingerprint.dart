@@ -95,7 +95,7 @@ class ChimahonBackupFingerprint {
     'mangaSources': backup.backupSources.length,
     'appPreferences': backup.backupPreferences.length,
     'sourcePreferenceGroups': backup.backupSourcePreferences.length,
-    'extensionRepositories': backup.backupExtensionRepo.length,
+    'extensionStores': backup.backupExtensionStores.length,
     'animeRecords': backup.backupAnime.length,
     'animeEpisodes': backup.backupAnime.fold(
       0,
@@ -114,6 +114,7 @@ class ChimahonBackupFingerprint {
     'animeExtensionRepositories': backup.backupAnimeExtensionRepo.length,
     'savedSearches': backup.backupSavedSearches.length,
     'feeds': backup.backupFeeds.length,
+    'searchHistory': backup.backupSearchHistory.length,
     'novels': backup.backupNovels.length,
     'novelStatistics': backup.backupNovels.fold(
       0,

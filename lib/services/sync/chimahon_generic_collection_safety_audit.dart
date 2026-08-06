@@ -1,9 +1,11 @@
 import 'dart:convert';
 
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionRepos.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionStore.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupFeed.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSavedSearch.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSearchHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupStatistics.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_feed_identity.dart';
@@ -34,6 +36,7 @@ class ChimahonGenericCollectionSafetyAudit {
       remote: remote.backupSources,
       proposed: proposed.backupSources,
       keyOf: _sourceKey,
+      knownFieldsEqual: _sameSourceIdentity,
       fail: fail,
     );
     _auditKnownCollection<BackupSource>(
@@ -42,14 +45,15 @@ class ChimahonGenericCollectionSafetyAudit {
       remote: remote.backupAnimeSources,
       proposed: proposed.backupAnimeSources,
       keyOf: _sourceKey,
+      knownFieldsEqual: _sameSourceIdentity,
       fail: fail,
     );
-    _auditKnownCollection<BackupExtensionRepos>(
-      family: 'extension_repo',
-      local: local.backupExtensionRepo,
-      remote: remote.backupExtensionRepo,
-      proposed: proposed.backupExtensionRepo,
-      keyOf: (repo) => repo.baseUrl,
+    _auditKnownCollection<BackupExtensionStore>(
+      family: 'extension_store',
+      local: local.backupExtensionStores,
+      remote: remote.backupExtensionStores,
+      proposed: proposed.backupExtensionStores,
+      keyOf: (store) => store.indexUrl,
       fail: fail,
     );
     _auditKnownCollection<BackupExtensionRepos>(
@@ -76,6 +80,14 @@ class ChimahonGenericCollectionSafetyAudit {
       keyOf: ChimahonFeedIdentity.key,
       fail: fail,
     );
+    _auditKnownCollection<BackupSearchHistory>(
+      family: 'search_history',
+      local: local.backupSearchHistory,
+      remote: remote.backupSearchHistory,
+      proposed: proposed.backupSearchHistory,
+      keyOf: (entry) => '${entry.scope}\u0000${entry.query}',
+      fail: fail,
+    );
 
     _auditRootUnknownFields(
       local: local,
@@ -98,6 +110,7 @@ class ChimahonGenericCollectionSafetyAudit {
     required Iterable<T> remote,
     required Iterable<T> proposed,
     required String Function(T value) keyOf,
+    bool Function(T first, T second)? knownFieldsEqual,
     required void Function(String code, Iterable<String> affected) fail,
   }) {
     final localList = local.toList(growable: false);
@@ -134,7 +147,8 @@ class ChimahonGenericCollectionSafetyAudit {
       final candidate = proposedByKey[entry.key];
       if (candidate == null) {
         localMissing.add(entry.key);
-      } else if (!_sameKnownFields(entry.value, candidate)) {
+      } else if (!(knownFieldsEqual?.call(entry.value, candidate) ??
+          _sameKnownFields(entry.value, candidate))) {
         localChanged.add(entry.key);
       }
     }
@@ -154,7 +168,8 @@ class ChimahonGenericCollectionSafetyAudit {
         remoteMissing.add(entry.key);
       } else if (!localByKey.containsKey(entry.key) &&
           remoteFrequency[entry.key] == 1 &&
-          !_sameKnownFields(entry.value, candidate)) {
+          !(knownFieldsEqual?.call(entry.value, candidate) ??
+              _sameKnownFields(entry.value, candidate))) {
         remoteOnlyChanged.add(entry.key);
       }
     }
@@ -178,6 +193,9 @@ class ChimahonGenericCollectionSafetyAudit {
       fail: fail,
     );
   }
+
+  bool _sameSourceIdentity(BackupSource first, BackupSource second) =>
+      first.sourceId == second.sourceId;
 
   void _auditDuplicateKeys<T>({
     required String side,
@@ -290,10 +308,7 @@ class ChimahonGenericCollectionSafetyAudit {
     required void Function(String code, Iterable<String> affected) fail,
     required void Function(String code, Iterable<String> affected) observe,
   }) {
-    final proposedManga = _statsByKey(
-      proposed.backupMangaStats,
-      _mangaStatKey,
-    );
+    final proposedManga = _statsByKey(proposed.backupMangaStats, _mangaStatKey);
     final proposedAnki = _statsByKey(proposed.backupAnkiStats, _ankiStatKey);
 
     for (final side in [('local', local), ('remote', remote)]) {

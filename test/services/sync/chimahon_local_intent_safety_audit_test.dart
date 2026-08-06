@@ -1,6 +1,7 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionRepos.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionStore.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupFeed.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
@@ -72,7 +73,7 @@ void main() {
       backupAnimeSources: [
         BackupSource(sourceId: Int64(84), name: 'Changed anime'),
       ],
-      backupExtensionRepo: [_repo('https://manga.example', name: 'Changed')],
+      backupExtensionStores: [_store('https://manga.example', name: 'Changed')],
       backupAnimeExtensionRepo: [
         _repo('https://anime.example', name: 'Changed'),
       ],
@@ -308,7 +309,7 @@ void main() {
 BackupMihon _completeLocal() => BackupMihon(
   backupSources: [BackupSource(sourceId: Int64(42), name: 'Manga source')],
   backupAnimeSources: [BackupSource(sourceId: Int64(84), name: 'Anime source')],
-  backupExtensionRepo: [_repo('https://manga.example')],
+  backupExtensionStores: [_store('https://manga.example')],
   backupAnimeExtensionRepo: [_repo('https://anime.example')],
   backupSavedSearches: [
     BackupSavedSearch(
@@ -366,6 +367,15 @@ BackupExtensionRepos _repo(String baseUrl, {String name = 'Repository'}) =>
       shortName: 'Repo',
       website: '$baseUrl/site',
       signingKeyFingerprint: 'fingerprint',
+    );
+
+BackupExtensionStore _store(String indexUrl, {String name = 'Store'}) =>
+    BackupExtensionStore(
+      indexUrl: indexUrl,
+      name: name,
+      badgeLabel: 'Store',
+      contactWebsite: '$indexUrl/site',
+      signingKey: 'fingerprint',
     );
 
 BackupNovel _novel({

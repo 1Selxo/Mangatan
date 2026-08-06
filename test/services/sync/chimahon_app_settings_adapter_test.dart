@@ -72,7 +72,6 @@ void main() {
           'pref_enable_transitions_pager_key',
           'pref_enable_transitions_webtoon_key',
           'pref_show_page_number_key',
-          'fullscreen',
           'pref_keep_screen_on_key',
           'crop_borders',
           'crop_borders_webtoon',
@@ -87,7 +86,6 @@ void main() {
           'pref_enable_discord_rpc',
           'pref_discord_show_progress',
           'pref_auto_update_manga_sync_key',
-          'player_fullscreen',
           'pref_enable_ani_skip',
           'pref_enable_auto_skip_ani_skip',
           'pref_audio_pitch_correction',
@@ -338,22 +336,44 @@ void main() {
       expect(settings.mangaGridSize, 2);
     });
 
+    test('keeps platform-specific fullscreen settings local', () {
+      final settings = Settings(
+        defaultReaderMode: ReaderMode.horizontalContinuous,
+        fullScreenReader: false,
+        fullScreenPlayer: false,
+      );
+      final projection = adapter.project(settings);
+      final preserveLocalKeys = projection.unrepresentableKeys;
+
+      expect(
+        projection.preferences.map((preference) => preference.key),
+        isNot(anyOf(contains('fullscreen'), contains('player_fullscreen'))),
+      );
+
+      adapter.importInto(settings, [
+        codec.encode('pref_default_reading_mode_key', 3),
+        codec.encode('fullscreen', true),
+        codec.encode('player_fullscreen', true),
+      ], preserveLocalKeys: preserveLocalKeys);
+
+      expect(settings.defaultReaderMode, ReaderMode.horizontalContinuous);
+      expect(settings.fullScreenReader, isFalse);
+      expect(settings.fullScreenPlayer, isFalse);
+    });
+
     test(
       'can preserve a local unrepresentable setting during routine sync',
       () {
         final settings = Settings(
           defaultReaderMode: ReaderMode.horizontalContinuous,
-          fullScreenReader: false,
         );
         final preserveLocalKeys = adapter.project(settings).unrepresentableKeys;
 
         adapter.importInto(settings, [
           codec.encode('pref_default_reading_mode_key', 3),
-          codec.encode('fullscreen', true),
         ], preserveLocalKeys: preserveLocalKeys);
 
         expect(settings.defaultReaderMode, ReaderMode.horizontalContinuous);
-        expect(settings.fullScreenReader, isTrue);
       },
     );
 

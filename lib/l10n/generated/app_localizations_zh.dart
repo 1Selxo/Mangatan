@@ -962,7 +962,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sync_button_download => '仅下载';
 
   @override
-  String get sync_button_download_info => '此操作将完全用远程数据替换本地数据！';
+  String get sync_button_download_info =>
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => '启用同步';

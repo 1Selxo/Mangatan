@@ -7,6 +7,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCa
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionRepos.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionStore.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupFeed.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
@@ -14,6 +15,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMi
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSavedSearch.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSearchHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_category_payload_adapter.dart';
@@ -89,10 +91,10 @@ class ChimahonSyncMerger {
         local.backupSourcePreferences,
         remote.backupSourcePreferences,
       ),
-      backupExtensionRepo: _mergeByKey<BackupExtensionRepos, String>(
-        local.backupExtensionRepo,
-        remote.backupExtensionRepo,
-        (repo) => repo.baseUrl,
+      backupExtensionStores: _mergeByKey<BackupExtensionStore, String>(
+        local.backupExtensionStores,
+        remote.backupExtensionStores,
+        (store) => store.indexUrl,
         remoteWins: remoteWinsTie,
       ),
       backupAnime: _mergeAnime(
@@ -130,6 +132,12 @@ class ChimahonSyncMerger {
         ChimahonFeedIdentity.key,
         remoteWins: remoteWinsTie,
         mergeDuplicate: _mergeFeed,
+      ),
+      backupSearchHistory: _mergeByKey<BackupSearchHistory, String>(
+        local.backupSearchHistory,
+        remote.backupSearchHistory,
+        (entry) => '${entry.scope}\u0000${entry.query}',
+        remoteWins: remoteWinsTie,
       ),
       backupNovels: _mergeNovels(
         local.backupNovels,
@@ -452,6 +460,11 @@ class ChimahonSyncMerger {
     } else {
       merged.clearInitialized();
     }
+    if (remote.hasMemo()) {
+      merged.memo = remote.memo;
+    } else {
+      merged.clearMemo();
+    }
   }
 
   BackupManga _remapMangaCategories(
@@ -583,6 +596,11 @@ class ChimahonSyncMerger {
           latest.sourceOrder = right.sourceOrder;
         } else {
           latest.clearSourceOrder();
+        }
+        if (right.hasMemo()) {
+          latest.memo = right.memo;
+        } else {
+          latest.clearMemo();
         }
         if (left.name == right.name &&
             left.chapterNumber != right.chapterNumber) {

@@ -1832,7 +1832,7 @@ abstract class AppLocalizations {
   /// No description provided for @sync_button_download_info.
   ///
   /// In en, this message translates to:
-  /// **'This operation will fully replace the local data with remote data!'**
+  /// **'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.'**
   String get sync_button_download_info;
 
   /// No description provided for @sync_on.

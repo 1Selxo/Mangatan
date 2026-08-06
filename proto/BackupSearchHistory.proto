@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+message BackupSearchHistory {
+    string scope = 1;
+    string query = 2;
+    int64 lastSearchedAt = 3;
+}

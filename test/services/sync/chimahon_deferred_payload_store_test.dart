@@ -11,6 +11,33 @@ import 'package:mangayomi/services/sync/chimahon_preferences.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 
 void main() {
+  test('authoritative download stage blocks sync until cleared', () async {
+    final directory = await Directory.systemTemp.createTemp('chimahon-stage-');
+    addTearDown(() => directory.delete(recursive: true));
+    final store = await defaultChimahonAuthoritativeDownloadStageStore(
+      scopeKey: 'account',
+      applicationSupportDirectory: directory,
+    );
+    final backup = BackupMihon(
+      backupManga: [BackupManga(title: 'Exact staged title')],
+    );
+
+    await store.begin(backup);
+    backup.backupManga.single.title = 'Caller mutation';
+
+    expect(
+      (await store.load())!.backupManga.single.title,
+      'Exact staged title',
+    );
+    await expectLater(
+      store.ensureNoIncompleteDownload(),
+      throwsA(isA<ChimahonAuthoritativeDownloadIncompleteException>()),
+    );
+    await store.clear();
+    await store.ensureNoIncompleteDownload();
+    expect(await store.load(), isNull);
+  });
+
   test('default store uses the application support sync directory', () async {
     final directory = await Directory.systemTemp.createTemp('chimahon-sync-');
     addTearDown(() => directory.delete(recursive: true));

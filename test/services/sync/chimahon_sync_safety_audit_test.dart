@@ -383,13 +383,14 @@ void main() {
     expect(encoded, isNot(contains('Private reference category')));
   });
 
-  test('requires every reference-surplus remote manga to be a tombstone', () {
+  test('allows remote-only favorites but requires clocks on tombstones', () {
     final reference = backup(mangaRows: [manga(url: '/retained')]);
     final remote = backup(
       mangaRows: [
         manga(url: '/retained'),
         manga(url: '/valid-delete', favorite: false, favoriteModifiedAt: 90),
-        manga(url: '/not-deleted'),
+        manga(url: '/remote-favorite'),
+        manga(url: '/invalid-delete', favorite: false),
       ],
     );
 
@@ -406,7 +407,7 @@ void main() {
     expect(failure.affectedCount, 1);
   });
 
-  test('pairs duplicate exact manga keys by multiset tombstone capacity', () {
+  test('checks only surplus explicit tombstones for deletion clocks', () {
     final retained = manga(url: '/duplicate-key');
     final tombstone = manga(
       url: '/duplicate-key',
@@ -440,7 +441,7 @@ void main() {
         retained.deepCopy(),
         retained.deepCopy(),
         tombstone.deepCopy(),
-        retained.deepCopy(),
+        manga(url: '/duplicate-key', favorite: false),
       ],
     );
     final insufficient = audit.audit(

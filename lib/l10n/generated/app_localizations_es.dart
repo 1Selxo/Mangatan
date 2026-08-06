@@ -987,7 +987,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      '¡Esta operación reemplazará completamente los datos locales con los datos remotos!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_on => 'Habilitar sincronización';
@@ -3598,10 +3598,6 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
 
   @override
   String get sync_button_download => 'Solo descargar';
-
-  @override
-  String get sync_button_download_info =>
-      '¡Esta operación reemplazará completamente los datos locales con los datos remotos!';
 
   @override
   String get sync_on => 'Habilitar sincronización';

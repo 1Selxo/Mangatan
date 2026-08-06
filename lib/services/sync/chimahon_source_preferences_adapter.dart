@@ -5,6 +5,7 @@ import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
+import 'package:mangayomi/services/mihon_source_preferences.dart';
 import 'package:mangayomi/services/sync/chimahon_preferences.dart';
 
 /// Lossless bridge for preferences owned by installed Mihon source factories.
@@ -37,9 +38,9 @@ class ChimahonSourcePreferencesAdapter {
       final localId = source.id;
       if (sourceKey == null || localId == null) continue;
 
-      final preferences = _preferencesFor(
-        source,
-        fallback: storedBySource[localId] ?? const [],
+      final preferences = mergeMihonSourcePreferenceDefinitions(
+        decodeMihonSourcePreferences(source.preferenceList),
+        storedBySource[localId] ?? const [],
       );
       final encoded = <BackupPreference>[];
       for (final preference in preferences) {
@@ -91,9 +92,9 @@ class ChimahonSourcePreferencesAdapter {
       final remote = sourceKey == null ? null : remoteByKey[sourceKey];
       if (remote == null || localId == null) continue;
 
-      final definitions = _preferencesFor(
-        source,
-        fallback: storedBySource[localId] ?? const [],
+      final definitions = mergeMihonSourcePreferenceDefinitions(
+        decodeMihonSourcePreferences(source.preferenceList),
+        storedBySource[localId] ?? const [],
       );
       final definitionsByKey = <String, SourcePreference>{};
       for (final preference in definitions) {
@@ -151,37 +152,6 @@ class ChimahonSourcePreferencesAdapter {
     final nativeId = int.tryParse(encodedId ?? '');
     if (nativeId == null) return null;
     return 'source_$nativeId';
-  }
-
-  List<SourcePreference> _preferencesFor(
-    Source source, {
-    required Iterable<SourcePreference> fallback,
-  }) {
-    final byKey = <String, SourcePreference>{};
-    final payload = source.preferenceList;
-    if (payload != null && payload.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(payload);
-        if (decoded is List) {
-          for (final value in decoded.whereType<Map>()) {
-            final preference = SourcePreference.fromJson(
-              value.map((key, item) => MapEntry(key.toString(), item)),
-            );
-            final key = preference.key;
-            if (key != null && key.isNotEmpty) byKey[key] = preference;
-          }
-        }
-      } on Object {
-        // Fall back to the normalized Isar rows below.
-      }
-    }
-    for (final preference in fallback) {
-      final key = preference.key;
-      if (key != null && key.isNotEmpty) {
-        byKey.putIfAbsent(key, () => preference);
-      }
-    }
-    return byKey.values.toList(growable: false);
   }
 
   Object? _valueOf(SourcePreference preference) {

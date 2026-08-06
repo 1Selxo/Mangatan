@@ -74,6 +74,12 @@ class Manga {
 
   int? sourceId;
 
+  /// Stable source identifier used by Mihon/Chimahon backup payloads.
+  ///
+  /// This is intentionally independent from [sourceId], which identifies the
+  /// locally installed Mangatan source and can differ between devices.
+  String? mihonSourceId;
+
   @Backlink(to: "manga")
   final chapters = IsarLinks<Chapter>();
 
@@ -93,6 +99,7 @@ class Manga {
     required this.status,
     required this.description,
     required this.sourceId,
+    this.mihonSourceId,
     this.isManga,
     this.itemType = ItemType.manga,
     this.dateAdded,
@@ -180,6 +187,7 @@ class Manga {
     smartUpdateDays = json['smartUpdateDays'];
     updatedAt = json['updatedAt'];
     sourceId = json['sourceId'];
+    mihonSourceId = json['mihonSourceId']?.toString();
   }
 
   Map<String, dynamic> toJson() => {
@@ -209,6 +217,7 @@ class Manga {
     'smartUpdateDays': smartUpdateDays,
     'updatedAt': updatedAt ?? 0,
     'sourceId': sourceId,
+    'mihonSourceId': mihonSourceId,
   };
 }
 

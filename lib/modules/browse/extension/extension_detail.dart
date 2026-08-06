@@ -23,6 +23,7 @@ import 'package:mangayomi/services/get_source_preference.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
+import 'package:mangayomi/services/mihon_source_preferences.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -64,9 +65,7 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
     try {
       if (selectedSource.sourceCodeLanguage == SourceCodeLanguage.mihon &&
           selectedSource.preferenceList != null) {
-        return (jsonDecode(selectedSource.preferenceList!) as List)
-            .map((e) => SourcePreference.fromJson(e))
-            .toList();
+        return decodeMihonSourcePreferences(selectedSource.preferenceList);
       }
       return getSourcePreference(source: selectedSource)
           .map((e) => getSourcePreferenceEntry(e.key!, selectedSource.id!))
@@ -196,29 +195,8 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
         );
       }
 
-      if (changedPreference?.editTextPreference != null && fresh != null) {
-        await Future<void>.delayed(const Duration(milliseconds: 750));
-        fresh =
-            await fetchPreferencesDalvik(
-              client,
-              source,
-              proxyServer,
-              preferences: appliedPreferences,
-            ) ??
-            fresh;
-        await Future<void>.delayed(const Duration(milliseconds: 1500));
-        fresh =
-            await fetchPreferencesDalvik(
-              client,
-              source,
-              proxyServer,
-              preferences: appliedPreferences,
-            ) ??
-            fresh;
-      }
-
       if (fresh == null) return;
-      final merged = mergeMihonPreferenceValues(fresh, appliedPreferences);
+      var merged = mergeMihonPreferenceValues(fresh, appliedPreferences);
       source.preferenceList = jsonEncode(
         merged.map((preference) => preference.toJson()).toList(),
       );
@@ -239,6 +217,43 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
       );
       if (descriptors != null) {
         await reconcileMihonFactorySources(source, descriptors);
+        final canonical = isar.sources.getSync(source.id!);
+        if (canonical != null) {
+          source = canonical;
+          _packageSources = _loadPackageSources(canonical);
+          merged = mergeMihonPreferenceValues(
+            decodeMihonSourcePreferences(canonical.preferenceList),
+            merged,
+          );
+        }
+      }
+
+      // Factory extensions can cache their server address and credentials in
+      // each child instance. Source discovery above recreates those children;
+      // preference screens fetched before that point would keep polling the
+      // stale instance and never expose asynchronously loaded values such as
+      // Jellyfin libraries.
+      if (changedPreference?.editTextPreference != null) {
+        for (final delay in const [
+          Duration.zero,
+          Duration(milliseconds: 750),
+          Duration(milliseconds: 1500),
+        ]) {
+          if (delay > Duration.zero) await Future<void>.delayed(delay);
+          final refreshed = await fetchPreferencesDalvik(
+            client,
+            source,
+            proxyServer,
+            preferences: merged,
+          );
+          if (refreshed != null) {
+            merged = mergeMihonPreferenceValues(refreshed, merged);
+          }
+        }
+        source.preferenceList = jsonEncode(
+          merged.map((preference) => preference.toJson()).toList(),
+        );
+        await isar.writeTxn(() => isar.sources.put(source));
       }
       if (mounted) setState(() => sourcePreference = merged);
     } finally {

@@ -15,6 +15,7 @@ import 'package:mangayomi/services/extension_catalog_reconciler.dart';
 import 'package:mangayomi/services/extension_repository_catalog.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/mihon_source_preferences.dart';
 import 'package:mangayomi/utils/extension_language_defaults.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -315,7 +316,7 @@ Future<void> _updateSources(
             extensionName: incomingMetadata.extensionName,
             packageLang: incomingMetadata.packageLang,
           );
-    final existingPreferences = _decodePreferences(
+    final existingPreferences = decodeMihonSourcePreferences(
       existingSource?.preferenceList,
     );
 
@@ -406,17 +407,6 @@ Future<void> _updateSources(
   }
 
   await isar.writeTxn(() async => isar.sources.putAll(updatedSources));
-}
-
-List<SourcePreference> _decodePreferences(String? preferenceList) {
-  if (preferenceList == null || preferenceList.isEmpty) return [];
-  try {
-    return (jsonDecode(preferenceList) as List)
-        .map((preference) => SourcePreference.fromJson(preference))
-        .toList();
-  } catch (_) {
-    return [];
-  }
 }
 
 Future<void> _addNewSource(
@@ -708,6 +698,8 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
   String androidProxyServer, {
   List<SourcePreference> preferences = const [],
   String? changedPreferenceKey,
+  MihonPreferenceApplyMode preferenceApplyMode =
+      MihonPreferenceApplyMode.bootstrap,
 }) async {
   try {
     final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
@@ -723,6 +715,7 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
           source,
           preferences,
           changedPreferenceKey: changedPreferenceKey,
+          applyMode: preferenceApplyMode,
         ),
       },
     );
@@ -744,6 +737,8 @@ Future<List<MihonSourceDescriptor>?> fetchMihonSourceDescriptors(
   Source source,
   String androidProxyServer, {
   List<SourcePreference> preferences = const [],
+  MihonPreferenceApplyMode preferenceApplyMode =
+      MihonPreferenceApplyMode.bootstrap,
 }) async {
   try {
     final name = source.itemType == ItemType.anime ? 'Anime' : 'Manga';
@@ -753,7 +748,11 @@ Future<List<MihonSourceDescriptor>?> fetchMihonSourceDescriptors(
       body: {
         'method': 'sources$name',
         'data': source.sourceCode,
-        'preferences': mihonPreferencePayload(source, preferences),
+        'preferences': mihonPreferencePayload(
+          source,
+          preferences,
+          applyMode: preferenceApplyMode,
+        ),
       },
     );
     final data = jsonDecode(res.body) as List;

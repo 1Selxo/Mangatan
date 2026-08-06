@@ -19,6 +19,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/models/video.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/services/mihon_source_preferences.dart';
 
 import '../../models/manga.dart';
 import '../interface.dart';
@@ -413,11 +414,7 @@ class MihonExtensionService implements ExtensionService {
 
   @override
   List<SourcePreference> getSourcePreferences() {
-    if (source.preferenceList == null) {
-      return [];
-    }
-    final data = jsonDecode(source.preferenceList!) as List;
-    return data.map((e) => SourcePreference.fromJson(e)).toList();
+    return decodeMihonSourcePreferences(source.preferenceList);
   }
 
   List<dynamic> _convertFilters(List<dynamic> filters) {

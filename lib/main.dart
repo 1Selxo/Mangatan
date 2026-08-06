@@ -41,6 +41,7 @@ import 'package:mangayomi/services/sync/google_drive_chimahon_preview_runner.dar
 import 'package:mangayomi/services/sync/google_drive_platform_support.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
+import 'package:mangayomi/services/reconcile_mihon_sources.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/dictionary_update_service.dart';
@@ -325,7 +326,11 @@ class _MyAppState extends ConsumerState<MyApp>
       // Flutter has finished restoring its UI. Mihon operations call
       // prepareMihonBridge and start it when it is actually needed.
       if (!Platform.isIOS) {
-        _mExtensionServer.startServer();
+        if (isDesktop) {
+          unawaited(_startBridgeAndRefreshFactorySources());
+        } else {
+          unawaited(_mExtensionServer.startServer());
+        }
       }
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
@@ -335,6 +340,18 @@ class _MyAppState extends ConsumerState<MyApp>
             .clearCache(showToast: false);
       }
     });
+  }
+
+  Future<void> _startBridgeAndRefreshFactorySources() async {
+    try {
+      await _mExtensionServer.startServer();
+      await ref.read(refreshInstalledMihonFactorySourcesProvider.future);
+    } on Object catch (error) {
+      AppLogger.log(
+        'Mihon source refresh failed (${error.runtimeType}).',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   @override

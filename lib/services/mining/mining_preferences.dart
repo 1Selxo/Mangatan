@@ -331,6 +331,20 @@ final class MiningPreferencesSnapshot {
       _values.containsKey(key) ? _values[key] : defaultValue;
 
   Iterable<dynamic> get _keys => _values.keys;
+
+  /// Stable, non-secret input for detecting edits between a sync preview and
+  /// its apply phase. Values are consumed only by a SHA-256 revision digest.
+  Map<String, String> get revisionEntries {
+    final entries = <String, String>{
+      for (final entry in _values.entries)
+        '${entry.key.runtimeType}:${entry.key}':
+            '${entry.value.runtimeType}:${entry.value}',
+    };
+    return Map.fromEntries(
+      entries.entries.toList()
+        ..sort((left, right) => left.key.compareTo(right.key)),
+    );
+  }
 }
 
 final class MiningPreferencesSnapshotException implements Exception {
@@ -370,7 +384,7 @@ final class _MiningPreferencesReader {
 }
 
 class MiningPreferences {
-  static const defaultOcrBackgroundOpacity = 0.70;
+  static const defaultOcrBackgroundOpacity = 0.0;
   static const defaultOcrTextOpacity = 1.0;
 
   static const _boxName = 'mining_preferences';
@@ -555,6 +569,23 @@ class MiningPreferences {
   static Future<Box<dynamic>> _box() async {
     if (Hive.isBoxOpen(_boxName)) return Hive.box(_boxName);
     return Hive.openBox(_boxName);
+  }
+
+  /// Captures the writable Hive state for a short-lived settings transaction.
+  static Future<MiningPreferencesSnapshot> writableSnapshot() async {
+    final box = await _box();
+    return MiningPreferencesSnapshot._(Map<dynamic, dynamic>.from(box.toMap()));
+  }
+
+  /// Restores the complete snapshot before the returned future completes.
+  static Future<void> restoreSnapshot(
+    MiningPreferencesSnapshot snapshot,
+  ) async {
+    final box = await _box();
+    await box.clear();
+    if (snapshot._values.isNotEmpty) {
+      await box.putAll(snapshot._values);
+    }
   }
 
   static Future<Box<dynamic>?> _boxOrNull({bool openIfNeeded = true}) async {
@@ -1174,6 +1205,14 @@ class MiningPreferences {
       value.clamp(0.0, 1.0),
     );
   }
+
+  static Future<double> getOcrBoxOpacity({
+    bool readOnly = false,
+    MiningPreferencesSnapshot? snapshot,
+  }) => getOcrBackgroundOpacity(readOnly: readOnly, snapshot: snapshot);
+
+  static Future<void> setOcrBoxOpacity(double value) =>
+      setOcrBackgroundOpacity(value);
 
   static Future<double> getOcrTextOpacity() async {
     final value =

@@ -460,6 +460,19 @@ void main() {
     expect(restored.cropMode, 'animated_scene');
     expect(restored.screenshotMode, AnkiScreenshotMode.animatedScene);
   });
+
+  test('writable snapshot restores a partially changed Hive state', () async {
+    await MiningPreferences.setOcrBackgroundOpacity(0.25);
+    await MiningPreferences.setOcrOutlineVisible(true);
+    final snapshot = await MiningPreferences.writableSnapshot();
+
+    await MiningPreferences.setOcrBackgroundOpacity(0.9);
+    await MiningPreferences.setOcrOutlineVisible(false);
+    await MiningPreferences.restoreSnapshot(snapshot);
+
+    expect(await MiningPreferences.getOcrBackgroundOpacity(), 0.25);
+    expect(await MiningPreferences.getOcrOutlineVisible(), isTrue);
+  });
 }
 
 class _DictionaryStorageStub implements DictionaryStorage {

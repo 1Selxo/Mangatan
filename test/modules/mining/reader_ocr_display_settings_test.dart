@@ -43,9 +43,8 @@ void main() {
 
     // Restore the shared appearance state to its packaged defaults so each
     // test observes a real transition rather than a stale value.
-    ReaderOcrState.backgroundOpacity.value =
+    ReaderOcrState.boxOpacity.value =
         MiningPreferences.defaultOcrBackgroundOpacity;
-    ReaderOcrState.textOpacity.value = MiningPreferences.defaultOcrTextOpacity;
     ReaderOcrState.outlineVisible.value = false;
   });
 
@@ -56,33 +55,18 @@ void main() {
     }
   });
 
-  test('setBackgroundOpacity applies live and persists', () async {
+  test('setBoxOpacity applies live and persists', () async {
     final observed = <double>[];
-    void listener() => observed.add(ReaderOcrState.backgroundOpacity.value);
-    ReaderOcrState.backgroundOpacity.addListener(listener);
-    addTearDown(
-      () => ReaderOcrState.backgroundOpacity.removeListener(listener),
-    );
+    void listener() => observed.add(ReaderOcrState.boxOpacity.value);
+    ReaderOcrState.boxOpacity.addListener(listener);
+    addTearDown(() => ReaderOcrState.boxOpacity.removeListener(listener));
 
-    await ReaderOcrState.setBackgroundOpacity(0.2);
+    await ReaderOcrState.setBoxOpacity(0.2);
 
-    expect(ReaderOcrState.backgroundOpacity.value, 0.2);
+    expect(ReaderOcrState.boxOpacity.value, 0.2);
     expect(observed, contains(0.2));
     // A reload reads back the persisted value, not the packaged default.
     expect(await MiningPreferences.getOcrBackgroundOpacity(), 0.2);
-  });
-
-  test('setTextOpacity applies live and persists', () async {
-    final observed = <double>[];
-    void listener() => observed.add(ReaderOcrState.textOpacity.value);
-    ReaderOcrState.textOpacity.addListener(listener);
-    addTearDown(() => ReaderOcrState.textOpacity.removeListener(listener));
-
-    await ReaderOcrState.setTextOpacity(0.35);
-
-    expect(ReaderOcrState.textOpacity.value, 0.35);
-    expect(observed, contains(0.35));
-    expect(await MiningPreferences.getOcrTextOpacity(), 0.35);
   });
 
   test('setOutlineVisible applies live and persists', () async {
@@ -122,13 +106,12 @@ void main() {
       controller.addListener(onRepaint);
       addTearDown(() => controller.removeListener(onRepaint));
 
-      await ReaderOcrState.setBackgroundOpacity(0.15);
-      await ReaderOcrState.setTextOpacity(0.5);
+      await ReaderOcrState.setBoxOpacity(0.15);
       await ReaderOcrState.setOutlineVisible(true);
 
-      // Each of the three appearance changes must have driven a repaint of the
+      // Each appearance change must have driven a repaint of the
       // overlay controller; issue #24 was the absence of exactly this signal.
-      expect(repaints, greaterThanOrEqualTo(3));
+      expect(repaints, greaterThanOrEqualTo(2));
     },
   );
 }

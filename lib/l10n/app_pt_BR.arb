@@ -457,7 +457,6 @@
   "sync_button_upload": "Apenas enviar",
   "sync_button_upload_info": "Esta operação substituirá completamente os dados remotos pelos dados locais!",
   "sync_button_download": "Apenas baixar",
-  "sync_button_download_info": "Esta operação substituirá completamente os dados locais pelos dados remotos!",
   "extension_settings": "Configurações de extensão",
   "video_audio_info": "Idiomas preferidos, correção de tom, canais de áudio",
   "all_chapters": "Todos os capítulos",

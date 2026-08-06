@@ -14,6 +14,8 @@ const _localSourcePreferenceBaselineFileName =
     'chimahon_local_source_preference_baseline.tachibk';
 const _pendingManualRestoreFileName = 'chimahon_pending_restore.tachibk';
 const _pendingManualRestoreStateFileName = 'chimahon_pending_restore.state';
+const _authoritativeDownloadStageFileName =
+    'chimahon_authoritative_download_stage.tachibk';
 
 Future<FileChimahonDeferredPayloadStore> defaultChimahonDeferredPayloadStore({
   required String scopeKey,
@@ -34,6 +36,27 @@ Future<FileChimahonDeferredPayloadStore> defaultChimahonDeferredPayloadStore({
       '${Platform.pathSeparator}$_deferredPayloadFileName',
     ),
     readOnly: readOnly,
+  );
+}
+
+Future<FileChimahonAuthoritativeDownloadStageStore>
+defaultChimahonAuthoritativeDownloadStageStore({
+  required String scopeKey,
+  Directory? applicationSupportDirectory,
+}) async {
+  if (scopeKey.isEmpty) {
+    throw ArgumentError.value(scopeKey, 'scopeKey', 'Must not be empty');
+  }
+  final support =
+      applicationSupportDirectory ?? await getApplicationSupportDirectory();
+  final scopeDigest = sha256.convert(utf8.encode(scopeKey)).toString();
+  return FileChimahonAuthoritativeDownloadStageStore(
+    File(
+      '${support.path}${Platform.pathSeparator}sync'
+      '${Platform.pathSeparator}chimahon'
+      '${Platform.pathSeparator}$scopeDigest'
+      '${Platform.pathSeparator}$_authoritativeDownloadStageFileName',
+    ),
   );
 }
 
@@ -93,6 +116,28 @@ class ChimahonPendingManualRestoreIncompleteException implements Exception {
   String toString() =>
       'The pending Chimahon manual restore is ${phase.name}. Restore the '
       'original backup again and let it finish before syncing.';
+}
+
+/// A previous authoritative download changed local state but did not finish
+/// activating its remote baseline. Upload must remain blocked until the same
+/// operation is retried, otherwise partially restored state could be uploaded.
+class ChimahonAuthoritativeDownloadIncompleteException implements Exception {
+  const ChimahonAuthoritativeDownloadIncompleteException();
+
+  @override
+  String toString() =>
+      'A Chimahon Download-only restore is incomplete. Retry Download only '
+      'before uploading or running two-way sync.';
+}
+
+abstract interface class ChimahonAuthoritativeDownloadStageStore {
+  Future<void> begin(BackupMihon backup);
+
+  Future<BackupMihon?> load();
+
+  Future<void> ensureNoIncompleteDownload();
+
+  Future<void> clear();
 }
 
 abstract interface class ChimahonDeferredPayloadStore {
@@ -221,10 +266,11 @@ class FileChimahonDeferredPayloadStore
         : (BackupMihon(
             backupPreferences: backup.backupPreferences,
             backupSourcePreferences: backup.backupSourcePreferences,
-            backupExtensionRepo: backup.backupExtensionRepo,
+            backupExtensionStores: backup.backupExtensionStores,
             backupAnimeExtensionRepo: backup.backupAnimeExtensionRepo,
             backupSavedSearches: backup.backupSavedSearches,
             backupFeeds: backup.backupFeeds,
+            backupSearchHistory: backup.backupSearchHistory,
             backupNovels: backup.backupNovels,
             backupNovelCategories: backup.backupNovelCategories,
             backupMangaStats: backup.backupMangaStats,
@@ -388,6 +434,36 @@ class FileChimahonDeferredPayloadStore
       // a local cache cannot be moved (for example, due to antivirus locking).
     }
   }
+}
+
+/// Account-scoped recovery copy for Download-only. It is deliberately never
+/// read as a normal deferred baseline or local upload intent.
+class FileChimahonAuthoritativeDownloadStageStore
+    implements ChimahonAuthoritativeDownloadStageStore {
+  FileChimahonAuthoritativeDownloadStageStore(File file)
+    : _delegate = FileChimahonDeferredPayloadStore(
+        file,
+        retainMediaRecords: true,
+        failOnCorruption: true,
+      );
+
+  final FileChimahonDeferredPayloadStore _delegate;
+
+  @override
+  Future<void> begin(BackupMihon backup) => _delegate.save(backup.deepCopy());
+
+  @override
+  Future<BackupMihon?> load() => _delegate.load();
+
+  @override
+  Future<void> ensureNoIncompleteDownload() async {
+    if (await load() != null) {
+      throw const ChimahonAuthoritativeDownloadIncompleteException();
+    }
+  }
+
+  @override
+  Future<void> clear() => _delegate.clear();
 }
 
 /// File-backed pending restore with a crash-safe preparing/ready marker.

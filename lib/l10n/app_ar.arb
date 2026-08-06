@@ -459,7 +459,6 @@
   "sync_button_upload": "رفع فقط",
   "sync_button_upload_info": "ستستبدل هذه العملية البيانات البعيدة بالكامل بالبيانات المحلية!",
   "sync_button_download": "تنزيل فقط",
-  "sync_button_download_info": "ستستبدل هذه العملية البيانات المحلية بالكامل بالبيانات البعيدة!",
   "extension_settings": "إعدادات الإضافة",
   "video_audio_info": "اللغات المفضلة، تصحيح طبقة الصوت، قنوات الصوت",
   "all_chapters": "كل الفصول",

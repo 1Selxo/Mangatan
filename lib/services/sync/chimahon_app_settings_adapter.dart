@@ -75,7 +75,6 @@ class ChimahonAppSettingsAdapter {
     'pref_enable_transitions_webtoon_key',
     'pref_double_tap_anim_speed',
     'pref_show_page_number_key',
-    'fullscreen',
     'pref_keep_screen_on_key',
     'pref_default_reading_mode_key',
     'page_layout',
@@ -108,7 +107,6 @@ class ChimahonAppSettingsAdapter {
     'pref_default_intro_length',
     'pref_skip_length_preference',
     'pref_player_speed',
-    'player_fullscreen',
     'pref_enable_ani_skip',
     'pref_enable_auto_skip_ani_skip',
     'pref_waiting_time_aniskip',
@@ -426,7 +424,6 @@ class ChimahonAppSettingsAdapter {
       unrepresentableKeys.add('pref_double_tap_anim_speed');
     }
     _put(values, 'pref_show_page_number_key', settings.showPagesNumber);
-    _put(values, 'fullscreen', settings.fullScreenReader);
     _put(values, 'pref_keep_screen_on_key', settings.keepScreenOnReader);
     final readerMode = _exportReaderMode(settings);
     _put(values, 'pref_default_reading_mode_key', readerMode);
@@ -534,7 +531,6 @@ class ChimahonAppSettingsAdapter {
       settings.defaultDoubleTapToSkipLength,
     );
     _put(values, 'pref_player_speed', settings.defaultPlayBackSpeed);
-    _put(values, 'player_fullscreen', settings.fullScreenPlayer);
     _put(values, 'pref_enable_ani_skip', settings.enableAniSkip);
     _put(values, 'pref_enable_auto_skip_ani_skip', settings.enableAutoSkip);
     _put(values, 'pref_waiting_time_aniskip', settings.aniSkipTimeoutLength);
@@ -830,11 +826,6 @@ class ChimahonAppSettingsAdapter {
     );
     _applyBool(
       decoded,
-      'fullscreen',
-      (value) => settings.fullScreenReader = value,
-    );
-    _applyBool(
-      decoded,
       'pref_keep_screen_on_key',
       (value) => settings.keepScreenOnReader = value,
     );
@@ -997,11 +988,6 @@ class ChimahonAppSettingsAdapter {
       decoded,
       'pref_player_speed',
       (value) => settings.defaultPlayBackSpeed = value,
-    );
-    _applyBool(
-      decoded,
-      'player_fullscreen',
-      (value) => settings.fullScreenPlayer = value,
     );
     _applyBool(
       decoded,

@@ -108,10 +108,13 @@ class MihonBackupExporter {
       final localSource = manga.sourceId == null
           ? null
           : sourceByLocalId[manga.sourceId!];
-      final nativeId = _nativeSourceId(localSource);
+      final nativeId = _nativeSourceId(
+        localSource,
+        fallback: manga.mihonSourceId,
+      );
       if (nativeId == null || manga.id == null) continue;
       usedSources[nativeId] = BackupSource(
-        name: localSource?.name ?? manga.source ?? 'Unknown',
+        name: _sourceLabel(localSource, nativeId, manga.source),
         sourceId: Int64(nativeId),
       );
 
@@ -201,10 +204,13 @@ class MihonBackupExporter {
       final localSource = anime.sourceId == null
           ? null
           : sourceByLocalId[anime.sourceId!];
-      final nativeId = _nativeSourceId(localSource);
+      final nativeId = _nativeSourceId(
+        localSource,
+        fallback: anime.mihonSourceId,
+      );
       if (nativeId == null || anime.id == null) continue;
       usedAnimeSources[nativeId] = BackupSource(
-        name: localSource?.name ?? anime.source ?? 'Unknown',
+        name: _sourceLabel(localSource, nativeId, anime.source),
         sourceId: Int64(nativeId),
       );
 
@@ -415,13 +421,21 @@ class MihonBackupExporter {
     return List.unmodifiable(projected);
   }
 
-  int? _nativeSourceId(Source? source) {
-    if (source == null) return null;
-    final metadata = mihonSourceMetadata(source);
+  int? _nativeSourceId(Source? source, {String? fallback}) {
+    final imported = int.tryParse(fallback ?? '');
+    if (imported != null) return imported;
+    final metadata = source == null ? null : mihonSourceMetadata(source);
     if (metadata != null) return int.tryParse(metadata.sourceId);
     // Mangatan's local Mihon ID is a hash and is not portable. A source with
     // missing native metadata cannot be represented compatibly.
     return null;
+  }
+
+  String _sourceLabel(Source? source, int nativeId, String? fallback) {
+    final metadata = source == null ? null : mihonSourceMetadata(source);
+    return metadata?.sourceId == nativeId.toString()
+        ? source?.name ?? fallback ?? 'Unknown'
+        : fallback ?? 'Unknown';
   }
 
   /// File-picker and drag-and-drop chapters are a device-local overlay. Source

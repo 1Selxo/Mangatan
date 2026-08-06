@@ -1,6 +1,7 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionRepos.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionStore.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupFeed.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSavedSearch.pb.dart';
@@ -29,8 +30,8 @@ void main() {
         'remote_source_missing_from_proposed',
         'local_anime_source_missing_from_proposed',
         'remote_anime_source_missing_from_proposed',
-        'local_extension_repo_missing_from_proposed',
-        'remote_extension_repo_missing_from_proposed',
+        'local_extension_store_missing_from_proposed',
+        'remote_extension_store_missing_from_proposed',
         'local_anime_extension_repo_missing_from_proposed',
         'remote_anime_extension_repo_missing_from_proposed',
         'local_saved_search_missing_from_proposed',
@@ -315,6 +316,30 @@ void main() {
     expect(result.failures['remote_source_duplicate_identity'], ['42']);
     expect(result.failures['proposed_source_duplicate_identity'], ['42']);
   });
+
+  test('treats source display aliases as advisory for the same native ID', () {
+    final local = BackupMihon(
+      backupSources: [BackupSource(sourceId: Int64(42), name: 'Jellyfin #2')],
+    );
+    final remote = BackupMihon(
+      backupSources: [BackupSource(sourceId: Int64(42), name: 'Jellyfin')],
+    );
+    final result = _run(
+      audit,
+      local: local,
+      remote: remote,
+      proposed: remote.deepCopy(),
+    );
+
+    expect(
+      result.failures,
+      isNot(contains('local_source_changed_in_proposed')),
+    );
+    expect(
+      result.failures,
+      isNot(contains('remote_source_changed_in_proposed')),
+    );
+  });
 }
 
 BackupMihon _payload(int suffix) => BackupMihon(
@@ -322,7 +347,7 @@ BackupMihon _payload(int suffix) => BackupMihon(
   backupAnimeSources: [
     BackupSource(sourceId: Int64(100 + suffix), name: 'Anime $suffix'),
   ],
-  backupExtensionRepo: [_repo('https://manga$suffix.example')],
+  backupExtensionStores: [_store('https://manga$suffix.example')],
   backupAnimeExtensionRepo: [_repo('https://anime$suffix.example')],
   backupSavedSearches: [
     BackupSavedSearch(
@@ -362,6 +387,13 @@ BackupExtensionRepos _repo(String baseUrl) => BackupExtensionRepos(
   name: 'Repository',
   website: '$baseUrl/site',
   signingKeyFingerprint: 'fingerprint',
+);
+
+BackupExtensionStore _store(String indexUrl) => BackupExtensionStore(
+  indexUrl: indexUrl,
+  name: 'Store',
+  contactWebsite: '$indexUrl/site',
+  signingKey: 'fingerprint',
 );
 
 ({Map<String, List<String>> failures, Map<String, List<String>> observations})

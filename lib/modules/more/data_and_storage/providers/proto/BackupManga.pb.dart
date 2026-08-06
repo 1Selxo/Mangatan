@@ -48,6 +48,7 @@ class BackupManga extends $pb.GeneratedMessage {
     $fixnum.Int64? version,
     $core.String? notes,
     $core.bool? initialized,
+    $core.List<$core.int>? memo,
     $core.String? customTitle,
   }) {
     final result = create();
@@ -78,6 +79,7 @@ class BackupManga extends $pb.GeneratedMessage {
     if (version != null) result.version = version;
     if (notes != null) result.notes = notes;
     if (initialized != null) result.initialized = initialized;
+    if (memo != null) result.memo = memo;
     if (customTitle != null) result.customTitle = customTitle;
     return result;
   }
@@ -127,6 +129,8 @@ class BackupManga extends $pb.GeneratedMessage {
     ..aInt64(109, _omitFieldNames ? '' : 'version')
     ..aOS(110, _omitFieldNames ? '' : 'notes')
     ..aOB(111, _omitFieldNames ? '' : 'initialized')
+    ..a<$core.List<$core.int>>(
+        112, _omitFieldNames ? '' : 'memo', $pb.PbFieldType.OY)
     ..aOS(800, _omitFieldNames ? '' : 'customTitle', protoName: 'customTitle')
     ..hasRequiredFields = false;
 
@@ -339,13 +343,22 @@ class BackupManga extends $pb.GeneratedMessage {
   @$pb.TagNumber(111)
   void clearInitialized() => $_clearField(111);
 
-  /// J2K/Chimahon custom manga info.
+  @$pb.TagNumber(112)
+  $core.List<$core.int> get memo => $_getN(25);
+  @$pb.TagNumber(112)
+  set memo($core.List<$core.int> value) => $_setBytes(25, value);
+  @$pb.TagNumber(112)
+  $core.bool hasMemo() => $_has(25);
+  @$pb.TagNumber(112)
+  void clearMemo() => $_clearField(112);
+
+  /// J2K/Chimahon custom manga info represented by Mangatan.
   @$pb.TagNumber(800)
-  $core.String get customTitle => $_getSZ(25);
+  $core.String get customTitle => $_getSZ(26);
   @$pb.TagNumber(800)
-  set customTitle($core.String value) => $_setString(25, value);
+  set customTitle($core.String value) => $_setString(26, value);
   @$pb.TagNumber(800)
-  $core.bool hasCustomTitle() => $_has(25);
+  $core.bool hasCustomTitle() => $_has(26);
   @$pb.TagNumber(800)
   void clearCustomTitle() => $_clearField(800);
 }

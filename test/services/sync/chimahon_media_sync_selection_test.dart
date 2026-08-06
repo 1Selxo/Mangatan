@@ -106,27 +106,33 @@ void main() {
     );
   });
 
-  test('an absent download selector set preserves every local value', () {
-    const current = ChimahonMediaSyncSelection(
-      manga: false,
-      anime: true,
-      novels: false,
-    );
-    final unrelated = [codec.encode('unrelated', true)];
+  test(
+    'an absent download selector set uses Chimahon all-enabled defaults',
+    () {
+      const current = ChimahonMediaSyncSelection(
+        manga: false,
+        anime: true,
+        novels: false,
+      );
+      final unrelated = [codec.encode('unrelated', true)];
 
-    expect(ChimahonMediaSyncSelection.hasAnyPreference(unrelated), isFalse);
-    expect(
-      ChimahonMediaSyncSelection.fromPreferences(unrelated, fallback: current),
-      current,
-    );
-    expect(
-      chimahonMediaSelectionForExplicitRestore(
-        preferences: unrelated,
-        current: current,
-      ),
-      current,
-    );
-  });
+      expect(ChimahonMediaSyncSelection.hasAnyPreference(unrelated), isFalse);
+      expect(
+        ChimahonMediaSyncSelection.fromPreferences(
+          unrelated,
+          fallback: current,
+        ),
+        current,
+      );
+      expect(
+        chimahonMediaSelectionForExplicitRestore(
+          preferences: unrelated,
+          current: current,
+        ),
+        const ChimahonMediaSyncSelection(),
+      );
+    },
+  );
 
   test('partial explicit restore defaults its missing selector keys true', () {
     const current = ChimahonMediaSyncSelection(

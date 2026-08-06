@@ -353,10 +353,9 @@ ChimahonMediaSyncSelection? chimahonMediaSelectionBootstrapForScope({
 
 /// Applies Chimahon's explicit restore/download selector semantics.
 ///
-/// An entirely absent selector set means the backup predates the controls and
-/// leaves this device untouched. Once any selector is present, omitted keys
-/// take Chimahon's `true` default while malformed present keys keep the
-/// current value.
+/// An entirely absent selector set predates the controls and therefore uses
+/// Chimahon's all-enabled defaults. Once any selector is present, omitted keys
+/// still take that `true` default while malformed values retain [current].
 ChimahonMediaSyncSelection chimahonMediaSelectionForExplicitRestore({
   required Iterable<BackupPreference> preferences,
   required ChimahonMediaSyncSelection current,
@@ -365,7 +364,7 @@ ChimahonMediaSyncSelection chimahonMediaSelectionForExplicitRestore({
         preferences,
         malformedFallback: current,
       )
-    : current;
+    : const ChimahonMediaSyncSelection();
 
 /// Compares the complete persisted selector state used by transactions.
 bool matchesChimahonMediaSelectionState(

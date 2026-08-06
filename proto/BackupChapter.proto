@@ -13,4 +13,5 @@ message BackupChapter {
     int64 sourceOrder = 10;
     int64 lastModifiedAt = 11;
     int64 version = 12;
+    bytes memo = 13;
 }

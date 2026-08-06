@@ -457,7 +457,6 @@
   "sync_button_upload": "Hanya unggah",
   "sync_button_upload_info": "Operasi ini akan sepenuhnya menggantikan data jarak jauh dengan data lokal!",
   "sync_button_download": "Hanya unduh",
-  "sync_button_download_info": "Operasi ini akan sepenuhnya menggantikan data lokal dengan data jarak jauh!",
   "extension_settings": "Pengaturan ekstensi",
   "video_audio_info": "Bahasa pilihan, koreksi nada, kanal audio",
   "all_chapters": "Semua bab",

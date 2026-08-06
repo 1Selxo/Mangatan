@@ -280,7 +280,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
     final model = manga;
     final now = DateTime.now().millisecondsSinceEpoch;
     isar.writeTxnSync(() {
-      model.favorite = !(model.favorite ?? false);
+      model.updateFavorite(!(model.favorite ?? false));
       model.dateAdded = model.favorite! ? now : 0;
       model.updatedAt = now;
       isar.mangas.putSync(model);

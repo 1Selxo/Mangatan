@@ -88,6 +88,7 @@ class ChimahonSyncSafetyAudit {
       localTrackingDeletions: localTrackingDeletions,
       remoteWinsTies: remoteWinsTies,
       fail: fail,
+      observe: observe,
     );
     _auditPreferenceKeys(
       remote: remote,
@@ -283,10 +284,9 @@ class ChimahonSyncSafetyAudit {
   ///
   /// Rows sharing Chimahon's full source+URL+normalized-title+nullable-author
   /// identity are indistinguishable for this reference subset check. The
-  /// maximum valid pairing matches non-tombstones to reference slots first and
-  /// reserves clocked tombstones for surplus slots. Consequently a group with
-  /// `n` surplus rows needs at least `n` clocked tombstones; excess tombstones
-  /// can occupy reference slots and do not manufacture additional surplus.
+  /// Remote-only favorites are valid cloud data, including legacy rows where
+  /// the optional favorite field is absent. Only explicit non-favorites claim
+  /// to be deletion markers, and those require a positive independent clock.
   void _auditRemoteOnlyManga({
     required BackupMihon reference,
     required BackupMihon remote,
@@ -298,8 +298,17 @@ class ChimahonSyncSafetyAudit {
     for (final entry in remoteGroups.entries) {
       final surplus = entry.value.length - (referenceCounts[entry.key] ?? 0);
       if (surplus <= 0) continue;
-      final clockedTombstones = entry.value.where(_isClockedTombstone).length;
-      final invalidCount = surplus - clockedTombstones;
+      final unclockedTombstones = entry.value
+          .where(
+            (manga) =>
+                manga.hasFavorite() &&
+                !manga.favorite &&
+                !_isClockedTombstone(manga),
+          )
+          .length;
+      final invalidCount = surplus < unclockedTombstones
+          ? surplus
+          : unclockedTombstones;
       if (invalidCount <= 0) continue;
       for (var i = 0; i < invalidCount; i++) {
         invalid.add(entry.key);

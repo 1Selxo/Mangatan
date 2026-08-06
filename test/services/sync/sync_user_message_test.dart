@@ -3,6 +3,7 @@ import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
 import 'package:mangayomi/services/sync/chimahon_pre_upload_safety_gate.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
 import 'package:mangayomi/services/sync/google_drive_oauth.dart';
+import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
 import 'package:mangayomi/services/sync/sync_user_message.dart';
 
 void main() {
@@ -91,6 +92,28 @@ void main() {
       'Chimahon restore data is incomplete. Restore the original backup '
       'again before syncing.',
     );
+    expect(message, isNot(contains(secret)));
+    expect(message, isNot(contains(privatePath)));
+  });
+
+  test('credential denial gives fixed Keychain recovery guidance', () {
+    const error = SyncCredentialAccessException(
+      SyncCredentialAccessFailureReason.denied,
+    );
+
+    final message = safeSyncUserMessage(error);
+
+    expect(message, contains('approve the Keychain prompt'));
+    expect(message, isNot(contains(secret)));
+    expect(message, isNot(contains(privatePath)));
+  });
+
+  test('incomplete authoritative download instructs a safe retry', () {
+    final message = safeSyncUserMessage(
+      const ChimahonAuthoritativeDownloadIncompleteException(),
+    );
+
+    expect(message, contains('Retry Download only'));
     expect(message, isNot(contains(secret)));
     expect(message, isNot(contains(privatePath)));
   });

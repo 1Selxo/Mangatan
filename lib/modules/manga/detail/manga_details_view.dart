@@ -8,6 +8,7 @@ import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/custom_floating_action_btn.dart';
 import 'package:mangayomi/modules/manga/detail/resume_chapter.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
@@ -20,12 +21,14 @@ import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 
 class MangaDetailsView extends ConsumerStatefulWidget {
   final Manga manga;
+  final Source? source;
   final bool sourceExist;
   final Function(bool) checkForUpdate;
   const MangaDetailsView({
     super.key,
     required this.sourceExist,
     required this.manga,
+    this.source,
     required this.checkForUpdate,
   });
 
@@ -138,9 +141,12 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                 const SizedBox(width: 4),
                 Text(getMangaStatusName(widget.manga.status, context)),
                 if (!isLocalArchive) const Text(' • '),
-                if (!isLocalArchive) Text(widget.manga.source!),
                 if (!isLocalArchive)
-                  Text(' (${widget.manga.lang!.toUpperCase()})'),
+                  Text(widget.source?.name ?? widget.manga.source!),
+                if (!isLocalArchive)
+                  Text(
+                    ' (${(widget.source?.lang ?? widget.manga.lang!).toUpperCase()})',
+                  ),
                 if (!isLocalArchive && !widget.sourceExist)
                   const Padding(
                     padding: EdgeInsets.all(3),

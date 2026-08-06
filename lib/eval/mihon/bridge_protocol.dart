@@ -5,6 +5,14 @@ import 'package:mangayomi/models/source.dart';
 
 const mihonBridgeContextKey = '__mangatan_bridge_context__';
 
+/// Controls how preference snapshots sent to the JVM bridge are applied.
+///
+/// Normal requests only bootstrap keys missing from the bridge's persistent
+/// store. An explicit Chimahon restore uses [replacePresent] so values carried
+/// by the remote store replace stale bridge values without deleting unknown
+/// extension-owned keys.
+enum MihonPreferenceApplyMode { bootstrap, replacePresent }
+
 /// Mihon catalogue sources use one-based page numbers.
 int mihonCataloguePage(int page) => page < 1 ? 1 : page;
 
@@ -114,6 +122,7 @@ List<Map<String, dynamic>> mihonPreferencePayload(
   Source source,
   Iterable<SourcePreference> preferences, {
   String? changedPreferenceKey,
+  MihonPreferenceApplyMode applyMode = MihonPreferenceApplyMode.bootstrap,
 }) {
   final payload = preferences
       .map((preference) => preference.toJson())
@@ -123,6 +132,8 @@ List<Map<String, dynamic>> mihonPreferencePayload(
     'key': mihonBridgeContextKey,
     if (metadata != null) 'sourceId': metadata.sourceId,
     'changedPreferenceKey': ?changedPreferenceKey,
+    if (applyMode == MihonPreferenceApplyMode.replacePresent)
+      'preferenceApplyMode': 'replace-present',
   });
   return payload;
 }

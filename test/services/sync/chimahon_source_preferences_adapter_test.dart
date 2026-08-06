@@ -230,6 +230,34 @@ void main() {
     expect(storedByKey, isNot(contains('invalid_list')));
     expect(storedByKey, isNot(contains('unknown_key')));
   });
+
+  test('replays a deferred preference store after factory discovery', () {
+    final remote = BackupSourcePreferences(
+      sourceKey: 'source_404',
+      prefs: [codec.encode('server_url', 'https://jellyfin.example')],
+    );
+
+    adapter.importInto(database: database, sourcePreferences: [remote]);
+    expect(database.sourcePreferences.countSync(), 0);
+
+    final discovered = _mihonSource(
+      localId: 4040,
+      nativeId: '404',
+      preferences: [
+        SourcePreference(
+          key: 'server_url',
+          editTextPreference: EditTextPreference(value: '', text: ''),
+        ),
+      ],
+    );
+    database.writeTxnSync(() => database.sources.putSync(discovered));
+
+    adapter.importInto(database: database, sourcePreferences: [remote]);
+
+    final stored = database.sourcePreferences.where().findFirstSync()!;
+    expect(stored.sourceId, 4040);
+    expect(stored.editTextPreference!.value, 'https://jellyfin.example');
+  });
 }
 
 Source _mihonSource({

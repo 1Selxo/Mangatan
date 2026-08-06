@@ -12,6 +12,7 @@ class ResolvedMihonBackupSource {
   });
 
   final int nativeId;
+  String get portableId => nativeId.toString();
   final String name;
   final String language;
   final int? localId;
@@ -33,6 +34,7 @@ ResolvedMihonBackupSource resolveMihonBackupSource({
       return false;
     }
     final metadata = mihonSourceMetadata(source);
+    if (metadata?.factoryAvailable == false) return false;
     return metadata?.sourceId == nativeId.toString() ||
         (metadata == null && source.id == nativeId);
   }).firstOrNull;

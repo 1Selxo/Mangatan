@@ -1,4 +1,5 @@
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 
 /// Resolves a stored source without treating Browse visibility as runtime
 /// availability.
@@ -15,6 +16,10 @@ Source? findSourceFromList(
 }) {
   for (final source in sources) {
     if (installedOnly && !(source.isAdded ?? false)) continue;
+    if (installedOnly &&
+        mihonSourceMetadata(source)?.factoryAvailable == false) {
+      continue;
+    }
     if (source.sourceCode == null) continue;
 
     final matches = sourceId != null

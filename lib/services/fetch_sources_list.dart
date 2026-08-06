@@ -265,11 +265,17 @@ Future<void> _updateSources(
   List<Source> sources,
   String androidProxyServer,
   Repo? repo,
-  ItemType itemType,
-) async {
+  ItemType itemType, {
+  String? sourceCodeOverride,
+  bool includeStoredMihonSiblings = true,
+  bool preserveInstalledFactoryAvailability = true,
+  bool useProvidedVersionLast = false,
+  bool reactivateUninstalledSources = false,
+}) async {
   if (sources.isEmpty) return;
   final sourcesToUpdate = List<Source>.of(sources);
-  if (sources.first.sourceCodeLanguage == SourceCodeLanguage.mihon) {
+  if (includeStoredMihonSiblings &&
+      sources.first.sourceCodeLanguage == SourceCodeLanguage.mihon) {
     final knownIds = sources.map((source) => source.id).toSet();
     final storedGroup = await isar.sources
         .filter()
@@ -292,11 +298,15 @@ Future<void> _updateSources(
   }
 
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
-  final req = await http.get(Uri.parse(sources.first.sourceCodeUrl!));
-  final sourceCode =
-      sources.first.sourceCodeLanguage == SourceCodeLanguage.mihon
-      ? base64.encode(req.bodyBytes)
-      : req.body;
+  late final String sourceCode;
+  if (sourceCodeOverride != null) {
+    sourceCode = sourceCodeOverride;
+  } else {
+    final req = await http.get(Uri.parse(sources.first.sourceCodeUrl!));
+    sourceCode = sources.first.sourceCodeLanguage == SourceCodeLanguage.mihon
+        ? base64.encode(req.bodyBytes)
+        : req.body;
+  }
 
   final updatedSources = <Source>[];
   for (final source in sourcesToUpdate) {
@@ -310,9 +320,10 @@ Future<void> _updateSources(
         : encodeMihonSourceMetadata(
             sourceId: incomingMetadata.sourceId,
             packageName: incomingMetadata.packageName,
-            factoryAvailable:
-                installedMetadata?.factoryAvailable ??
-                incomingMetadata.factoryAvailable,
+            factoryAvailable: preserveInstalledFactoryAvailability
+                ? installedMetadata?.factoryAvailable ??
+                      incomingMetadata.factoryAvailable
+                : incomingMetadata.factoryAvailable,
             extensionName: incomingMetadata.extensionName,
             packageLang: incomingMetadata.packageLang,
           );
@@ -372,11 +383,13 @@ Future<void> _updateSources(
             : null
         ..isAdded = true
         ..isActive =
-            existingSource?.isActive ??
-            shouldEnableExtensionLanguageByDefault(
-              source.lang,
-              PlatformDispatcher.instance.locales,
-            )
+            reactivateUninstalledSources && existingSource?.isAdded != true
+            ? source.isActive ?? true
+            : existingSource?.isActive ??
+                  shouldEnableExtensionLanguageByDefault(
+                    source.lang,
+                    PlatformDispatcher.instance.locales,
+                  )
         ..isPinned = existingSource?.isPinned ?? false
         ..lastUsed = existingSource?.lastUsed ?? false
         ..sourceCode = sourceCode
@@ -393,7 +406,9 @@ Future<void> _updateSources(
         ..isNsfw = source.isNsfw
         ..name = source.name
         ..version = source.version
-        ..versionLast = source.version
+        ..versionLast = useProvidedVersionLast
+            ? source.versionLast ?? source.version
+            : source.version
         ..itemType = itemType
         ..isFullData = source.isFullData ?? false
         ..appMinVerReq = source.appMinVerReq
@@ -407,6 +422,34 @@ Future<void> _updateSources(
   }
 
   await isar.writeTxn(() async => isar.sources.putAll(updatedSources));
+}
+
+Future<void> installMihonApkSources({
+  required List<Source> sources,
+  required String apkBase64,
+  required String androidProxyServer,
+  required ItemType itemType,
+}) {
+  if (sources.any(
+    (source) => source.sourceCodeLanguage != SourceCodeLanguage.mihon,
+  )) {
+    throw ArgumentError.value(
+      sources,
+      'sources',
+      'Every local APK source must use the Mihon bridge.',
+    );
+  }
+  return _updateSources(
+    sources,
+    androidProxyServer,
+    null,
+    itemType,
+    sourceCodeOverride: apkBase64,
+    includeStoredMihonSiblings: false,
+    preserveInstalledFactoryAvailability: false,
+    useProvidedVersionLast: true,
+    reactivateUninstalledSources: true,
+  );
 }
 
 Future<void> _addNewSource(
@@ -766,6 +809,31 @@ Future<List<MihonSourceDescriptor>?> fetchMihonSourceDescriptors(
   } catch (_) {
     return null;
   }
+}
+
+Future<MihonExtensionDescriptor> fetchMihonExtensionDescriptor(
+  InterceptedClient client,
+  Source source,
+  String androidProxyServer,
+) async {
+  final res = await postMihonBridge(
+    client,
+    mihonBridgeDalvikUri(androidProxyServer),
+    body: {
+      'method': 'extensionInfo',
+      'data': source.sourceCode,
+      'preferences': mihonPreferencePayload(source, const []),
+    },
+  );
+  final data = jsonDecode(res.body);
+  if (data is! Map) {
+    throw const FormatException(
+      'Mihon bridge returned invalid extension metadata.',
+    );
+  }
+  return MihonExtensionDescriptor.fromJson(
+    data.map((key, value) => MapEntry(key.toString(), value)),
+  );
 }
 
 String _convertLang(dynamic e) {

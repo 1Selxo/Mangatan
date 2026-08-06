@@ -38,6 +38,72 @@ class MihonSourceDescriptor {
       );
 }
 
+enum MihonExtensionItemType { manga, anime }
+
+class MihonExtensionDescriptor {
+  const MihonExtensionDescriptor({
+    required this.packageName,
+    required this.name,
+    required this.versionName,
+    required this.versionCode,
+    required this.lang,
+    required this.isNsfw,
+    required this.itemType,
+    required this.sources,
+  });
+
+  final String packageName;
+  final String name;
+  final String versionName;
+  final int versionCode;
+  final String lang;
+  final bool isNsfw;
+  final MihonExtensionItemType itemType;
+  final List<MihonSourceDescriptor> sources;
+
+  factory MihonExtensionDescriptor.fromJson(Map<String, dynamic> json) {
+    final packageName = json['packageName']?.toString().trim() ?? '';
+    final sources = (json['sources'] as List? ?? const [])
+        .whereType<Map>()
+        .map(
+          (source) => MihonSourceDescriptor.fromJson(
+            source.map((key, value) => MapEntry(key.toString(), value)),
+          ),
+        )
+        .toList(growable: false);
+    final itemType = switch (json['itemType']?.toString()) {
+      'manga' => MihonExtensionItemType.manga,
+      'anime' => MihonExtensionItemType.anime,
+      final value => throw FormatException(
+        'Unsupported Mihon extension type: ${value ?? 'missing'}',
+      ),
+    };
+
+    if (packageName.isEmpty) {
+      throw const FormatException('Mihon extension package name is missing.');
+    }
+    if (sources.isEmpty) {
+      throw const FormatException('The Mihon extension exposes no sources.');
+    }
+
+    return MihonExtensionDescriptor(
+      packageName: packageName,
+      name: json['name']?.toString().trim().isNotEmpty == true
+          ? json['name'].toString().trim()
+          : packageName,
+      versionName: json['versionName']?.toString().trim() ?? '',
+      versionCode: switch (json['versionCode']) {
+        final int value => value,
+        final value => int.tryParse(value?.toString() ?? '') ?? 0,
+      },
+      lang: json['lang']?.toString() ?? '',
+      isNsfw: json['isNsfw'] == true,
+      itemType: itemType,
+      sources: sources,
+    );
+  }
+}
+
 class MihonSourceMetadata {
   const MihonSourceMetadata({
     required this.sourceId,
@@ -117,6 +183,10 @@ bool belongsToSameMihonExtension(Source first, Source second) {
   }
   return mihonExtensionGroupKey(first) == mihonExtensionGroupKey(second);
 }
+
+bool isLocallyImportedMihonExtension(Source source) =>
+    source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
+    Uri.tryParse(source.sourceCodeUrl ?? '')?.scheme == 'mihon-apk';
 
 List<Map<String, dynamic>> mihonPreferencePayload(
   Source source,

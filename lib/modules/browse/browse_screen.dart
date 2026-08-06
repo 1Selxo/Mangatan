@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +17,8 @@ import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/library/widgets/search_text_form_field.dart';
 import 'package:mangayomi/modules/widgets/tv_pill.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
+import 'package:mangayomi/services/import_mihon_extension.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
@@ -94,6 +97,68 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   }
 
   bool _isSearch = false;
+  bool _isImportingApk = false;
+
+  Future<void> _importMihonApk() async {
+    final selection = await FilePicker.pickFiles(
+      dialogTitle: 'Select a Mihon or Aniyomi extension APK',
+      type: FileType.custom,
+      allowedExtensions: const ['apk'],
+    );
+    final path = selection?.files.single.path;
+    if (path == null || !mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Import extension APK?'),
+        content: const Text(
+          'Mihon extensions execute code inside the local extension server. '
+          'Only import APKs from developers you trust.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(dialogContext.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(dialogContext.l10n.import),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isImportingApk = true);
+    try {
+      final result = await importMihonExtensionApk(
+        MExtensionServerPlatform(ref),
+        path,
+      );
+      if (!mounted) return;
+      final target = result.itemType.localizedSources(context.l10n);
+      final sourceLabel = result.sourceCount == 1 ? 'source' : 'sources';
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Installed ${result.extension.name} '
+              '(${result.sourceCount} $sourceLabel). Open $target to use it.',
+            ),
+          ),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Failed to import extension APK: $error')),
+        );
+    } finally {
+      if (mounted) setState(() => _isImportingApk = false);
+    }
+  }
 
   /// The top-bar action icons, which differ per tab (see #729): Sources =
   /// global-search + filter; Extensions = add + search + language filter.
@@ -123,6 +188,23 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (!isExtensionTab && isDesktop && tabType != ItemType.novel)
+                  IconButton(
+                    tooltip: context.l10n.import,
+                    focusColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.4),
+                    onPressed: _isImportingApk ? null : _importMihonApk,
+                    icon: _isImportingApk
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            Icons.add_outlined,
+                            color: Theme.of(context).hintColor,
+                          ),
+                  ),
                 if (isExtensionTab)
                   IconButton(
                     focusColor: Theme.of(context).colorScheme.primary

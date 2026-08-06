@@ -38,10 +38,12 @@ UninstallExtensionResult uninstallExtension(Source selectedSource) {
       if (source.isObsolete ?? false) {
         isar.sources.deleteSync(source.id!);
       } else {
+        final locallyImported = isLocallyImportedMihonExtension(source);
         isar.sources.putSync(
           source
             ..sourceCode = ''
             ..isAdded = false
+            ..isActive = locallyImported ? false : source.isActive
             ..isPinned = false
             ..updatedAt = DateTime.now().millisecondsSinceEpoch,
         );

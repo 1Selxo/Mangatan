@@ -54,9 +54,12 @@ void main() {
       video.audios?.single.file,
       'http://192.168.2.112:8080/video/audio-token',
     );
+    expect(video.audios?.single.label, isNull);
+    expect(video.audios?.single.language, 'Japanese');
     expect(
       video.subtitles?.single.file,
       'http://192.168.2.112:8080/video/subtitle-token',
     );
+    expect(video.subtitles?.single.language, 'English');
   });
 }

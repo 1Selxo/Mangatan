@@ -376,7 +376,8 @@ class MihonExtensionService implements ExtensionService {
                     file: _resolveBridgeMediaUrl(
                       (e['file'] ?? e['url'])?.toString(),
                     ),
-                    label: e['label'] ?? e['lang'],
+                    label: e['label']?.toString(),
+                    language: (e['language'] ?? e['lang'])?.toString(),
                   ),
                 )
                 .toList() ??
@@ -388,7 +389,8 @@ class MihonExtensionService implements ExtensionService {
                     file: _resolveBridgeMediaUrl(
                       (e['file'] ?? e['url'])?.toString(),
                     ),
-                    label: e['label'] ?? e['lang'],
+                    label: e['label']?.toString(),
+                    language: (e['language'] ?? e['lang'])?.toString(),
                   ),
                 )
                 .toList() ??

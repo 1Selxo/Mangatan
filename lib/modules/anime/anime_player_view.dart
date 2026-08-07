@@ -23,6 +23,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/utils/audio_track_label.dart';
 import 'package:mangayomi/modules/anime/utils/playback_error_report.dart';
 import 'package:mangayomi/modules/anime/utils/playback_media.dart';
 import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
@@ -966,14 +967,15 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (!restoredJimaku && (_firstVid.subtitles?.isNotEmpty ?? false)) {
       try {
         final defaultTrack = _firstVid.subtitles!.firstWhere(
-          (sub) => sub.label == widget.defaultSubtitle,
+          (sub) => (sub.label ?? sub.language) == widget.defaultSubtitle,
           orElse: () => _firstVid.subtitles!.first,
         );
         final file = defaultTrack.file ?? "";
         final label = defaultTrack.label;
+        final language = defaultTrack.language ?? label;
         final track = (file.startsWith("http") || file.startsWith("file"))
-            ? SubtitleTrack.uri(file, title: label, language: label)
-            : SubtitleTrack.data(file, title: label, language: label);
+            ? SubtitleTrack.uri(file, title: label, language: language)
+            : SubtitleTrack.data(file, title: label, language: language);
         await _setSubtitleTrack(track);
       } catch (_) {}
     }
@@ -981,7 +983,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       try {
         final at = _firstVid.audios!.first;
         await _player.setAudioTrack(
-          AudioTrack.uri(at.file ?? "", title: at.label, language: at.label),
+          AudioTrack.uri(
+            at.file ?? "",
+            title: at.label,
+            language: at.language ?? at.label,
+          ),
         );
       } catch (_) {}
     }
@@ -1954,12 +1960,17 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           if (!subs.contains(sub.file)) {
             final file = sub.file!;
             final label = sub.label;
+            final language = sub.language ?? label;
             videoSubtitle.add(
               VideoPrefs(
                 isLocal: widget.isLocal,
                 subtitle: (file.startsWith("http") || file.startsWith("file"))
-                    ? SubtitleTrack.uri(file, title: label, language: label)
-                    : SubtitleTrack.data(file, title: label, language: label),
+                    ? SubtitleTrack.uri(file, title: label, language: language)
+                    : SubtitleTrack.data(
+                        file,
+                        title: label,
+                        language: language,
+                      ),
               ),
             );
             subs.add(sub.file!);
@@ -2216,7 +2227,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 audio: AudioTrack.uri(
                   audio.file!,
                   title: audio.label,
-                  language: audio.label,
+                  language: audio.language ?? audio.label,
                 ),
               ),
             );
@@ -2229,11 +2240,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     videoAudio = videoAudio
         .map((e) {
           VideoPrefs vid = e;
-          vid.title =
-              vid.audio?.title ??
-              vid.audio?.language ??
-              vid.audio?.channels ??
-              "";
+          vid.title = audioTrackLabel(vid.audio);
           return vid;
         })
         .toList()
@@ -2245,12 +2252,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
       child: Column(
         children: videoAudio.toSet().toList().map((aud) {
-          final title =
-              aud.title ??
-              aud.audio?.title ??
-              aud.audio?.language ??
-              aud.audio?.channels ??
-              "None";
+          final title = aud.title ?? audioTrackLabel(aud.audio);
           final selected =
               (aud.audio == audio) || (audio.id == "no" && title == "None");
           return GestureDetector(

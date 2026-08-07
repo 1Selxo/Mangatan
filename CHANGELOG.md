@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.2.2+173 - 2026-08-07
+
+- Added local Mihon extension APK import and reconciled factory sources with
+  synced repositories.
+- Made Chimahon downloads authoritative while preserving audio and subtitle
+  track languages and adding an audio fallback for decoder failures.
+- Improved reader playback and page-position persistence, subtitle OCR timing,
+  rendered-bitmap OCR, Apple Vision OCR, and OCR box opacity alignment.
+
 ## 1.2.1+172 - 2026-08-04
 
 - Rebased Mangatan on Mangayomi 0.8.2, including its player layout, font CPU,

@@ -81,6 +81,20 @@ String audioTrackLabel(AudioTrack? track) {
   return base.isEmpty ? details.join(', ') : '$base ${details.join(', ')}';
 }
 
+/// Compares track languages by their language family, allowing values such as
+/// `en`, `eng`, and `English` to match one another.
+bool audioTrackLanguagesMatch(String? first, String? second) {
+  final firstFamily = _languageFamily(first);
+  final secondFamily = _languageFamily(second);
+  return firstFamily.isNotEmpty && firstFamily == secondFamily;
+}
+
+String _languageFamily(String? value) {
+  final name = _languageName(value).toLowerCase().trim();
+  if (name.isEmpty) return '';
+  return name.split(RegExp(r'\s*[(;\-]'))[0].trim();
+}
+
 String _languageName(String? value) {
   final language = value?.trim() ?? '';
   if (language.isEmpty) return '';

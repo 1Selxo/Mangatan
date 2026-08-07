@@ -4,6 +4,10 @@
 
 <h1 align="center"> Mangatan </h1>
 
+<p align="center">
+  <img src="media/screenshots/anki-card-export.webp" alt="Exporting an anime sentence with audio and a screenshot from Mangatan to Anki" width="100%">
+</p>
+
 <div align="center">
 
  [![GitHub downloads](https://img.shields.io/github/downloads/1Selxo/Mangatan/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/1Selxo/Mangatan/releases)

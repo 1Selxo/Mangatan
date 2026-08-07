@@ -76,7 +76,12 @@ void main() {
       mainSource,
       contains(
         'if (!Platform.isIOS) {\n'
-        '        _mExtensionServer.startServer();',
+        '        if (isDesktop) {\n'
+        '          unawaited(_startBridgeAndRefreshFactorySources());\n'
+        '        } else {\n'
+        '          unawaited(_mExtensionServer.startServer());\n'
+        '        }\n'
+        '      }',
       ),
     );
     expect(

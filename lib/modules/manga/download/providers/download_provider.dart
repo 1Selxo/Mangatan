@@ -15,6 +15,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/video.dart';
+import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
 import 'package:mangayomi/modules/manga/download/providers/convert_to_cbz.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/downloads/providers/downloads_state_provider.dart';
@@ -28,6 +29,7 @@ import 'package:mangayomi/services/get_video_list.dart';
 import 'package:mangayomi/services/get_chapter_pages.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/download_manager/m3u8/m3u8_downloader.dart';
 import 'package:mangayomi/services/download_manager/m3u8/models/download.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
@@ -150,7 +152,7 @@ Future<void> downloadChapter(
     };
     bool hasM3U8File = false;
     bool nonM3U8File = false;
-    M3u8Downloader? m3u8Downloader;
+    List<Video> m3u8Videos = [];
 
     Future<void> processConvert() async {
       if (!saveAsCbz) return;
@@ -305,53 +307,59 @@ Future<void> downloadChapter(
             startFailure = "Failed to load chapter pages: $e";
           });
     } else if (itemType == ItemType.anime) {
-      ref
-          .read(getVideoListProvider(episode: chapter).future)
-          .then((value) async {
-            final m3u8Urls = value.$1
-                .where(
-                  (element) =>
-                      element.originalUrl.endsWith(".m3u8") ||
-                      element.originalUrl.endsWith(".m3u"),
-                )
-                .toList();
-            final nonM3u8Urls = value.$1
-                .where((element) => element.originalUrl.isMediaVideo())
-                .toList();
-            nonM3U8File = nonM3u8Urls.isNotEmpty;
-            hasM3U8File = nonM3U8File ? false : m3u8Urls.isNotEmpty;
-            final videosUrls = nonM3U8File ? nonM3u8Urls : m3u8Urls;
-            if (videosUrls.isNotEmpty) {
-              subtitles = videosUrls.first.subtitles;
-              if (hasM3U8File) {
-                m3u8Downloader = M3u8Downloader(
-                  m3u8Url: videosUrls.first.url,
-                  downloadDir: chapterDirectory.path,
-                  headers: videosUrls.first.headers ?? {},
-                  subtitles: subtitles,
-                  fileName: p.join(
-                    mangaMainDirectory!.path,
-                    "$chapterName.mp4",
-                  ),
-                  chapter: chapter,
-                );
-              } else {
-                pageUrls = [PageUrl(videosUrls.first.url)];
-              }
-              videoHeader.addAll(videosUrls.first.headers ?? {});
-              isOk = true;
-            } else {
-              // Got a video list but nothing matched .m3u8/.m3u or a known video
-              // extension — record why instead of spinning forever below.
-              startFailure = value.$1.isEmpty
-                  ? "No videos returned by the source"
-                  : "No downloadable URL among ${value.$1.length} video(s) "
-                        "(none matched .m3u8/.m3u or a known extension)";
-            }
-          })
-          .catchError((Object e) {
-            startFailure = "Failed to load the video list: $e";
-          });
+      try {
+        final value = await ref.read(
+          getVideoListProvider(episode: chapter).future,
+        );
+        final m3u8Urls = value.$1
+            .where(
+              (element) =>
+                  _isM3u8Url(element.url) || _isM3u8Url(element.originalUrl),
+            )
+            .toList();
+        final directVideoUrls = value.$1
+            .where(
+              (element) =>
+                  // Jellyfin and some bridge proxies use extensionless
+                  // stream endpoints, so the URL scheme is the reliable
+                  // direct-download signal here.
+                  !_isM3u8Url(element.url) &&
+                  !_isM3u8Url(element.originalUrl) &&
+                  _isHttpUrl(element.url),
+            )
+            .toList();
+        nonM3U8File = directVideoUrls.isNotEmpty;
+        hasM3U8File = nonM3U8File ? false : m3u8Urls.isNotEmpty;
+        final videosUrls = nonM3U8File ? directVideoUrls : m3u8Urls;
+        if (videosUrls.isNotEmpty) {
+          if (hasM3U8File) {
+            final selected = preferredVideoStream(
+              videosUrls,
+              await MiningPreferences.getVideoStreamPreference(manga.id),
+            );
+            // Match the player's saved stream preference, then try the
+            // remaining source URLs if that stream has expired.
+            m3u8Videos = [
+              selected,
+              ...videosUrls.where((video) => video.url != selected.url),
+            ];
+            subtitles = selected.subtitles;
+          } else {
+            pageUrls = [PageUrl(videosUrls.first.url)];
+            subtitles = videosUrls.first.subtitles;
+            videoHeader.addAll(videosUrls.first.headers ?? {});
+          }
+          isOk = true;
+        } else {
+          // Got a video list but nothing exposed a playable HTTP URL.
+          startFailure = value.$1.isEmpty
+              ? "No videos returned by the source"
+              : "No downloadable URL among ${value.$1.length} video(s) "
+                    "(none exposed an HTTP video or playlist URL)";
+        }
+      } catch (e) {
+        startFailure = "Failed to load the video list: $e";
+      }
     } else if (itemType == ItemType.novel && chapter.url != null) {
       final manga = chapter.manga.value!;
       final source = getSource(manga.lang!, manga.source!, manga.sourceId)!;
@@ -400,6 +408,16 @@ Future<void> downloadChapter(
     if (_downloadCancelled(chapter)) {
       keepAlive.close();
       return;
+    }
+
+    // A failed HLS attempt can leave partial segments that look complete on a
+    // later retry. Remove them before parsing a fresh playlist.
+    if (hasM3U8File &&
+        !(isar.downloads.getSync(chapter.id!)?.isDownload ?? false)) {
+      await _clearM3u8FallbackArtifacts(
+        chapterDirectory: chapterDirectory,
+        outputFile: File(p.join(mangaMainDirectory!.path, "$chapterName.mp4")),
+      );
     }
 
     if (pageUrls.isNotEmpty) {
@@ -536,9 +554,39 @@ Future<void> downloadChapter(
         await setProgress(DownloadProgress(1, 1, itemType, isCompleted: true));
       }
     } else if (hasM3U8File) {
-      await m3u8Downloader?.download((progress) {
-        setProgress(progress);
-      });
+      Object? lastError;
+      StackTrace? lastStackTrace;
+      for (var index = 0; index < m3u8Videos.length; index++) {
+        final video = m3u8Videos[index];
+        try {
+          await M3u8Downloader(
+            m3u8Url: video.url,
+            downloadDir: chapterDirectory.path,
+            headers: video.headers ?? {},
+            subtitles: video.subtitles,
+            fileName: p.join(mangaMainDirectory!.path, "$chapterName.mp4"),
+            chapter: chapter,
+          ).download((progress) {
+            setProgress(progress);
+          });
+          lastError = null;
+          break;
+        } catch (error, stackTrace) {
+          lastError = error;
+          lastStackTrace = stackTrace;
+          if (index + 1 < m3u8Videos.length) {
+            await _clearM3u8FallbackArtifacts(
+              chapterDirectory: chapterDirectory,
+              outputFile: File(
+                p.join(mangaMainDirectory!.path, "$chapterName.mp4"),
+              ),
+            );
+          }
+        }
+      }
+      if (lastError != null) {
+        Error.throwWithStackTrace(lastError, lastStackTrace!);
+      }
     }
     if (callback != null) {
       callback();
@@ -553,6 +601,35 @@ Future<void> downloadChapter(
     keepAlive.close();
   } finally {
     _DownloadGate.instance.release(sourceKey);
+  }
+}
+
+bool _isHttpUrl(String value) {
+  final scheme = Uri.tryParse(value.trim())?.scheme.toLowerCase();
+  return scheme == 'http' || scheme == 'https';
+}
+
+bool _isM3u8Url(String value) {
+  final trimmed = value.trim().toLowerCase();
+  final path = Uri.tryParse(trimmed)?.path.toLowerCase() ?? trimmed;
+  return path.endsWith('.m3u8') ||
+      path.endsWith('.m3u') ||
+      path.endsWith('/m3u8') ||
+      path.endsWith('/m3u') ||
+      trimmed.contains('.m3u8?') ||
+      trimmed.contains('.m3u?');
+}
+
+Future<void> _clearM3u8FallbackArtifacts({
+  required Directory chapterDirectory,
+  required File outputFile,
+}) async {
+  final tempDirectory = Directory(p.join(chapterDirectory.path, 'temp'));
+  if (await tempDirectory.exists()) {
+    await tempDirectory.delete(recursive: true);
+  }
+  if (await outputFile.exists()) {
+    await outputFile.delete();
   }
 }
 

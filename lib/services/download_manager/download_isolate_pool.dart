@@ -637,17 +637,24 @@ Future<void> _downloadSegment(
   try {
     final file = File(path.join(params.tempDir, '${ts.name}.ts'));
 
-    // Streaming to save memory
-    var request = Request('GET', Uri.parse(ts.url));
-    if (params.headers != null) {
-      request.headers.addAll(params.headers!);
-    }
     // Connection/response-headers timeout so a dropped connection can't hang
     // the segment forever (see _downloadFile) — retry, then fail loudly.
-    StreamedResponse response = await _withRetry(
-      () => client.send(request).timeout(const Duration(seconds: 30)),
-      3,
-    );
+    StreamedResponse response = await _withRetry(() {
+      // A package:http Request is finalized by Client.send. Retrying the
+      // same instance fails before it reaches the server, so create a fresh
+      // request for every attempt.
+      final request = Request('GET', Uri.parse(ts.url));
+      request.headers.addAll(params.headers ?? {});
+      // HLS players request byte ranges for their media segments. Sending the
+      // equivalent open-ended range keeps source-side handling consistent with
+      // playback while still accepting either a 200 or 206 response below.
+      if (!request.headers.keys.any(
+        (name) => name.toLowerCase() == HttpHeaders.rangeHeader,
+      )) {
+        request.headers[HttpHeaders.rangeHeader] = 'bytes=0-';
+      }
+      return client.send(request).timeout(const Duration(seconds: 30));
+    }, 3);
 
     // Accept any 2xx (including 206 Partial Content) — see comment in
     // _downloadFile.

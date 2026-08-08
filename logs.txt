@@ -127,3 +127,67 @@ Logger initialized
 
 [27/07/2026 23:35:08][ERROR] FlutterError: Bad state: Failed to load https://img.comic-fuz.com/c/1xjnwE/5x.webp?h=27DXFBe2_vhKH7TH0QJipQ&e=5000000000.
 
+[08/08/2026 11:43:34][INFO] 
+
+Logger initialized
+
+
+[08/08/2026 11:43:36][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+
+[08/08/2026 11:43:36][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+
+[08/08/2026 11:43:36][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[08/08/2026 11:44:25][INFO] Total TS files to download: 20
+[08/08/2026 11:44:25][INFO] Downloading 20 segments...
+[08/08/2026 11:44:25][ERROR] Download failed
+[08/08/2026 11:44:25][ERROR] DownloadPoolException: Error downloading segment TS_1 (DownloadPoolException: Failed to process segment: TS_1 (DownloadPoolException: Failed to download segment: TS_1 (status 404)))
+[08/08/2026 12:02:27][INFO] 
+
+Logger initialized
+
+
+[08/08/2026 12:02:29][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+
+[08/08/2026 12:02:29][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[08/08/2026 12:02:29][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+
+[08/08/2026 12:03:11][INFO] Total TS files to download: 20
+[08/08/2026 12:03:11][INFO] Downloading 20 segments...
+[08/08/2026 12:03:11][ERROR] Download failed
+[08/08/2026 12:03:11][ERROR] DownloadPoolException: Error downloading segment TS_1 (DownloadPoolException: Failed to process segment: TS_1 (DownloadPoolException: Failed to download segment: TS_1 (status 500)))
+[08/08/2026 12:03:12][INFO] Total TS files to download: 20
+[08/08/2026 12:03:12][INFO] Downloading 20 segments...
+[08/08/2026 12:03:12][ERROR] Download failed
+[08/08/2026 12:03:12][ERROR] DownloadPoolException: Error downloading segment TS_1 (DownloadPoolException: Failed to process segment: TS_1 (DownloadPoolException: Failed to download segment: TS_1 (status 500)))
+[08/08/2026 12:03:12][INFO] Total TS files to download: 17
+[08/08/2026 12:03:12][INFO] Downloading 17 segments...
+[08/08/2026 12:03:12][ERROR] Download failed
+[08/08/2026 12:03:12][ERROR] DownloadPoolException: Error downloading segment TS_1 (DownloadPoolException: Failed to process segment: TS_1 (DownloadPoolException: Failed to download segment: TS_1 (status 500)))
+[08/08/2026 12:03:12][INFO] Total TS files to download: 307
+[08/08/2026 12:03:12][INFO] Media sequence: 1
+[08/08/2026 12:03:12][INFO] Downloading 307 segments...
+[08/08/2026 12:04:08][INFO] Merging segments...
+[08/08/2026 12:04:08][INFO] Merge completed successfully
+[08/08/2026 12:04:08][INFO] Downloading subtitle file: null
+[08/08/2026 12:04:09][INFO] Subtitle file downloaded: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:09][INFO] Subtitle file already exists: null
+[08/08/2026 12:04:37][INFO] 
+
+Logger initialized
+
+
+[08/08/2026 12:04:39][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+
+[08/08/2026 12:04:39][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[08/08/2026 12:04:39][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+

@@ -73,15 +73,13 @@ class M3u8Downloader {
 
   Future<(List<TsInfo>, Uint8List?, Uint8List?, int?)> _getTsList() async {
     try {
-      final uri = Uri.parse(m3u8Url);
-      final m3u8Host = "${uri.scheme}://${uri.host}${path.dirname(uri.path)}";
-      final m3u8Body = await _withRetry(() => _getM3u8Body(m3u8Url));
-      final tsList = _parseTsList(m3u8Host, m3u8Body);
+      final (playlistUri, m3u8Body) = await _getMediaPlaylist();
+      final tsList = _parseTsList(playlistUri, m3u8Body);
       final mediaSequence = _extractMediaSequence(m3u8Body);
 
       _log("Total TS files to download: ${tsList.length}");
 
-      final (key, iv) = await _getM3u8KeyAndIv(m3u8Body);
+      final (key, iv) = await _getM3u8KeyAndIv(m3u8Body, playlistUri);
       if (key != null) _log("TS Key found");
       if (iv != null) _log("TS IV found");
       if (mediaSequence != null) _log("Media sequence: $mediaSequence");
@@ -278,31 +276,46 @@ class M3u8Downloader {
     return response.body;
   }
 
-  List<TsInfo> _parseTsList(String host, String body) {
+  Future<(Uri, String)> _getMediaPlaylist() async {
+    var playlistUri = Uri.parse(m3u8Url);
+    var body = await _withRetry(() => _getM3u8Body(playlistUri.toString()));
+
+    // A source may return a master playlist even when the selected video URL
+    // looks like a media playlist. Follow the highest-bandwidth variant before
+    // interpreting playlist entries as TS segments.
+    for (var depth = 0; depth < 5; depth++) {
+      final variantUrl = selectM3u8VariantUrl(playlistUri.toString(), body);
+      if (variantUrl == null) return (playlistUri, body);
+      playlistUri = Uri.parse(variantUrl);
+      body = await _withRetry(() => _getM3u8Body(playlistUri.toString()));
+    }
+    throw M3u8DownloaderException('Too many nested m3u8 playlists');
+  }
+
+  List<TsInfo> _parseTsList(Uri playlistUri, String body) {
     final lines = body.split('\n');
     final tsList = <TsInfo>[];
     var index = 0;
 
-    for (final line in lines) {
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
       if (line.isEmpty || line.startsWith('#')) continue;
       index++;
-      final tsUrl = line.startsWith('http')
-          ? line
-          : '$host/${line.replaceFirst("/", "")}';
+      final tsUrl = resolveM3u8Reference(playlistUri.toString(), line);
       tsList.add(TsInfo('TS_$index', tsUrl));
     }
     return tsList;
   }
 
-  Future<(Uint8List?, Uint8List?)> _getM3u8KeyAndIv(String m3u8Body) async {
+  Future<(Uint8List?, Uint8List?)> _getM3u8KeyAndIv(
+    String m3u8Body,
+    Uri playlistUri,
+  ) async {
     try {
-      final uri = Uri.parse(m3u8Url);
-      final m3u8Host = '${uri.scheme}://${uri.host}${path.dirname(uri.path)}';
-
       for (final line in m3u8Body.split('\n')) {
         if (!line.contains('#EXT-X-KEY')) continue;
 
-        final (keyUrl, iv) = _extractKeyAttributes(line, m3u8Host);
+        final (keyUrl, iv) = _extractKeyAttributes(line, playlistUri);
         if (keyUrl == null) break;
 
         final response = await _withRetry(
@@ -318,7 +331,7 @@ class M3u8Downloader {
     }
   }
 
-  (String?, Uint8List?) _extractKeyAttributes(String content, String host) {
+  (String?, Uint8List?) _extractKeyAttributes(String content, Uri playlistUri) {
     final keyPattern = RegExp(
       r'#EXT-X-KEY:METHOD=AES-128(?:,URI="([^"]+)")?(?:,IV=0x([A-F0-9]+))?',
       caseSensitive: false,
@@ -327,8 +340,8 @@ class M3u8Downloader {
     if (match == null) return (null, null);
 
     String? uri = match.group(1);
-    if (uri != null && !uri.contains('http')) {
-      uri = '$host/${uri.replaceFirst("/", "")}';
+    if (uri != null) {
+      uri = resolveM3u8Reference(playlistUri.toString(), uri);
     }
 
     final ivStr = match.group(2);
@@ -346,6 +359,64 @@ class M3u8Downloader {
     }
     return null;
   }
+}
+
+/// Resolves a playlist reference using URI semantics rather than string
+/// concatenation. Mihon's video proxy routes child URLs through `/video/`; keep
+/// that route rooted whether a manifest includes its leading slash or not.
+String resolveM3u8Reference(String playlistUrl, String reference) {
+  final base = Uri.parse(playlistUrl);
+  final value = reference.trim();
+  if (value.isEmpty) return base.toString();
+
+  final parsed = Uri.parse(value);
+  if (parsed.hasScheme) return parsed.toString();
+  if (parsed.host.isNotEmpty) return base.resolve(value).toString();
+
+  if (base.pathSegments.isNotEmpty &&
+      base.pathSegments.first == 'video' &&
+      parsed.pathSegments.isNotEmpty &&
+      parsed.pathSegments.first == 'video') {
+    return base
+        .replace(
+          path: parsed.path.startsWith('/') ? parsed.path : '/${parsed.path}',
+          query: parsed.hasQuery ? parsed.query : null,
+          fragment: parsed.hasFragment ? parsed.fragment : null,
+        )
+        .toString();
+  }
+  return base.resolve(value).toString();
+}
+
+/// Returns the highest-bandwidth variant URL when [body] is a master playlist.
+/// A media playlist returns null so callers can parse its segment entries.
+String? selectM3u8VariantUrl(String playlistUrl, String body) {
+  final lines = body.split('\n');
+  String? bestUrl;
+  var bestBandwidth = -1;
+  int? pendingBandwidth;
+
+  for (final rawLine in lines) {
+    final line = rawLine.trim();
+    if (line.isEmpty) continue;
+    if (line.toUpperCase().startsWith('#EXT-X-STREAM-INF:')) {
+      final bandwidth = RegExp(
+        r'(?:^|,)BANDWIDTH=(\d+)',
+        caseSensitive: false,
+      ).firstMatch(line)?.group(1);
+      pendingBandwidth = int.tryParse(bandwidth ?? '') ?? 0;
+      continue;
+    }
+    if (pendingBandwidth == null || line.startsWith('#')) continue;
+
+    final resolved = resolveM3u8Reference(playlistUrl, line);
+    if (bestUrl == null || pendingBandwidth >= bestBandwidth) {
+      bestUrl = resolved;
+      bestBandwidth = pendingBandwidth;
+    }
+    pendingBandwidth = null;
+  }
+  return bestUrl;
 }
 
 class M3u8DownloaderException implements Exception {

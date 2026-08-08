@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:mangayomi/eval/javascript/http.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
@@ -61,7 +62,43 @@ Future<GetChapterPagesModel> getChapterPages(
 
     List<Uint8List?> archiveImages = [];
     final isLocalArchive = (chapter.archivePath ?? '').isNotEmpty;
-    if (!chapter.manga.value!.isLocalArchive!) {
+    final downloadedCbz = downloadedMangaChapterCbz(mangaDirectory!, chapter);
+    final hasDownloadedCbz = await downloadedCbz.exists();
+    final download = chapter.id == null
+        ? null
+        : isar.downloads.getSync(chapter.id!);
+    final downloadedImagePageCount = download?.isDownload ?? false
+        ? await downloadedMangaChapterImagePageCount(path!)
+        : 0;
+    final hasDownloadedImageFolder = downloadedImagePageCount > 0;
+    final hasDownloadedArtifact = hasDownloadedCbz || hasDownloadedImageFolder;
+    final localArtifactPath = isLocalArchive
+        ? chapter.archivePath
+        : hasDownloadedCbz
+        ? downloadedCbz.path
+        : hasDownloadedImageFolder
+        ? path!.path
+        : null;
+
+    // Downloads are complete, self-contained copies. Resolve them before
+    // touching the source so they remain readable while offline.
+    if (isLocalArchive || hasDownloadedCbz) {
+      final archivePath = isLocalArchive
+          ? chapter.archivePath
+          : downloadedCbz.path;
+      final local = await ref.read(
+        getArchiveDataFromFileProvider(archivePath!).future,
+      );
+      for (var image in local.images!) {
+        pageUrls.add(PageUrl(''));
+        archiveImages.add(image.image!);
+        isLocaleList.add(true);
+      }
+    } else if (hasDownloadedImageFolder) {
+      pageUrls = List.generate(downloadedImagePageCount, (_) => PageUrl(''));
+      archiveImages = List.filled(downloadedImagePageCount, null);
+      isLocaleList = List.filled(downloadedImagePageCount, true);
+    } else if (!chapter.manga.value!.isLocalArchive!) {
       final source = getSource(
         chapter.manga.value!.lang!,
         chapter.manga.value!.source!,
@@ -96,24 +133,8 @@ Future<GetChapterPagesModel> getChapterPages(
       uChapDataPreload: [],
     );
 
-    if (pageUrls.isNotEmpty || isLocalArchive) {
-      final downloadedCbz = downloadedMangaChapterCbz(mangaDirectory!, chapter);
-      final hasDownloadedCbz = await downloadedCbz.exists();
-      final localArtifactPath = isLocalArchive
-          ? chapter.archivePath
-          : hasDownloadedCbz
-          ? downloadedCbz.path
-          : path?.path;
-      if (hasDownloadedCbz || isLocalArchive) {
-        final path = isLocalArchive ? chapter.archivePath : downloadedCbz.path;
-        final local = await ref.read(
-          getArchiveDataFromFileProvider(path!).future,
-        );
-        for (var image in local.images!) {
-          archiveImages.add(image.image!);
-          isLocaleList.add(true);
-        }
-      } else {
+    if (pageUrls.isNotEmpty) {
+      if (!hasDownloadedArtifact && !isLocalArchive) {
         for (var i = 0; i < pageUrls.length; i++) {
           archiveImages.add(null);
           if (await File(p.join(path!.path, '${padIndex(i)}.jpg')).exists()) {
@@ -123,12 +144,7 @@ Future<GetChapterPagesModel> getChapterPages(
           }
         }
       }
-      if (isLocalArchive) {
-        for (var i = 0; i < archiveImages.length; i++) {
-          pageUrls.add(PageUrl(""));
-        }
-      }
-      if (!incognitoMode) {
+      if (!incognitoMode && !hasDownloadedArtifact) {
         List<ChapterPageurls>? chapterPageUrls = [];
         for (var chapterPageUrl in settings.chapterPageUrlsList ?? []) {
           if (chapterPageUrl.chapterId != chapter.id) {

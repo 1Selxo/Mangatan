@@ -11,4 +11,29 @@ void main() {
     expect(isArchiveReaderImagePath('006.jxl'), isTrue);
     expect(isArchiveReaderImagePath('metadata.json'), isFalse);
   });
+
+  test('archive pages use natural numeric filename order', () {
+    final paths = [
+      'pages/10.webp',
+      'pages/2.webp',
+      'pages/01.webp',
+      'pages/1.webp',
+      'pages/11.webp',
+    ]..sort(compareArchiveReaderPaths);
+
+    expect(paths, [
+      'pages/1.webp',
+      'pages/01.webp',
+      'pages/2.webp',
+      'pages/10.webp',
+      'pages/11.webp',
+    ]);
+  });
+
+  test('archive page sorting handles numeric runs larger than an integer', () {
+    final paths = ['100000000000000000000.webp', '9.webp', '10.webp']
+      ..sort(compareArchiveReaderPaths);
+
+    expect(paths, ['9.webp', '10.webp', '100000000000000000000.webp']);
+  });
 }

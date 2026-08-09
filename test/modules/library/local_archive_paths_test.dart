@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -6,6 +8,12 @@ import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 
 void main() {
+  test('local cover images are never rejected based on byte size', () {
+    final cover = Uint8List(6 * 1024 * 1024);
+
+    expect(cover.getCoverImage, same(cover));
+  });
+
   group('supportedLocalArchiveExtensions', () {
     test('matches the picker formats for every library type', () {
       expect(supportedLocalArchiveExtensions(ItemType.manga), [

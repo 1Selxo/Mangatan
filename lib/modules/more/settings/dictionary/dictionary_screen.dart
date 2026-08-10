@@ -2008,6 +2008,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _ankiDecks.contains(_ankiProfile.deckName)
                           ? _ankiProfile.deckName
                           : null,
@@ -2015,10 +2016,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         labelText: 'Deck',
                         prefixIcon: Icon(Icons.style_outlined),
                       ),
-                      hint: Text(_ankiProfile.deckName),
+                      hint: Text(
+                        _ankiProfile.deckName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       items: [
                         for (final deck in _ankiDecks)
-                          DropdownMenuItem(value: deck, child: Text(deck)),
+                          DropdownMenuItem(
+                            value: deck,
+                            child: Text(
+                              deck,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
@@ -2048,6 +2060,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _ankiModels.contains(_ankiProfile.modelName)
                           ? _ankiProfile.modelName
                           : null,
@@ -2055,10 +2068,21 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         labelText: 'Note type',
                         prefixIcon: Icon(Icons.view_agenda_outlined),
                       ),
-                      hint: Text(_ankiProfile.modelName),
+                      hint: Text(
+                        _ankiProfile.modelName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       items: [
                         for (final model in _ankiModels)
-                          DropdownMenuItem(value: model, child: Text(model)),
+                          DropdownMenuItem(
+                            value: model,
+                            child: Text(
+                              model,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                       ],
                       onChanged: (value) {
                         if (value == null) return;

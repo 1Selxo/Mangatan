@@ -357,7 +357,7 @@ void main() {
     expect(script, contains("event.key === 'Home' ? 0"));
   });
 
-  test('keeps frequency and pitch labels white on accent tags', () {
+  test('uses the theme foreground for frequency and pitch accent tags', () {
     const preferences = DictionaryPopupPreferences(
       width: 540,
       height: 450,
@@ -385,12 +385,50 @@ void main() {
     final globalColorRule = html.indexOf('.entry, .entry *');
     final tagRowColorRule = html.indexOf('.tag-row, .tag-row *');
     final labelColorRule = html.indexOf(
-      '.frequency-dict-label, .pitch-dict-label { color: #fff; }',
+      '.frequency-dict-label, .pitch-dict-label { color: var(--on-primary); }',
     );
 
+    expect(html, contains('--on-primary: #ffffff;'));
     expect(labelColorRule, isNonNegative);
     expect(labelColorRule, greaterThan(globalColorRule));
     expect(labelColorRule, greaterThan(tagRowColorRule));
+  });
+
+  test('keeps sepia dark accent tags legible', () {
+    const preferences = DictionaryPopupPreferences(
+      width: 540,
+      height: 450,
+      fontSize: 15,
+      theme: DictionaryThemePreference.dark,
+      eInkMode: false,
+      paginatedScrolling: false,
+      customCss: '',
+      showFrequencyHarmonic: true,
+      showFrequencyAverage: false,
+      showPitchNumber: true,
+      showPitchText: true,
+    );
+    final theme = ThemeData.dark().copyWith(
+      colorScheme: ThemeData.dark().colorScheme.copyWith(
+        primary: const Color(0xfff1e8d9),
+        onPrimary: const Color(0xff332d22),
+      ),
+    );
+
+    final html = buildHoshiPopupHtml(
+      popupCss: '/* upstream popup css */',
+      popupJs: 'window.renderPopup = function() {};',
+      selectionJs: 'window.hoshiSelection = {};',
+      audioPreferences: AnkiAudioPreferences.defaults,
+      allowDuplicates: false,
+      preferences: preferences,
+      theme: theme,
+      dark: true,
+    );
+
+    expect(html, contains('--freq-tag-color: #f1e8d9;'));
+    expect(html, contains('--pitch-tag-color: #f1e8d9;'));
+    expect(html, contains('--on-primary: #332d22;'));
   });
 
   test('keeps the description overlay readable in a light popup', () {

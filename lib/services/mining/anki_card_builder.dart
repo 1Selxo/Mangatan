@@ -40,6 +40,7 @@ class AnkiCardBuilder {
     Future<List<AnkiMediaFile>> Function()? dictionaryMediaLoader,
     Future<AnkiMediaFile?> Function()? wordAudioLoader,
   }) async {
+    final fieldMap = profile.effectiveFieldMap;
     final placeholder = await _buildPrepared(
       result: result,
       context: context.copyWith(
@@ -50,10 +51,10 @@ class AnkiCardBuilder {
       renderedContent: renderedContent,
       screenshotMode: AnkiScreenshotMode.noScreenshot,
     );
-    final usesScreenshot = _usesScreenshotMarker(profile.fieldMap);
+    final usesScreenshot = _usesScreenshotMarker(fieldMap);
     final usesWordAudio =
-        _usesMarker(profile.fieldMap, AnkiMarker.audio) ||
-        _usesMarker(profile.fieldMap, AnkiMarker.wordAudio);
+        _usesMarker(fieldMap, AnkiMarker.audio) ||
+        _usesMarker(fieldMap, AnkiMarker.wordAudio);
     final requests = <AnkiMediaRequest>[
       if (dictionaryMediaLoader != null)
         AnkiMediaRequest(
@@ -62,7 +63,7 @@ class AnkiCardBuilder {
         ),
       if (usesWordAudio && wordAudioLoader != null)
         AnkiMediaRequest(marker: AnkiMarker.wordAudio, load: wordAudioLoader),
-      if (_usesMarker(profile.fieldMap, AnkiMarker.sentenceAudio) &&
+      if (_usesMarker(fieldMap, AnkiMarker.sentenceAudio) &&
           context.sentenceAudioLoader != null)
         AnkiMediaRequest(
           marker: AnkiMarker.sentenceAudio,
@@ -158,15 +159,15 @@ class AnkiCardBuilder {
     required AnkiScreenshotMode screenshotMode,
     AnkiScreenshotPreparation? screenshotOverride,
   }) async {
-    final sentenceAudioFuture =
-        _usesMarker(profile.fieldMap, AnkiMarker.sentenceAudio)
+    final fieldMap = profile.effectiveFieldMap;
+    final sentenceAudioFuture = _usesMarker(fieldMap, AnkiMarker.sentenceAudio)
         ? Future<AnkiMediaFile?>.sync(
             () =>
                 context.sentenceAudioLoader?.call(profile.sentenceAudioFormat),
           )
         : Future<AnkiMediaFile?>.value();
     final screenshotFuture =
-        !_usesScreenshotMarker(profile.fieldMap) ||
+        !_usesScreenshotMarker(fieldMap) ||
             screenshotMode == AnkiScreenshotMode.noScreenshot
         ? Future<_ScreenshotPayload?>.value()
         : screenshotOverride != null
@@ -325,10 +326,11 @@ class AnkiCardBuilder {
       AnkiMarker.source: _escape(context.locationLabel),
       AnkiMarker.documentTitle: _escape(context.sourceTitle),
       AnkiMarker.selectionText: selectedText,
-      _legacyPopupSelectionTextMarker: selectedText,
+      AnkiMarker.popupSelectionText: selectedText,
+      AnkiMarker.mediaName: _escape(context.sourceTitle),
     };
 
-    final fields = profile.fieldMap.map((field, template) {
+    final fields = fieldMap.map((field, template) {
       if (_normalizeFieldName(field) == 'definitionpicture') {
         return MapEntry(field, '');
       }
@@ -647,7 +649,6 @@ class AnkiCardBuilder {
 
   static final _markerPattern = RegExp(r'\{([^{}]+)\}');
 
-  static const _legacyPopupSelectionTextMarker = '{popup-selection-text}';
   static const _absoluteScreenshotUploadBytes = 8 * 1024 * 1024;
   static const _maxScreenshotDimension = 1280;
 

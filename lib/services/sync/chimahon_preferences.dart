@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
+import 'package:mangayomi/services/mining/anki_markers.dart';
 
 enum ChimahonPreferenceKind {
   integer,
@@ -147,6 +148,10 @@ class ChimahonLanguageProfile {
   final String languageCode;
 
   factory ChimahonLanguageProfile.fromJson(Map<String, dynamic> json) {
+    final rawModelName = json['ankiModel']?.toString() ?? '';
+    final modelName = rawModelName.trim().isEmpty
+        ? AnkiMarker.lapisModelName
+        : rawModelName;
     final rawFieldMap = json['ankiFieldMap'];
     Map<String, String> fieldMap = const {};
     if (rawFieldMap is String && rawFieldMap.isNotEmpty) {
@@ -171,8 +176,8 @@ class ChimahonLanguageProfile {
       name: json['name']?.toString() ?? '',
       ankiEnabled: json['ankiEnabled'] as bool? ?? false,
       ankiDeck: json['ankiDeck']?.toString() ?? '',
-      ankiModel: json['ankiModel']?.toString() ?? '',
-      ankiFieldMap: fieldMap,
+      ankiModel: modelName,
+      ankiFieldMap: AnkiMarker.effectiveFieldMap(modelName, fieldMap),
       ankiTags: json['ankiTags']?.toString() ?? '',
       ankiDuplicateCheck: json['ankiDupCheck'] as bool? ?? true,
       ankiDuplicateScope: json['ankiDupScope']?.toString() ?? 'deck',

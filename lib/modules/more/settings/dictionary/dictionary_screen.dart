@@ -410,9 +410,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   }
 
   Future<void> _saveAnki(AnkiMiningProfile profile) async {
+    if (!mounted) return;
+    final activeProfile = _activeProfile.copyWith(anki: profile);
     setState(() {
       _ankiProfile = profile;
-      _activeProfile = _activeProfile.copyWith(anki: profile);
+      _activeProfile = activeProfile;
+      _profiles = [
+        for (final item in _profiles)
+          item.id == activeProfile.id ? activeProfile : item,
+      ];
     });
     await MiningPreferences.setAnkiProfile(profile);
   }
@@ -662,9 +668,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
               )
             : _ankiProfile;
-        if (!identical(profile, _ankiProfile)) {
-          await MiningPreferences.setAnkiProfile(profile);
-        }
+        if (!mounted) return;
+        if (!identical(profile, _ankiProfile)) await _saveAnki(profile);
         if (!mounted) return;
         setState(() {
           _ankiProfile = profile;
@@ -702,9 +707,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               ),
             )
           : _ankiProfile;
-      if (!identical(profile, _ankiProfile)) {
-        await MiningPreferences.setAnkiProfile(profile);
-      }
+      if (!mounted) return;
+      if (!identical(profile, _ankiProfile)) await _saveAnki(profile);
       if (!mounted) return;
       setState(() {
         _ankiProfile = profile;
@@ -2163,6 +2167,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     value: _activeProfile.duplicateAction == 'allow',
                     onChanged: (value) => _updateActiveProfile(
                       _activeProfile.copyWith(
+                        anki: _ankiProfile,
                         duplicateAction: value ? 'allow' : 'prevent',
                       ),
                     ),

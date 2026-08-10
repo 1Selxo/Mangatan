@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1523042926;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1576459657;
 
 // Section: executor
 
@@ -285,6 +285,41 @@ fn wire__crate__api__rhttp__client__create_static_resolver_sync_impl(
         },
     )
 }
+fn wire__crate__api__rar__extract_rar_entries_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "extract_rar_entries",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_archive_path = <String>::sse_decode(&mut deserializer);
+            let api_entry_names = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::rar::extract_rar_entries(api_archive_path, api_entry_names)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__epub__get_chapter_content_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -462,6 +497,39 @@ fn wire__crate__api__hoshidicts__native__import_dictionary_impl(
                         api_output_dir,
                         api_low_ram,
                     )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__rar__list_rar_entries_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "list_rar_entries",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_archive_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::rar::list_rar_entries(api_archive_path)?;
                     Ok(output_ok)
                 })())
             }
@@ -1641,6 +1709,30 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Vec<crate::api::rar::RarEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::rar::RarEntry>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::rar::RarEntryData> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::rar::RarEntryData>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<(String, Vec<String>)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1868,6 +1960,30 @@ impl SseDecode for crate::api::rhttp::client::ProxySettings {
     }
 }
 
+impl SseDecode for crate::api::rar::RarEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_isFile = <bool>::sse_decode(deserializer);
+        return crate::api::rar::RarEntry {
+            name: var_name,
+            is_file: var_isFile,
+        };
+    }
+}
+
+impl SseDecode for crate::api::rar::RarEntryData {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_content = <Vec<u8>>::sse_decode(deserializer);
+        return crate::api::rar::RarEntryData {
+            name: var_name,
+            content: var_content,
+        };
+    }
+}
+
 impl SseDecode for (String, Vec<String>) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2081,38 +2197,40 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        8 => wire__crate__api__epub__get_chapter_content_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__hoshidicts__native__get_media_file_impl(
+        8 => wire__crate__api__rar__extract_rar_entries_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__epub__get_chapter_content_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__hoshidicts__native__get_media_file_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        10 => {
+        11 => {
             wire__crate__api__hoshidicts__native__get_styles_impl(port, ptr, rust_vec_len, data_len)
         }
-        11 => wire__crate__api__hoshidicts__native__import_dictionary_impl(
+        12 => wire__crate__api__hoshidicts__native__import_dictionary_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__hoshidicts__native__lookup_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__rhttp__http__make_http_request_receive_stream_impl(
+        13 => wire__crate__api__rar__list_rar_entries_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__hoshidicts__native__lookup_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__rhttp__http__make_http_request_receive_stream_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        14 => wire__crate__api__epub__parse_epub_from_bytes_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__epub__parse_epub_from_path_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__hoshidicts__native__rebuild_query_impl(
+        16 => wire__crate__api__epub__parse_epub_from_bytes_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__epub__parse_epub_from_path_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__hoshidicts__native__rebuild_query_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        18 => {
+        20 => {
             wire__crate__api__rhttp__http__register_client_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -2137,8 +2255,8 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        16 => wire__crate__api__image__process_crop_image_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__rhttp__http__register_client_sync_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__image__process_crop_image_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__rhttp__http__register_client_sync_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2723,6 +2841,40 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::rhttp::client::ProxySettings>
     for crate::api::rhttp::client::ProxySettings
 {
     fn into_into_dart(self) -> crate::api::rhttp::client::ProxySettings {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::rar::RarEntry {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.is_file.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::rar::RarEntry {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::rar::RarEntry> for crate::api::rar::RarEntry {
+    fn into_into_dart(self) -> crate::api::rar::RarEntry {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::rar::RarEntryData {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.content.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::rar::RarEntryData {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::rar::RarEntryData>
+    for crate::api::rar::RarEntryData
+{
+    fn into_into_dart(self) -> crate::api::rar::RarEntryData {
         self
     }
 }
@@ -3442,6 +3594,26 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Vec<crate::api::rar::RarEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::rar::RarEntry>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::rar::RarEntryData> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::rar::RarEntryData>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<(String, Vec<String>)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3634,6 +3806,22 @@ impl SseEncode for crate::api::rhttp::client::ProxySettings {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseEncode for crate::api::rar::RarEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <bool>::sse_encode(self.is_file, serializer);
+    }
+}
+
+impl SseEncode for crate::api::rar::RarEntryData {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <Vec<u8>>::sse_encode(self.content, serializer);
     }
 }
 

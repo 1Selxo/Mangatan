@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/modules/manga/archive_reader/models/models.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
 
 void main() {
@@ -35,5 +36,12 @@ void main() {
       ..sort(compareArchiveReaderPaths);
 
     expect(paths, ['9.webp', '10.webp', '100000000000000000000.webp']);
+  });
+
+  test('RAR comic extensions keep their archive type', () {
+    expect(setTypeExtension('cbr'), LocalExtensionType.cbr);
+    expect(setTypeExtension('RAR'), LocalExtensionType.rar);
+    expect(getTypeExtension(LocalExtensionType.cbr), 'cbr');
+    expect(getTypeExtension(LocalExtensionType.rar), 'rar');
   });
 }

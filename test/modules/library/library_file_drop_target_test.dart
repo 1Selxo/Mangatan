@@ -22,7 +22,7 @@ void main() {
       find.byKey(const ValueKey('library-file-drop-overlay')),
       findsOneWidget,
     );
-    expect(find.text('Files (.cbz, .zip, .epub)'), findsOneWidget);
+    expect(find.text('Files (.cbz, .zip, .cbr, .rar, .epub)'), findsOneWidget);
 
     dropTarget.onDragExited!(_eventDetails);
     await tester.pump();
@@ -51,6 +51,8 @@ void main() {
         files: [
           DropItemFile('/library/first.CBZ'),
           DropItemFile('/library/comic.epub'),
+          DropItemFile('/library/volume.cbr'),
+          DropItemFile('/library/raw.rar'),
           DropItemFile('/library/ignore.txt'),
           DropItemFile('/library/second.zip'),
         ],
@@ -63,6 +65,8 @@ void main() {
     expect(importedPaths, [
       '/library/first.CBZ',
       '/library/comic.epub',
+      '/library/volume.cbr',
+      '/library/raw.rar',
       '/library/second.zip',
     ]);
     expect(find.byType(AlertDialog), findsNothing);

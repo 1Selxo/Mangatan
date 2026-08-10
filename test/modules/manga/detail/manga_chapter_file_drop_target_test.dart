@@ -24,6 +24,7 @@ void main() {
         files: [
           DropItemFile('/library/volume-1.epub'),
           DropItemFile('/library/volume-2.cbz'),
+          DropItemFile('/library/volume-3.cbr'),
         ],
         localPosition: Offset.zero,
         globalPosition: Offset.zero,
@@ -31,7 +32,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(importedPaths, ['/library/volume-1.epub', '/library/volume-2.cbz']);
+    expect(importedPaths, [
+      '/library/volume-1.epub',
+      '/library/volume-2.cbz',
+      '/library/volume-3.cbr',
+    ]);
     expect(
       find.byKey(const ValueKey('epub-library-choice-dialog')),
       findsNothing,

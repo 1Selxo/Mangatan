@@ -1951,6 +1951,8 @@ dependencies = [
 name = "rust_lib_mangayomi"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "cc",
  "chrono",
  "cmake",
  "encoding_rs",

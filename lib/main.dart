@@ -98,6 +98,7 @@ void main(List<String> args) async {
   // Zone-level catch-all for anything that slips through both layers
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    _registerBundledLibraryLicenses();
     if (Platform.isLinux && runWebViewTitleBarWidget(args)) return;
 
     // Cap the decoded image cache so a large library grid can't fill the
@@ -194,6 +195,15 @@ void main(List<String> args) async {
       });
     }
   }, _handleUncaughtError);
+}
+
+void _registerBundledLibraryLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    final notice = await rootBundle.loadString(
+      'third_party/libarchive/COPYING',
+    );
+    yield LicenseEntryWithLineBreaks(const ['libarchive'], notice);
+  });
 }
 
 void _handleUncaughtError(Object error, StackTrace stack) {

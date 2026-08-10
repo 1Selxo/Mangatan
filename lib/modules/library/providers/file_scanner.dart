@@ -74,7 +74,7 @@ class LocalFoldersState extends _$LocalFoldersState {
 /// ```
 /// Mangatan/local/MangaName/CustomCover.jpg (optional)
 /// Mangatan/local/MangaName/Chapter1/Page1.jpg
-/// Mangatan/local/MangaName/Chapter2.cbz
+/// Mangatan/local/MangaName/Chapter2.cbz (or .cbr/.rar)
 /// Mangatan/local/AnimeName/Episode1.mp4
 /// Mangatan/local/NovelName/NovelName.epub
 /// ```
@@ -82,7 +82,7 @@ class LocalFoldersState extends _$LocalFoldersState {
 /// ```
 /// Videotypes:   mp4, mov, avi, flv, wmv, mpeg, mkv
 /// Imagetypes:   jpg, jpeg, png, webp, avif
-/// Archivetypes: cbz, zip, cbt, tar
+/// Archivetypes: cbz, zip, cbr, rar, cbt, tar
 /// Other types: epub
 /// ```
 @riverpod
@@ -293,7 +293,7 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       addNewChapters(subDirs, hasImagesFolders);
     } // Possible that image folders and archives are mixed in one manga
     if (hasArchives) {
-      // Each .cbz/.zip file is a chapter
+      // Each comic archive file is a chapter
       final archives = files.where((f) => _isArchive(f.path)).toList();
       addNewChapters(archives, false);
     }
@@ -506,7 +506,12 @@ bool _isImage(String path) {
 /// Returns if file is an archive
 bool _isArchive(String path) {
   final ext = p.extension(path).toLowerCase();
-  return ext == '.cbz' || ext == '.zip' || ext == '.cbt' || ext == '.tar';
+  return ext == '.cbz' ||
+      ext == '.zip' ||
+      ext == '.cbr' ||
+      ext == '.rar' ||
+      ext == '.cbt' ||
+      ext == '.tar';
 }
 
 /// Returns if file is a video

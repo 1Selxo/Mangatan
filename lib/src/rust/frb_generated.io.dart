@@ -7,6 +7,7 @@ import 'api/epub.dart';
 import 'api/hoshidicts.dart';
 import 'api/hoshidicts/native.dart';
 import 'api/image.dart';
+import 'api/rar.dart';
 import 'api/rhttp/client.dart';
 import 'api/rhttp/error.dart';
 import 'api/rhttp/http.dart';
@@ -320,6 +321,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<RarEntry> dco_decode_list_rar_entry(dynamic raw);
+
+  @protected
+  List<RarEntryData> dco_decode_list_rar_entry_data(dynamic raw);
+
+  @protected
   List<(String, List<String>)> dco_decode_list_record_string_list_string(
     dynamic raw,
   );
@@ -380,6 +387,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProxySettings dco_decode_proxy_settings(dynamic raw);
+
+  @protected
+  RarEntry dco_decode_rar_entry(dynamic raw);
+
+  @protected
+  RarEntryData dco_decode_rar_entry_data(dynamic raw);
 
   @protected
   (String, List<String>) dco_decode_record_string_list_string(dynamic raw);
@@ -723,6 +736,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<RarEntry> sse_decode_list_rar_entry(SseDeserializer deserializer);
+
+  @protected
+  List<RarEntryData> sse_decode_list_rar_entry_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<(String, List<String>)> sse_decode_list_record_string_list_string(
     SseDeserializer deserializer,
   );
@@ -805,6 +826,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProxySettings sse_decode_proxy_settings(SseDeserializer deserializer);
+
+  @protected
+  RarEntry sse_decode_rar_entry(SseDeserializer deserializer);
+
+  @protected
+  RarEntryData sse_decode_rar_entry_data(SseDeserializer deserializer);
 
   @protected
   (String, List<String>) sse_decode_record_string_list_string(
@@ -1262,6 +1289,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_rar_entry(List<RarEntry> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_rar_entry_data(
+    List<RarEntryData> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_record_string_list_string(
     List<(String, List<String>)> self,
     SseSerializer serializer,
@@ -1364,6 +1400,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_proxy_settings(ProxySettings self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rar_entry(RarEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rar_entry_data(RarEntryData self, SseSerializer serializer);
 
   @protected
   void sse_encode_record_string_list_string(

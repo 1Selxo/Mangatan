@@ -153,6 +153,7 @@ flutter:
     - assets/
     - assets/hoshi_popup/
     - assets/yomitan_transforms/
+    - third_party/libarchive/COPYING
     - path: assets/fonts/
       platforms: [android]
     - assets/trackers_icons/

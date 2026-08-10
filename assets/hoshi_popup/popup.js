@@ -194,6 +194,20 @@ function createPlusIcon() {
     ]);
 }
 
+function createDuplicateIcon() {
+    return svgEl('svg', {
+        class: 'slot-icon duplicate-icon',
+        viewBox: '0 0 24 24',
+        'aria-hidden': 'true',
+        focusable: 'false'
+    }, [
+        svgEl('path', {
+            class: 'duplicate-line',
+            d: 'M4 4h16v16H4zM12 7v10M7 12h10'
+        })
+    ]);
+}
+
 function createBrowseIcon() {
     return svgEl('svg', {
         class: 'slot-icon browse-icon',
@@ -1557,6 +1571,7 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
         slot.appendChild(createAudioIcon());
     } else if (kind === 'mine') {
         slot.appendChild(createPlusIcon());
+        slot.appendChild(createDuplicateIcon());
     } else if (kind === 'browse') {
         slot.appendChild(createBrowseIcon());
     }

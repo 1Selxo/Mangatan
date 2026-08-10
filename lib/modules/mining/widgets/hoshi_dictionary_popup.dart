@@ -1296,8 +1296,7 @@ String buildHoshiPopupHtml({
 		    .button-slot[hidden] { display: none; }
 		    .button-slot::before { content: none; }
 		    .button-slot[data-state="loading"] .slot-icon,
-		    .button-slot[data-state="error"] .slot-icon,
-		    .button-slot[data-state="duplicate"] .slot-icon { display: none; }
+		    .button-slot[data-state="error"] .slot-icon { display: none; }
 		    .slot-icon {
 		      display: block;
 		      width: calc(23px * var(--popup-scale));
@@ -1309,14 +1308,18 @@ String buildHoshiPopupHtml({
 		      fill: currentColor;
 		      shape-rendering: crispEdges;
 		    }
-		    .audio-icon { transform: translate(calc(1px * var(--popup-scale)), calc(1px * var(--popup-scale))); }
-		    .audio-speaker-body { fill: currentColor; }
+		    .duplicate-icon { display: none; }
+		    .button-slot[data-state="duplicate"] .plus-icon { display: none; }
+		    .button-slot[data-state="duplicate"] .duplicate-icon { display: block; }
+		    .duplicate-line,
 		    .browse-line {
 		      fill: none;
 		      stroke: currentColor;
 		      stroke-width: 1.8;
+		      stroke-linecap: round;
 		      stroke-linejoin: round;
 		    }
+		    .audio-speaker-body { fill: currentColor; }
 			    .audio-wave {
 			      fill: none;
 			      stroke: currentColor;
@@ -1326,7 +1329,6 @@ String buildHoshiPopupHtml({
 		    }
 		    .button-slot[data-state="loading"]::before { content: '…'; font-size: calc(18px * var(--popup-scale)); }
 		    .button-slot[data-state="error"]::before { content: '!'; font-size: calc(18px * var(--popup-scale)); }
-		    .button-slot[data-state="duplicate"]::before { content: '⊞'; font-size: calc(19px * var(--popup-scale)); }
 	    .button-slot[data-enabled="false"] { opacity: .45; pointer-events: none; }
 	  </style>
   <script>
@@ -1385,17 +1387,12 @@ String buildHoshiPopupHtml({
   <div class="overlay"><div class="overlay-close" onclick="closeOverlay()">×</div><div class="overlay-content"></div></div>
 </body>
 </html>''';
-  return html
-      .replaceFirst(
-        RegExp(r'\.button-slot\[data-state="duplicate"\]::before \{[^}]*\}'),
-        '.button-slot[data-state="duplicate"]::before { content: "\\229E"; font-size: calc(19px * var(--popup-scale)); }',
-      )
-      .replaceFirst(
-        RegExp(
-          r'<div class="overlay-close" onclick="closeOverlay\(\)">.*?<div class="overlay-content">',
-        ),
-        '<div class="overlay-close" onclick="closeOverlay()">&times;</div><div class="overlay-content">',
-      );
+  return html.replaceFirst(
+    RegExp(
+      r'<div class="overlay-close" onclick="closeOverlay\(\)">.*?<div class="overlay-content">',
+    ),
+    '<div class="overlay-close" onclick="closeOverlay()">&times;</div><div class="overlay-content">',
+  );
 }
 
 bool _isDarkPopup(

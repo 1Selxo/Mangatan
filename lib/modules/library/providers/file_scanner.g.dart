@@ -67,7 +67,7 @@ abstract class _$LocalFoldersState extends $Notifier<List<String>> {
 /// ```
 /// Mangatan/local/MangaName/CustomCover.jpg (optional)
 /// Mangatan/local/MangaName/Chapter1/Page1.jpg
-/// Mangatan/local/MangaName/Chapter2.cbz
+/// Mangatan/local/MangaName/Chapter2.cbz (or .cbr/.rar)
 /// Mangatan/local/AnimeName/Episode1.mp4
 /// Mangatan/local/NovelName/NovelName.epub
 /// ```
@@ -75,7 +75,7 @@ abstract class _$LocalFoldersState extends $Notifier<List<String>> {
 /// ```
 /// Videotypes:   mp4, mov, avi, flv, wmv, mpeg, mkv
 /// Imagetypes:   jpg, jpeg, png, webp
-/// Archivetypes: cbz, zip, cbt, tar
+/// Archivetypes: cbz, zip, cbr, rar, cbt, tar
 /// Other types: epub
 /// ```
 
@@ -88,7 +88,7 @@ final scanLocalLibraryProvider = ScanLocalLibraryProvider._();
 /// ```
 /// Mangatan/local/MangaName/CustomCover.jpg (optional)
 /// Mangatan/local/MangaName/Chapter1/Page1.jpg
-/// Mangatan/local/MangaName/Chapter2.cbz
+/// Mangatan/local/MangaName/Chapter2.cbz (or .cbr/.rar)
 /// Mangatan/local/AnimeName/Episode1.mp4
 /// Mangatan/local/NovelName/NovelName.epub
 /// ```
@@ -96,7 +96,7 @@ final scanLocalLibraryProvider = ScanLocalLibraryProvider._();
 /// ```
 /// Videotypes:   mp4, mov, avi, flv, wmv, mpeg, mkv
 /// Imagetypes:   jpg, jpeg, png, webp
-/// Archivetypes: cbz, zip, cbt, tar
+/// Archivetypes: cbz, zip, cbr, rar, cbt, tar
 /// Other types: epub
 /// ```
 
@@ -109,7 +109,7 @@ final class ScanLocalLibraryProvider
   /// ```
   /// Mangatan/local/MangaName/CustomCover.jpg (optional)
   /// Mangatan/local/MangaName/Chapter1/Page1.jpg
-  /// Mangatan/local/MangaName/Chapter2.cbz
+  /// Mangatan/local/MangaName/Chapter2.cbz (or .cbr/.rar)
   /// Mangatan/local/AnimeName/Episode1.mp4
   /// Mangatan/local/NovelName/NovelName.epub
   /// ```
@@ -117,7 +117,7 @@ final class ScanLocalLibraryProvider
   /// ```
   /// Videotypes:   mp4, mov, avi, flv, wmv, mpeg, mkv
   /// Imagetypes:   jpg, jpeg, png, webp
-  /// Archivetypes: cbz, zip, cbt, tar
+  /// Archivetypes: cbz, zip, cbr, rar, cbt, tar
   /// Other types: epub
   /// ```
   ScanLocalLibraryProvider._()

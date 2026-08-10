@@ -316,7 +316,7 @@ Manga _newLocalArchiveParent({
 
 List<String> supportedLocalArchiveExtensions(ItemType itemType) {
   return switch (itemType) {
-    ItemType.manga => const ['cbz', 'zip', 'epub'],
+    ItemType.manga => const ['cbz', 'zip', 'cbr', 'rar', 'epub'],
     ItemType.anime => const ['mp4', 'mov', 'avi', 'flv', 'wmv', 'mpeg', 'mkv'],
     ItemType.novel => const ['epub'],
   };
@@ -343,7 +343,7 @@ String localArchiveName(String path) {
       .last
       .replaceAll(
         RegExp(
-          r'\.(mp4|mov|avi|flv|wmv|mpeg|mkv|cbz|zip|cbt|tar|epub)$',
+          r'\.(mp4|mov|avi|flv|wmv|mpeg|mkv|cbz|zip|cbr|rar|cbt|tar|epub)$',
           caseSensitive: false,
         ),
         '',

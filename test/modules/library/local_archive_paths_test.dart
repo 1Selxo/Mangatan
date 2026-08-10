@@ -11,6 +11,8 @@ void main() {
       expect(supportedLocalArchiveExtensions(ItemType.manga), [
         'cbz',
         'zip',
+        'cbr',
+        'rar',
         'epub',
       ]);
       expect(supportedLocalArchiveExtensions(ItemType.anime), [
@@ -33,9 +35,17 @@ void main() {
           '/library/first.CBZ',
           '/library/notes.txt',
           r'C:\library\second.ZiP',
+          '/library/third.CBR',
+          r'C:\library\fourth.RaR',
           '/library/book.epub',
         ], ItemType.manga),
-        ['/library/first.CBZ', r'C:\library\second.ZiP', '/library/book.epub'],
+        [
+          '/library/first.CBZ',
+          r'C:\library\second.ZiP',
+          '/library/third.CBR',
+          r'C:\library\fourth.RaR',
+          '/library/book.epub',
+        ],
       );
     });
 
@@ -94,6 +104,8 @@ void main() {
     () {
       expect(localArchiveName('/library/My Book.EPUB'), 'My Book');
       expect(localArchiveName(r'C:\library\My Anime.MKV'), 'My Anime');
+      expect(localArchiveName('/library/My Manga.CBR'), 'My Manga');
+      expect(localArchiveName(r'C:\library\Raw Volume.RAR'), 'Raw Volume');
     },
   );
 

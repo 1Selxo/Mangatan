@@ -7,6 +7,7 @@ import 'api/epub.dart';
 import 'api/hoshidicts.dart';
 import 'api/hoshidicts/native.dart';
 import 'api/image.dart';
+import 'api/rar.dart';
 import 'api/rhttp/client.dart';
 import 'api/rhttp/error.dart';
 import 'api/rhttp/http.dart';
@@ -71,7 +72,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1523042926;
+  int get rustContentHash => -1576459657;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -103,6 +104,11 @@ abstract class RustLibApi extends BaseApi {
     required StaticDnsSettings settings,
   });
 
+  Future<List<RarEntryData>> crateApiRarExtractRarEntries({
+    required String archivePath,
+    required List<String> entryNames,
+  });
+
   Future<String> crateApiEpubGetChapterContent({
     required String epubPath,
     required String chapterPath,
@@ -122,6 +128,10 @@ abstract class RustLibApi extends BaseApi {
     required String zipPath,
     required String outputDir,
     required bool lowRam,
+  });
+
+  Future<List<RarEntry>> crateApiRarListRarEntries({
+    required String archivePath,
   });
 
   Future<List<HoshiLookupResult>> crateApiHoshidictsNativeLookup({
@@ -402,6 +412,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<List<RarEntryData>> crateApiRarExtractRarEntries({
+    required String archivePath,
+    required List<String> entryNames,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(archivePath, serializer);
+          sse_encode_list_String(entryNames, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_rar_entry_data,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiRarExtractRarEntriesConstMeta,
+        argValues: [archivePath, entryNames],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRarExtractRarEntriesConstMeta =>
+      const TaskConstMeta(
+        debugName: "extract_rar_entries",
+        argNames: ["archivePath", "entryNames"],
+      );
+
+  @override
   Future<String> crateApiEpubGetChapterContent({
     required String epubPath,
     required String chapterPath,
@@ -415,7 +460,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 9,
             port: port_,
           );
         },
@@ -455,7 +500,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 10,
             port: port_,
           );
         },
@@ -491,7 +536,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 11,
             port: port_,
           );
         },
@@ -525,7 +570,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 12,
             port: port_,
           );
         },
@@ -545,6 +590,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         debugName: "import_dictionary",
         argNames: ["zipPath", "outputDir", "lowRam"],
       );
+
+  @override
+  Future<List<RarEntry>> crateApiRarListRarEntries({
+    required String archivePath,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(archivePath, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 13,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_rar_entry,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiRarListRarEntriesConstMeta,
+        argValues: [archivePath],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRarListRarEntriesConstMeta => const TaskConstMeta(
+    debugName: "list_rar_entries",
+    argNames: ["archivePath"],
+  );
 
   @override
   Future<List<HoshiLookupResult>> crateApiHoshidictsNativeLookup({
@@ -567,7 +644,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 14,
             port: port_,
           );
         },
@@ -638,7 +715,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 13,
+              funcId: 15,
               port: port_,
             );
           },
@@ -701,7 +778,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 16,
             port: port_,
           );
         },
@@ -736,7 +813,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 17,
             port: port_,
           );
         },
@@ -764,7 +841,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_list_prim_u_8_loose(image, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_prim_u_8_strict,
@@ -801,7 +878,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 19,
             port: port_,
           );
         },
@@ -834,7 +911,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 20,
             port: port_,
           );
         },
@@ -862,7 +939,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_client_settings(settings, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -1362,8 +1439,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ClientSettings dco_decode_client_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return ClientSettings(
       timeoutSettings: dco_decode_opt_box_autoadd_timeout_settings(arr[0]),
       throwOnStatusCode: dco_decode_bool(arr[1]),
@@ -1393,8 +1470,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EpubChapter dco_decode_epub_chapter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return EpubChapter(
       name: dco_decode_String(arr[0]),
       content: dco_decode_String(arr[1]),
@@ -1733,6 +1810,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<RarEntry> dco_decode_list_rar_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_rar_entry).toList();
+  }
+
+  @protected
+  List<RarEntryData> dco_decode_list_rar_entry_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_rar_entry_data).toList();
+  }
+
+  @protected
   List<(String, List<String>)> dco_decode_list_record_string_list_string(
     dynamic raw,
   ) {
@@ -1869,6 +1958,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw Exception("unreachable");
     }
+  }
+
+  @protected
+  RarEntry dco_decode_rar_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RarEntry(
+      name: dco_decode_String(arr[0]),
+      isFile: dco_decode_bool(arr[1]),
+    );
+  }
+
+  @protected
+  RarEntryData dco_decode_rar_entry_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RarEntryData(
+      name: dco_decode_String(arr[0]),
+      content: dco_decode_list_prim_u_8_strict(arr[1]),
+    );
   }
 
   @protected
@@ -2825,6 +2938,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<RarEntry> sse_decode_list_rar_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RarEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_rar_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<RarEntryData> sse_decode_list_rar_entry_data(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RarEntryData>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_rar_entry_data(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<(String, List<String>)> sse_decode_list_record_string_list_string(
     SseDeserializer deserializer,
   ) {
@@ -3057,6 +3196,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw UnimplementedError('');
     }
+  }
+
+  @protected
+  RarEntry sse_decode_rar_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_isFile = sse_decode_bool(deserializer);
+    return RarEntry(name: var_name, isFile: var_isFile);
+  }
+
+  @protected
+  RarEntryData sse_decode_rar_entry_data(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_content = sse_decode_list_prim_u_8_strict(deserializer);
+    return RarEntryData(name: var_name, content: var_content);
   }
 
   @protected
@@ -4058,6 +4213,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_rar_entry(
+    List<RarEntry> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_rar_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_rar_entry_data(
+    List<RarEntryData> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_rar_entry_data(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_record_string_list_string(
     List<(String, List<String>)> self,
     SseSerializer serializer,
@@ -4287,6 +4466,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_32(1, serializer);
         sse_encode_list_custom_proxy(field0, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_rar_entry(RarEntry self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_bool(self.isFile, serializer);
+  }
+
+  @protected
+  void sse_encode_rar_entry_data(RarEntryData self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_list_prim_u_8_strict(self.content, serializer);
   }
 
   @protected

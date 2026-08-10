@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.2.3+174 - 2026-08-11
+
+- Added self-contained RAR and CBR manga archive imports through libarchive,
+  including native desktop and iOS builds, natural page ordering, and bundled
+  license attribution.
+- Improved local archive reading with natural CBZ page sorting and preference
+  for downloaded chapter artifacts.
+- Refined Anki field mapping and popup controls, refreshed card state after
+  changes, and made library category tabs visible by default.
+- Improved HLS playlist resolution and download fallback handling.
+
 ## 1.2.2+173 - 2026-08-07
 
 - Added local Mihon extension APK import and reconciled factory sources with

@@ -1589,6 +1589,32 @@ function updateButtonSlot(slot, changes) {
     requestAnimationFrame(reportButtonRects);
 }
 
+async function refreshEntryAnkiState(entryIndex, expression) {
+    const [isDuplicate, noteIds] = await Promise.all([
+        webkit.messageHandlers.duplicateCheck.postMessage(expression),
+        webkit.messageHandlers.duplicateNotes.postMessage(expression)
+    ]);
+    if (window.lookupEntries?.[entryIndex]?.expression !== expression) { return; }
+
+    const mineSlot = getButtonSlot('mine', entryIndex);
+    const browseSlot = getButtonSlot('browse', entryIndex);
+    if (!mineSlot || !browseSlot) { return; }
+    const ids = Array.isArray(noteIds)
+        ? noteIds.map(Number).filter(Number.isFinite)
+        : [];
+    updateButtonSlot(mineSlot, {
+        state: isDuplicate ? 'duplicate' : 'default',
+        enabled: true
+    });
+    mineSlot.title = isDuplicate ? 'Add duplicate card' : 'Add card';
+    browseSlot.dataset.noteIds = ids.join(' ');
+    browseSlot.hidden = ids.length === 0;
+    updateButtonSlot(browseSlot, {
+        state: 'default',
+        enabled: ids.length > 0
+    });
+}
+
 async function playEntryAudio(entryIndex) {
     const entry = window.lookupEntries?.[entryIndex];
     if (!entry) { return; }
@@ -1626,20 +1652,14 @@ async function mineEntryAtIndex(entryIndex) {
     updateButtonSlot(mineSlot, { enabled: false });
     
     const allowDuplicate = mineSlot.dataset.state === 'duplicate';
-    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, selectedText, allowDuplicate);
+    const wasAdded = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, selectedText, allowDuplicate);
     lastSelection = '';
-    const checkDuplicate = async () => {
-        const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
-        updateButtonSlot(mineSlot, {
-            state: wasAdded ? 'duplicate' : 'default',
-            enabled: true
-        });
-    };
+    const refreshAnkiState = () => refreshEntryAnkiState(entryIndex, expression);
     
-    if (isAnkiConnect) {
-        await checkDuplicate();
+    if (wasAdded) {
+        await refreshAnkiState();
     } else {
-        setTimeout(checkDuplicate, 1000);
+        setTimeout(refreshAnkiState, 1000);
     }
 }
 
@@ -1685,20 +1705,7 @@ function createEntryHeader(entry, idx) {
     browseSlot.hidden = true;
     browseSlot.title = 'View existing card(s) in Anki';
     buttonsContainer.appendChild(browseSlot);
-    Promise.all([
-        webkit.messageHandlers.duplicateCheck.postMessage(expression),
-        webkit.messageHandlers.duplicateNotes.postMessage(expression)
-    ]).then(([isDuplicate, noteIds]) => {
-        const ids = Array.isArray(noteIds) ? noteIds : [];
-        updateButtonSlot(mineSlot, {
-            state: isDuplicate ? 'duplicate' : 'default',
-            enabled: true
-        });
-        mineSlot.title = isDuplicate ? 'Add duplicate card' : 'Add card';
-        browseSlot.dataset.noteIds = ids.join(' ');
-        browseSlot.hidden = ids.length === 0;
-        updateButtonSlot(browseSlot, { enabled: ids.length > 0 });
-    });
+    refreshEntryAnkiState(idx, expression);
 
     if (window.audioSources?.length) {
         buttonsContainer.appendChild(createButtonSlot('audio', idx));

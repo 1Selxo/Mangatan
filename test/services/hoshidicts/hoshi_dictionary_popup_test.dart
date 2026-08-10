@@ -134,10 +134,18 @@ void main() {
     expect(html, contains('"duplicateNotes"'));
     expect(html, contains('"browseNotes"'));
     expect(html, contains('window.allowDupes = false;'));
-    expect(html, contains('\\229E'));
     expect(html, contains('.plus-line'));
-    expect(html, contains('.audio-icon'));
+    expect(html, contains('.duplicate-icon'));
+    expect(html, contains('.duplicate-line'));
+    expect(
+      html,
+      contains(
+        '.button-slot[data-state="duplicate"] .duplicate-icon { display: block; }',
+      ),
+    );
     expect(html, contains('.audio-speaker-body'));
+    expect(html, isNot(contains('audio-icon { transform:')));
+    expect(html, isNot(contains('\\229E')));
     expect(html, isNot(contains('\u{1F50A}')));
   });
 
@@ -481,6 +489,8 @@ void main() {
     expect(popup, contains('SPDX-License-Identifier: GPL-3.0-or-later'));
     expect(popup, contains('plus-icon'));
     expect(popup, contains('M10 3h3v17h-3zM3 10h17v3H3z'));
+    expect(popup, contains('duplicate-icon'));
+    expect(popup, contains('M4 4h16v16H4zM12 7v10M7 12h10'));
     expect(popup, contains('audio-speaker-body'));
     expect(popup, contains('M3 9v6h4l5 4V5L7 9H3z'));
     expect(popup, contains('window.resetHoshiAudioCaches = resetAudioCaches'));

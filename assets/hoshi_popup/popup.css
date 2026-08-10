@@ -326,7 +326,7 @@ body {
     display: flex;
     align-items: center;
     background-color: var(--freq-tag-color, #77aaeb);
-    color: #fff;
+    color: var(--on-primary, #fff);
     padding: calc(4px * var(--popup-scale));
 }
 
@@ -665,7 +665,7 @@ a {
 
 .pitch-dict-label {
     background-color: var(--pitch-tag-color, #94a6eb);
-    color: #fff;
+    color: var(--on-primary, #fff);
     padding: calc(2px * var(--popup-scale)) calc(4px * var(--popup-scale));
     border-radius: calc(4px * var(--popup-scale));
 }

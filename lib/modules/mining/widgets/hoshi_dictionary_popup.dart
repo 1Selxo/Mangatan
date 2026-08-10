@@ -1214,6 +1214,7 @@ String buildHoshiPopupHtml({
   final muted3 = _cssColor(scheme.onSurfaceVariant.withValues(alpha: 0.70));
   final muted4 = _cssColor(scheme.onSurfaceVariant.withValues(alpha: 0.56));
   final primary = _cssColor(scheme.primary);
+  final onPrimary = _cssColor(scheme.onPrimary);
   final primaryContainer = _cssColor(scheme.primaryContainer);
   final onPrimaryContainer = _cssColor(scheme.onPrimaryContainer);
   final audioSources = audioPreferences.enabled
@@ -1255,6 +1256,7 @@ String buildHoshiPopupHtml({
       --text-color-light3: $muted3;
       --text-color-light4: $muted4;
       --accent-color: $primary;
+      --on-primary: $onPrimary;
       --link-color: $primary;
       --primary-container: $primaryContainer;
       --on-primary-container: $onPrimaryContainer;
@@ -1277,7 +1279,7 @@ String buildHoshiPopupHtml({
 	    }
 	    .glossary-content, .glossary-content * { color: var(--text-color); }
 	    .tag-row, .tag-row * { color: var(--text-color-light1); }
-	    .frequency-dict-label, .pitch-dict-label { color: #fff; }
+	    .frequency-dict-label, .pitch-dict-label { color: var(--on-primary); }
 	    .overlay {
 	      background: var(--background-color-dark1);
 	      color: var(--text-color);

@@ -514,6 +514,20 @@ void main() {
     expect(popup, contains('function hasPopupTextSelection()'));
     expect(popup, contains('function rememberPopupTextSelection()'));
     expect(popup, contains('function browseEntryNotes(entryIndex)'));
+    expect(
+      popup,
+      contains('async function refreshEntryAnkiState(entryIndex, expression)'),
+    );
+    expect(
+      popup,
+      contains(
+        'const refreshAnkiState = () => '
+        'refreshEntryAnkiState(entryIndex, expression);',
+      ),
+    );
+    expect(popup, contains('await refreshAnkiState();'));
+    expect(popup, contains("browseSlot.dataset.noteIds = ids.join(' ');"));
+    expect(popup, contains('browseSlot.hidden = ids.length === 0;'));
     expect(popup, contains("? 'Add duplicate card' : 'Add card'"));
     expect(popup, contains('allowDuplicate,'));
     expect(

@@ -259,3 +259,14 @@ Logger initialized
 
 [10/08/2026 21:55:19][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
 
+[10/08/2026 23:02:21][INFO] 
+
+Logger initialized
+
+
+[10/08/2026 23:02:22][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E7%A7%81%E3%82%92%E5%96%B0%E3%81%B9%E3%81%9F%E3%81%84%E3%80%81%E3%81%B2%E3%81%A8%E3%81%A7%E3%81%AA%E3%81%97%2Fcover.jpg.
+
+[10/08/2026 23:02:22][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%81%AE%E5%A5%87%E5%A6%99%E3%81%AA%E5%86%92%E9%99%BA%20%E7%AC%AC8%E9%83%A8%20%E3%82%B8%E3%83%A7%E3%82%B8%E3%83%A7%E3%83%AA%E3%82%AA%E3%83%B3%20%E3%82%AB%E3%83%A9%E3%83%BC%E7%89%88%2Fcover.jpg.
+
+[10/08/2026 23:02:22][ERROR] FlutterError: Bad state: Failed to load content://com.android.externalstorage.documents/tree/primary%3AChimahon/document/primary%3AChimahon%2Flocal%2F%5B%E3%81%AA%E3%82%82%E3%82%8A%5D%20%E3%82%86%E3%82%8B%E3%82%86%E3%82%8A%2Fcover.jpg.
+

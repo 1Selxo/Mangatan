@@ -27,6 +27,14 @@ void main() {
     expect(Settings().usePageTapZones, !isDesktop);
   });
 
+  test('library category tabs are shown by default', () {
+    final settings = Settings();
+
+    expect(settings.libraryShowCategoryTabs, isTrue);
+    expect(settings.animeLibraryShowCategoryTabs, isTrue);
+    expect(settings.novelLibraryShowCategoryTabs, isTrue);
+  });
+
   test('EPUB reading layout is persisted in settings JSON', () {
     final settings = Settings()..novelEpubReadingLayout = 2;
     final json = settings.toJson();

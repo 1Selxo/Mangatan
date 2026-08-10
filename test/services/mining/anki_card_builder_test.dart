@@ -11,7 +11,7 @@ import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
 void main() {
-  test('Lapis autofill bolds the full conjugated lookup match', () async {
+  test('Lapis autofill matches Chimahon sentence defaults', () async {
     final result = HoshiLookupResult(
       matched: '食べさせられました',
       deinflected: '食べる',
@@ -34,7 +34,7 @@ void main() {
       AnkiMarker.defaultsForFields(fields)['Sentence'],
       AnkiMarker.sentence,
     );
-    expect(fieldMap['Sentence'], AnkiMarker.sentenceBold);
+    expect(fieldMap['Sentence'], AnkiMarker.sentence);
 
     final draft = await const AnkiCardBuilder().build(
       result: result,
@@ -42,7 +42,48 @@ void main() {
       profile: AnkiMiningProfile(modelName: 'Lapis', fieldMap: fieldMap),
     );
 
-    expect(draft.fields['Sentence'], 'パンを<b>食べさせられました</b>。');
+    expect(draft.fields['Sentence'], 'パンを食べさせられました。');
+  });
+
+  test('blank bundled Lapis maps use Chimahon defaults at export', () async {
+    final result = HoshiLookupResult(
+      matched: '食べる',
+      deinflected: '食べる',
+      trace: const [],
+      preprocessorSteps: 0,
+      term: const HoshiTermResult(
+        expression: '食べる',
+        reading: 'たべる',
+        rules: 'v1',
+        score: 1,
+        glossaries: [
+          HoshiGlossaryEntry(
+            dictName: 'JMdict',
+            glossary: 'to eat',
+            definitionTags: 'v1',
+            termTags: '',
+          ),
+        ],
+        frequencies: [],
+        pitches: [],
+      ),
+    );
+
+    final draft = await const AnkiCardBuilder().build(
+      result: result,
+      context: const MiningContext(
+        sentence: 'パンを食べる。',
+        sourceTitle: 'Example book',
+      ),
+      profile: const AnkiMiningProfile(modelName: 'Lapis', fieldMap: {}),
+      renderedContent: const {'popupSelectionText': 'selected'},
+    );
+
+    expect(draft.fields['Expression'], '食べる');
+    expect(draft.fields['Sentence'], 'パンを食べる。');
+    expect(draft.fields['SelectionText'], 'selected');
+    expect(draft.fields['MiscInfo'], 'Example book');
+    expect(draft.fields, isNotEmpty);
   });
 
   test('uses the Yomitan-rendered payload for Lapis fields', () async {

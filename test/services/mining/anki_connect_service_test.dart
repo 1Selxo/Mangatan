@@ -244,6 +244,54 @@ void main() {
     expect(actions, ['modelFieldNames', 'canAddNotesWithErrorDetail']);
   });
 
+  test('does not misreport Anki validation failures as duplicates', () async {
+    final actions = <String>[];
+    var preparations = 0;
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final action = body['action'] as String;
+      actions.add(action);
+      return switch (action) {
+        'modelFieldNames' => http.Response(
+          '{"result": ["Front", "Back"], "error": null}',
+          200,
+        ),
+        'canAddNotesWithErrorDetail' => http.Response(
+          '{"result": [{"canAdd": false, "error": "cannot create note because it is empty"}], "error": null}',
+          200,
+        ),
+        _ => throw StateError('Unexpected action: $action'),
+      };
+    });
+    final pending = PendingAnkiCard(
+      placeholderDraft: const AnkiCardDraft(
+        deckName: 'Mining',
+        modelName: 'Basic',
+        expression: '事件',
+        fields: {},
+      ),
+      prepare: (_) async {
+        preparations++;
+        throw StateError('must not prepare an invalid note');
+      },
+    );
+
+    Object? failure;
+    try {
+      await AnkiConnectService(
+        client: client,
+      ).exportPending(pending, allowDuplicate: true);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure, isA<AnkiConnectException>());
+    expect(failure, isNot(isA<AnkiDuplicateException>()));
+    expect(failure.toString(), 'cannot create note because it is empty');
+    expect(preparations, 0);
+    expect(actions, ['modelFieldNames', 'canAddNotesWithErrorDetail']);
+  });
+
   test(
     'stores an animated scene first and falls back to the frozen still',
     () async {

@@ -461,6 +461,40 @@ void main() {
     expect(restored.screenshotMode, AnkiScreenshotMode.animatedScene);
   });
 
+  test('normalizes blank bundled Lapis maps idempotently', () async {
+    const codec = ChimahonPreferenceCodec();
+    final remoteProfile = {
+      'id': 'japanese',
+      'name': 'Japanese',
+      'languageCode': 'ja',
+      'ankiEnabled': true,
+      'ankiDeck': 'Japanese Mined Cards',
+      'ankiModel': 'Lapis',
+      'ankiFieldMap': '{}',
+      'ankiTags': 'chimahon',
+    };
+
+    await const ChimahonMiningSettingsAdapter().import([
+      codec.encode('pref_anki_profiles', jsonEncode([remoteProfile])),
+      codec.encode('pref_active_profile_id', 'japanese'),
+    ], dictionaryStorage: _DictionaryStorageStub());
+
+    final restored = (await MiningPreferences.getDictionaryProfiles()).single;
+    expect(restored.anki.fieldMap, AnkiMarker.lapisDefaultFieldMap);
+    expect(
+      (await MiningPreferences.getAnkiProfile()).fieldMap,
+      AnkiMarker.lapisDefaultFieldMap,
+    );
+
+    final exported = await const ChimahonMiningSettingsAdapter().export(
+      dictionaryStorage: _DictionaryStorageStub(),
+    );
+    final roundTripped = ChimahonSettingsPayload.fromBackup(
+      exported,
+    ).languageProfiles.single;
+    expect(roundTripped.ankiFieldMap, AnkiMarker.lapisDefaultFieldMap);
+  });
+
   test('writable snapshot restores a partially changed Hive state', () async {
     await MiningPreferences.setOcrBackgroundOpacity(0.25);
     await MiningPreferences.setOcrOutlineVisible(true);

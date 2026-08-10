@@ -43,6 +43,46 @@ class AnkiMarker {
   static const source = '{source}';
   static const documentTitle = '{document-title}';
   static const selectionText = '{selection-text}';
+  static const popupSelectionText = '{popup-selection-text}';
+  static const mediaName = '{media-name}';
+
+  static const lapisModelName = 'Lapis';
+
+  /// Matches Chimahon's bundled Lapis preset. Chimahon treats a blank map as
+  /// this preset both while loading profiles and immediately before export.
+  static const lapisDefaultFieldMap = <String, String>{
+    'Expression': expression,
+    'ExpressionFurigana': furiganaPlain,
+    'ExpressionReading': reading,
+    'ExpressionAudio': audio,
+    'SelectionText': popupSelectionText,
+    'MainDefinition': selectedGlossary,
+    'Sentence': sentence,
+    'SentenceFurigana': sentenceFurigana,
+    'SentenceAudio': sentenceAudio,
+    'Picture': screenshot,
+    'Glossary': glossary,
+    'IsWordAndSentenceCard': 'x',
+    'PitchPosition': pitchAccentPositions,
+    'PitchCategories': pitchAccentCategories,
+    'Frequency': frequencies,
+    'FreqSort': frequencyHarmonicRank,
+    'MiscInfo': mediaName,
+  };
+
+  static bool isBundledLapisModelName(String name) {
+    final normalized = name.trim().toLowerCase();
+    return normalized == 'lapis' ||
+        normalized == 'lapis (chimahon)' ||
+        normalized.startsWith('lapis (chimahon ');
+  }
+
+  static Map<String, String> effectiveFieldMap(
+    String modelName,
+    Map<String, String> fieldMap,
+  ) => fieldMap.isEmpty && isBundledLapisModelName(modelName)
+      ? lapisDefaultFieldMap
+      : fieldMap;
 
   static const standardTemplates = <String, String>{
     'Expression': expression,
@@ -114,8 +154,11 @@ class AnkiMarker {
     bool isLapis = false,
   }) {
     if (isLapis) {
-      final lapis = _lapisFieldMap[fieldName.toLowerCase()];
-      if (lapis != null) return lapis;
+      for (final entry in lapisDefaultFieldMap.entries) {
+        if (entry.key.toLowerCase() == fieldName.toLowerCase()) {
+          return entry.value;
+        }
+      }
     }
     if (fieldIndex == 0) return expression;
     final normalized = _normalizeFieldName(fieldName);
@@ -171,31 +214,6 @@ class AnkiMarker {
     selectionText: ['selection', 'selection-text', 'popup-selection-text'],
   };
 
-  static const _lapisFieldMap = <String, String>{
-    'expression': expression,
-    'expressionfurigana': furiganaPlain,
-    'expressionreading': reading,
-    'expressionaudio': audio,
-    'selectiontext': selectionText,
-    'maindefinition': selectedGlossary,
-    'definitionpicture': '',
-    'sentence': sentenceBold,
-    'sentencefurigana': '',
-    'sentenceaudio': sentenceAudio,
-    'picture': screenshot,
-    'glossary': glossary,
-    'hint': '',
-    'iswordandsentencecard': 'x',
-    'isclickcard': '',
-    'issentencecard': '',
-    'isaudiocard': '',
-    'pitchposition': pitchAccentPositions,
-    'pitchcategories': pitchAccentCategories,
-    'frequency': frequencies,
-    'freqsort': frequencyHarmonicRank,
-    'miscinfo': documentTitle,
-  };
-
   static Map<String, String> defaultsForFields(
     List<String> fields, {
     bool isLapis = false,
@@ -236,10 +254,16 @@ class AnkiMiningProfile {
   factory AnkiMiningProfile.fromJson(Map<dynamic, dynamic>? json) {
     if (json == null) return const AnkiMiningProfile();
     final rawFieldMap = json['fieldMap'];
+    final modelName = json['modelName'] as String? ?? 'Basic';
+    final parsedFieldMap = rawFieldMap is Map
+        ? rawFieldMap.map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          )
+        : null;
     return AnkiMiningProfile(
       ankiEnabled: json['ankiEnabled'] as bool? ?? true,
       deckName: json['deckName'] as String? ?? 'Mining',
-      modelName: json['modelName'] as String? ?? 'Basic',
+      modelName: modelName,
       tags:
           (json['tags'] as List?)?.map((tag) => tag.toString()).toList() ??
           const ['mangatan'],
@@ -257,13 +281,18 @@ class AnkiMiningProfile {
         (format) => format.name == json['sentenceAudioFormat'],
         orElse: () => AnkiSentenceAudioFormat.mp3,
       ),
-      fieldMap: rawFieldMap is Map
-          ? rawFieldMap.map(
-              (key, value) => MapEntry(key.toString(), value.toString()),
-            )
-          : defaultFieldMap,
+      fieldMap: AnkiMarker.effectiveFieldMap(
+        modelName,
+        parsedFieldMap ??
+            (AnkiMarker.isBundledLapisModelName(modelName)
+                ? const {}
+                : defaultFieldMap),
+      ),
     );
   }
+
+  Map<String, String> get effectiveFieldMap =>
+      AnkiMarker.effectiveFieldMap(modelName, fieldMap);
 
   AnkiMiningProfile copyWith({
     bool? ankiEnabled,

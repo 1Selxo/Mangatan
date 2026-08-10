@@ -27,7 +27,8 @@ class AnkiCanAddResult {
   final bool canAdd;
   final String? error;
 
-  bool get isDuplicate => !canAdd;
+  bool get isDuplicate =>
+      !canAdd && (error?.toLowerCase().contains('duplicate') ?? false);
 }
 
 class AnkiConnectService {
@@ -280,9 +281,11 @@ class AnkiConnectService {
         duplicateDeckNames: duplicateDeckNames,
         checkAllModels: checkAllModels,
       );
-      if (!status.canAdd && !allowDuplicate) {
-        throw AnkiDuplicateException(normalized.expression, status.error);
-      }
+      _handleCanAddResult(
+        status,
+        expression: normalized.expression,
+        allowDuplicate: allowDuplicate,
+      );
     }
     for (final media in normalized.mediaFiles) {
       await storeMediaSource(filename: media.filename, source: media.source);
@@ -326,9 +329,11 @@ class AnkiConnectService {
         duplicateDeckNames: duplicateDeckNames,
         checkAllModels: checkAllModels,
       );
-      if (!status.canAdd && !allowDuplicate) {
-        throw AnkiDuplicateException(placeholder.expression, status.error);
-      }
+      _handleCanAddResult(
+        status,
+        expression: placeholder.expression,
+        allowDuplicate: allowDuplicate,
+      );
     }
 
     AnkiExportJobSession? session;
@@ -423,6 +428,26 @@ class AnkiConnectService {
       screenshotBytes: draft.screenshotBytes,
       screenshotSource: draft.screenshotSource,
       mediaFiles: draft.mediaFiles,
+    );
+  }
+
+  static void _handleCanAddResult(
+    AnkiCanAddResult status, {
+    required String expression,
+    required bool allowDuplicate,
+  }) {
+    if (status.canAdd) return;
+    if (status.isDuplicate) {
+      if (!allowDuplicate) {
+        throw AnkiDuplicateException(expression, status.error);
+      }
+      return;
+    }
+    final detail = status.error?.trim();
+    throw AnkiConnectException(
+      detail == null || detail.isEmpty
+          ? 'Anki rejected the note during validation.'
+          : detail,
     );
   }
 

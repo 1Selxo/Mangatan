@@ -25,7 +25,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: "3.44.4"
           cache: true
 
       - name: Install dependencies
@@ -49,7 +49,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: "3.44.4"
           cache: true
 
       - name: Setup Rust toolchain
@@ -154,6 +154,11 @@ jobs:
   build-windows:
     name: Build (Windows debug)
     runs-on: windows-latest
+    env:
+      # Keep plugin junctions out of the runner's AppData path. Cargokit's
+      # component-wise symlink resolver cannot traverse that hosted-runner
+      # junction reliably.
+      PUB_CACHE: 'C:\pub-cache'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

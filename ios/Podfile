@@ -111,6 +111,11 @@ post_integrate do |installer|
     filtered = File.readlines(path).reject { |line| line.include?('OpenJDKRuntime') }
     File.write(path, filtered.join)
   end
+  Dir.glob(File.join(support_dir, 'Pods-Runner*.xcconfig')).each do |path|
+    contents = File.read(path)
+    contents.gsub!(/\s-framework\s+"OpenJDKRuntime"/, '')
+    File.write(path, contents)
+  end
 
   runner_project = installer.aggregate_targets
     .map(&:user_project)

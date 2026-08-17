@@ -8,6 +8,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSa
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSearchHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupStatistics.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_anime_repo_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_feed_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_opaque_rows.dart';
 import 'package:mangayomi/services/sync/chimahon_unknown_field_safety.dart';
@@ -61,7 +62,8 @@ class ChimahonGenericCollectionSafetyAudit {
       local: local.backupAnimeExtensionRepo,
       remote: remote.backupAnimeExtensionRepo,
       proposed: proposed.backupAnimeExtensionRepo,
-      keyOf: (repo) => repo.baseUrl,
+      keyOf: chimahonAnimeRepositoryIdentity,
+      knownFieldsEqual: _sameAnimeRepositoryIdentity,
       fail: fail,
     );
     _auditKnownCollection<BackupSavedSearch>(
@@ -196,6 +198,13 @@ class ChimahonGenericCollectionSafetyAudit {
 
   bool _sameSourceIdentity(BackupSource first, BackupSource second) =>
       first.sourceId == second.sourceId;
+
+  bool _sameAnimeRepositoryIdentity(
+    BackupExtensionRepos first,
+    BackupExtensionRepos second,
+  ) =>
+      chimahonAnimeRepositoryIdentity(first) ==
+      chimahonAnimeRepositoryIdentity(second);
 
   void _auditDuplicateKeys<T>({
     required String side,

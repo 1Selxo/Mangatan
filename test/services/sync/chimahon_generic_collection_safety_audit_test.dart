@@ -340,6 +340,33 @@ void main() {
       isNot(contains('remote_source_changed_in_proposed')),
     );
   });
+
+  test('allows an anime repository URL to migrate for the same key', () {
+    final local = BackupMihon(
+      backupAnimeExtensionRepo: [
+        BackupExtensionRepos(
+          baseUrl: 'https://legacy.example/repo',
+          name: 'Legacy repository',
+          website: 'https://legacy.example',
+          signingKeyFingerprint: 'shared-key',
+        ),
+      ],
+    );
+    final remote = BackupMihon(
+      backupAnimeExtensionRepo: [
+        BackupExtensionRepos(
+          baseUrl: 'https://current.example/repo',
+          name: 'Current repository',
+          website: 'https://current.example',
+          signingKeyFingerprint: 'shared-key',
+        ),
+      ],
+    );
+
+    final result = _run(audit, local: local, remote: remote, proposed: remote);
+
+    expect(result.failures, isEmpty);
+  });
 }
 
 BackupMihon _payload(int suffix) => BackupMihon(

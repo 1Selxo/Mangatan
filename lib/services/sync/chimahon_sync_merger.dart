@@ -18,6 +18,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSa
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSearchHistory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_anime_repo_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_category_payload_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_feed_identity.dart';
@@ -117,7 +118,7 @@ class ChimahonSyncMerger {
       backupAnimeExtensionRepo: _mergeByKey<BackupExtensionRepos, String>(
         local.backupAnimeExtensionRepo,
         remote.backupAnimeExtensionRepo,
-        (repo) => repo.baseUrl,
+        chimahonAnimeRepositoryIdentity,
         remoteWins: remoteWinsTie,
       ),
       backupSavedSearches: _mergeByKey<BackupSavedSearch, String>(

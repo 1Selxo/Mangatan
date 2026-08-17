@@ -4,6 +4,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAn
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionRepos.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupExtensionStore.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupFeed.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupHistory.pb.dart';
@@ -1600,6 +1601,43 @@ void main() {
     expect(_unknownMarkers(merged.backupFeeds.single.savedSearch), [
       Int64(42),
       Int64(41),
+    ]);
+  });
+
+  test('keeps one anime repository when its URL was migrated', () {
+    final merged = merger.merge(
+      local: BackupMihon(
+        backupAnimeExtensionRepo: [
+          BackupExtensionRepos(
+            baseUrl: 'https://legacy.example/repo',
+            name: 'Legacy repository',
+            website: 'https://legacy.example',
+            signingKeyFingerprint: 'shared-key',
+          ),
+        ],
+      ),
+      remote: BackupMihon(
+        backupAnimeExtensionRepo: [
+          BackupExtensionRepos(
+            baseUrl: 'https://current.example/repo',
+            name: 'Current repository',
+            website: 'https://current.example',
+            signingKeyFingerprint: 'shared-key',
+          ),
+          BackupExtensionRepos(
+            baseUrl: 'https://anime.example/repo',
+            name: 'Other',
+            website: 'https://anime.example',
+            signingKeyFingerprint: 'other-key',
+          ),
+        ],
+      ),
+      remoteWinsProjectionTies: true,
+    );
+
+    expect(merged.backupAnimeExtensionRepo.map((repo) => repo.baseUrl), [
+      'https://current.example/repo',
+      'https://anime.example/repo',
     ]);
   });
 

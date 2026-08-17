@@ -56,8 +56,8 @@ post_install do |installer|
 
     next unless target.name == 'm_extension_server'
 
-    # OpenJDK Zero has thousands of native initializers. Keep CocoaPods' embed
-    # step, but let the plugin load it only when startServer is requested.
+    # OpenJDK Zero has thousands of native initializers. Keep the pod target
+    # from linking it into the app launch image; Runner embeds its lazy copy.
     target.frameworks_build_phase.files
       .select { |file| file.display_name.include?('OpenJDKRuntime') }
       .each(&:remove_from_project)
@@ -96,6 +96,22 @@ post_install do |installer|
 end
 
 post_integrate do |installer|
+  # The app embeds its own lazily loaded OpenJDK runtime. The current
+  # m_extension_server pod also vendors a framework with the same product
+  # name, so remove only that framework from CocoaPods' aggregate embed lists
+  # to avoid a duplicate output while keeping the plugin itself linked.
+  support_dir = File.join(
+    installer.sandbox.root.to_s,
+    'Target Support Files',
+    'Pods-Runner',
+  )
+  Dir.glob(File.join(support_dir, 'Pods-Runner-frameworks*')).each do |path|
+    next unless File.file?(path)
+
+    filtered = File.readlines(path).reject { |line| line.include?('OpenJDKRuntime') }
+    File.write(path, filtered.join)
+  end
+
   runner_project = installer.aggregate_targets
     .map(&:user_project)
     .compact

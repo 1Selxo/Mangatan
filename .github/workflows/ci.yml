@@ -64,7 +64,7 @@ jobs:
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: "3.22.1"
+          cmake-version: "3.31.6"
 
       - name: Setup ninja
         uses: seanmiddleditch/gha-setup-ninja@master
@@ -153,7 +153,7 @@ jobs:
 
   build-windows:
     name: Build (Windows debug)
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       # Keep plugin junctions out of the runner's AppData path. Cargokit's
       # component-wise symlink resolver cannot traverse that hosted-runner

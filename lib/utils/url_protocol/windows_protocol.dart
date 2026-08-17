@@ -7,7 +7,7 @@ import 'package:win32/win32.dart';
 
 import './protocol.dart';
 
-const _hive = HKEY_CURRENT_USER;
+final _hive = HKEY_CURRENT_USER;
 
 class WindowsProtocolHandler extends ProtocolHandler {
   static final Map<String, _OwnedProtocolRegistration> _registrations = {};
@@ -256,10 +256,15 @@ class WindowsProtocolHandler extends ProtocolHandler {
     );
   }
 
-  int _regCreateStringKey(int hKey, String key, String valueName, String data) {
-    final txtKey = TEXT(key);
-    final txtValue = TEXT(valueName);
-    final txtData = TEXT(data);
+  WIN32_ERROR _regCreateStringKey(
+    HKEY hKey,
+    String key,
+    String valueName,
+    String data,
+  ) {
+    final txtKey = key.toPcwstr(allocator: calloc);
+    final txtValue = valueName.toPcwstr(allocator: calloc);
+    final txtData = data.toPcwstr(allocator: calloc);
     try {
       return RegSetKeyValue(
         hKey,
@@ -267,7 +272,7 @@ class WindowsProtocolHandler extends ProtocolHandler {
         txtValue,
         REG_SZ,
         txtData,
-        txtData.length * 2 + 2,
+        txtData.byteLength + sizeOf<WCHAR>(),
       );
     } finally {
       free(txtKey);
@@ -277,7 +282,7 @@ class WindowsProtocolHandler extends ProtocolHandler {
   }
 
   void _regCreateStringKeyOrThrow(
-    int hKey,
+    HKEY hKey,
     String key,
     String valueName,
     String data,
@@ -285,7 +290,7 @@ class WindowsProtocolHandler extends ProtocolHandler {
     final result = _regCreateStringKey(hKey, key, valueName, data);
     if (result != ERROR_SUCCESS) {
       throw WindowsException(
-        result,
+        result.toHRESULT(),
         message:
             'Could not register the URL protocol in the current-user '
             'registry key $key',
@@ -294,18 +299,18 @@ class WindowsProtocolHandler extends ProtocolHandler {
   }
 
   bool _registryKeyExists(String key) {
-    final txtKey = TEXT(key);
-    final openedKey = calloc<HKEY>();
+    final txtKey = key.toPcwstr(allocator: calloc);
+    final openedKey = calloc<Pointer>();
     try {
       final result = RegOpenKeyEx(_hive, txtKey, 0, KEY_READ, openedKey);
       if (result == ERROR_FILE_NOT_FOUND) return false;
       if (result != ERROR_SUCCESS) {
         throw WindowsException(
-          result,
+          result.toHRESULT(),
           message: 'Could not inspect current-user registry key $key',
         );
       }
-      RegCloseKey(openedKey.value);
+      HKEY(openedKey.value).close();
       return true;
     } finally {
       free(txtKey);
@@ -314,8 +319,8 @@ class WindowsProtocolHandler extends ProtocolHandler {
   }
 
   String? _readRegistryString(String key, String valueName) {
-    final txtKey = TEXT(key);
-    final txtValue = TEXT(valueName);
+    final txtKey = key.toPcwstr(allocator: calloc);
+    final txtValue = valueName.toPcwstr(allocator: calloc);
     final dataType = calloc<DWORD>();
     final dataSize = calloc<DWORD>();
     Pointer<Uint8>? data;
@@ -332,7 +337,7 @@ class WindowsProtocolHandler extends ProtocolHandler {
       if (result == ERROR_FILE_NOT_FOUND) return null;
       if (result != ERROR_SUCCESS) {
         throw WindowsException(
-          result,
+          result.toHRESULT(),
           message: 'Could not inspect current-user registry value $key',
         );
       }
@@ -348,11 +353,11 @@ class WindowsProtocolHandler extends ProtocolHandler {
       );
       if (result != ERROR_SUCCESS) {
         throw WindowsException(
-          result,
+          result.toHRESULT(),
           message: 'Could not read current-user registry value $key',
         );
       }
-      return data.cast<Utf16>().toDartString();
+      return PCWSTR(data.cast<Utf16>()).toDartString();
     } finally {
       free(txtKey);
       free(txtValue);
@@ -363,13 +368,13 @@ class WindowsProtocolHandler extends ProtocolHandler {
   }
 
   void _deleteRegistryTree(String key, {required bool ignoreMissing}) {
-    final txtKey = TEXT(key);
+    final txtKey = key.toPcwstr(allocator: calloc);
     try {
       final result = RegDeleteTree(_hive, txtKey);
       if (result != ERROR_SUCCESS &&
           !(ignoreMissing && result == ERROR_FILE_NOT_FOUND)) {
         throw WindowsException(
-          result,
+          result.toHRESULT(),
           message: 'Could not remove current-user registry key $key',
         );
       }

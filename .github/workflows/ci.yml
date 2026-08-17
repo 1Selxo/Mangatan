@@ -155,9 +155,11 @@ jobs:
     name: Build (Windows debug)
     runs-on: windows-2022
     env:
-      # Keep plugin junctions out of the runner's AppData path. Cargokit's
-      # component-wise symlink resolver cannot traverse that hosted-runner
-      # junction reliably.
+      CARGO_BUILD_JOBS: 2
+      CARGOKIT_CACHE_ROOT: 'C:\ck'
+      CARGOKIT_VERBOSE: 1
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+      CMAKE_TOOLCHAIN_FILE: 'C:\ck\libarchive-windows.cmake'
       PUB_CACHE: 'C:\pub-cache'
     steps:
       - name: Checkout
@@ -174,17 +176,52 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+      # Keep the checkout and Cargokit target paths short. The full hosted
+      # runner path can make the Rust custom-build process exit without
+      # surfacing Cargo's actual diagnostic through MSBuild.
+      - name: Copy workspace to short path
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath 'C:\m') {
+            Remove-Item -LiteralPath 'C:\m' -Recurse -Force
+          }
+          robocopy "$env:GITHUB_WORKSPACE" 'C:\m' /MIR /XD .git .dart_tool | Out-Host
+          if ($LASTEXITCODE -le 7) {
+            exit 0
+          }
+          exit $LASTEXITCODE
 
       - name: Install dependencies
+        working-directory: C:\m
         run: flutter pub get
 
+      - name: Prebuild Windows Rust library
+        working-directory: C:\m
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:CARGOKIT_CACHE_ROOT | Out-Null
+          Set-Content `
+            -LiteralPath $env:CMAKE_TOOLCHAIN_FILE `
+            -Value 'set(POSIX_REGEX_LIB LIBC CACHE STRING "" FORCE)'
+
+          $sourceDir = (Resolve-Path '.').Path.Replace('\', '/')
+          $sourceBytes = [Text.Encoding]::UTF8.GetBytes($sourceDir)
+          $hashBytes = [Security.Cryptography.MD5]::HashData($sourceBytes)
+          $projectHash = [Convert]::ToHexString($hashBytes).ToLowerInvariant()
+          $targetDir = Join-Path $env:CARGOKIT_CACHE_ROOT $projectHash.Substring(0, 8)
+
+          rustup run stable cargo build `
+            --manifest-path rust/Cargo.toml `
+            --package rust_lib_mangayomi `
+            --target x86_64-pc-windows-msvc `
+            --target-dir $targetDir
+
       - name: Build debug Windows
+        working-directory: C:\m
         run: flutter build windows --debug
 
       - name: Upload Windows debug artifact
         uses: actions/upload-artifact@v4
         with:
           name: Mangatan-windows-debug
-          path: build/windows/x64/runner/Debug/
+          path: C:\m\build\windows\x64\runner\Debug\

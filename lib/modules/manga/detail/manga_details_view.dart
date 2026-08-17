@@ -19,6 +19,9 @@ import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.d
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 
+String mangaDetailValueOrFallback(String? value, String fallback) =>
+    value == null || value.isEmpty ? fallback : value;
+
 class MangaDetailsView extends ConsumerStatefulWidget {
   final Manga manga;
   final Source? source;
@@ -58,6 +61,14 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
     bool? isLocalArchive = widget.manga.isLocalArchive ?? false;
+    final sourceName = mangaDetailValueOrFallback(
+      widget.source?.name ?? widget.manga.source,
+      l10n.unknown,
+    );
+    final sourceLanguage = mangaDetailValueOrFallback(
+      widget.source?.lang ?? widget.manga.lang,
+      l10n.unknown,
+    );
     return Scaffold(
       floatingActionButton: Consumer(
         builder: (context, ref, child) {
@@ -127,9 +138,7 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                 Icon(Icons.person_outline, size: 14),
                 const SizedBox(width: 4),
                 Text(
-                  (widget.manga.author?.isEmpty ?? false)
-                      ? l10n.unknown
-                      : widget.manga.author!,
+                  mangaDetailValueOrFallback(widget.manga.author, l10n.unknown),
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ],
@@ -141,12 +150,8 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                 const SizedBox(width: 4),
                 Text(getMangaStatusName(widget.manga.status, context)),
                 if (!isLocalArchive) const Text(' • '),
-                if (!isLocalArchive)
-                  Text(widget.source?.name ?? widget.manga.source!),
-                if (!isLocalArchive)
-                  Text(
-                    ' (${(widget.source?.lang ?? widget.manga.lang!).toUpperCase()})',
-                  ),
+                if (!isLocalArchive) Text(sourceName),
+                if (!isLocalArchive) Text(' (${sourceLanguage.toUpperCase()})'),
                 if (!isLocalArchive && !widget.sourceExist)
                   const Padding(
                     padding: EdgeInsets.all(3),

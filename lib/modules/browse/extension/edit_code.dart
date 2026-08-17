@@ -199,7 +199,9 @@ class _CodeEditorPageState extends ConsumerState<CodeEditorPage> {
     List<dynamic> filterList = source != null
         ? getFilterList(source: source!)
         : [];
-    final appFontFamily = ref.watch(appFontFamilyProvider);
+    final appFontFamily = ref.watch(
+      appFontFamilyProvider.select((value) => value.$2),
+    );
     final page = Scaffold(
       appBar: AppBar(
         elevation: 0,

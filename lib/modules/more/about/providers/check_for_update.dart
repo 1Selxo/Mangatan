@@ -37,8 +37,21 @@ Future<UpdateInfo?> _getUpdateIfAvailable() async {
 }
 
 @riverpod
-bool checkForAppUpdates(Ref ref) {
-  return isar.settings.getSync(227)?.checkForAppUpdates ?? true;
+class CheckForAppUpdates extends _$CheckForAppUpdates {
+  @override
+  bool build() => isar.settings.getSync(227)?.checkForAppUpdates ?? true;
+
+  void set(bool value) {
+    final settings = isar.settings.getSync(227);
+    state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..checkForAppUpdates = value
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
 }
 
 /// Performs an update check unconditionally, ignoring the auto-update setting.

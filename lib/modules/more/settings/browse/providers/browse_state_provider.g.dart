@@ -42,7 +42,7 @@ final class AndroidProxyServerStateProvider
 }
 
 String _$androidProxyServerStateHash() =>
-    r'3ac060f8a61added586dcefc889fa44c71263c5b';
+    r'e43fe8bb83da834f55473b3845c84b0773cf3f59';
 
 abstract class _$AndroidProxyServerState extends $Notifier<String> {
   String build();
@@ -422,7 +422,7 @@ final class GetRepoInfosProvider
   }
 }
 
-String _$getRepoInfosHash() => r'91181c43ba8778d8886be9bba4ac0aaf9f4357bb';
+String _$getRepoInfosHash() => r'c3fb4aee810561f88cd0a6a587f92ae952a98cbb';
 
 final class GetRepoInfosFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Repo?>, String> {

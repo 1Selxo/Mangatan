@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
+import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
@@ -28,7 +29,7 @@ void showCategorySelectionDialog({
   final bool isLibraryVisible = !isBulk && singleManga!.isVisibleInLibrary;
   List<int> categoryIds = [];
   if (!isBulk) {
-    categoryIds = List<int>.from(singleManga.categories ?? []);
+    categoryIds = List<int>.from(singleManga?.categories ?? []);
   }
   final bulkOverrides = <int, bool>{};
   showDialog(
@@ -167,7 +168,7 @@ void showCategorySelectionDialog({
                               ? (bulkOverrides.containsKey(category.id)
                                   ? (bulkOverrides[category.id]! ? 1 : 0)
                                   : CategoryService.membershipState(
-                                      bulkMangas!,
+                                      bulkMangas,
                                       category.id!,
                                     ))
                               : (categoryIds.contains(category.id) ? 1 : 0);
@@ -268,7 +269,7 @@ void showCategorySelectionDialog({
                           onPressed: () {
                             isar.writeTxnSync(() {
                               if (isBulk) {
-                                for (var manga in bulkMangas!) {
+                                for (var manga in bulkMangas) {
                                   final categories = List<int>.from(
                                     manga.categories ?? const [],
                                   );

@@ -9,6 +9,59 @@ part of 'reader_state_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(AutomaticBackgroundState)
+final automaticBackgroundStateProvider = AutomaticBackgroundStateProvider._();
+
+final class AutomaticBackgroundStateProvider
+    extends $NotifierProvider<AutomaticBackgroundState, bool> {
+  AutomaticBackgroundStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'automaticBackgroundStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$automaticBackgroundStateHash();
+
+  @$internal
+  @override
+  AutomaticBackgroundState create() => AutomaticBackgroundState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$automaticBackgroundStateHash() =>
+    r'adeef482a7630c03d0eee4eef7bf33aeff71d053';
+
+abstract class _$AutomaticBackgroundState extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(DefaultReadingModeState)
 final defaultReadingModeStateProvider = DefaultReadingModeStateProvider._();
 

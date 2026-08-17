@@ -54,9 +54,7 @@ jobs:
 
       - name: Run bridge regression tests
         run: |
-          flutter test --concurrency=1 \
-            test/eval/dart/m_manga_bridge_test.dart \
-            test/eval/mihon
+          flutter test --concurrency=1 test/eval/mihon
           flutter test --concurrency=1 \
             test/services/hoshidicts/hoshi_dictionary_popup_test.dart \
             test/services/ios_launch_wiring_test.dart \

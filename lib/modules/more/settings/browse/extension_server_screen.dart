@@ -410,7 +410,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
 
   Future<void> _refreshRuntimeStatus() async {
     if (!Platform.isIOS) return;
-    final running = await MExtensionServerPlatform(ref).checkLocalServer();
+    final running = await MExtensionServerPlatform(ref).check();
     if (mounted) setState(() => _runtimeRunning = running);
   }
 
@@ -420,9 +420,9 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
     if (_runtimeRunning) {
       await server.stopServer();
     } else {
-      await server.startServer(forceLocal: true);
+      await server.startServer(foregroundRequest: true);
     }
-    final running = await server.checkLocalServer();
+    final running = await server.check();
     if (mounted) {
       setState(() {
         _runtimeRunning = running;
@@ -900,11 +900,12 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   }
 
   Future<File?> _pickIosJarFile(dynamic l10n) async {
-    final file = await FilePicker.pickFile(
+    final result = await FilePicker.pickFiles(
       dialogTitle: l10n.select_extension_server_jar,
       type: FileType.custom,
       allowedExtensions: const ['jar'],
     );
+    final file = result?.files.singleOrNull;
     final filePath = file?.path;
     if (filePath == null || filePath.isEmpty) {
       return null;

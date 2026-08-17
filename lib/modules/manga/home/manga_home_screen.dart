@@ -324,13 +324,11 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
   }
 
   void _runSavedSearch(String query) {
-    _mangaList.clear();
     _textEditingController.text = query;
     setState(() {
       _isSearch = true;
       _selectedIndex = 2;
       _query = query;
-      _page = 1;
     });
   }
 

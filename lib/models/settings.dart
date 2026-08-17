@@ -351,6 +351,8 @@ class Settings {
 
   List<String>? localFolders;
 
+  bool? askDownloadDestination;
+
   bool? appLockEnabled;
 
   int? libraryFilterMangasCompletedType;
@@ -586,6 +588,7 @@ class Settings {
     this.downloadedOnlyMode = false,
     this.algorithmWeights,
     this.localFolders,
+    this.askDownloadDestination = true,
     this.appLockEnabled = false,
     this.libraryFilterMangasCompletedType = 0,
     this.libraryFilterAnimeCompletedType = 0,
@@ -934,6 +937,7 @@ class Settings {
         ? AlgorithmWeights.fromJson(json['algorithmWeights'])
         : null;
     localFolders = (json['localFolders'] as List?)?.cast<String>();
+    askDownloadDestination = json['askDownloadDestination'];
     appLockEnabled = json['appLockEnabled'];
     libraryFilterMangasCompletedType = json['libraryFilterMangasCompletedType'];
     libraryFilterAnimeCompletedType = json['libraryFilterAnimeCompletedType'];
@@ -1165,6 +1169,7 @@ class Settings {
     if (algorithmWeights != null)
       'algorithmWeights': algorithmWeights!.toJson(),
     'localFolders': localFolders,
+    'askDownloadDestination': askDownloadDestination,
     'appLockEnabled': appLockEnabled,
     'libraryFilterMangasCompletedType': libraryFilterMangasCompletedType,
     'libraryFilterAnimeCompletedType': libraryFilterAnimeCompletedType,

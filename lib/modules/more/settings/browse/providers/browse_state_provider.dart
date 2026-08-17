@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -6,6 +8,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/services/extension_repository_catalog.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'browse_state_provider.g.dart';
 
@@ -225,3 +228,23 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   infos["jsonUrl"] = jsonUrl;
   return Repo.fromJson(infos);
 }
+
+final isExtensionServerInstalledStreamProvider = StreamProvider<bool>((
+  ref,
+) async* {
+  if (!isDesktop) {
+    yield true;
+    return;
+  }
+  await for (final settings in isar.settings.watchObject(
+    227,
+    fireImmediately: true,
+  )) {
+    final jrePath = settings?.jrePath ?? '';
+    final serverPath = settings?.extensionServerPath ?? '';
+    yield jrePath.isNotEmpty &&
+        serverPath.isNotEmpty &&
+        File(jrePath).existsSync() &&
+        File(serverPath).existsSync();
+  }
+});

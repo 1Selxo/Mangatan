@@ -984,5 +984,150 @@
   "saved_searches": "Saved searches",
   "enter_search_to_save_first": "Enter a search to save first",
   "no_saved_searches": "No saved searches for this source yet.\nRun a search, then pick \"Save search\".",
-  "source": "Source"
+  "source": "Source",
+"label_value": "{label}: {value}",
+  "@label_value": {
+    "placeholders": {
+      "label": {},
+      "value": {}
+    }
+  },
+  "url": "URL",
+  "beta_version": "Beta ({version})",
+  "@beta_version": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "empty_placeholder": "EMPTY\nMPTY\nMTY\nMT\n\n",
+  "error": "Error",
+  "error_with_message": "Error: {error}",
+  "@error_with_message": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "no_pages_available": "Error: no pages available",
+  "create_extension": "Create Extension",
+  "choose_extension_language": "Choose extension language",
+  "lang": "Lang",
+  "base_url": "BaseUrl",
+  "api_url_optional": "ApiUrl (optional)",
+  "icon_url": "iconUrl",
+  "source_icon_url": "Source icon url",
+  "notes": "notes",
+  "extension_name_example": "ex: myAnime",
+  "language_code_example": "ex: en",
+  "base_url_example": "ex: https://example.com",
+  "api_url_example": "ex: https://api.example.com",
+  "extension_notes_example": "ex: this extension requires login",
+  "type": "Type",
+  "target": "Target",
+  "source_type_single": "single",
+  "source_type_multi": "multi",
+  "source_type_torrent": "torrent",
+  "source_language_dart": "Dart",
+  "source_language_javascript": "JavaScript",
+  "source_language_lnreader_compiled_js": "LNReader compiled JS",
+  "source_created_successfully": "Source created successfully",
+  "source_already_exists": "Source already exists",
+  "error_when_creating_source": "Error when creating source",
+  "cookies_deleted": "Cookies deleted!",
+  "delete_all_cookies": "Delete all cookies",
+  "url_must_end_with_dot_json_or_dot_pb": "URL must end with .json / .pb",
+  "default_download_destination": "Default download destination",
+  "ask_download_destination": "Ask for download destination",
+  "ask_download_destination_desc": "Choose a local folder each time a download starts.",
+  "select_download_destination": "Select download destination",
+  "clear_local_library": "Clear local library",
+  "clear_local_library_desc": "Remove local folder and archive entries from the library.",
+  "clear_local_library_msg": "This will remove local folder and archive entries from your library. It will not delete files from disk.",
+  "custom": "Custom",
+  "no_local_folder_available_for_downloads": "No local folder is available for downloads",
+  "failed_to_create_cbz": "Failed to create CBZ: {error}",
+  "@failed_to_create_cbz": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "error_reading_cover_image": "Error reading cover image: {error}",
+  "@error_reading_cover_image": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "error_reading_metadata": "Error reading metadata: {error}",
+  "@error_reading_metadata": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "error_saving_chapter_episode_to_library": "Error saving chapter/episode to library: {error}",
+  "@error_saving_chapter_episode_to_library": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "error_reading_chapter_cover_image": "Error reading chapter cover image: {error}",
+  "@error_reading_chapter_cover_image": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "error_reading_archive_cover_image": "Error reading archive cover image: {error}",
+  "@error_reading_archive_cover_image": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "error_getting_local_library": "Error getting local library: {error}",
+  "@error_getting_local_library": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "failed_to_export_metadata": "Failed to export metadata: {error}",
+  "@failed_to_export_metadata": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudflare_resolution_webview_server_start_failed": "Couldn't start Cloudflare Resolution Webview Server.",
+  "tracker_token_expired": "{tracker} Token expired",
+  "@tracker_token_expired": {
+    "placeholders": {
+      "tracker": {}
+    }
+  },
+  "video_list_empty": "Video list is empty",
+  "playback_speed_multiplier": "x{value}",
+  "@playback_speed_multiplier": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "could_not_launch_url": "Could not launch {url}",
+  "@could_not_launch_url": {
+    "placeholders": {
+      "url": {}
+    }
+  },
+  "zero_interpreter": "Zero interpreter",
+  "zero_interpreter_description": "The server starts automatically on launch. You can also control it manually.",
+  "runtime_status": "Runtime status",
+  "running": "Running",
+  "stopped": "Stopped",
+  "start": "Start",
+  "stop": "Stop",
+  "something_went_wrong": "Something went wrong",
+  "startup_failed": "Mangayomi could not finish starting up",
+  "sources_with_no_results": "{count, plural, =1{1 source with no results} other{{count} sources with no results}}",
+  "@sources_with_no_results": {
+    "description": "Header of the collapsed group in global search holding every source that failed or found nothing.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

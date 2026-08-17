@@ -14,21 +14,28 @@
       "bundleIdentifier": "com.kodjodevf.mangayomi",
       "developerName": "Moustapha Kodjo Amadou",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.3",
-      "versionDate": "2026-08-10T22:37:23Z",
-      "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.3/Mangatan-v1.2.3-build.174-6273e4d-ios.ipa",
+      "version": "1.2.5",
+      "versionDate": "2026-08-17T20:51:00Z",
+      "versionDescription": "What's changed\n\nSubtitle appearance\n\u2022 Added adjustable subtitle textbox background opacity; the previous appearance remains the default.\n\u2022 Added font\u2022weight, outline\u2022thickness, shadow\u2022thickness, shadow\u2022blur, and shadow\u2022offset controls with live preview.\n\nSubtitle browsing\n\u2022 Reworked the video subtitle list to behave more like Memento, including active\u2022cue tracking, search, delay\u2022aware timestamps, and more direct seeking.\n\nDictionaries and upstream\n\u2022 Updated HoshiDicts integration and generated bindings.\n\u2022 Rebased the fork onto Mangayomi v0.8.5 while retaining Mangatan's iOS and language\u2022learning features.\n\nReliability and packaging\n\u2022 Repaired stale Riverpod, Isar, localization, and plugin outputs left by the upstream rebase.\n\u2022 Restored reader, local archive, extension, and platform integrations affected by the rebase.\n\u2022 Fixed iOS embedded\u2022Mihon tests and packaging while preserving lazy OpenJDK loading.\n\u2022 Aligned Flutter, Rust bridge, Windows, CocoaPods, and dependency versions for reproducible release builds.\n\u2022 Restored reliable Windows native builds with short build paths and an explicit Rust prebuild.\n\nRelease builds\n\u2022 iOS sideload IPA\n\u2022 macOS arm64 DMG\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 SHA\u2022256 checksum manifests\n\nVersion 1.2.5, build 177.\n\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.2.3...v1.2.5",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.5/Mangatan-v1.2.5-build.177-c399014-ios.ipa",
       "localizedDescription": "Mangayomi is an open-source Flutter app for reading manga, novels, and watching anime across multiple platforms.",
       "iconURL": "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 126743374,
+      "size": 170960475,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/screenshots/image_1_default.webp",
         "https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/images/screenshots/image_2_default.webp"
       ],
       "versions": [
+        {
+          "version": "1.2.5",
+          "date": "2026-08-17T20:51:00Z",
+          "localizedDescription": "What's changed\n\nSubtitle appearance\n\u2022 Added adjustable subtitle textbox background opacity; the previous appearance remains the default.\n\u2022 Added font\u2022weight, outline\u2022thickness, shadow\u2022thickness, shadow\u2022blur, and shadow\u2022offset controls with live preview.\n\nSubtitle browsing\n\u2022 Reworked the video subtitle list to behave more like Memento, including active\u2022cue tracking, search, delay\u2022aware timestamps, and more direct seeking.\n\nDictionaries and upstream\n\u2022 Updated HoshiDicts integration and generated bindings.\n\u2022 Rebased the fork onto Mangayomi v0.8.5 while retaining Mangatan's iOS and language\u2022learning features.\n\nReliability and packaging\n\u2022 Repaired stale Riverpod, Isar, localization, and plugin outputs left by the upstream rebase.\n\u2022 Restored reader, local archive, extension, and platform integrations affected by the rebase.\n\u2022 Fixed iOS embedded\u2022Mihon tests and packaging while preserving lazy OpenJDK loading.\n\u2022 Aligned Flutter, Rust bridge, Windows, CocoaPods, and dependency versions for reproducible release builds.\n\u2022 Restored reliable Windows native builds with short build paths and an explicit Rust prebuild.\n\nRelease builds\n\u2022 iOS sideload IPA\n\u2022 macOS arm64 DMG\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 SHA\u2022256 checksum manifests\n\nVersion 1.2.5, build 177.\n\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.2.3...v1.2.5",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.5/Mangatan-v1.2.5-build.177-c399014-ios.ipa",
+          "size": 170960475
+        },
         {
           "version": "1.2.3",
           "date": "2026-08-10T22:37:23Z",
@@ -113,6 +120,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.3"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.5 - 17 Aug",
+      "identifier": "release-1.2.5",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-17T20:51:00Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.5"
     }
   ]
 }

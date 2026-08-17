@@ -3099,9 +3099,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             AnimeSubtitleListPanel(
               cues: _subtitleCues,
               position: _currentPosition,
+              subtitleDelayMs: _subDelay,
               onSelect: (cue) {
-                unawaited(_player.seek(cue.start));
-                setState(() => _showSubtitleList = false);
+                unawaited(
+                  _player.seek(
+                    subtitleCuePlaybackTime(cue, subtitleDelayMs: _subDelay),
+                  ),
+                );
               },
               onDismiss: () => setState(() => _showSubtitleList = false),
             ),

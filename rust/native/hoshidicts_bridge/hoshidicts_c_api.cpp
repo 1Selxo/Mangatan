@@ -150,7 +150,12 @@ void append_pitch_entry(std::ostringstream& out, const PitchEntry& entry) {
   out << "{\"dictName\":";
   append_json_string(out, entry.dict_name);
   out << ",\"pitchPositions\":";
-  append_int_array(out, entry.pitch_positions);
+  std::vector<int> pitch_positions;
+  pitch_positions.reserve(entry.pitches.size());
+  for (const auto& pitch : entry.pitches) {
+    pitch_positions.push_back(pitch.position);
+  }
+  append_int_array(out, pitch_positions);
   out << ",\"transcriptions\":";
   append_string_array(out, entry.transcriptions);
   out << '}';
@@ -219,17 +224,25 @@ extern "C" char* hoshidicts_import_dictionary_json(const char* zip_path, const c
     }
 
     const auto result = dictionary_importer::import(zip_path, output_dir, low_ram);
+    const auto meta_count = [&result](std::string_view mode) {
+      const auto it = result.summary.counts.termMeta.find(std::string(mode));
+      return it == result.summary.counts.termMeta.end() ? size_t{0} : it->second;
+    };
     std::ostringstream out;
     out << "{\"success\":" << (result.success ? "true" : "false");
     out << ",\"title\":";
     append_json_string(out, result.title);
-    out << ",\"termCount\":" << result.term_count;
-    out << ",\"metaCount\":" << result.meta_count;
-    out << ",\"freqCount\":" << result.freq_count;
-    out << ",\"pitchCount\":" << result.pitch_count;
-    out << ",\"mediaCount\":" << result.media_count;
+    out << ",\"termCount\":" << result.summary.counts.terms.total;
+    out << ",\"metaCount\":" << meta_count("total");
+    out << ",\"freqCount\":" << meta_count("freq");
+    out << ",\"pitchCount\":" << (meta_count("pitch") + meta_count("ipa"));
+    out << ",\"mediaCount\":" << result.summary.counts.media.total;
     out << ",\"errors\":";
-    append_string_array(out, result.errors);
+    if (result.error.empty()) {
+      append_string_array(out, {});
+    } else {
+      append_string_array(out, {result.error});
+    }
     out << '}';
     return duplicate_string(out.str());
   } catch (const std::exception& error) {

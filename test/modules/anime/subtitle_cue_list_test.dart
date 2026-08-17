@@ -90,4 +90,56 @@ Dialogue: 0,0:00:02.00,0:00:04.50,Default,,0,0,0,,{\\i1}字幕\\N二行目
     expect(cues.single.text, '字幕\n二行目');
     expect(cues.single.end, const Duration(milliseconds: 4500));
   });
+
+  test('uses subtitle delay for timestamps, seeking, and active cue', () {
+    const cue = AnimeSubtitleCue(
+      index: 0,
+      text: 'delayed',
+      start: Duration(seconds: 10),
+      end: Duration(seconds: 12),
+    );
+
+    expect(
+      subtitleCuePlaybackTime(cue, subtitleDelayMs: 1500),
+      const Duration(milliseconds: 11500),
+    );
+    expect(
+      activeSubtitleCueIndex(
+        cues: const [cue],
+        playbackPosition: const Duration(seconds: 12),
+        subtitleDelayMs: 1500,
+      ),
+      0,
+    );
+    expect(
+      formatSubtitleCueTimestamp(const Duration(milliseconds: 11500)),
+      '00:00:11',
+    );
+  });
+
+  test('search can ignore whitespace like Memento', () {
+    const cues = [
+      AnimeSubtitleCue(
+        index: 0,
+        text: '日 本 語',
+        start: Duration.zero,
+        end: Duration(seconds: 1),
+      ),
+      AnimeSubtitleCue(
+        index: 1,
+        text: 'English line',
+        start: Duration(seconds: 2),
+        end: Duration(seconds: 3),
+      ),
+    ];
+
+    expect(
+      findSubtitleCueMatches(cues: cues, query: '日本語', ignoreWhitespace: false),
+      isEmpty,
+    );
+    expect(
+      findSubtitleCueMatches(cues: cues, query: '日本語', ignoreWhitespace: true),
+      [0],
+    );
+  });
 }

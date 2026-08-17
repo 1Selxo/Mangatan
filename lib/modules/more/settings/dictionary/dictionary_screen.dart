@@ -1675,7 +1675,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 ),
                 const SizedBox(height: 8),
                 _SliderSetting(
-                  title: 'OCR box opacity',
+                  title: 'OCR text box opacity',
+                  description:
+                      '0% keeps the current transparent background; raise it for a more opaque white text box.',
                   value: _backgroundOpacity,
                   min: 0,
                   max: 1,
@@ -2575,6 +2577,7 @@ class _SectionHeader extends StatelessWidget {
 
 class _SliderSetting extends StatelessWidget {
   final String title;
+  final String? description;
   final double value;
   final double min;
   final double max;
@@ -2584,6 +2587,7 @@ class _SliderSetting extends StatelessWidget {
 
   const _SliderSetting({
     required this.title,
+    this.description,
     required this.value,
     required this.min,
     required this.max,
@@ -2596,13 +2600,22 @@ class _SliderSetting extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(title),
-      subtitle: Slider(
-        value: value,
-        min: min,
-        max: max,
-        divisions: divisions,
-        label: label,
-        onChanged: onChanged,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (description != null) ...[
+            const SizedBox(height: 4),
+            Text(description!),
+          ],
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            label: label,
+            onChanged: onChanged,
+          ),
+        ],
       ),
       trailing: SizedBox(
         width: 48,

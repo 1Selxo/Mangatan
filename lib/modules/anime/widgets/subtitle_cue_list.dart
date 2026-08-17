@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class AnimeSubtitleCue {
   const AnimeSubtitleCue({
@@ -47,6 +49,52 @@ int? subtitleDelayForAdjacentCue({
   }
   if (target == null) return null;
   return playbackPosition.inMilliseconds - target.start.inMilliseconds;
+}
+
+Duration subtitleCuePlaybackTime(
+  AnimeSubtitleCue cue, {
+  required int subtitleDelayMs,
+}) {
+  final delayed = cue.start + Duration(milliseconds: subtitleDelayMs);
+  return delayed.isNegative ? Duration.zero : delayed;
+}
+
+int activeSubtitleCueIndex({
+  required List<AnimeSubtitleCue> cues,
+  required Duration playbackPosition,
+  required int subtitleDelayMs,
+}) {
+  final subtitlePosition =
+      playbackPosition - Duration(milliseconds: subtitleDelayMs);
+  return cues.lastIndexWhere((cue) => cue.contains(subtitlePosition));
+}
+
+List<int> findSubtitleCueMatches({
+  required List<AnimeSubtitleCue> cues,
+  required String query,
+  required bool ignoreWhitespace,
+}) {
+  String normalize(String value) {
+    final lower = value.toLowerCase();
+    return ignoreWhitespace ? lower.replaceAll(RegExp(r'\s+'), '') : lower;
+  }
+
+  final normalizedQuery = normalize(query.trim());
+  if (normalizedQuery.isEmpty) return const [];
+  return [
+    for (var index = 0; index < cues.length; index++)
+      if (normalize(cues[index].text).contains(normalizedQuery)) index,
+  ];
+}
+
+String formatSubtitleCueTimestamp(Duration value) {
+  final totalSeconds = value.inSeconds.clamp(0, 359999);
+  final hours = totalSeconds ~/ 3600;
+  final minutes = (totalSeconds % 3600) ~/ 60;
+  final seconds = totalSeconds % 60;
+  return '${hours.toString().padLeft(2, '0')}:'
+      '${minutes.toString().padLeft(2, '0')}:'
+      '${seconds.toString().padLeft(2, '0')}';
 }
 
 List<AnimeSubtitleCue> parseAnimeSubtitleFile(File file) {
@@ -201,12 +249,14 @@ class AnimeSubtitleListPanel extends StatefulWidget {
     super.key,
     required this.cues,
     required this.position,
+    required this.subtitleDelayMs,
     required this.onSelect,
     required this.onDismiss,
   });
 
   final List<AnimeSubtitleCue> cues;
   final ValueListenable<Duration> position;
+  final int subtitleDelayMs;
   final ValueChanged<AnimeSubtitleCue> onSelect;
   final VoidCallback onDismiss;
 
@@ -215,34 +265,241 @@ class AnimeSubtitleListPanel extends StatefulWidget {
 }
 
 class _AnimeSubtitleListPanelState extends State<AnimeSubtitleListPanel> {
-  final ScrollController _scrollController = ScrollController();
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final TextEditingController _searchController = TextEditingController();
   int? _lastActive;
+  int _matchCursor = 0;
+  bool _ignoreWhitespace = false;
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   void _centerActive(int index) {
-    if (_lastActive == index || !_scrollController.hasClients) return;
+    if (_lastActive == index) return;
     _lastActive = index;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      const estimatedHeight = 66.0;
-      final target =
-          index * estimatedHeight -
-          _scrollController.position.viewportDimension / 2;
-      _scrollController.animateTo(
-        target.clamp(0, _scrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
+      if (!mounted || !_itemScrollController.isAttached) return;
+      unawaited(
+        _itemScrollController.scrollTo(
+          index: index,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        ),
       );
     });
   }
 
+  List<int> get _matches => findSubtitleCueMatches(
+    cues: widget.cues,
+    query: _searchController.text,
+    ignoreWhitespace: _ignoreWhitespace,
+  );
+
+  void _searchChanged(String _) {
+    setState(() => _matchCursor = 0);
+    _jumpToCurrentMatch();
+  }
+
+  void _stepMatch(int delta) {
+    final matches = _matches;
+    if (matches.isEmpty) return;
+    setState(() {
+      _matchCursor = (_matchCursor + delta) % matches.length;
+      if (_matchCursor < 0) _matchCursor += matches.length;
+    });
+    _jumpToCurrentMatch();
+  }
+
+  void _jumpToCurrentMatch() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final matches = _matches;
+      if (!mounted || matches.isEmpty || !_itemScrollController.isAttached) {
+        return;
+      }
+      final cursor = _matchCursor.clamp(0, matches.length - 1);
+      unawaited(
+        _itemScrollController.scrollTo(
+          index: matches[cursor],
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+        ),
+      );
+    });
+  }
+
+  void _toggleIgnoreWhitespace() {
+    setState(() {
+      _ignoreWhitespace = !_ignoreWhitespace;
+      _matchCursor = 0;
+    });
+    _jumpToCurrentMatch();
+  }
+
+  Widget _buildSearchBar(BuildContext context, List<int> matches) {
+    final hasQuery = _searchController.text.trim().isNotEmpty;
+    final matchLabel = !hasQuery
+        ? '${widget.cues.length} lines'
+        : matches.isEmpty
+        ? 'No matches'
+        : '${_matchCursor + 1} of ${matches.length}';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(color: Colors.white),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Search subtitles',
+                    hintStyle: const TextStyle(color: Colors.white54),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                    suffixIcon: hasQuery
+                        ? IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchChanged('');
+                            },
+                            icon: const Icon(
+                              Icons.clear,
+                              color: Colors.white70,
+                            ),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.white10,
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: _searchChanged,
+                  onSubmitted: (_) => _stepMatch(1),
+                ),
+              ),
+              IconButton(
+                tooltip: _ignoreWhitespace
+                    ? 'Whitespace is ignored'
+                    : 'Ignore whitespace',
+                onPressed: _toggleIgnoreWhitespace,
+                icon: Icon(
+                  Icons.space_bar_rounded,
+                  color: _ignoreWhitespace
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white70,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              if (hasQuery) ...[
+                IconButton(
+                  tooltip: 'Previous match',
+                  onPressed: matches.isEmpty ? null : () => _stepMatch(-1),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_up,
+                    color: Colors.white,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Next match',
+                  onPressed: matches.isEmpty ? null : () => _stepMatch(1),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+              const Spacer(),
+              Text(
+                matchLabel,
+                textAlign: TextAlign.end,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCueRow({
+    required BuildContext context,
+    required int index,
+    required int active,
+    required int? focusedMatch,
+  }) {
+    final cue = widget.cues[index];
+    final selected = index == active;
+    final searchSelected = index == focusedMatch;
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => widget.onSelect(cue),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.primary.withValues(alpha: 0.58)
+              : searchSelected
+              ? colorScheme.secondary.withValues(alpha: 0.28)
+              : Colors.transparent,
+          border: searchSelected
+              ? Border(left: BorderSide(color: colorScheme.secondary, width: 3))
+              : null,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 70,
+              child: Text(
+                formatSubtitleCueTimestamp(
+                  subtitleCuePlaybackTime(
+                    cue,
+                    subtitleDelayMs: widget.subtitleDelayMs,
+                  ),
+                ),
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.white60,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SelectableText(
+                cue.text,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                  height: 1.3,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final matches = _matches;
+    final focusedMatch = matches.isEmpty
+        ? null
+        : matches[_matchCursor.clamp(0, matches.length - 1)];
     return Positioned.fill(
       child: Material(
         color: Colors.black54,
@@ -274,20 +531,32 @@ class _AnimeSubtitleListPanelState extends State<AnimeSubtitleListPanel> {
                           'Subtitle list',
                           style: TextStyle(color: Colors.white),
                         ),
+                        subtitle: Text(
+                          widget.subtitleDelayMs == 0
+                              ? 'Tap a line to seek'
+                              : 'Tap to seek • ${widget.subtitleDelayMs > 0 ? '+' : ''}${widget.subtitleDelayMs} ms delay',
+                          style: const TextStyle(color: Colors.white60),
+                        ),
                         trailing: IconButton(
                           onPressed: widget.onDismiss,
                           icon: const Icon(Icons.close, color: Colors.white),
                         ),
                       ),
                       const Divider(height: 1, color: Colors.white24),
+                      _buildSearchBar(context, matches),
+                      const Divider(height: 1, color: Colors.white24),
                       Expanded(
                         child: ValueListenableBuilder<Duration>(
                           valueListenable: widget.position,
                           builder: (context, position, _) {
-                            final active = widget.cues.lastIndexWhere(
-                              (cue) => cue.contains(position),
+                            final active = activeSubtitleCueIndex(
+                              cues: widget.cues,
+                              playbackPosition: position,
+                              subtitleDelayMs: widget.subtitleDelayMs,
                             );
-                            if (active >= 0) _centerActive(active);
+                            if (active >= 0 && _searchController.text.isEmpty) {
+                              _centerActive(active);
+                            }
                             if (widget.cues.isEmpty) {
                               return const Center(
                                 child: Padding(
@@ -300,45 +569,16 @@ class _AnimeSubtitleListPanelState extends State<AnimeSubtitleListPanel> {
                                 ),
                               );
                             }
-                            return ListView.builder(
-                              controller: _scrollController,
+                            return ScrollablePositionedList.builder(
+                              itemScrollController: _itemScrollController,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               itemCount: widget.cues.length,
-                              itemBuilder: (context, index) {
-                                final cue = widget.cues[index];
-                                final selected = index == active;
-                                return InkWell(
-                                  onTap: () => widget.onSelect(cue),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 120),
-                                    color: selected
-                                        ? Theme.of(context).colorScheme.primary
-                                              .withValues(alpha: 0.58)
-                                        : Colors.transparent,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 10,
-                                    ),
-                                    child: Text(
-                                      cue.text,
-                                      maxLines: 3,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: selected
-                                            ? FontWeight.bold
-                                            : FontWeight.w500,
-                                        shadows: const [
-                                          Shadow(
-                                            color: Colors.black,
-                                            blurRadius: 8,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
+                              itemBuilder: (context, index) => _buildCueRow(
+                                context: context,
+                                index: index,
+                                active: active,
+                                focusedMatch: focusedMatch,
+                              ),
                             );
                           },
                         ),

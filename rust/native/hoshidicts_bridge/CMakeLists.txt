@@ -91,6 +91,8 @@ file(WRITE "${HOSHIDICTS_TEXT_PROCESSOR_PATCHED}" "${HOSHIDICTS_TEXT_PROCESSOR_C
 # those paths explicitly instead of interpreting them with the active ANSI
 # code page. The generated overlays keep the vendored submodule untouched.
 file(READ "${HOSHIDICTS_MEMORY_SOURCE}" HOSHIDICTS_MEMORY_CONTENT)
+string(FIND "${HOSHIDICTS_MEMORY_CONTENT}" "CreateFileA(path.c_str()," HOSHIDICTS_LEGACY_PATH_API)
+if(NOT HOSHIDICTS_LEGACY_PATH_API EQUAL -1)
 hoshidicts_replace_or_fail(
     HOSHIDICTS_MEMORY_CONTENT
     [=[#include <windows.h>]=]
@@ -259,6 +261,15 @@ hoshidicts_replace_or_fail(
     "load styles and fallback names through native filesystem paths"
 )
 file(WRITE "${HOSHIDICTS_QUERY_PATCHED}" "${HOSHIDICTS_QUERY_CONTENT}")
+else()
+    # Newer Hoshidicts revisions use std::filesystem paths and wide Windows
+    # APIs themselves, so the legacy path overlays must not be reapplied.
+    file(WRITE "${HOSHIDICTS_MEMORY_PATCHED}" "${HOSHIDICTS_MEMORY_CONTENT}")
+    file(READ "${HOSHIDICTS_IMPORTER_SOURCE}" HOSHIDICTS_IMPORTER_CONTENT)
+    file(WRITE "${HOSHIDICTS_IMPORTER_PATCHED}" "${HOSHIDICTS_IMPORTER_CONTENT}")
+    file(READ "${HOSHIDICTS_QUERY_SOURCE}" HOSHIDICTS_QUERY_CONTENT)
+    file(WRITE "${HOSHIDICTS_QUERY_PATCHED}" "${HOSHIDICTS_QUERY_CONTENT}")
+endif()
 
 file(READ "${HOSHIDICTS_YOMITAN_PARSER_SOURCE}" HOSHIDICTS_YOMITAN_PARSER_CONTENT)
 hoshidicts_replace_or_fail(

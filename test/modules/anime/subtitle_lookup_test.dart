@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
@@ -74,7 +75,28 @@ void main() {
     final settings = PlayerSubtitleSettings.fromJson({'fontSize': 45});
 
     expect(settings.position, 0);
+    expect(settings.fontWeight, isNull);
+    expect(settings.outlineThickness, isNull);
+    expect(settings.shadowThickness, 0);
+    expect(effectiveSubtitleOutlineThickness(settings), closeTo(3.375, 0.001));
     expect(settings.toJson()['position'], 0);
+  });
+
+  test('subtitle appearance settings map to the rendered text style', () {
+    final settings = PlayerSubtitleSettings(
+      fontSize: 48,
+      fontWeight: 500,
+      outlineThickness: 4.5,
+      shadowThickness: 6,
+    );
+
+    final style = subtitleTextStyleFromSettings(settings);
+
+    expect(style.fontSize, 48);
+    expect(style.fontWeight, FontWeight.w500);
+    expect(style.decorationThickness, 4.5);
+    expect(style.shadows, hasLength(1));
+    expect(style.shadows!.single.blurRadius, 6);
   });
 
   test(

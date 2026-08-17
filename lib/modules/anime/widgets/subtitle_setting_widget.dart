@@ -246,7 +246,9 @@ class _FontSettingWidgetState extends ConsumerState<FontSettingWidget> {
                   ref
                       .read(subtitleSettingsStateProvider.notifier)
                       .set(
-                        subtitleSettings..useBold = !subtitleSettings.useBold!,
+                        subtitleSettings
+                          ..useBold = !subtitleSettings.useBold!
+                          ..fontWeight = null,
                         true,
                       );
                   setState(() {});
@@ -361,8 +363,11 @@ class _FontSettingWidgetState extends ConsumerState<FontSettingWidget> {
                     subtitleSettings
                       ..useItalic = false
                       ..useBold = false
+                      ..fontWeight = null
                       ..fontSize = 45
-                      ..position = 0,
+                      ..position = 0
+                      ..outlineThickness = null
+                      ..shadowThickness = 0,
                     true,
                   );
               setState(() {});

@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
@@ -502,6 +503,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
           textAlign: textAlign,
           textScaler: textScaler,
           outlineColor: _subtitleOutlineColor(rawSubtitleStyle),
+          outlineWidth: _subtitleOutlineWidth(rawSubtitleStyle),
           highlightStart: _highlightStart,
           highlightEnd: _highlightEnd,
         );
@@ -780,6 +782,7 @@ class _CrispSubtitleText extends StatelessWidget {
     required this.textAlign,
     required this.textScaler,
     required this.outlineColor,
+    required this.outlineWidth,
     required this.highlightStart,
     required this.highlightEnd,
   });
@@ -790,19 +793,22 @@ class _CrispSubtitleText extends StatelessWidget {
   final TextAlign textAlign;
   final TextScaler textScaler;
   final Color outlineColor;
+  final double outlineWidth;
   final int highlightStart;
   final int highlightEnd;
 
   @override
   Widget build(BuildContext context) {
     final fillColor = style.color ?? Colors.white;
-    final outlineVisible = fillColor.a > 0 && outlineColor.a > 0;
+    final outlineVisible =
+        outlineWidth > 0 && fillColor.a > 0 && outlineColor.a > 0;
     final highlightColor = highlightStart >= 0 && highlightEnd > highlightStart
         ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.45)
         : null;
     final highlightStyle = style.copyWith(
       color: Colors.transparent,
       backgroundColor: Colors.transparent,
+      shadows: const [],
     );
     return Stack(
       alignment: Alignment.center,
@@ -823,11 +829,11 @@ class _CrispSubtitleText extends StatelessWidget {
           Text.rich(
             _subtitleSpan(
               text: text,
-              style: _subtitleOutlineStyle(style, outlineColor),
+              style: _subtitleOutlineStyle(style, outlineColor, outlineWidth),
               highlightStart: -1,
               highlightEnd: -1,
             ),
-            style: _subtitleOutlineStyle(style, outlineColor),
+            style: _subtitleOutlineStyle(style, outlineColor, outlineWidth),
             textAlign: textAlign,
             textScaler: textScaler,
           ),
@@ -873,16 +879,21 @@ TextSpan _subtitleSpan({
 }
 
 TextStyle _subtitleFillStyle(TextStyle style) {
-  return style.copyWith(shadows: const []);
+  return style;
 }
 
 Color _subtitleOutlineColor(TextStyle style) {
+  if (style.decorationColor != null) return style.decorationColor!;
   final shadows = style.shadows;
   if (shadows != null && shadows.isNotEmpty) return shadows.first.color;
   return Colors.black;
 }
 
-TextStyle _subtitleOutlineStyle(TextStyle style, Color outlineColor) {
+TextStyle _subtitleOutlineStyle(
+  TextStyle style,
+  Color outlineColor,
+  double outlineWidth,
+) {
   return TextStyle(
     inherit: style.inherit,
     fontFamily: style.fontFamily,
@@ -899,7 +910,7 @@ TextStyle _subtitleOutlineStyle(TextStyle style, Color outlineColor) {
     foreground: Paint()
       ..style = PaintingStyle.stroke
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = _subtitleOutlineWidth(style)
+      ..strokeWidth = outlineWidth
       ..color = outlineColor,
     fontFeatures: style.fontFeatures,
     fontVariations: style.fontVariations,
@@ -912,39 +923,109 @@ TextStyle _subtitleOutlineStyle(TextStyle style, Color outlineColor) {
 }
 
 double _subtitleOutlineWidth(TextStyle style) {
+  if (style.decorationThickness != null) return style.decorationThickness!;
   final size = style.fontSize ?? 40;
-  return max(2.0, min(3.4, size * 0.075));
+  return automaticSubtitleOutlineThickness(size);
+}
+
+double automaticSubtitleOutlineThickness(double fontSize) =>
+    max(2.0, min(3.4, fontSize * 0.075));
+
+FontWeight subtitleFontWeight(PlayerSubtitleSettings settings) {
+  final configured = settings.fontWeight;
+  if (configured == null) {
+    return (settings.useBold ?? true) ? FontWeight.bold : FontWeight.normal;
+  }
+  final index = ((configured.clamp(100, 900) / 100).round() - 1).clamp(
+    0,
+    FontWeight.values.length - 1,
+  );
+  return FontWeight.values[index];
+}
+
+double effectiveSubtitleOutlineThickness(PlayerSubtitleSettings settings) =>
+    settings.outlineThickness ??
+    automaticSubtitleOutlineThickness((settings.fontSize ?? 45).toDouble());
+
+TextStyle subtitleTextStyleFromSettings(PlayerSubtitleSettings settings) {
+  final borderColor = Color.fromARGB(
+    settings.borderColorA ?? 255,
+    settings.borderColorR ?? 0,
+    settings.borderColorG ?? 0,
+    settings.borderColorB ?? 0,
+  );
+  final shadowThickness = (settings.shadowThickness ?? 0)
+      .clamp(0, 20)
+      .toDouble();
+  return TextStyle(
+    fontSize: (settings.fontSize ?? 45).toDouble(),
+    fontWeight: subtitleFontWeight(settings),
+    fontStyle: settings.useItalic ?? false ? FontStyle.italic : null,
+    color: Color.fromARGB(
+      settings.textColorA ?? 255,
+      settings.textColorR ?? 255,
+      settings.textColorG ?? 255,
+      settings.textColorB ?? 255,
+    ),
+    shadows: shadowThickness > 0
+        ? [
+            Shadow(
+              color: borderColor,
+              blurRadius: shadowThickness,
+              offset: Offset.zero,
+            ),
+          ]
+        : const [],
+    backgroundColor: Color.fromARGB(
+      settings.backgroundColorA ?? 0,
+      settings.backgroundColorR ?? 0,
+      settings.backgroundColorG ?? 0,
+      settings.backgroundColorB ?? 0,
+    ),
+    // The custom subtitle painter reads these as outline metadata. With no
+    // text decoration configured they do not alter the fill pass.
+    decorationColor: borderColor,
+    decorationThickness: effectiveSubtitleOutlineThickness(settings),
+  );
+}
+
+class SubtitleAppearancePreview extends StatelessWidget {
+  const SubtitleAppearancePreview({
+    super.key,
+    required this.settings,
+    this.text = 'アあ安  Subtitle preview',
+  });
+
+  final PlayerSubtitleSettings settings;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final previewSize = (settings.fontSize ?? 45).clamp(16, 56).toDouble();
+    final style = subtitleTextStyleFromSettings(
+      settings,
+    ).copyWith(fontSize: previewSize);
+    final outlineColor = _subtitleOutlineColor(style);
+    final outlineWidth =
+        settings.outlineThickness ??
+        automaticSubtitleOutlineThickness(previewSize);
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        if (outlineWidth > 0 && outlineColor.a > 0)
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: _subtitleOutlineStyle(style, outlineColor, outlineWidth),
+          ),
+        Text(text, textAlign: TextAlign.center, style: style),
+      ],
+    );
+  }
 }
 
 TextStyle subtileTextStyle(WidgetRef ref) {
-  final subSets = ref.watch(subtitleSettingsStateProvider);
-  final borderColor = Color.fromARGB(
-    subSets.borderColorA!,
-    subSets.borderColorR!,
-    subSets.borderColorG!,
-    subSets.borderColorB!,
-  );
-  return TextStyle(
-    fontSize: subSets.fontSize!.toDouble(),
-    fontWeight: subSets.useBold! ? FontWeight.bold : null,
-    fontStyle: subSets.useItalic! ? FontStyle.italic : null,
-    color: Color.fromARGB(
-      subSets.textColorA!,
-      subSets.textColorR!,
-      subSets.textColorG!,
-      subSets.textColorB!,
-    ),
-    shadows: [
-      Shadow(offset: const Offset(-1.5, -1.5), color: borderColor),
-      Shadow(offset: const Offset(1.5, -1.5), color: borderColor),
-      Shadow(offset: const Offset(1.5, 1.5), color: borderColor),
-      Shadow(offset: const Offset(-1.5, 1.5), color: borderColor),
-    ],
-    backgroundColor: Color.fromARGB(
-      subSets.backgroundColorA!,
-      subSets.backgroundColorR!,
-      subSets.backgroundColorG!,
-      subSets.backgroundColorB!,
-    ),
+  return subtitleTextStyleFromSettings(
+    ref.watch(subtitleSettingsStateProvider),
   );
 }

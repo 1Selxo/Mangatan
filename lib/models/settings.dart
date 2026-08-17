@@ -1683,9 +1683,12 @@ class CustomColorFilter {
 @embedded
 class PlayerSubtitleSettings {
   int? fontSize;
+  int? fontWeight;
   int? position;
   bool? useBold;
   bool? useItalic;
+  double? outlineThickness;
+  double? shadowThickness;
   int? textColorA;
   int? textColorR;
   int? textColorG;
@@ -1700,9 +1703,12 @@ class PlayerSubtitleSettings {
   int? backgroundColorB;
   PlayerSubtitleSettings({
     this.fontSize = 45,
+    this.fontWeight,
     this.position = 0,
     this.useBold = true,
     this.useItalic = false,
+    this.outlineThickness,
+    this.shadowThickness = 0,
     this.textColorA = 255,
     this.textColorR = 255,
     this.textColorG = 255,
@@ -1718,9 +1724,12 @@ class PlayerSubtitleSettings {
   });
   PlayerSubtitleSettings.fromJson(Map<String, dynamic> json) {
     fontSize = json['fontSize'];
+    fontWeight = json['fontWeight'];
     position = json['position'] ?? 0;
     useBold = json['useBold'];
     useItalic = json['useItalic'];
+    outlineThickness = (json['outlineThickness'] as num?)?.toDouble();
+    shadowThickness = (json['shadowThickness'] as num?)?.toDouble() ?? 0;
     textColorA = json['textColorA'];
     textColorR = json['textColorR'];
     textColorG = json['textColorG'];
@@ -1737,9 +1746,12 @@ class PlayerSubtitleSettings {
 
   Map<String, dynamic> toJson() => {
     'fontSize': fontSize,
+    'fontWeight': fontWeight,
     'position': position,
     'useBold': useBold,
     'useItalic': useItalic,
+    'outlineThickness': outlineThickness,
+    'shadowThickness': shadowThickness,
     'textColorA': textColorA,
     'textColorR': textColorR,
     'textColorG': textColorG,

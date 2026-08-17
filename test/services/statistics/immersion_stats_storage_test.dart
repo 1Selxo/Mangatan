@@ -217,8 +217,9 @@ void main() {
       expect(bookA.single.readingTimeSeconds, 120.5);
       expect(bookA.single.readingTimeMs, 120500);
       expect(
-        (await ImmersionStatsStorage.loadNovelStats('book-b')).single
-            .charactersRead,
+        (await ImmersionStatsStorage.loadNovelStats(
+          'book-b',
+        )).single.charactersRead,
         100,
       );
     });
@@ -281,7 +282,10 @@ void main() {
       await ImmersionStatsStorage.deleteNovelStats('book-a');
 
       expect(await ImmersionStatsStorage.loadNovelStats('book-a'), isEmpty);
-      expect(await ImmersionStatsStorage.loadNovelStats('book-b'), hasLength(1));
+      expect(
+        await ImmersionStatsStorage.loadNovelStats('book-b'),
+        hasLength(1),
+      );
     });
 
     test('an empty book ID is not persisted', () async {
@@ -296,6 +300,24 @@ void main() {
     final before = ImmersionStatsStorage.revision.value;
     await ImmersionStatsStorage.addMangaStats(characters: 10, timeMs: 100);
     expect(ImmersionStatsStorage.revision.value, greaterThan(before));
+  });
+
+  test('sync snapshot loads every statistics collection together', () async {
+    await ImmersionStatsStorage.addMangaStats(
+      characters: 10,
+      timeMs: 100,
+      mangaId: 7,
+    );
+    await ImmersionStatsStorage.addAnkiCard(profileId: 'ja');
+    await ImmersionStatsStorage.saveNovelStats('book', [
+      const NovelStatsEntry(dateKey: '2026-07-18', charactersRead: 1),
+    ]);
+
+    final snapshot = await ImmersionStatsStorage.loadSyncSnapshot();
+
+    expect(snapshot.mangaStats.single.mangaId, 7);
+    expect(snapshot.ankiStats.single.profileId, 'ja');
+    expect(snapshot.novelStats['book'], hasLength(1));
   });
 
   test('clear removes every collection', () async {

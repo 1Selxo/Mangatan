@@ -258,6 +258,42 @@ void main() {
     expect(stored.sourceId, 4040);
     expect(stored.editTextPreference!.value, 'https://jellyfin.example');
   });
+
+  test('reports only sources whose effective preference value changed', () {
+    final source = _mihonSource(
+      localId: 5150,
+      nativeId: '515',
+      preferences: [
+        SourcePreference(
+          key: 'enabled',
+          checkBoxPreference: CheckBoxPreference(value: false),
+        ),
+      ],
+    );
+    database.writeTxnSync(() => database.sources.putSync(source));
+
+    final unchanged = adapter.importInto(
+      database: database,
+      sourcePreferences: [
+        BackupSourcePreferences(
+          sourceKey: 'source_515',
+          prefs: [codec.encode('enabled', false)],
+        ),
+      ],
+    );
+    final changed = adapter.importInto(
+      database: database,
+      sourcePreferences: [
+        BackupSourcePreferences(
+          sourceKey: 'source_515',
+          prefs: [codec.encode('enabled', true)],
+        ),
+      ],
+    );
+
+    expect(unchanged.valueChangedSourceIds, isEmpty);
+    expect(changed.valueChangedSourceIds, {5150});
+  });
 }
 
 Source _mihonSource({

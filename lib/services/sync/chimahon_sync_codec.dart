@@ -91,6 +91,22 @@ class ChimahonSyncCodec {
     int compressionLevel = 6,
   }) {
     final protobufBytes = backup.writeToBuffer();
+    return encodeProtobufBytes(
+      protobufBytes,
+      format: format,
+      compressionLevel: compressionLevel,
+    );
+  }
+
+  /// Encodes an already serialized backup without serializing it a second time.
+  ///
+  /// The caller retains ownership of [protobufBytes] and must not mutate it
+  /// while the returned raw-protobuf payload is in use.
+  Uint8List encodeProtobufBytes(
+    Uint8List protobufBytes, {
+    ChimahonSyncWireFormat format = ChimahonSyncWireFormat.protobuf,
+    int compressionLevel = 6,
+  }) {
     if (format == ChimahonSyncWireFormat.protobuf) return protobufBytes;
     return const GZipEncoder().encodeBytes(
       protobufBytes,

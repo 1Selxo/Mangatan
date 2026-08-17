@@ -17,6 +17,7 @@ import 'package:mangayomi/services/sync/chimahon_pending_restore_authority.dart'
 import 'package:mangayomi/services/sync/chimahon_preferences.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_engine.dart';
+import 'package:mangayomi/services/sync/cross_device_sync_metrics.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
 import 'package:mangayomi/utils/chimahon_novel_identity.dart';
 
@@ -42,6 +43,7 @@ void main() {
         ),
       );
       BackupMihon? imported;
+      CrossDeviceSyncMetrics? reportedMetrics;
       final result = await CrossDeviceSyncEngine(
         storage: storage,
         exportLocal: () async => BackupMihon(
@@ -54,6 +56,8 @@ void main() {
           ],
         ),
         importMerged: (backup) async => imported = backup,
+        onMetrics: (metrics) => reportedMetrics = metrics,
+        initialExportDuration: const Duration(milliseconds: 10),
       ).synchronize();
 
       expect(result.hadRemoteData, isTrue);
@@ -66,8 +70,59 @@ void main() {
       );
       final uploaded = codec.decode(storage.uploaded!).backup;
       expect(uploaded.backupNovels, hasLength(2));
+      final metrics = result.metrics!;
+      expect(reportedMetrics, same(metrics));
+      expect(metrics.attempts, 1);
+      expect(metrics.conflicts, 0);
+      expect(metrics.remoteBytes, greaterThan(0));
+      expect(metrics.protobufBytes, greaterThan(0));
+      expect(metrics.uploadBytes, greaterThan(0));
+      expect(metrics.uploaded, isTrue);
+      expect(metrics.skippedUpload, isFalse);
+      expect(metrics.imported, isTrue);
+      expect(
+        metrics.duration(CrossDeviceSyncPhase.exportLocal),
+        greaterThanOrEqualTo(const Duration(milliseconds: 10)),
+      );
+      expect(
+        metrics.total,
+        greaterThanOrEqualTo(const Duration(milliseconds: 10)),
+      );
+      expect(
+        metrics.phases.keys,
+        containsAll([
+          CrossDeviceSyncPhase.exportLocal,
+          CrossDeviceSyncPhase.download,
+          CrossDeviceSyncPhase.decode,
+          CrossDeviceSyncPhase.reconcile,
+          CrossDeviceSyncPhase.serialize,
+          CrossDeviceSyncPhase.upload,
+          CrossDeviceSyncPhase.importMerged,
+        ]),
+      );
+      expect(metrics.toLogMessage(), contains('attempts=1'));
     },
   );
+
+  test('reports completed phase metrics when synchronization fails', () async {
+    CrossDeviceSyncMetrics? reportedMetrics;
+    final engine = CrossDeviceSyncEngine(
+      storage: _MemoryStorage(
+        remote: Uint8List(0),
+        onDownload: (_) => throw StateError('download failed'),
+      ),
+      exportLocal: () async => BackupMihon(),
+      importMerged: (_) async {},
+      onMetrics: (metrics) => reportedMetrics = metrics,
+    );
+
+    await expectLater(engine.synchronize(), throwsA(anything));
+
+    expect(reportedMetrics, isNotNull);
+    expect(reportedMetrics!.attempts, 1);
+    expect(reportedMetrics!.uploaded, isFalse);
+    expect(reportedMetrics!.phases, contains(CrossDeviceSyncPhase.download));
+  });
 
   test(
     'matching complete remote skips write but synchronize still finalizes',

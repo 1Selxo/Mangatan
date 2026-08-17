@@ -169,6 +169,72 @@ void main() {
       expect(result.detached, 1);
     },
   );
+
+  test(
+    'source rebinding cannot overwrite a concurrent favorite edit',
+    () async {
+      final template = Source(
+        id: 101,
+        name: 'RawINU parent',
+        sourceCodeUrl: 'https://extensions.example/rawinu.apk',
+        sourceCode: 'apk-bytes',
+        itemType: ItemType.manga,
+        additionalParams: encodeMihonSourceMetadata(
+          sourceId: '1001',
+          packageName: 'rawinu',
+        ),
+      )..sourceCodeLanguage = SourceCodeLanguage.mihon;
+      final manga = Manga(
+        id: 77,
+        source: 'RawINU',
+        sourceId: null,
+        mihonSourceId: '1004',
+        author: null,
+        artist: null,
+        favorite: true,
+        favoriteModifiedAt: 100,
+        genre: const [],
+        imageUrl: '',
+        lang: 'en',
+        link: '/migrated-title',
+        name: 'Migrated title',
+        status: Status.ongoing,
+        description: '',
+        itemType: ItemType.manga,
+      );
+      await database.writeTxn(() async {
+        await database.sources.put(template);
+        await database.mangas.put(manga);
+      });
+
+      await reconcileMihonFactorySources(
+        template,
+        const [
+          MihonSourceDescriptor(
+            id: '1004',
+            name: 'RawINU',
+            lang: 'en',
+            baseUrl: 'https://rawinu.example',
+          ),
+        ],
+        beforeReconciliationWrite: () async {
+          await database.writeTxn(() async {
+            final edited = (await database.mangas.get(77))!
+              ..updateFavorite(
+                false,
+                modifiedAt: DateTime.fromMillisecondsSinceEpoch(200000),
+              );
+            await database.mangas.put(edited);
+          });
+        },
+      );
+
+      final restored = database.mangas.getSync(77)!;
+      expect(restored.sourceId, mihonLocalSourceId('1004'));
+      expect(restored.favorite, isFalse);
+      expect(restored.favoriteModifiedAt, 200);
+    },
+  );
 }
 
 Future<String> _isarLibraryPath() async {

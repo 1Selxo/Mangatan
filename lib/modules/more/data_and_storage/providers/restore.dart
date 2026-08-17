@@ -53,6 +53,7 @@ import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.da
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
+import 'package:mangayomi/utils/log/logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'restore.g.dart';
 
@@ -971,23 +972,38 @@ Future<ChimahonSyncImportResult> restoreChimahonSyncData(
   BackupMihon backup, {
   ChimahonMediaSyncSelection? authoritativeSelection,
 }) async {
+  final totalWatch = Stopwatch()..start();
+  final mediaWatch = Stopwatch()..start();
   var result = const ChimahonSyncImporter().apply(
     database: isar,
     backup: backup,
     authoritativeSelection: authoritativeSelection,
   );
+  mediaWatch.stop();
+  final settingsWatch = Stopwatch()..start();
   final factoryRefresh = await _importChimahonSettings(
     ref,
     backup,
     preserveUnrepresentableLocalSettings: true,
   );
+  settingsWatch.stop();
   result = result.withSourceReconciliation(
     rebound: factoryRefresh.reconciliation.rebound,
     unavailable: factoryRefresh.reconciliation.unavailable,
     unresolved: factoryRefresh.unresolvedGroups,
   );
+  final statisticsWatch = Stopwatch()..start();
   await _importImmersionStats(backup, replace: false);
+  statisticsWatch.stop();
   _invalidateCommonState(ref);
+  totalWatch.stop();
+  AppLogger.log(
+    'Chimahon import performance: total=${_syncMilliseconds(totalWatch.elapsed)}ms '
+    'media=${_syncMilliseconds(mediaWatch.elapsed)}ms '
+    'settings=${_syncMilliseconds(settingsWatch.elapsed)}ms '
+    'statistics=${_syncMilliseconds(statisticsWatch.elapsed)}ms',
+    logLevel: LogLevel.debug,
+  );
   return result;
 }
 
@@ -996,7 +1012,13 @@ Future<MihonFactoryRefreshResult> _importChimahonSettings(
   BackupMihon backup, {
   bool preserveUnrepresentableLocalSettings = false,
 }) async {
+  final totalWatch = Stopwatch()..start();
+  final snapshotWatch = Stopwatch()..start();
   final miningSnapshot = await MiningPreferences.writableSnapshot();
+  snapshotWatch.stop();
+  final localSettingsWatch = Stopwatch()..start();
+  late final Stopwatch miningWatch;
+  late final ChimahonSourcePreferencesImportResult sourcePreferencesImport;
   try {
     isar.writeTxnSync(() {
       final settings = isar.settings.getSync(227);
@@ -1014,10 +1036,12 @@ Future<MihonFactoryRefreshResult> _importChimahonSettings(
       }
     });
     const sourcePreferencesAdapter = ChimahonSourcePreferencesAdapter();
-    sourcePreferencesAdapter.importInto(
+    sourcePreferencesImport = sourcePreferencesAdapter.importInto(
       database: isar,
       sourcePreferences: backup.backupSourcePreferences,
     );
+    localSettingsWatch.stop();
+    miningWatch = Stopwatch()..start();
     final sources = isar.sources.filter().idIsNotNull().findAllSync();
     const miningAdapter = ChimahonMiningSettingsAdapter();
     final portableSourceIds = chimahonPortableSourceOverrideIds(sources);
@@ -1031,6 +1055,7 @@ Future<MihonFactoryRefreshResult> _importChimahonSettings(
       portableSourceIds: portableSourceIds,
       preserveLocalKeys: preserveLocalMiningKeys,
     );
+    miningWatch.stop();
   } catch (_) {
     await MiningPreferences.restoreSnapshot(miningSnapshot);
     rethrow;
@@ -1038,19 +1063,49 @@ Future<MihonFactoryRefreshResult> _importChimahonSettings(
   // JVM discovery is deliberately outside the settings rollback boundary.
   // A missing bridge leaves native IDs unresolved and retryable; it must not
   // revert an otherwise successful authoritative settings import.
+  final factoryWatch = Stopwatch()..start();
   final factoryRefresh = await refreshInstalledMihonFactorySources(
     ref,
     remoteSourcePreferences: backup.backupSourcePreferences,
     replacePresentPreferences: true,
+    requiredNativeSourceIds: {
+      for (final source in backup.backupSources)
+        source.sourceId.toInt().toString(),
+      for (final source in backup.backupAnimeSources)
+        source.sourceId.toInt().toString(),
+      for (final manga in backup.backupManga) manga.source.toInt().toString(),
+      for (final anime in backup.backupAnime) anime.source.toInt().toString(),
+    },
+    changedPreferenceSourceIds: sourcePreferencesImport.valueChangedSourceIds,
   );
+  factoryWatch.stop();
+  final reconcileWatch = Stopwatch()..start();
   if (factoryRefresh.groupsReconciled > 0) {
     const ChimahonSourcePreferencesAdapter().importInto(
       database: isar,
       sourcePreferences: backup.backupSourcePreferences,
     );
   }
+  reconcileWatch.stop();
+  totalWatch.stop();
+  AppLogger.log(
+    'Chimahon settings import performance: '
+    'total=${_syncMilliseconds(totalWatch.elapsed)}ms '
+    'snapshot=${_syncMilliseconds(snapshotWatch.elapsed)}ms '
+    'local=${_syncMilliseconds(localSettingsWatch.elapsed)}ms '
+    'mining=${_syncMilliseconds(miningWatch.elapsed)}ms '
+    'factory=${_syncMilliseconds(factoryWatch.elapsed)}ms '
+    'reconcile=${_syncMilliseconds(reconcileWatch.elapsed)}ms '
+    'factoryGroups=${factoryRefresh.groupsReconciled} '
+    'unresolvedGroups=${factoryRefresh.unresolvedGroups}',
+    logLevel: LogLevel.debug,
+  );
   return factoryRefresh;
 }
+
+String _syncMilliseconds(Duration duration) =>
+    (duration.inMicroseconds / Duration.microsecondsPerMillisecond)
+        .toStringAsFixed(2);
 
 int _protoInt(Object value) {
   if (value is int) {

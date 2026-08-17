@@ -110,6 +110,8 @@ class ChimahonSyncImporter {
 
     final sources = localSources.toList(growable: false);
     final mangas = localMangas.toList(growable: false);
+    final mangasByTypeAndUrl = _indexMangasByTypeAndUrl(mangas);
+    final resolvedSources = <int, ResolvedMihonBackupSource>{};
     final matchedFavoriteIds = <int>{};
     if (itemType == ItemType.manga) {
       final urlCounts = _sourceUrlCounts(
@@ -120,13 +122,22 @@ class ChimahonSyncImporter {
       for (final remote in backup.backupManga.where(
         (manga) => !manga.hasFavorite() || manga.favorite,
       )) {
-        final resolvedSource = resolveMihonBackupSource(
-          nativeId: remote.source.toInt(),
-          backupSources: backup.backupSources,
-          localSources: sources,
+        final nativeId = remote.source.toInt();
+        final resolvedSource = resolvedSources.putIfAbsent(
+          nativeId,
+          () => resolveMihonBackupSource(
+            nativeId: nativeId,
+            backupSources: backup.backupSources,
+            localSources: sources,
+          ),
         );
         final local = _titleMatcher.find(
-          localMangas: mangas,
+          localMangas: _titleCandidates(
+            all: mangas,
+            indexed: mangasByTypeAndUrl,
+            itemType: itemType,
+            url: remote.url,
+          ),
           itemType: itemType,
           source: resolvedSource,
           url: remote.url,
@@ -146,13 +157,22 @@ class ChimahonSyncImporter {
       for (final remote in backup.backupAnime.where(
         (anime) => !anime.hasFavorite() || anime.favorite,
       )) {
-        final resolvedSource = resolveMihonBackupSource(
-          nativeId: remote.source.toInt(),
-          backupSources: backup.backupAnimeSources,
-          localSources: sources,
+        final nativeId = remote.source.toInt();
+        final resolvedSource = resolvedSources.putIfAbsent(
+          nativeId,
+          () => resolveMihonBackupSource(
+            nativeId: nativeId,
+            backupSources: backup.backupAnimeSources,
+            localSources: sources,
+          ),
         );
         final local = _titleMatcher.find(
-          localMangas: mangas,
+          localMangas: _titleCandidates(
+            all: mangas,
+            indexed: mangasByTypeAndUrl,
+            itemType: itemType,
+            url: remote.url,
+          ),
           itemType: itemType,
           source: resolvedSource,
           url: remote.url,
@@ -165,12 +185,9 @@ class ChimahonSyncImporter {
       }
     }
 
-    final deviceLocalParentIds = localChapters
+    final localOverlayParentIds = localChapters
         .where(
-          (chapter) =>
-              const ChimahonLocalChapterPolicy().isDeviceLocal(chapter) ||
-              (chapter.archivePath?.trim().isNotEmpty ?? false) ||
-              downloadedChapterIds.contains(chapter.id),
+          (chapter) => _isLocalOverlayChapter(chapter, downloadedChapterIds),
         )
         .map((chapter) => chapter.mangaId)
         .nonNulls
@@ -180,8 +197,7 @@ class ChimahonSyncImporter {
         return false;
       }
       if (manga.isLocalArchive == true ||
-          manga.hasLocalChapterOverlay == true ||
-          deviceLocalParentIds.contains(manga.id)) {
+          localOverlayParentIds.contains(manga.id)) {
         return false;
       }
       return !matchedFavoriteIds.contains(manga.id);
@@ -203,6 +219,35 @@ class ChimahonSyncImporter {
     final localTracks = database.tracks.where().findAllSync();
     final localCategories = database.categorys.where().findAllSync();
     final localNovelProgress = database.epubBookProgress.where().findAllSync();
+    final sourcesById = <int, Source>{
+      for (final source in localSources)
+        if (source.id != null) source.id!: source,
+    };
+    final chaptersByMangaId = _groupByMangaId(
+      localChapters,
+      (chapter) => chapter.mangaId,
+    );
+    final historiesByMangaId = _groupByMangaId(
+      localHistories,
+      (history) => history.mangaId,
+    );
+    final tracksByMangaId = _groupByMangaId(
+      localTracks,
+      (track) => track.mangaId,
+    );
+    final mangasByTypeAndUrl = _indexMangasByTypeAndUrl(localMangas);
+    final mangasById = <int, Manga>{
+      for (final manga in localMangas)
+        if (manga.id != null) manga.id!: manga,
+    };
+    final resolvedMangaSources = <int, ResolvedMihonBackupSource>{};
+    final resolvedAnimeSources = <int, ResolvedMihonBackupSource>{};
+    final downloadedChapterIds = database.downloads
+        .where()
+        .findAllSync()
+        .map((download) => download.id)
+        .nonNulls
+        .toSet();
     const novelMaterializer = ChimahonNovelMaterializer();
     final staleCloudNovelParentIds = !syncNovels
         ? <int>{}
@@ -239,10 +284,7 @@ class ChimahonSyncImporter {
         .where(
           (chapter) =>
               !localArchiveParentIds.contains(chapter.mangaId) &&
-              (const ChimahonLocalChapterPolicy().isDeviceLocal(chapter) ||
-                  (chapter.archivePath?.trim().isNotEmpty ?? false) ||
-                  (chapter.id != null &&
-                      database.downloads.getSync(chapter.id!) != null)),
+              _isLocalOverlayChapter(chapter, downloadedChapterIds),
         )
         .map((chapter) => chapter.mangaId)
         .nonNulls
@@ -285,6 +327,7 @@ class ChimahonSyncImporter {
       }
       for (final mangaId in staleCloudNovelParentIds) {
         database.mangas.deleteSync(mangaId);
+        mangasById.remove(mangaId);
       }
       localMangas.removeWhere(
         (manga) => staleCloudNovelParentIds.contains(manga.id),
@@ -295,9 +338,7 @@ class ChimahonSyncImporter {
       for (final manga in localMangas) {
         final localSource = manga.sourceId == null
             ? null
-            : localSources
-                  .where((source) => source.id == manga.sourceId)
-                  .firstOrNull;
+            : sourcesById[manga.sourceId];
         final portableSourceId = localSource == null
             ? null
             : mihonSourceMetadata(localSource)?.sourceId;
@@ -342,6 +383,7 @@ class ChimahonSyncImporter {
             .toList();
         database.mangas.putSync(cloudNovel.parent);
         localMangas.add(cloudNovel.parent);
+        mangasById[cloudNovel.parent.id!] = cloudNovel.parent;
         cloudNovel.progress.mangaId = cloudNovel.parent.id!;
         database.epubBookProgress.putSync(cloudNovel.progress);
         titlesCreated++;
@@ -352,13 +394,22 @@ class ChimahonSyncImporter {
 
       for (final remote
           in syncManga ? backup.backupManga : const <BackupManga>[]) {
-        final resolvedSource = resolveMihonBackupSource(
-          nativeId: remote.source.toInt(),
-          backupSources: backup.backupSources,
-          localSources: localSources,
+        final nativeId = remote.source.toInt();
+        final resolvedSource = resolvedMangaSources.putIfAbsent(
+          nativeId,
+          () => resolveMihonBackupSource(
+            nativeId: nativeId,
+            backupSources: backup.backupSources,
+            localSources: localSources,
+          ),
         );
         var local = _titleMatcher.find(
-          localMangas: localMangas,
+          localMangas: _titleCandidates(
+            all: localMangas,
+            indexed: mangasByTypeAndUrl,
+            itemType: ItemType.manga,
+            url: remote.url,
+          ),
           itemType: ItemType.manga,
           source: resolvedSource,
           url: remote.url,
@@ -375,7 +426,10 @@ class ChimahonSyncImporter {
         if (!isFavorite) {
           if (local != null) {
             final retainedOverlay = localOverlayParentIds.contains(local.id);
-            if (retainedOverlay) matchedMangaIds.add(local.id!);
+            // Chimahon applies a tombstone to an existing cache row in place.
+            // It disappears from the favorite-only library, but remains
+            // addressable through source search and history.
+            matchedMangaIds.add(local.id!);
             local
               ..favorite = false
               ..categories = authoritativeSelection != null && retainedOverlay
@@ -388,7 +442,10 @@ class ChimahonSyncImporter {
               manga: local,
               remoteTracking: remote.tracking,
               parentModifiedAt: remote.lastModifiedAt,
-              localTracks: localTracks,
+              localTracks: tracksByMangaId.putIfAbsent(
+                local.id!,
+                () => <Track>[],
+              ),
             );
             titlesUpdated++;
           }
@@ -399,6 +456,13 @@ class ChimahonSyncImporter {
           local = _newManga(remote, resolvedSource, mangaCategories);
           database.mangas.putSync(local);
           localMangas.add(local);
+          mangasById[local.id!] = local;
+          mangasByTypeAndUrl
+              .putIfAbsent((
+                type: ItemType.manga,
+                url: remote.url,
+              ), () => <Manga>[])
+              .add(local);
           matchedMangaIds.add(local.id!);
           titlesCreated++;
         } else {
@@ -421,6 +485,10 @@ class ChimahonSyncImporter {
           manga: local,
           remoteChapters: remote.chapters,
           localChapters: localChapters,
+          localChaptersForManga: chaptersByMangaId.putIfAbsent(
+            local.id!,
+            () => <Chapter>[],
+          ),
         );
         chaptersCreated += chapterChanges.$1;
         chaptersUpdated += chapterChanges.$2;
@@ -428,27 +496,39 @@ class ChimahonSyncImporter {
           database: database,
           manga: local,
           remoteHistory: remote.history,
-          localChapters: localChapters,
-          localHistories: localHistories,
+          localChapters: chaptersByMangaId[local.id] ?? const <Chapter>[],
+          localHistories: historiesByMangaId.putIfAbsent(
+            local.id!,
+            () => <History>[],
+          ),
         );
         _upsertTracking(
           database: database,
           manga: local,
           remoteTracking: remote.tracking,
           parentModifiedAt: remote.lastModifiedAt,
-          localTracks: localTracks,
+          localTracks: tracksByMangaId.putIfAbsent(local.id!, () => <Track>[]),
         );
       }
 
       for (final remote
           in syncAnime ? backup.backupAnime : const <BackupAnime>[]) {
-        final resolvedSource = resolveMihonBackupSource(
-          nativeId: remote.source.toInt(),
-          backupSources: backup.backupAnimeSources,
-          localSources: localSources,
+        final nativeId = remote.source.toInt();
+        final resolvedSource = resolvedAnimeSources.putIfAbsent(
+          nativeId,
+          () => resolveMihonBackupSource(
+            nativeId: nativeId,
+            backupSources: backup.backupAnimeSources,
+            localSources: localSources,
+          ),
         );
         var local = _titleMatcher.find(
-          localMangas: localMangas,
+          localMangas: _titleCandidates(
+            all: localMangas,
+            indexed: mangasByTypeAndUrl,
+            itemType: ItemType.anime,
+            url: remote.url,
+          ),
           itemType: ItemType.anime,
           source: resolvedSource,
           url: remote.url,
@@ -465,7 +545,7 @@ class ChimahonSyncImporter {
         if (!isFavorite) {
           if (local != null) {
             final retainedOverlay = localOverlayParentIds.contains(local.id);
-            if (retainedOverlay) matchedAnimeIds.add(local.id!);
+            matchedAnimeIds.add(local.id!);
             local
               ..favorite = false
               ..categories = authoritativeSelection != null && retainedOverlay
@@ -478,7 +558,10 @@ class ChimahonSyncImporter {
               manga: local,
               remoteTracking: remote.tracking,
               parentModifiedAt: remote.lastModifiedAt,
-              localTracks: localTracks,
+              localTracks: tracksByMangaId.putIfAbsent(
+                local.id!,
+                () => <Track>[],
+              ),
             );
             titlesUpdated++;
           }
@@ -489,6 +572,13 @@ class ChimahonSyncImporter {
           local = _newAnime(remote, resolvedSource, animeCategories);
           database.mangas.putSync(local);
           localMangas.add(local);
+          mangasById[local.id!] = local;
+          mangasByTypeAndUrl
+              .putIfAbsent((
+                type: ItemType.anime,
+                url: remote.url,
+              ), () => <Manga>[])
+              .add(local);
           matchedAnimeIds.add(local.id!);
           titlesCreated++;
         } else {
@@ -511,6 +601,10 @@ class ChimahonSyncImporter {
           anime: local,
           remoteEpisodes: remote.episodes,
           localChapters: localChapters,
+          localChaptersForAnime: chaptersByMangaId.putIfAbsent(
+            local.id!,
+            () => <Chapter>[],
+          ),
         );
         chaptersCreated += chapterChanges.$1;
         chaptersUpdated += chapterChanges.$2;
@@ -518,26 +612,24 @@ class ChimahonSyncImporter {
           database: database,
           manga: local,
           remoteHistory: remote.history,
-          localChapters: localChapters,
-          localHistories: localHistories,
+          localChapters: chaptersByMangaId[local.id] ?? const <Chapter>[],
+          localHistories: historiesByMangaId.putIfAbsent(
+            local.id!,
+            () => <History>[],
+          ),
         );
         _upsertTracking(
           database: database,
           manga: local,
           remoteTracking: remote.tracking,
           parentModifiedAt: remote.lastModifiedAt,
-          localTracks: localTracks,
+          localTracks: tracksByMangaId.putIfAbsent(local.id!, () => <Track>[]),
         );
       }
 
       for (final entry in novelPlan.remoteCategoryIdsByMangaId.entries) {
-        final local = localMangas
-            .where(
-              (manga) =>
-                  manga.id == entry.key && manga.itemType == ItemType.novel,
-            )
-            .firstOrNull;
-        if (local == null) continue;
+        final local = mangasById[entry.key];
+        if (local == null || local.itemType != ItemType.novel) continue;
         final remoteCategoryIds = entry.value
             .map((id) => novelCategories[id])
             .nonNulls
@@ -567,6 +659,8 @@ class ChimahonSyncImporter {
           database: database,
           localMangas: localMangas,
           localChapters: localChapters,
+          chaptersByMangaId: chaptersByMangaId,
+          downloadedChapterIds: downloadedChapterIds,
           matchedMangaIds: matchedMangaIds,
           matchedAnimeIds: matchedAnimeIds,
           syncManga: syncManga,
@@ -575,17 +669,24 @@ class ChimahonSyncImporter {
         titlesRemoved += cleanup.removed;
         duplicatesRepaired += cleanup.duplicatesRepaired;
         ambiguousRowsRetained += cleanup.retained;
+        final referencedCategoryIds = database.mangas
+            .where()
+            .findAllSync()
+            .expand((manga) => manga.categories ?? const <int>[])
+            .toSet();
         _removeUnreferencedCategories(
           database: database,
           itemType: ItemType.manga,
           enabled: syncManga,
           authoritativeIds: mangaCategories.values.toSet(),
+          referencedIds: referencedCategoryIds,
         );
         _removeUnreferencedCategories(
           database: database,
           itemType: ItemType.anime,
           enabled: syncAnime,
           authoritativeIds: animeCategories.values.toSet(),
+          referencedIds: referencedCategoryIds,
         );
         _removeUnreferencedCategories(
           database: database,
@@ -595,6 +696,7 @@ class ChimahonSyncImporter {
               .map((category) => novelCategories[category.id])
               .nonNulls
               .toSet(),
+          referencedIds: referencedCategoryIds,
         );
       }
     });
@@ -711,6 +813,8 @@ class ChimahonSyncImporter {
     required Isar database,
     required List<Manga> localMangas,
     required List<Chapter> localChapters,
+    required Map<int, List<Chapter>> chaptersByMangaId,
+    required Set<int> downloadedChapterIds,
     required Set<int> matchedMangaIds,
     required Set<int> matchedAnimeIds,
     required bool syncManga,
@@ -739,24 +843,19 @@ class ChimahonSyncImporter {
               manga.itemType != ItemType.anime)) {
         continue;
       }
-      final chapters = localChapters
-          .where((chapter) => chapter.mangaId == mangaId)
-          .toList(growable: false);
-      final hasDeviceLocalData =
-          (manga.hasLocalChapterOverlay ?? false) ||
-          chapters.any(
-            (chapter) =>
-                const ChimahonLocalChapterPolicy().isDeviceLocal(chapter) ||
-                (chapter.archivePath?.trim().isNotEmpty ?? false) ||
-                (chapter.id != null &&
-                    database.downloads.getSync(chapter.id!) != null),
-          );
-      if (hasDeviceLocalData) {
+      final chapters = chaptersByMangaId[mangaId] ?? const <Chapter>[];
+      final hasLocalOverlayData = chapters.any(
+        (chapter) => _isLocalOverlayChapter(chapter, downloadedChapterIds),
+      );
+      final hasDownloads = chapters.any(
+        (chapter) => downloadedChapterIds.contains(chapter.id),
+      );
+      if (hasLocalOverlayData || hasDownloads) {
         manga
           ..favorite = false
           ..favoriteModifiedAt = null
           ..categories = <int>[]
-          ..hasLocalChapterOverlay = true;
+          ..hasLocalChapterOverlay = hasLocalOverlayData;
         database.mangas.putSync(manga);
         retained++;
         continue;
@@ -770,7 +869,8 @@ class ChimahonSyncImporter {
           duplicate: manga,
           target: duplicateTarget,
           duplicateChapters: chapters,
-          allChapters: localChapters,
+          targetChapters:
+              chaptersByMangaId[duplicateTarget.id] ?? const <Chapter>[],
         );
         duplicatesRepaired++;
       }
@@ -795,19 +895,26 @@ class ChimahonSyncImporter {
     );
   }
 
+  static bool _isLocalOverlayChapter(
+    Chapter chapter,
+    Set<int> downloadedChapterIds,
+  ) {
+    if (const ChimahonLocalChapterPolicy().isDeviceLocal(chapter)) return true;
+    return (chapter.archivePath?.trim().isNotEmpty ?? false) &&
+        !downloadedChapterIds.contains(chapter.id);
+  }
+
   void _transferCompatibleDuplicateData({
     required Isar database,
     required Manga duplicate,
     required Manga target,
     required List<Chapter> duplicateChapters,
-    required List<Chapter> allChapters,
+    required List<Chapter> targetChapters,
   }) {
     final duplicateId = duplicate.id!;
     final targetId = target.id!;
     final targetChaptersByIdentity = <String, Chapter>{
-      for (final chapter in allChapters.where(
-        (chapter) => chapter.mangaId == targetId,
-      ))
+      for (final chapter in targetChapters)
         _localChildIdentity(chapter, target.itemType): chapter,
     };
     final targetChapterIdByDuplicateId = <int, int>{};
@@ -943,13 +1050,9 @@ class ChimahonSyncImporter {
     required ItemType itemType,
     required bool enabled,
     required Set<int> authoritativeIds,
+    required Set<int> referencedIds,
   }) {
     if (!enabled) return;
-    final referencedIds = database.mangas
-        .where()
-        .findAllSync()
-        .expand((manga) => manga.categories ?? const <int>[])
-        .toSet();
     for (final category
         in database.categorys
             .filter()
@@ -1126,6 +1229,7 @@ class ChimahonSyncImporter {
     required Manga manga,
     required Iterable<BackupChapter> remoteChapters,
     required List<Chapter> localChapters,
+    required List<Chapter> localChaptersForManga,
   }) {
     var created = 0;
     var updated = 0;
@@ -1133,9 +1237,14 @@ class ChimahonSyncImporter {
       database: database,
       manga: manga,
       localChapters: localChapters,
+      localChaptersForManga: localChaptersForManga,
     );
     final localByKey = <String, Chapter>{
       for (final chapter in portableLocal) _localChapterKey(chapter): chapter,
+    };
+    final localKeyById = <int, String>{
+      for (final entry in localByKey.entries)
+        if (entry.value.id != null) entry.value.id!: entry.key,
     };
     final localByUrl = <String, List<Chapter>>{};
     for (final chapter in portableLocal) {
@@ -1183,6 +1292,7 @@ class ChimahonSyncImporter {
         database.chapters.putSync(local);
         local.manga.saveSync();
         localChapters.add(local);
+        localChaptersForManga.add(local);
         localByUrl.putIfAbsent(remote.url, () => <Chapter>[]).add(local);
         created++;
       } else {
@@ -1202,7 +1312,14 @@ class ChimahonSyncImporter {
         database.chapters.putSync(local);
         updated++;
       }
-      localByKey.removeWhere((_, candidate) => candidate.id == local!.id);
+      final localId = local.id;
+      if (localId != null) {
+        final previousKey = localKeyById[localId];
+        if (previousKey != null && previousKey != remoteKey) {
+          localByKey.remove(previousKey);
+        }
+        localKeyById[localId] = remoteKey;
+      }
       localByKey[remoteKey] = local;
     }
     return (created, updated);
@@ -1213,6 +1330,7 @@ class ChimahonSyncImporter {
     required Manga anime,
     required Iterable<BackupEpisode> remoteEpisodes,
     required List<Chapter> localChapters,
+    required List<Chapter> localChaptersForAnime,
   }) {
     var created = 0;
     var updated = 0;
@@ -1220,10 +1338,15 @@ class ChimahonSyncImporter {
       database: database,
       manga: anime,
       localChapters: localChapters,
+      localChaptersForManga: localChaptersForAnime,
       episodes: true,
     );
     final localByKey = <String, Chapter>{
       for (final episode in portableLocal) _localEpisodeKey(episode): episode,
+    };
+    final localKeyById = <int, String>{
+      for (final entry in localByKey.entries)
+        if (entry.value.id != null) entry.value.id!: entry.key,
     };
     final localByUrl = <String, List<Chapter>>{};
     for (final episode in portableLocal) {
@@ -1272,6 +1395,7 @@ class ChimahonSyncImporter {
         database.chapters.putSync(local);
         local.manga.saveSync();
         localChapters.add(local);
+        localChaptersForAnime.add(local);
         localByUrl.putIfAbsent(remote.url, () => <Chapter>[]).add(local);
         created++;
       } else {
@@ -1295,7 +1419,14 @@ class ChimahonSyncImporter {
         database.chapters.putSync(local);
         updated++;
       }
-      localByKey.removeWhere((_, candidate) => candidate.id == local!.id);
+      final localId = local.id;
+      if (localId != null) {
+        final previousKey = localKeyById[localId];
+        if (previousKey != null && previousKey != remoteKey) {
+          localByKey.remove(previousKey);
+        }
+        localKeyById[localId] = remoteKey;
+      }
       localByKey[remoteKey] = local;
     }
     return (created, updated);
@@ -1309,16 +1440,12 @@ class ChimahonSyncImporter {
     required List<History> localHistories,
   }) {
     final chaptersByUrl = <String, Chapter>{
-      for (final chapter in localChapters.where(
-        (chapter) => chapter.mangaId == manga.id,
-      ))
+      for (final chapter in localChapters)
         if (const ChimahonLocalChapterPolicy().hasPortableIdentity(chapter))
           chapter.url!: chapter,
     };
     final historiesByChapter = <int, History>{
-      for (final history in localHistories.where(
-        (history) => history.mangaId == manga.id,
-      ))
+      for (final history in localHistories)
         if (history.chapterId != null) history.chapterId!: history,
     };
     var lastRead = manga.lastRead ?? 0;
@@ -1449,14 +1576,11 @@ class ChimahonSyncImporter {
     required Isar database,
     required Manga manga,
     required List<Chapter> localChapters,
+    required List<Chapter> localChaptersForManga,
     bool episodes = false,
   }) {
-    final portable = localChapters
-        .where(
-          (chapter) =>
-              chapter.mangaId == manga.id &&
-              const ChimahonLocalChapterPolicy().hasPortableIdentity(chapter),
-        )
+    final portable = localChaptersForManga
+        .where(const ChimahonLocalChapterPolicy().hasPortableIdentity)
         .toList();
     final byIdentity = <String, List<Chapter>>{};
     for (final chapter in portable) {
@@ -1517,6 +1641,9 @@ class ChimahonSyncImporter {
         );
         database.chapters.deleteSync(duplicate.id!);
         localChapters.removeWhere((chapter) => chapter.id == duplicate.id);
+        localChaptersForManga.removeWhere(
+          (chapter) => chapter.id == duplicate.id,
+        );
         portable.removeWhere((chapter) => chapter.id == duplicate.id);
       }
     }
@@ -1611,4 +1738,42 @@ class ChimahonSyncImporter {
   String _normalized(String? value) => (value ?? '').trim().toLowerCase();
 
   int _max(int first, int second) => first >= second ? first : second;
+
+  Map<int, List<T>> _groupByMangaId<T>(
+    Iterable<T> values,
+    int? Function(T value) mangaIdOf,
+  ) {
+    final result = <int, List<T>>{};
+    for (final value in values) {
+      final mangaId = mangaIdOf(value);
+      if (mangaId == null) continue;
+      result.putIfAbsent(mangaId, () => <T>[]).add(value);
+    }
+    return result;
+  }
+
+  Map<({ItemType type, String url}), List<Manga>> _indexMangasByTypeAndUrl(
+    Iterable<Manga> mangas,
+  ) {
+    final result = <({ItemType type, String url}), List<Manga>>{};
+    for (final manga in mangas) {
+      if (manga.isLocalArchive == true) continue;
+      result
+          .putIfAbsent((
+            type: manga.itemType,
+            url: manga.link ?? '',
+          ), () => <Manga>[])
+          .add(manga);
+    }
+    return result;
+  }
+
+  Iterable<Manga> _titleCandidates({
+    required List<Manga> all,
+    required Map<({ItemType type, String url}), List<Manga>> indexed,
+    required ItemType itemType,
+    required String url,
+  }) => url.isEmpty
+      ? all
+      : indexed[(type: itemType, url: url)] ?? const <Manga>[];
 }

@@ -791,6 +791,168 @@ void main() {
   );
 
   test(
+    'migrated source tombstone hides its downloaded row without deleting it',
+    () {
+      late Manga oldSourceTitle;
+      late Manga replacementTitle;
+      late Chapter downloadedChapter;
+      database.writeTxnSync(() {
+        database.sources.putAllSync([
+          _source(),
+          Source(
+            id: 43,
+            name: 'Replacement source',
+            lang: 'ja',
+            sourceCode: 'installed',
+            isAdded: true,
+            additionalParams: encodeMihonSourceMetadata(
+              sourceId: 9002,
+              packageName: 'test.replacement.extension',
+            ),
+          ),
+        ]);
+        oldSourceTitle = _manga(
+          name: 'Migrated title',
+          sourceTitle: 'Migrated title',
+          link: '/old-source',
+          sourceId: 42,
+        )..hasLocalChapterOverlay = true;
+        replacementTitle =
+            _manga(
+                name: 'Migrated title',
+                sourceTitle: 'Migrated title',
+                link: '/replacement-source',
+                sourceId: 43,
+              )
+              ..source = 'Replacement source'
+              ..mihonSourceId = '9002';
+        database.mangas.putAllSync([oldSourceTitle, replacementTitle]);
+
+        downloadedChapter = _chapter(
+          oldSourceTitle,
+          name: 'Downloaded chapter',
+          url: '/old-source/chapter-1',
+        );
+        database.chapters.putSync(downloadedChapter);
+        downloadedChapter.manga.saveSync();
+        final download = Download(
+          id: downloadedChapter.id,
+          succeeded: 10,
+          failed: 0,
+          total: 10,
+          isDownload: true,
+          isStartDownload: false,
+        )..chapter.value = downloadedChapter;
+        database.downloads.putSync(download);
+        download.chapter.saveSync();
+      });
+
+      const ChimahonSyncImporter().apply(
+        database: database,
+        backup: BackupMihon(
+          backupSources: [
+            BackupSource(sourceId: Int64(9001), name: 'Remote source'),
+            BackupSource(sourceId: Int64(9002), name: 'Replacement source'),
+          ],
+          backupManga: [
+            BackupManga(
+              source: Int64(9001),
+              url: '/old-source',
+              title: 'Migrated title',
+              favorite: false,
+              favoriteModifiedAt: Int64(800),
+            ),
+            BackupManga(
+              source: Int64(9002),
+              url: '/replacement-source',
+              title: 'Migrated title',
+              favorite: true,
+              favoriteModifiedAt: Int64(900),
+            ),
+          ],
+        ),
+      );
+
+      final restoredOld = database.mangas.getSync(oldSourceTitle.id!)!;
+      final restoredReplacement = database.mangas.getSync(
+        replacementTitle.id!,
+      )!;
+      expect(restoredOld.favorite, isFalse);
+      expect(restoredOld.hasLocalChapterOverlay, isFalse);
+      expect(restoredOld.isVisibleInLibrary, isFalse);
+      expect(restoredReplacement.favorite, isTrue);
+      expect(restoredReplacement.isVisibleInLibrary, isTrue);
+      expect(database.chapters.getSync(downloadedChapter.id!), isNotNull);
+      expect(database.downloads.getSync(downloadedChapter.id!), isNotNull);
+      expect(database.mangas.countSync(), 2);
+    },
+  );
+
+  test(
+    'authoritative tombstone keeps an existing row available through history',
+    () {
+      late Manga cachedTitle;
+      late Chapter readChapter;
+      late History history;
+      database.writeTxnSync(() {
+        database.sources.putSync(_source());
+        cachedTitle = _manga(
+          name: 'Previously favorited title',
+          sourceTitle: 'Previously favorited title',
+          link: '/history-title',
+          sourceId: 42,
+        );
+        database.mangas.putSync(cachedTitle);
+        readChapter = _chapter(
+          cachedTitle,
+          name: 'Read chapter',
+          url: '/history-title/chapter-1',
+          isRead: true,
+        );
+        database.chapters.putSync(readChapter);
+        readChapter.manga.saveSync();
+        history = History(
+          mangaId: cachedTitle.id,
+          chapterId: readChapter.id,
+          itemType: ItemType.manga,
+          date: '700',
+        )..chapter.value = readChapter;
+        database.historys.putSync(history);
+        history.chapter.saveSync();
+      });
+
+      const ChimahonSyncImporter().apply(
+        database: database,
+        backup: BackupMihon(
+          backupSources: [
+            BackupSource(sourceId: Int64(9001), name: 'Remote source'),
+          ],
+          backupManga: [
+            BackupManga(
+              source: Int64(9001),
+              url: '/history-title',
+              title: 'Previously favorited title',
+              favorite: false,
+              favoriteModifiedAt: Int64(800),
+            ),
+          ],
+        ),
+        authoritativeSelection: ChimahonMediaSyncSelection(
+          manga: true,
+          anime: false,
+          novels: false,
+        ),
+      );
+
+      final restored = database.mangas.getSync(cachedTitle.id!)!;
+      expect(restored.favorite, isFalse);
+      expect(restored.isVisibleInLibrary, isFalse);
+      expect(database.chapters.getSync(readChapter.id!), isNotNull);
+      expect(database.historys.getSync(history.id!), isNotNull);
+    },
+  );
+
+  test(
     'remote tombstone import does not activate stale cached metadata on the next sync',
     () {
       late Manga cached;

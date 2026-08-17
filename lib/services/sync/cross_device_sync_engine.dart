@@ -12,6 +12,7 @@ import 'package:mangayomi/services/sync/chimahon_source_preference_three_way_mer
 import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_storage.dart';
+import 'package:mangayomi/services/sync/cross_device_sync_metrics.dart';
 import 'package:protobuf/protobuf.dart';
 
 typedef SyncBackupExporter = Future<BackupMihon> Function();
@@ -41,6 +42,7 @@ class CrossDeviceSyncResult {
     this.initialMediaSelectionGeneration = 0,
     this.initialMediaSelectionState = const ChimahonMediaSyncSelectionState(),
     this.localTrackingDeletions = const {},
+    this.metrics,
   });
 
   final bool hadRemoteData;
@@ -68,6 +70,26 @@ class CrossDeviceSyncResult {
 
   /// Tracker deletion evidence that was included after media filtering.
   final Set<ChimahonTrackingDeletionKey> localTrackingDeletions;
+
+  /// Performance measurements for engine-produced results.
+  final CrossDeviceSyncMetrics? metrics;
+
+  CrossDeviceSyncResult _withMetrics(CrossDeviceSyncMetrics metrics) =>
+      CrossDeviceSyncResult(
+        hadRemoteData: hadRemoteData,
+        remoteRevision: remoteRevision,
+        requiresRetry: requiresRetry,
+        mediaSelection: mediaSelection,
+        mediaSelectionInitializationCompleted:
+            mediaSelectionInitializationCompleted,
+        mediaSelectionNeedsPersistence: mediaSelectionNeedsPersistence,
+        initialMediaSelection: initialMediaSelection,
+        initialMediaSelectionInitialized: initialMediaSelectionInitialized,
+        initialMediaSelectionGeneration: initialMediaSelectionGeneration,
+        initialMediaSelectionState: initialMediaSelectionState,
+        localTrackingDeletions: localTrackingDeletions,
+        metrics: metrics,
+      );
 }
 
 /// A defensive, read-only view of the exact payload a sync would propose.
@@ -186,6 +208,8 @@ class CrossDeviceSyncEngine {
     this.localMediaSelectionGenerationProvider,
     this.localMediaSelectionStateProvider,
     this.preUpload,
+    this.onMetrics,
+    this.initialExportDuration = Duration.zero,
   }) : localTrackingDeletions = Set.unmodifiable(localTrackingDeletions);
 
   final CrossDeviceSyncStorage storage;
@@ -226,6 +250,16 @@ class CrossDeviceSyncEngine {
   /// sidecar writes for that attempt.
   final SyncPreUploadHook? preUpload;
 
+  /// Receives the completed measurements after a synchronization succeeds or
+  /// terminates with an error. Reporter failures cannot affect sync behavior.
+  final CrossDeviceSyncMetricsReporter? onMetrics;
+
+  /// Time already spent producing a cached first export supplied by
+  /// [exportLocal]. Production constructs that snapshot before the engine so
+  /// its metadata can configure reconciliation; including it here keeps the
+  /// reported export and total durations complete.
+  final Duration initialExportDuration;
+
   Future<CrossDeviceSyncResult> synchronize({int maxConflictRetries = 2}) =>
       _runWithConflictRetries(
         importAfterCommit: true,
@@ -251,7 +285,7 @@ class CrossDeviceSyncEngine {
   /// This performs one remote download and read-only sidecar loads. It never
   /// uploads, imports, or advances any deferred/pending/baseline sidecar.
   Future<CrossDeviceSyncPreview> preview() async {
-    final prepared = await _prepareSyncPayload();
+    final prepared = await _prepareSyncPayload(null);
     return _previewFor(prepared);
   }
 
@@ -277,38 +311,76 @@ class CrossDeviceSyncEngine {
     required bool importAfterCommit,
     required int maxConflictRetries,
   }) async {
-    for (var attempt = 0; ; attempt++) {
-      try {
-        return await _mergeAndCommitOnce(importAfterCommit: importAfterCommit);
-      } on SyncConflictException {
-        if (attempt >= maxConflictRetries) rethrow;
+    final metrics = _SyncMetricsRecorder(initialExportDuration);
+    try {
+      for (var attempt = 0; ; attempt++) {
+        metrics.attempts++;
+        try {
+          final result = await _mergeAndCommitOnce(
+            importAfterCommit: importAfterCommit,
+            metrics: metrics,
+          );
+          final snapshot = metrics.snapshot();
+          _reportMetrics(snapshot);
+          return result._withMetrics(snapshot);
+        } on SyncConflictException {
+          metrics.conflicts++;
+          if (attempt >= maxConflictRetries) rethrow;
+        }
       }
+    } catch (_) {
+      _reportMetrics(metrics.snapshot());
+      rethrow;
+    }
+  }
+
+  void _reportMetrics(CrossDeviceSyncMetrics metrics) {
+    try {
+      onMetrics?.call(metrics);
+    } catch (_) {
+      // Performance reporting must never affect synchronization behavior.
     }
   }
 
   Future<CrossDeviceSyncResult> _mergeAndCommitOnce({
     required bool importAfterCommit,
+    required _SyncMetricsRecorder metrics,
   }) async {
-    final prepared = await _prepareSyncPayload();
+    final prepared = await _prepareSyncPayload(metrics);
     if (_canSkipUpload(prepared)) {
-      final revision = await _confirmNoOpRemote(prepared);
+      metrics.skippedUpload = true;
+      final revision = await metrics.measureAsync(
+        CrossDeviceSyncPhase.confirmNoOp,
+        () => _confirmNoOpRemote(prepared),
+      );
       return _finalizeSuccessfulCommit(
         prepared: prepared,
         revision: revision,
         importAfterCommit: importAfterCommit,
+        metrics: metrics,
       );
     }
 
-    await preUpload?.call(_previewFor(prepared));
-    final revision = await storage.upload(
-      prepared.bytes,
-      expectedRevision: prepared.remoteSnapshot?.revision,
-      expectedAbsent: prepared.remoteSnapshot == null,
+    if (preUpload != null) {
+      await metrics.measureAsync(
+        CrossDeviceSyncPhase.preUpload,
+        () => preUpload!.call(_previewFor(prepared)),
+      );
+    }
+    final revision = await metrics.measureAsync(
+      CrossDeviceSyncPhase.upload,
+      () => storage.upload(
+        prepared.bytes,
+        expectedRevision: prepared.remoteSnapshot?.revision,
+        expectedAbsent: prepared.remoteSnapshot == null,
+      ),
     );
+    metrics.uploaded = true;
     return _finalizeSuccessfulCommit(
       prepared: prepared,
       revision: revision,
       importAfterCommit: importAfterCommit,
+      metrics: metrics,
     );
   }
 
@@ -334,6 +406,7 @@ class CrossDeviceSyncEngine {
     }
 
     try {
+      if (_sameBytes(current.bytes, prepared.bytes)) return current.revision;
       final currentProtobufBytes = codec.decode(current.bytes).protobufBytes;
       if (!_sameBytes(currentProtobufBytes, prepared.proposedProtobufBytes)) {
         throw const SyncConflictException();
@@ -350,24 +423,38 @@ class CrossDeviceSyncEngine {
     required _PreparedSyncPayload prepared,
     required String? revision,
     required bool importAfterCommit,
+    required _SyncMetricsRecorder metrics,
   }) async {
     // Re-read before importing. Remote I/O can be slow enough for a reader
     // action or settings edit to land after the first export. Importing [merged]
     // in that case would overwrite the newer local value with a stale projection.
-    var localAfterCommit = await exportLocal();
+    var localAfterCommit = await metrics.measureAsync(
+      CrossDeviceSyncPhase.recheckLocal,
+      exportLocal,
+    );
     final mediaSelectionGenerationAfterCommit =
         localMediaSelectionGenerationProvider?.call() ??
         localMediaSelectionGeneration;
     var unrepresentablePreferenceKeysAfterCommit = Set<String>.unmodifiable(
       localUnrepresentablePreferenceKeys(),
     );
-    final requiresRetry =
-        !_sameBackup(prepared.exported, localAfterCommit) ||
-        mediaSelectionGenerationAfterCommit !=
-            prepared.initialMediaSelectionGeneration;
+    final requiresRetry = metrics.measureSync(
+      CrossDeviceSyncPhase.compareLocal,
+      () =>
+          !_sameBackup(prepared.exported, localAfterCommit) ||
+          mediaSelectionGenerationAfterCommit !=
+              prepared.initialMediaSelectionGeneration,
+    );
     if (importAfterCommit && !requiresRetry) {
-      await importMerged(prepared.merged);
-      localAfterCommit = await exportLocal();
+      await metrics.measureAsync(
+        CrossDeviceSyncPhase.importMerged,
+        () => importMerged(prepared.merged),
+      );
+      metrics.imported = true;
+      localAfterCommit = await metrics.measureAsync(
+        CrossDeviceSyncPhase.recheckLocal,
+        exportLocal,
+      );
       unrepresentablePreferenceKeysAfterCommit = Set<String>.unmodifiable(
         localUnrepresentablePreferenceKeys(),
       );
@@ -375,6 +462,7 @@ class CrossDeviceSyncEngine {
     final projectedLocalAfterCommit = prepared.mediaSelection.projectLocal(
       localAfterCommit,
     );
+    final persistStarted = metrics.elapsedMicroseconds;
     await deferredPayloadStore?.save(prepared.merged);
     // If local state changed in flight, [merged] is now the real remote
     // baseline but the newer local settings have not reached it yet. Keep the
@@ -403,6 +491,7 @@ class CrossDeviceSyncEngine {
         ?.saveLocalSourcePreferenceBaseline(
           sourcePreferenceBaselineAfterCommit,
         );
+    metrics.addElapsed(CrossDeviceSyncPhase.persistSidecars, persistStarted);
     return CrossDeviceSyncResult(
       hadRemoteData: prepared.remoteSnapshot != null,
       remoteRevision: revision,
@@ -424,8 +513,15 @@ class CrossDeviceSyncEngine {
     );
   }
 
-  Future<_PreparedSyncPayload> _prepareSyncPayload() async {
-    final exported = await exportLocal();
+  Future<_PreparedSyncPayload> _prepareSyncPayload(
+    _SyncMetricsRecorder? metrics,
+  ) async {
+    final exported = metrics == null
+        ? await exportLocal()
+        : await metrics.measureAsync(
+            CrossDeviceSyncPhase.exportLocal,
+            exportLocal,
+          );
     final providedLocalMediaSelection =
         localMediaSelectionProvider?.call() ?? localMediaSelection;
     final currentLocalMediaSelection =
@@ -454,39 +550,77 @@ class CrossDeviceSyncEngine {
     final unrepresentablePreferenceKeys = Set<String>.unmodifiable(
       localUnrepresentablePreferenceKeys(),
     );
-    final deferred = await deferredPayloadStore?.load();
     final pendingLocalStore =
         deferredPayloadStore is ChimahonPendingLocalPayloadStore
         ? deferredPayloadStore as ChimahonPendingLocalPayloadStore
         : null;
-    final pendingLocal = await pendingLocalStore?.loadPendingLocalPayload();
     final pendingProjectionBaselineStore =
         deferredPayloadStore is ChimahonPendingLocalProjectionBaselineStore
         ? deferredPayloadStore as ChimahonPendingLocalProjectionBaselineStore
         : null;
-    final pendingLocalPreferenceBaseline = await pendingProjectionBaselineStore
-        ?.loadPendingLocalPreferenceBaseline();
-    final pendingLocalSourcePreferenceBaseline =
-        await pendingProjectionBaselineStore
-            ?.loadPendingLocalSourcePreferenceBaseline();
     final localPreferenceStore =
         deferredPayloadStore is ChimahonLocalPreferenceBaselineStore
         ? deferredPayloadStore as ChimahonLocalPreferenceBaselineStore
         : null;
-    final localPreferenceBaseline = await localPreferenceStore
-        ?.loadLocalPreferenceBaseline();
     final localSourcePreferenceStore =
         deferredPayloadStore is ChimahonLocalSourcePreferenceBaselineStore
         ? deferredPayloadStore as ChimahonLocalSourcePreferenceBaselineStore
         : null;
-    final localSourcePreferenceBaseline = await localSourcePreferenceStore
-        ?.loadLocalSourcePreferenceBaseline();
-    final remoteSnapshot = await storage.download();
+    Future<
+      (
+        BackupMihon?,
+        BackupMihon?,
+        List<BackupPreference>?,
+        List<BackupSourcePreferences>?,
+        List<BackupPreference>?,
+        List<BackupSourcePreferences>?,
+      )
+    >
+    readSidecars() => (
+      deferredPayloadStore?.load() ?? Future<BackupMihon?>.value(),
+      pendingLocalStore?.loadPendingLocalPayload() ??
+          Future<BackupMihon?>.value(),
+      pendingProjectionBaselineStore?.loadPendingLocalPreferenceBaseline() ??
+          Future<List<BackupPreference>?>.value(),
+      pendingProjectionBaselineStore
+              ?.loadPendingLocalSourcePreferenceBaseline() ??
+          Future<List<BackupSourcePreferences>?>.value(),
+      localPreferenceStore?.loadLocalPreferenceBaseline() ??
+          Future<List<BackupPreference>?>.value(),
+      localSourcePreferenceStore?.loadLocalSourcePreferenceBaseline() ??
+          Future<List<BackupSourcePreferences>?>.value(),
+    ).wait;
+
+    final sidecarsFuture = metrics == null
+        ? readSidecars()
+        : metrics.measureAsync(CrossDeviceSyncPhase.readSidecars, readSidecars);
+    final remoteFuture = metrics == null
+        ? storage.download()
+        : metrics.measureAsync(CrossDeviceSyncPhase.download, storage.download);
+    final (sidecars, remoteSnapshot) = await (
+      sidecarsFuture,
+      remoteFuture,
+    ).wait;
+    final (
+      deferred,
+      pendingLocal,
+      pendingLocalPreferenceBaseline,
+      pendingLocalSourcePreferenceBaseline,
+      localPreferenceBaseline,
+      localSourcePreferenceBaseline,
+    ) = sidecars;
+    metrics?.remoteBytes = remoteSnapshot?.bytes.length ?? 0;
     final decodedRemote = remoteSnapshot == null
         ? null
-        : codec.decode(remoteSnapshot.bytes);
+        : metrics == null
+        ? codec.decode(remoteSnapshot.bytes)
+        : metrics.measureSync(
+            CrossDeviceSyncPhase.decode,
+            () => codec.decode(remoteSnapshot.bytes),
+          );
     final remote = decodedRemote?.backup;
 
+    final reconcileStarted = metrics?.elapsedMicroseconds;
     final bootstrapAppPreferences =
         localPreferenceStore != null && localPreferenceBaseline == null;
     final rawLocalPreferenceIntent = pendingLocal == null
@@ -611,7 +745,7 @@ class CrossDeviceSyncEngine {
     // which another client deleted. A pending manual restore is explicit local
     // intent and is the only cached payload allowed onto the local side.
     final local = pendingLocal == null
-        ? projectedExported.deepCopy()
+        ? projectedExported.toBuilder() as BackupMihon
         : merger.merge(
             local: projectedExported,
             remote: pendingLocal,
@@ -741,8 +875,38 @@ class CrossDeviceSyncEngine {
         localTrackingDeletions: effectiveLocalTrackingDeletions,
       );
     }
-    final proposedProtobufBytes = merged.writeToBuffer();
-    final bytes = codec.encode(merged, format: storage.wireFormat);
+    if (reconcileStarted != null) {
+      metrics!.addElapsed(CrossDeviceSyncPhase.reconcile, reconcileStarted);
+    }
+    final proposedProtobufBytes = metrics == null
+        ? merged.writeToBuffer()
+        : metrics.measureSync(
+            CrossDeviceSyncPhase.serialize,
+            merged.writeToBuffer,
+          );
+    final canReuseCompleteRemoteBytes =
+        metrics != null &&
+        remoteSnapshot?.isCompleteRecovery == true &&
+        remoteSnapshot!.revision?.isNotEmpty == true &&
+        decodedRemote != null &&
+        _sameBytes(proposedProtobufBytes, decodedRemote.protobufBytes);
+    final bytes = canReuseCompleteRemoteBytes
+        ? remoteSnapshot.bytes
+        : metrics == null
+        ? codec.encodeProtobufBytes(
+            proposedProtobufBytes,
+            format: storage.wireFormat,
+          )
+        : metrics.measureSync(
+            CrossDeviceSyncPhase.encode,
+            () => codec.encodeProtobufBytes(
+              proposedProtobufBytes,
+              format: storage.wireFormat,
+            ),
+          );
+    metrics
+      ?..protobufBytes = proposedProtobufBytes.length
+      ..uploadBytes = bytes.length;
     if (pendingLocal != null &&
         !pendingRestoreAuthority.containsSelectedIntent(
           uploaded: codec.decode(bytes).backup,
@@ -982,10 +1146,11 @@ class CrossDeviceSyncEngine {
   }
 
   bool _sameBackup(BackupMihon left, BackupMihon right) {
-    return _sameBytes(left.writeToBuffer(), right.writeToBuffer());
+    return left == right;
   }
 
   bool _sameBytes(List<int> left, List<int> right) {
+    if (identical(left, right)) return true;
     if (left.length != right.length) return false;
     for (var index = 0; index < left.length; index++) {
       if (left[index] != right[index]) return false;
@@ -1042,4 +1207,74 @@ class _PreparedSyncPayload {
   final BackupMihon merged;
   final Uint8List proposedProtobufBytes;
   final Uint8List bytes;
+}
+
+class _SyncMetricsRecorder {
+  _SyncMetricsRecorder(Duration initialExportDuration)
+    : _initialMicroseconds = initialExportDuration.inMicroseconds {
+    if (_initialMicroseconds > 0) {
+      _phaseMicroseconds[CrossDeviceSyncPhase.exportLocal] =
+          _initialMicroseconds;
+    }
+    _clock.start();
+  }
+
+  final Stopwatch _clock = Stopwatch();
+  final Map<CrossDeviceSyncPhase, int> _phaseMicroseconds = {};
+  final int _initialMicroseconds;
+  int attempts = 0;
+  int conflicts = 0;
+  int remoteBytes = 0;
+  int protobufBytes = 0;
+  int uploadBytes = 0;
+  bool uploaded = false;
+  bool skippedUpload = false;
+  bool imported = false;
+
+  int get elapsedMicroseconds => _clock.elapsedMicroseconds;
+
+  T measureSync<T>(CrossDeviceSyncPhase phase, T Function() action) {
+    final started = elapsedMicroseconds;
+    try {
+      return action();
+    } finally {
+      addElapsed(phase, started);
+    }
+  }
+
+  Future<T> measureAsync<T>(
+    CrossDeviceSyncPhase phase,
+    Future<T> Function() action,
+  ) async {
+    final started = elapsedMicroseconds;
+    try {
+      return await action();
+    } finally {
+      addElapsed(phase, started);
+    }
+  }
+
+  void addElapsed(CrossDeviceSyncPhase phase, int startedMicroseconds) {
+    _phaseMicroseconds.update(
+      phase,
+      (value) => value + elapsedMicroseconds - startedMicroseconds,
+      ifAbsent: () => elapsedMicroseconds - startedMicroseconds,
+    );
+  }
+
+  CrossDeviceSyncMetrics snapshot() => CrossDeviceSyncMetrics(
+    total: Duration(microseconds: _initialMicroseconds + elapsedMicroseconds),
+    phases: {
+      for (final entry in _phaseMicroseconds.entries)
+        entry.key: Duration(microseconds: entry.value),
+    },
+    attempts: attempts,
+    conflicts: conflicts,
+    remoteBytes: remoteBytes,
+    protobufBytes: protobufBytes,
+    uploadBytes: uploadBytes,
+    uploaded: uploaded,
+    skippedUpload: skippedUpload,
+    imported: imported,
+  );
 }

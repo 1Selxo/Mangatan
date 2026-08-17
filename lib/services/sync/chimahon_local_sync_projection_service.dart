@@ -51,7 +51,7 @@ class ChimahonLocalSyncProjectionSnapshot {
     required this.mediaSelectionGeneration,
     required this.mediaSelectionScopeToken,
     required this.persistedMediaSelectionState,
-  }) : backup = backup.deepCopy()..freeze(),
+  }) : backup = backup..freeze(),
        unrepresentablePreferenceKeys = Set.unmodifiable(
          unrepresentablePreferenceKeys,
        ),
@@ -166,12 +166,16 @@ class ChimahonLocalSyncProjectionService {
         ? persistedMediaSelectionState.initialized ||
               persistedMediaSelectionState.userSelected
         : persistedMediaSelectionState.isInitializedForScope(activeScopeToken);
-    final trackingDeletions = _trackingDeletionState();
+    final sources = database.sources.filter().idIsNotNull().findAllSync();
+    final localMangas = database.mangas.filter().idIsNotNull().findAllSync();
+    final trackingDeletions = _trackingDeletionState(
+      sources: sources,
+      mangas: localMangas,
+    );
     final settings = database.settings.getSync(227);
     final settingsProjection = settings == null
         ? null
         : const ChimahonAppSettingsAdapter().project(settings);
-    final sources = database.sources.filter().idIsNotNull().findAllSync();
     final miningProjection = await const ChimahonMiningSettingsAdapter()
         .project(
           dictionaryStorage: dictionaryStorage,
@@ -186,7 +190,6 @@ class ChimahonLocalSyncProjectionService {
       sources: sources,
       storedPreferences: database.sourcePreferences.where().findAllSync(),
     );
-    final localMangas = database.mangas.filter().idIsNotNull().findAllSync();
     final localCategories = database.categorys
         .filter()
         .idIsNotNull()
@@ -223,6 +226,7 @@ class ChimahonLocalSyncProjectionService {
           (category.updatedAt ?? 0) > 0 ||
           (category.id != null && liveNovelCategoryIds.contains(category.id)),
     );
+    final statistics = await ImmersionStatsStorage.loadSyncSnapshot();
     final exported = const MihonBackupExporter().export(
       // Exact empty-path Chimahon parents are a remote cache. Excluding both
       // those parents and zero-clock categories used only by remote cache
@@ -244,9 +248,9 @@ class ChimahonLocalSyncProjectionService {
       deletedTracks: trackingDeletions.deletions,
       appPreferences: appPreferences,
       sourcePreferences: sourcePreferences,
-      mangaStats: await ImmersionStatsStorage.loadMangaStats(),
-      ankiStats: await ImmersionStatsStorage.loadAnkiStats(),
-      novelStats: await ImmersionStatsStorage.loadAllNovelStats(),
+      mangaStats: statistics.mangaStats,
+      ankiStats: statistics.ankiStats,
+      novelStats: statistics.novelStats,
     );
     // Keep every local media record until the engine has read the current
     // remote and can safely resolve a first-contact selection. Only the exact
@@ -278,18 +282,18 @@ class ChimahonLocalSyncProjectionService {
     Map<ChimahonTrackingDeletionKey, List<int>>
     changedPartIdsByTrackingDeletionKey,
   })
-  _trackingDeletionState() {
+  _trackingDeletionState({
+    required Iterable<Source> sources,
+    required Iterable<Manga> mangas,
+  }) {
     const adapter = ChimahonTrackingAdapter();
     final deletions = <ChimahonTrackingDeletion>[];
     final keys = <ChimahonTrackingDeletionKey>{};
     final changedPartIds = <int>[];
     final changedPartIdsByTrackingDeletionKey =
         <ChimahonTrackingDeletionKey, List<int>>{};
-    final sourcesById = {
-      for (final source
-          in database.sources.filter().idIsNotNull().findAllSync())
-        source.id!: source,
-    };
+    final sourcesById = {for (final source in sources) source.id!: source};
+    final mangasById = {for (final manga in mangas) manga.id!: manga};
     for (final marker
         in database.changedParts
             .filter()
@@ -304,7 +308,7 @@ class ChimahonLocalSyncProjectionService {
           !adapter.isSupportedTracker(trackerId)) {
         continue;
       }
-      final manga = database.mangas.getSync(mangaId);
+      final manga = mangasById[mangaId];
       final source = manga?.sourceId == null
           ? null
           : sourcesById[manga!.sourceId!];

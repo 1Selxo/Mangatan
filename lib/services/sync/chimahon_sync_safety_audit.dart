@@ -33,6 +33,7 @@ class ChimahonSyncSafetyAudit {
     ChimahonPreferenceSafetyPolicy? preferenceSafetyPolicy,
     Set<ChimahonTrackingDeletionKey> localTrackingDeletions = const {},
     bool remoteWinsTies = false,
+    bool includeDiagnostics = true,
   }) {
     final counts = <String, int>{};
     final hashes = <String, String>{};
@@ -46,8 +47,10 @@ class ChimahonSyncSafetyAudit {
       'proposed': proposed,
     };
     counts['referencePresent'] = reference == null ? 0 : 1;
-    for (final entry in inputs.entries) {
-      _describeInput(entry.key, entry.value, counts, hashes);
+    if (includeDiagnostics) {
+      for (final entry in inputs.entries) {
+        _describeInput(entry.key, entry.value, counts, hashes);
+      }
     }
 
     void fail(String code, Iterable<String> affected) {
@@ -64,6 +67,7 @@ class ChimahonSyncSafetyAudit {
     }
 
     void observe(String code, Iterable<String> affected) {
+      if (!includeDiagnostics) return;
       final values = affected.toList(growable: false);
       counts['observation.$code'] = values.length;
       if (values.isEmpty) return;
@@ -140,7 +144,9 @@ class ChimahonSyncSafetyAudit {
       observe: observe,
     );
 
-    _reportLocalDifferences(remote: remote, local: local, observe: observe);
+    if (includeDiagnostics) {
+      _reportLocalDifferences(remote: remote, local: local, observe: observe);
+    }
 
     counts['hardFailureKinds'] = failures.length;
     counts['hardFailureAffectedRecords'] = failures.fold(

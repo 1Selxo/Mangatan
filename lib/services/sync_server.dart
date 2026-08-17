@@ -47,6 +47,7 @@ import 'package:mangayomi/services/sync/mangatan_epub_sync_service.dart';
 import 'package:mangayomi/services/sync/sync_user_message.dart';
 import 'package:mangayomi/services/sync/webdav_credential_store.dart';
 import 'package:mangayomi/services/sync/webdav_sync_storage.dart';
+import 'package:mangayomi/utils/log/logger.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
@@ -55,6 +56,10 @@ part 'sync_server.g.dart';
 class _ChimahonDownloadCancelled implements Exception {
   const _ChimahonDownloadCancelled();
 }
+
+String _syncMilliseconds(Duration duration) =>
+    (duration.inMicroseconds / Duration.microsecondsPerMillisecond)
+        .toStringAsFixed(2);
 
 @riverpod
 class SyncServer extends _$SyncServer {
@@ -206,7 +211,11 @@ class SyncServer extends _$SyncServer {
       return true;
     } on _ChimahonDownloadCancelled {
       return true;
-    } catch (error) {
+    } catch (error, stackTrace) {
+      AppLogger.log(
+        'Synchronization failed (${error.runtimeType}): $error\n$stackTrace',
+        logLevel: LogLevel.error,
+      );
       if (!silent) botToast(safeSyncUserMessage(error), second: 5);
       return false;
     } finally {
@@ -243,9 +252,13 @@ class SyncServer extends _$SyncServer {
     bool download = false,
     Future<bool> Function(ChimahonDownloadPlan plan)? confirmDownload,
   }) async {
+    final fullSyncWatch = Stopwatch()..start();
+    final pendingRestoreWatch = Stopwatch()..start();
     final pendingManualRestoreStore =
         await defaultChimahonPendingManualRestoreStore();
     await pendingManualRestoreStore.ensureReadyForSync();
+    pendingRestoreWatch.stop();
+    final providerWatch = Stopwatch()..start();
     final CrossDeviceSyncStorage storage;
     late final String deferredPayloadScope;
     final legacyDeferredPayloadScopes = <String>{};
@@ -345,6 +358,10 @@ class SyncServer extends _$SyncServer {
         _currentSyncNotifier.setGoogleDriveConnected(true);
         break;
     }
+    providerWatch.stop();
+    final setupWatch = Stopwatch()..start();
+    var epubDuration = Duration.zero;
+    late final Stopwatch coreWatch;
     try {
       final activeMediaSelectionScopeToken = chimahonMediaSelectionScopeToken(
         deferredPayloadScope,
@@ -386,21 +403,62 @@ class SyncServer extends _$SyncServer {
       final preUploadSafetyGate = ChimahonPreUploadSafetyGate(
         recoveryStore: remoteRecoveryStore,
       );
+      setupWatch.stop();
+      coreWatch = Stopwatch()..start();
       if (download) {
-        var localProjection = await localProjectionService.createSnapshot();
+        final downloadWatch = Stopwatch()..start();
+        final downloadPhaseMicroseconds = <String, int>{};
+        Future<T> measureDownloadPhase<T>(
+          String phase,
+          Future<T> Function() action,
+        ) async {
+          final watch = Stopwatch()..start();
+          try {
+            return await action();
+          } finally {
+            watch.stop();
+            downloadPhaseMicroseconds.update(
+              phase,
+              (value) => value + watch.elapsedMicroseconds,
+              ifAbsent: () => watch.elapsedMicroseconds,
+            );
+          }
+        }
+
+        T measureDownloadPhaseSync<T>(String phase, T Function() action) {
+          final watch = Stopwatch()..start();
+          try {
+            return action();
+          } finally {
+            watch.stop();
+            downloadPhaseMicroseconds.update(
+              phase,
+              (value) => value + watch.elapsedMicroseconds,
+              ifAbsent: () => watch.elapsedMicroseconds,
+            );
+          }
+        }
+
+        var localProjection = await measureDownloadPhase(
+          'initialProjection',
+          localProjectionService.createSnapshot,
+        );
         final localBeforeDownload = localProjection.backup;
         final mediaSelectionBeforeDownload = localProjection.mediaSelection;
         final mediaSelectionInitializedBeforeDownload =
             localProjection.mediaSelectionInitialized;
         final mediaSelectionStateBeforeDownload =
             localProjection.persistedMediaSelectionState;
-        final remote = await storage.download();
+        final remote = await measureDownloadPhase('download', storage.download);
         if (remote == null) {
           throw const SyncStorageException(
             'No remote Chimahon sync data found',
           );
         }
-        final backup = codec.decode(remote.bytes).backup;
+        final backup = measureDownloadPhaseSync(
+          'decode',
+          () => codec.decode(remote.bytes).backup,
+        );
         final downloadedSelection = chimahonMediaSelectionForExplicitRestore(
           preferences: backup.backupPreferences,
           current: mediaSelectionBeforeDownload,
@@ -415,7 +473,10 @@ class SyncServer extends _$SyncServer {
           );
         }
         final downloadedSelectionCanInitialize = !downloadedSelectionMalformed;
-        localProjection = await localProjectionService.createSnapshot();
+        localProjection = await measureDownloadPhase(
+          'previewProjection',
+          localProjectionService.createSnapshot,
+        );
         if (!_sameChimahonBackup(localBeforeDownload, localProjection.backup) ||
             localProjection.persistedMediaSelectionState !=
                 mediaSelectionStateBeforeDownload) {
@@ -424,32 +485,42 @@ class SyncServer extends _$SyncServer {
             'download again to avoid overwriting the newer local state',
           );
         }
-        var localRevision = await ChimahonLocalRevision.capture(
-          isar,
-          localProjection.backup,
+        var localRevision = await measureDownloadPhase(
+          'previewRevision',
+          () => ChimahonLocalRevision.capture(isar, localProjection.backup),
         );
-        final downloadPlan = ChimahonDownloadPlan(
-          backup: backup,
-          selection: downloadedSelection,
-          localProjection: localProjection.backup,
-          localMangas: isar.mangas.where().findAllSync(),
-          localChapters: isar.chapters.where().findAllSync(),
-          localSources: isar.sources.where().findAllSync(),
-          downloadedChapterIds: isar.downloads
-              .where()
-              .findAllSync()
-              .map((download) => download.id)
-              .nonNulls
-              .toSet(),
-          localRevision: localRevision,
+        final downloadPlan = measureDownloadPhaseSync(
+          'buildPreview',
+          () => ChimahonDownloadPlan(
+            backup: backup,
+            selection: downloadedSelection,
+            localProjection: localProjection.backup,
+            localMangas: isar.mangas.where().findAllSync(),
+            localChapters: isar.chapters.where().findAllSync(),
+            localSources: isar.sources.where().findAllSync(),
+            downloadedChapterIds: isar.downloads
+                .where()
+                .findAllSync()
+                .map((download) => download.id)
+                .nonNulls
+                .toSet(),
+            localRevision: localRevision,
+          ),
         );
-        if (confirmDownload != null && !await confirmDownload(downloadPlan)) {
-          throw const _ChimahonDownloadCancelled();
+        if (confirmDownload != null) {
+          final confirmed = await measureDownloadPhase(
+            'confirmation',
+            () => confirmDownload(downloadPlan),
+          );
+          if (!confirmed) throw const _ChimahonDownloadCancelled();
         }
-        localProjection = await localProjectionService.createSnapshot();
-        localRevision = await ChimahonLocalRevision.capture(
-          isar,
-          localProjection.backup,
+        localProjection = await measureDownloadPhase(
+          'preImportProjection',
+          localProjectionService.createSnapshot,
+        );
+        localRevision = await measureDownloadPhase(
+          'preImportRevision',
+          () => ChimahonLocalRevision.capture(isar, localProjection.backup),
         );
         if (!downloadPlan.matchesLocalRevision(localRevision) ||
             localProjection.persistedMediaSelectionState !=
@@ -459,11 +530,17 @@ class SyncServer extends _$SyncServer {
             'download again to review the new plan',
           );
         }
-        await authoritativeDownloadStage.begin(downloadPlan.backup);
-        localProjection = await localProjectionService.createSnapshot();
-        localRevision = await ChimahonLocalRevision.capture(
-          isar,
-          localProjection.backup,
+        await measureDownloadPhase(
+          'staging',
+          () => authoritativeDownloadStage.begin(downloadPlan.backup),
+        );
+        localProjection = await measureDownloadPhase(
+          'stagingProjection',
+          localProjectionService.createSnapshot,
+        );
+        localRevision = await measureDownloadPhase(
+          'stagingRevision',
+          () => ChimahonLocalRevision.capture(isar, localProjection.backup),
         );
         if (!downloadPlan.matchesLocalRevision(localRevision) ||
             localProjection.persistedMediaSelectionState !=
@@ -473,16 +550,20 @@ class SyncServer extends _$SyncServer {
             'download again to review the new plan',
           );
         }
-        final importResult = await restoreChimahonSyncData(
-          ref,
-          downloadPlan.backup,
-          authoritativeSelection: downloadedSelection,
+        final importResult = await measureDownloadPhase(
+          'import',
+          () => restoreChimahonSyncData(
+            ref,
+            downloadPlan.backup,
+            authoritativeSelection: downloadedSelection,
+          ),
         );
         final downloadResult = downloadPlan.complete(importResult);
         if (!silent) {
           botToast(downloadResult.summary, second: 5);
         }
         if (storage case MangatanEpubBlobStorage epubStorage) {
+          final epubWatch = Stopwatch()..start();
           final epubResult = await MangatanEpubSyncService(
             database: isar,
             storage: epubStorage,
@@ -494,9 +575,12 @@ class SyncServer extends _$SyncServer {
               second: 5,
             );
           }
+          epubWatch.stop();
+          epubDuration += epubWatch.elapsed;
         }
         // A download is not evidence that a pending manual restore reached the
         // remote backend; only the account cache staged above was updated.
+        final postImportWatch = Stopwatch()..start();
         localProjection = await ChimahonLocalSyncProjectionService(
           database: isar,
           mediaSelection: downloadedSelection,
@@ -536,14 +620,29 @@ class SyncServer extends _$SyncServer {
         // the process exits anywhere before this point.
         await accountDeferredStore.save(downloadPlan.backup);
         await authoritativeDownloadStage.clear();
+        postImportWatch.stop();
+        downloadPhaseMicroseconds['postImport'] =
+            postImportWatch.elapsedMicroseconds;
+        downloadWatch.stop();
+        final confirmationMicroseconds =
+            downloadPhaseMicroseconds['confirmation'] ?? 0;
+        AppLogger.log(
+          'Chimahon download performance: '
+          'total=${_syncMilliseconds(downloadWatch.elapsed)}ms '
+          'processing=${_syncMilliseconds(Duration(microseconds: downloadWatch.elapsedMicroseconds - confirmationMicroseconds))}ms '
+          '${downloadPhaseMicroseconds.entries.map((entry) => '${entry.key}=${_syncMilliseconds(Duration(microseconds: entry.value))}ms').join(' ')}',
+          logLevel: LogLevel.debug,
+        );
       } else {
         await authoritativeDownloadStage.ensureNoIncompleteDownload();
         // Rebuild the engine and tombstone snapshot if a local edit lands
         // during network I/O. This lets one automatic retry include a tracker
         // deletion or chapter update that the first snapshot could not see.
         for (var localAttempt = 0; ; localAttempt++) {
+          final initialProjectionWatch = Stopwatch()..start();
           final initialProjection = await localProjectionService
               .createSnapshot();
+          initialProjectionWatch.stop();
           var currentProjection = initialProjection;
           var initialProjectionPending = true;
           Future<BackupMihon> exportLocal() async {
@@ -584,6 +683,11 @@ class SyncServer extends _$SyncServer {
             localUnrepresentablePreferenceKeys: () =>
                 currentProjection.unrepresentablePreferenceKeys,
             preUpload: preUploadSafetyGate.check,
+            initialExportDuration: initialProjectionWatch.elapsed,
+            onMetrics: (metrics) => AppLogger.log(
+              'Chimahon sync performance: $metrics',
+              logLevel: LogLevel.debug,
+            ),
           );
           final result = upload
               ? await engine.uploadPreservingRemote()
@@ -625,6 +729,7 @@ class SyncServer extends _$SyncServer {
           }
         }
         if (storage case MangatanEpubBlobStorage epubStorage) {
+          final epubWatch = Stopwatch()..start();
           final epubResult = await MangatanEpubSyncService(
             database: isar,
             storage: epubStorage,
@@ -637,14 +742,34 @@ class SyncServer extends _$SyncServer {
               second: 5,
             );
           }
+          epubWatch.stop();
+          epubDuration += epubWatch.elapsed;
         }
       }
+      coreWatch.stop();
     } finally {
       if (storage case ClosableSyncStorage closable) {
         closable.close();
       }
     }
 
+    fullSyncWatch.stop();
+    AppLogger.log(
+      'Chimahon full sync performance: '
+      'total=${(fullSyncWatch.elapsedMicroseconds / Duration.microsecondsPerMillisecond).toStringAsFixed(2)}ms '
+      'pendingRestore=${(pendingRestoreWatch.elapsedMicroseconds / Duration.microsecondsPerMillisecond).toStringAsFixed(2)}ms '
+      'providerSetup=${(providerWatch.elapsedMicroseconds / Duration.microsecondsPerMillisecond).toStringAsFixed(2)}ms '
+      'localSetup=${(setupWatch.elapsedMicroseconds / Duration.microsecondsPerMillisecond).toStringAsFixed(2)}ms '
+      'core=${(coreWatch.elapsedMicroseconds / Duration.microsecondsPerMillisecond).toStringAsFixed(2)}ms '
+      'epub=${(epubDuration.inMicroseconds / Duration.microsecondsPerMillisecond).toStringAsFixed(2)}ms '
+      'provider=${syncPreference.chimahonSyncProvider.name} '
+      'mode=${download
+          ? 'download'
+          : upload
+          ? 'upload'
+          : 'twoWay'}',
+      logLevel: LogLevel.debug,
+    );
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     _currentSyncNotifier.setLastSyncManga(timestamp);
     _currentSyncNotifier.setLastSyncHistory(timestamp);

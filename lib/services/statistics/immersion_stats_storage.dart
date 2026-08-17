@@ -154,6 +154,42 @@ class ImmersionStatsStorage {
     return _decodeList(raw, AnkiStatsEntry.fromJson);
   }
 
+  /// Loads the three collections used by sync from one box snapshot.
+  ///
+  /// Besides keeping the export internally consistent, this avoids opening
+  /// and resolving the same Hive box three times on every synchronization.
+  static Future<
+    ({
+      List<MangaStatsEntry> mangaStats,
+      List<AnkiStatsEntry> ankiStats,
+      Map<String, List<NovelStatsEntry>> novelStats,
+    })
+  >
+  loadSyncSnapshot() async {
+    final box = await _box();
+    if (box == null) {
+      return (
+        mangaStats: const <MangaStatsEntry>[],
+        ankiStats: const <AnkiStatsEntry>[],
+        novelStats: const <String, List<NovelStatsEntry>>{},
+      );
+    }
+    final novelStats = <String, List<NovelStatsEntry>>{};
+    for (final key in box.keys) {
+      final name = key.toString();
+      if (!name.startsWith(_novelKeyPrefix)) continue;
+      final novelId = name.substring(_novelKeyPrefix.length);
+      if (novelId.isEmpty) continue;
+      final stats = _decodeList(box.get(key), NovelStatsEntry.fromJson);
+      if (stats.isNotEmpty) novelStats[novelId] = stats;
+    }
+    return (
+      mangaStats: _decodeList(box.get(_mangaKey), MangaStatsEntry.fromJson),
+      ankiStats: _decodeList(box.get(_ankiKey), AnkiStatsEntry.fromJson),
+      novelStats: novelStats,
+    );
+  }
+
   static Future<void> saveAnkiStats(List<AnkiStatsEntry> stats) =>
       _synchronized(() => _writeAnkiStats(stats));
 

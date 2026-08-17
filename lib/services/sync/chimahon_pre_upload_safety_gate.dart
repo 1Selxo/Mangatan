@@ -32,6 +32,7 @@ ChimahonSyncSafetyReport _defaultAudit({
   preferenceSafetyPolicy: preferenceSafetyPolicy,
   localTrackingDeletions: localTrackingDeletions,
   remoteWinsTies: remoteWinsTies,
+  includeDiagnostics: false,
 );
 
 /// Production fail-closed boundary immediately before a Chimahon upload.

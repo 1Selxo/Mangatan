@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:isar_community/isar.dart';
@@ -27,70 +28,85 @@ final class ChimahonLocalRevision {
     Isar database,
     BackupMihon projection,
   ) async {
-    final mining = await MiningPreferences.writableSnapshot();
-    final payload = <String, Object?>{
-      'projection': base64Encode(projection.writeToBuffer()),
-      'manga': _rows(
-        database.mangas.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'chapter': _rows(
-        database.chapters.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'category': _rows(
-        database.categorys.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'download': _rows(
-        database.downloads.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'history': _rows(
-        database.historys.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'update': _rows(
-        database.updates.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'track': _rows(
-        database.tracks.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'source': _rows(
-        database.sources.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'sourcePreference': _rows(
-        database.sourcePreferences.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'settings': _rows(
-        database.settings.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'syncPreference': _rows(
-        database.syncPreferences.where().findAllSync(),
-        (row) => row.toJson(),
-      ),
-      'mining': mining.revisionEntries,
-    };
-    return ChimahonLocalRevision(
-      sha256.convert(utf8.encode(jsonEncode(payload))).toString(),
+    final miningSnapshot = MiningPreferences.writableSnapshot();
+    final digestReceiver = _DigestReceiver();
+    final digestSink = sha256.startChunkedConversion(digestReceiver);
+
+    // Stream framed values into SHA-256. The previous implementation built a
+    // second, base64-expanded copy of the projection and one very large JSON
+    // string on every validation pass. Download-only deliberately captures
+    // this revision three times, so avoiding those transient copies matters.
+    _addValue(digestSink, 'projection', projection.writeToBuffer());
+    // Isar's native exporter preserves stable primary-key order and includes
+    // every persisted property. Hash inside its callback because the buffer is
+    // owned by Isar and is released as soon as the callback returns.
+    database.mangas.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'manga', bytes),
     );
+    database.chapters.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'chapter', bytes),
+    );
+    database.categorys.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'category', bytes),
+    );
+    database.downloads.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'download', bytes),
+    );
+    database.historys.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'history', bytes),
+    );
+    database.updates.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'update', bytes),
+    );
+    database.tracks.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'track', bytes),
+    );
+    database.sources.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'source', bytes),
+    );
+    database.sourcePreferences.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'sourcePreference', bytes),
+    );
+    database.settings.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'settings', bytes),
+    );
+    database.syncPreferences.where().exportJsonRawSync(
+      (bytes) => _addValue(digestSink, 'syncPreference', bytes),
+    );
+    _addValue(
+      digestSink,
+      'mining',
+      _jsonEncoder.convert((await miningSnapshot).revisionEntries),
+    );
+    digestSink.close();
+    return ChimahonLocalRevision(digestReceiver.value.toString());
   }
 
-  static List<Map<String, dynamic>> _rows<T>(
-    Iterable<T> rows,
-    Map<String, dynamic> Function(T row) encode,
+  static final _jsonEncoder = JsonUtf8Encoder();
+
+  static void _addValue(
+    ByteConversionSink digestSink,
+    String name,
+    List<int> value,
   ) {
-    final encoded = rows.map(encode).toList(growable: false);
-    encoded.sort(
-      (left, right) => (left['id'] ?? left['syncId'] ?? 0).toString().compareTo(
-        (right['id'] ?? right['syncId'] ?? 0).toString(),
-      ),
-    );
-    return encoded;
+    final nameBytes = utf8.encode(name);
+    digestSink
+      ..add(_lengthBytes(nameBytes.length))
+      ..add(nameBytes)
+      ..add(_lengthBytes(value.length))
+      ..add(value);
   }
+
+  static Uint8List _lengthBytes(int length) =>
+      Uint8List(8)..buffer.asByteData().setUint64(0, length);
+}
+
+final class _DigestReceiver implements Sink<Digest> {
+  late Digest value;
+
+  @override
+  void add(Digest data) => value = data;
+
+  @override
+  void close() {}
 }

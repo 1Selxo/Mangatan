@@ -12,11 +12,14 @@ import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/mihon_source_preferences.dart';
 import 'package:mangayomi/services/sync/chimahon_source_preferences_adapter.dart';
+import 'package:mangayomi/utils/log/logger.dart';
 
 final refreshInstalledMihonFactorySourcesProvider =
     FutureProvider<MihonFactoryRefreshResult>(
       refreshInstalledMihonFactorySources,
     );
+
+final _successfullyRefreshedFactoryGroups = Expando<Set<String>>();
 
 class MihonFactoryReconcileResult {
   const MihonFactoryReconcileResult({
@@ -69,7 +72,10 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
   Ref ref, {
   Iterable<BackupSourcePreferences> remoteSourcePreferences = const [],
   bool replacePresentPreferences = false,
+  Set<String>? requiredNativeSourceIds,
+  Set<int> changedPreferenceSourceIds = const {},
 }) async {
+  final totalWatch = Stopwatch()..start();
   final candidates = isar.sources
       .where()
       .findAllSync()
@@ -85,13 +91,54 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
   for (final source in candidates) {
     groups.putIfAbsent(mihonExtensionGroupKey(source), () => []).add(source);
   }
+  final refreshedGroups = _successfullyRefreshedFactoryGroups[isar] ??=
+      <String>{};
+  var requiredIds = const <String>{};
+  var knownRequiredIds = const <String>{};
+  if (requiredNativeSourceIds != null) {
+    requiredIds = {
+      ...requiredNativeSourceIds,
+      for (final preferences in remoteSourcePreferences)
+        if (preferences.sourceKey.startsWith('source_'))
+          preferences.sourceKey.substring('source_'.length),
+    };
+    knownRequiredIds = <String>{};
+    final changedPreferenceGroups = <String>{};
+    for (final source in candidates) {
+      final nativeId = mihonSourceMetadata(source)?.sourceId;
+      if (nativeId != null && requiredIds.contains(nativeId)) {
+        knownRequiredIds.add(nativeId);
+      }
+      if (source.id case final localId?
+          when changedPreferenceSourceIds.contains(localId)) {
+        changedPreferenceGroups.add(mihonExtensionGroupKey(source));
+      }
+    }
+    final hasUnknownRequiredIds = knownRequiredIds.length != requiredIds.length;
+    // Changed values need their owning factory refreshed so the JVM receives
+    // them and preference-derived children are reconciled. An unknown native
+    // ID can belong to any installed factory, but a group already queried for
+    // the current installed source code cannot reveal it on every later sync.
+    groups.removeWhere(
+      (key, sources) =>
+          !changedPreferenceGroups.contains(key) &&
+          (!hasUnknownRequiredIds ||
+              refreshedGroups.contains(_factoryRefreshFingerprint(sources))),
+    );
+  }
 
   final client = MClient.init(reqcopyWith: {'useDartHttpClient': true});
   var reconciledGroups = 0;
   var unresolvedGroups = 0;
   var aggregate = const MihonFactoryReconcileResult();
+  var passes = 0;
+  var bridgeMicroseconds = 0;
+  var preferenceMicroseconds = 0;
+  var descriptorMicroseconds = 0;
+  var reconciliationMicroseconds = 0;
   const sourcePreferencesAdapter = ChimahonSourcePreferencesAdapter();
-  for (final sources in groups.values) {
+
+  Future<void> refreshGroup(List<Source> sources) async {
     sources.sort((left, right) {
       final active =
           (right.isActive == true ? 1 : 0) - (left.isActive == true ? 1 : 0);
@@ -99,12 +146,15 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
       return (left.id ?? 0).compareTo(right.id ?? 0);
     });
     var template = sources.first;
-    Set<String>? previousDescriptorIds;
     var groupReconciled = false;
     var groupFailed = false;
     try {
+      final bridgeWatch = Stopwatch()..start();
       final proxyServer = await prepareMihonBridge(ref, template);
+      bridgeWatch.stop();
+      bridgeMicroseconds += bridgeWatch.elapsedMicroseconds;
       for (var pass = 0; pass < 3; pass++) {
+        passes++;
         final currentGroup =
             (await isar.sources
                     .filter()
@@ -122,6 +172,7 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
 
         // New factory children have no local schema yet. Query it first so a
         // deferred Chimahon store can be decoded and persisted for that child.
+        final preferenceWatch = Stopwatch()..start();
         for (final source in currentGroup) {
           final persisted = loadPersistedMihonSourcePreferences(isar, source);
           final fresh = await fetchPreferencesDalvik(
@@ -141,13 +192,17 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
           await isar.writeTxn(() => isar.sources.put(source));
         }
         if (remoteSourcePreferences.isNotEmpty) {
-          sourcePreferencesAdapter.importInto(
+          await sourcePreferencesAdapter.importIntoAsync(
             database: isar,
             sourcePreferences: remoteSourcePreferences,
+            candidateSources: currentGroup,
           );
         }
+        preferenceWatch.stop();
+        preferenceMicroseconds += preferenceWatch.elapsedMicroseconds;
 
         List<MihonSourceDescriptor>? descriptors;
+        final descriptorWatch = Stopwatch()..start();
         for (final source in currentGroup) {
           final refreshed = await fetchMihonSourceDescriptors(
             client,
@@ -162,16 +217,25 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
             descriptors = refreshed;
           }
         }
+        descriptorWatch.stop();
+        descriptorMicroseconds += descriptorWatch.elapsedMicroseconds;
         if (descriptors == null || descriptors.isEmpty) break;
         final descriptorIds = descriptors.map((item) => item.id).toSet();
+        final currentDescriptorIds = {
+          for (final source in currentGroup)
+            if (mihonSourceMetadata(source) case final metadata?
+                when metadata.factoryAvailable)
+              metadata.sourceId,
+        };
+        final reconciliationWatch = Stopwatch()..start();
         aggregate += await reconcileMihonFactorySources(template, descriptors);
+        reconciliationWatch.stop();
+        reconciliationMicroseconds += reconciliationWatch.elapsedMicroseconds;
         groupReconciled = true;
-        if (previousDescriptorIds != null &&
-            previousDescriptorIds.length == descriptorIds.length &&
-            previousDescriptorIds.containsAll(descriptorIds)) {
+        if (currentDescriptorIds.length == descriptorIds.length &&
+            currentDescriptorIds.containsAll(descriptorIds)) {
           break;
         }
-        previousDescriptorIds = descriptorIds;
       }
     } on Object {
       groupFailed = true;
@@ -182,7 +246,30 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
       unresolvedGroups++;
     }
     if (groupFailed && groupReconciled) unresolvedGroups++;
+    if (!groupFailed && groupReconciled) {
+      refreshedGroups.add(_factoryRefreshFingerprint(sources));
+    }
   }
+
+  await _forEachConcurrent(
+    groups.values.toList(growable: false),
+    concurrency: 8,
+    action: refreshGroup,
+  );
+  totalWatch.stop();
+  AppLogger.log(
+    'Mihon factory refresh performance: '
+    'total=${_milliseconds(totalWatch.elapsedMicroseconds)}ms '
+    'groups=${groups.length} passes=$passes concurrency=8 '
+    'requiredIds=${requiredIds.length} '
+    'knownRequiredIds=${knownRequiredIds.length} '
+    'changedPreferenceSources=${changedPreferenceSourceIds.length} '
+    'bridgeWork=${_milliseconds(bridgeMicroseconds)}ms '
+    'preferenceWork=${_milliseconds(preferenceMicroseconds)}ms '
+    'descriptorWork=${_milliseconds(descriptorMicroseconds)}ms '
+    'reconciliationWork=${_milliseconds(reconciliationMicroseconds)}ms',
+    logLevel: LogLevel.debug,
+  );
   return MihonFactoryRefreshResult(
     groupsReconciled: reconciledGroups,
     reconciliation: aggregate,
@@ -190,10 +277,44 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
   );
 }
 
+Future<void> _forEachConcurrent<T>(
+  List<T> values, {
+  required int concurrency,
+  required Future<void> Function(T value) action,
+}) async {
+  var next = 0;
+  Future<void> worker() async {
+    while (next < values.length) {
+      final index = next++;
+      await action(values[index]);
+    }
+  }
+
+  await Future.wait([
+    for (
+      var workerIndex = 0;
+      workerIndex < concurrency && workerIndex < values.length;
+      workerIndex++
+    )
+      worker(),
+  ]);
+}
+
+String _milliseconds(int microseconds) =>
+    (microseconds / Duration.microsecondsPerMillisecond).toStringAsFixed(2);
+
+String _factoryRefreshFingerprint(List<Source> sources) {
+  final template = sources.first;
+  final sourceCode = template.sourceCode ?? '';
+  return '${mihonExtensionGroupKey(template)}\u0000'
+      '${sourceCode.length}\u0000${sourceCode.hashCode}';
+}
+
 Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
   Source template,
-  List<MihonSourceDescriptor> descriptors,
-) async {
+  List<MihonSourceDescriptor> descriptors, {
+  Future<void> Function()? beforeReconciliationWrite,
+}) async {
   if (template.sourceCodeLanguage != SourceCodeLanguage.mihon ||
       descriptors.isEmpty) {
     return const MihonFactoryReconcileResult();
@@ -209,6 +330,11 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
   final groupSources = group
       .where((source) => belongsToSameMihonExtension(template, source))
       .toList();
+  final groupSourcesById = <int, Source>{
+    for (final source in groupSources)
+      if (source.id != null) source.id!: source,
+  };
+  final groupSourceIds = groupSourcesById.keys.toSet();
   final byNativeId = <String, Source>{};
   for (final source in groupSources) {
     final metadata = mihonSourceMetadata(source);
@@ -315,53 +441,84 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
           when metadata.factoryAvailable)
         metadata.sourceId: source,
   };
-  final localMangas = await isar.mangas.where().findAll();
-  final mangaUpdates = localMangas
-      .where((manga) {
-        var nativeId = manga.mihonSourceId;
-        var changed = false;
-        if (nativeId == null && manga.sourceId != null) {
-          final priorSource = groupSources
-              .where((source) => source.id == manga.sourceId)
-              .firstOrNull;
-          nativeId = priorSource == null
-              ? null
-              : mihonSourceMetadata(priorSource)?.sourceId;
-          manga.mihonSourceId = nativeId;
-          changed = nativeId != null;
-        }
-        final target = nativeId == null ? null : reconciledByNativeId[nativeId];
-        final priorSourceBelongsToGroup = groupSources.any(
-          (source) => source.id == manga.sourceId,
-        );
-        if (target == null || manga.itemType != target.itemType) {
-          if (nativeId != null &&
-              priorSourceBelongsToGroup &&
-              manga.sourceId != null) {
-            manga.sourceId = null;
-            changed = true;
-          }
-          return changed;
-        }
-        changed =
-            changed ||
-            manga.sourceId != target.id ||
-            manga.source != target.name ||
-            manga.lang != target.lang;
-        manga
-          ..sourceId = target.id
-          ..source = target.name
-          ..lang = target.lang;
-        return changed;
-      })
-      .toList(growable: false);
+  final mangaUpdates =
+      <
+        ({
+          int id,
+          int? sourceId,
+          String? source,
+          String? lang,
+          String? mihonSourceId,
+        })
+      >[];
+  for (final manga in await isar.mangas.where().findAll()) {
+    final mangaId = manga.id;
+    if (mangaId == null) continue;
+    var nativeId = manga.mihonSourceId;
+    var sourceId = manga.sourceId;
+    var source = manga.source;
+    var lang = manga.lang;
+    var changed = false;
+    if (nativeId == null && sourceId != null) {
+      final priorSource = groupSourcesById[sourceId];
+      nativeId = priorSource == null
+          ? null
+          : mihonSourceMetadata(priorSource)?.sourceId;
+      changed = nativeId != null;
+    }
+    final target = nativeId == null ? null : reconciledByNativeId[nativeId];
+    final priorSourceBelongsToGroup = groupSourceIds.contains(sourceId);
+    if (target == null || manga.itemType != target.itemType) {
+      if (nativeId != null && priorSourceBelongsToGroup && sourceId != null) {
+        sourceId = null;
+        changed = true;
+      }
+    } else {
+      changed =
+          changed ||
+          sourceId != target.id ||
+          source != target.name ||
+          lang != target.lang;
+      sourceId = target.id;
+      source = target.name;
+      lang = target.lang;
+    }
+    if (changed) {
+      mangaUpdates.add((
+        id: mangaId,
+        sourceId: sourceId,
+        source: source,
+        lang: lang,
+        mihonSourceId: nativeId,
+      ));
+    }
+  }
 
+  await beforeReconciliationWrite?.call();
   await isar.writeTxn(() async {
     await isar.sources.putAll(updates);
-    if (mangaUpdates.isNotEmpty) await isar.mangas.putAll(mangaUpdates);
+    if (mangaUpdates.isEmpty) return;
+    final currentMangas = await isar.mangas.getAll(
+      mangaUpdates.map((update) => update.id).toList(growable: false),
+    );
+    final rebinding = <Manga>[];
+    for (var index = 0; index < mangaUpdates.length; index++) {
+      final manga = currentMangas[index];
+      if (manga == null) continue;
+      final update = mangaUpdates[index];
+      manga
+        ..sourceId = update.sourceId
+        ..source = update.source
+        ..lang = update.lang
+        ..mihonSourceId = update.mihonSourceId;
+      rebinding.add(manga);
+    }
+    if (rebinding.isNotEmpty) await isar.mangas.putAll(rebinding);
   });
   final detached = mangaUpdates
-      .where((manga) => manga.sourceId == null && manga.mihonSourceId != null)
+      .where(
+        (update) => update.sourceId == null && update.mihonSourceId != null,
+      )
       .length;
   final rebound = mangaUpdates.length - detached;
   return MihonFactoryReconcileResult(

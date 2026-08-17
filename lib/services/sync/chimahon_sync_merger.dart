@@ -185,17 +185,23 @@ class ChimahonSyncMerger {
     final localManga = localProjectionRules
         ? _rebaseLegacyLocalMangaIdentity(local, remoteManga)
         : local;
+    final localCategoryMapper = _OrderedCategoryMembershipMapper(
+      localCategories,
+      mergedCategories,
+    );
+    final remoteCategoryMapper = _OrderedCategoryMembershipMapper(
+      remoteCategories,
+      mergedCategories,
+    );
     final localByKey = _lastByKey<BackupManga, String>(
       localManga.map(
-        (manga) =>
-            _remapMangaCategories(manga, localCategories, mergedCategories),
+        (manga) => _remapMangaCategories(manga, localCategoryMapper),
       ),
       _mangaKey,
     );
     final remoteByKey = _lastByKey<BackupManga, String>(
       remoteManga.map(
-        (manga) =>
-            _remapMangaCategories(manga, remoteCategories, mergedCategories),
+        (manga) => _remapMangaCategories(manga, remoteCategoryMapper),
       ),
       _mangaKey,
     );
@@ -208,6 +214,7 @@ class ChimahonSyncMerger {
       final right = remoteByKey[key];
       if (left == null) return right!.deepCopy();
       if (right == null) return left.deepCopy();
+      if (_canCopyExactManga(left, right)) return right.deepCopy();
       var leftWins = _recordLeftWins(
         left.version,
         left.lastModifiedAt,
@@ -470,64 +477,13 @@ class ChimahonSyncMerger {
 
   BackupManga _remapMangaCategories(
     BackupManga manga,
-    Iterable<BackupCategory> sourceCategories,
-    Iterable<BackupCategory> mergedCategories,
+    _OrderedCategoryMembershipMapper mapper,
   ) {
-    final result = manga.deepCopy()..categories.clear();
-    result.categories.addAll(
-      _remapOrderedCategoryMemberships(
-        manga.categories,
-        sourceCategories,
-        mergedCategories,
-      ),
-    );
-    return result;
-  }
-
-  List<Int64> _remapOrderedCategoryMemberships(
-    Iterable<Int64> memberships,
-    Iterable<BackupCategory> sourceCategories,
-    Iterable<BackupCategory> mergedCategories,
-  ) {
-    final sourceList = sourceCategories.toList(growable: false);
-    final mergedList = mergedCategories.toList(growable: false);
-    final sourceByOrder = {
-      for (final category in sourceList) category.order.toInt(): category,
-    };
-    final sourceCountByNormalizedName = <String, int>{};
-    for (final category in sourceList) {
-      final key = _normalized(category.name);
-      sourceCountByNormalizedName[key] =
-          (sourceCountByNormalizedName[key] ?? 0) + 1;
-    }
-    final mergedByExactName = {
-      for (final category in mergedList) category.name: category,
-    };
-    final mergedByNormalizedName = <String, List<BackupCategory>>{};
-    for (final category in mergedList) {
-      mergedByNormalizedName
-          .putIfAbsent(_normalized(category.name), () => <BackupCategory>[])
-          .add(category);
-    }
-
-    final result = <Int64>[];
-    final seen = <Int64>{};
-    for (final membership in memberships) {
-      final source = sourceByOrder[membership.toInt()];
-      if (source == null) continue;
-      final normalizedName = _normalized(source.name);
-      final normalizedMatches =
-          mergedByNormalizedName[normalizedName] ?? const <BackupCategory>[];
-      final sourceIsAmbiguousProjection =
-          sourceCountByNormalizedName[normalizedName] == 1 &&
-          normalizedMatches.length > 1;
-      final targets = sourceIsAmbiguousProjection
-          ? normalizedMatches
-          : [mergedByExactName[source.name]].nonNulls;
-      for (final target in targets) {
-        if (seen.add(target.order)) result.add(target.order);
-      }
-    }
+    final remapped = mapper.map(manga.categories);
+    if (_sameValues(manga.categories, remapped)) return manga;
+    final result = manga.deepCopy()
+      ..categories.clear()
+      ..categories.addAll(remapped);
     return result;
   }
 
@@ -706,16 +662,13 @@ class ChimahonSyncMerger {
   ) {
     BackupAnime remap(
       BackupAnime anime,
-      Iterable<BackupCategory> sourceCategories,
+      _OrderedCategoryMembershipMapper mapper,
     ) {
-      final result = anime.deepCopy()..categories.clear();
-      result.categories.addAll(
-        _remapOrderedCategoryMemberships(
-          anime.categories,
-          sourceCategories,
-          mergedCategories,
-        ),
-      );
+      final remapped = mapper.map(anime.categories);
+      if (_sameValues(anime.categories, remapped)) return anime;
+      final result = anime.deepCopy()
+        ..categories.clear()
+        ..categories.addAll(remapped);
       return result;
     }
 
@@ -723,12 +676,20 @@ class ChimahonSyncMerger {
     final localAnime = localProjectionRules
         ? _rebaseLegacyLocalAnimeIdentity(local, remoteAnime)
         : local;
+    final localCategoryMapper = _OrderedCategoryMembershipMapper(
+      localCategories,
+      mergedCategories,
+    );
+    final remoteCategoryMapper = _OrderedCategoryMembershipMapper(
+      remoteCategories,
+      mergedCategories,
+    );
     final localByKey = _lastByKey<BackupAnime, String>(
-      localAnime.map((anime) => remap(anime, localCategories)),
+      localAnime.map((anime) => remap(anime, localCategoryMapper)),
       _animeKey,
     );
     final remoteByKey = _lastByKey<BackupAnime, String>(
-      remoteAnime.map((anime) => remap(anime, remoteCategories)),
+      remoteAnime.map((anime) => remap(anime, remoteCategoryMapper)),
       _animeKey,
     );
     return _orderedKeys(remoteByKey, localByKey).map((key) {
@@ -736,6 +697,7 @@ class ChimahonSyncMerger {
       final right = remoteByKey[key];
       if (left == null) return right!.deepCopy();
       if (right == null) return left.deepCopy();
+      if (_canCopyExactAnime(left, right)) return right.deepCopy();
       var leftWins = _recordLeftWins(
         left.version,
         left.lastModifiedAt,
@@ -1311,7 +1273,7 @@ class ChimahonSyncMerger {
       final key = keyOf(value);
       final existing = result[key];
       result[key] = existing == null
-          ? value.deepCopy()
+          ? value
           : _copyWithMergedUnknownFields(value, existing);
     }
     return result;
@@ -1521,9 +1483,59 @@ class ChimahonSyncMerger {
 
   Iterable<K> _orderedKeys<K, T>(Map<K, T> first, Map<K, T> second) sync* {
     final seen = <K>{};
-    for (final key in [...first.keys, ...second.keys]) {
+    for (final key in first.keys) {
       if (seen.add(key)) yield key;
     }
+    for (final key in second.keys) {
+      if (seen.add(key)) yield key;
+    }
+  }
+
+  bool _sameValues<T>(List<T> left, List<T> right) {
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (left[index] != right[index]) return false;
+    }
+    return true;
+  }
+
+  bool _canCopyExactManga(BackupManga left, BackupManga right) =>
+      left == right &&
+      left.unknownFields.isEmpty &&
+      _hasUniqueKeysWithoutUnknownFields(left.chapters, _chapterKey) &&
+      _hasUniqueKeysWithoutUnknownFields(
+        left.history,
+        (history) => history.url,
+      ) &&
+      _hasUniqueKeysWithoutUnknownFields(
+        left.tracking,
+        (tracking) => tracking.syncId,
+      );
+
+  bool _canCopyExactAnime(BackupAnime left, BackupAnime right) =>
+      left == right &&
+      left.unknownFields.isEmpty &&
+      _hasUniqueKeysWithoutUnknownFields(left.episodes, _episodeKey) &&
+      _hasUniqueKeysWithoutUnknownFields(
+        left.history,
+        (history) => history.url,
+      ) &&
+      _hasUniqueKeysWithoutUnknownFields(
+        left.tracking,
+        (tracking) => tracking.syncId,
+      );
+
+  bool _hasUniqueKeysWithoutUnknownFields<T extends GeneratedMessage, K>(
+    Iterable<T> values,
+    K Function(T value) keyOf,
+  ) {
+    final keys = <K>{};
+    for (final value in values) {
+      if (value.unknownFields.isNotEmpty || !keys.add(keyOf(value))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// A source refresh advances Mangatan's wall clock on the parent and every
@@ -1813,4 +1825,53 @@ class ChimahonSyncMerger {
   }
 
   String _normalized(String value) => value.trim().toLowerCase();
+}
+
+class _OrderedCategoryMembershipMapper {
+  _OrderedCategoryMembershipMapper(
+    Iterable<BackupCategory> sourceCategories,
+    Iterable<BackupCategory> mergedCategories,
+  ) {
+    for (final category in sourceCategories) {
+      _sourceByOrder[category.order.toInt()] = category;
+      final key = _normalized(category.name);
+      _sourceCountByNormalizedName[key] =
+          (_sourceCountByNormalizedName[key] ?? 0) + 1;
+    }
+    for (final category in mergedCategories) {
+      _mergedByExactName[category.name] = category;
+      _mergedByNormalizedName
+          .putIfAbsent(_normalized(category.name), () => <BackupCategory>[])
+          .add(category);
+    }
+  }
+
+  final Map<int, BackupCategory> _sourceByOrder = {};
+  final Map<String, int> _sourceCountByNormalizedName = {};
+  final Map<String, BackupCategory> _mergedByExactName = {};
+  final Map<String, List<BackupCategory>> _mergedByNormalizedName = {};
+
+  List<Int64> map(Iterable<Int64> memberships) {
+    final result = <Int64>[];
+    final seen = <Int64>{};
+    for (final membership in memberships) {
+      final source = _sourceByOrder[membership.toInt()];
+      if (source == null) continue;
+      final normalizedName = _normalized(source.name);
+      final normalizedMatches =
+          _mergedByNormalizedName[normalizedName] ?? const <BackupCategory>[];
+      if (_sourceCountByNormalizedName[normalizedName] == 1 &&
+          normalizedMatches.length > 1) {
+        for (final target in normalizedMatches) {
+          if (seen.add(target.order)) result.add(target.order);
+        }
+        continue;
+      }
+      final target = _mergedByExactName[source.name];
+      if (target != null && seen.add(target.order)) result.add(target.order);
+    }
+    return result;
+  }
+
+  static String _normalized(String value) => value.trim().toLowerCase();
 }

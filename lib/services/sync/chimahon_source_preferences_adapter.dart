@@ -66,15 +66,88 @@ class ChimahonSourcePreferencesAdapter {
   /// This intentionally does not delete a local definition merely because it
   /// is absent remotely. An absent key can mean the extension now uses its
   /// default, while deleting the definition would also discard its UI schema.
-  void importInto({
+  ChimahonSourcePreferencesImportResult importInto({
     required Isar database,
     required Iterable<BackupSourcePreferences> sourcePreferences,
+    Iterable<Source>? candidateSources,
   }) {
-    final sources = database.sources.where().findAllSync();
+    final changes = _prepareImport(
+      database: database,
+      sourcePreferences: sourcePreferences,
+      candidateSources: candidateSources,
+    );
+    if (changes.sources.isEmpty && changes.preferences.isEmpty) {
+      return ChimahonSourcePreferencesImportResult(
+        valueChangedSourceIds: changes.valueChangedSourceIds,
+      );
+    }
+    database.writeTxnSync(() {
+      if (changes.sources.isNotEmpty) {
+        database.sources.putAllSync(changes.sources);
+      }
+      if (changes.preferences.isNotEmpty) {
+        database.sourcePreferences.putAllSync(changes.preferences);
+      }
+    });
+    return ChimahonSourcePreferencesImportResult(
+      valueChangedSourceIds: changes.valueChangedSourceIds,
+    );
+  }
+
+  /// Async transaction variant for independent factory groups refreshed in
+  /// parallel. Each caller can limit work to its own [candidateSources], while
+  /// Isar safely serializes the resulting writes.
+  Future<ChimahonSourcePreferencesImportResult> importIntoAsync({
+    required Isar database,
+    required Iterable<BackupSourcePreferences> sourcePreferences,
+    Iterable<Source>? candidateSources,
+  }) async {
+    final changes = _prepareImport(
+      database: database,
+      sourcePreferences: sourcePreferences,
+      candidateSources: candidateSources,
+    );
+    if (changes.sources.isEmpty && changes.preferences.isEmpty) {
+      return ChimahonSourcePreferencesImportResult(
+        valueChangedSourceIds: changes.valueChangedSourceIds,
+      );
+    }
+    await database.writeTxn(() async {
+      if (changes.sources.isNotEmpty) {
+        await database.sources.putAll(changes.sources);
+      }
+      if (changes.preferences.isNotEmpty) {
+        await database.sourcePreferences.putAll(changes.preferences);
+      }
+    });
+    return ChimahonSourcePreferencesImportResult(
+      valueChangedSourceIds: changes.valueChangedSourceIds,
+    );
+  }
+
+  ({
+    List<Source> sources,
+    List<SourcePreference> preferences,
+    Set<int> valueChangedSourceIds,
+  })
+  _prepareImport({
+    required Isar database,
+    required Iterable<BackupSourcePreferences> sourcePreferences,
+    required Iterable<Source>? candidateSources,
+  }) {
+    final sources =
+        candidateSources?.toList(growable: false) ??
+        database.sources.where().findAllSync();
     final remoteByKey = {
       for (final group in sourcePreferences) group.sourceKey: group,
     };
-    if (remoteByKey.isEmpty) return;
+    if (remoteByKey.isEmpty) {
+      return (
+        sources: <Source>[],
+        preferences: <SourcePreference>[],
+        valueChangedSourceIds: <int>{},
+      );
+    }
 
     final stored = database.sourcePreferences.where().findAllSync();
     final storedBySource = <int, List<SourcePreference>>{};
@@ -86,6 +159,7 @@ class ChimahonSourcePreferencesAdapter {
 
     final changedSources = <Source>[];
     final changedPreferences = <SourcePreference>[];
+    final valueChangedSourceIds = <int>{};
     for (final source in sources) {
       final sourceKey = sourcePreferenceKey(source);
       final localId = source.id;
@@ -118,8 +192,12 @@ class ChimahonSourcePreferencesAdapter {
         } on Object {
           continue;
         }
+        final priorValue = _valueOf(definition);
         if (!_applyCompatible(definition, decoded)) continue;
         sourceChanged = true;
+        if (!_samePreferenceValue(priorValue, decoded.value)) {
+          valueChangedSourceIds.add(localId);
+        }
 
         final persisted = SourcePreference.fromJson(definition.toJson())
           ..id = storedByKey[encoded.key]?.id
@@ -134,15 +212,11 @@ class ChimahonSourcePreferencesAdapter {
       changedSources.add(source);
     }
 
-    if (changedSources.isEmpty && changedPreferences.isEmpty) return;
-    database.writeTxnSync(() {
-      if (changedSources.isNotEmpty) {
-        database.sources.putAllSync(changedSources);
-      }
-      if (changedPreferences.isNotEmpty) {
-        database.sourcePreferences.putAllSync(changedPreferences);
-      }
-    });
+    return (
+      sources: changedSources,
+      preferences: changedPreferences,
+      valueChangedSourceIds: valueChangedSourceIds,
+    );
   }
 
   /// Returns Chimahon's portable preference-store key for [source].
@@ -173,6 +247,13 @@ class ChimahonSourcePreferencesAdapter {
       return values?.toSet();
     }
     return null;
+  }
+
+  bool _samePreferenceValue(Object? left, Object? right) {
+    if (left is Set<String> && right is Set<String>) {
+      return left.length == right.length && left.containsAll(right);
+    }
+    return left == right;
   }
 
   bool _applyCompatible(
@@ -235,4 +316,14 @@ class ChimahonSourcePreferencesAdapter {
     }
     return false;
   }
+}
+
+class ChimahonSourcePreferencesImportResult {
+  const ChimahonSourcePreferencesImportResult({
+    required this.valueChangedSourceIds,
+  });
+
+  /// Local source rows whose effective value changed, and therefore need to
+  /// be propagated to the JVM bridge before factory descriptors are queried.
+  final Set<int> valueChangedSourceIds;
 }

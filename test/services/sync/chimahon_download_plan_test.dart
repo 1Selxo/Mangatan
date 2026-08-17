@@ -64,7 +64,9 @@ void main() {
     expect(plan.remoteMangaFavorites, 0);
     expect(plan.remoteAnimeFavorites, 1);
     expect(plan.remoteNovels, 1);
-    expect(plan.estimatedMangaRemovals, 1);
+    // Downloaded source chapters keep their files and cache row, but Chimahon
+    // still removes their unfavorited parent from the visible library.
+    expect(plan.estimatedMangaRemovals, 2);
     expect(plan.estimatedAnimeRemovals, 0);
     expect(plan.deviceLocalRowsRetained, 1);
     expect(plan.confirmationSummary, contains('Manga: 0 remote'));

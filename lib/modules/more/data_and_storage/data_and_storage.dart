@@ -226,16 +226,18 @@ class DataAndStorage extends ConsumerWidget {
                                       TextButton(
                                         onPressed: () async {
                                           try {
+                                            final result =
+                                                await FilePicker.pickFiles();
                                             final file =
-                                                await FilePicker.pickFile();
+                                                result?.files.singleOrNull;
 
                                             if (file != null &&
                                                 context.mounted) {
-                                              ref.watch(
+                                              await ref.read(
                                                 doRestoreProvider(
                                                   path: file.path!,
                                                   context: context,
-                                                ),
+                                                ).future,
                                               );
                                             }
                                             if (!context.mounted) return;

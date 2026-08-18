@@ -43,11 +43,17 @@ class Video {
 class Track {
   String? file;
   String? label;
+  String? language;
 
-  Track({this.file, this.label});
+  Track({this.file, this.label, this.language});
   Track.fromJson(Map<String, dynamic> json) {
     file = json['file']?.toString().trim();
     label = json['label']?.toString().trim();
+    language = (json['language'] ?? json['lang'])?.toString().trim();
   }
-  Map<String, dynamic> toJson() => {'file': file, 'label': label};
+  Map<String, dynamic> toJson() => {
+    'file': file,
+    'label': label,
+    'language': language,
+  };
 }

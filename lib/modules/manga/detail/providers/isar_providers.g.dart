@@ -134,7 +134,7 @@ final class GetChaptersStreamProvider
   }
 }
 
-String _$getChaptersStreamHash() => r'0f03db54c5a639c4356a81e4bad50fa8a077ceac';
+String _$getChaptersStreamHash() => r'730624a227eb26eaab72d16a25b977ac67853835';
 
 final class GetChaptersStreamFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<Chapter>>, int> {

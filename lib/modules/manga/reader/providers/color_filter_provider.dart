@@ -11,23 +11,21 @@ class CustomColorFilterState extends _$CustomColorFilterState {
     return isar.settings.getSync(227)!.customColorFilter;
   }
 
-  void set(int a, int r, int g, int b, bool end) {
+  void set(int a, int r, int g, int b, bool _) {
     final settings = isar.settings.getSync(227);
     var value = CustomColorFilter()
       ..a = a
       ..r = r
       ..g = g
       ..b = b;
-    if (end) {
-      isar.writeTxnSync(
-        () => isar.settings.putSync(
-          settings!
-            ..customColorFilter = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-    }
     state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..customColorFilter = value
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
   }
 }
 

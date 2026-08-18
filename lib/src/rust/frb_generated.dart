@@ -4,18 +4,19 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/epub.dart';
+import 'api/hoshidicts.dart';
+import 'api/hoshidicts/native.dart';
+import 'api/image.dart';
+import 'api/rar.dart';
 import 'api/rhttp/client.dart';
 import 'api/rhttp/error.dart';
 import 'api/rhttp/http.dart';
-
 import 'dart:async';
 import 'dart:convert';
-
 import 'frb_generated.dart';
 import 'frb_generated.io.dart'
     if (dart.library.js_interop) 'frb_generated.web.dart';
 import 'lib.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 /// Main entrypoint of the Rust API
@@ -71,7 +72,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1109570704;
+  int get rustContentHash => -1576459657;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -97,13 +98,47 @@ abstract class RustLibApi extends BaseApi {
     required FutureOr<List<String>> Function(String) resolver,
   });
 
+  Future<HoshiLookupSession> crateApiHoshidictsNativeCreateLookupSession();
+
   DnsSettings crateApiRhttpClientCreateStaticResolverSync({
     required StaticDnsSettings settings,
+  });
+
+  Future<List<RarEntryData>> crateApiRarExtractRarEntries({
+    required String archivePath,
+    required List<String> entryNames,
   });
 
   Future<String> crateApiEpubGetChapterContent({
     required String epubPath,
     required String chapterPath,
+  });
+
+  Future<Uint8List?> crateApiHoshidictsNativeGetMediaFile({
+    required HoshiLookupSession session,
+    required String dictName,
+    required String mediaPath,
+  });
+
+  Future<List<HoshiDictionaryStyle>> crateApiHoshidictsNativeGetStyles({
+    required HoshiLookupSession session,
+  });
+
+  Future<HoshiImportResult> crateApiHoshidictsNativeImportDictionary({
+    required String zipPath,
+    required String outputDir,
+    required bool lowRam,
+  });
+
+  Future<List<RarEntry>> crateApiRarListRarEntries({
+    required String archivePath,
+  });
+
+  Future<List<HoshiLookupResult>> crateApiHoshidictsNativeLookup({
+    required HoshiLookupSession session,
+    required String text,
+    required int maxResults,
+    required BigInt scanLength,
   });
 
   Stream<Uint8List> crateApiRhttpHttpMakeHttpRequestReceiveStream({
@@ -130,6 +165,15 @@ abstract class RustLibApi extends BaseApi {
     required bool fullData,
   });
 
+  Uint8List crateApiImageProcessCropImage({required List<int> image});
+
+  Future<void> crateApiHoshidictsNativeRebuildQuery({
+    required HoshiLookupSession session,
+    required List<String> termPaths,
+    required List<String> freqPaths,
+    required List<String> pitchPaths,
+  });
+
   Future<RequestClient> crateApiRhttpHttpRegisterClient({
     required ClientSettings settings,
   });
@@ -154,6 +198,15 @@ abstract class RustLibApi extends BaseApi {
   get rust_arc_decrement_strong_count_DnsSettings;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_DnsSettingsPtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_HoshiLookupSession;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_HoshiLookupSession;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_HoshiLookupSessionPtr;
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_RequestClient;
@@ -302,6 +355,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<HoshiLookupSession> crateApiHoshidictsNativeCreateLookupSession() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHoshidictsNativeCreateLookupSessionConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHoshidictsNativeCreateLookupSessionConstMeta =>
+      const TaskConstMeta(debugName: "create_lookup_session", argNames: []);
+
+  @override
   DnsSettings crateApiRhttpClientCreateStaticResolverSync({
     required StaticDnsSettings settings,
   }) {
@@ -310,7 +391,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_static_dns_settings(settings, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -331,6 +412,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<List<RarEntryData>> crateApiRarExtractRarEntries({
+    required String archivePath,
+    required List<String> entryNames,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(archivePath, serializer);
+          sse_encode_list_String(entryNames, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_rar_entry_data,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiRarExtractRarEntriesConstMeta,
+        argValues: [archivePath, entryNames],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRarExtractRarEntriesConstMeta =>
+      const TaskConstMeta(
+        debugName: "extract_rar_entries",
+        argNames: ["archivePath", "entryNames"],
+      );
+
+  @override
   Future<String> crateApiEpubGetChapterContent({
     required String epubPath,
     required String chapterPath,
@@ -344,7 +460,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 9,
             port: port_,
           );
         },
@@ -363,6 +479,190 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "get_chapter_content",
         argNames: ["epubPath", "chapterPath"],
+      );
+
+  @override
+  Future<Uint8List?> crateApiHoshidictsNativeGetMediaFile({
+    required HoshiLookupSession session,
+    required String dictName,
+    required String mediaPath,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+            session,
+            serializer,
+          );
+          sse_encode_String(dictName, serializer);
+          sse_encode_String(mediaPath, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_list_prim_u_8_strict,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHoshidictsNativeGetMediaFileConstMeta,
+        argValues: [session, dictName, mediaPath],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHoshidictsNativeGetMediaFileConstMeta =>
+      const TaskConstMeta(
+        debugName: "get_media_file",
+        argNames: ["session", "dictName", "mediaPath"],
+      );
+
+  @override
+  Future<List<HoshiDictionaryStyle>> crateApiHoshidictsNativeGetStyles({
+    required HoshiLookupSession session,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+            session,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_hoshi_dictionary_style,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHoshidictsNativeGetStylesConstMeta,
+        argValues: [session],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHoshidictsNativeGetStylesConstMeta =>
+      const TaskConstMeta(debugName: "get_styles", argNames: ["session"]);
+
+  @override
+  Future<HoshiImportResult> crateApiHoshidictsNativeImportDictionary({
+    required String zipPath,
+    required String outputDir,
+    required bool lowRam,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(zipPath, serializer);
+          sse_encode_String(outputDir, serializer);
+          sse_encode_bool(lowRam, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 12,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_hoshi_import_result,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHoshidictsNativeImportDictionaryConstMeta,
+        argValues: [zipPath, outputDir, lowRam],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHoshidictsNativeImportDictionaryConstMeta =>
+      const TaskConstMeta(
+        debugName: "import_dictionary",
+        argNames: ["zipPath", "outputDir", "lowRam"],
+      );
+
+  @override
+  Future<List<RarEntry>> crateApiRarListRarEntries({
+    required String archivePath,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(archivePath, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 13,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_rar_entry,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiRarListRarEntriesConstMeta,
+        argValues: [archivePath],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRarListRarEntriesConstMeta => const TaskConstMeta(
+    debugName: "list_rar_entries",
+    argNames: ["archivePath"],
+  );
+
+  @override
+  Future<List<HoshiLookupResult>> crateApiHoshidictsNativeLookup({
+    required HoshiLookupSession session,
+    required String text,
+    required int maxResults,
+    required BigInt scanLength,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+            session,
+            serializer,
+          );
+          sse_encode_String(text, serializer);
+          sse_encode_i_32(maxResults, serializer);
+          sse_encode_u_64(scanLength, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 14,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_hoshi_lookup_result,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHoshidictsNativeLookupConstMeta,
+        argValues: [session, text, maxResults, scanLength],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHoshidictsNativeLookupConstMeta =>
+      const TaskConstMeta(
+        debugName: "lookup",
+        argNames: ["session", "text", "maxResults", "scanLength"],
       );
 
   @override
@@ -415,7 +715,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 8,
+              funcId: 15,
               port: port_,
             );
           },
@@ -478,7 +778,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 16,
             port: port_,
           );
         },
@@ -513,7 +813,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 17,
             port: port_,
           );
         },
@@ -535,6 +835,71 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Uint8List crateApiImageProcessCropImage({required List<int> image}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_prim_u_8_loose(image, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiImageProcessCropImageConstMeta,
+        argValues: [image],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiImageProcessCropImageConstMeta =>
+      const TaskConstMeta(debugName: "process_crop_image", argNames: ["image"]);
+
+  @override
+  Future<void> crateApiHoshidictsNativeRebuildQuery({
+    required HoshiLookupSession session,
+    required List<String> termPaths,
+    required List<String> freqPaths,
+    required List<String> pitchPaths,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+            session,
+            serializer,
+          );
+          sse_encode_list_String(termPaths, serializer);
+          sse_encode_list_String(freqPaths, serializer);
+          sse_encode_list_String(pitchPaths, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHoshidictsNativeRebuildQueryConstMeta,
+        argValues: [session, termPaths, freqPaths, pitchPaths],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHoshidictsNativeRebuildQueryConstMeta =>
+      const TaskConstMeta(
+        debugName: "rebuild_query",
+        argNames: ["session", "termPaths", "freqPaths", "pitchPaths"],
+      );
+
+  @override
   Future<RequestClient> crateApiRhttpHttpRegisterClient({
     required ClientSettings settings,
   }) {
@@ -546,7 +911,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 20,
             port: port_,
           );
         },
@@ -574,7 +939,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_client_settings(settings, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -754,6 +1119,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDnsSettings;
 
   RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_HoshiLookupSession => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_HoshiLookupSession => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession;
+
+  RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_RequestClient => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient;
 
@@ -797,6 +1170,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HoshiLookupSession
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return HoshiLookupSessionImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   RequestClient
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     dynamic raw,
@@ -812,6 +1194,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return CancellationTokenImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  HoshiLookupSession
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return HoshiLookupSessionImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -875,8 +1266,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Map<String, String> dco_decode_Map_String_String_None(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Map.fromEntries(
-      dco_decode_list_record_string_string(raw)
-          .map((e) => MapEntry(e.$1, e.$2)),
+      dco_decode_list_record_string_string(
+        raw,
+      ).map((e) => MapEntry(e.$1, e.$2)),
     );
   }
 
@@ -886,8 +1278,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Map.fromEntries(
-      dco_decode_list_record_string_list_string(raw)
-          .map((e) => MapEntry(e.$1, e.$2)),
+      dco_decode_list_record_string_list_string(
+        raw,
+      ).map((e) => MapEntry(e.$1, e.$2)),
     );
   }
 
@@ -907,6 +1300,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return DnsSettingsImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  HoshiLookupSession
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return HoshiLookupSessionImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -1068,12 +1470,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EpubChapter dco_decode_epub_chapter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return EpubChapter(
       name: dco_decode_String(arr[0]),
       content: dco_decode_String(arr[1]),
       path: dco_decode_String(arr[2]),
+      href: dco_decode_String(arr[3]),
+      spineIndex: dco_decode_u_32(arr[4]),
+      isLinear: dco_decode_bool(arr[5]),
+      isNavigationEntry: dco_decode_bool(arr[6]),
     );
   }
 
@@ -1081,17 +1487,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EpubNovel dco_decode_epub_novel(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return EpubNovel(
       name: dco_decode_String(arr[0]),
       cover: dco_decode_opt_list_prim_u_8_strict(arr[1]),
       summary: dco_decode_opt_String(arr[2]),
       author: dco_decode_opt_String(arr[3]),
-      artist: dco_decode_opt_String(arr[4]),
-      chapters: dco_decode_list_epub_chapter(arr[5]),
-      images: dco_decode_list_epub_resource(arr[6]),
-      stylesheets: dco_decode_list_epub_resource(arr[7]),
+      language: dco_decode_opt_String(arr[4]),
+      artist: dco_decode_opt_String(arr[5]),
+      chapters: dco_decode_list_epub_chapter(arr[6]),
+      images: dco_decode_list_epub_resource(arr[7]),
+      stylesheets: dco_decode_list_epub_resource(arr[8]),
     );
   }
 
@@ -1104,6 +1511,131 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return EpubResource(
       name: dco_decode_String(arr[0]),
       content: dco_decode_list_prim_u_8_strict(arr[1]),
+    );
+  }
+
+  @protected
+  HoshiDictionaryStyle dco_decode_hoshi_dictionary_style(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return HoshiDictionaryStyle(
+      dictName: dco_decode_String(arr[0]),
+      styles: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  HoshiFrequency dco_decode_hoshi_frequency(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return HoshiFrequency(
+      value: dco_decode_i_32(arr[0]),
+      displayValue: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  HoshiFrequencyEntry dco_decode_hoshi_frequency_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return HoshiFrequencyEntry(
+      dictName: dco_decode_String(arr[0]),
+      frequencies: dco_decode_list_hoshi_frequency(arr[1]),
+    );
+  }
+
+  @protected
+  HoshiGlossaryEntry dco_decode_hoshi_glossary_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return HoshiGlossaryEntry(
+      dictName: dco_decode_String(arr[0]),
+      glossary: dco_decode_String(arr[1]),
+      definitionTags: dco_decode_String(arr[2]),
+      termTags: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  HoshiImportResult dco_decode_hoshi_import_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return HoshiImportResult(
+      success: dco_decode_bool(arr[0]),
+      title: dco_decode_String(arr[1]),
+      termCount: dco_decode_u_64(arr[2]),
+      metaCount: dco_decode_u_64(arr[3]),
+      freqCount: dco_decode_u_64(arr[4]),
+      pitchCount: dco_decode_u_64(arr[5]),
+      mediaCount: dco_decode_u_64(arr[6]),
+      errors: dco_decode_list_String(arr[7]),
+    );
+  }
+
+  @protected
+  HoshiLookupResult dco_decode_hoshi_lookup_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return HoshiLookupResult(
+      matched: dco_decode_String(arr[0]),
+      deinflected: dco_decode_String(arr[1]),
+      trace: dco_decode_list_hoshi_transform_group(arr[2]),
+      preprocessorSteps: dco_decode_i_32(arr[3]),
+      term: dco_decode_hoshi_term_result(arr[4]),
+    );
+  }
+
+  @protected
+  HoshiPitchEntry dco_decode_hoshi_pitch_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return HoshiPitchEntry(
+      dictName: dco_decode_String(arr[0]),
+      pitchPositions: dco_decode_list_prim_i_32_strict(arr[1]),
+      transcriptions: dco_decode_list_String(arr[2]),
+    );
+  }
+
+  @protected
+  HoshiTermResult dco_decode_hoshi_term_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return HoshiTermResult(
+      expression: dco_decode_String(arr[0]),
+      reading: dco_decode_String(arr[1]),
+      rules: dco_decode_String(arr[2]),
+      score: dco_decode_i_32(arr[3]),
+      glossaries: dco_decode_list_hoshi_glossary_entry(arr[4]),
+      frequencies: dco_decode_list_hoshi_frequency_entry(arr[5]),
+      pitches: dco_decode_list_hoshi_pitch_entry(arr[6]),
+    );
+  }
+
+  @protected
+  HoshiTransformGroup dco_decode_hoshi_transform_group(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return HoshiTransformGroup(
+      name: dco_decode_String(arr[0]),
+      description: dco_decode_String(arr[1]),
     );
   }
 
@@ -1204,9 +1736,65 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<HoshiDictionaryStyle> dco_decode_list_hoshi_dictionary_style(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_hoshi_dictionary_style)
+        .toList();
+  }
+
+  @protected
+  List<HoshiFrequency> dco_decode_list_hoshi_frequency(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_hoshi_frequency).toList();
+  }
+
+  @protected
+  List<HoshiFrequencyEntry> dco_decode_list_hoshi_frequency_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_hoshi_frequency_entry)
+        .toList();
+  }
+
+  @protected
+  List<HoshiGlossaryEntry> dco_decode_list_hoshi_glossary_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_hoshi_glossary_entry).toList();
+  }
+
+  @protected
+  List<HoshiLookupResult> dco_decode_list_hoshi_lookup_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_hoshi_lookup_result).toList();
+  }
+
+  @protected
+  List<HoshiPitchEntry> dco_decode_list_hoshi_pitch_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_hoshi_pitch_entry).toList();
+  }
+
+  @protected
+  List<HoshiTransformGroup> dco_decode_list_hoshi_transform_group(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_hoshi_transform_group)
+        .toList();
+  }
+
+  @protected
   List<Uint8List> dco_decode_list_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_list_prim_u_8_strict).toList();
+  }
+
+  @protected
+  Int32List dco_decode_list_prim_i_32_strict(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as Int32List;
   }
 
   @protected
@@ -1219,6 +1807,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  List<RarEntry> dco_decode_list_rar_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_rar_entry).toList();
+  }
+
+  @protected
+  List<RarEntryData> dco_decode_list_rar_entry_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_rar_entry_data).toList();
   }
 
   @protected
@@ -1361,6 +1961,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RarEntry dco_decode_rar_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RarEntry(
+      name: dco_decode_String(arr[0]),
+      isFile: dco_decode_bool(arr[1]),
+    );
+  }
+
+  @protected
+  RarEntryData dco_decode_rar_entry_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RarEntryData(
+      name: dco_decode_String(arr[0]),
+      content: dco_decode_list_prim_u_8_strict(arr[1]),
+    );
+  }
+
+  @protected
   (String, List<String>) dco_decode_record_string_list_string(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1477,6 +2101,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
+  BigInt dco_decode_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeU64(raw);
+  }
+
+  @protected
   int dco_decode_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -1539,6 +2175,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HoshiLookupSession
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return HoshiLookupSessionImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   RequestClient
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     SseDeserializer deserializer,
@@ -1557,6 +2205,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return CancellationTokenImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  HoshiLookupSession
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return HoshiLookupSessionImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -1625,6 +2285,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return DnsSettingsImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  HoshiLookupSession
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return HoshiLookupSessionImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -1815,7 +2487,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_name = sse_decode_String(deserializer);
     var var_content = sse_decode_String(deserializer);
     var var_path = sse_decode_String(deserializer);
-    return EpubChapter(name: var_name, content: var_content, path: var_path);
+    var var_href = sse_decode_String(deserializer);
+    var var_spineIndex = sse_decode_u_32(deserializer);
+    var var_isLinear = sse_decode_bool(deserializer);
+    var var_isNavigationEntry = sse_decode_bool(deserializer);
+    return EpubChapter(
+      name: var_name,
+      content: var_content,
+      path: var_path,
+      href: var_href,
+      spineIndex: var_spineIndex,
+      isLinear: var_isLinear,
+      isNavigationEntry: var_isNavigationEntry,
+    );
   }
 
   @protected
@@ -1825,6 +2509,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_cover = sse_decode_opt_list_prim_u_8_strict(deserializer);
     var var_summary = sse_decode_opt_String(deserializer);
     var var_author = sse_decode_opt_String(deserializer);
+    var var_language = sse_decode_opt_String(deserializer);
     var var_artist = sse_decode_opt_String(deserializer);
     var var_chapters = sse_decode_list_epub_chapter(deserializer);
     var var_images = sse_decode_list_epub_resource(deserializer);
@@ -1834,6 +2519,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       cover: var_cover,
       summary: var_summary,
       author: var_author,
+      language: var_language,
       artist: var_artist,
       chapters: var_chapters,
       images: var_images,
@@ -1847,6 +2533,142 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_name = sse_decode_String(deserializer);
     var var_content = sse_decode_list_prim_u_8_strict(deserializer);
     return EpubResource(name: var_name, content: var_content);
+  }
+
+  @protected
+  HoshiDictionaryStyle sse_decode_hoshi_dictionary_style(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_dictName = sse_decode_String(deserializer);
+    var var_styles = sse_decode_String(deserializer);
+    return HoshiDictionaryStyle(dictName: var_dictName, styles: var_styles);
+  }
+
+  @protected
+  HoshiFrequency sse_decode_hoshi_frequency(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_value = sse_decode_i_32(deserializer);
+    var var_displayValue = sse_decode_String(deserializer);
+    return HoshiFrequency(value: var_value, displayValue: var_displayValue);
+  }
+
+  @protected
+  HoshiFrequencyEntry sse_decode_hoshi_frequency_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_dictName = sse_decode_String(deserializer);
+    var var_frequencies = sse_decode_list_hoshi_frequency(deserializer);
+    return HoshiFrequencyEntry(
+      dictName: var_dictName,
+      frequencies: var_frequencies,
+    );
+  }
+
+  @protected
+  HoshiGlossaryEntry sse_decode_hoshi_glossary_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_dictName = sse_decode_String(deserializer);
+    var var_glossary = sse_decode_String(deserializer);
+    var var_definitionTags = sse_decode_String(deserializer);
+    var var_termTags = sse_decode_String(deserializer);
+    return HoshiGlossaryEntry(
+      dictName: var_dictName,
+      glossary: var_glossary,
+      definitionTags: var_definitionTags,
+      termTags: var_termTags,
+    );
+  }
+
+  @protected
+  HoshiImportResult sse_decode_hoshi_import_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_success = sse_decode_bool(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_termCount = sse_decode_u_64(deserializer);
+    var var_metaCount = sse_decode_u_64(deserializer);
+    var var_freqCount = sse_decode_u_64(deserializer);
+    var var_pitchCount = sse_decode_u_64(deserializer);
+    var var_mediaCount = sse_decode_u_64(deserializer);
+    var var_errors = sse_decode_list_String(deserializer);
+    return HoshiImportResult(
+      success: var_success,
+      title: var_title,
+      termCount: var_termCount,
+      metaCount: var_metaCount,
+      freqCount: var_freqCount,
+      pitchCount: var_pitchCount,
+      mediaCount: var_mediaCount,
+      errors: var_errors,
+    );
+  }
+
+  @protected
+  HoshiLookupResult sse_decode_hoshi_lookup_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_matched = sse_decode_String(deserializer);
+    var var_deinflected = sse_decode_String(deserializer);
+    var var_trace = sse_decode_list_hoshi_transform_group(deserializer);
+    var var_preprocessorSteps = sse_decode_i_32(deserializer);
+    var var_term = sse_decode_hoshi_term_result(deserializer);
+    return HoshiLookupResult(
+      matched: var_matched,
+      deinflected: var_deinflected,
+      trace: var_trace,
+      preprocessorSteps: var_preprocessorSteps,
+      term: var_term,
+    );
+  }
+
+  @protected
+  HoshiPitchEntry sse_decode_hoshi_pitch_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_dictName = sse_decode_String(deserializer);
+    var var_pitchPositions = sse_decode_list_prim_i_32_strict(deserializer);
+    var var_transcriptions = sse_decode_list_String(deserializer);
+    return HoshiPitchEntry(
+      dictName: var_dictName,
+      pitchPositions: var_pitchPositions,
+      transcriptions: var_transcriptions,
+    );
+  }
+
+  @protected
+  HoshiTermResult sse_decode_hoshi_term_result(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_expression = sse_decode_String(deserializer);
+    var var_reading = sse_decode_String(deserializer);
+    var var_rules = sse_decode_String(deserializer);
+    var var_score = sse_decode_i_32(deserializer);
+    var var_glossaries = sse_decode_list_hoshi_glossary_entry(deserializer);
+    var var_frequencies = sse_decode_list_hoshi_frequency_entry(deserializer);
+    var var_pitches = sse_decode_list_hoshi_pitch_entry(deserializer);
+    return HoshiTermResult(
+      expression: var_expression,
+      reading: var_reading,
+      rules: var_rules,
+      score: var_score,
+      glossaries: var_glossaries,
+      frequencies: var_frequencies,
+      pitches: var_pitches,
+    );
+  }
+
+  @protected
+  HoshiTransformGroup sse_decode_hoshi_transform_group(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_description = sse_decode_String(deserializer);
+    return HoshiTransformGroup(name: var_name, description: var_description);
   }
 
   @protected
@@ -1983,6 +2805,104 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<HoshiDictionaryStyle> sse_decode_list_hoshi_dictionary_style(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HoshiDictionaryStyle>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hoshi_dictionary_style(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HoshiFrequency> sse_decode_list_hoshi_frequency(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HoshiFrequency>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hoshi_frequency(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HoshiFrequencyEntry> sse_decode_list_hoshi_frequency_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HoshiFrequencyEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hoshi_frequency_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HoshiGlossaryEntry> sse_decode_list_hoshi_glossary_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HoshiGlossaryEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hoshi_glossary_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HoshiLookupResult> sse_decode_list_hoshi_lookup_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HoshiLookupResult>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hoshi_lookup_result(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HoshiPitchEntry> sse_decode_list_hoshi_pitch_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HoshiPitchEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hoshi_pitch_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HoshiTransformGroup> sse_decode_list_hoshi_transform_group(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HoshiTransformGroup>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hoshi_transform_group(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<Uint8List> sse_decode_list_list_prim_u_8_strict(
     SseDeserializer deserializer,
   ) {
@@ -1997,6 +2917,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getInt32List(len_);
+  }
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -2008,6 +2935,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  List<RarEntry> sse_decode_list_rar_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RarEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_rar_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<RarEntryData> sse_decode_list_rar_entry_data(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RarEntryData>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_rar_entry_data(deserializer));
+    }
+    return ans_;
   }
 
   @protected
@@ -2246,6 +3199,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RarEntry sse_decode_rar_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_isFile = sse_decode_bool(deserializer);
+    return RarEntry(name: var_name, isFile: var_isFile);
+  }
+
+  @protected
+  RarEntryData sse_decode_rar_entry_data(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_content = sse_decode_list_prim_u_8_strict(deserializer);
+    return RarEntryData(name: var_name, content: var_content);
+  }
+
+  @protected
   (String, List<String>) sse_decode_record_string_list_string(
     SseDeserializer deserializer,
   ) {
@@ -2390,6 +3359,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
+  }
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getBigUint64();
+  }
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8();
@@ -2456,6 +3437,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    HoshiLookupSession self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as HoshiLookupSessionImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     RequestClient self,
     SseSerializer serializer,
@@ -2476,6 +3470,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as CancellationTokenImpl).frbInternalSseEncode(move: false),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    HoshiLookupSession self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as HoshiLookupSessionImpl).frbInternalSseEncode(move: false),
       serializer,
     );
   }
@@ -2611,6 +3618,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as DnsSettingsImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    HoshiLookupSession self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as HoshiLookupSessionImpl).frbInternalSseEncode(move: null),
       serializer,
     );
   }
@@ -2815,6 +3835,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.content, serializer);
     sse_encode_String(self.path, serializer);
+    sse_encode_String(self.href, serializer);
+    sse_encode_u_32(self.spineIndex, serializer);
+    sse_encode_bool(self.isLinear, serializer);
+    sse_encode_bool(self.isNavigationEntry, serializer);
   }
 
   @protected
@@ -2824,6 +3848,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_list_prim_u_8_strict(self.cover, serializer);
     sse_encode_opt_String(self.summary, serializer);
     sse_encode_opt_String(self.author, serializer);
+    sse_encode_opt_String(self.language, serializer);
     sse_encode_opt_String(self.artist, serializer);
     sse_encode_list_epub_chapter(self.chapters, serializer);
     sse_encode_list_epub_resource(self.images, serializer);
@@ -2835,6 +3860,113 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.name, serializer);
     sse_encode_list_prim_u_8_strict(self.content, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_dictionary_style(
+    HoshiDictionaryStyle self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.dictName, serializer);
+    sse_encode_String(self.styles, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_frequency(
+    HoshiFrequency self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.value, serializer);
+    sse_encode_String(self.displayValue, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_frequency_entry(
+    HoshiFrequencyEntry self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.dictName, serializer);
+    sse_encode_list_hoshi_frequency(self.frequencies, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_glossary_entry(
+    HoshiGlossaryEntry self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.dictName, serializer);
+    sse_encode_String(self.glossary, serializer);
+    sse_encode_String(self.definitionTags, serializer);
+    sse_encode_String(self.termTags, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_import_result(
+    HoshiImportResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.success, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_u_64(self.termCount, serializer);
+    sse_encode_u_64(self.metaCount, serializer);
+    sse_encode_u_64(self.freqCount, serializer);
+    sse_encode_u_64(self.pitchCount, serializer);
+    sse_encode_u_64(self.mediaCount, serializer);
+    sse_encode_list_String(self.errors, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_lookup_result(
+    HoshiLookupResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.matched, serializer);
+    sse_encode_String(self.deinflected, serializer);
+    sse_encode_list_hoshi_transform_group(self.trace, serializer);
+    sse_encode_i_32(self.preprocessorSteps, serializer);
+    sse_encode_hoshi_term_result(self.term, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_pitch_entry(
+    HoshiPitchEntry self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.dictName, serializer);
+    sse_encode_list_prim_i_32_strict(self.pitchPositions, serializer);
+    sse_encode_list_String(self.transcriptions, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_term_result(
+    HoshiTermResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.expression, serializer);
+    sse_encode_String(self.reading, serializer);
+    sse_encode_String(self.rules, serializer);
+    sse_encode_i_32(self.score, serializer);
+    sse_encode_list_hoshi_glossary_entry(self.glossaries, serializer);
+    sse_encode_list_hoshi_frequency_entry(self.frequencies, serializer);
+    sse_encode_list_hoshi_pitch_entry(self.pitches, serializer);
+  }
+
+  @protected
+  void sse_encode_hoshi_transform_group(
+    HoshiTransformGroup self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.description, serializer);
   }
 
   @protected
@@ -2953,6 +4085,90 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_hoshi_dictionary_style(
+    List<HoshiDictionaryStyle> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hoshi_dictionary_style(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hoshi_frequency(
+    List<HoshiFrequency> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hoshi_frequency(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hoshi_frequency_entry(
+    List<HoshiFrequencyEntry> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hoshi_frequency_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hoshi_glossary_entry(
+    List<HoshiGlossaryEntry> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hoshi_glossary_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hoshi_lookup_result(
+    List<HoshiLookupResult> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hoshi_lookup_result(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hoshi_pitch_entry(
+    List<HoshiPitchEntry> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hoshi_pitch_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hoshi_transform_group(
+    List<HoshiTransformGroup> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hoshi_transform_group(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_list_prim_u_8_strict(
     List<Uint8List> self,
     SseSerializer serializer,
@@ -2962,6 +4178,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     for (final item in self) {
       sse_encode_list_prim_u_8_strict(item, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_list_prim_i_32_strict(
+    Int32List self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putInt32List(self);
   }
 
   @protected
@@ -2984,6 +4210,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_list_rar_entry(
+    List<RarEntry> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_rar_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_rar_entry_data(
+    List<RarEntryData> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_rar_entry_data(item, serializer);
+    }
   }
 
   @protected
@@ -3219,6 +4469,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_rar_entry(RarEntry self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_bool(self.isFile, serializer);
+  }
+
+  @protected
+  void sse_encode_rar_entry_data(RarEntryData self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_list_prim_u_8_strict(self.content, serializer);
+  }
+
+  @protected
   void sse_encode_record_string_list_string(
     (String, List<String>) self,
     SseSerializer serializer,
@@ -3339,6 +4603,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
+  }
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putBigUint64(self);
+  }
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self);
@@ -3397,6 +4673,30 @@ class DnsSettingsImpl extends RustOpaque implements DnsSettings {
         RustLib.instance.api.rust_arc_decrement_strong_count_DnsSettings,
     rustArcDecrementStrongCountPtr:
         RustLib.instance.api.rust_arc_decrement_strong_count_DnsSettingsPtr,
+  );
+}
+
+@sealed
+class HoshiLookupSessionImpl extends RustOpaque implements HoshiLookupSession {
+  // Not to be used by end users
+  HoshiLookupSessionImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  HoshiLookupSessionImpl.frbInternalSseDecode(
+    BigInt ptr,
+    int externalSizeOnNative,
+  ) : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_HoshiLookupSession,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_HoshiLookupSession,
+    rustArcDecrementStrongCountPtr: RustLib
+        .instance
+        .api
+        .rust_arc_decrement_strong_count_HoshiLookupSessionPtr,
   );
 }
 

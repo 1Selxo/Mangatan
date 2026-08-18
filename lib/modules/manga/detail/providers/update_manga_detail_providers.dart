@@ -50,6 +50,9 @@ Future<dynamic> updateMangaDetail(
         [];
 
     final imgUrl = getManga.imageUrl.trimmedOrDefault(manga.imageUrl);
+    final refreshedSourceTitle = getManga.name.trimmedOrDefault(
+      manga.sourceTitle ?? manga.name,
+    );
     final now = DateTime.now().millisecondsSinceEpoch;
 
     manga
@@ -58,7 +61,7 @@ Future<dynamic> updateMangaDetail(
           : imgUrl.startsWith('http')
           ? imgUrl
           : '${source.baseUrl ?? ''}/${imgUrl.getUrlWithoutDomain}'
-      ..name = getManga.name.trimmedOrDefault(manga.name)
+      ..updateSourceTitle(refreshedSourceTitle)
       ..genre = (genre.isEmpty ? null : genre) ?? manga.genre ?? []
       ..author = getManga.author.trimmedOrDefault(manga.author) ?? ""
       ..artist = getManga.artist.trimmedOrDefault(manga.artist) ?? ""
@@ -117,10 +120,14 @@ Future<dynamic> updateMangaDetail(
       // a chapter the user has already read, the new entry is pre-marked read.
       // The value is true if ANY existing chapter at that number is read.
       final recognition = ChapterRecognition();
-      final readByNumber = <int, bool>{};
+      final readByNumber = <double, bool>{};
       for (final c in existingChapters) {
         if (c.name == null) continue;
-        final num = recognition.parseChapterNumber(manga.name ?? '', c.name!);
+        final num = recognition.resolveChapterNumber(
+          manga.name ?? '',
+          c.name!,
+          sourceChapterNumber: c.chapterNumber,
+        );
         if (num > 0) {
           readByNumber[num] =
               (readByNumber[num] ?? false) || (c.isRead ?? false);
@@ -144,7 +151,11 @@ Future<dynamic> updateMangaDetail(
           // Determine whether this chapter number has already been read under
           // a different scanlator, so we don't show it as unread to the user.
           final chapNum = chap.name != null
-              ? recognition.parseChapterNumber(manga.name!, chap.name!)
+              ? recognition.resolveChapterNumber(
+                  manga.name!,
+                  chap.name!,
+                  sourceChapterNumber: chap.chapterNumber,
+                )
               : 0;
           final alreadyRead = chapNum > 0 && (readByNumber[chapNum] ?? false);
 
@@ -155,6 +166,7 @@ Future<dynamic> updateMangaDetail(
                 ? now.toString()
                 : chap.dateUpload.toString(),
             scanlator: chap.scanlator ?? '',
+            chapterNumber: normalizeSourceChapterNumber(chap.chapterNumber),
             mangaId: savedMangaId,
             updatedAt: now,
             isFiller: chap.isFiller,
@@ -176,6 +188,9 @@ Future<dynamic> updateMangaDetail(
           existing
             ..name = chap.name
             ..scanlator = chap.scanlator
+            ..chapterNumber =
+                normalizeSourceChapterNumber(chap.chapterNumber) ??
+                normalizeSourceChapterNumber(existing.chapterNumber)
             ..updatedAt = now
             ..isFiller = chap.isFiller
             ..thumbnailUrl = chap.thumbnailUrl

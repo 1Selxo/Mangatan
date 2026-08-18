@@ -1,9 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:google_fonts/google_fonts.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
@@ -17,27 +16,22 @@ import 'package:mangayomi/modules/more/about/providers/download_file_screen.dart
 import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
-import 'package:mangayomi/modules/widgets/error_state.dart';
 import 'package:mangayomi/modules/widgets/loading_icon.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/modules/main_view/providers/migration.dart';
-import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
+import 'package:mangayomi/modules/main_view/auto_sync_timer_controller.dart';
 import 'package:mangayomi/modules/more/about/providers/check_for_update.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/auto_backup.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/sync_server.dart';
+import 'package:mangayomi/utils/app_font_fallback.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
 
 final libLocationRegex = RegExp(r"^/(Manga|Anime|Novel)Library$");
-
-/// Nav destinations kept off the anime-only TV layout (the manga & novel
-/// libraries). True means "keep this destination".
-bool _isNotHiddenLibOnTv(String nav) =>
-    nav != "/MangaLibrary" && nav != "/NovelLibrary";
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key, required this.child});
@@ -50,11 +44,10 @@ class MainScreen extends ConsumerStatefulWidget {
 
 class _MainScreenState extends ConsumerState<MainScreen> {
   Timer? _backupTimer;
-  Timer? _syncTimer;
+  late final AutoSyncTimerController _autoSyncTimerController;
 
   late final String _defaultLocation;
   late final List<String> _navigationOrder;
-  late final int _autoSyncFrequency;
 
   static final Map<String, String> _hyphenatedLabelsCache = {};
 
@@ -91,17 +84,25 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     super.initState();
 
     _navigationOrder = ref.read(navigationOrderStateProvider);
-    _autoSyncFrequency = ref
-        .read(synchingProvider(syncId: 1))
-        .autoSyncFrequency;
+    _autoSyncTimerController = AutoSyncTimerController(
+      onTick: _runAutoSync,
+      onError: _onAutoSyncError,
+    );
+    ref.listenManual<AutoSyncTimerSettings>(
+      synchingProvider(syncId: 1).select(
+        (preference) => (
+          syncOn: preference.syncOn,
+          frequencySeconds: preference.autoSyncFrequency,
+        ),
+      ),
+      (_, settings) => _autoSyncTimerController.configure(settings),
+      fireImmediately: true,
+    );
     final hiddenItems = ref.read(hideItemsStateProvider);
 
-    // On the anime-only TV layout, never land on a hidden manga/novel library.
-    final order = ref.read(animeOnlyTvModeProvider)
-        ? _navigationOrder.where(_isNotHiddenLibOnTv).toList()
-        : _navigationOrder;
-    final visible = order.where((e) => !hiddenItems.contains(e)).toList();
-    _defaultLocation = visible.isNotEmpty ? visible.first : "/AnimeLibrary";
+    _defaultLocation = _navigationOrder
+        .where((e) => !hiddenItems.contains(e))
+        .first;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -119,20 +120,15 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       const Duration(minutes: 5),
       _onBackupTimerTick,
     );
-
-    if (_autoSyncFrequency != 0) {
-      _syncTimer = Timer.periodic(
-        Duration(seconds: _autoSyncFrequency),
-        _onSyncTimerTick,
-      );
-    }
   }
 
   void _initializeProviders() {
-    // The extension-repo fetches (one per item type) and the GitHub update
-    // check hit the network; delay them so they don't compete with the first
-    // paint and the initial library queries.
-    Future.delayed(const Duration(seconds: 3), () {
+    // Mihon sources start the embedded OpenJDK runtime. On iOS, leave that
+    // heavyweight work to explicit extension and source actions instead of
+    // starting Java as a side effect of opening the main screen.
+    if (Platform.isIOS) return;
+
+    Future.microtask(() {
       if (mounted) {
         for (var type in ItemType.values) {
           ref.read(
@@ -145,22 +141,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         }
       }
     });
-    Future.delayed(const Duration(seconds: 5), () {
-      if (!mounted || isTv) return;
-      ref.listenManual<AsyncValue<UpdateInfo?>>(checkForUpdateProvider, (
-        _,
-        next,
-      ) {
-        next.whenData((updateInfo) {
-          if (updateInfo != null && mounted) {
-            showDialog(
-              context: context,
-              builder: (_) => DownloadFileScreen(updateAvailable: updateInfo),
-            );
-          }
-        });
-      });
-    });
   }
 
   void _onBackupTimerTick(Timer timer) {
@@ -171,27 +151,35 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     ref.read(checkAndBackupProvider);
   }
 
-  void _onSyncTimerTick(Timer timer) {
-    if (!mounted) {
-      timer.cancel();
+  Future<void> _runAutoSync() async {
+    if (!mounted) return;
+
+    // Keep this final guard at the write boundary as preference invalidation
+    // and a timer callback can be queued in the same event-loop turn.
+    final syncPreference = ref.read(synchingProvider(syncId: 1));
+    if (!syncPreference.syncOn || syncPreference.autoSyncFrequency == 0) {
       return;
     }
-    try {
-      final l10n = l10nLocalizations(context)!;
-      ref.read(syncServerProvider(syncId: 1).notifier).startSync(l10n, true);
-    } catch (e) {
-      botToast(
-        "Failed to sync! Maybe the sync server is down. "
-        "Restart the app to resume auto sync.",
-      );
-      timer.cancel();
-    }
+    final l10n = l10nLocalizations(context)!;
+    await runAutoSyncOrThrow(
+      () => ref
+          .read(syncServerProvider(syncId: 1).notifier)
+          .startSync(l10n, true),
+    );
+  }
+
+  void _onAutoSyncError(Object error, StackTrace stackTrace) {
+    if (!mounted) return;
+    botToast(
+      "Automatic sync failed and was paused. "
+      "Restart the app or change the interval to resume.",
+    );
   }
 
   @override
   void dispose() {
     _backupTimer?.cancel();
-    _syncTimer?.cancel();
+    _autoSyncTimerController.dispose();
     discordRpc?.disconnect();
     super.dispose();
   }
@@ -200,6 +188,17 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   bool isLibSwitch = false;
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<UpdateInfo?>>(checkForUpdateProvider, (_, next) {
+      next.whenData((updateInfo) {
+        if (updateInfo != null && context.mounted) {
+          showDialog(
+            context: context,
+            builder: (_) => DownloadFileScreen(updateAvailable: updateInfo),
+          );
+        }
+      });
+    });
+
     ref.listen<Locale>(l10nLocaleStateProvider, (previous, next) {
       _clearCache();
       setState(() {});
@@ -229,11 +228,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   : navigationOrder
                         .where((nav) => !hideItems.contains(nav))
                         .toList();
-
-              // Anime-only TV layout: drop the manga & novel library tabs.
-              if (ref.watch(animeOnlyTvModeProvider)) {
-                dest = dest.where(_isNotHiddenLibOnTv).toList();
-              }
 
               if (mergeLibraryNavMobile && !context.isTablet && !isLibSwitch) {
                 dest = dest
@@ -334,16 +328,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               );
             },
           ),
-          // A failed migration used to render the loading screen, so the app
-          // sat on a blank splash forever with nothing to act on. Show what
-          // happened and let the user run it again.
-          error: (error, _) => Scaffold(
-            body: ErrorState(
-              message: l10n.startup_failed,
-              detail: error.toString(),
-              onRetry: () => ref.invalidate(migrationProvider),
-            ),
-          ),
+          error: (error, _) => const LoadingIcon(),
           loading: () => const LoadingIcon(),
         );
   }
@@ -372,8 +357,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     if (dest.contains("/MangaLibrary")) {
       destinations[dest.indexOf("/MangaLibrary")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.collections_bookmark),
         icon: const Icon(Icons.collections_bookmark_outlined),
         label: Padding(
@@ -384,8 +367,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/AnimeLibrary")) {
       destinations[dest.indexOf("/AnimeLibrary")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.video_collection),
         icon: const Icon(Icons.video_collection_outlined),
         label: Padding(
@@ -396,8 +377,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/NovelLibrary")) {
       destinations[dest.indexOf("/NovelLibrary")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.local_library),
         icon: const Icon(Icons.local_library_outlined),
         label: Padding(
@@ -408,8 +387,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/updates")) {
       destinations[dest.indexOf("/updates")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: _UpdatesBadgeWidget(
           icon: const Icon(Icons.new_releases),
           ref: ref,
@@ -432,8 +409,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/history")) {
       destinations[dest.indexOf("/history")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.history),
         icon: const Icon(Icons.history_outlined),
         label: Padding(
@@ -444,8 +419,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/browse")) {
       destinations[dest.indexOf("/browse")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: _ExtensionBadgeWidget(
           icon: const Icon(Icons.explore),
           ref: ref,
@@ -460,10 +433,20 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ),
       );
     }
+    if (dest.contains("/dictionaryLookup")) {
+      destinations[dest.indexOf(
+        "/dictionaryLookup",
+      )] = NavigationRailDestination(
+        selectedIcon: const Icon(Icons.translate),
+        icon: const Icon(Icons.translate_outlined),
+        label: Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Text(l10n.dictionary_lookup),
+        ),
+      );
+    }
     if (dest.contains("/more")) {
       destinations[dest.indexOf("/more")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.more_horiz),
         icon: const Icon(Icons.more_horiz_outlined),
         label: Padding(
@@ -474,8 +457,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/trackerLibrary")) {
       destinations[dest.indexOf("/trackerLibrary")] = NavigationRailDestination(
-        // Even breathing room between tabs on TV; null off-TV.
-        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.account_tree),
         icon: const Icon(Icons.account_tree_outlined),
         label: Padding(
@@ -574,6 +555,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         label: l10n.browse,
       );
     }
+    if (dest.contains("/dictionaryLookup")) {
+      destinations[dest.indexOf("/dictionaryLookup")] = NavigationDestination(
+        selectedIcon: const Icon(Icons.translate),
+        icon: const Icon(Icons.translate_outlined),
+        label: l10n.dictionary_lookup,
+      );
+    }
     if (dest.contains("/more")) {
       destinations[dest.indexOf("/more")] = NavigationDestination(
         selectedIcon: const Icon(Icons.more_horiz),
@@ -594,10 +582,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 }
 
-// Resolved once — GoogleFonts lookups in build run font resolution on every
-// rebuild of these always-mounted bars.
-final String? _barFontFamily = GoogleFonts.aBeeZee().fontFamily;
-
 class _DownloadedOnlyBar extends StatelessWidget {
   const _DownloadedOnlyBar({required this.downloadedOnly, required this.l10n});
 
@@ -610,7 +594,7 @@ class _DownloadedOnlyBar extends StatelessWidget {
       child: AnimatedContainer(
         height: downloadedOnly
             ? isMobile
-                  ? MediaQuery.paddingOf(context).top * 2
+                  ? MediaQuery.of(context).padding.top * 2
                   : 50
             : 0,
         curve: Curves.easeIn,
@@ -624,9 +608,9 @@ class _DownloadedOnlyBar extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               child: Text(
                 l10n.downloaded_only,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: _barFontFamily,
+                  fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),
             ),
@@ -649,7 +633,7 @@ class _IncognitoModeBar extends StatelessWidget {
       child: AnimatedContainer(
         height: incognitoMode
             ? isMobile
-                  ? MediaQuery.paddingOf(context).top * 2
+                  ? MediaQuery.of(context).padding.top * 2
                   : 50
             : 0,
         curve: Curves.easeIn,
@@ -663,9 +647,9 @@ class _IncognitoModeBar extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               child: Text(
                 l10n.incognito_mode,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: _barFontFamily,
+                  fontFamilyFallback: appFontFamilyFallback,
                 ),
               ),
             ),
@@ -676,7 +660,7 @@ class _IncognitoModeBar extends StatelessWidget {
   }
 }
 
-class _TabletLayout extends StatefulWidget {
+class _TabletLayout extends StatelessWidget {
   const _TabletLayout({
     required this.isLongPressed,
     required this.location,
@@ -703,137 +687,13 @@ class _TabletLayout extends StatefulWidget {
   buildNavigationWidgetsDesktop;
 
   @override
-  State<_TabletLayout> createState() => _TabletLayoutState();
-}
-
-class _TabletLayoutState extends State<_TabletLayout> {
-  // Explicit focus scopes for the rail and the routed content, used on Android
-  // TV only. Directional (d-pad) focus traversal doesn't cross into the rail —
-  // the routed page lives in its own FocusScope and arrows only move focus
-  // within it — so we move focus between the two scopes ourselves. A scope
-  // wraps the whole rail because NavigationRail doesn't expose its
-  // destinations' focus nodes.
-  final FocusScopeNode _railScope = FocusScopeNode(debugLabel: 'navRailScope');
-  final FocusScopeNode _contentScope = FocusScopeNode(
-    debugLabel: 'navContentScope',
-  );
-  bool _didAutofocusRail = false;
-
-  @override
-  void dispose() {
-    _railScope.dispose();
-    _contentScope.dispose();
-    super.dispose();
-  }
-
-  // TV d-pad crossing: LEFT that can't move any further inside the content
-  // pulls focus onto the rail; RIGHT from the rail dives into the content.
-  // Other keys (up/down/select) fall through to the default handler. Only
-  // active while the rail is visible (library tabs), never in the reader.
-  KeyEventResult _handleTvKey(KeyEvent event, bool railVisible) {
-    if (!railVisible) return KeyEventResult.ignored;
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      if (_railScope.hasFocus) return KeyEventResult.ignored;
-      final current = FocusManager.instance.primaryFocus;
-      final moved = current?.focusInDirection(TraversalDirection.left) ?? false;
-      if (!moved) _railScope.requestFocus();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight && _railScope.hasFocus) {
-      // Focus the content scope — it restores its focusedChild, which for the
-      // library grid is the first cover (autofocused on TV). That fixes both
-      // "focus never lands on the grid" and the anime-tab "hold Left to reach
-      // the rail" (Left from a cover reaches the rail in one press).
-      _contentScope.requestFocus();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final destinations = widget.buildNavigationWidgetsDesktop(
-      widget.ref,
-      widget.dest,
-      context,
-    );
-    final railWidth = _getNavigationRailWidth(
-      widget.isLongPressed,
-      widget.location,
-    );
-    final railVisible = railWidth > 0;
-
-    // On a TV, open with the tab rail focused so the user lands on the tabs and
-    // dives into content with RIGHT. One-shot per mount.
-    if (isTv && railVisible && !_didAutofocusRail) {
-      _didAutofocusRail = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _railScope.requestFocus();
-      });
-    }
-
-    final scheme = Theme.of(context).colorScheme;
-    Widget navRail = NavigationRail(
-      labelType: NavigationRailLabelType.all,
-      useIndicator: true,
-      // Centre the tabs rather than bunching them under the logo with dead
-      // space below. Off-TV keeps the default top alignment.
-      groupAlignment: isTv ? 0.0 : null,
-      // Brand the rail on TV: the app glyph, then the beta flag under it.
-      leading: isTv ? const _TvRailHeader() : null,
-      // A TV is read from across a room, so the desktop defaults (24px icons,
-      // regular labels) are undersized. Colours are restated rather than left
-      // null, because supplying an IconThemeData/TextStyle replaces the rail's
-      // own defaults wholesale and would otherwise drop the selected and
-      // unselected colouring. All null off TV, so desktop keeps its defaults.
-      selectedIconTheme: isTv
-          ? IconThemeData(size: 28, color: scheme.onSecondaryContainer)
-          : null,
-      unselectedIconTheme: isTv
-          ? IconThemeData(size: 28, color: scheme.onSurfaceVariant)
-          : null,
-      selectedLabelTextStyle: isTv
-          ? TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurface,
-            )
-          : null,
-      unselectedLabelTextStyle: isTv
-          ? TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)
-          : null,
-      destinations: destinations,
-      selectedIndex:
-          (widget.currentIndex >= 0 &&
-              widget.currentIndex < destinations.length)
-          ? widget.currentIndex
-          : 0,
-      onDestinationSelected: (newIndex) {
-        widget.route.go(widget.dest[newIndex]);
-      },
-    );
-    if (isTv) {
-      navRail = FocusScope(node: _railScope, child: navRail);
-    }
-
-    Widget content = widget.child;
-    if (isTv) {
-      content = FocusScope(node: _contentScope, child: content);
-    }
-
-    Widget row = Row(
+    final destinations = buildNavigationWidgetsDesktop(ref, dest, context);
+    return Row(
       children: [
         AnimatedContainer(
-          // The rail collapses to zero width when a reader or player opens, so
-          // on TV give that a real transition instead of snapping. Off-TV keeps
-          // the original instant behaviour.
-          duration: Duration(milliseconds: isTv ? 220 : 0),
-          curve: Curves.easeOutCubic,
-          width: railWidth,
+          duration: const Duration(milliseconds: 0),
+          width: _getNavigationRailWidth(isLongPressed, location),
           child: Stack(
             children: [
               NavigationRailTheme(
@@ -842,38 +702,25 @@ class _TabletLayoutState extends State<_TabletLayout> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                 ),
-                // On Android TV the rail destination's default d-pad focus
-                // overlay is too faint to see from across a room. The
-                // destination InkResponse draws its focus highlight from the
-                // ambient Theme.focusColor, so a bold primary-tinted focusColor
-                // makes the focused tab clearly visible. No-op off TV.
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    focusColor: isTv
-                        ? context.primaryColor.withValues(alpha: 0.45)
-                        : Theme.of(context).focusColor,
-                  ),
-                  child: navRail,
+                child: NavigationRail(
+                  labelType: NavigationRailLabelType.all,
+                  useIndicator: true,
+                  destinations: destinations,
+                  selectedIndex:
+                      (currentIndex >= 0 && currentIndex < destinations.length)
+                      ? currentIndex
+                      : 0,
+                  onDestinationSelected: (newIndex) {
+                    route.go(dest[newIndex]);
+                  },
                 ),
               ),
             ],
           ),
         ),
-        Expanded(child: content),
+        Expanded(child: child),
       ],
     );
-
-    // Wrap in a non-focusable key handler on TV so we can move focus across the
-    // rail/content scope boundary that directional traversal won't cross.
-    if (isTv) {
-      row = Focus(
-        canRequestFocus: false,
-        skipTraversal: true,
-        onKeyEvent: (node, event) => _handleTvKey(event, railVisible),
-        child: row,
-      );
-    }
-    return row;
   }
 
   static double _getNavigationRailWidth(bool isLongPressed, String? location) {
@@ -886,6 +733,7 @@ class _TabletLayoutState extends State<_TabletLayout> {
       '/history',
       '/updates',
       '/browse',
+      '/dictionaryLookup',
       '/more',
       '/trackerLibrary',
     };
@@ -924,8 +772,8 @@ class _MobileBottomNavigation extends StatelessWidget {
       height: _getBottomNavigationHeight(isLongPressed, location),
       child: NavigationBarTheme(
         data: NavigationBarThemeData(
-          labelTextStyle: const WidgetStatePropertyAll(
-            TextStyle(overflow: TextOverflow.ellipsis),
+          labelTextStyle: WidgetStatePropertyAll(
+            appBottomNavigationLabelStyle(Theme.of(context), dest.length),
           ),
           indicatorShape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
@@ -956,6 +804,7 @@ class _MobileBottomNavigation extends StatelessWidget {
       '/history',
       '/updates',
       '/browse',
+      '/dictionaryLookup',
       '/more',
       '/trackerLibrary',
     };
@@ -976,9 +825,8 @@ class _ExtensionBadgeWidget extends ConsumerWidget {
 
     return StreamBuilder(
       stream: isar.sources
-          .where()
-          .isActiveEqualTo(true)
           .filter()
+          .idIsNotNull()
           .optional(
             hideItems.contains("/MangaLibrary"),
             (q) => q.not().itemTypeEqualTo(ItemType.manga),
@@ -991,6 +839,8 @@ class _ExtensionBadgeWidget extends ConsumerWidget {
             hideItems.contains("/NovelLibrary"),
             (q) => q.not().itemTypeEqualTo(ItemType.novel),
           )
+          .and()
+          .isActiveEqualTo(true)
           .watch(fireImmediately: true),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -1027,6 +877,7 @@ class _UpdatesBadgeWidget extends ConsumerWidget {
     return StreamBuilder(
       stream: isar.updates
           .filter()
+          .idIsNotNull()
           .optional(
             hideItems.contains("/MangaLibrary"),
             (q) => q.chapter(
@@ -1045,66 +896,25 @@ class _UpdatesBadgeWidget extends ConsumerWidget {
               (c) => c.manga((m) => m.not().itemTypeEqualTo(ItemType.novel)),
             ),
           )
-          // Filter unread in the query itself — loading every linked chapter
-          // with loadSync() in the builder ran N+1 sync DB reads on the
-          // always-mounted nav bar for every update write.
-          .chapter((c) => c.not().isReadEqualTo(true))
           .watch(fireImmediately: true),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return icon;
         }
 
-        return Badge(label: Text("${snapshot.data!.length}"), child: icon);
+        final entries = snapshot.data!.where((element) {
+          if (!element.chapter.isLoaded) {
+            element.chapter.loadSync();
+          }
+          return !(element.chapter.value?.isRead ?? false);
+        }).toList();
+
+        if (entries.isEmpty) {
+          return icon;
+        }
+
+        return Badge(label: Text("${entries.length}"), child: icon);
       },
-    );
-  }
-}
-
-/// The top of the TV nav rail: the app glyph over a beta flag.
-///
-/// Uses the bare glyph asset rather than the app icon, tinted with the theme
-/// accent, so it carries no white tile of its own into a dark rail and follows
-/// whatever accent the user picked.
-class _TvRailHeader extends StatelessWidget {
-  const _TvRailHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-    return Padding(
-      // Tight under the glyph: the first destination already carries its
-      // own vertical padding, so this only needs to clear the beta pill.
-      padding: const EdgeInsets.only(top: 14, bottom: 2),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/app_icons/icon.png',
-            width: 30,
-            height: 30,
-            color: accent,
-            filterQuality: FilterQuality.medium,
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Text(
-              'BETA',
-              style: TextStyle(
-                color: accent,
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

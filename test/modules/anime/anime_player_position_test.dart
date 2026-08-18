@@ -1,0 +1,65 @@
+import 'dart:ffi';
+import 'dart:io';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart' as app;
+import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+
+import '../../test_utils/isar_library.dart';
+
+void main() {
+  late Directory databaseDirectory;
+  late Isar database;
+  late ProviderContainer container;
+
+  setUpAll(() async {
+    await Isar.initializeIsarCore(
+      libraries: {Abi.current(): await isarTestLibraryPath()},
+    );
+  });
+
+  setUp(() async {
+    databaseDirectory = await Directory.systemTemp.createTemp(
+      'mangatan-anime-position-',
+    );
+    database = await Isar.open(
+      [MangaSchema, ChapterSchema, SettingsSchema, SourceSchema],
+      directory: databaseDirectory.path,
+      name: 'anime_position_test',
+    );
+    app.isar = database;
+    await database.writeTxn(() => database.settings.put(Settings()));
+    container = ProviderContainer();
+  });
+
+  tearDown(() async {
+    container.dispose();
+    await database.close(deleteFromDisk: true);
+    if (await databaseDirectory.exists()) {
+      await databaseDirectory.delete(recursive: true);
+    }
+  });
+
+  test('saving anime progress persists its total duration for sync', () async {
+    final episode = Chapter(mangaId: 1, name: 'Episode 1', isRead: false);
+    await database.writeTxn(() => database.chapters.put(episode));
+
+    container
+        .read(animeStreamControllerProvider(episode: episode).notifier)
+        .setCurrentPosition(
+          const Duration(seconds: 49),
+          const Duration(minutes: 24),
+          save: true,
+        );
+
+    final saved = await database.chapters.get(episode.id!);
+    expect(saved?.lastPageRead, '49000');
+    expect(saved?.duration, '1440000');
+  });
+}

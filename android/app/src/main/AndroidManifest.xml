@@ -18,7 +18,7 @@
         android:required="false" />
 
    <application
-        android:label="Mangayomi"
+        android:label="Mangatan"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:banner="@drawable/tv_banner"

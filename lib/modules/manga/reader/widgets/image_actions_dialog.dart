@@ -5,10 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
+import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:share_plus/share_plus.dart';
@@ -48,7 +53,9 @@ class ImageActionsDialog {
       constraints: BoxConstraints(maxWidth: context.width(1)),
       builder: (context) => _ImageActionsSheet(
         imageBytes: imageBytes,
+        data: data,
         manga: manga,
+        chapterName: chapterName,
         fileName: name,
       ),
     );
@@ -57,12 +64,16 @@ class ImageActionsDialog {
 
 class _ImageActionsSheet extends StatelessWidget {
   final List<int> imageBytes;
+  final UChapDataPreload data;
   final Manga manga;
+  final String chapterName;
   final String fileName;
 
   const _ImageActionsSheet({
     required this.imageBytes,
+    required this.data,
     required this.manga,
+    required this.chapterName,
     required this.fileName,
   });
 
@@ -110,6 +121,20 @@ class _ImageActionsSheet extends StatelessWidget {
                     label: context.l10n.save,
                     icon: Icons.save_outlined,
                     onPressed: () => _saveImage(context),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  _ActionButton(
+                    label: 'Lookup',
+                    icon: Icons.manage_search,
+                    onPressed: () => _lookupText(context),
+                  ),
+                  _ActionButton(
+                    label: 'OCR',
+                    icon: Icons.document_scanner_outlined,
+                    onPressed: () => _showOcrOverlay(context),
                   ),
                 ],
               ),
@@ -188,6 +213,35 @@ class _ImageActionsSheet extends StatelessWidget {
     if (context.mounted) {
       botToast(context.l10n.picture_saved, second: 3);
     }
+  }
+
+  Future<void> _lookupText(BuildContext context) async {
+    final source = manga.sourceId == null
+        ? null
+        : isar.sources.getSync(manga.sourceId!);
+    await MiningLookupSheet.show(
+      context: context,
+      text: '',
+      miningContext: MiningContext(
+        mediaType: MiningMediaType.manga,
+        mangaId: manga.id,
+        sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+        sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+          source,
+          fallback: manga.lang ?? '',
+        ),
+        sourceTitle: manga.name ?? '',
+        chapterTitle: chapterName,
+        pageIndex: data.pageIndex,
+        sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
+        imageBytesLoader: () async => Uint8List.fromList(imageBytes),
+      ),
+    );
+  }
+
+  Future<void> _showOcrOverlay(BuildContext context) async {
+    await ReaderOcrState.setEnabled(true);
+    if (context.mounted) Navigator.pop(context);
   }
 }
 

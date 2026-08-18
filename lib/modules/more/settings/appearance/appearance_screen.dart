@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_font_family.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/follow_system_theme_button.dart';
@@ -10,6 +12,7 @@ import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/date.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/date_format_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/widgets/animation_speed_slider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/blend_level_slider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/dark_mode_button.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/theme_selector.dart';
@@ -28,6 +31,7 @@ final navigationItems = {
   "/updates": "Updates",
   "/history": "History",
   "/browse": "Browse",
+  "/dictionaryLookup": "Dictionary",
   "/more": "More",
   "/trackerLibrary": "Tracking",
 };
@@ -163,6 +167,7 @@ class AppearanceScreen extends ConsumerWidget {
                 ),
                 _buildLanguageTile(context, ref, l10n),
                 _buildFontTile(context, ref, l10n),
+                if (!isMobile) const AnimationSpeedSlider(),
                 ListTile(
                   title: Text(l10n.reorder_navigation),
                   subtitle: Text(
@@ -264,7 +269,8 @@ class AppearanceScreen extends ConsumerWidget {
     WidgetRef ref,
     AppLocalizations l10n,
   ) {
-    final rawFontFamily = ref.watch(appFontFamilyProvider.select((t) => t.$1));
+    ref.watch(appFontFamilyProvider);
+    final rawFontFamily = isar.settings.getSync(227)?.appFontFamily;
     final appFontFamilySub = rawFontFamily ?? context.l10n.default0;
     return ListTile(
       title: Text(context.l10n.font),
@@ -320,6 +326,9 @@ class AppearanceScreen extends ConsumerWidget {
                         ),
                         Builder(
                           builder: (context) {
+                            final currentSelected = isar.settings
+                                .getSync(227)
+                                ?.appFontFamily;
                             final filteredFontNames = allFontNames
                                 .where(
                                   (name) => name.toLowerCase().contains(
@@ -334,7 +343,7 @@ class AppearanceScreen extends ConsumerWidget {
                                 radius: const Radius.circular(10),
                                 controller: controller,
                                 child: RadioGroup<String?>(
-                                  groupValue: rawFontFamily,
+                                  groupValue: currentSelected,
                                   onChanged: (value) {
                                     ref
                                         .read(appFontFamilyProvider.notifier)

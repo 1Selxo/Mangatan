@@ -1,0 +1,424 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
+
+String _readNormalized(String path) =>
+    File(path).readAsStringSync().replaceAll('\r\n', '\n');
+
+void main() {
+  group('embedded iOS Mihon bridge response', () {
+    test('accepts a valid loopback port', () {
+      expect(
+        embeddedMihonBaseUrlFromResponse({
+          'port': 49321,
+          'baseUrl': 'http://127.0.0.1:49321',
+        }),
+        'http://127.0.0.1:49321',
+      );
+    });
+
+    test('constructs the URL when native code only returns a port', () {
+      expect(
+        embeddedMihonBaseUrlFromResponse({'port': 8080}),
+        'http://127.0.0.1:8080',
+      );
+    });
+
+    test('rejects remote, invalid, and mismatched responses', () {
+      expect(
+        embeddedMihonBaseUrlFromResponse({
+          'port': 8080,
+          'baseUrl': 'https://bridge.example',
+        }),
+        isNull,
+      );
+      expect(
+        embeddedMihonBaseUrlFromResponse({
+          'port': 8080,
+          'baseUrl': 'http://127.0.0.1:8081',
+        }),
+        isNull,
+      );
+      expect(embeddedMihonBaseUrlFromResponse({'port': 0}), isNull);
+      expect(embeddedMihonBaseUrlFromResponse({'port': 70000}), isNull);
+    });
+  });
+
+  test('keeps the iOS VM outside the app launch image and UI thread', () {
+    final mainSource = _readNormalized('lib/main.dart');
+    final serviceSource = _readNormalized(
+      'lib/services/m_extension_server.dart',
+    );
+    final mainScreenSource = _readNormalized(
+      'lib/modules/main_view/main_screen.dart',
+    );
+    final browseStateSource = _readNormalized(
+      'lib/modules/more/settings/browse/providers/browse_state_provider.dart',
+    );
+    final nativeSource = _readNormalized('ios/Runner/MihonEmbeddedBridge.mm');
+    final appDelegateSource = _readNormalized('ios/Runner/AppDelegate.swift');
+    final runtimeBuilder = _readNormalized('tool/build_lazy_openjdk_ios.sh');
+    final openJdkWorkflow = _readNormalized(
+      '.github/workflows/build-openjdk-ios13.yml',
+    );
+    final zeroRuntimePatch = _readNormalized(
+      'tool/openjdk/ios-zero-runtime.patch',
+    );
+    final libjavaGlobalSymbolsPatch = _readNormalized(
+      'tool/openjdk/ios-libjava-global-symbols.patch',
+    );
+    final xcodeProject = _readNormalized(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    );
+
+    expect(
+      mainSource,
+      contains(
+        'if (!Platform.isIOS) {\n'
+        '        if (isDesktop) {\n'
+        '          unawaited(_startBridgeAndRefreshFactorySources());\n'
+        '        } else {\n'
+        '          unawaited(_mExtensionServer.startServer());\n'
+        '        }\n'
+        '      }',
+      ),
+    );
+    expect(
+      mainSource,
+      contains('unawaited(_mExtensionServer.suspendEmbeddedIosBridge());'),
+      reason: 'the listener must stop before iOS suspends the process',
+    );
+    expect(
+      mainSource,
+      contains('unawaited(_mExtensionServer.resumeEmbeddedIosBridge());'),
+      reason: 'the on-device bridge must return after device wake',
+    );
+    expect(
+      appDelegateSource,
+      contains('applicationWillResignActive'),
+      reason: 'native pause must begin before iOS suspends the Dart isolate',
+    );
+    expect(
+      appDelegateSource,
+      contains('applicationDidBecomeActive'),
+      reason: 'a listener paused natively must also resume natively',
+    );
+    expect(
+      appDelegateSource,
+      contains('MangatanEmbeddedMihonStart(port)'),
+      reason: 'existing image tokens must regain their original loopback port',
+    );
+    expect(
+      serviceSource,
+      contains("invokeMethod<bool>('status')"),
+      reason: 'a stale native listener must be detected before restart',
+    );
+    expect(
+      serviceSource,
+      contains("invokeMethod<void>('pause')"),
+      reason: 'app suspension must preserve loaded extension instances',
+    );
+    expect(
+      serviceSource,
+      contains('Future<String> resolveActiveIosMihonProxyUrl(String url)'),
+      reason: 'reader image retries must heal a stopped loopback listener',
+    );
+    expect(
+      serviceSource,
+      contains('Future<String> prepareActiveIosMihonProxyUrl(String url)'),
+      reason: 'restored reader pages must wake the bridge before first HTTP',
+    );
+    expect(
+      serviceSource,
+      contains('WidgetsBinding.instance.lifecycleState'),
+      reason: 'a stale lifecycle notification must not block a visible reader',
+    );
+    expect(
+      serviceSource,
+      contains('foregroundRequest: true'),
+      reason: 'an active reader request must bypass stale inactive state',
+    );
+    expect(
+      serviceSource,
+      contains('MExtensionServerPlatform._iosBridgeIsReady'),
+      reason: 'a failed launch must not suppress the next reader wake-up',
+    );
+    expect(
+      serviceSource,
+      contains('!await server._supportsMangatanMihonBridge(baseUrl)'),
+      reason: 'a dead saved loopback address must never be returned as ready',
+    );
+    final imageProviderSource = _readNormalized(
+      'lib/modules/widgets/custom_extended_image_provider.dart',
+    );
+    expect(
+      imageProviderSource,
+      contains(
+        'prepareActiveIosMihonProxyUrl(\n'
+        '      resolved.toString(),',
+      ),
+      reason: 'the first restored reader request must start the bridge',
+    );
+    expect(
+      imageProviderSource,
+      contains(
+        'resolveActiveIosMihonProxyUrl(\n'
+        '          requestUri.toString(),',
+      ),
+      reason: 'transient reader images must restart the bridge before HTTP',
+    );
+    expect(
+      nativeSource,
+      contains('gEmbeddedBridgeClass, "pause", "()V"'),
+      reason: 'the native bridge must expose listener-only suspension',
+    );
+    expect(
+      nativeSource,
+      contains('dlopen(runtimePath.UTF8String, RTLD_NOW | RTLD_GLOBAL)'),
+    );
+    expect(nativeSource, isNot(contains('RTLD_NOW | RTLD_LOCAL')));
+    expect(nativeSource, contains('dlsym(RTLD_DEFAULT, symbol)'));
+    for (final symbol in [
+      'JDK_Canonicalize',
+      'JIMAGE_Open',
+      'JIMAGE_Close',
+      'JIMAGE_FindResource',
+      'JIMAGE_GetResource',
+      'VerifyClassForMajorVersion',
+    ]) {
+      expect(
+        nativeSource,
+        contains('"$symbol",'),
+        reason: '$symbol must be visible to static OpenJDK lookups',
+      );
+    }
+    expect(
+      nativeSource,
+      contains('dlsym(handle, "MangatanOpenJDKLoadFunctions")'),
+    );
+    expect(
+      nativeSource,
+      contains('self.stackSize = 8 * 1024 * 1024;'),
+      reason:
+          'the Zero interpreter needs more stack than an iOS dispatch worker',
+    );
+    expect(
+      nativeSource,
+      contains('"-Xss8m",'),
+      reason:
+          'NanoHTTPD request workers need the same full Zero interpreter stack',
+    );
+    for (final option in [
+      '-XX:+UseSerialGC',
+      '-Xms128m',
+      '-Xmx512m',
+      '-XX:NewSize=64m',
+      '-XX:MaxNewSize=256m',
+    ]) {
+      expect(
+        nativeSource,
+        contains('"$option",'),
+        reason: 'the embedded VM needs deterministic balanced generations',
+      );
+    }
+    expect(
+      nativeSource,
+      isNot(contains('"-Xmn')),
+      reason: 'the young generation must remain elastic after bootstrap',
+    );
+    expect(nativeSource, contains('[EmbeddedMihonThread() enqueueBlock:^{'));
+    expect(
+      nativeSource,
+      isNot(contains('dispatch_async(EmbeddedMihonQueue()')),
+    );
+    expect(nativeSource, isNot(contains('AllowUserSignalHandlers')));
+    expect(nativeSource, isNot(contains('JavaVMDiagnosticSignalHandler')));
+    expect(
+      serviceSource,
+      contains(
+        'if (_isLoopbackServer(_baseUrl)) {\n'
+        '        // A saved desktop loopback URL points back at the iPhone',
+      ),
+      reason: 'iOS must not reuse a stale desktop loopback bridge',
+    );
+    expect(
+      serviceSource,
+      contains('if ((isDesktop || Platform.isIOS) &&'),
+      reason: 'an unavailable embedded iOS bridge must fail before HTTP',
+    );
+    expect(
+      browseStateSource,
+      contains(
+        '// The embedded iOS bridge outlives any individual source provider.\n'
+        '    ref.keepAlive();',
+      ),
+      reason: 'the process-wide bridge address must survive source disposal',
+    );
+    expect(
+      serviceSource,
+      isNot(contains('_readBaseUrl = () => ref.read(')),
+      reason: 'bridge startup must not read a disposed source Ref',
+    );
+    expect(
+      serviceSource,
+      contains('_readBaseUrl = () => proxyServerState.currentValue;'),
+      reason: 'bridge startup must retain the process-wide state notifier',
+    );
+    expect(
+      nativeSource,
+      contains('TraceEmbeddedMihon(@"calling JNI_CreateJavaVM");'),
+      reason: 'device builds must expose the embedded VM startup boundary',
+    );
+    expect(
+      nativeSource,
+      contains('@"EmbeddedBridge.start returned %d (exception=%@)"'),
+      reason: 'device builds must distinguish server errors from VM errors',
+    );
+    expect(
+      mainScreenSource,
+      contains(
+        'void _initializeProviders() {\n'
+        '    // Mihon sources start the embedded OpenJDK runtime.',
+      ),
+    );
+    expect(mainScreenSource, contains('if (Platform.isIOS) return;'));
+    expect(
+      nativeSource,
+      contains('stringByAppendingPathComponent:@"lib/modules"'),
+    );
+    expect(
+      nativeSource,
+      contains('std::string("-Djava.home=") + runtimeHome.UTF8String'),
+    );
+    expect(
+      runtimeBuilder,
+      contains(r'cp "$runtime_modules" "$output_framework/lib/lib/modules"'),
+    );
+    expect(
+      runtimeBuilder,
+      contains(r'cp -R "$runtime_conf" "$output_framework/lib/conf"'),
+      reason: 'java.home must include the matching OpenJDK configuration',
+    );
+    expect(
+      openJdkWorkflow,
+      contains('cp -R host-jdk/conf java_bundle-device/conf'),
+      reason: 'the security configuration must match the OpenJDK source build',
+    );
+    expect(
+      openJdkWorkflow,
+      contains('cp host-jdk/lib/tzdb.dat java_bundle-device/lib/tzdb.dat'),
+      reason: 'the timezone database must match the OpenJDK source build',
+    );
+    expect(
+      openJdkWorkflow,
+      contains('libnet.a libnio.a libjimage.a libverify.a'),
+      reason: 'dex2jar-generated classes need the static legacy verifier',
+    );
+    expect(
+      runtimeBuilder,
+      contains(r'cp "$runtime_tzdb" "$output_framework/lib/lib/tzdb.dat"'),
+      reason: 'java.home must include the matching timezone database',
+    );
+    expect(
+      nativeSource,
+      contains('stringByAppendingPathComponent:@"conf/security/java.security"'),
+      reason: 'missing security properties must fail before VM startup',
+    );
+    expect(
+      nativeSource,
+      contains('stringByAppendingPathComponent:@"lib/tzdb.dat"'),
+      reason: 'missing timezone data must fail before VM startup',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains(
+        'if (!is_init_completed() &&\n'
+        '+            holder == vmClasses::Class_klass() &&\n'
+        '+            callee->name()->equals("desiredAssertionStatus")',
+      ),
+      reason:
+          'the bootstrap bypass must be limited to the primordial assertion query',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('enabled = JavaAssertions::enabled('),
+      reason: 'the primordial query must use HotSpot assertion semantics',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('asserted_klass->class_loader() == nullptr'),
+      reason: 'dynamic non-bootstrap assertion settings must not be bypassed',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('holder->link_class(THREAD);'),
+      reason: 'extension and post-bootstrap classes must retain full linkage',
+    );
+    expect(
+      zeroRuntimePatch,
+      isNot(contains('vmClasses::Class_klass()->link_class(CHECK);')),
+      reason:
+          'java.lang.Class must remain on its normal bootstrap linkage lifecycle',
+    );
+    expect(
+      zeroRuntimePatch,
+      isNot(contains('holder->rewrite_class(THREAD);')),
+      reason: 'the fallback must not partially rewrite java.lang.Class',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Rewriter: class=java.lang.Class'),
+      reason: 'the Class constant-pool sizing fallback must remain observable',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Serial bootstrap allocation exhausted:'),
+      reason: 'pre-initialization allocation failures need generation evidence',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Serial bootstrap Java stack:'),
+      reason: 'pre-initialization exhaustion must identify its Java caller',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('Mangatan Serial raw Zero frame chain:'),
+      reason: 'Zero bootstrap failures need the complete interpreter chain',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('return RTLD_DEFAULT;'),
+      reason:
+          'the iOS Zero runtime must resolve JNI symbols from its global framework',
+    );
+    expect(
+      zeroRuntimePatch,
+      contains('scope=RTLD_DEFAULT found=%s'),
+      reason: 'bootstrap native lookup must remain observable on physical iOS',
+    );
+    expect(
+      libjavaGlobalSymbolsPatch,
+      contains('procHandle = RTLD_DEFAULT;'),
+      reason:
+          'libjava must see built-in native libraries in the lazy iOS framework',
+    );
+    expect(
+      libjavaGlobalSymbolsPatch,
+      contains(
+        'defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)\n'
+        '+    // The iOS Zero VM lives in a framework loaded after process launch.\n'
+        '+    // RTLD_FIRST only searches the main executable, so built-in libjava,\n'
+        '+    // jimage, net, nio, and zip symbols cannot be found.\n'
+        '+    procHandle = RTLD_DEFAULT;\n'
+        '+#elif defined(__APPLE__)',
+      ),
+      reason: 'only iOS should replace the macOS RTLD_FIRST search scope',
+    );
+    expect(xcodeProject, isNot(contains('OpenJDK.xcframework in Frameworks')));
+    expect(
+      xcodeProject,
+      contains('OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime'),
+    );
+  });
+}

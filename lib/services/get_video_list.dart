@@ -1,14 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/video.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/torrent_server.dart';
+import 'package:mangayomi/services/youtube/youtube_service.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -26,14 +24,12 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
   final keepAlive = ref.keepAlive();
   try {
     final storageProvider = StorageProvider();
-    // Only touch the (public) mpv config dir when the mpv-config feature is on.
-    // Otherwise a fresh install with no all-files access would hit a permission
-    // error just for streaming an episode — the dir was being created on every
-    // play even though useMpvConfig defaults to false. See #740.
-    final useMpvConfig = ref.read(useMpvConfigStateProvider);
-    final mpvDirectory = useMpvConfig
-        ? await storageProvider.getMpvDirectory()
-        : null;
+    final mpvDirectory = await storageProvider.getMpvDirectory();
+    if (episode.manga.value?.source == youtubeSourceName) {
+      final videos = await YouTubeService.resolveVideoStreams(episode.url!);
+      keepAlive.close();
+      return (videos, false, const <String>[], mpvDirectory);
+    }
     final mangaDirectory = await storageProvider.getMangaMainDirectory(episode);
     final isLocalArchive =
         episode.manga.value!.isLocalArchive! &&
@@ -42,20 +38,17 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
       mangaDirectory!.path,
       "${episode.name!.replaceForbiddenCharacters(' ')}.mp4",
     );
-    final resolvedArchivePath = episode.archivePath?.isNotEmpty ?? false
-        ? await resolveLocalArchivePath(episode.archivePath!)
-        : null;
     List<String> infoHashes = [];
     if (await File(mp4animePath).exists() || isLocalArchive) {
       final animeDir =
-          resolvedArchivePath != null && episode.manga.value?.source == "local"
-          ? Directory(p.dirname(resolvedArchivePath))
+          episode.archivePath != null && episode.manga.value?.source == "local"
+          ? Directory(p.dirname(episode.archivePath!))
           : null;
       final chapterDirectory = (await storageProvider.getMangaChapterDirectory(
         episode,
         mangaMainDirectory: animeDir ?? mangaDirectory,
       ))!;
-      final path = isLocalArchive ? resolvedArchivePath : mp4animePath;
+      final path = isLocalArchive ? episode.archivePath : mp4animePath;
       final subtitlesDir = Directory(
         p.join('${chapterDirectory.path}_subtitles'),
       );
@@ -84,7 +77,7 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
       episode.manga.value!.source!,
       episode.manga.value!.sourceId,
     );
-    final proxyServer = ref.read(androidProxyServerStateProvider);
+    final proxyServer = await prepareMihonBridge(ref, source);
 
     final isMihonTorrent =
         source?.sourceCodeLanguage == SourceCodeLanguage.mihon &&

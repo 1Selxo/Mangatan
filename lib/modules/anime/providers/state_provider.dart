@@ -33,16 +33,24 @@ class SubtitleSettingsState extends _$SubtitleSettingsState {
     final settings = isar.settings.getSync(227);
     state = PlayerSubtitleSettings(
       fontSize: state.fontSize,
+      fontWeight: state.fontWeight,
+      position: state.position ?? 0,
       useBold: state.useBold,
       useItalic: state.useItalic,
+      outlineThickness: state.outlineThickness,
+      shadowThickness: state.shadowThickness,
     );
     isar.writeTxnSync(
       () => isar.settings.putSync(
         settings!
           ..playerSubtitleSettings = PlayerSubtitleSettings(
             fontSize: state.fontSize,
+            fontWeight: state.fontWeight,
+            position: state.position ?? 0,
             useBold: state.useBold,
             useItalic: state.useItalic,
+            outlineThickness: state.outlineThickness,
+            shadowThickness: state.shadowThickness,
           )
           ..updatedAt = DateTime.now().millisecondsSinceEpoch,
       ),

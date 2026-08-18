@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -5,13 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
+import 'package:mangayomi/modules/manga/reader/reader_eink_state.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_popup_menu_button.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 
 String _navLayoutName(int index, BuildContext context) {
   final l10n = l10nLocalizations(context)!;
@@ -48,10 +51,14 @@ class ReaderSettingsModal {
     required BuildContext context,
     required TickerProvider vsync,
     required ProviderListenable<ReaderMode?> currentReaderModeProvider,
+    required ProviderListenable<ReadingDirection?>
+    currentReadingDirectionProvider,
     required ValueNotifier<bool> autoScrollPage,
     required ValueNotifier<bool> autoScroll,
     required ValueNotifier<double> pageOffset,
     required void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged,
+    required void Function(ReadingDirection direction, WidgetRef ref)
+    onReadingDirectionChanged,
     required void Function(bool enabled, double offset) onAutoScrollSave,
     required VoidCallback onFullScreenToggle,
     required VoidCallback onAutoPageScroll,
@@ -63,6 +70,8 @@ class ReaderSettingsModal {
     }
 
     final l10n = l10nLocalizations(context)!;
+    unawaited(ReaderOcrState.initialize());
+    unawaited(ReaderEInkState.initialize());
 
     await customDraggableTabBar(
       tabs: [
@@ -74,9 +83,11 @@ class ReaderSettingsModal {
         // Reading Mode Tab
         _ReadingModeTab(
           currentReaderModeProvider: currentReaderModeProvider,
+          currentReadingDirectionProvider: currentReadingDirectionProvider,
           autoScrollPage: autoScrollPage,
           pageOffset: pageOffset,
           onReaderModeChanged: onReaderModeChanged,
+          onReadingDirectionChanged: onReadingDirectionChanged,
           onAutoScrollSave: onAutoScrollSave,
           onAutoScroll: (val) {
             autoScroll.value = val;
@@ -107,17 +118,22 @@ class ReaderSettingsModal {
 /// Reading Mode Tab with Consumer for reactive updates.
 class _ReadingModeTab extends ConsumerWidget {
   final ProviderListenable<ReaderMode?> currentReaderModeProvider;
+  final ProviderListenable<ReadingDirection?> currentReadingDirectionProvider;
   final ValueNotifier<bool> autoScrollPage;
   final ValueNotifier<double> pageOffset;
   final void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged;
+  final void Function(ReadingDirection direction, WidgetRef ref)
+  onReadingDirectionChanged;
   final void Function(bool enabled, double offset) onAutoScrollSave;
   final void Function(bool val) onAutoScroll;
 
   const _ReadingModeTab({
     required this.currentReaderModeProvider,
+    required this.currentReadingDirectionProvider,
     required this.autoScrollPage,
     required this.pageOffset,
     required this.onReaderModeChanged,
+    required this.onReadingDirectionChanged,
     required this.onAutoScrollSave,
     required this.onAutoScroll,
   });
@@ -126,6 +142,7 @@ class _ReadingModeTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = l10nLocalizations(context)!;
     final readerMode = ref.watch(currentReaderModeProvider);
+    final readingDirection = ref.watch(currentReadingDirectionProvider);
     final usePageTapZones = ref.watch(usePageTapZonesStateProvider);
     final cropBorders = ref.watch(cropBordersStateProvider);
     final splitWidePages = ref.watch(splitWidePagesStateProvider);
@@ -139,6 +156,7 @@ class _ReadingModeTab extends ConsumerWidget {
     );
     final landscapeZoom = ref.watch(landscapeZoomStateProvider);
     final zoomStartPosition = ref.watch(zoomStartPositionStateProvider);
+    final automaticBackground = ref.watch(automaticBackgroundStateProvider);
     final webtoonDisableZoomOut = ref.watch(webtoonDisableZoomOutStateProvider);
     final webtoonDoubleTapZoomEnabled = ref.watch(
       webtoonDoubleTapZoomEnabledStateProvider,
@@ -158,8 +176,20 @@ class _ReadingModeTab extends ConsumerWidget {
                 onReaderModeChanged(value, ref);
               },
               value: readerMode,
-              list: ReaderMode.values,
+              list: ReaderModeExtension.selectableValues,
               itemText: (mode) => getReaderModeName(mode, context),
+            ),
+
+            CustomPopupMenuButton<ReadingDirection>(
+              label: l10n.reading_direction,
+              title: getReadingDirectionName(readingDirection!, context),
+              onSelected: (value) {
+                onReadingDirectionChanged(value, ref);
+              },
+              value: readingDirection,
+              list: ReadingDirection.values,
+              itemText: (direction) =>
+                  getReadingDirectionName(direction, context),
             ),
 
             // Crop Borders
@@ -168,8 +198,9 @@ class _ReadingModeTab extends ConsumerWidget {
               title: Text(
                 l10n.crop_borders,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -184,8 +215,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   l10n.webtoon_disable_zoom_out,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -200,8 +232,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   l10n.webtoon_double_tap_zoom_enabled,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -219,8 +252,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   l10n.navigate_to_pan,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -238,8 +272,9 @@ class _ReadingModeTab extends ConsumerWidget {
               title: Text(
                 l10n.split_wide_pages,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -254,8 +289,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   l10n.dual_page_invert,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -269,8 +305,9 @@ class _ReadingModeTab extends ConsumerWidget {
               title: Text(
                 l10n.dual_page_rotate_to_fit,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -285,8 +322,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   l10n.dual_page_rotate_to_fit_invert,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -303,8 +341,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   l10n.landscape_zoom,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -333,14 +372,31 @@ class _ReadingModeTab extends ConsumerWidget {
                 },
               ),
 
+            SwitchListTile(
+              value: automaticBackground,
+              title: Text(
+                l10n.automatic_background,
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                  fontSize: 14,
+                ),
+              ),
+              onChanged: (value) {
+                ref.read(automaticBackgroundStateProvider.notifier).set(value);
+              },
+            ),
+
             // Page Tap Zones
             SwitchListTile(
               value: usePageTapZones,
               title: Text(
                 l10n.use_page_tap_zones,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -355,8 +411,9 @@ class _ReadingModeTab extends ConsumerWidget {
               title: Text(
                 l10n.keep_screen_on,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -372,8 +429,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   l10n.show_page_gaps,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -388,8 +446,9 @@ class _ReadingModeTab extends ConsumerWidget {
                 title: Text(
                   '${l10n.webtoon_side_padding}: $webtoonSidePadding%',
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -517,8 +576,9 @@ class _GeneralTab extends ConsumerWidget {
               value: scaleType,
               list: ScaleType.values.where((scale) {
                 try {
-                  return getScaleTypeNames(context)
-                      .contains(getScaleTypeNames(context)[scale.index]);
+                  return getScaleTypeNames(
+                    context,
+                  ).contains(getScaleTypeNames(context)[scale.index]);
                 } catch (_) {
                   return false;
                 }
@@ -531,8 +591,9 @@ class _GeneralTab extends ConsumerWidget {
               title: Text(
                 l10n.navigation_layout,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -576,8 +637,9 @@ class _GeneralTab extends ConsumerWidget {
               title: Text(
                 l10n.tapping_inversion,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -637,8 +699,9 @@ class _GeneralTab extends ConsumerWidget {
               title: Text(
                 l10n.flash_on_page_change,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -655,8 +718,9 @@ class _GeneralTab extends ConsumerWidget {
                 title: Text(
                   l10n.flash_color,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -701,8 +765,9 @@ class _GeneralTab extends ConsumerWidget {
                 title: Text(
                   l10n.flash_interval(flashInterval.toString()),
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -722,8 +787,9 @@ class _GeneralTab extends ConsumerWidget {
                 title: Text(
                   l10n.flash_duration(flashDuration.toString()),
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -747,8 +813,9 @@ class _GeneralTab extends ConsumerWidget {
               title: Text(
                 l10n.show_navigation_overlay_on_start,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -764,8 +831,9 @@ class _GeneralTab extends ConsumerWidget {
               title: Text(
                 l10n.reader_hide_threshold,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -818,22 +886,37 @@ class _GeneralTab extends ConsumerWidget {
                 );
               },
             ),
-            if (!isMobile)
-              // Fullscreen
-              SwitchListTile(
-                value: fullScreenReader,
-                title: Text(
-                  l10n.fullscreen,
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!
-                        .withValues(alpha: 0.9),
-                    fontSize: 14,
-                  ),
+
+            // Fullscreen
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderEInkState.enabled,
+              builder: (context, eInkMode, _) => SwitchListTile(
+                value: eInkMode,
+                title: const Text('E-Ink mode'),
+                subtitle: const Text(
+                  'Uses a high-contrast white reader surface for E-Ink displays',
                 ),
                 onChanged: (value) {
-                  onFullScreenToggle();
+                  unawaited(ReaderEInkState.setEnabled(value));
                 },
               ),
+            ),
+
+            SwitchListTile(
+              value: fullScreenReader,
+              title: Text(
+                l10n.fullscreen,
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                  fontSize: 14,
+                ),
+              ),
+              onChanged: (value) {
+                onFullScreenToggle();
+              },
+            ),
 
             // Show Page Numbers
             SwitchListTile(
@@ -841,13 +924,138 @@ class _GeneralTab extends ConsumerWidget {
               title: Text(
                 l10n.show_page_number,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
               onChanged: (value) {
                 ref.read(showPagesNumberStateProvider.notifier).set(value);
+              },
+            ),
+
+            ValueListenableBuilder<OcrEnginePreference>(
+              valueListenable: ReaderOcrState.engine,
+              builder: (context, engine, _) {
+                return ListTile(
+                  title: const Text('OCR engine'),
+                  subtitle: Text(ocrEngineLabel(engine)),
+                  trailing: PopupMenuButton<OcrEnginePreference>(
+                    initialValue: engine,
+                    onSelected: (value) {
+                      unawaited(ReaderOcrState.setEngine(value));
+                    },
+                    itemBuilder: (context) => [
+                      for (final option in availableOcrEngines())
+                        PopupMenuItem(
+                          value: option,
+                          child: Text(ocrEngineLabel(option)),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            ValueListenableBuilder<OcrScanTrigger>(
+              valueListenable: ReaderOcrState.scanTrigger,
+              builder: (context, trigger, _) {
+                return ListTile(
+                  title: const Text('OCR trigger'),
+                  subtitle: Text(switch (trigger) {
+                    OcrScanTrigger.automatic =>
+                      'Automatic (scans pages in the background)',
+                    OcrScanTrigger.manual =>
+                      'Manual (tap the OCR button to scan the current page)',
+                  }),
+                  trailing: PopupMenuButton<OcrScanTrigger>(
+                    initialValue: trigger,
+                    onSelected: (value) {
+                      unawaited(ReaderOcrState.setScanTrigger(value));
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: OcrScanTrigger.automatic,
+                        child: Text('Automatic'),
+                      ),
+                      PopupMenuItem(
+                        value: OcrScanTrigger.manual,
+                        child: Text('Manual'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            ValueListenableBuilder<int>(
+              valueListenable: ReaderOcrState.parallelOcrLimit,
+              builder: (context, limit, _) {
+                return ListTile(
+                  title: const Text('Parallel OCR tasks'),
+                  subtitle: Text(
+                    limit == 1
+                        ? '1 task (recommended)'
+                        : '$limit tasks (higher battery and network use)',
+                  ),
+                  trailing: DropdownButton<int>(
+                    value: limit,
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('1')),
+                      DropdownMenuItem(value: 2, child: Text('2')),
+                      DropdownMenuItem(value: 3, child: Text('3')),
+                      DropdownMenuItem(value: 4, child: Text('4')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        unawaited(ReaderOcrState.setParallelOcrLimit(value));
+                      }
+                    },
+                  ),
+                );
+              },
+            ),
+
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderOcrState.outlineVisible,
+              builder: (context, outlineVisible, _) {
+                return SwitchListTile(
+                  value: outlineVisible,
+                  title: Text(
+                    'Show OCR box outlines',
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    unawaited(ReaderOcrState.setOutlineVisible(value));
+                  },
+                );
+              },
+            ),
+
+            ValueListenableBuilder<bool>(
+              valueListenable: ReaderOcrState.lookupOnHover,
+              builder: (context, lookupOnHover, _) {
+                return SwitchListTile(
+                  value: lookupOnHover,
+                  title: Text(
+                    'Lookup OCR text on hover',
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    unawaited(ReaderOcrState.setLookupOnHover(value));
+                  },
+                );
               },
             ),
 
@@ -857,8 +1065,9 @@ class _GeneralTab extends ConsumerWidget {
               title: Text(
                 l10n.animate_page_transitions,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -922,8 +1131,9 @@ class _CustomFilterTab extends ConsumerWidget {
               title: Text(
                 l10n.invert_colors,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -938,8 +1148,9 @@ class _CustomFilterTab extends ConsumerWidget {
               title: Text(
                 l10n.grayscale,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -994,8 +1205,9 @@ class _CustomFilterTab extends ConsumerWidget {
               title: Text(
                 l10n.custom_color_filter,
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!
-                      .withValues(alpha: 0.9),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -1065,8 +1277,9 @@ class _CustomFilterTab extends ConsumerWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: Theme.of(context).textTheme.bodyLarge!.color!
-                    .withValues(alpha: 0.9),
+                color: Theme.of(
+                  context,
+                ).textTheme.bodyLarge!.color!.withValues(alpha: 0.9),
                 fontSize: 14,
               ),
             ),

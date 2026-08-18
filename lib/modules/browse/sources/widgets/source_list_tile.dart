@@ -5,9 +5,11 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/browse/widgets/source_extension_icon.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
 import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/utils/cached_network.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:mangayomi/utils/language.dart';
@@ -26,22 +28,26 @@ class SourceListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dictionaryProfileSourceId =
+        DictionaryProfileResolver.overrideIdForSource(source);
     return Consumer(
       builder: (context, ref, child) => ListTile(
         onTap: () {
           if (!isLocal) {
-            isar.writeTxn(() async {
-              final sources = await isar.sources
-                  .filter()
-                  .idIsNotNull()
-                  .itemTypeEqualTo(itemType)
-                  .findAll();
-              final updated = sources.map((src) {
-                return src
-                  ..lastUsed = src.id == source.id
-                  ..updatedAt = DateTime.now().millisecondsSinceEpoch;
-              }).toList();
-              await isar.sources.putAll(updated);
+            final sources = isar.sources
+                .filter()
+                .idIsNotNull()
+                .and()
+                .itemTypeEqualTo(itemType)
+                .findAllSync();
+            isar.writeTxnSync(() {
+              for (var src in sources) {
+                isar.sources.putSync(
+                  src
+                    ..lastUsed = src.id == source.id ? true : false
+                    ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+                );
+              }
             });
           }
           context.push('/mangaHome', extra: (source, false));
@@ -50,24 +56,12 @@ class SourceListTile extends StatelessWidget {
           height: 37,
           width: 37,
           decoration: BoxDecoration(
-            color: Theme.of(context).secondaryHeaderColor
-                .withValues(alpha: 0.5),
+            color: Theme.of(
+              context,
+            ).secondaryHeaderColor.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(5),
           ),
-          child: source.iconUrl!.isEmpty
-              ? const Icon(Icons.extension_rounded)
-              : cachedNetworkImage(
-                  imageUrl: source.iconUrl!,
-                  fit: BoxFit.contain,
-                  width: 37,
-                  height: 37,
-                  errorWidget: const SizedBox(
-                    width: 37,
-                    height: 37,
-                    child: Center(child: Icon(Icons.extension_rounded)),
-                  ),
-                  useCustomNetworkImage: false,
-                ),
+          child: SourceExtensionIcon(source: source, size: 37),
         ),
         subtitle: Row(
           children: [
@@ -104,56 +98,73 @@ class SourceListTile extends StatelessWidget {
               ? source.name!
               : "${context.l10n.local_source} ${source.itemType.localized(context.l10n)}",
         ),
-        trailing: SizedBox(
-          width: 150,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Consumer(
-                builder: (context, ref, child) {
-                  // final supportsLatest =  ref.watch(supportsLatestProvider(source: source));
-                  // if (supportsLatest) {
-                  return TextButton(
-                    style: const ButtonStyle(
-                      padding: WidgetStatePropertyAll(EdgeInsets.all(10)),
-                    ),
-                    onPressed: () =>
-                        context.push('/mangaHome', extra: (source, true)),
-                    child: Text(context.l10n.latest),
-                  );
-                  // }
-                  // return const SizedBox.shrink();
-                },
-              ),
-              const SizedBox(width: 10),
-              if (!isLocal)
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Consumer(
+              builder: (context, ref, child) {
+                // final supportsLatest =  ref.watch(supportsLatestProvider(source: source));
+                // if (supportsLatest) {
+                return TextButton(
+                  style: const ButtonStyle(
+                    padding: WidgetStatePropertyAll(EdgeInsets.all(10)),
+                  ),
+                  onPressed: () =>
+                      context.push('/mangaHome', extra: (source, true)),
+                  child: Text(context.l10n.latest),
+                );
+                // }
+                // return const SizedBox.shrink();
+              },
+            ),
+            const SizedBox(width: 10),
+            if (!isLocal) ...[
+              if (dictionaryProfileSourceId != null)
                 IconButton(
-                  padding: const EdgeInsets.all(0),
-                  onPressed: () {
-                    isar.writeTxn(
-                      () async => await isar.sources.put(
-                        source
-                          ..isPinned = !source.isPinned!
-                          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+                  tooltip: 'Set dictionary profile',
+                  onPressed: () async {
+                    await showDictionaryProfileOverrideDialog(
+                      context: context,
+                      overrideKey: DictionaryProfileResolver.sourceOverrideKey(
+                        dictionaryProfileSourceId,
                       ),
+                      autoProfile: DictionaryProfileResolver.resolve(
+                        sourceLanguage:
+                            DictionaryProfileResolver.sourceLanguageForSource(
+                              source,
+                            ),
+                      ),
+                      title: 'Dictionary profile for this source',
                     );
                   },
-                  icon: Icon(
-                    Icons.push_pin_outlined,
-                    color: source.isPinned! ? context.primaryColor : null,
-                  ),
+                  icon: const Icon(Icons.menu_book_outlined),
                 ),
+              IconButton(
+                padding: const EdgeInsets.all(0),
+                onPressed: () {
+                  isar.writeTxnSync(
+                    () => isar.sources.putSync(
+                      source
+                        ..isPinned = !source.isPinned!
+                        ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+                    ),
+                  );
+                },
+                icon: Icon(
+                  Icons.push_pin_outlined,
+                  color: source.isPinned! ? context.primaryColor : null,
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// TV variant of [SourceListTile]: three independently d-pad-focusable buttons
-/// in a row — the source (opens popular), Latest, and Pin — so the remote moves
-/// Left/Right between them and Up/Down between rows. See #729.
+/// D-pad-friendly source row used by the Android TV source browser.
 class TvSourceRow extends StatelessWidget {
   final Source source;
   final ItemType itemType;
@@ -176,16 +187,18 @@ class TvSourceRow extends StatelessWidget {
     if (!isLocal) {
       final sources = isar.sources
           .filter()
+          .idIsNotNull()
+          .and()
           .itemTypeEqualTo(itemType)
           .findAllSync();
-      final now = DateTime.now().millisecondsSinceEpoch;
       isar.writeTxnSync(() {
-        for (var src in sources) {
-          src
-            ..lastUsed = src.id == source.id
-            ..updatedAt = now;
+        for (final src in sources) {
+          isar.sources.putSync(
+            src
+              ..lastUsed = src.id == source.id
+              ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+          );
         }
-        isar.sources.putAllSync(sources);
       });
     }
     context.push('/mangaHome', extra: (source, false));
@@ -211,26 +224,12 @@ class TvSourceRow extends StatelessWidget {
                       height: 37,
                       width: 37,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).secondaryHeaderColor
-                            .withValues(alpha: 0.5),
+                        color: Theme.of(
+                          context,
+                        ).secondaryHeaderColor.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(5),
                       ),
-                      child: source.iconUrl!.isEmpty
-                          ? const Icon(Icons.extension_rounded)
-                          : cachedNetworkImage(
-                              imageUrl: source.iconUrl!,
-                              fit: BoxFit.contain,
-                              width: 37,
-                              height: 37,
-                              errorWidget: const SizedBox(
-                                width: 37,
-                                height: 37,
-                                child: Center(
-                                  child: Icon(Icons.extension_rounded),
-                                ),
-                              ),
-                              useCustomNetworkImage: false,
-                            ),
+                      child: SourceExtensionIcon(source: source, size: 37),
                     ),
                     const SizedBox(width: 14),
                     Expanded(

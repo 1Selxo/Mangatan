@@ -5,11 +5,40 @@ PODS:
     - Flutter
   - device_info_plus (0.0.1):
     - Flutter
-  - external_path (2.0.1):
-    - Flutter
+  - DKImagePickerController/Core (4.3.4):
+    - DKImagePickerController/ImageDataManager
+    - DKImagePickerController/Resource
+  - DKImagePickerController/ImageDataManager (4.3.4)
+  - DKImagePickerController/PhotoGallery (4.3.4):
+    - DKImagePickerController/Core
+    - DKPhotoGallery
+  - DKImagePickerController/Resource (4.3.4)
+  - DKPhotoGallery (0.0.17):
+    - DKPhotoGallery/Core (= 0.0.17)
+    - DKPhotoGallery/Model (= 0.0.17)
+    - DKPhotoGallery/Preview (= 0.0.17)
+    - DKPhotoGallery/Resource (= 0.0.17)
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Core (0.0.17):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Preview
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Model (0.0.17):
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Preview (0.0.17):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Resource
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Resource (0.0.17):
+    - SDWebImage
+    - SwiftyGif
   - file_picker (0.0.1):
+    - DKImagePickerController/PhotoGallery
     - Flutter
-    - FlutterMacOS
   - Flutter (1.0.0)
   - flutter_avif_ios (0.0.1):
     - Flutter
@@ -34,7 +63,7 @@ PODS:
   - local_auth_darwin (0.0.1):
     - Flutter
     - FlutterMacOS
-  - m_extension_server (0.0.4):
+  - m_extension_server (0.0.1):
     - Flutter
   - media_kit_libs_ios_video (1.0.4):
     - Flutter
@@ -48,6 +77,9 @@ PODS:
     - Flutter
   - screen_brightness_ios (2.1.3):
     - Flutter
+  - SDWebImage (5.17.0):
+    - SDWebImage/Core (= 5.17.0)
+  - SDWebImage/Core (5.17.0)
   - share_plus (0.0.1):
     - Flutter
   - swift-collections (1.1.1):
@@ -66,6 +98,7 @@ PODS:
     - InternalCollectionsUtilities (= 1.1.1)
   - swift-collections/OrderedCollections (1.1.1):
     - InternalCollectionsUtilities (= 1.1.1)
+  - SwiftyGif (5.4.4)
   - url_launcher_ios (0.0.1):
     - Flutter
   - volume_controller (0.0.1):
@@ -77,8 +110,7 @@ DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
-  - external_path (from `.symlinks/plugins/external_path/ios`)
-  - file_picker (from `.symlinks/plugins/file_picker/darwin`)
+  - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - Flutter (from `Flutter`)
   - flutter_avif_ios (from `.symlinks/plugins/flutter_avif_ios/ios`)
   - flutter_discord_rpc_fork (from `.symlinks/plugins/flutter_discord_rpc_fork/ios`)
@@ -102,8 +134,12 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - DKImagePickerController
+    - DKPhotoGallery
     - InternalCollectionsUtilities
+    - SDWebImage
     - swift-collections
+    - SwiftyGif
 
 EXTERNAL SOURCES:
   app_links:
@@ -112,10 +148,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/connectivity_plus/ios"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
-  external_path:
-    :path: ".symlinks/plugins/external_path/ios"
   file_picker:
-    :path: ".symlinks/plugins/file_picker/darwin"
+    :path: ".symlinks/plugins/file_picker/ios"
   Flutter:
     :path: Flutter
   flutter_avif_ios:
@@ -161,6 +195,8 @@ SPEC CHECKSUMS:
   app_links: a754cbec3c255bd4bbb4d236ecc06f28cd9a7ce8
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
+  DKImagePickerController: b512c28220a2b8ac7419f21c491fc8534b7601ac
+  DKPhotoGallery: fdfad5125a9fdda9cc57df834d49df790dbb4179
   external_path: fd37c654b69a1336e33a2403f48383ae6100e443
   file_picker: 70164d9778c42c47218d6cd79ce435de0856b11a
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
@@ -173,19 +209,21 @@ SPEC CHECKSUMS:
   InternalCollectionsUtilities: af3f471602c4a67cbcb0bee0a80f6f55a33ae453
   isar_community_flutter_libs: bede843185a61a05ff364a05c9b23209523f7e0d
   local_auth_darwin: c3ee6cce0a8d56be34c8ccb66ba31f7f180aaebb
-  m_extension_server: 8460f14761883af48772290c5f818659b844d4c3
+  m_extension_server: 6946ec189542b271dbd15629b9498595f1036761
   media_kit_libs_ios_video: 5a18affdb97d1f5d466dc79988b13eff6c5e2854
   media_kit_video: 1746e198cb697d1ffb734b1d05ec429d1fcd1474
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
-  rust_lib_mangayomi: 360a904274b47351a0f7c26d3ce5aa6392bb8db3
+  rust_lib_mangayomi: a5d2241ff76d46e2c516b584155422f27ac68f4f
   screen_brightness_ios: 212d950bb99c915eee971c884f4a6c87c92cd13d
+  SDWebImage: 750adf017a315a280c60fde706ab1e552a3ae4e9
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   swift-collections: ba248ecaf44ef500b27d5cf94d304218c89892ff
+  SwiftyGif: 93a1cc87bf3a51916001cf8f3d63835fb64c819f
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   volume_controller: 3657a1f65bedb98fa41ff7dc5793537919f31b12
   wakelock_plus: e29112ab3ef0b318e58cfa5c32326458be66b556
 
-PODFILE CHECKSUM: c6004dd61ab6b724c93a40f3706bf6adbdd5d4a0
+PODFILE CHECKSUM: a57f30d18f102dd3ce366b1d62a55ecbef2158e5
 
 COCOAPODS: 1.16.2

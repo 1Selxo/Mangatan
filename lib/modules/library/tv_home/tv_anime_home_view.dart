@@ -29,6 +29,7 @@ import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:mangayomi/modules/widgets/tv_pill.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
+import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 // Poster width per density scale (0 compact · 1 comfortable · 2 large); row
@@ -314,11 +315,16 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                     ),
                   )
                   .$2,
-              settings: settings,
             ),
           );
           final entries = (sortState.reverse ?? false)
-              ? filtered.reversed.toList()
+              ? sortState.index == 3
+                    ? sortByUnreadCount(
+                        filtered,
+                        unreadCountOf: (manga) => manga.unreadChaptersCount,
+                        descending: true,
+                      )
+                    : filtered.reversed.toList()
               : filtered;
 
           // Continue Watching = every anime you've actually played, from watch

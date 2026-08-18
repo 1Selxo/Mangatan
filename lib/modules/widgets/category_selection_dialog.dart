@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
-import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
+import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
-import 'package:mangayomi/modules/library/widgets/list_tile_manga_category.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_filter_list_tile_widget.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/category_service.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
@@ -26,11 +26,12 @@ void showCategorySelectionDialog({
   );
   final l10n = l10nLocalizations(context)!;
   final bool isBulk = bulkMangas != null;
-  final bool isFavorite = !isBulk && (singleManga!.favorite ?? false);
+  final bool isLibraryVisible = !isBulk && singleManga!.isVisibleInLibrary;
   List<int> categoryIds = [];
-  if (!isBulk && isFavorite) {
-    categoryIds = List<int>.from(singleManga.categories ?? []);
+  if (!isBulk) {
+    categoryIds = List<int>.from(singleManga?.categories ?? []);
   }
+  final bulkOverrides = <int, bool>{};
   showDialog(
     context: context,
     builder: (context) => StatefulBuilder(
@@ -134,14 +135,8 @@ void showCategorySelectionDialog({
                           ),
                         );
                       }
-                      var entries = (snapshot.data!
+                      final entries = (snapshot.data!
                         ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0)));
-                      if (isFavorite || isBulk) {
-                        // When item is in library, hide hidden categories in list
-                        entries = entries
-                            .where((e) => !(e.hide ?? false))
-                            .toList();
-                      }
                       if (entries.isEmpty) {
                         return Center(
                           child: Column(
@@ -169,7 +164,14 @@ void showCategorySelectionDialog({
                         itemCount: entries.length,
                         itemBuilder: (context, index) {
                           final category = entries[index];
-                          final isSelected = categoryIds.contains(category.id);
+                          final state = isBulk
+                              ? (bulkOverrides.containsKey(category.id)
+                                  ? (bulkOverrides[category.id]! ? 1 : 0)
+                                  : CategoryService.membershipState(
+                                      bulkMangas,
+                                      category.id!,
+                                    ))
+                              : (categoryIds.contains(category.id) ? 1 : 0);
                           if (!isBulk) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 6),
@@ -177,34 +179,24 @@ void showCategorySelectionDialog({
                                 label: category.name!,
                                 onTap: () {
                                   setState(() {
-                                    isSelected
+                                    state == 1
                                         ? categoryIds.remove(category.id)
                                         : categoryIds.add(category.id!);
                                   });
                                 },
-                                type: isSelected ? 1 : 0,
+                                type: state,
                               ),
                             );
                           }
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 6),
-                            child: ListTileMangaCategory(
-                              category: category,
-                              categoryIds: categoryIds,
-                              mangasList: bulkMangas,
+                            child: ListTileChapterFilter(
+                              label: category.name!,
+                              type: state,
                               onTap: () {
                                 setState(() {
-                                  if (isSelected) {
-                                    categoryIds.remove(category.id);
-                                  } else {
-                                    categoryIds.add(category.id!);
-                                  }
+                                  bulkOverrides[category.id!] = state != 1;
                                 });
-                              },
-                              res: (res) {
-                                if (res.isNotEmpty && !isSelected) {
-                                  categoryIds.add(category.id!);
-                                }
                               },
                             ),
                           );
@@ -243,11 +235,7 @@ void showCategorySelectionDialog({
                           "/categories",
                           extra: (
                             true,
-                            itemType == ItemType.manga
-                                ? 0
-                                : itemType == ItemType.anime
-                                ? 1
-                                : 2,
+                            itemType,
                           ),
                         );
                         Navigator.pop(context);
@@ -282,14 +270,26 @@ void showCategorySelectionDialog({
                             isar.writeTxnSync(() {
                               if (isBulk) {
                                 for (var manga in bulkMangas) {
-                                  manga.categories = categoryIds;
+                                  final categories = List<int>.from(
+                                    manga.categories ?? const [],
+                                  );
+                                  for (final entry in bulkOverrides.entries) {
+                                    if (entry.value) {
+                                      if (!categories.contains(entry.key)) {
+                                        categories.add(entry.key);
+                                      }
+                                    } else {
+                                      categories.remove(entry.key);
+                                    }
+                                  }
+                                  manga.categories = categories..sort();
                                   manga.updatedAt =
                                       DateTime.now().millisecondsSinceEpoch;
                                   isar.mangas.putSync(manga);
                                 }
                               } else {
-                                if (!isFavorite) {
-                                  singleManga!.favorite = true;
+                                if (!isLibraryVisible) {
+                                  singleManga!.updateFavorite(true);
                                   singleManga.dateAdded =
                                       DateTime.now().millisecondsSinceEpoch;
                                 }

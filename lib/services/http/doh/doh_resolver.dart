@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/services/http/doh/doh_providers.dart';
 
@@ -143,16 +142,6 @@ class DoHResolver {
     return [];
   }
 
-  /// Long-lived clients per provider so DoH lookups reuse connections instead
-  /// of paying a fresh TLS handshake per DNS query.
-  static final Map<String, HttpClient> _hostnameClients = {};
-
-  static HttpClient _hostnameClientFor(DoHProvider provider) =>
-      _hostnameClients.putIfAbsent(
-        provider.url,
-        () => HttpClient()..connectionTimeout = _requestTimeout,
-      );
-
   /// Query DoH by provider hostname (relies on platform DNS for provider host)
   static Future<List<String>> _queryDoHViaHostname(
     String targetHost,
@@ -160,30 +149,35 @@ class DoHResolver {
     String recordType,
   ) async {
     final uri = Uri.parse(provider.url);
-    final client = _hostnameClientFor(provider);
+    final client = HttpClient();
+    client.connectionTimeout = _requestTimeout;
 
-    final request = await client.getUrl(
-      Uri(
-        scheme: uri.scheme,
-        host: uri.host,
-        port: uri.port,
-        path: uri.path,
-        query: 'name=$targetHost&type=$recordType',
-      ),
-    );
+    try {
+      final request = await client.getUrl(
+        Uri(
+          scheme: uri.scheme,
+          host: uri.host,
+          port: uri.port,
+          path: uri.path,
+          query: 'name=$targetHost&type=$recordType',
+        ),
+      );
 
-    request.headers.set('Accept', 'application/dns-json');
-    request.headers.set('User-Agent', 'Mangayomi/1.0');
+      request.headers.set('Accept', 'application/dns-json');
+      request.headers.set('User-Agent', 'Mangatan/1.0');
 
-    final response = await request.close().timeout(_requestTimeout);
+      final response = await request.close().timeout(_requestTimeout);
 
-    if (response.statusCode == 200) {
-      final body = await utf8.decodeStream(response);
-      return _parseDoHResponse(body);
+      if (response.statusCode == 200) {
+        final body = await utf8.decodeStream(response);
+        return _parseDoHResponse(body);
+      }
+
+      _log('HTTP ${response.statusCode} from hostname (${provider.name})');
+      return [];
+    } finally {
+      client.close(force: true);
     }
-
-    _log('HTTP ${response.statusCode} from hostname (${provider.name})');
-    return [];
   }
 
   /// Fallback resolution with other providers

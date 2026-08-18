@@ -49,20 +49,19 @@ final class DownloadedChapterIdsProvider
 }
 
 String _$downloadedChapterIdsHash() =>
-    r'2697cdf0c52c2efa41ef00ba4b4af42ad6029100';
+    r'ff409df987e776e8c150e541c5aa48b1d5f9e9b9';
 
-/// Pre-fetches all manga IDs that have at least one tracking entry reactively.
+/// Pre-fetches all manga IDs that have at least one tracking entry.
 
 @ProviderFor(trackedMangaIds)
 final trackedMangaIdsProvider = TrackedMangaIdsProvider._();
 
-/// Pre-fetches all manga IDs that have at least one tracking entry reactively.
+/// Pre-fetches all manga IDs that have at least one tracking entry.
 
 final class TrackedMangaIdsProvider
-    extends
-        $FunctionalProvider<AsyncValue<Set<int>>, Set<int>, Stream<Set<int>>>
-    with $FutureModifier<Set<int>>, $StreamProvider<Set<int>> {
-  /// Pre-fetches all manga IDs that have at least one tracking entry reactively.
+    extends $FunctionalProvider<Set<int>, Set<int>, Set<int>>
+    with $Provider<Set<int>> {
+  /// Pre-fetches all manga IDs that have at least one tracking entry.
   TrackedMangaIdsProvider._()
     : super(
         from: null,
@@ -79,16 +78,24 @@ final class TrackedMangaIdsProvider
 
   @$internal
   @override
-  $StreamProviderElement<Set<int>> $createElement($ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
+  $ProviderElement<Set<int>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
 
   @override
-  Stream<Set<int>> create(Ref ref) {
+  Set<int> create(Ref ref) {
     return trackedMangaIds(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<int> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<int>>(value),
+    );
   }
 }
 
-String _$trackedMangaIdsHash() => r'7cdf57492a70d233907d543f3c1aadeca5dfad50';
+String _$trackedMangaIdsHash() => r'8fd052ae3ff4e9fe47e66d5e24cd57233aa03d0a';
 
 /// Filters and sorts a list of [Manga] based on library filter/sort settings.
 
@@ -116,7 +123,6 @@ final class FilteredLibraryMangaProvider
       String searchQuery,
       bool ignoreFiltersOnSearch,
       List<String> sourceIds,
-      Settings settings,
     })
     super.argument,
   }) : super(
@@ -159,7 +165,6 @@ final class FilteredLibraryMangaProvider
               String searchQuery,
               bool ignoreFiltersOnSearch,
               List<String> sourceIds,
-              Settings settings,
             });
     return filteredLibraryManga(
       ref,
@@ -175,7 +180,6 @@ final class FilteredLibraryMangaProvider
       searchQuery: argument.searchQuery,
       ignoreFiltersOnSearch: argument.ignoreFiltersOnSearch,
       sourceIds: argument.sourceIds,
-      settings: argument.settings,
     );
   }
 
@@ -199,7 +203,7 @@ final class FilteredLibraryMangaProvider
 }
 
 String _$filteredLibraryMangaHash() =>
-    r'0d24c1464203816fb724873a55b67ad5eb3dbe43';
+    r'95fea1bd64bf4ab32582bd0595519196a05c393f';
 
 /// Filters and sorts a list of [Manga] based on library filter/sort settings.
 
@@ -220,7 +224,6 @@ final class FilteredLibraryMangaFamily extends $Family
             String searchQuery,
             bool ignoreFiltersOnSearch,
             List<String> sourceIds,
-            Settings settings,
           })
         > {
   FilteredLibraryMangaFamily._()
@@ -247,7 +250,6 @@ final class FilteredLibraryMangaFamily extends $Family
     required String searchQuery,
     required bool ignoreFiltersOnSearch,
     required List<String> sourceIds,
-    required Settings settings,
   }) => FilteredLibraryMangaProvider._(
     argument: (
       data: data,
@@ -262,7 +264,6 @@ final class FilteredLibraryMangaFamily extends $Family
       searchQuery: searchQuery,
       ignoreFiltersOnSearch: ignoreFiltersOnSearch,
       sourceIds: sourceIds,
-      settings: settings,
     ),
     from: this,
   );

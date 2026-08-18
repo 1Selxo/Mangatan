@@ -10,18 +10,22 @@ class MTrackBridge {
         return Track(
           file: namedArgs.get<String?>('file'),
           label: namedArgs.get<String?>('label'),
+          language: namedArgs.get<String?>('language'),
         );
       },
     },
     getters: {
       'file': (visitor, target) => (target as Track).file,
       'label': (visitor, target) => (target as Track).label,
+      'language': (visitor, target) => (target as Track).language,
     },
     setters: {
       'file': (visitor, target, value) =>
           (target as Track).file = value as String?,
       'label': (visitor, target, value) =>
           (target as Track).label = value as String?,
+      'language': (visitor, target, value) =>
+          (target as Track).language = value as String?,
     },
   );
   void registerBridgedClasses(D4rt interpreter) {

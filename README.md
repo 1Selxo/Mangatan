@@ -2,20 +2,22 @@
  <img width=200px height=200px src="assets/app_icons/icon-red.png"/>
 </p>
 
-<h1 align="center"> Mangayomi </h1>
+<h1 align="center"> Mangatan </h1>
+
+<p align="center">
+  <img src="media/screenshots/anki-card-export.webp" alt="Exporting an anime sentence with audio and a screenshot from Mangatan to Anki" width="100%">
+</p>
 
 <div align="center">
 
- [![GitHub downloads](https://img.shields.io/github/downloads/kodjodevf/mangayomi/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/kodjodevf/mangayomi/releases)
-![star](https://img.shields.io/github/stars/kodjodevf/mangayomi)
- [![Discord server](https://img.shields.io/discord/1157628512077893666.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.com/invite/EjfBuYahsP) 
+ [![GitHub downloads](https://img.shields.io/github/downloads/1Selxo/Mangatan/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/1Selxo/Mangatan/releases)
+![star](https://img.shields.io/github/stars/1Selxo/Mangatan)
+ [![Discord server](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/SqwE6b7Bb)
 
 
-Mangayomi is an open-source Flutter app for reading manga, novels, and watching animes across multiple platforms.
+ Mangatan is an open-source desktop app for reading manga and novels, watching anime, and learning languages through dictionary lookup, OCR, subtitle mining, and Anki export.
 </div>
 
-> [!WARNING]
-> **Official Warning**: This GitHub repository ([kodjodevf/mangayomi](https://github.com/kodjodevf/mangayomi)) and our official [Discord server](https://discord.com/invite/EjfBuYahsP) are the **only official sources** for Mangayomi. Third-party websites such as `mangayomi.org` are **untrusted** and NOT affiliated with this project. Always download official releases from our GitHub repository.
 
 ## Features
 
@@ -32,25 +34,85 @@ Features include:
 
 </div>
 
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Manga Shelf</strong><br><br>
+      <img src="assets/screenshots/manga-shelf.jpg" alt="Mangatan manga shelf" width="100%">
+    </td>
+    <td width="50%" align="center">
+      <strong>Manga Lookup</strong><br><br>
+      <img src="assets/screenshots/manga-lookup.jpg" alt="Dictionary lookup while reading manga" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Anime Lookup</strong><br><br>
+      <img src="assets/screenshots/anime-lookup.jpg" alt="OCR dictionary lookup while watching anime" width="100%">
+    </td>
+    <td width="50%" align="center">
+      <strong>Novel Lookup</strong><br><br>
+      <img src="assets/screenshots/novel-lookup.jpg" alt="Dictionary lookup while reading a Japanese novel" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <strong>Dictionary</strong><br><br>
+      <img src="assets/screenshots/dictionary.jpg" alt="Mangatan dictionary search" width="75%">
+    </td>
+  </tr>
+</table>
+
 ## Download
-Get the app from our [releases page](https://github.com/kodjodevf/mangayomi/releases).
+
+Get Mangatan from the [releases page](https://github.com/1Selxo/Mangatan/releases),
+then download the asset that matches your platform:
+
+- **Windows** — `Mangatan-<version>-windows.exe` (installer) or
+  `Mangatan-<version>-windows.zip` (portable).
+- **macOS** — `Mangatan-<version>-macos-arm64.dmg` (Apple Silicon).
+- **Linux** — `Mangatan-<version>-linux-x86_64.tar.gz`.
+
+See the [desktop install guide](docs/desktop_install.md) for the full
+download-and-run steps on each platform.
+
+### Android
+
+Looking for the Android version? See [Chimahon](https://github.com/sohilsayed/chimahon).
 
 ## iOS Sideloading Sources
-<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="AltStore Source" src="repo/images/buttons/altstore_button.png" width="150"></a>
 &nbsp;
-<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="Feather Source" src="repo/images/buttons/feather_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="Feather Source" src="repo/images/buttons/feather_button.png" width="150"></a>
 &nbsp;
-<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="Sidestore Source" src="repo/images/buttons/sidestore_button.png" width="150"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="Sidestore Source" src="repo/images/buttons/sidestore_button.png" width="150"></a>
 &nbsp;
-<a href="https://raw.githubusercontent.com/kodjodevf/mangayomi/refs/heads/main/repo/source.json"><img alt="Direct URL Source" src="repo/images/buttons/url_button.png" width="150"></a>
+<a href="https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/source.json"><img alt="Direct URL Source" src="repo/images/buttons/url_button.png" width="150"></a>
 
-Note: Only future releases (> 0.5.2) will be signed (and therefore have AltStore/SideStore compatibility).
+Release IPAs are intentionally unsigned. AltStore, SideStore, Feather, Sideloadly, and similar tools sign the app with your Apple ID during installation.
+
+To build an IPA without publishing a release, open **Actions → Build iOS sideload IPA → Run workflow**. Download the IPA from the completed run's artifacts. Pushing a `v*` tag also attaches the IPA to that GitHub release and refreshes the sideloading source.
+
+### Anki on iOS
+
+The iOS build exports cards through AnkiMobile callbacks instead of
+AnkiConnect. In **Settings → Dictionary → Anki**, tap **Refresh** once to open
+AnkiMobile and import its current decks, note types, and fields. Mining then
+opens AnkiMobile to add the note and returns to Mangatan when the note succeeds;
+images and audio are transferred locally during that callback.
+
+Japanese word audio is enabled by default with JapanesePod101, Jisho.org, and
+LanguagePod101. Audio sources are ordered fallbacks: add, remove, edit, or move
+multiple built-in and custom URL/JSON sources from the same Anki settings page.
 
 # Contributing
 
 Contributions are welcome!
 
-To get started with extension development, see [CONTRIBUTING-DART.md](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-DART.md) for create sources in Dart or [CONTRIBUTING-JS.md](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-JS.md) for create sources in JavaScript.
+To get started with extension development, see the archived upstream [Dart extension guide](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-DART.md) or [JavaScript extension guide](https://github.com/kodjodevf/mangayomi-extensions/blob/main/CONTRIBUTING-JS.md).
 
 ## Using flutter_rust_bridge
 
@@ -84,25 +146,37 @@ Now you can run and build this app just like any other Flutter projects.
 flutter run
 ```
 
+### macOS quick build
+
+On macOS, use the helper script to build the desktop app and open it:
+
+```bash
+./scripts/build_macos.sh
+```
+
+Useful options:
+
+```bash
+./scripts/build_macos.sh --release
+./scripts/build_macos.sh --clean --no-open
+```
+
 
 
 ## License
 
     Copyright 2023 Moustapha Kodjo Amadou
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, version 3 of the License.
 
-    http://www.apache.org/licenses/LICENSE-2.0
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
 
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-    
 
 ## Disclaimer
 
-Mangayomi is not hosting any kind of content and the developer(s) of this application does not have any affiliation with the content providers that are freely available in the internet.
+ Mangatan does not host any content, and the developers of this application are not affiliated with content providers available on the internet.

@@ -5,6 +5,7 @@ import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/services/get_source_preference.dart';
+import 'package:mangayomi/services/mihon_source_preferences.dart';
 
 void setPreferenceSetting(SourcePreference sourcePreference, Source source) {
   final sourcePref = isar.sourcePreferences
@@ -15,12 +16,11 @@ void setPreferenceSetting(SourcePreference sourcePreference, Source source) {
   isar.writeTxnSync(() {
     if (source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
         source.preferenceList != null) {
-      final prefs = (jsonDecode(source.preferenceList!) as List)
-          .map((e) => SourcePreference.fromJson(e))
-          .toList();
+      final prefs = decodeMihonSourcePreferences(source.preferenceList);
       final idx = prefs.indexWhere((e) => e.key == sourcePreference.key);
       if (idx != -1) {
-        prefs[idx] = sourcePreference..id = null;
+        prefs[idx] = SourcePreference.fromJson(sourcePreference.toJson())
+          ..id = null;
         isar.sources.putSync(
           source
             ..preferenceList = jsonEncode(
@@ -30,7 +30,11 @@ void setPreferenceSetting(SourcePreference sourcePreference, Source source) {
       }
     }
     if (sourcePref != null) {
-      isar.sourcePreferences.putSync(sourcePreference);
+      isar.sourcePreferences.putSync(
+        sourcePreference
+          ..id = sourcePref.id
+          ..sourceId = source.id,
+      );
     } else {
       isar.sourcePreferences.putSync(sourcePreference..sourceId = source.id);
     }
@@ -42,7 +46,11 @@ dynamic getPreferenceValue(int sourceId, String key) {
 
   if (sourcePreference.listPreference != null) {
     final pref = sourcePreference.listPreference!;
-    return pref.entryValues![pref.valueIndex!];
+    final index = pref.valueIndex;
+    final values = pref.entryValues ?? const <String>[];
+    return index != null && index >= 0 && index < values.length
+        ? values[index]
+        : null;
   } else if (sourcePreference.checkBoxPreference != null) {
     return sourcePreference.checkBoxPreference!.value;
   } else if (sourcePreference.switchPreferenceCompat != null) {

@@ -1,35 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 
 /// Handler for keyboard shortcuts in the reader.
 class ReaderKeyboardHandler {
-  final VoidCallback? onEscape;
+  final VoidCallback? onBack;
   final VoidCallback? onFullScreen;
   final VoidCallback? onPreviousPage;
   final VoidCallback? onNextPage;
   final VoidCallback? onNextChapter;
   final VoidCallback? onPreviousChapter;
+  final bool Function(KeyEvent event)? onLookupTrigger;
+  final bool pageKeysNavigatePages;
+  final bool delegateHorizontalPageKeysToChild;
 
   const ReaderKeyboardHandler({
-    this.onEscape,
+    this.onBack,
     this.onFullScreen,
     this.onPreviousPage,
     this.onNextPage,
     this.onNextChapter,
     this.onPreviousChapter,
+    this.onLookupTrigger,
+    this.pageKeysNavigatePages = false,
+    this.delegateHorizontalPageKeysToChild = false,
   });
 
   /// Handles a key event and returns true if it was handled.
   bool handleKeyEvent(KeyEvent event, {bool isReverseHorizontal = false}) {
+    if (onLookupTrigger?.call(event) ?? false) return true;
     if (event is! KeyDownEvent) return false;
     switch (event.logicalKey) {
       case LogicalKeyboardKey.f11:
         onFullScreen?.call();
         return true;
 
-      case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.backspace:
-        onEscape?.call();
+        onBack?.call();
         return true;
 
       case LogicalKeyboardKey.arrowUp:
@@ -41,6 +48,7 @@ class ReaderKeyboardHandler {
         return true;
 
       case LogicalKeyboardKey.arrowLeft:
+        if (delegateHorizontalPageKeysToChild) return false;
         if (isReverseHorizontal) {
           onNextPage?.call();
         } else {
@@ -49,6 +57,7 @@ class ReaderKeyboardHandler {
         return true;
 
       case LogicalKeyboardKey.arrowRight:
+        if (delegateHorizontalPageKeysToChild) return false;
         if (isReverseHorizontal) {
           onPreviousPage?.call();
         } else {
@@ -56,15 +65,29 @@ class ReaderKeyboardHandler {
         }
         return true;
 
-      case LogicalKeyboardKey.keyN:
       case LogicalKeyboardKey.pageDown:
-      case LogicalKeyboardKey.shiftRight:
+        if (delegateHorizontalPageKeysToChild) return false;
+        if (pageKeysNavigatePages && onNextPage != null) {
+          onNextPage?.call();
+        } else {
+          onNextChapter?.call();
+        }
+        return true;
+
+      case LogicalKeyboardKey.pageUp:
+        if (delegateHorizontalPageKeysToChild) return false;
+        if (pageKeysNavigatePages && onPreviousPage != null) {
+          onPreviousPage?.call();
+        } else {
+          onPreviousChapter?.call();
+        }
+        return true;
+
+      case LogicalKeyboardKey.keyN:
         onNextChapter?.call();
         return true;
 
       case LogicalKeyboardKey.keyP:
-      case LogicalKeyboardKey.pageUp:
-      case LogicalKeyboardKey.shiftLeft:
         onPreviousChapter?.call();
         return true;
 
@@ -73,18 +96,24 @@ class ReaderKeyboardHandler {
     }
   }
 
-  /// Creates a KeyboardListener widget with this handler.
+  /// Creates a focusable widget with this handler.
   Widget wrapWithKeyboardListener({
     required Widget child,
     bool isReverseHorizontal = false,
     FocusNode? focusNode,
   }) {
-    return KeyboardListener(
+    final keyboardListener = Focus(
       autofocus: true,
-      focusNode: focusNode ?? FocusNode(),
-      onKeyEvent: (event) =>
-          handleKeyEvent(event, isReverseHorizontal: isReverseHorizontal),
+      focusNode: focusNode,
+      onKeyEvent: (_, event) =>
+          handleKeyEvent(event, isReverseHorizontal: isReverseHorizontal)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored,
       child: child,
     );
+    final onBack = this.onBack;
+    return onBack == null
+        ? keyboardListener
+        : DesktopBackNavigationScope(onBack: onBack, child: keyboardListener);
   }
 }

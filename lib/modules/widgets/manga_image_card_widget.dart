@@ -300,7 +300,7 @@ Future<void> pushToMangaReaderDetail({
       final empty = await isar.mangas
           .filter()
           .langEqualTo(lang)
-          .nameEqualTo(manga.name)
+          .titleMatchesSourceIdentity(manga.sourceTitle ?? manga.name)
           .sourceEqualTo(manga.source)
           .isEmpty();
       if (empty) {
@@ -314,7 +314,7 @@ Future<void> pushToMangaReaderDetail({
       final foundMangas = await isar.mangas
           .filter()
           .langEqualTo(lang)
-          .nameEqualTo(manga.name)
+          .titleMatchesSourceIdentity(manga.sourceTitle ?? manga.name)
           .sourceEqualTo(manga.source)
           .findAll();
       Manga? matchedManga;
@@ -386,9 +386,7 @@ Future<void> pushToMangaReaderDetail({
     final getManga = await isar.mangas.get(mangaId);
     await isar.writeTxn(() async {
       await isar.mangas.put(
-        getManga!
-          ..favorite = !getManga.favorite!
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+        getManga!..updateFavorite(!(getManga.favorite ?? false)),
       );
     });
   }

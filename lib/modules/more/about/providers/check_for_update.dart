@@ -13,28 +13,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'check_for_update.g.dart';
 
-@riverpod
-class CheckForAppUpdates extends _$CheckForAppUpdates {
-  @override
-  bool build() {
-    return isar.settings.getSync(227)?.checkForAppUpdates ?? true;
-  }
-
-  void set(bool value) {
-    final settings = isar.settings.getSync(227);
-
-    state = value;
-
-    isar.writeTxnSync(() {
-      isar.settings.putSync(
-        settings!
-          ..checkForAppUpdates = value
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      );
-    });
-  }
-}
-
 /// Convenience alias: (version, body, htmlUrl, assets).
 typedef UpdateInfo = (String, String, String, List<dynamic>);
 
@@ -109,6 +87,24 @@ bool _hasPlatformAssets(List<dynamic> assets) {
   return true;
 }
 
+@riverpod
+class CheckForAppUpdates extends _$CheckForAppUpdates {
+  @override
+  bool build() => isar.settings.getSync(227)?.checkForAppUpdates ?? true;
+
+  void set(bool value) {
+    final settings = isar.settings.getSync(227);
+    state = value;
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        settings!
+          ..checkForAppUpdates = value
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+}
+
 /// Performs an update check unconditionally, ignoring the auto-update setting.
 Future<UpdateInfo?> performManualUpdateCheck() => _getUpdateIfAvailable();
 
@@ -116,16 +112,29 @@ Future<UpdateInfo> _fetchLatestRelease() async {
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
   final res = await http.get(
     Uri.parse(
-      'https://api.github.com/repos/kodjodevf/Mangayomi/releases/latest',
+      'https://api.github.com/repos/1Selxo/Mangatan/releases?per_page=10',
     ),
   );
-  final release = jsonDecode(res.body) as Map<String, dynamic>;
+  final releases = (jsonDecode(res.body) as List<dynamic>)
+      .cast<Map<String, dynamic>>();
+  final release = releases.firstWhere(
+    (release) => release['draft'] != true,
+    orElse: () => throw StateError('Mangatan has no published releases'),
+  );
   return (
-    release['name'].toString().substringAfter('v').substringBefore('-'),
+    _numericVersion(release['tag_name'].toString()),
     release['body'].toString(),
     release['html_url'].toString(),
     (release['assets'] as List)
         .map((asset) => asset['browser_download_url'])
         .toList(),
   );
+}
+
+String _numericVersion(String value) {
+  final match = RegExp(r'\d+(?:\.\d+)*').firstMatch(value);
+  if (match == null) {
+    throw FormatException('Release does not contain a numeric version', value);
+  }
+  return match.group(0)!;
 }

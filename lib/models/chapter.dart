@@ -7,7 +7,6 @@ part 'chapter.g.dart';
 class Chapter {
   Id? id;
 
-  @Index(composite: [CompositeIndex('isRead')])
   int? mangaId;
 
   String? name;
@@ -18,10 +17,11 @@ class Chapter {
 
   String? scanlator;
 
-  @Index()
+  /// Chapter/volume number supplied by the source, when available.
+  double? chapterNumber;
+
   bool? isBookmarked;
 
-  @Index()
   bool? isRead;
 
   String? lastPageRead;
@@ -53,6 +53,7 @@ class Chapter {
     this.dateUpload = '',
     this.isBookmarked = false,
     this.scanlator = '',
+    this.chapterNumber,
     this.isRead = false,
     this.lastPageRead = '',
     this.archivePath = '',
@@ -74,6 +75,7 @@ class Chapter {
     mangaId = json['mangaId'];
     name = json['name'];
     scanlator = json['scanlator'];
+    chapterNumber = (json['chapterNumber'] as num?)?.toDouble();
     url = json['url'];
     isFiller = json['isFiller'] ?? false;
     thumbnailUrl = json['thumbnailUrl'];
@@ -93,6 +95,7 @@ class Chapter {
     'mangaId': mangaId,
     'name': name,
     'scanlator': scanlator,
+    'chapterNumber': chapterNumber,
     'url': url,
     'isFiller': isFiller,
     'thumbnailUrl': thumbnailUrl,

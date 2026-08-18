@@ -22,56 +22,61 @@ const ChapterSchema = CollectionSchema(
       name: r'archivePath',
       type: IsarType.string,
     ),
-    r'dateUpload': PropertySchema(
+    r'chapterNumber': PropertySchema(
       id: 1,
+      name: r'chapterNumber',
+      type: IsarType.double,
+    ),
+    r'dateUpload': PropertySchema(
+      id: 2,
       name: r'dateUpload',
       type: IsarType.string,
     ),
     r'description': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'description',
       type: IsarType.string,
     ),
     r'downloadSize': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'downloadSize',
       type: IsarType.string,
     ),
     r'duration': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'duration',
       type: IsarType.string,
     ),
     r'isBookmarked': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'isBookmarked',
       type: IsarType.bool,
     ),
-    r'isFiller': PropertySchema(id: 6, name: r'isFiller', type: IsarType.bool),
-    r'isRead': PropertySchema(id: 7, name: r'isRead', type: IsarType.bool),
+    r'isFiller': PropertySchema(id: 7, name: r'isFiller', type: IsarType.bool),
+    r'isRead': PropertySchema(id: 8, name: r'isRead', type: IsarType.bool),
     r'lastPageRead': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'lastPageRead',
       type: IsarType.string,
     ),
-    r'mangaId': PropertySchema(id: 9, name: r'mangaId', type: IsarType.long),
-    r'name': PropertySchema(id: 10, name: r'name', type: IsarType.string),
+    r'mangaId': PropertySchema(id: 10, name: r'mangaId', type: IsarType.long),
+    r'name': PropertySchema(id: 11, name: r'name', type: IsarType.string),
     r'scanlator': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'scanlator',
       type: IsarType.string,
     ),
     r'thumbnailUrl': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'thumbnailUrl',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'url': PropertySchema(id: 14, name: r'url', type: IsarType.string),
+    r'url': PropertySchema(id: 15, name: r'url', type: IsarType.string),
   },
 
   estimateSize: _chapterEstimateSize,
@@ -79,52 +84,7 @@ const ChapterSchema = CollectionSchema(
   deserialize: _chapterDeserialize,
   deserializeProp: _chapterDeserializeProp,
   idName: r'id',
-  indexes: {
-    r'mangaId_isRead': IndexSchema(
-      id: 4614369434036219438,
-      name: r'mangaId_isRead',
-      unique: false,
-      replace: false,
-      properties: [
-        IndexPropertySchema(
-          name: r'mangaId',
-          type: IndexType.value,
-          caseSensitive: false,
-        ),
-        IndexPropertySchema(
-          name: r'isRead',
-          type: IndexType.value,
-          caseSensitive: false,
-        ),
-      ],
-    ),
-    r'isBookmarked': IndexSchema(
-      id: -5205273177397984230,
-      name: r'isBookmarked',
-      unique: false,
-      replace: false,
-      properties: [
-        IndexPropertySchema(
-          name: r'isBookmarked',
-          type: IndexType.value,
-          caseSensitive: false,
-        ),
-      ],
-    ),
-    r'isRead': IndexSchema(
-      id: -944277114070112791,
-      name: r'isRead',
-      unique: false,
-      replace: false,
-      properties: [
-        IndexPropertySchema(
-          name: r'isRead',
-          type: IndexType.value,
-          caseSensitive: false,
-        ),
-      ],
-    ),
-  },
+  indexes: {},
   links: {
     r'manga': LinkSchema(
       id: -8510956094935473973,
@@ -217,20 +177,21 @@ void _chapterSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.archivePath);
-  writer.writeString(offsets[1], object.dateUpload);
-  writer.writeString(offsets[2], object.description);
-  writer.writeString(offsets[3], object.downloadSize);
-  writer.writeString(offsets[4], object.duration);
-  writer.writeBool(offsets[5], object.isBookmarked);
-  writer.writeBool(offsets[6], object.isFiller);
-  writer.writeBool(offsets[7], object.isRead);
-  writer.writeString(offsets[8], object.lastPageRead);
-  writer.writeLong(offsets[9], object.mangaId);
-  writer.writeString(offsets[10], object.name);
-  writer.writeString(offsets[11], object.scanlator);
-  writer.writeString(offsets[12], object.thumbnailUrl);
-  writer.writeLong(offsets[13], object.updatedAt);
-  writer.writeString(offsets[14], object.url);
+  writer.writeDouble(offsets[1], object.chapterNumber);
+  writer.writeString(offsets[2], object.dateUpload);
+  writer.writeString(offsets[3], object.description);
+  writer.writeString(offsets[4], object.downloadSize);
+  writer.writeString(offsets[5], object.duration);
+  writer.writeBool(offsets[6], object.isBookmarked);
+  writer.writeBool(offsets[7], object.isFiller);
+  writer.writeBool(offsets[8], object.isRead);
+  writer.writeString(offsets[9], object.lastPageRead);
+  writer.writeLong(offsets[10], object.mangaId);
+  writer.writeString(offsets[11], object.name);
+  writer.writeString(offsets[12], object.scanlator);
+  writer.writeString(offsets[13], object.thumbnailUrl);
+  writer.writeLong(offsets[14], object.updatedAt);
+  writer.writeString(offsets[15], object.url);
 }
 
 Chapter _chapterDeserialize(
@@ -241,21 +202,22 @@ Chapter _chapterDeserialize(
 ) {
   final object = Chapter(
     archivePath: reader.readStringOrNull(offsets[0]),
-    dateUpload: reader.readStringOrNull(offsets[1]),
-    description: reader.readStringOrNull(offsets[2]),
-    downloadSize: reader.readStringOrNull(offsets[3]),
-    duration: reader.readStringOrNull(offsets[4]),
+    chapterNumber: reader.readDoubleOrNull(offsets[1]),
+    dateUpload: reader.readStringOrNull(offsets[2]),
+    description: reader.readStringOrNull(offsets[3]),
+    downloadSize: reader.readStringOrNull(offsets[4]),
+    duration: reader.readStringOrNull(offsets[5]),
     id: id,
-    isBookmarked: reader.readBoolOrNull(offsets[5]),
-    isFiller: reader.readBoolOrNull(offsets[6]),
-    isRead: reader.readBoolOrNull(offsets[7]),
-    lastPageRead: reader.readStringOrNull(offsets[8]),
-    mangaId: reader.readLongOrNull(offsets[9]),
-    name: reader.readStringOrNull(offsets[10]),
-    scanlator: reader.readStringOrNull(offsets[11]),
-    thumbnailUrl: reader.readStringOrNull(offsets[12]),
-    updatedAt: reader.readLongOrNull(offsets[13]),
-    url: reader.readStringOrNull(offsets[14]),
+    isBookmarked: reader.readBoolOrNull(offsets[6]),
+    isFiller: reader.readBoolOrNull(offsets[7]),
+    isRead: reader.readBoolOrNull(offsets[8]),
+    lastPageRead: reader.readStringOrNull(offsets[9]),
+    mangaId: reader.readLongOrNull(offsets[10]),
+    name: reader.readStringOrNull(offsets[11]),
+    scanlator: reader.readStringOrNull(offsets[12]),
+    thumbnailUrl: reader.readStringOrNull(offsets[13]),
+    updatedAt: reader.readLongOrNull(offsets[14]),
+    url: reader.readStringOrNull(offsets[15]),
   );
   return object;
 }
@@ -270,7 +232,7 @@ P _chapterDeserializeProp<P>(
     case 0:
       return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
@@ -278,24 +240,26 @@ P _chapterDeserializeProp<P>(
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readBoolOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 6:
       return (reader.readBoolOrNull(offset)) as P;
     case 7:
       return (reader.readBoolOrNull(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBoolOrNull(offset)) as P;
     case 9:
-      return (reader.readLongOrNull(offset)) as P;
-    case 10:
       return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readLongOrNull(offset)) as P;
     case 11:
       return (reader.readStringOrNull(offset)) as P;
     case 12:
       return (reader.readStringOrNull(offset)) as P;
     case 13:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 14:
+      return (reader.readLongOrNull(offset)) as P;
+    case 15:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -319,30 +283,6 @@ extension ChapterQueryWhereSort on QueryBuilder<Chapter, Chapter, QWhere> {
   QueryBuilder<Chapter, Chapter, QAfterWhere> anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhere> anyMangaIdIsRead() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        const IndexWhereClause.any(indexName: r'mangaId_isRead'),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhere> anyIsBookmarked() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        const IndexWhereClause.any(indexName: r'isBookmarked'),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhere> anyIsRead() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        const IndexWhereClause.any(indexName: r'isRead'),
-      );
     });
   }
 }
@@ -413,373 +353,6 @@ extension ChapterQueryWhere on QueryBuilder<Chapter, Chapter, QWhereClause> {
           includeUpper: includeUpper,
         ),
       );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdIsNullAnyIsRead() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(indexName: r'mangaId_isRead', value: [null]),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause>
-  mangaIdIsNotNullAnyIsRead() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.between(
-          indexName: r'mangaId_isRead',
-          lower: [null],
-          includeLower: false,
-          upper: [],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdEqualToAnyIsRead(
-    int? mangaId,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(
-          indexName: r'mangaId_isRead',
-          value: [mangaId],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdNotEqualToAnyIsRead(
-    int? mangaId,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      if (query.whereSort == Sort.asc) {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [],
-                upper: [mangaId],
-                includeUpper: false,
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [mangaId],
-                includeLower: false,
-                upper: [],
-              ),
-            );
-      } else {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [mangaId],
-                includeLower: false,
-                upper: [],
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [],
-                upper: [mangaId],
-                includeUpper: false,
-              ),
-            );
-      }
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdGreaterThanAnyIsRead(
-    int? mangaId, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.between(
-          indexName: r'mangaId_isRead',
-          lower: [mangaId],
-          includeLower: include,
-          upper: [],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdLessThanAnyIsRead(
-    int? mangaId, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.between(
-          indexName: r'mangaId_isRead',
-          lower: [],
-          upper: [mangaId],
-          includeUpper: include,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdBetweenAnyIsRead(
-    int? lowerMangaId,
-    int? upperMangaId, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.between(
-          indexName: r'mangaId_isRead',
-          lower: [lowerMangaId],
-          includeLower: includeLower,
-          upper: [upperMangaId],
-          includeUpper: includeUpper,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdEqualToIsReadIsNull(
-    int? mangaId,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(
-          indexName: r'mangaId_isRead',
-          value: [mangaId, null],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause>
-  mangaIdEqualToIsReadIsNotNull(int? mangaId) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.between(
-          indexName: r'mangaId_isRead',
-          lower: [mangaId, null],
-          includeLower: false,
-          upper: [mangaId],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> mangaIdIsReadEqualTo(
-    int? mangaId,
-    bool? isRead,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(
-          indexName: r'mangaId_isRead',
-          value: [mangaId, isRead],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause>
-  mangaIdEqualToIsReadNotEqualTo(int? mangaId, bool? isRead) {
-    return QueryBuilder.apply(this, (query) {
-      if (query.whereSort == Sort.asc) {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [mangaId],
-                upper: [mangaId, isRead],
-                includeUpper: false,
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [mangaId, isRead],
-                includeLower: false,
-                upper: [mangaId],
-              ),
-            );
-      } else {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [mangaId, isRead],
-                includeLower: false,
-                upper: [mangaId],
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'mangaId_isRead',
-                lower: [mangaId],
-                upper: [mangaId, isRead],
-                includeUpper: false,
-              ),
-            );
-      }
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isBookmarkedIsNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(indexName: r'isBookmarked', value: [null]),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isBookmarkedIsNotNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.between(
-          indexName: r'isBookmarked',
-          lower: [null],
-          includeLower: false,
-          upper: [],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isBookmarkedEqualTo(
-    bool? isBookmarked,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(
-          indexName: r'isBookmarked',
-          value: [isBookmarked],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isBookmarkedNotEqualTo(
-    bool? isBookmarked,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      if (query.whereSort == Sort.asc) {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isBookmarked',
-                lower: [],
-                upper: [isBookmarked],
-                includeUpper: false,
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isBookmarked',
-                lower: [isBookmarked],
-                includeLower: false,
-                upper: [],
-              ),
-            );
-      } else {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isBookmarked',
-                lower: [isBookmarked],
-                includeLower: false,
-                upper: [],
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isBookmarked',
-                lower: [],
-                upper: [isBookmarked],
-                includeUpper: false,
-              ),
-            );
-      }
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isReadIsNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(indexName: r'isRead', value: [null]),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isReadIsNotNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.between(
-          indexName: r'isRead',
-          lower: [null],
-          includeLower: false,
-          upper: [],
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isReadEqualTo(
-    bool? isRead,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        IndexWhereClause.equalTo(indexName: r'isRead', value: [isRead]),
-      );
-    });
-  }
-
-  QueryBuilder<Chapter, Chapter, QAfterWhereClause> isReadNotEqualTo(
-    bool? isRead,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      if (query.whereSort == Sort.asc) {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isRead',
-                lower: [],
-                upper: [isRead],
-                includeUpper: false,
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isRead',
-                lower: [isRead],
-                includeLower: false,
-                upper: [],
-              ),
-            );
-      } else {
-        return query
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isRead',
-                lower: [isRead],
-                includeLower: false,
-                upper: [],
-              ),
-            )
-            .addWhereClause(
-              IndexWhereClause.between(
-                indexName: r'isRead',
-                lower: [],
-                upper: [isRead],
-                includeUpper: false,
-              ),
-            );
-      }
     });
   }
 }
@@ -945,6 +518,98 @@ extension ChapterQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'archivePath', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> chapterNumberIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'chapterNumber'),
+      );
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  chapterNumberIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'chapterNumber'),
+      );
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> chapterNumberEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'chapterNumber',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  chapterNumberGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'chapterNumber',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> chapterNumberLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'chapterNumber',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> chapterNumberBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'chapterNumber',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
       );
     });
   }
@@ -2750,6 +2415,18 @@ extension ChapterQuerySortBy on QueryBuilder<Chapter, Chapter, QSortBy> {
     });
   }
 
+  QueryBuilder<Chapter, Chapter, QAfterSortBy> sortByChapterNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterSortBy> sortByChapterNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterNumber', Sort.desc);
+    });
+  }
+
   QueryBuilder<Chapter, Chapter, QAfterSortBy> sortByDateUpload() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dateUpload', Sort.asc);
@@ -2930,6 +2607,18 @@ extension ChapterQuerySortThenBy
   QueryBuilder<Chapter, Chapter, QAfterSortBy> thenByArchivePathDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'archivePath', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterSortBy> thenByChapterNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Chapter, Chapter, QAfterSortBy> thenByChapterNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterNumber', Sort.desc);
     });
   }
 
@@ -3124,6 +2813,12 @@ extension ChapterQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Chapter, Chapter, QDistinct> distinctByChapterNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chapterNumber');
+    });
+  }
+
   QueryBuilder<Chapter, Chapter, QDistinct> distinctByDateUpload({
     bool caseSensitive = true,
   }) {
@@ -3238,6 +2933,12 @@ extension ChapterQueryProperty
   QueryBuilder<Chapter, String?, QQueryOperations> archivePathProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'archivePath');
+    });
+  }
+
+  QueryBuilder<Chapter, double?, QQueryOperations> chapterNumberProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chapterNumber');
     });
   }
 

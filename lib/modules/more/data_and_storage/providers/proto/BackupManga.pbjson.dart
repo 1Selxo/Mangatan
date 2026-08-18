@@ -54,6 +54,14 @@ const BackupManga$json = {
       '10': 'chapters'
     },
     {'1': 'categories', '3': 17, '4': 3, '5': 3, '10': 'categories'},
+    {
+      '1': 'tracking',
+      '3': 18,
+      '4': 3,
+      '5': 11,
+      '6': '.BackupTracking',
+      '10': 'tracking'
+    },
     {'1': 'favorite', '3': 100, '4': 1, '5': 8, '10': 'favorite'},
     {'1': 'chapterFlags', '3': 101, '4': 1, '5': 5, '10': 'chapterFlags'},
     {
@@ -92,6 +100,18 @@ const BackupManga$json = {
       '10': 'excludedScanlators'
     },
     {'1': 'version', '3': 109, '4': 1, '5': 3, '10': 'version'},
+    {'1': 'notes', '3': 110, '4': 1, '5': 9, '10': 'notes'},
+    {'1': 'initialized', '3': 111, '4': 1, '5': 8, '10': 'initialized'},
+    {'1': 'memo', '3': 112, '4': 1, '5': 12, '10': 'memo'},
+    {
+      '1': 'customTitle',
+      '3': 800,
+      '4': 1,
+      '5': 9,
+      '9': 6,
+      '10': 'customTitle',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_artist'},
@@ -100,6 +120,7 @@ const BackupManga$json = {
     {'1': '_thumbnailUrl'},
     {'1': '_viewer_flags'},
     {'1': '_favoriteModifiedAt'},
+    {'1': '_customTitle'},
   ],
 };
 
@@ -112,12 +133,15 @@ final $typed_data.Uint8List backupMangaDescriptor = $convert.base64Decode(
     'Cgx0aHVtYm5haWxVcmwYCSABKAlIA1IMdGh1bWJuYWlsVXJsiAEBEhwKCWRhdGVBZGRlZBgNIA'
     'EoA1IJZGF0ZUFkZGVkEhYKBnZpZXdlchgOIAEoBVIGdmlld2VyEioKCGNoYXB0ZXJzGBAgAygL'
     'Mg4uQmFja3VwQ2hhcHRlclIIY2hhcHRlcnMSHgoKY2F0ZWdvcmllcxgRIAMoA1IKY2F0ZWdvcm'
-    'llcxIaCghmYXZvcml0ZRhkIAEoCFIIZmF2b3JpdGUSIgoMY2hhcHRlckZsYWdzGGUgASgFUgxj'
-    'aGFwdGVyRmxhZ3MSJgoMdmlld2VyX2ZsYWdzGGcgASgFSARSC3ZpZXdlckZsYWdziAEBEigKB2'
-    'hpc3RvcnkYaCADKAsyDi5CYWNrdXBIaXN0b3J5UgdoaXN0b3J5EiYKDnVwZGF0ZVN0cmF0ZWd5'
-    'GGkgASgFUg51cGRhdGVTdHJhdGVneRImCg5sYXN0TW9kaWZpZWRBdBhqIAEoA1IObGFzdE1vZG'
-    'lmaWVkQXQSMwoSZmF2b3JpdGVNb2RpZmllZEF0GGsgASgDSAVSEmZhdm9yaXRlTW9kaWZpZWRB'
-    'dIgBARIuChJleGNsdWRlZFNjYW5sYXRvcnMYbCADKAlSEmV4Y2x1ZGVkU2NhbmxhdG9ycxIYCg'
-    'd2ZXJzaW9uGG0gASgDUgd2ZXJzaW9uQgkKB19hcnRpc3RCCQoHX2F1dGhvckIOCgxfZGVzY3Jp'
-    'cHRpb25CDwoNX3RodW1ibmFpbFVybEIPCg1fdmlld2VyX2ZsYWdzQhUKE19mYXZvcml0ZU1vZG'
-    'lmaWVkQXQ=');
+    'llcxIrCgh0cmFja2luZxgSIAMoCzIPLkJhY2t1cFRyYWNraW5nUgh0cmFja2luZxIaCghmYXZv'
+    'cml0ZRhkIAEoCFIIZmF2b3JpdGUSIgoMY2hhcHRlckZsYWdzGGUgASgFUgxjaGFwdGVyRmxhZ3'
+    'MSJgoMdmlld2VyX2ZsYWdzGGcgASgFSARSC3ZpZXdlckZsYWdziAEBEigKB2hpc3RvcnkYaCAD'
+    'KAsyDi5CYWNrdXBIaXN0b3J5UgdoaXN0b3J5EiYKDnVwZGF0ZVN0cmF0ZWd5GGkgASgFUg51cG'
+    'RhdGVTdHJhdGVneRImCg5sYXN0TW9kaWZpZWRBdBhqIAEoA1IObGFzdE1vZGlmaWVkQXQSMwoS'
+    'ZmF2b3JpdGVNb2RpZmllZEF0GGsgASgDSAVSEmZhdm9yaXRlTW9kaWZpZWRBdIgBARIuChJleG'
+    'NsdWRlZFNjYW5sYXRvcnMYbCADKAlSEmV4Y2x1ZGVkU2NhbmxhdG9ycxIYCgd2ZXJzaW9uGG0g'
+    'ASgDUgd2ZXJzaW9uEhQKBW5vdGVzGG4gASgJUgVub3RlcxIgCgtpbml0aWFsaXplZBhvIAEoCF'
+    'ILaW5pdGlhbGl6ZWQSEgoEbWVtbxhwIAEoDFIEbWVtbxImCgtjdXN0b21UaXRsZRigBiABKAlI'
+    'BlILY3VzdG9tVGl0bGWIAQFCCQoHX2FydGlzdEIJCgdfYXV0aG9yQg4KDF9kZXNjcmlwdGlvbk'
+    'IPCg1fdGh1bWJuYWlsVXJsQg8KDV92aWV3ZXJfZmxhZ3NCFQoTX2Zhdm9yaXRlTW9kaWZpZWRB'
+    'dEIOCgxfY3VzdG9tVGl0bGU=');

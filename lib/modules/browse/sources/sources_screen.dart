@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mangayomi/modules/browse/browse_screen.dart';
 import 'package:mangayomi/modules/widgets/custom_sliver_grouped_list_view.dart';
 import 'package:isar_community/isar.dart';
@@ -73,6 +74,21 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
       );
     }
     return SourceListTile(source: source, itemType: widget.itemType);
+  }
+
+  Widget _youtubeTile() {
+    if (widget.itemType != ItemType.anime) return const SizedBox.shrink();
+    return ListTile(
+      leading: const CircleAvatar(
+        backgroundColor: Color(0xfff00000),
+        foregroundColor: Colors.white,
+        child: Icon(Icons.play_arrow_rounded),
+      ),
+      title: const Text('YouTube'),
+      subtitle: const Text('Videos, channels and playlists'),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => context.push('/youtubeBrowser'),
+    );
   }
 
   @override
@@ -154,6 +170,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                   ),
                   itemType: widget.itemType,
                 ),
+                _youtubeTile(),
               ],
             );
           }
@@ -278,6 +295,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                         ),
                         itemType: widget.itemType,
                       ),
+                      _youtubeTile(),
                     ],
                   ),
                 ),

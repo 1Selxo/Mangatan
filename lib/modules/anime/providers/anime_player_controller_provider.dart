@@ -84,6 +84,9 @@ class AnimeStreamController extends _$AnimeStreamController
       isar.writeTxnSync(() {
         ep.isRead = isWatch;
         ep.lastPageRead = (duration.inMilliseconds).toString();
+        if (totalDuration != null && totalDuration > Duration.zero) {
+          ep.duration = totalDuration.inMilliseconds.toString();
+        }
         ep.updatedAt = DateTime.now().millisecondsSinceEpoch;
         isar.chapters.putSync(ep);
       });

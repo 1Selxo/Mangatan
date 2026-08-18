@@ -226,7 +226,7 @@ packages:
     source: hosted
     version: "4.11.1"
   collection:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: collection
       sha256: "2f5709ae4d3d59dd8f7cd309b4e023046b57d8a6c82130785d2b0e5868084e76"
@@ -237,10 +237,10 @@ packages:
     dependency: "direct main"
     description:
       name: connectivity_plus
-      sha256: "051849e2bd7c7b3bc5844ea0d096609ddc3a859890ec3a9ac4a65a2620cc1f99"
+      sha256: "762c99f890ca8bf87f7337236f99edd42793843bc6c3631da294a76653a54bd0"
       url: "https://pub.dev"
     source: hosted
-    version: "6.1.4"
+    version: "7.3.1"
   connectivity_plus_platform_interface:
     dependency: transitive
     description:
@@ -265,6 +265,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.15.1"
+  crop_image:
+    dependency: "direct main"
+    description:
+      name: crop_image
+      sha256: "27cbce1685a595efee62caab81c98b49b636f765c1da86353f58f5b2bf2775d8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.17"
   cross_file:
     dependency: transitive
     description:
@@ -297,14 +305,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.9"
-  cupertino_ui:
-    dependency: "direct main"
-    description:
-      name: cupertino_ui
-      sha256: "7ed8ce4159d342eec4c65f4ea6eec57adaf9365404378541f38efc1da20a5b3d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.0"
   d4rt:
     dependency: "direct main"
     description:
@@ -337,6 +337,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.15"
+  desktop_drop:
+    dependency: "direct main"
+    description:
+      name: desktop_drop
+      sha256: aa1e797255bfbc76f9eb5aa4f61e5b68dbf69962ab1be6495816d2f251bc0d1f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.1"
   desktop_webview_window:
     dependency: "direct main"
     description:
@@ -403,14 +411,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.0.1"
-  external_path:
-    dependency: "direct main"
-    description:
-      name: external_path
-      sha256: "68a18a2aa51ec012d7013ea2a80305dc5372f3577a2bbcc7dcc5550b25a5a73b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.0"
   fading_edge_scrollview:
     dependency: transitive
     description:
@@ -884,7 +884,7 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image
       sha256: "1976370a4df3091bb0f72409c187ad1f9132a818bc6b95ca59c0bae1c75c688e"
@@ -1241,10 +1241,10 @@ packages:
     dependency: "direct main"
     description:
       name: native_toolchain_c
-      sha256: a1c26117c48cebe5677b0cf0e33a980a79a7c5577effc86f52e5a0d309cdcb60
+      sha256: f9c168717100ae6d9fee9ffb0be379bf1f8b26b0f6bcbd4fdddcd931993a6a72
       url: "https://pub.dev"
     source: hosted
-    version: "0.19.3"
+    version: "0.19.2"
   nm:
     dependency: transitive
     description:
@@ -1749,6 +1749,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.1"
+  simple_sparse_list:
+    dependency: transitive
+    description:
+      name: simple_sparse_list
+      sha256: aa648fd240fa39b49dcd11c19c266990006006de6699a412de485695910fbc1f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.4"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -1898,6 +1906,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  unicode:
+    dependency: transitive
+    description:
+      name: unicode
+      sha256: a6f7bcfc8ea1d5ce1f6c0b1c39117a9919f4953edd9fd7a64090a9796c499b57
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.9"
   universal_platform:
     dependency: transitive
     description:
@@ -2075,7 +2091,7 @@ packages:
     source: hosted
     version: "6.4.0"
   win32_registry:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: win32_registry
       sha256: "73b1d78920a9d6e03f8b4e43e612b87bf3152a0e5c5e5150267762b7c4116904"
@@ -2110,10 +2126,10 @@ packages:
     dependency: transitive
     description:
       name: xml
-      sha256: "67f0aff7be013d107995e9b75bf4e7f2c3ef2dfdb2c8e68024bba0a7fd5756a4"
+      sha256: "971043b3a0d3da28727e40ed3e0b5d18b742fa5a68665cca88e74b7876d5e025"
       url: "https://pub.dev"
     source: hosted
-    version: "7.0.1"
+    version: "6.6.1"
   xpath_selector:
     dependency: transitive
     description:
@@ -2154,6 +2170,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.4"
+  youtube_explode_dart:
+    dependency: "direct main"
+    description:
+      name: youtube_explode_dart
+      sha256: "10134a53989b2f3dc576121735aec8fc6d88784956f4a2ad1a2525b006373a76"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.0"
 sdks:
   dart: ">=3.13.1 <4.0.0"
   flutter: ">=3.44.0"

@@ -85,9 +85,6 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
     final androidProxyServer = ref.watch(androidProxyServerStateProvider);
-    final autoStartServer = ref.watch(
-      autoStartExtensionServerOnLaunchStateProvider,
-    );
     final actionLabel = !_isInstalled
         ? l10n.download
         : (_hasUpdateAvailable ? l10n.update_files : l10n.up_to_date);
@@ -297,16 +294,6 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
                   l10n.zero_interpreter_description,
                   style: TextStyle(color: context.secondaryColor),
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.start_server_on_launch),
-                  value: autoStartServer,
-                  onChanged: ref
-                      .read(
-                        autoStartExtensionServerOnLaunchStateProvider.notifier,
-                      )
-                      .set,
-                ),
                 const SizedBox(height: 12),
                 ExtensionServerStatusTile(
                   label: l10n.runtime_status,
@@ -423,7 +410,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
 
   Future<void> _refreshRuntimeStatus() async {
     if (!Platform.isIOS) return;
-    final running = await MExtensionServerPlatform(ref).checkLocalServer();
+    final running = await MExtensionServerPlatform(ref).check();
     if (mounted) setState(() => _runtimeRunning = running);
   }
 
@@ -433,9 +420,9 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
     if (_runtimeRunning) {
       await server.stopServer();
     } else {
-      await server.startServer(forceLocal: true);
+      await server.startServer(foregroundRequest: true);
     }
-    final running = await server.checkLocalServer();
+    final running = await server.check();
     if (mounted) {
       setState(() {
         _runtimeRunning = running;
@@ -454,7 +441,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
     final wasInstalled = _isInstalled;
     try {
       await _downloadReleaseBundle(release, bundleZip, l10n);
-      final installDir = await _resolveInstallDirectory();
+      final installDir = await _resolveDownloadDirectory(l10n);
       await MExtensionServerPlatform(ref).stopServer();
       await _installDownloadedBundle(bundleZip, installDir, l10n);
       await _startServerAndRefresh();
@@ -590,6 +577,24 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
       return Directory(_selectedInstallDirectory);
     }
     return _defaultInstallDirectory();
+  }
+
+  /// Like [_resolveInstallDirectory], but never returns a package-managed
+  /// directory: installing there would wipe a pacman-owned tree (the install
+  /// clears the target first) and the files would be lost on the next upgrade.
+  /// The selected directory becomes package-managed whenever the bridge adopted
+  /// a distro install, so this is the normal case, not an edge case.
+  Future<Directory> _resolveDownloadDirectory(dynamic l10n) async {
+    final installDir = await _resolveInstallDirectory();
+    if (!isManagedExtensionServerDirectory(installDir.path)) {
+      return installDir;
+    }
+    final fallback = await _defaultInstallDirectory();
+    botToast(
+      l10n.extension_server_directory_is_package_managed(fallback.path),
+      second: 5,
+    );
+    return fallback;
   }
 
   Future<Directory> _defaultInstallDirectory() async {
@@ -816,6 +821,14 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   }
 
   Future<void> _prepareInstallDirectory(Directory installDir) async {
+    // Last line of defence for the recursive delete below: callers are expected
+    // to have gone through _resolveDownloadDirectory already.
+    if (isManagedExtensionServerDirectory(installDir.path)) {
+      throw Exception(
+        'Refusing to install into the package-managed directory '
+        '"${installDir.path}".',
+      );
+    }
     if (await installDir.exists()) {
       await _deleteDirectoryWithRetry(installDir);
     }
@@ -887,11 +900,12 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
   }
 
   Future<File?> _pickIosJarFile(dynamic l10n) async {
-    final file = await FilePicker.pickFile(
+    final result = await FilePicker.pickFiles(
       dialogTitle: l10n.select_extension_server_jar,
       type: FileType.custom,
       allowedExtensions: const ['jar'],
     );
+    final file = result?.files.singleOrNull;
     final filePath = file?.path;
     if (filePath == null || filePath.isEmpty) {
       return null;

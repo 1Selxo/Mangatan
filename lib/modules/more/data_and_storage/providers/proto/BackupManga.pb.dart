@@ -16,7 +16,8 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'BackupChapter.pb.dart' as $0;
-import 'BackupHistory.pb.dart' as $1;
+import 'BackupHistory.pb.dart' as $2;
+import 'BackupTracking.pb.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -35,15 +36,20 @@ class BackupManga extends $pb.GeneratedMessage {
     $core.int? viewer,
     $core.Iterable<$0.BackupChapter>? chapters,
     $core.Iterable<$fixnum.Int64>? categories,
+    $core.Iterable<$1.BackupTracking>? tracking,
     $core.bool? favorite,
     $core.int? chapterFlags,
     $core.int? viewerFlags,
-    $core.Iterable<$1.BackupHistory>? history,
+    $core.Iterable<$2.BackupHistory>? history,
     $core.int? updateStrategy,
     $fixnum.Int64? lastModifiedAt,
     $fixnum.Int64? favoriteModifiedAt,
     $core.Iterable<$core.String>? excludedScanlators,
     $fixnum.Int64? version,
+    $core.String? notes,
+    $core.bool? initialized,
+    $core.List<$core.int>? memo,
+    $core.String? customTitle,
   }) {
     final result = create();
     if (source != null) result.source = source;
@@ -59,6 +65,7 @@ class BackupManga extends $pb.GeneratedMessage {
     if (viewer != null) result.viewer = viewer;
     if (chapters != null) result.chapters.addAll(chapters);
     if (categories != null) result.categories.addAll(categories);
+    if (tracking != null) result.tracking.addAll(tracking);
     if (favorite != null) result.favorite = favorite;
     if (chapterFlags != null) result.chapterFlags = chapterFlags;
     if (viewerFlags != null) result.viewerFlags = viewerFlags;
@@ -70,6 +77,10 @@ class BackupManga extends $pb.GeneratedMessage {
     if (excludedScanlators != null)
       result.excludedScanlators.addAll(excludedScanlators);
     if (version != null) result.version = version;
+    if (notes != null) result.notes = notes;
+    if (initialized != null) result.initialized = initialized;
+    if (memo != null) result.memo = memo;
+    if (customTitle != null) result.customTitle = customTitle;
     return result;
   }
 
@@ -100,11 +111,13 @@ class BackupManga extends $pb.GeneratedMessage {
         subBuilder: $0.BackupChapter.create)
     ..p<$fixnum.Int64>(
         17, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.K6)
+    ..pPM<$1.BackupTracking>(18, _omitFieldNames ? '' : 'tracking',
+        subBuilder: $1.BackupTracking.create)
     ..aOB(100, _omitFieldNames ? '' : 'favorite')
     ..aI(101, _omitFieldNames ? '' : 'chapterFlags', protoName: 'chapterFlags')
     ..aI(103, _omitFieldNames ? '' : 'viewerFlags')
-    ..pPM<$1.BackupHistory>(104, _omitFieldNames ? '' : 'history',
-        subBuilder: $1.BackupHistory.create)
+    ..pPM<$2.BackupHistory>(104, _omitFieldNames ? '' : 'history',
+        subBuilder: $2.BackupHistory.create)
     ..aI(105, _omitFieldNames ? '' : 'updateStrategy',
         protoName: 'updateStrategy')
     ..aInt64(106, _omitFieldNames ? '' : 'lastModifiedAt',
@@ -114,6 +127,11 @@ class BackupManga extends $pb.GeneratedMessage {
     ..pPS(108, _omitFieldNames ? '' : 'excludedScanlators',
         protoName: 'excludedScanlators')
     ..aInt64(109, _omitFieldNames ? '' : 'version')
+    ..aOS(110, _omitFieldNames ? '' : 'notes')
+    ..aOB(111, _omitFieldNames ? '' : 'initialized')
+    ..a<$core.List<$core.int>>(
+        112, _omitFieldNames ? '' : 'memo', $pb.PbFieldType.OY)
+    ..aOS(800, _omitFieldNames ? '' : 'customTitle', protoName: 'customTitle')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -235,74 +253,114 @@ class BackupManga extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   $pb.PbList<$fixnum.Int64> get categories => $_getList(12);
 
+  @$pb.TagNumber(18)
+  $pb.PbList<$1.BackupTracking> get tracking => $_getList(13);
+
   @$pb.TagNumber(100)
-  $core.bool get favorite => $_getBF(13);
+  $core.bool get favorite => $_getBF(14);
   @$pb.TagNumber(100)
-  set favorite($core.bool value) => $_setBool(13, value);
+  set favorite($core.bool value) => $_setBool(14, value);
   @$pb.TagNumber(100)
-  $core.bool hasFavorite() => $_has(13);
+  $core.bool hasFavorite() => $_has(14);
   @$pb.TagNumber(100)
   void clearFavorite() => $_clearField(100);
 
   @$pb.TagNumber(101)
-  $core.int get chapterFlags => $_getIZ(14);
+  $core.int get chapterFlags => $_getIZ(15);
   @$pb.TagNumber(101)
-  set chapterFlags($core.int value) => $_setSignedInt32(14, value);
+  set chapterFlags($core.int value) => $_setSignedInt32(15, value);
   @$pb.TagNumber(101)
-  $core.bool hasChapterFlags() => $_has(14);
+  $core.bool hasChapterFlags() => $_has(15);
   @$pb.TagNumber(101)
   void clearChapterFlags() => $_clearField(101);
 
   @$pb.TagNumber(103)
-  $core.int get viewerFlags => $_getIZ(15);
+  $core.int get viewerFlags => $_getIZ(16);
   @$pb.TagNumber(103)
-  set viewerFlags($core.int value) => $_setSignedInt32(15, value);
+  set viewerFlags($core.int value) => $_setSignedInt32(16, value);
   @$pb.TagNumber(103)
-  $core.bool hasViewerFlags() => $_has(15);
+  $core.bool hasViewerFlags() => $_has(16);
   @$pb.TagNumber(103)
   void clearViewerFlags() => $_clearField(103);
 
   @$pb.TagNumber(104)
-  $pb.PbList<$1.BackupHistory> get history => $_getList(16);
+  $pb.PbList<$2.BackupHistory> get history => $_getList(17);
 
   @$pb.TagNumber(105)
-  $core.int get updateStrategy => $_getIZ(17);
+  $core.int get updateStrategy => $_getIZ(18);
   @$pb.TagNumber(105)
-  set updateStrategy($core.int value) => $_setSignedInt32(17, value);
+  set updateStrategy($core.int value) => $_setSignedInt32(18, value);
   @$pb.TagNumber(105)
-  $core.bool hasUpdateStrategy() => $_has(17);
+  $core.bool hasUpdateStrategy() => $_has(18);
   @$pb.TagNumber(105)
   void clearUpdateStrategy() => $_clearField(105);
 
   @$pb.TagNumber(106)
-  $fixnum.Int64 get lastModifiedAt => $_getI64(18);
+  $fixnum.Int64 get lastModifiedAt => $_getI64(19);
   @$pb.TagNumber(106)
-  set lastModifiedAt($fixnum.Int64 value) => $_setInt64(18, value);
+  set lastModifiedAt($fixnum.Int64 value) => $_setInt64(19, value);
   @$pb.TagNumber(106)
-  $core.bool hasLastModifiedAt() => $_has(18);
+  $core.bool hasLastModifiedAt() => $_has(19);
   @$pb.TagNumber(106)
   void clearLastModifiedAt() => $_clearField(106);
 
   @$pb.TagNumber(107)
-  $fixnum.Int64 get favoriteModifiedAt => $_getI64(19);
+  $fixnum.Int64 get favoriteModifiedAt => $_getI64(20);
   @$pb.TagNumber(107)
-  set favoriteModifiedAt($fixnum.Int64 value) => $_setInt64(19, value);
+  set favoriteModifiedAt($fixnum.Int64 value) => $_setInt64(20, value);
   @$pb.TagNumber(107)
-  $core.bool hasFavoriteModifiedAt() => $_has(19);
+  $core.bool hasFavoriteModifiedAt() => $_has(20);
   @$pb.TagNumber(107)
   void clearFavoriteModifiedAt() => $_clearField(107);
 
   @$pb.TagNumber(108)
-  $pb.PbList<$core.String> get excludedScanlators => $_getList(20);
+  $pb.PbList<$core.String> get excludedScanlators => $_getList(21);
 
   @$pb.TagNumber(109)
-  $fixnum.Int64 get version => $_getI64(21);
+  $fixnum.Int64 get version => $_getI64(22);
   @$pb.TagNumber(109)
-  set version($fixnum.Int64 value) => $_setInt64(21, value);
+  set version($fixnum.Int64 value) => $_setInt64(22, value);
   @$pb.TagNumber(109)
-  $core.bool hasVersion() => $_has(21);
+  $core.bool hasVersion() => $_has(22);
   @$pb.TagNumber(109)
   void clearVersion() => $_clearField(109);
+
+  @$pb.TagNumber(110)
+  $core.String get notes => $_getSZ(23);
+  @$pb.TagNumber(110)
+  set notes($core.String value) => $_setString(23, value);
+  @$pb.TagNumber(110)
+  $core.bool hasNotes() => $_has(23);
+  @$pb.TagNumber(110)
+  void clearNotes() => $_clearField(110);
+
+  @$pb.TagNumber(111)
+  $core.bool get initialized => $_getBF(24);
+  @$pb.TagNumber(111)
+  set initialized($core.bool value) => $_setBool(24, value);
+  @$pb.TagNumber(111)
+  $core.bool hasInitialized() => $_has(24);
+  @$pb.TagNumber(111)
+  void clearInitialized() => $_clearField(111);
+
+  @$pb.TagNumber(112)
+  $core.List<$core.int> get memo => $_getN(25);
+  @$pb.TagNumber(112)
+  set memo($core.List<$core.int> value) => $_setBytes(25, value);
+  @$pb.TagNumber(112)
+  $core.bool hasMemo() => $_has(25);
+  @$pb.TagNumber(112)
+  void clearMemo() => $_clearField(112);
+
+  /// J2K/Chimahon custom manga info represented by Mangatan.
+  @$pb.TagNumber(800)
+  $core.String get customTitle => $_getSZ(26);
+  @$pb.TagNumber(800)
+  set customTitle($core.String value) => $_setString(26, value);
+  @$pb.TagNumber(800)
+  $core.bool hasCustomTitle() => $_has(26);
+  @$pb.TagNumber(800)
+  void clearCustomTitle() => $_clearField(800);
 }
 
 const $core.bool _omitFieldNames =

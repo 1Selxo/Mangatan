@@ -54,9 +54,7 @@ class EnableHardwareAccelState extends _$EnableHardwareAccelState {
   @override
   bool build() {
     return isar.settings.getSync(227)!.enableHardwareAcceleration ??
-            Platform.isMacOS
-        ? false
-        : true;
+        (Platform.isMacOS ? false : true);
   }
 
   void set(bool value) {

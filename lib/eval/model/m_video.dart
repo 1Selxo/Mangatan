@@ -19,6 +19,7 @@ class MVideo {
 class MTrack {
   String? file;
   String? label;
+  String? language;
 
-  MTrack({this.file, this.label});
+  MTrack({this.file, this.label, this.language});
 }

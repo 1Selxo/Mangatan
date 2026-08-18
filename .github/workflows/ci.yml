@@ -234,8 +234,8 @@ jobs:
       - name: Upload Windows debug artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Mangayomi-windows-debug
-          path: build/windows/x64/runner/Debug/
+          name: Mangatan-windows-debug
+          path: C:\m\build\windows\x64\runner\Debug\
 
   build-linux:
     name: Build (Linux debug)

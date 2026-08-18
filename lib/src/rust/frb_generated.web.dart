@@ -7,16 +7,17 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/epub.dart';
+import 'api/hoshidicts.dart';
+import 'api/hoshidicts/native.dart';
+import 'api/image.dart';
+import 'api/rar.dart';
 import 'api/rhttp/client.dart';
 import 'api/rhttp/error.dart';
 import 'api/rhttp/http.dart';
-
 import 'dart:async';
 import 'dart:convert';
-
 import 'frb_generated.dart';
 import 'lib.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
 abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
@@ -34,6 +35,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_DnsSettingsPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDnsSettings;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_HoshiLookupSessionPtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession;
 
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_RequestClientPtr => wire
@@ -61,6 +66,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  HoshiLookupSession
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    dynamic raw,
+  );
+
+  @protected
   RequestClient
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     dynamic raw,
@@ -69,6 +80,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   CancellationToken
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCancellationToken(
+    dynamic raw,
+  );
+
+  @protected
+  HoshiLookupSession
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
     dynamic raw,
   );
 
@@ -121,6 +138,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   DnsSettings
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDnsSettings(
+    dynamic raw,
+  );
+
+  @protected
+  HoshiLookupSession
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
     dynamic raw,
   );
 
@@ -202,6 +225,33 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EpubResource dco_decode_epub_resource(dynamic raw);
 
   @protected
+  HoshiDictionaryStyle dco_decode_hoshi_dictionary_style(dynamic raw);
+
+  @protected
+  HoshiFrequency dco_decode_hoshi_frequency(dynamic raw);
+
+  @protected
+  HoshiFrequencyEntry dco_decode_hoshi_frequency_entry(dynamic raw);
+
+  @protected
+  HoshiGlossaryEntry dco_decode_hoshi_glossary_entry(dynamic raw);
+
+  @protected
+  HoshiImportResult dco_decode_hoshi_import_result(dynamic raw);
+
+  @protected
+  HoshiLookupResult dco_decode_hoshi_lookup_result(dynamic raw);
+
+  @protected
+  HoshiPitchEntry dco_decode_hoshi_pitch_entry(dynamic raw);
+
+  @protected
+  HoshiTermResult dco_decode_hoshi_term_result(dynamic raw);
+
+  @protected
+  HoshiTransformGroup dco_decode_hoshi_transform_group(dynamic raw);
+
+  @protected
   HttpHeaders dco_decode_http_headers(dynamic raw);
 
   @protected
@@ -238,13 +288,45 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<EpubResource> dco_decode_list_epub_resource(dynamic raw);
 
   @protected
+  List<HoshiDictionaryStyle> dco_decode_list_hoshi_dictionary_style(
+    dynamic raw,
+  );
+
+  @protected
+  List<HoshiFrequency> dco_decode_list_hoshi_frequency(dynamic raw);
+
+  @protected
+  List<HoshiFrequencyEntry> dco_decode_list_hoshi_frequency_entry(dynamic raw);
+
+  @protected
+  List<HoshiGlossaryEntry> dco_decode_list_hoshi_glossary_entry(dynamic raw);
+
+  @protected
+  List<HoshiLookupResult> dco_decode_list_hoshi_lookup_result(dynamic raw);
+
+  @protected
+  List<HoshiPitchEntry> dco_decode_list_hoshi_pitch_entry(dynamic raw);
+
+  @protected
+  List<HoshiTransformGroup> dco_decode_list_hoshi_transform_group(dynamic raw);
+
+  @protected
   List<Uint8List> dco_decode_list_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  Int32List dco_decode_list_prim_i_32_strict(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<RarEntry> dco_decode_list_rar_entry(dynamic raw);
+
+  @protected
+  List<RarEntryData> dco_decode_list_rar_entry_data(dynamic raw);
 
   @protected
   List<(String, List<String>)> dco_decode_list_record_string_list_string(
@@ -309,6 +391,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProxySettings dco_decode_proxy_settings(dynamic raw);
 
   @protected
+  RarEntry dco_decode_rar_entry(dynamic raw);
+
+  @protected
+  RarEntryData dco_decode_rar_entry_data(dynamic raw);
+
+  @protected
   (String, List<String>) dco_decode_record_string_list_string(dynamic raw);
 
   @protected
@@ -334,6 +422,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int dco_decode_u_16(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
+
+  @protected
+  BigInt dco_decode_u_64(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -366,6 +460,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  HoshiLookupSession
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RequestClient
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     SseDeserializer deserializer,
@@ -374,6 +474,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   CancellationToken
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCancellationToken(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HoshiLookupSession
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
     SseDeserializer deserializer,
   );
 
@@ -408,6 +514,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   DnsSettings
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDnsSettings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HoshiLookupSession
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
     SseDeserializer deserializer,
   );
 
@@ -500,6 +612,45 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EpubResource sse_decode_epub_resource(SseDeserializer deserializer);
 
   @protected
+  HoshiDictionaryStyle sse_decode_hoshi_dictionary_style(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HoshiFrequency sse_decode_hoshi_frequency(SseDeserializer deserializer);
+
+  @protected
+  HoshiFrequencyEntry sse_decode_hoshi_frequency_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HoshiGlossaryEntry sse_decode_hoshi_glossary_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HoshiImportResult sse_decode_hoshi_import_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HoshiLookupResult sse_decode_hoshi_lookup_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HoshiPitchEntry sse_decode_hoshi_pitch_entry(SseDeserializer deserializer);
+
+  @protected
+  HoshiTermResult sse_decode_hoshi_term_result(SseDeserializer deserializer);
+
+  @protected
+  HoshiTransformGroup sse_decode_hoshi_transform_group(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HttpHeaders sse_decode_http_headers(SseDeserializer deserializer);
 
   @protected
@@ -538,15 +689,61 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<HoshiDictionaryStyle> sse_decode_list_hoshi_dictionary_style(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HoshiFrequency> sse_decode_list_hoshi_frequency(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HoshiFrequencyEntry> sse_decode_list_hoshi_frequency_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HoshiGlossaryEntry> sse_decode_list_hoshi_glossary_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HoshiLookupResult> sse_decode_list_hoshi_lookup_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HoshiPitchEntry> sse_decode_list_hoshi_pitch_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HoshiTransformGroup> sse_decode_list_hoshi_transform_group(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<Uint8List> sse_decode_list_list_prim_u_8_strict(
     SseDeserializer deserializer,
   );
+
+  @protected
+  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer);
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<RarEntry> sse_decode_list_rar_entry(SseDeserializer deserializer);
+
+  @protected
+  List<RarEntryData> sse_decode_list_rar_entry_data(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<(String, List<String>)> sse_decode_list_record_string_list_string(
@@ -633,6 +830,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProxySettings sse_decode_proxy_settings(SseDeserializer deserializer);
 
   @protected
+  RarEntry sse_decode_rar_entry(SseDeserializer deserializer);
+
+  @protected
+  RarEntryData sse_decode_rar_entry_data(SseDeserializer deserializer);
+
+  @protected
   (String, List<String>) sse_decode_record_string_list_string(
     SseDeserializer deserializer,
   );
@@ -664,6 +867,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int sse_decode_u_16(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -703,6 +912,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    HoshiLookupSession self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     RequestClient self,
     SseSerializer serializer,
@@ -712,6 +928,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCancellationToken(
     CancellationToken self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    HoshiLookupSession self,
     SseSerializer serializer,
   );
 
@@ -776,6 +999,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDnsSettings(
     DnsSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    HoshiLookupSession self,
     SseSerializer serializer,
   );
 
@@ -896,6 +1126,60 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_epub_resource(EpubResource self, SseSerializer serializer);
 
   @protected
+  void sse_encode_hoshi_dictionary_style(
+    HoshiDictionaryStyle self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_frequency(
+    HoshiFrequency self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_frequency_entry(
+    HoshiFrequencyEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_glossary_entry(
+    HoshiGlossaryEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_import_result(
+    HoshiImportResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_lookup_result(
+    HoshiLookupResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_pitch_entry(
+    HoshiPitchEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_term_result(
+    HoshiTermResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_hoshi_transform_group(
+    HoshiTransformGroup self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_http_headers(HttpHeaders self, SseSerializer serializer);
 
   @protected
@@ -944,8 +1228,56 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_hoshi_dictionary_style(
+    List<HoshiDictionaryStyle> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_hoshi_frequency(
+    List<HoshiFrequency> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_hoshi_frequency_entry(
+    List<HoshiFrequencyEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_hoshi_glossary_entry(
+    List<HoshiGlossaryEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_hoshi_lookup_result(
+    List<HoshiLookupResult> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_hoshi_pitch_entry(
+    List<HoshiPitchEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_hoshi_transform_group(
+    List<HoshiTransformGroup> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_list_prim_u_8_strict(
     List<Uint8List> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_i_32_strict(
+    Int32List self,
     SseSerializer serializer,
   );
 
@@ -955,6 +1287,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_rar_entry(List<RarEntry> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_rar_entry_data(
+    List<RarEntryData> self,
     SseSerializer serializer,
   );
 
@@ -1063,6 +1404,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_proxy_settings(ProxySettings self, SseSerializer serializer);
 
   @protected
+  void sse_encode_rar_entry(RarEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rar_entry_data(RarEntryData self, SseSerializer serializer);
+
+  @protected
   void sse_encode_record_string_list_string(
     (String, List<String>) self,
     SseSerializer serializer,
@@ -1103,6 +1450,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_u_16(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
@@ -1152,6 +1505,22 @@ class RustLibWire implements BaseWire {
       );
 
   void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+        ptr,
+      );
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+        ptr,
+      );
+
+  void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     int ptr,
   ) => wasmModule
@@ -1191,6 +1560,16 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
 
   external void
   rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDnsSettings(
+    int ptr,
+  );
+
+  external void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
+    int ptr,
+  );
+
+  external void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHoshiLookupSession(
     int ptr,
   );
 

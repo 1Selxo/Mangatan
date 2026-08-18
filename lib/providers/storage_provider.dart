@@ -10,6 +10,7 @@ import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/custom_button.dart';
 import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -26,6 +27,9 @@ import 'package:path/path.dart' as path;
 import 'package:mangayomi/utils/platform_utils.dart';
 
 class StorageProvider {
+  static const _defaultDirectoryName = 'Mangatan';
+  static const _legacyDirectoryName = 'Mangayomi';
+
   static final StorageProvider _instance = StorageProvider._internal();
   StorageProvider._internal();
   factory StorageProvider() => _instance;
@@ -56,11 +60,10 @@ class StorageProvider {
       directory = Directory("/storage/emulated/0/Mangayomi/");
     } else {
       final dir = await getApplicationDocumentsDirectory();
-      // The documents dir in iOS is already named "Mangayomi".
-      // Appending "Mangayomi" to the documents dir would create
-      // unnecessarily nested Mangayomi/Mangayomi/ folder.
+      // The iOS documents directory is already app-specific, so appending an
+      // additional branded directory would create unnecessary nesting.
       if (Platform.isIOS) return dir;
-      directory = Directory(path.join(dir.path, 'Mangayomi'));
+      directory = await _resolveDesktopAppDirectory(dir.path);
     }
     return directory;
   }
@@ -147,11 +150,10 @@ class StorageProvider {
     } else {
       final dir = await getApplicationDocumentsDirectory();
       final p = dPath.isEmpty ? dir.path : dPath;
-      // The documents dir in iOS is already named "Mangayomi".
-      // Appending "Mangayomi" to the documents dir would create
-      // unnecessarily nested Mangayomi/Mangayomi/ folder.
+      // The iOS documents directory is already app-specific, so appending an
+      // additional branded directory would create unnecessary nesting.
       if (Platform.isIOS) return Directory(p);
-      directory = Directory(path.join(p, 'Mangayomi'));
+      directory = await _resolveDesktopAppDirectory(p);
     }
     return directory;
   }
@@ -211,7 +213,11 @@ class StorageProvider {
       // So they are not just in the app folders root dir
       dbDir = path.join(dir.path, 'databases');
     } else {
-      dbDir = path.join(dir.path, 'Mangayomi', 'databases');
+      final appDirectory = await _resolveDesktopAppDirectory(
+        dir.path,
+        existingChild: 'databases',
+      );
+      dbDir = path.join(appDirectory.path, 'databases');
     }
     if (Platform.isMacOS) {
       await _migrateLegacyMacosDatabase(dbDir);
@@ -247,8 +253,8 @@ class StorageProvider {
       }
     } catch (e) {
       // Migration is best-effort. Falling back to a fresh DB is preferable
-      // to crashing on launch — the user can manually move the legacy
-      // ~/Documents/Mangayomi/databases/ contents if needed.
+      // to crashing on launch; the legacy database can still be moved
+      // manually if needed.
       if (kDebugMode) {
         debugPrint('[storage] macOS DB migration skipped: $e');
       }
@@ -264,6 +270,31 @@ class StorageProvider {
     }
     await createDirectorySafely(gPath);
     return Directory(gPath);
+  }
+
+  /// Uses the new branded directory for fresh installs while continuing to
+  /// open an existing legacy directory in place. This keeps user data intact
+  /// without merging or renaming folders behind the user's back.
+  Future<Directory> _resolveDesktopAppDirectory(
+    String parentPath, {
+    String? existingChild,
+  }) async {
+    final current = Directory(path.join(parentPath, _defaultDirectoryName));
+    final legacy = Directory(path.join(parentPath, _legacyDirectoryName));
+
+    if (existingChild != null) {
+      if (await Directory(path.join(current.path, existingChild)).exists()) {
+        return current;
+      }
+      if (await Directory(path.join(legacy.path, existingChild)).exists()) {
+        return legacy;
+      }
+    }
+
+    if (await current.exists()) return current;
+    if (await legacy.exists()) return legacy;
+
+    return current;
   }
 
   Future<void> createDirectorySafely(String dirPath) async {
@@ -305,6 +336,7 @@ class StorageProvider {
         UpdateSchema,
         HistorySchema,
         DownloadSchema,
+        EpubBookProgressSchema,
         SourceSchema,
         SettingsSchema,
         TrackPreferenceSchema,
@@ -352,6 +384,8 @@ class StorageProvider {
         }
       }
     }
+
+    await _migrateDesktopReaderToWindowed(isar, dir);
 
     final prefs = await isar.trackPreferences
         .filter()
@@ -401,5 +435,29 @@ end""",
     }
 
     return isar;
+  }
+
+  Future<void> _migrateDesktopReaderToWindowed(
+    Isar isar,
+    Directory databaseDirectory,
+  ) async {
+    if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) return;
+    final marker = File(
+      path.join(databaseDirectory.path, '.windowed-reader-default-v1'),
+    );
+    if (await marker.exists()) return;
+    try {
+      final settings = await isar.settings.get(227);
+      if (settings?.fullScreenReader == true) {
+        await isar.writeTxn(() async {
+          await isar.settings.put(settings!..fullScreenReader = false);
+        });
+      }
+      await marker.writeAsString('done', flush: true);
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[storage] Windowed reader migration skipped: $error');
+      }
+    }
   }
 }

@@ -49,6 +49,9 @@ Future<dynamic> updateMangaDetail(
         [];
 
     final imgUrl = getManga.imageUrl.trimmedOrDefault(manga.imageUrl);
+    final refreshedSourceTitle = getManga.name.trimmedOrDefault(
+      manga.sourceTitle ?? manga.name,
+    );
     final now = DateTime.now().millisecondsSinceEpoch;
 
     manga
@@ -57,7 +60,7 @@ Future<dynamic> updateMangaDetail(
           : imgUrl.startsWith('http')
           ? imgUrl
           : '${source.baseUrl ?? ''}/${imgUrl.getUrlWithoutDomain}'
-      ..name = getManga.name.trimmedOrDefault(manga.name)
+      ..updateSourceTitle(refreshedSourceTitle)
       ..genre = (genre.isEmpty ? null : genre) ?? manga.genre ?? []
       ..author = getManga.author.trimmedOrDefault(manga.author) ?? ""
       ..artist = getManga.artist.trimmedOrDefault(manga.artist) ?? ""
@@ -170,6 +173,7 @@ Future<dynamic> updateMangaDetail(
                 ? now.toString()
                 : chap.dateUpload.toString(),
             scanlator: chap.scanlator ?? '',
+            chapterNumber: normalizeSourceChapterNumber(chap.chapterNumber),
             mangaId: savedMangaId,
             updatedAt: now,
             isFiller: chap.isFiller,
@@ -195,6 +199,9 @@ Future<dynamic> updateMangaDetail(
             ..name = chap.name
             ..url = url
             ..scanlator = chap.scanlator
+            ..chapterNumber =
+                normalizeSourceChapterNumber(chap.chapterNumber) ??
+                normalizeSourceChapterNumber(existing.chapterNumber)
             ..updatedAt = now
             ..isFiller = chap.isFiller
             ..thumbnailUrl = chap.thumbnailUrl

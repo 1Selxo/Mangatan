@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+import "BackupSavedSearch.proto";
+
+message BackupFeed {
+    int64 source = 1;
+    bool global = 2;
+    optional BackupSavedSearch savedSearch = 9;
+}

@@ -53,6 +53,14 @@ const BackupAnime$json = {
       '10': 'episodes'
     },
     {'1': 'categories', '3': 17, '4': 3, '5': 3, '10': 'categories'},
+    {
+      '1': 'tracking',
+      '3': 18,
+      '4': 3,
+      '5': 11,
+      '6': '.BackupTracking',
+      '10': 'tracking'
+    },
     {'1': 'favorite', '3': 100, '4': 1, '5': 8, '10': 'favorite'},
     {'1': 'episodeFlags', '3': 101, '4': 1, '5': 5, '10': 'episodeFlags'},
     {
@@ -82,6 +90,13 @@ const BackupAnime$json = {
       '9': 5,
       '10': 'favoriteModifiedAt',
       '17': true
+    },
+    {
+      '1': 'excludedScanlators',
+      '3': 108,
+      '4': 3,
+      '5': 9,
+      '10': 'excludedScanlators'
     },
     {'1': 'version', '3': 109, '4': 1, '5': 3, '10': 'version'},
     {
@@ -135,17 +150,18 @@ final $typed_data.Uint8List backupAnimeDescriptor = $convert.base64Decode(
     'B0aW9uiAEBEhQKBWdlbnJlGAcgAygJUgVnZW5yZRIWCgZzdGF0dXMYCCABKAVSBnN0YXR1cxIn'
     'Cgx0aHVtYm5haWxVcmwYCSABKAlIA1IMdGh1bWJuYWlsVXJsiAEBEhwKCWRhdGVBZGRlZBgNIA'
     'EoA1IJZGF0ZUFkZGVkEioKCGVwaXNvZGVzGBAgAygLMg4uQmFja3VwRXBpc29kZVIIZXBpc29k'
-    'ZXMSHgoKY2F0ZWdvcmllcxgRIAMoA1IKY2F0ZWdvcmllcxIaCghmYXZvcml0ZRhkIAEoCFIIZm'
-    'F2b3JpdGUSIgoMZXBpc29kZUZsYWdzGGUgASgFUgxlcGlzb2RlRmxhZ3MSJgoMdmlld2VyX2Zs'
-    'YWdzGGcgASgFSARSC3ZpZXdlckZsYWdziAEBEigKB2hpc3RvcnkYaCADKAsyDi5CYWNrdXBIaX'
-    'N0b3J5UgdoaXN0b3J5EiYKDnVwZGF0ZVN0cmF0ZWd5GGkgASgFUg51cGRhdGVTdHJhdGVneRIm'
-    'Cg5sYXN0TW9kaWZpZWRBdBhqIAEoA1IObGFzdE1vZGlmaWVkQXQSMwoSZmF2b3JpdGVNb2RpZm'
-    'llZEF0GGsgASgDSAVSEmZhdm9yaXRlTW9kaWZpZWRBdIgBARIYCgd2ZXJzaW9uGG0gASgDUgd2'
-    'ZXJzaW9uEioKDWJhY2tncm91bmRVcmwY9AMgASgJSAZSDWJhY2tncm91bmRVcmyIAQESIAoIcG'
-    'FyZW50SWQY9gMgASgDSAdSCHBhcmVudElkiAEBEhQKAmlkGPcDIAEoA0gIUgJpZIgBARIhCgtz'
-    'ZWFzb25GbGFncxj4AyABKANSC3NlYXNvbkZsYWdzEiMKDHNlYXNvbk51bWJlchj5AyABKAFSDH'
-    'NlYXNvbk51bWJlchItChFzZWFzb25Tb3VyY2VPcmRlchj6AyABKANSEXNlYXNvblNvdXJjZU9y'
-    'ZGVyEh0KCWZldGNoVHlwZRj7AyABKAVSCWZldGNoVHlwZUIJCgdfYXJ0aXN0QgkKB19hdXRob3'
-    'JCDgoMX2Rlc2NyaXB0aW9uQg8KDV90aHVtYm5haWxVcmxCDwoNX3ZpZXdlcl9mbGFnc0IVChNf'
-    'ZmF2b3JpdGVNb2RpZmllZEF0QhAKDl9iYWNrZ3JvdW5kVXJsQgsKCV9wYXJlbnRJZEIFCgNfaW'
-    'Q=');
+    'ZXMSHgoKY2F0ZWdvcmllcxgRIAMoA1IKY2F0ZWdvcmllcxIrCgh0cmFja2luZxgSIAMoCzIPLk'
+    'JhY2t1cFRyYWNraW5nUgh0cmFja2luZxIaCghmYXZvcml0ZRhkIAEoCFIIZmF2b3JpdGUSIgoM'
+    'ZXBpc29kZUZsYWdzGGUgASgFUgxlcGlzb2RlRmxhZ3MSJgoMdmlld2VyX2ZsYWdzGGcgASgFSA'
+    'RSC3ZpZXdlckZsYWdziAEBEigKB2hpc3RvcnkYaCADKAsyDi5CYWNrdXBIaXN0b3J5UgdoaXN0'
+    'b3J5EiYKDnVwZGF0ZVN0cmF0ZWd5GGkgASgFUg51cGRhdGVTdHJhdGVneRImCg5sYXN0TW9kaW'
+    'ZpZWRBdBhqIAEoA1IObGFzdE1vZGlmaWVkQXQSMwoSZmF2b3JpdGVNb2RpZmllZEF0GGsgASgD'
+    'SAVSEmZhdm9yaXRlTW9kaWZpZWRBdIgBARIuChJleGNsdWRlZFNjYW5sYXRvcnMYbCADKAlSEm'
+    'V4Y2x1ZGVkU2NhbmxhdG9ycxIYCgd2ZXJzaW9uGG0gASgDUgd2ZXJzaW9uEioKDWJhY2tncm91'
+    'bmRVcmwY9AMgASgJSAZSDWJhY2tncm91bmRVcmyIAQESIAoIcGFyZW50SWQY9gMgASgDSAdSCH'
+    'BhcmVudElkiAEBEhQKAmlkGPcDIAEoA0gIUgJpZIgBARIhCgtzZWFzb25GbGFncxj4AyABKANS'
+    'C3NlYXNvbkZsYWdzEiMKDHNlYXNvbk51bWJlchj5AyABKAFSDHNlYXNvbk51bWJlchItChFzZW'
+    'Fzb25Tb3VyY2VPcmRlchj6AyABKANSEXNlYXNvblNvdXJjZU9yZGVyEh0KCWZldGNoVHlwZRj7'
+    'AyABKAVSCWZldGNoVHlwZUIJCgdfYXJ0aXN0QgkKB19hdXRob3JCDgoMX2Rlc2NyaXB0aW9uQg'
+    '8KDV90aHVtYm5haWxVcmxCDwoNX3ZpZXdlcl9mbGFnc0IVChNfZmF2b3JpdGVNb2RpZmllZEF0'
+    'QhAKDl9iYWNrZ3JvdW5kVXJsQgsKCV9wYXJlbnRJZEIFCgNfaWQ=');

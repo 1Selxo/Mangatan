@@ -7,6 +7,8 @@ class MChapter {
 
   String? scanlator;
 
+  double? chapterNumber;
+
   bool? isFiller;
 
   String? thumbnailUrl;
@@ -24,6 +26,7 @@ class MChapter {
     this.url,
     this.dateUpload,
     this.scanlator,
+    this.chapterNumber,
     this.isFiller = false,
     this.thumbnailUrl,
     this.description,
@@ -36,6 +39,7 @@ class MChapter {
       url: json['url'],
       dateUpload: json['dateUpload'],
       scanlator: json['scanlator'],
+      chapterNumber: (json['chapterNumber'] as num?)?.toDouble(),
       isFiller: json['isFiller'] ?? false,
       thumbnailUrl: json['thumbnailUrl'],
       description: json['description'],
@@ -48,6 +52,7 @@ class MChapter {
     'url': url,
     'dateUpload': dateUpload,
     'scanlator': scanlator,
+    'chapterNumber': chapterNumber,
     'isFiller': isFiller,
     'thumbnailUrl': thumbnailUrl,
     'description': description,

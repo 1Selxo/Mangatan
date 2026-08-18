@@ -120,8 +120,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   ///
   /// The default `local` folder is not among these; the provider holds the
   /// ones a user has added themselves.
-  List<LocalFolder> get _existingFolders =>
-      ref.watch(localFoldersStateProvider);
+  List<String> get _existingFolders => ref.watch(localFoldersStateProvider);
 
   /// Whether the folder this screen added is still on the list.
   ///
@@ -130,9 +129,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   /// used to leave this step still reporting a folder that had gone.
   bool get _addedLocalFolder =>
       _addedFolderPath != null &&
-      ref
-          .watch(localFoldersStateProvider)
-          .any((folder) => folder.path == _addedFolderPath);
+      ref.watch(localFoldersStateProvider).contains(_addedFolderPath);
 
   /// The folder that was added here, so a wrong pick can be undone without
   /// going to look for it in Settings.
@@ -288,13 +285,8 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
     // de-duplication turned that into "Manga 2", "Manga 3" and so on. Trying
     // again after a scan found nothing is the most likely thing a user does
     // here, so it has to be the cheapest.
-    if (!folders.any((folder) => folder.path == path)) {
-      folders.add(
-        LocalFolder(
-          name: LocalFolder.fromPath(path: path).name ?? p.basename(path),
-          path: path,
-        ),
-      );
+    if (!folders.contains(path)) {
+      folders.add(path);
       ref.read(localFoldersStateProvider.notifier).set(folders);
     }
     // The downloads directory already belongs to the app. Scanning it as a
@@ -357,7 +349,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
         .set(
           ref
               .read(localFoldersStateProvider)
-              .where((folder) => folder.path != path)
+              .where((folder) => folder != path)
               .toList(),
         );
     setState(() {
@@ -760,7 +752,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
         _FolderStatus(
           message: l10n.onboarding_local_existing('${_existingFolders.length}'),
           titles: _existingFolders
-              .map((folder) => folder.name ?? '')
+              .map(p.basename)
               .where((name) => name.isNotEmpty)
               .toList(),
         ),

@@ -10,6 +10,8 @@ import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/modules/manga/download/providers/download_provider.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar_path.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/global_style.dart';
@@ -22,18 +24,9 @@ class ChapterPageDownload extends ConsumerWidget {
 
   const ChapterPageDownload({super.key, required this.chapter});
 
-  void _startDownload(
-    bool? useWifi,
-    int? downloadId,
-    WidgetRef ref,
-  ) async {
+  void _startDownload(bool? useWifi, int? downloadId, WidgetRef ref) async {
     _cancelTasks(downloadId: downloadId);
-    ref.read(
-      downloadChapterProvider(
-        chapter: chapter,
-        useWifi: useWifi,
-      ),
-    );
+    ref.read(downloadChapterProvider(chapter: chapter, useWifi: useWifi));
   }
 
   void _sendFile(BuildContext context) async {
@@ -227,11 +220,7 @@ class ChapterPageDownload extends ConsumerWidget {
                   : download.succeeded == 0
                   ? IconButton(
                       onPressed: () {
-                        _downloadChapter(
-                          context,
-                          ref,
-                          downloadId: download.id,
-                        );
+                        _downloadChapter(context, ref, downloadId: download.id);
                       },
                       icon: FaIcon(
                         FontAwesomeIcons.circleDown,

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/widgets/downloaded_only_widget.dart';
 import 'package:mangayomi/modules/more/widgets/incognito_mode_widget.dart';
 import 'package:mangayomi/modules/more/widgets/list_tile_widget.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
-import 'package:mangayomi/models/manga.dart';
 
 class MoreScreen extends ConsumerStatefulWidget {
   const MoreScreen({super.key});
@@ -30,11 +30,8 @@ class MoreScreenState extends ConsumerState<MoreScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Image.asset(
-                "assets/app_icons/icon.png",
-                color: Theme.of(context).brightness == Brightness.light
-                    ? Colors.black
-                    : Colors.white,
-                fit: BoxFit.cover,
+                "assets/app_icons/icon-red.png",
+                fit: BoxFit.contain,
                 height: 100,
               ),
             ),
@@ -92,17 +89,24 @@ class MoreScreenState extends ConsumerState<MoreScreen> {
               ),
             ListTileWidget(
               onTap: () {
-                context.push('/categories', extra: (false, 0));
+                context.push('/categories', extra: (false, ItemType.manga));
               },
               icon: Icons.label_outline_rounded,
               title: l10n.categories,
             ),
             ListTileWidget(
               onTap: () {
-                context.push('/statistics');
+                context.push('/statistics/immersion');
               },
               icon: Icons.query_stats_outlined,
               title: l10n.statistics,
+            ),
+            ListTileWidget(
+              onTap: () {
+                context.push('/statistics');
+              },
+              icon: Icons.pie_chart_outline,
+              title: l10n.library_statistics,
             ),
             ListTileWidget(
               onTap: () {

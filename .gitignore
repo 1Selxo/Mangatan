@@ -48,9 +48,30 @@ app.*.map.json
 
 /android/app/.cxx
 untranslated_messages.txt
-
 # Isar's native core, downloaded into the repo root by tests that open a
 # real database (Isar.initializeIsarCore).
 libisar.dylib
 libisar.so
 isar.dll
+
+AGENTS.override.md
+
+# Platform caches and generated files created by Flutter run/build
+/android/.gradle/
+/android/local.properties
+/ios/.symlinks/
+/ios/Flutter/ephemeral/
+/ios/Pods/
+/ios/EmbeddedMihon/runtime/
+/ios/Frameworks/OpenJDK.xcframework/
+/ios/Frameworks/OpenJDKRuntime.framework/
+/macos/Flutter/ephemeral/
+/macos/Pods/
+/linux/flutter/ephemeral/
+/windows/flutter/ephemeral/
+
+# Runtime mpv configuration extracted from assets/mangayomi_mpv.zip
+/mpv/
+
+# Chapters downloaded by the debug build
+downloads/

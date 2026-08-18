@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "BackupEpisode.proto";
 import "BackupHistory.proto";
+import "BackupTracking.proto";
 
 message BackupAnime {
     int64 source = 1;
@@ -16,6 +17,7 @@ message BackupAnime {
     int64 dateAdded = 13;
     repeated BackupEpisode episodes = 16;
     repeated int64 categories = 17;
+    repeated BackupTracking tracking = 18;
     bool favorite = 100;
     int32 episodeFlags = 101;
     optional int32 viewer_flags = 103;
@@ -23,6 +25,7 @@ message BackupAnime {
     int32 updateStrategy = 105;
     int64 lastModifiedAt = 106;
     optional int64 favoriteModifiedAt = 107;
+    repeated string excludedScanlators = 108;
     int64 version = 109;
     optional string backgroundUrl = 500;
     optional int64 parentId = 502;

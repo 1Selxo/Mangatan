@@ -83,10 +83,10 @@ class _StubRepoState extends ExtensionsRepoState {
 
 class _StubLocalFolders extends LocalFoldersState {
   @override
-  List<LocalFolder> build() => const [];
+  List<String> build() => const [];
 
   @override
-  void set(List<LocalFolder> value) => state = value;
+  void set(List<String> value) => state = value;
 }
 
 class _StubHideItems extends HideItemsState {

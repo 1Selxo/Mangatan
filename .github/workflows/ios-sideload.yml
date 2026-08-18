@@ -1,0 +1,219 @@
+name: Build iOS sideload IPA
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    name: iOS IPA
+    runs-on: macos-26
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          architecture: arm64
+          cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          cache-on-failure: true
+
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.31.6"
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Run bridge regression tests
+        run: |
+          flutter test --concurrency=1 test/eval/mihon
+          flutter test --concurrency=1 \
+            test/services/hoshidicts/hoshi_dictionary_popup_test.dart \
+            test/services/ios_launch_wiring_test.dart \
+            test/services/mining/anki_audio_service_test.dart \
+            test/services/mining/anki_connect_service_test.dart \
+            test/services/mining/anki_mobile_service_test.dart \
+            test/services/mining/dictionary_profile_test.dart \
+            test/services/mining/mining_preferences_profile_test.dart \
+            test/services/m_extension_server_test.dart \
+            test/utils/app_font_fallback_test.dart
+
+      - name: Verify native dictionary source
+        run: test -f third_party/hoshidicts/CMakeLists.txt
+
+      - name: Prepare on-device Mihon bridge
+        run: |
+          tool/prepare_embedded_mihon_ios.sh
+          runtime="ios/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"
+          test -x "$runtime"
+          test -f \
+            "ios/Frameworks/OpenJDKRuntime.framework/lib/lib/modules"
+          nm -gjU "$runtime" > "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          grep -E 'JNI_CreateJavaVM|MangatanOpenJDKLoadFunctions' \
+            "$RUNNER_TEMP/openjdk-runtime-symbols.txt" || true
+          grep -Fxq '_JNI_CreateJavaVM' \
+            "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          grep -Fxq '_MangatanOpenJDKLoadFunctions' \
+            "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          for symbol in \
+            _JDK_Canonicalize \
+            _JIMAGE_Open \
+            _JIMAGE_Close \
+            _JIMAGE_FindResource \
+            _JIMAGE_GetResource \
+            _VerifyClassForMajorVersion; do
+            grep -Fxq "$symbol" \
+              "$RUNNER_TEMP/openjdk-runtime-symbols.txt"
+          done
+          otool -D "$runtime" > "$RUNNER_TEMP/openjdk-runtime-id.txt"
+          cat "$RUNNER_TEMP/openjdk-runtime-id.txt"
+          grep -q '@rpath/OpenJDKRuntime.framework/OpenJDKRuntime' \
+            "$RUNNER_TEMP/openjdk-runtime-id.txt"
+
+      - name: Configure iOS release
+        run: flutter build ios --release --no-codesign --config-only
+
+      - name: Install CocoaPods
+        working-directory: ios
+        run: pod install
+
+      - name: Build unsigned iOS app
+        run: |
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$GITHUB_WORKSPACE/build/ios" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=
+
+      - name: Verify on-device Mihon bridge
+        run: |
+          app_path="$GITHUB_WORKSPACE/build/ios/Build/Products/Release-iphoneos/Runner.app"
+          test -f "$app_path/lib/modules"
+          test -f "$app_path/lib/security/cacerts"
+          test -f "$app_path/MExtensionServer.jar"
+          test -f "$app_path/java-logging-shim.jar"
+          test -f "$app_path/EMBEDDED_MIHON_NOTICES.md"
+          test -x "$app_path/Runner"
+          lazy_runtime="$app_path/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"
+          test -x "$lazy_runtime"
+          framework_modules="$app_path/Frameworks/OpenJDKRuntime.framework/lib/lib/modules"
+          test -f "$framework_modules"
+          cmp "$app_path/lib/modules" "$framework_modules"
+          test -f \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/lib/conf/security/java.security"
+          test -f \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/lib/lib/tzdb.dat"
+          test -f \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/lib/lib/security/public_suffix_list.dat"
+          python3 tool/verify_macho_min_ios.py \
+            --maximum 15.0 "$app_path/Runner"
+          python3 tool/verify_macho_min_ios.py \
+            --maximum 13.0 "$lazy_runtime"
+          python3 tool/verify_macho_initializers.py \
+            --maximum 64 "$app_path/Runner"
+          if otool -L "$app_path/Runner" | grep -q OpenJDKRuntime; then
+            echo "OpenJDKRuntime must not be loaded during app launch." >&2
+            exit 1
+          fi
+          codesign --force --sign - --timestamp=none \
+            "$app_path/Frameworks/OpenJDKRuntime.framework"
+          codesign --verify --strict --verbose=2 \
+            "$app_path/Frameworks/OpenJDKRuntime.framework"
+          test -d \
+            "$app_path/Frameworks/OpenJDKRuntime.framework/_CodeSignature"
+          du -sh "$app_path"
+
+      - name: Package IPA
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version_value=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -1)
+          app_version="${version_value%%+*}"
+          if [[ "$version_value" == *"+"* ]]; then
+            app_build="${version_value##*+}"
+          else
+            app_build="0"
+          fi
+
+          short_sha="${GITHUB_SHA:0:7}"
+          ipa_name="Mangatan-v${app_version}-build.${app_build}-${short_sha}-ios.ipa"
+          package_dir="$RUNNER_TEMP/mangatan-ipa"
+          app_path="$GITHUB_WORKSPACE/build/ios/Build/Products/Release-iphoneos/Runner.app"
+
+          test -d "$app_path"
+          rm -rf "$package_dir"
+          mkdir -p "$package_dir/Payload"
+          cp -R "$app_path" "$package_dir/Payload/Runner.app"
+
+          bundle_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
+            "$package_dir/Payload/Runner.app/Info.plist")
+          test "$bundle_id" = "com.selxo.mangatan"
+          bundle_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
+            "$package_dir/Payload/Runner.app/Info.plist")
+          test "$bundle_version" = "$app_build"
+          /usr/libexec/PlistBuddy -c \
+            "Add :MangatanSourceCommit string $GITHUB_SHA" \
+            "$package_dir/Payload/Runner.app/Info.plist"
+
+          (
+            cd "$package_dir"
+            ditto -c -k --sequesterRsrc --keepParent Payload "$ipa_name"
+            unzip -t "$ipa_name"
+          )
+
+          mkdir -p "$GITHUB_WORKSPACE/release-ios"
+          mv "$package_dir/$ipa_name" "$GITHUB_WORKSPACE/release-ios/$ipa_name"
+          echo "ipa_name=$ipa_name" >> "$GITHUB_OUTPUT"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+          echo "app_build=$app_build" >> "$GITHUB_OUTPUT"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.ipa_name }}
+          path: release-ios/${{ steps.package.outputs.ipa_name }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attach IPA to tag release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-ios/${{ steps.package.outputs.ipa_name }}
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

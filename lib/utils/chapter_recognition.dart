@@ -1,5 +1,46 @@
 import 'package:mangayomi/utils/log/logger.dart';
 
+/// Mihon uses negative values for "number unknown". Mangatan keeps `-2` as a
+/// meaningful source value for compatibility, but all other negative and
+/// non-finite values must fall back to name recognition.
+double? normalizeSourceChapterNumber(double? number) {
+  if (number == null || !number.isFinite) return null;
+  return number == -2 || number >= 0 ? number : null;
+}
+
+/// Matches the legacy Mihon backup projection: use the final numeric token in
+/// a chapter or episode name when the source did not provide a known number.
+double fallbackChapterNumberFromName(String? name) {
+  final matches = RegExp(r'\d+(?:\.\d+)?').allMatches(name ?? '').toList();
+  return matches.isEmpty
+      ? 0
+      : double.tryParse(matches.last.group(0) ?? '') ?? 0;
+}
+
+String formatChapterNumberForDisplay(double number) {
+  if (number == number.truncateToDouble()) return number.toInt().toString();
+  return number
+      .toStringAsFixed(3)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
+}
+
+String chapterNumberDisplayTitle({
+  required String sourceTitle,
+  required String mangaTitle,
+  required String numberLabel,
+  double? sourceChapterNumber,
+}) {
+  final number = ChapterRecognition().resolveChapterNumberOrNull(
+    mangaTitle,
+    sourceTitle,
+    sourceChapterNumber: sourceChapterNumber,
+  );
+  return number == null || number < 0
+      ? sourceTitle
+      : '$numberLabel ${formatChapterNumberForDisplay(number)}';
+}
+
 class ChapterRecognition {
   static final _unwanted = RegExp(
     r"\b(?:v|ver|vol|version|volume|season|staffel|saison|temporada|s)[^a-z]?[0-9]+",
@@ -10,6 +51,15 @@ class ChapterRecognition {
   );
   static final _episodeKeyword = RegExp(
     r"\b(?:folge|episode|ep\.?)\s*([0-9]+(?:\.[0-9]+)?)",
+  );
+  static final _japaneseVolume = RegExp(
+    r"第\s*([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?\s*巻",
+  );
+  static final _japaneseChapterNumber = RegExp(
+    r"第\s*([〇零一二三四五六七八九十百千万億兆壱弐参拾]+)\s*(?:話|章|回|節|篇|巻)",
+  );
+  static final _westernVolume = RegExp(
+    r"\b(?:v|vol(?:ume)?)\.?\s*([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?",
   );
   // lookbehind for "ch." then zero or more spaces.
   static final _chNotation = RegExp(
@@ -36,6 +86,40 @@ class ChapterRecognition {
     return (ep ?? 0).toInt();
   }
 
+  double resolveChapterNumber(
+    String mangaTitle,
+    String chapterName, {
+    double? sourceChapterNumber,
+  }) =>
+      resolveChapterNumberOrNull(
+        mangaTitle,
+        chapterName,
+        sourceChapterNumber: sourceChapterNumber,
+      ) ??
+      0;
+
+  double? resolveChapterNumberOrNull(
+    String mangaTitle,
+    String chapterName, {
+    double? sourceChapterNumber,
+  }) {
+    final sourceNumber = normalizeSourceChapterNumber(sourceChapterNumber);
+    if (sourceNumber != null) return sourceNumber;
+    final (season, episode) = rawSeasonAndNumber(mangaTitle, chapterName);
+    return episode == null ? null : _withSeason(season, episode);
+  }
+
+  double resolveEpisodeNumber(
+    String mangaTitle,
+    String episodeName, {
+    double? sourceEpisodeNumber,
+  }) {
+    final sourceNumber = normalizeSourceChapterNumber(sourceEpisodeNumber);
+    if (sourceNumber != null) return sourceNumber;
+    final (_, episode) = rawSeasonAndNumber(mangaTitle, episodeName);
+    return episode ?? 0;
+  }
+
   /// Raw (season, episode) pair, unbucketed — season is 0 if none matched.
   /// Episode keeps its fractional part (e.g. 12.5) so callers needing exact
   /// chapter identity (dedup, stable sort of split chapters) don't collide
@@ -60,8 +144,27 @@ class ChapterRecognition {
       return (season, double.parse(epMatch.group(1)!));
     }
 
+    final chapterMatch = _chNotation.firstMatch(name);
+    if (chapterMatch != null) {
+      return (season, _fromMatch(chapterMatch));
+    }
+
+    final japaneseChapterMatch = _japaneseChapterNumber.firstMatch(name);
+    if (japaneseChapterMatch != null) {
+      final chapter = _parseJapaneseNumber(japaneseChapterMatch.group(1)!);
+      if (chapter != null) return (season, chapter.toDouble());
+    }
+
+    final japaneseVolumeMatch = _japaneseVolume.firstMatch(name);
+    if (japaneseVolumeMatch != null) {
+      return (season, _fromMatch(japaneseVolumeMatch));
+    }
+
     final stripped = name.replaceAll(_unwanted, '');
-    final ep = _extractNumber(stripped);
+    final westernVolumeMatch = _westernVolume.firstMatch(name);
+    final ep =
+        _extractNumber(stripped) ??
+        (westernVolumeMatch == null ? null : _fromMatch(westernVolumeMatch));
     if (ep == null && _loggedUnrecognized.add('$mangaTitle|$chapterName')) {
       AppLogger.log(
         'ChapterRecognition: no number detected in "$chapterName" (manga: "$mangaTitle")',
@@ -83,6 +186,72 @@ class ChapterRecognition {
     if (numMatch != null) return _fromMatch(numMatch);
 
     return null;
+  }
+
+  int? _parseJapaneseNumber(String value) {
+    const digits = {
+      '〇': 0,
+      '零': 0,
+      '一': 1,
+      '壱': 1,
+      '二': 2,
+      '弐': 2,
+      '三': 3,
+      '参': 3,
+      '四': 4,
+      '五': 5,
+      '六': 6,
+      '七': 7,
+      '八': 8,
+      '九': 9,
+    };
+    const smallUnits = {'十': 10, '拾': 10, '百': 100, '千': 1000};
+    const largeUnits = {'万': 10000, '億': 100000000, '兆': 1000000000000};
+
+    final hasUnit = value
+        .split('')
+        .any(
+          (character) =>
+              smallUnits.containsKey(character) ||
+              largeUnits.containsKey(character),
+        );
+    if (!hasUnit) {
+      final converted = value
+          .split('')
+          .map((character) => digits[character]?.toString())
+          .join();
+      return converted.length == value.length ? int.tryParse(converted) : null;
+    }
+
+    var total = 0;
+    var section = 0;
+    var pendingDigit = 0;
+    for (final character in value.split('')) {
+      final digit = digits[character];
+      if (digit != null) {
+        pendingDigit = digit;
+        continue;
+      }
+
+      final smallUnit = smallUnits[character];
+      if (smallUnit != null) {
+        section += (pendingDigit == 0 ? 1 : pendingDigit) * smallUnit;
+        pendingDigit = 0;
+        continue;
+      }
+
+      final largeUnit = largeUnits[character];
+      if (largeUnit != null) {
+        section += pendingDigit;
+        total += (section == 0 ? 1 : section) * largeUnit;
+        section = 0;
+        pendingDigit = 0;
+        continue;
+      }
+
+      return null;
+    }
+    return total + section + pendingDigit;
   }
 
   double _fromMatch(Match match) {

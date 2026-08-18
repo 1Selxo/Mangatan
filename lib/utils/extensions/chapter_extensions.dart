@@ -7,16 +7,18 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/modules/more/settings/track/providers/track_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/download_manager/download_isolate_pool.dart';
+import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
+import 'package:mangayomi/services/mining/mokuro_sidecar_path.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path/path.dart' as p;
@@ -70,13 +72,16 @@ extension ChapterExtension on Chapter {
     final defaultMangaDir = await storageProvider.getMangaMainDirectory(this);
     if (defaultMangaDir != null) mangaDirList.add(defaultMangaDir);
 
-    final folders = await getAllLocalFolders();
-    for (final folder in folders) {
-      final folderPath = folder.path;
-      if (folderPath == null || folderPath.isEmpty) continue;
+    final folders =
+        isar.settings.getSync(227)?.localFolders ?? const <String>[];
+    for (final folderPath in folders) {
+      if (folderPath.isEmpty) continue;
       mangaDirList.add(
         Directory(
-          p.join(folderPath, manga.value!.name!.replaceForbiddenCharacters('_')),
+          p.join(
+            folderPath,
+            manga.value!.name!.replaceForbiddenCharacters('_'),
+          ),
         ),
       );
     }
@@ -87,18 +92,23 @@ extension ChapterExtension on Chapter {
         mangaMainDirectory: mangaDir,
       );
 
-      for (final entity in [
-        File(p.join(mangaDir.path, "$name.cbz")),
-        File(p.join(mangaDir.path, "$chapterName.cbz")),
-        File(p.join(mangaDir.path, "$chapterName.mp4")),
-        File(p.join(mangaDir.path, "$name.html")),
-        File(p.join(chapterDir!.path, "$chapterName.html")),
-        chapterDir,
-      ]) {
-        try {
-          if (entity.existsSync()) entity.deleteSync(recursive: true);
-        } catch (_) {}
-      }
+      try {
+        final cbzFile = downloadedMangaChapterCbz(mangaDir, this);
+        if (cbzFile.existsSync()) cbzFile.deleteSync();
+        final sidecar = mokuroSidecarFor(cbzFile);
+        if (sidecar.existsSync()) sidecar.deleteSync();
+      } catch (_) {}
+      try {
+        final mp4File = File(p.join(mangaDir.path, "$chapterName.mp4"));
+        if (mp4File.existsSync()) mp4File.deleteSync();
+      } catch (_) {}
+      try {
+        final htmlFile = File(p.join(mangaDir.path, "$name.html"));
+        if (htmlFile.existsSync()) htmlFile.deleteSync();
+      } catch (_) {}
+      try {
+        chapterDir?.deleteSync(recursive: true);
+      } catch (_) {}
     }
 
     cancelDownloads(download.id);
@@ -111,14 +121,19 @@ extension ChapterExtension on Chapter {
     );
     if (!updateProgressAfterReading) return;
     final manga = this.manga.value!;
-    final chapterNumber = ChapterRecognition().parseEpisodeNumber(
-      manga.name!,
-      name!,
-    );
+    final chapterNumber = ChapterRecognition()
+        .resolveEpisodeNumber(
+          manga.name!,
+          name!,
+          sourceEpisodeNumber: this.chapterNumber,
+        )
+        .toInt();
 
     final tracks = isar.tracks
-        .where()
-        .mangaIdItemTypeEqualTo(manga.id!, manga.itemType)
+        .filter()
+        .idIsNotNull()
+        .itemTypeEqualTo(manga.itemType)
+        .mangaIdEqualTo(manga.id!)
         .findAllSync();
 
     for (var track in tracks) {

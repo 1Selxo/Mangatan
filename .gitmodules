@@ -1,0 +1,4 @@
+[submodule "third_party/hoshidicts"]
+	path = third_party/hoshidicts
+	url = https://github.com/Manhhao/hoshidicts.git
+	branch = main

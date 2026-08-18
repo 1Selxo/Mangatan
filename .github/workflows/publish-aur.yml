@@ -1,0 +1,321 @@
+name: Publish AUR package
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Stable Mangatan release tag to publish
+        required: true
+        type: string
+      extension_server_tag:
+        description: >-
+          M-Extension-Server tag for mangatan-extension-server, or blank for its
+          latest stable release
+        required: false
+        default: ""
+        type: string
+    secrets:
+      AUR_SSH_PRIVATE_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Stable tag to publish, or blank for the latest release
+        required: false
+        default: ""
+        type: string
+      extension_server_tag:
+        description: >-
+          M-Extension-Server tag for mangatan-extension-server, or blank for its
+          latest stable release
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aur-${{ inputs.release_tag || 'latest' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - name: require AUR publishing key
+        shell: bash
+        run: |
+          if [[ -z "$AUR_SSH_PRIVATE_KEY" ]]; then
+            echo "::error::Add the AUR SSH private key as the AUR_SSH_PRIVATE_KEY repository secret."
+            exit 1
+          fi
+
+      - name: resolve stable release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          release_tag=$REQUESTED_TAG
+          if [[ -z "$release_tag" ]]; then
+            release_tag=$(gh api \
+              repos/1Selxo/Mangatan/releases/latest \
+              --jq .tag_name)
+          fi
+
+          if [[ ! $release_tag =~ ^v[0-9]+([.][0-9]+)*$ ]]; then
+            echo "::error::Expected a stable vX.Y.Z-style tag, got: $release_tag"
+            exit 1
+          fi
+
+          printf 'RELEASE_TAG=%s\n' "$release_tag" >> "$GITHUB_ENV"
+          printf 'release_tag=%s\n' "$release_tag" >> "$GITHUB_OUTPUT"
+          printf 'Publishing Mangatan %s to the AUR\n' "$release_tag"
+
+      - name: checkout packaging source
+        uses: actions/checkout@v7
+
+      - name: download Linux checksums
+        shell: bash
+        run: |
+          install -d release-linux
+          curl --fail --location --silent --show-error \
+            --output release-linux/SHA256SUMS-linux.txt \
+            "https://github.com/1Selxo/Mangatan/releases/download/$RELEASE_TAG/SHA256SUMS-linux.txt"
+
+      - name: render AUR package
+        shell: bash
+        run: |
+          scripts/render_aur_package.sh \
+            "$RELEASE_TAG" \
+            release-linux/SHA256SUMS-linux.txt \
+            aur-package
+
+      - name: generate AUR metadata
+        shell: bash
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE/aur-package:/pkg:ro" \
+            --workdir /pkg \
+            archlinux:base-devel \
+            runuser -u nobody -- env \
+              HOME=/tmp \
+              BUILDDIR=/tmp/makepkg-build \
+              SRCDEST=/tmp/makepkg-sources \
+              PKGDEST=/tmp/makepkg-packages \
+              makepkg --printsrcinfo \
+            > aur-package/.SRCINFO
+
+          grep -Fx 'pkgbase = mangatan-bin' aur-package/.SRCINFO
+          grep -Fx "	pkgver = ${RELEASE_TAG#v}" aur-package/.SRCINFO
+
+      - name: configure AUR SSH access
+        shell: bash
+        run: |
+          install -dm700 "$HOME/.ssh"
+          install -m600 /dev/null "$HOME/.ssh/aur"
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > "$HOME/.ssh/aur"
+          printf '%s\n' \
+            'aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN' \
+            > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: publish AUR package
+        shell: bash
+        env:
+          GIT_SSH_COMMAND: >-
+            ssh -i ~/.ssh/aur -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+        run: |
+          retry() {
+            local description=$1
+            shift
+            local max_attempts=5
+            local retry_delay=30
+            local attempt
+
+            for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+              if "$@"; then
+                return 0
+              fi
+
+              if ((attempt == max_attempts)); then
+                echo "::error::$description failed after $max_attempts attempts."
+                return 1
+              fi
+
+              echo "::warning::$description failed on attempt $attempt/$max_attempts; retrying in ${retry_delay}s."
+              sleep "$retry_delay"
+            done
+          }
+
+          clone_aur_repository() {
+            rm -rf aur-repository
+            git clone \
+              ssh://aur@aur.archlinux.org/mangatan-bin.git \
+              aur-repository
+          }
+
+          retry "Clone mangatan-bin from the AUR" clone_aur_repository
+
+          install -m644 aur-package/PKGBUILD aur-repository/PKGBUILD
+          install -m644 aur-package/.SRCINFO aur-repository/.SRCINFO
+          install -m644 aur-package/LICENSE aur-repository/LICENSE
+
+          git -C aur-repository config user.name "Mangatan release bot"
+          git -C aur-repository config user.email \
+            "10378052+bee-san@users.noreply.github.com"
+          git -C aur-repository config commit.gpgsign false
+          git -C aur-repository add PKGBUILD .SRCINFO LICENSE
+
+          if git -C aur-repository diff --cached --quiet; then
+            echo "AUR package is already up to date."
+            exit 0
+          fi
+
+          git -C aur-repository commit \
+            -m "Update to ${RELEASE_TAG#v}"
+          retry "Push mangatan-bin to the AUR" \
+            git -C aur-repository push origin HEAD:master
+
+  # The extension server versions independently of Mangatan, so this usually
+  # finds the AUR already up to date and exits without pushing. It runs
+  # regardless of the app job's outcome because neither package depends on the
+  # other's contents.
+  publish-extension-server:
+    runs-on: ubuntu-24.04
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - name: require AUR publishing key
+        shell: bash
+        run: |
+          if [[ -z "$AUR_SSH_PRIVATE_KEY" ]]; then
+            echo "::error::Add the AUR SSH private key as the AUR_SSH_PRIVATE_KEY repository secret."
+            exit 1
+          fi
+
+      - name: resolve extension server release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.extension_server_tag }}
+        run: |
+          server_tag=$REQUESTED_TAG
+          if [[ -z "$server_tag" ]]; then
+            # /releases/latest excludes prereleases, which is what keeps the
+            # ios-runtime-vN tags in this repository out of the AUR.
+            server_tag=$(gh api \
+              repos/1Selxo/M-Extension-Server/releases/latest \
+              --jq .tag_name)
+          fi
+
+          if [[ ! $server_tag =~ ^v[0-9]+([.][0-9]+)*$ ]]; then
+            echo "::error::Expected a stable vX.Y.Z-style extension server tag, got: $server_tag"
+            exit 1
+          fi
+
+          printf 'SERVER_TAG=%s\n' "$server_tag" >> "$GITHUB_ENV"
+          printf 'Publishing M-Extension-Server %s to the AUR\n' "$server_tag"
+
+      - name: checkout packaging source
+        uses: actions/checkout@v7
+
+      - name: render AUR package
+        shell: bash
+        run: |
+          scripts/render_aur_extension_server.sh \
+            "$SERVER_TAG" \
+            aur-package
+
+      - name: generate AUR metadata
+        shell: bash
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE/aur-package:/pkg:ro" \
+            --workdir /pkg \
+            archlinux:base-devel \
+            runuser -u nobody -- env \
+              HOME=/tmp \
+              BUILDDIR=/tmp/makepkg-build \
+              SRCDEST=/tmp/makepkg-sources \
+              PKGDEST=/tmp/makepkg-packages \
+              makepkg --printsrcinfo \
+            > aur-package/.SRCINFO
+
+          grep -Fx 'pkgbase = mangatan-extension-server' aur-package/.SRCINFO
+          grep -Fx "	pkgver = ${SERVER_TAG#v}" aur-package/.SRCINFO
+
+      - name: configure AUR SSH access
+        shell: bash
+        run: |
+          install -dm700 "$HOME/.ssh"
+          install -m600 /dev/null "$HOME/.ssh/aur"
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > "$HOME/.ssh/aur"
+          printf '%s\n' \
+            'aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN' \
+            > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: publish AUR package
+        shell: bash
+        env:
+          GIT_SSH_COMMAND: >-
+            ssh -i ~/.ssh/aur -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+        run: |
+          retry() {
+            local description=$1
+            shift
+            local max_attempts=5
+            local retry_delay=30
+            local attempt
+
+            for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+              if "$@"; then
+                return 0
+              fi
+
+              if ((attempt == max_attempts)); then
+                echo "::error::$description failed after $max_attempts attempts."
+                return 1
+              fi
+
+              echo "::warning::$description failed on attempt $attempt/$max_attempts; retrying in ${retry_delay}s."
+              sleep "$retry_delay"
+            done
+          }
+
+          clone_aur_repository() {
+            rm -rf aur-repository
+            git clone \
+              ssh://aur@aur.archlinux.org/mangatan-extension-server.git \
+              aur-repository
+          }
+
+          retry "Clone mangatan-extension-server from the AUR" \
+            clone_aur_repository
+
+          install -m644 aur-package/PKGBUILD aur-repository/PKGBUILD
+          install -m644 aur-package/.SRCINFO aur-repository/.SRCINFO
+          install -m644 aur-package/LICENSE aur-repository/LICENSE
+
+          git -C aur-repository config user.name "Mangatan release bot"
+          git -C aur-repository config user.email \
+            "10378052+bee-san@users.noreply.github.com"
+          git -C aur-repository config commit.gpgsign false
+          git -C aur-repository add PKGBUILD .SRCINFO LICENSE
+
+          if git -C aur-repository diff --cached --quiet; then
+            echo "AUR package is already up to date."
+            exit 0
+          fi
+
+          git -C aur-repository commit \
+            -m "Update to ${SERVER_TAG#v}"
+          retry "Push mangatan-extension-server to the AUR" \
+            git -C aur-repository push origin HEAD:master

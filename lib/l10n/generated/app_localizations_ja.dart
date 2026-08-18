@@ -482,6 +482,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get statistics => '統計';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => '設定';
 
   @override
@@ -508,14 +511,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get name => '名前';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label: $value';
-  }
-
-  @override
-  String get url => 'URL';
 
   @override
   String get category_name_required => '*必須';
@@ -551,6 +546,18 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get appearance_subtitle => 'テーマ、日時形式';
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
 
   @override
   String get theme => 'テーマ';
@@ -610,10 +617,34 @@ class AppLocalizationsJa extends AppLocalizations {
   String get reading_mode_right_to_left => '右から左へ';
 
   @override
+  String get reading_direction => '読み方向';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
   String get reading_mode_vertical_continuous => '垂直連続';
 
   @override
   String get reading_mode_webtoon => 'ウェブトゥーン';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => 'ダブルタップアニメーション速度';
@@ -677,11 +708,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get version => 'バージョン';
 
   @override
-  String beta_version(Object version) {
-    return 'Beta ($version)';
-  }
-
-  @override
   String get check_for_update => '更新を確認';
 
   @override
@@ -735,20 +761,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get unknown => '不明';
 
   @override
-  String get empty_placeholder => 'EMPTY\nMPTY\nMTY\nMT\n\n';
-
-  @override
-  String get error => 'エラー';
-
-  @override
-  String error_with_message(Object error) {
-    return 'Error: $error';
-  }
-
-  @override
-  String get no_pages_available => 'Error: no pages available';
-
-  @override
   String get set_categories => 'カテゴリを設定';
 
   @override
@@ -777,84 +789,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get source_title => 'ソースタイトル';
-
-  @override
-  String get create_extension => 'Create Extension';
-
-  @override
-  String get choose_extension_language => 'Choose extension language';
-
-  @override
-  String get lang => 'Lang';
-
-  @override
-  String get base_url => 'BaseUrl';
-
-  @override
-  String get api_url_optional => 'ApiUrl (optional)';
-
-  @override
-  String get icon_url => 'iconUrl';
-
-  @override
-  String get source_icon_url => 'Source icon url';
-
-  @override
-  String get notes => 'notes';
-
-  @override
-  String get extension_name_example => 'ex: myAnime';
-
-  @override
-  String get language_code_example => 'ex: en';
-
-  @override
-  String get base_url_example => 'ex: https://example.com';
-
-  @override
-  String get api_url_example => 'ex: https://api.example.com';
-
-  @override
-  String get extension_notes_example => 'ex: this extension requires login';
-
-  @override
-  String get type => 'タイプ';
-
-  @override
-  String get target => 'Target';
-
-  @override
-  String get source_type_single => 'single';
-
-  @override
-  String get source_type_multi => 'multi';
-
-  @override
-  String get source_type_torrent => 'torrent';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'LNReader compiled JS';
-
-  @override
-  String get source_created_successfully => 'Source created successfully';
-
-  @override
-  String get source_already_exists => 'Source already exists';
-
-  @override
-  String get error_when_creating_source => 'Error when creating source';
-
-  @override
-  String get cookies_deleted => 'Cookies deleted!';
-
-  @override
-  String get delete_all_cookies => 'Delete all cookies';
 
   @override
   String get chapter_number => 'チャプター番号';
@@ -1084,7 +1018,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sync_button_download => 'ダウンロードのみ';
 
   @override
-  String get sync_button_download_info => 'この操作はローカルデータを完全にリモートデータで置き換えます！';
+  String get sync_button_download_info =>
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_status_not_configured => 'Not connected';
@@ -1543,7 +1478,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get markEpisodeAsSeenSetting => 'エピソードを視聴済みにするタイミング';
 
   @override
-  String get mark_duplicate_chapters_read => '重複する章番号を読済みとしてマーク';
+  String get mark_duplicate_chapters_read =>
+      'Mark duplicate chapter numbers as read';
 
   @override
   String get default_skip_intro_length => 'デフォルトイントロスキップ長';
@@ -1902,7 +1838,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get url_cannot_be_empty => 'URLは空にできません';
 
   @override
-  String get url_must_end_with_dot_json_or_dot_pb => 'URLは.jsonで終わる必要があります';
+  String get url_must_end_with_dot_json => 'URLは.jsonで終わる必要があります';
 
   @override
   String get repo_url => 'リポジトリURL';
@@ -2188,72 +2124,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get rescan_local_folder => 'すべてのローカルフォルダを今すぐ再スキャン';
 
   @override
-  String get default_download_destination => 'Default download destination';
-
-  @override
-  String get ask_download_destination => 'Ask for download destination';
-
-  @override
-  String get ask_download_destination_desc =>
-      'Choose a local folder each time a download starts.';
-
-  @override
-  String get select_download_destination => 'Select download destination';
-
-  @override
-  String get clear_local_library => 'Clear local library';
-
-  @override
-  String get clear_local_library_desc =>
-      'Remove local folder and archive entries from the library.';
-
-  @override
-  String get clear_local_library_msg =>
-      'This will remove local folder and archive entries from your library. It will not delete files from disk.';
-
-  @override
-  String get custom => 'カスタム';
-
-  @override
-  String get no_local_folder_available_for_downloads =>
-      'No local folder is available for downloads';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return 'Failed to create CBZ: $error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return 'Error reading cover image: $error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return 'Error reading metadata: $error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return 'Error saving chapter/episode to library: $error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return 'Error reading chapter cover image: $error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return 'Error reading archive cover image: $error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return 'Error getting local library: $error';
-  }
-
-  @override
   String get export_metadata => 'メタデータをエクスポート';
 
   @override
@@ -2330,10 +2200,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tracked => '追跡中';
 
   @override
-  String get auth_unlock_msg => 'Mangayomiのロックを解除するために認証してください';
+  String get auth_unlock_msg => 'Mangatanのロックを解除するために認証してください';
 
   @override
-  String get app_locked => 'Mangayomiはロックされています';
+  String get app_locked => 'Mangatanはロックされています';
 
   @override
   String get auth_to_continue => '続行するために認証してください';
@@ -2555,6 +2425,13 @@ class AppLocalizationsJa extends AppLocalizations {
       'Extension server files were linked.';
 
   @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
   String get select_extension_server_jar => 'Select extension server JAR';
 
   @override
@@ -2577,73 +2454,48 @@ class AppLocalizationsJa extends AppLocalizations {
   String get not_configured => 'Not configured';
 
   @override
-  String get zero_interpreter => 'Zero interpreter';
-
-  @override
-  String get zero_interpreter_description =>
-      'Control the Zero interpreter server automatically or manually.';
-
-  @override
-  String get start_server_on_launch => 'Start server on launch';
-
-  @override
-  String get runtime_status => 'Runtime status';
-
-  @override
-  String get running => 'Running';
-
-  @override
-  String get stopped => 'Stopped';
-
-  @override
-  String get start => '開始';
-
-  @override
-  String get stop => 'Stop';
-
-  @override
   String get webview => 'Webview';
 
   @override
-  String get tts => 'テキスト読み上げ';
+  String get tts => 'Text-to-Speech';
 
   @override
-  String get tts_speed => '速度';
+  String get tts_speed => 'Speed';
 
   @override
-  String get tts_pitch => 'ピッチ';
+  String get tts_pitch => 'Pitch';
 
   @override
-  String get tts_language => '言語';
+  String get tts_language => 'Language';
 
   @override
-  String get tts_voice => 'ボイス';
+  String get tts_voice => 'Voice';
 
   @override
-  String get tts_stop => '停止';
+  String get tts_stop => 'Stop';
 
   @override
-  String get tts_play => '再生';
+  String get tts_play => 'Play';
 
   @override
-  String get tts_pause => '一時停止';
+  String get tts_pause => 'Pause';
 
   @override
-  String get tts_previous => '前の段落';
+  String get tts_previous => 'Previous paragraph';
 
   @override
-  String get tts_next => '次の段落';
+  String get tts_next => 'Next paragraph';
 
   @override
   String tts_paragraph_progress(Object current, Object total) {
-    return '段落$current/$total';
+    return 'Paragraph $current of $total';
   }
 
   @override
-  String get tts_settings => 'TTS設定';
+  String get tts_settings => 'TTS Settings';
 
   @override
-  String get tts_default => 'デフォルト';
+  String get tts_default => 'Default';
 
   @override
   String get webtoon_disable_zoom_out => 'Webtoonの縮小を無効化';
@@ -2752,41 +2604,292 @@ class AppLocalizationsJa extends AppLocalizations {
   String get error_no_pages_available => 'エラー：利用可能なページがありません';
 
   @override
-  String get app_ui_scale => 'インターフェーススケール';
+  String get subtitle_position => 'Subtitle position';
+
+  @override
+  String get dictionary_lookup => 'Dictionary';
+
+  @override
+  String get dictionary_settings => 'Dictionary settings';
+
+  @override
+  String get dictionary_search_label => 'Search';
+
+  @override
+  String get dictionary_search_hint => 'Word, reading, or phrase';
+
+  @override
+  String get clear_search => 'Clear search';
+
+  @override
+  String dictionary_count(int count) {
+    return '$count dictionaries';
+  }
+
+  @override
+  String dictionary_anki_deck(String name) {
+    return 'Anki deck: $name';
+  }
+
+  @override
+  String get dictionary_load_failed => 'Dictionary data could not be loaded';
+
+  @override
+  String get no_dictionaries_title => 'No dictionaries installed';
+
+  @override
+  String get no_dictionaries_description =>
+      'Import a Yomitan dictionary to start looking up words.';
+
+  @override
+  String get manage_dictionaries => 'Set up dictionaries';
+
+  @override
+  String get dictionary_empty_title => 'Look up a word or phrase';
+
+  @override
+  String get dictionary_empty_description =>
+      'Search a term, expression, sentence, or block of text.';
+
+  @override
+  String get previous_lookup => 'Previous lookup';
+
+  @override
+  String get next_lookup => 'Next lookup';
+
+  @override
+  String get app_ui_scale => 'Interface scale';
 
   @override
   String get app_ui_scale_subtitle =>
-      'インターフェースをお使いのスクリーンと視聴距離に合わせて大きくまたは小さくします。';
+      'Make the interface larger or smaller to suit your screen and viewing distance.';
 
   @override
-  String get allow_concurrent_downloads => '同時ダウンロードを許可';
+  String get allow_concurrent_downloads => 'Allow concurrent downloads';
 
   @override
   String get allow_concurrent_downloads_subtitle =>
-      '異なるソースから同時にダウンロードします。1つのソースは依然として一度に1つの章をダウンロードするため、過負荷になりません。すべての場所で1つずつダウンロードするには、オフにしてください。';
+      'Download from different sources at the same time. A single source still downloads one chapter at a time so it isn\'t overloaded. Turn off to download one at a time everywhere.';
 
   @override
-  String get download_delay => 'ダウンロード遅延';
+  String get download_delay => 'Download delay';
 
   @override
   String get download_delay_subtitle =>
-      'オフ。ソースに優しくするために、章間にランダムジッターを伴う待機を追加します。';
+      'Off. Add a wait with random jitter between chapters to be gentler on sources.';
 
   @override
-  String get save_search => '検索を保存';
+  String get save_search => 'Save search';
 
   @override
-  String get saved_searches => '保存済み検索';
+  String get saved_searches => 'Saved searches';
 
   @override
-  String get enter_search_to_save_first => 'まず検索を入力して保存してください';
+  String get enter_search_to_save_first => 'Enter a search to save first';
 
   @override
   String get no_saved_searches =>
-      'このソースの保存済み検索はまだありません。\n検索を実行してから、「検索を保存」を選択してください。';
+      'No saved searches for this source yet.\nRun a search, then pick \"Save search\".';
 
   @override
   String get source => 'ソース';
+
+  @override
+  String label_value(Object label, Object value) {
+    return '$label: $value';
+  }
+
+  @override
+  String get url => 'URL';
+
+  @override
+  String beta_version(Object version) {
+    return 'Beta ($version)';
+  }
+
+  @override
+  String get empty_placeholder => 'EMPTY\nMPTY\nMTY\nMT\n\n';
+
+  @override
+  String get error => 'エラー';
+
+  @override
+  String error_with_message(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get no_pages_available => 'Error: no pages available';
+
+  @override
+  String get create_extension => 'Create Extension';
+
+  @override
+  String get choose_extension_language => 'Choose extension language';
+
+  @override
+  String get lang => 'Lang';
+
+  @override
+  String get base_url => 'BaseUrl';
+
+  @override
+  String get api_url_optional => 'ApiUrl (optional)';
+
+  @override
+  String get icon_url => 'iconUrl';
+
+  @override
+  String get source_icon_url => 'Source icon url';
+
+  @override
+  String get notes => 'notes';
+
+  @override
+  String get extension_name_example => 'ex: myAnime';
+
+  @override
+  String get language_code_example => 'ex: en';
+
+  @override
+  String get base_url_example => 'ex: https://example.com';
+
+  @override
+  String get api_url_example => 'ex: https://api.example.com';
+
+  @override
+  String get extension_notes_example => 'ex: this extension requires login';
+
+  @override
+  String get type => 'タイプ';
+
+  @override
+  String get target => 'Target';
+
+  @override
+  String get source_type_single => 'single';
+
+  @override
+  String get source_type_multi => 'multi';
+
+  @override
+  String get source_type_torrent => 'torrent';
+
+  @override
+  String get source_language_dart => 'Dart';
+
+  @override
+  String get source_language_javascript => 'JavaScript';
+
+  @override
+  String get source_language_lnreader_compiled_js => 'LNReader compiled JS';
+
+  @override
+  String get source_created_successfully => 'Source created successfully';
+
+  @override
+  String get source_already_exists => 'Source already exists';
+
+  @override
+  String get error_when_creating_source => 'Error when creating source';
+
+  @override
+  String get cookies_deleted => 'Cookies deleted!';
+
+  @override
+  String get delete_all_cookies => 'Delete all cookies';
+
+  @override
+  String get url_must_end_with_dot_json_or_dot_pb =>
+      'URL must end with .json / .pb';
+
+  @override
+  String get default_download_destination => 'Default download destination';
+
+  @override
+  String get ask_download_destination => 'Ask for download destination';
+
+  @override
+  String get ask_download_destination_desc =>
+      'Choose a local folder each time a download starts.';
+
+  @override
+  String get select_download_destination => 'Select download destination';
+
+  @override
+  String get clear_local_library => 'Clear local library';
+
+  @override
+  String get clear_local_library_desc =>
+      'Remove local folder and archive entries from the library.';
+
+  @override
+  String get clear_local_library_msg =>
+      'This will remove local folder and archive entries from your library. It will not delete files from disk.';
+
+  @override
+  String get custom => 'カスタム';
+
+  @override
+  String get no_local_folder_available_for_downloads =>
+      'No local folder is available for downloads';
+
+  @override
+  String failed_to_create_cbz(Object error) {
+    return 'Failed to create CBZ: $error';
+  }
+
+  @override
+  String error_reading_cover_image(Object error) {
+    return 'Error reading cover image: $error';
+  }
+
+  @override
+  String error_reading_metadata(Object error) {
+    return 'Error reading metadata: $error';
+  }
+
+  @override
+  String error_saving_chapter_episode_to_library(Object error) {
+    return 'Error saving chapter/episode to library: $error';
+  }
+
+  @override
+  String error_reading_chapter_cover_image(Object error) {
+    return 'Error reading chapter cover image: $error';
+  }
+
+  @override
+  String error_reading_archive_cover_image(Object error) {
+    return 'Error reading archive cover image: $error';
+  }
+
+  @override
+  String error_getting_local_library(Object error) {
+    return 'Error getting local library: $error';
+  }
+
+  @override
+  String get zero_interpreter => 'Zero interpreter';
+
+  @override
+  String get zero_interpreter_description =>
+      'The server starts automatically on launch. You can also control it manually.';
+
+  @override
+  String get runtime_status => 'Runtime status';
+
+  @override
+  String get running => 'Running';
+
+  @override
+  String get stopped => 'Stopped';
+
+  @override
+  String get start => '開始';
+
+  @override
+  String get stop => 'Stop';
 
   @override
   String get something_went_wrong => 'Something went wrong';

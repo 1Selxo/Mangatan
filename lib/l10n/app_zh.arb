@@ -460,7 +460,6 @@
   "sync_button_upload": "仅上传",
   "sync_button_upload_info": "此操作将完全用本地数据替换远程数据！",
   "sync_button_download": "仅下载",
-  "sync_button_download_info": "此操作将完全用远程数据替换本地数据！",
   "extension_settings": "扩展设置",
   "video_audio_info": "首选语言、音调校正、音频通道",
   "all_chapters": "所有章节",

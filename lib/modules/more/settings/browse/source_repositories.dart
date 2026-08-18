@@ -197,8 +197,9 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                             IconButton(
                               onPressed: () => ref
                                   .read(
-                                    extensionsRepoStateProvider(widget.itemType)
-                                        .notifier,
+                                    extensionsRepoStateProvider(
+                                      widget.itemType,
+                                    ).notifier,
                                   )
                                   .setVisibility(repo, !isHidden),
                               icon: Stack(
@@ -319,8 +320,9 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                         mangaRepos.removeWhere((url) => url == removedRepo);
                         ref
                             .read(
-                              extensionsRepoStateProvider(widget.itemType)
-                                  .notifier,
+                              extensionsRepoStateProvider(
+                                widget.itemType,
+                              ).notifier,
                             )
                             .set(mangaRepos);
                         _removeOrphanSources(removedRepo);
@@ -351,6 +353,8 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
           child: StatefulBuilder(
             builder: (context, setState) {
               final l10n = context.l10n;
+              final supportedRepoUrlHint = l10n.url_must_end_with_dot_json
+                  .replaceFirst('.json', '.json or .pb');
               return AlertDialog(
                 title: Text(l10n.add_extensions_repo),
                 content: TextFormField(
@@ -364,13 +368,15 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                   keyboardType: TextInputType.url,
                   onChanged: (value) => setState(() {}),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value.isEmpty) {
                       return l10n.url_cannot_be_empty;
                     }
+                    if (!value.endsWith('.json') && !value.endsWith('.pb')) {
+                      return supportedRepoUrlHint;
+                    }
                     try {
-                      final uri = Uri.parse(value.trim());
-                      if (!uri.isAbsolute ||
-                          (uri.scheme != 'http' && uri.scheme != 'https')) {
+                      final uri = Uri.parse(value);
+                      if (!uri.isAbsolute) {
                         return l10n.invalid_url_format;
                       }
                       return null;
@@ -380,7 +386,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                   },
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   decoration: InputDecoration(
-                    hintText: l10n.url_must_end_with_dot_json_or_dot_pb,
+                    hintText: supportedRepoUrlHint,
                     filled: false,
                     contentPadding: const EdgeInsets.all(12),
                     enabledBorder: OutlineInputBorder(
@@ -410,12 +416,11 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                       const SizedBox(width: 15),
                       StatefulBuilder(
                         builder: (context, setState) {
-                          final text = controller.text.trim();
-                          final isValid =
-                              text.isNotEmpty &&
-                              Uri.tryParse(text)?.isAbsolute == true;
                           return TextButton(
-                            onPressed: !isValid
+                            onPressed:
+                                controller.text.isEmpty ||
+                                    (!controller.text.endsWith(".json") &&
+                                        !controller.text.endsWith(".pb"))
                                 ? null
                                 : () async {
                                     setState(() => isLoading = true);
@@ -428,8 +433,9 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                           )
                                           .toList();
                                       final repo = await ref.read(
-                                        getRepoInfosProvider(jsonUrl: text)
-                                            .future,
+                                        getRepoInfosProvider(
+                                          jsonUrl: controller.text,
+                                        ).future,
                                       );
                                       if (repo == null) {
                                         botToast(l10n.unsupported_repo);
@@ -453,7 +459,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                     }
                                   },
                             child: isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     height: 20,
                                     width: 20,
                                     child: CircularProgressIndicator(),
@@ -461,7 +467,9 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                 : Text(
                                     l10n.add,
                                     style: TextStyle(
-                                      color: !isValid
+                                      color:
+                                          controller.text.isEmpty ||
+                                              !controller.text.endsWith(".json")
                                           ? Theme.of(context).primaryColor
                                                 .withValues(alpha: 0.2)
                                           : null,

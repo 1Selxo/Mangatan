@@ -4,12 +4,13 @@ import 'dart:io';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/video.dart';
 import 'package:mangayomi/modules/library/providers/file_scanner.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/downloaded_chapter.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/torrent_server.dart';
+import 'package:mangayomi/services/youtube/youtube_service.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -35,6 +36,11 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
     final mpvDirectory = useMpvConfig
         ? await storageProvider.getMpvDirectory()
         : null;
+    if (episode.manga.value?.source == youtubeSourceName) {
+      final videos = await YouTubeService.resolveVideoStreams(episode.url!);
+      keepAlive.close();
+      return (videos, false, const <String>[], mpvDirectory);
+    }
     final isLocalArchive =
         episode.manga.value!.isLocalArchive! &&
         episode.manga.value!.source != "torrent";
@@ -55,8 +61,8 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
     List<String> infoHashes = [];
     if (await File(mp4animePath).exists() || isLocalArchive) {
       final animeDir =
-          resolvedArchivePath != null && episode.manga.value?.source == "local"
-          ? Directory(p.dirname(resolvedArchivePath))
+          episode.archivePath != null && episode.manga.value?.source == "local"
+          ? Directory(p.dirname(episode.archivePath!))
           : null;
       final chapterDirectory = (await storageProvider.getMangaChapterDirectory(
         episode,
@@ -92,7 +98,7 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
       episode.manga.value!.sourceId,
       installedOnly: true,
     );
-    final proxyServer = ref.read(androidProxyServerStateProvider);
+    final proxyServer = await prepareMihonBridge(ref, source);
 
     final isMihonTorrent =
         source?.sourceCodeLanguage == SourceCodeLanguage.mihon &&

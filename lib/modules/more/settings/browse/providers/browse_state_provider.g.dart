@@ -42,7 +42,7 @@ final class AndroidProxyServerStateProvider
 }
 
 String _$androidProxyServerStateHash() =>
-    r'3ac060f8a61added586dcefc889fa44c71263c5b';
+    r'e43fe8bb83da834f55473b3845c84b0773cf3f59';
 
 abstract class _$AndroidProxyServerState extends $Notifier<String> {
   String build();
@@ -55,62 +55,6 @@ abstract class _$AndroidProxyServerState extends $Notifier<String> {
             as $ClassProviderElement<
               AnyNotifier<String, String>,
               String,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(AutoStartExtensionServerOnLaunchState)
-final autoStartExtensionServerOnLaunchStateProvider =
-    AutoStartExtensionServerOnLaunchStateProvider._();
-
-final class AutoStartExtensionServerOnLaunchStateProvider
-    extends $NotifierProvider<AutoStartExtensionServerOnLaunchState, bool> {
-  AutoStartExtensionServerOnLaunchStateProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'autoStartExtensionServerOnLaunchStateProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() =>
-      _$autoStartExtensionServerOnLaunchStateHash();
-
-  @$internal
-  @override
-  AutoStartExtensionServerOnLaunchState create() =>
-      AutoStartExtensionServerOnLaunchState();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
-    );
-  }
-}
-
-String _$autoStartExtensionServerOnLaunchStateHash() =>
-    r'be04fc2923244e09d51c699d411e692c7d139ac6';
-
-abstract class _$AutoStartExtensionServerOnLaunchState extends $Notifier<bool> {
-  bool build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<bool, bool>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
               Object?,
               Object?
             >;
@@ -478,7 +422,7 @@ final class GetRepoInfosProvider
   }
 }
 
-String _$getRepoInfosHash() => r'91181c43ba8778d8886be9bba4ac0aaf9f4357bb';
+String _$getRepoInfosHash() => r'c3fb4aee810561f88cd0a6a587f92ae952a98cbb';
 
 final class GetRepoInfosFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Repo?>, String> {

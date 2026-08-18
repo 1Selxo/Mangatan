@@ -15,6 +15,7 @@ import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.da
 import 'package:mangayomi/services/get_detail.dart';
 import 'package:mangayomi/services/search.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
+import 'package:mangayomi/services/sync/chimahon_local_chapter_policy.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 
 Future<void> migrateLibraryItem({
@@ -70,6 +71,19 @@ _MigrationSnapshot _captureMigrationSnapshot({
   double? historyChapter;
   String? historyDate;
   final chaptersProgress = <Chapter>[];
+  final existingChapters = isar.chapters
+      .filter()
+      .mangaIdEqualTo(oldManga.id)
+      .findAllSync();
+  const localChapterPolicy = ChimahonLocalChapterPolicy();
+  final localOverlayChapterIds = oldManga.isLocalArchive == true
+      ? const <int>{}
+      : existingChapters
+            .where(localChapterPolicy.isDeviceLocal)
+            .map((chapter) => chapter.id)
+            .nonNulls
+            .toSet();
+  oldManga.hasLocalChapterOverlay = localOverlayChapterIds.isNotEmpty;
   final sourceTitle = oldManga.name ?? '';
 
   isar.writeTxnSync(() {
@@ -78,22 +92,30 @@ _MigrationSnapshot _captureMigrationSnapshot({
         .mangaIdEqualTo(oldManga.id)
         .sortByDate()
         .findAllSync();
+    final portableHistories = histories
+        .where((history) => !localOverlayChapterIds.contains(history.chapterId))
+        .toList(growable: false);
     historyChapter = _chapterNumber(
       sourceTitle,
-      histories.lastOrNull?.chapter.value?.name,
+      portableHistories.lastOrNull?.chapter.value?.name,
     );
-    historyDate = histories.lastOrNull?.date;
-    for (final history in histories) {
+    historyDate = portableHistories.lastOrNull?.date;
+    for (final history in portableHistories) {
       isar.historys.deleteSync(history.id!);
       ref
           .read(synchingProvider(syncId: 1).notifier)
           .addChangedPart(ActionType.removeHistory, history.id, '{}', false);
     }
-    // Batch delete all updates for oldManga via mangaId index
-    isar.updates.where().mangaIdEqualTo(oldManga.id).deleteAllSync();
-
-    for (final chapter in oldManga.chapters) {
+    for (final chapter in existingChapters) {
+      // The parent keeps its stable Isar ID during migration, so local file
+      // overlays can remain linked while only portable source rows are rebuilt.
+      if (localOverlayChapterIds.contains(chapter.id)) continue;
       chaptersProgress.add(chapter);
+      isar.updates
+          .filter()
+          .mangaIdEqualTo(chapter.mangaId)
+          .chapterNameEqualTo(chapter.name)
+          .deleteAllSync();
       isar.chapters.deleteSync(chapter.id!);
       ref
           .read(synchingProvider(syncId: 1).notifier)
@@ -116,7 +138,7 @@ void _rewriteMigratedItemMetadata({
   required Source destinationSource,
 }) {
   isar.writeTxnSync(() {
-    oldManga.name = selectedManga.name;
+    oldManga.resetTitleFromSource(selectedManga.name);
     oldManga.link = selectedManga.link;
     oldManga.imageUrl = selectedManga.imageUrl;
     oldManga.lang = destinationSource.lang;
@@ -146,13 +168,16 @@ void _syncMigratedMangaFromPreview({
       [];
 
   final previewImageUrl = preview.imageUrl.trimmedOrDefault(oldManga.imageUrl);
+  final previewSourceTitle = preview.name.trimmedOrDefault(
+    oldManga.sourceTitle ?? oldManga.name,
+  );
   oldManga
     ..imageUrl = previewImageUrl == null
         ? null
         : previewImageUrl.startsWith('http')
         ? previewImageUrl
         : '${destinationSource.baseUrl ?? ''}/${previewImageUrl.getUrlWithoutDomain}'
-    ..name = preview.name.trimmedOrDefault(oldManga.name)
+    ..resetTitleFromSource(previewSourceTitle)
     ..genre = genre.isEmpty ? oldManga.genre ?? [] : genre
     ..author = preview.author.trimmedOrDefault(oldManga.author) ?? ''
     ..artist = preview.artist.trimmedOrDefault(oldManga.artist) ?? ''
@@ -190,9 +215,8 @@ void _syncMigratedMangaFromPreview({
           )..manga.value = oldManga,
         )
         .toList();
-    final orderedChapters = chapters.reversed.toList();
-    isar.chapters.putAllSync(orderedChapters);
-    for (final chapter in orderedChapters) {
+    for (final chapter in chapters.reversed) {
+      isar.chapters.putSync(chapter);
       chapter.manga.saveSync();
     }
   });
@@ -211,15 +235,11 @@ void _restoreMigrationProgress({
     final destinationTitle = oldManga.name ?? '';
     final byNumber = <double, Chapter>{};
     for (final chapter
-        in isar.chapters
-            .where()
-            .mangaIdEqualToAnyIsRead(oldManga.id)
-            .findAllSync()) {
+        in isar.chapters.filter().mangaIdEqualTo(oldManga.id).findAllSync()) {
       final number = _chapterNumber(destinationTitle, chapter.name);
       if (number != null) byNumber.putIfAbsent(number, () => chapter);
     }
 
-    final updatedChapters = <Chapter>[];
     for (final oldChapter in snapshot.chaptersProgress) {
       final number = _chapterNumber(snapshot.sourceTitle, oldChapter.name);
       final chapter = number == null ? null : byNumber[number];
@@ -227,11 +247,8 @@ void _restoreMigrationProgress({
         chapter.isBookmarked = oldChapter.isBookmarked;
         chapter.lastPageRead = oldChapter.lastPageRead;
         chapter.isRead = oldChapter.isRead;
-        updatedChapters.add(chapter);
+        isar.chapters.putSync(chapter);
       }
-    }
-    if (updatedChapters.isNotEmpty) {
-      isar.chapters.putAllSync(updatedChapters);
     }
 
     final historyChapter = snapshot.historyChapter == null

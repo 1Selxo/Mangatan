@@ -3,6 +3,9 @@
 //
 
 pub mod epub;
+pub mod hoshidicts;
+pub mod image;
+pub mod rar;
 pub mod rhttp;
 
 pub use epub::{EpubChapter, EpubNovel, EpubResource};

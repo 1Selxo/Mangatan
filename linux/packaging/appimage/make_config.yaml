@@ -1,4 +1,4 @@
-display_name: Mangayomi
+display_name: Mangatan
 
 icon: assets/app_icons/icon-red.png
 
@@ -13,5 +13,9 @@ categories:
   - AudioVideo
 
 startup_notify: true
+
+supported_mime_type:
+  - x-scheme-handler/mangayomi
+  - x-scheme-handler/app.chimahon.google.oauth
 
 include: []

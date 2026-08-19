@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.2.7+179 - 2026-08-19
+
+- Rebased the latest Mangatan changes onto Mangayomi 0.8.6, including its
+  AVIF decoding support and reader loading, error-handling, and memory updates.
+- Fixed the reader OCR opacity slider so 0% removes the white text-box
+  background even while a lookup is active, while keeping recognized text
+  readable.
+- Integrated the latest Chimahon synchronization fixes for duplicate migrated
+  repositories, full-sync performance, and missing synchronized metadata.
+- Updated Windows, macOS, Linux, and iOS build workflows to Flutter 3.47 and
+  aligned the iOS app with Mangayomi's iOS 15 target while retaining the lazy
+  OpenJDK runtime's iOS 13 compatibility checks.
+
 ## 1.2.3+174 - 2026-08-11
 
 - Added self-contained RAR and CBR manga archive imports through libarchive,

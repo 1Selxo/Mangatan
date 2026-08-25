@@ -14,10 +14,10 @@ trap 'find "$work_dir" -depth -delete' EXIT
 server_commit="68645ae7a8b2ffd0954e9c6cba62427f54f95503"
 server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v7/MExtensionServer-ios.jar"
 server_jar_sha256="40f29f44014fbe1d68b9c368a7c88ab559f8de40e7554c4873389a475aee2fe0"
-openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
-openjdk_framework_sha256="24589886361678b369e4703d82fcb3deff1b40728d725fef4fea7e70cb728f55"
-openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"
-openjdk_bundle_sha256="168d1174063a35ddda9e1acbd3978c8015e3ed656f6670d2e09688078e08deeb"
+openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/OpenJDK.xcframework.zip"
+openjdk_framework_sha256="f21681caae40e508647e7f18c9082f27fa9aa67ee7f1376725eae528fa2d38cb"
+openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/java_bundle-device.zip"
+openjdk_bundle_sha256="15369b9bb9dfdd400c18c56b30e2f6cf316b81d4e0bae5ddd6b1fe72355c4b0b"
 
 if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/javac" ]]; then
   echo "JAVA_HOME must point to a JDK 21 or newer." >&2

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -77,6 +78,7 @@ class MExtensionServerPlatform {
   static bool _iosBridgeIsReady = false;
   static bool _iosRestartOnResume = false;
   static int? _iosResumePort;
+  static String? _lastIosBridgeError;
   static int? _preferredRestartPort;
   static Timer? _restartTimer;
   static final List<DateTime> _automaticRestartHistory = [];
@@ -173,11 +175,41 @@ class MExtensionServerPlatform {
     return operation;
   }
 
+  /// Starts the iOS listener for a user-visible operation after any queued
+  /// inactive/resumed transition has settled.
+  ///
+  /// Extension installs can be tapped immediately after iOS returns the app
+  /// to active. Starting outside this queue lets the older suspend transition
+  /// pause the newly started listener. A second round covers another lifecycle
+  /// notification arriving while the first round is completing.
+  Future<void> startForegroundServer({int? preferredPort}) async {
+    if (!Platform.isIOS) {
+      await startServer(preferredPort: preferredPort);
+      return;
+    }
+
+    for (var round = 0; round < 2; round++) {
+      final lifecycleTransition = _iosLifecycleTransition;
+      try {
+        await lifecycleTransition;
+      } catch (_) {}
+      await startServer(preferredPort: preferredPort, foregroundRequest: true);
+      if (_iosBridgeIsReady &&
+          identical(lifecycleTransition, _iosLifecycleTransition)) {
+        return;
+      }
+      if (round == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+      }
+    }
+  }
+
   Future<void> _startEmbeddedIosBridge(
     int generation,
     int? preferredPort,
   ) async {
     var restartPort = preferredPort;
+    Object? lastLaunchError;
     try {
       final runningBaseUrl = _baseUrl;
       if (_isLoopbackServer(runningBaseUrl) &&
@@ -221,11 +253,13 @@ class MExtensionServerPlatform {
               )) {
             _writeRuntimeBaseUrl(baseUrl);
             _iosBridgeIsReady = true;
+            _lastIosBridgeError = null;
             _log('Embedded iPhone Mihon bridge is ready at $baseUrl.');
             return;
           }
           throw StateError('The embedded iOS bridge did not become ready.');
         } catch (error, stackTrace) {
+          lastLaunchError = error;
           _log(
             'Embedded iPhone Mihon bridge launch failed on attempt $attempt '
             'of $_embeddedIosLaunchAttempts: $error\n$stackTrace',
@@ -238,10 +272,12 @@ class MExtensionServerPlatform {
 
       throw StateError(
         'The embedded iOS bridge did not become ready after '
-        '$_embeddedIosLaunchAttempts attempts.',
+        '$_embeddedIosLaunchAttempts attempts. Last error: '
+        '${lastLaunchError ?? 'unknown startup failure'}',
       );
     } catch (error, stackTrace) {
       _iosBridgeIsReady = false;
+      _lastIosBridgeError = error.toString();
       _restoreSavedBaseUrl();
       if (_isLoopbackServer(_baseUrl)) {
         // A saved desktop loopback URL points back at the iPhone on iOS and
@@ -762,7 +798,7 @@ Future<String?> prepareYouTubeResolverBridge() async {
   final server = MExtensionServerPlatform._stableInstance;
   if (server == null) return null;
 
-  await server.startServer(foregroundRequest: Platform.isIOS);
+  await server.startForegroundServer();
   final baseUrl = server.baseUrl;
   if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
       !server._isLoopbackServer(baseUrl) ||
@@ -796,9 +832,8 @@ Future<String> resolveActiveIosMihonProxyUrl(String url) async {
   final proxyUri = Uri.tryParse(url);
   if (server == null || proxyUri == null) return url;
 
-  await server.startServer(
+  await server.startForegroundServer(
     preferredPort: proxyUri.hasPort && proxyUri.port > 0 ? proxyUri.port : null,
-    foregroundRequest: true,
   );
   final baseUrl = server.baseUrl;
   if (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
@@ -813,7 +848,7 @@ Future<String> prepareMihonBridge(Ref ref, Source? source) async {
   final server = MExtensionServerPlatform.fromRef(ref);
   if ((isDesktop || Platform.isIOS) &&
       source?.sourceCodeLanguage == SourceCodeLanguage.mihon) {
-    await server.startServer();
+    await server.startForegroundServer();
   }
   final baseUrl = server.baseUrl;
   final requiresMihonBridge =
@@ -826,18 +861,26 @@ Future<String> prepareMihonBridge(Ref ref, Source? source) async {
   if (requiresMihonBridge &&
       (baseUrl == MExtensionServerPlatform._unavailableBaseUrl ||
           unusableIosLoopback)) {
-    throw const MihonBridgeUnavailableException();
+    throw MihonBridgeUnavailableException(
+      Platform.isIOS ? MExtensionServerPlatform._lastIosBridgeError : null,
+    );
   }
   return baseUrl;
 }
 
 class MihonBridgeUnavailableException implements Exception {
-  const MihonBridgeUnavailableException();
+  const MihonBridgeUnavailableException([this.detail]);
+
+  final String? detail;
 
   @override
-  String toString() => Platform.isIOS
-      ? 'The on-device Mihon bridge could not be restarted. Return to the app '
-            'foreground and try the source again.'
-      : 'The Mihon bridge could not be started. Check the configured JRE and '
-            'extension-server JAR, then try again.';
+  String toString() {
+    if (!Platform.isIOS) {
+      return 'The Mihon bridge could not be started. Check the configured JRE '
+          'and extension-server JAR, then try again.';
+    }
+    final reason = detail?.trim();
+    return 'The on-device Mihon bridge could not be restarted.'
+        '${reason == null || reason.isEmpty ? '' : ' $reason'}';
+  }
 }

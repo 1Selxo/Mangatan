@@ -420,7 +420,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
     if (_runtimeRunning) {
       await server.stopServer();
     } else {
-      await server.startServer(foregroundRequest: true);
+      await server.startForegroundServer();
     }
     final running = await server.check();
     if (mounted) {

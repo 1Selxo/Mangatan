@@ -141,6 +141,21 @@ void main() {
     );
     expect(
       serviceSource,
+      contains('await server.startForegroundServer();'),
+      reason: 'foreground source installs must wait for queued lifecycle work',
+    );
+    expect(
+      serviceSource,
+      contains('final lifecycleTransition = _iosLifecycleTransition;'),
+      reason: 'a queued suspend must finish before a foreground restart',
+    );
+    expect(
+      serviceSource,
+      contains('identical(lifecycleTransition, _iosLifecycleTransition)'),
+      reason: 'a newer lifecycle transition must invalidate a raced restart',
+    );
+    expect(
+      serviceSource,
       contains('MExtensionServerPlatform._iosBridgeIsReady'),
       reason: 'a failed launch must not suppress the next reader wake-up',
     );
@@ -337,8 +352,7 @@ void main() {
         '+            holder == vmClasses::Class_klass() &&\n'
         '+            callee->name()->equals("desiredAssertionStatus")',
       ),
-      reason:
-          'the bootstrap bypass must be limited to the primordial assertion query',
+      reason: 'the bootstrap bypass must be limited to the primordial assertion query',
     );
     expect(
       zeroRuntimePatch,
@@ -358,8 +372,7 @@ void main() {
     expect(
       zeroRuntimePatch,
       isNot(contains('vmClasses::Class_klass()->link_class(CHECK);')),
-      reason:
-          'java.lang.Class must remain on its normal bootstrap linkage lifecycle',
+      reason: 'java.lang.Class must remain on its normal bootstrap linkage lifecycle',
     );
     expect(
       zeroRuntimePatch,
@@ -389,8 +402,7 @@ void main() {
     expect(
       zeroRuntimePatch,
       contains('return RTLD_DEFAULT;'),
-      reason:
-          'the iOS Zero runtime must resolve JNI symbols from its global framework',
+      reason: 'the iOS Zero runtime must resolve JNI symbols from its global framework',
     );
     expect(
       zeroRuntimePatch,
@@ -400,8 +412,7 @@ void main() {
     expect(
       libjavaGlobalSymbolsPatch,
       contains('procHandle = RTLD_DEFAULT;'),
-      reason:
-          'libjava must see built-in native libraries in the lazy iOS framework',
+      reason: 'libjava must see built-in native libraries in the lazy iOS framework',
     );
     expect(
       libjavaGlobalSymbolsPatch,

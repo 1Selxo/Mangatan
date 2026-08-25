@@ -29,12 +29,11 @@ class VideoOcrFrame {
   final Duration position;
 }
 
-typedef VideoOcrMiningContextBuilder =
-    Future<MiningContext> Function(
-      String text,
-      Uint8List imageBytes,
-      Duration? position,
-    );
+typedef VideoOcrMiningContextBuilder = Future<MiningContext> Function(
+  String text,
+  Uint8List imageBytes,
+  Duration? position,
+);
 
 Future<VideoOcrResult> recognizeVideoFrame(
   Uint8List bytes, {
@@ -46,7 +45,7 @@ Future<VideoOcrResult> recognizeVideoFrame(
 
   if (engine == OcrEnginePreference.mokuroOnly) {
     throw StateError(
-      'Video OCR requires Apple Vision, ScreenAI, or Google Lens',
+      'Video OCR requires Apple Vision, ScreenAI, Hayai, or Google Lens',
     );
   }
   final result = await recognizeGeneratedOcr(
@@ -771,9 +770,8 @@ _VideoOcrSelection _videoOcrSelectionAtPosition(
 
 bool _isLookupBoundary(String character) =>
     character.trim().isEmpty ||
-    RegExp(
-      r'[\u3000-\u303f\uff01-\uff65、。！？「」『』（）［］【】…‥・,.!?;:()\[\]{}]',
-    ).hasMatch(character);
+    RegExp(r'[\u3000-\u303f\uff01-\uff65、。！？「」『』（）［］【】…‥・,.!?;:()\[\]{}]')
+        .hasMatch(character);
 
 bool _isAsciiWord(String character) =>
     RegExp(r'[A-Za-z0-9_\-]').hasMatch(character);

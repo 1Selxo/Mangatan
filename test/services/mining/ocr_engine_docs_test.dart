@@ -31,7 +31,9 @@ void main() {
     // map is incomplete and the test below (the enum-count check) fails.
     const expectedLabels = <OcrEnginePreference, String>{
       OcrEnginePreference.automatic: 'Automatic',
+      OcrEnginePreference.appleVision: 'Apple Vision',
       OcrEnginePreference.screenAi: 'ScreenAI',
+      OcrEnginePreference.hayai: 'Hayai OCR v2.1',
       OcrEnginePreference.googleLens: 'Google Lens',
       OcrEnginePreference.mokuroOnly: 'Mokuro only',
     };

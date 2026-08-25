@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/mining/widgets/ocr_processing_queue_sheet.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/ocr_processing_queue.dart';
+import 'package:mangayomi/services/mining/anime_text_detection_service.dart';
 import 'package:mangayomi/services/reader/panel_detection_service.dart';
 
 class OcrSettingsScreen extends StatefulWidget {
@@ -21,6 +24,7 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
   bool _outline = false;
   bool _hover = false;
   bool _panelNavigation = false;
+  bool _animeTextEnabled = false;
   double _passiveBackground = MiningPreferences.defaultOcrBackgroundOpacity;
   double _activeText = MiningPreferences.defaultOcrTextOpacity;
   double _activeBackground =
@@ -30,6 +34,8 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
   int _parallel = 1;
   OcrEnginePreference _engine = OcrEnginePreference.automatic;
   OcrScanTrigger _scanTrigger = OcrScanTrigger.automatic;
+  final _hayaiEndpoint = TextEditingController();
+  final _hayaiApiKey = TextEditingController();
 
   @override
   void initState() {
@@ -45,6 +51,10 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
       MiningPreferences.getOcrBoxScaleY(),
       MiningPreferences.getPanelNavigationEnabled(),
       PanelDetectionService.instance.isModelReady(),
+      MiningPreferences.getAnimeTextDetectionEnabled(),
+      AnimeTextDetectionService.instance.isModelReady(),
+      MiningPreferences.getHayaiOcrEndpoint(),
+      MiningPreferences.getHayaiOcrApiKey(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -61,8 +71,65 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
       _scaleX = values[1] as double;
       _scaleY = values[2] as double;
       _panelNavigation = values[3] as bool;
+      _animeTextEnabled = values[5] as bool;
+      _hayaiEndpoint.text = (values[7] as Uri).toString();
+      _hayaiApiKey.text = values[8] as String;
       _loading = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _hayaiEndpoint.dispose();
+    _hayaiApiKey.dispose();
+    super.dispose();
+  }
+
+  Future<void> _importAnimeTextModel() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['tflite'],
+    );
+    final selected = result?.files.single.path;
+    if (selected == null) return;
+    try {
+      await AnimeTextDetectionService.instance.importModel(File(selected));
+      await MiningPreferences.setAnimeTextDetectionEnabled(true);
+      if (mounted) setState(() => _animeTextEnabled = true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not import AnimeText model: $error')),
+      );
+    }
+  }
+
+  Future<void> _setAnimeTextEnabled(bool enabled) async {
+    if (enabled && !await AnimeTextDetectionService.instance.isModelReady()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Import the AnimeText LiteRT model first'),
+          ),
+        );
+      }
+      return;
+    }
+    await MiningPreferences.setAnimeTextDetectionEnabled(enabled);
+    if (mounted) setState(() => _animeTextEnabled = enabled);
+  }
+
+  Future<void> _saveHayaiEndpoint(String raw) async {
+    final endpoint = Uri.tryParse(raw.trim());
+    if (endpoint == null || !endpoint.hasScheme || endpoint.host.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a valid Hayai server URL')),
+        );
+      }
+      return;
+    }
+    await MiningPreferences.setHayaiOcrEndpoint(endpoint);
   }
 
   Future<void> _setPanelNavigation(bool enabled) async {
@@ -119,6 +186,41 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
                     },
                   ),
                 ),
+                if (_engine == OcrEnginePreference.hayai)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: TextField(
+                      controller: _hayaiEndpoint,
+                      keyboardType: TextInputType.url,
+                      autocorrect: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Hayai OCR server',
+                        hintText: 'http://127.0.0.1:8766',
+                        helperText: 'Mangatan appends /v1/ocr. Use the computer LAN address from iOS.',
+                      ),
+                      onSubmitted: (value) =>
+                          unawaited(_saveHayaiEndpoint(value)),
+                      onTapOutside: (_) =>
+                          unawaited(_saveHayaiEndpoint(_hayaiEndpoint.text)),
+                    ),
+                  ),
+                if (_engine == OcrEnginePreference.hayai)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: TextField(
+                      controller: _hayaiApiKey,
+                      obscureText: true,
+                      autocorrect: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Hayai server API key (optional)',
+                      ),
+                      onSubmitted: (value) =>
+                          unawaited(MiningPreferences.setHayaiOcrApiKey(value)),
+                      onTapOutside: (_) => unawaited(
+                        MiningPreferences.setHayaiOcrApiKey(_hayaiApiKey.text),
+                      ),
+                    ),
+                  ),
                 ListTile(
                   leading: const Icon(Icons.account_tree_outlined),
                   title: const Text('Parallel OCR tasks'),
@@ -134,6 +236,63 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
                       setState(() => _parallel = value);
                       unawaited(ReaderOcrState.setParallelOcrLimit(value));
                     },
+                  ),
+                ),
+                const _SectionHeader('AnimeText detection'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.text_fields_outlined),
+                  title: const Text('Detect text boxes before OCR'),
+                  subtitle: Text(
+                    _engine == OcrEnginePreference.hayai
+                        ? 'Required by Hayai because it recognizes crops, not full pages'
+                        : 'Crop detected regions before sending them to the selected OCR engine',
+                  ),
+                  value:
+                      _engine == OcrEnginePreference.hayai || _animeTextEnabled,
+                  onChanged: _engine == OcrEnginePreference.hayai
+                      ? null
+                      : (value) => unawaited(_setAnimeTextEnabled(value)),
+                ),
+                ValueListenableBuilder<AnimeTextModelStatus>(
+                  valueListenable: AnimeTextDetectionService.instance.status,
+                  builder: (context, status, _) => ListTile(
+                    leading: const Icon(Icons.center_focus_strong_outlined),
+                    title: const Text('AnimeText YOLO12n LiteRT model'),
+                    subtitle: Text(switch (status) {
+                      AnimeTextModelStatus.missing =>
+                        'Export the gated model, then import its .tflite file',
+                      AnimeTextModelStatus.importing => 'Importing…',
+                      AnimeTextModelStatus.ready => 'Ready for offline use',
+                      AnimeTextModelStatus.error =>
+                        'Unsupported or damaged model',
+                    }),
+                    trailing: status == AnimeTextModelStatus.ready
+                        ? TextButton(
+                            onPressed: () async {
+                              await AnimeTextDetectionService.instance
+                                  .deleteModel();
+                              await MiningPreferences.setAnimeTextDetectionEnabled(
+                                false,
+                              );
+                              if (mounted) {
+                                setState(() => _animeTextEnabled = false);
+                              }
+                            },
+                            child: const Text('Remove'),
+                          )
+                        : TextButton(
+                            onPressed: status == AnimeTextModelStatus.importing
+                                ? null
+                                : _importAnimeTextModel,
+                            child: const Text('Import'),
+                          ),
+                  ),
+                ),
+                const ListTile(
+                  leading: Icon(Icons.gavel_outlined),
+                  title: Text('Upstream model is gated and GPL-3.0'),
+                  subtitle: Text(
+                    'Mangatan cannot redistribute it. Accept its Hugging Face terms and run tool/export_animetext_litert.py on a desktop.',
                   ),
                 ),
                 const _SectionHeader('OCR boxes'),

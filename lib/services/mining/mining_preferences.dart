@@ -12,6 +12,7 @@ enum OcrEnginePreference {
   automatic,
   appleVision,
   screenAi,
+  hayai,
   googleLens,
   mokuroOnly,
 }
@@ -30,6 +31,7 @@ List<OcrEnginePreference> availableOcrEngines({OcrHostPlatform? platform}) {
     OcrEnginePreference.automatic,
     if (host == OcrHostPlatform.apple) OcrEnginePreference.appleVision,
     if (host == OcrHostPlatform.windows) OcrEnginePreference.screenAi,
+    OcrEnginePreference.hayai,
     OcrEnginePreference.googleLens,
     OcrEnginePreference.mokuroOnly,
   ];
@@ -60,6 +62,7 @@ String ocrEngineLabel(OcrEnginePreference engine) => switch (engine) {
   },
   OcrEnginePreference.appleVision => 'Apple Vision (on device)',
   OcrEnginePreference.screenAi => 'ScreenAI (local Chrome)',
+  OcrEnginePreference.hayai => 'Hayai OCR v2.1 (local server)',
   OcrEnginePreference.googleLens => 'Google Lens',
   OcrEnginePreference.mokuroOnly => 'Mokuro only',
 };
@@ -422,6 +425,9 @@ class MiningPreferences {
   static const _ocrTextOpacity = 'ocr_text_opacity';
   static const _activeOcrBackgroundOpacity = 'active_ocr_background_opacity';
   static const _panelNavigationEnabled = 'panel_navigation_enabled';
+  static const _animeTextDetectionEnabled = 'anime_text_detection_enabled';
+  static const _hayaiOcrEndpoint = 'hayai_ocr_endpoint';
+  static const _hayaiOcrApiKey = 'hayai_ocr_api_key';
   static const _ocrBoxScale = 'ocr_box_scale';
   static const _ocrOutlineVisible = 'ocr_outline_visible';
   static const _ocrLookupOnHover = 'ocr_lookup_on_hover';
@@ -1242,6 +1248,37 @@ class MiningPreferences {
 
   static Future<void> setPanelNavigationEnabled(bool value) async {
     await (await _boxOrNull())?.put(_panelNavigationEnabled, value);
+  }
+
+  static Future<bool> getAnimeTextDetectionEnabled() async =>
+      (await _boxOrNull())?.get(_animeTextDetectionEnabled, defaultValue: false)
+          as bool? ??
+      false;
+
+  static Future<void> setAnimeTextDetectionEnabled(bool value) async {
+    await (await _boxOrNull())?.put(_animeTextDetectionEnabled, value);
+  }
+
+  static Future<Uri> getHayaiOcrEndpoint() async {
+    final raw =
+        (await _boxOrNull())?.get(
+          _hayaiOcrEndpoint,
+          defaultValue: 'http://127.0.0.1:8766',
+        ) as String? ??
+        'http://127.0.0.1:8766';
+    return Uri.tryParse(raw) ?? Uri.parse('http://127.0.0.1:8766');
+  }
+
+  static Future<void> setHayaiOcrEndpoint(Uri value) async {
+    await (await _boxOrNull())?.put(_hayaiOcrEndpoint, value.toString());
+  }
+
+  static Future<String> getHayaiOcrApiKey() async =>
+      (await _boxOrNull())?.get(_hayaiOcrApiKey, defaultValue: '') as String? ??
+      '';
+
+  static Future<void> setHayaiOcrApiKey(String value) async {
+    await (await _boxOrNull())?.put(_hayaiOcrApiKey, value.trim());
   }
 
   static Future<double> getOcrBoxScale() async {

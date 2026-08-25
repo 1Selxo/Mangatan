@@ -7,35 +7,31 @@ and **what data leaves your device**, so you can choose one that matches your
 privacy expectations.
 
 > Every claim below is tied to the source that proves it. The dispatch order
-> lives in `_recognize()` in
-> `lib/modules/mining/widgets/reader_ocr_overlay.dart`; the engine list is
-> `enum OcrEnginePreference { automatic, screenAi, googleLens, mokuroOnly }` in
+> lives in `recognizeGeneratedOcr()` in
+> `lib/services/mining/generated_ocr.dart`; the engine list is
+> `OcrEnginePreference` in
 > `lib/services/mining/mining_preferences.dart`.
 
 ## The engines
 
 | Engine (setting) | Where inference runs | Network request it can make |
 | --- | --- | --- |
-| **Automatic** (default) | Mixed — prefers local, **falls back to the cloud** | Google Lens, and Mokuro-website (see below) |
+| **Automatic** (default) | Mixed — Google Lens first, then a platform-local fallback | Google Lens, and Mokuro-website (see below) |
+| **Apple Vision** | On-device (iOS and macOS) | None for inference; Mokuro-website may still fire |
 | **ScreenAI (local Chrome)** | On-device (Windows only) | None for inference; Mokuro-website may still fire (see below) |
+| **Hayai OCR v2.1** | The user-configured Hayai server | Sends each AnimeText crop to that server |
 | **Google Lens** | Remote Google endpoint | Google Lens, and Mokuro-website (see below) |
 | **Mokuro only** | Local pre-generated data | None for inference; Mokuro-website may still fire (see below) |
 
 ### Automatic — NOT isolated; can silently use the cloud
 
 `Automatic` is a cascade, not a single engine. For a page with no local Mokuro
-data it tries **ScreenAI** if it is installed, and **if ScreenAI is
-unavailable or returns nothing it falls through to Google Lens**, which uploads
-the page image to Google. This fall-through is unconditional — there is no
-prompt — so choosing `Automatic` means page images **may be sent to Google**
-without any further confirmation.
+data it tries **Google Lens first**, then falls back to Apple Vision or ScreenAI
+when that platform-local engine is available. There is no upload prompt, so
+choosing `Automatic` means page images may be sent to Google.
 
-Proof: after the local Mokuro checks, `_recognize()` computes
-`shouldTryScreenAi = engine == screenAi || (engine == automatic && await
-ScreenAiOcrClient.isAvailable())`. When that is false (or ScreenAI throws and
-the engine is *not* `screenAi`, so the error is swallowed), control reaches the
-final unconditional `ChromeLensOcrClient().recognize(...)` block
-(`reader_ocr_overlay.dart`, `_recognize`).
+Proof: `generatedOcrEngineOrder()` returns Google Lens before Apple Vision or
+ScreenAI for the automatic preference (`generated_ocr.dart`).
 
 ### ScreenAI (local Chrome) — on-device, Windows only, no OCR upload
 
@@ -62,6 +58,60 @@ Requirements/limits, from the code:
   `chrome_screen_ai.dll` + `manifest.json` (`_findComponentDirectory()`). If it
   is missing you get "ScreenAI is not installed. Open Chrome once or select
   Google Lens." — you do not copy any file by hand.
+
+### Apple Vision — on-device on Apple platforms
+
+Apple Vision performs recognition through the native Vision framework on iOS
+and macOS. It does not upload page images for inference.
+
+### Hayai OCR v2.1 — crop-level recognition through your server
+
+Hayai is a custom ~150M-parameter Transformers model and its current v2.1
+checkpoint is about 622 MB. Mangatan therefore talks to the included
+`tool/hayai_ocr_server.py` adapter instead of embedding PyTorch in the app.
+The helper pins revision `53d4723f2d9a748a4d8b2c1b50c12e53093e9cf2`.
+Each detected text crop is sent to the URL configured in OCR settings. Use
+`127.0.0.1` when the server and Mangatan run on the same computer, or an
+authenticated LAN URL when an iPhone uses a computer-hosted server.
+
+Desktop setup:
+
+```sh
+python -m pip install fastapi "uvicorn[standard]" python-multipart pillow \
+  torch "transformers<5" accelerate
+python tool/hayai_ocr_server.py
+```
+
+For another device on the LAN, bind explicitly and set an API key. Prefer a
+shell secret prompt or environment manager so the real value is not retained
+in shell history:
+
+```sh
+HAYAI_API_KEY="replace-me" python tool/hayai_ocr_server.py --host 0.0.0.0
+```
+
+Enter the computer's LAN URL and the same API key in Mangatan. Do not expose
+this development server directly to the public internet.
+
+## Shared AnimeText textbox detection
+
+The optional AnimeText layer runs before any generated OCR engine. It detects
+text blocks locally, crops them, invokes the selected OCR engine per crop, and
+maps results back onto the full page. This is required for Hayai because Hayai
+is crop-level rather than full-page OCR; it is optional for Apple Vision,
+ScreenAI, and Google Lens. With Google Lens enabled, each crop is uploaded to
+Google separately.
+
+The upstream `deepghs/AnimeText_yolo` model is gated and GPL-3.0, so Mangatan
+does not redistribute it. After accepting the Hugging Face terms, run
+`tool/export_animetext_litert.py` with a read-only `HF_TOKEN`, then import the
+resulting `.tflite` file in OCR settings. The helper pins the nano checkpoint
+at revision `a180c191bfdb9f0e31b57e7de567e7b6bac50f84`.
+
+```sh
+python -m pip install huggingface_hub ultralytics tensorflow
+HF_TOKEN="your-read-token" python tool/export_animetext_litert.py
+```
 
 ### Google Lens — remote, page image is uploaded
 

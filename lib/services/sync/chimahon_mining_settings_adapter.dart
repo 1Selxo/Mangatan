@@ -12,7 +12,9 @@ import 'package:mangayomi/services/sync/chimahon_preferences.dart';
 String? exportChimahonOcrEngine(OcrEnginePreference engine) => switch (engine) {
   OcrEnginePreference.googleLens => 'cloud',
   OcrEnginePreference.appleVision || OcrEnginePreference.screenAi => 'local',
-  OcrEnginePreference.automatic || OcrEnginePreference.mokuroOnly => null,
+  OcrEnginePreference.automatic ||
+  OcrEnginePreference.hayai ||
+  OcrEnginePreference.mokuroOnly => null,
 };
 
 OcrEnginePreference? importChimahonOcrEngine(

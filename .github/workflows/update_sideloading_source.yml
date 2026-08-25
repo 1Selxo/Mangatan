@@ -37,7 +37,9 @@ jobs:
           pip install requests
 
       - name: Run source updater
-        run: python repo/update_source.py
+        run: |
+          python repo/update_source.py
+          python -m unittest repo/test_update_source.py
 
       - name: Commit and Push changes
         run: |

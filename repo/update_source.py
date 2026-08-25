@@ -62,6 +62,48 @@ class AppConfig(TypedDict):
     image_url: str
 
 
+def apply_source_identity(data: AppData, config: AppConfig) -> None:
+    """Keep the AltStore source and app identity aligned with the IPA."""
+    repository_url = f"https://github.com/{config['repo_url']}"
+    raw_assets_url = (
+        f"https://raw.githubusercontent.com/{config['repo_url']}"
+        "/refs/heads/main/repo/images"
+    )
+    data.update(
+        {
+            "name": config["app_name"],
+            "identifier": config["app_id"],
+            "headerURL": f"{raw_assets_url}/headers/source_header_default.webp",
+            "website": repository_url,
+            "iconURL": f"{raw_assets_url}/icons/icon_default.webp",
+            "subtitle": "Read, watch, and learn.",
+            "description": (
+                f"The official sideloading source for {config['app_name']}.\n\n"
+                "For full details, check the GitHub repository:\n"
+                f"{repository_url}"
+            ),
+        }
+    )
+
+    app = data["apps"][0]
+    app.update(
+        {
+            "name": config["app_name"],
+            "bundleIdentifier": config["app_id"],
+            "developerName": f"{config['app_name']} contributors",
+            "localizedDescription": (
+                f"{config['app_name']} is an open-source Flutter app for "
+                "reading manga and novels, watching anime, and language learning."
+            ),
+            "iconURL": f"{raw_assets_url}/icons/icon_default.webp",
+            "screenshotURLs": [
+                f"{raw_assets_url}/screenshots/image_{index}_default.webp"
+                for index in range(3)
+            ],
+        }
+    )
+
+
 def load_config(config_path: str) -> AppConfig:
     """
     Load repo configuration values.
@@ -244,6 +286,7 @@ def update_json_file(
     with open(json_file, "r") as file:
         data: AppData = json.load(file)
 
+    apply_source_identity(data, config)
     app = data["apps"][0]
 
     releases = []

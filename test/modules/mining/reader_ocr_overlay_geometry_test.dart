@@ -8,6 +8,8 @@ import 'package:mangayomi/services/mining/mining_preferences.dart';
 void main() {
   test('matches Chimahon OCR opacity defaults', () {
     expect(MiningPreferences.defaultOcrBackgroundOpacity, 0.0);
+    expect(MiningPreferences.defaultOcrTextOpacity, 1.0);
+    expect(MiningPreferences.defaultActiveOcrBackgroundOpacity, 0.7);
   });
 
   test('uses configured background and opaque text for passive boxes', () {
@@ -17,17 +19,27 @@ void main() {
     ));
   });
 
-  test('uses configured background and opaque text for active boxes', () {
-    final opacity = readerOcrContentOpacities(boxOpacity: 0.25, active: true);
-    expect(opacity.background, 0.25);
-    expect(opacity.text, 1.0);
+  test('uses independent text and background opacity for active boxes', () {
+    final opacity = readerOcrContentOpacities(
+      boxOpacity: 0.25,
+      activeTextOpacity: .6,
+      activeBackgroundOpacity: .8,
+      active: true,
+    );
+    expect(opacity.background, 0.8);
+    expect(opacity.text, 0.6);
   });
 
   test('clamps OCR content opacity to the slider range', () {
-    expect(readerOcrContentOpacities(boxOpacity: -0.5, active: true), (
-      background: 0.0,
-      text: 1.0,
-    ));
+    expect(
+      readerOcrContentOpacities(
+        boxOpacity: .5,
+        activeTextOpacity: 2,
+        activeBackgroundOpacity: -1,
+        active: true,
+      ),
+      (background: 0.0, text: 1.0),
+    );
   });
 
   test('keeps single-page OCR paint rect unchanged', () {

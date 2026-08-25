@@ -386,6 +386,7 @@ final class _MiningPreferencesReader {
 class MiningPreferences {
   static const defaultOcrBackgroundOpacity = 0.0;
   static const defaultOcrTextOpacity = 1.0;
+  static const defaultActiveOcrBackgroundOpacity = 0.7;
 
   static const _boxName = 'mining_preferences';
   static const _jimakuApiKey = 'jimaku_api_key';
@@ -419,6 +420,8 @@ class MiningPreferences {
   // Keep the existing key so saved overlay opacity becomes background opacity.
   static const _ocrBackgroundOpacity = 'ocr_overlay_opacity';
   static const _ocrTextOpacity = 'ocr_text_opacity';
+  static const _activeOcrBackgroundOpacity = 'active_ocr_background_opacity';
+  static const _panelNavigationEnabled = 'panel_navigation_enabled';
   static const _ocrBoxScale = 'ocr_box_scale';
   static const _ocrOutlineVisible = 'ocr_outline_visible';
   static const _ocrLookupOnHover = 'ocr_lookup_on_hover';
@@ -624,10 +627,9 @@ class MiningPreferences {
     MiningPreferencesSnapshot? snapshot,
   }) async {
     return (await _reader(
-              readOnly: readOnly,
-              snapshot: snapshot,
-            ))?.get(_cropImageBeforeMining, defaultValue: false)
-            as bool? ??
+          readOnly: readOnly,
+          snapshot: snapshot,
+        ))?.get(_cropImageBeforeMining, defaultValue: false) as bool? ??
         false;
   }
 
@@ -673,10 +675,9 @@ class MiningPreferences {
 
   static Future<int> getDictionaryAutoUpdateIntervalHours() async =>
       ((await _boxOrNull())?.get(
-                    _dictionaryAutoUpdateIntervalHours,
-                    defaultValue: 24,
-                  )
-                  as int? ??
+                _dictionaryAutoUpdateIntervalHours,
+                defaultValue: 24,
+              ) as int? ??
               24)
           .clamp(1, 168);
 
@@ -707,10 +708,9 @@ class MiningPreferences {
     MiningPreferencesSnapshot? snapshot,
   }) async {
     return (await _reader(
-              readOnly: readOnly,
-              snapshot: snapshot,
-            ))?.get(_jimakuApiKey, defaultValue: '')
-            as String? ??
+          readOnly: readOnly,
+          snapshot: snapshot,
+        ))?.get(_jimakuApiKey, defaultValue: '') as String? ??
         '';
   }
 
@@ -752,10 +752,9 @@ class MiningPreferences {
   static Future<String> getVideoStreamPreference(int? mediaId) async {
     if (mediaId == null) return '';
     return (await _boxOrNull())?.get(
-              _videoStreamPreferenceKey(mediaId),
-              defaultValue: '',
-            )
-            as String? ??
+          _videoStreamPreferenceKey(mediaId),
+          defaultValue: '',
+        ) as String? ??
         '';
   }
 
@@ -773,10 +772,9 @@ class MiningPreferences {
   static Future<Uri> getAnkiEndpoint() async {
     final raw =
         (await _boxOrNull())?.get(
-              _ankiEndpoint,
-              defaultValue: 'http://127.0.0.1:8765',
-            )
-            as String? ??
+          _ankiEndpoint,
+          defaultValue: 'http://127.0.0.1:8765',
+        ) as String? ??
         'http://127.0.0.1:8765';
     return Uri.tryParse(raw) ?? Uri.parse('http://127.0.0.1:8765');
   }
@@ -786,12 +784,10 @@ class MiningPreferences {
   }
 
   static Future<AnkiIntegrationMode> getAnkiIntegrationMode() async {
-    final raw =
-        (await _boxOrNull())?.get(
-              _ankiIntegrationMode,
-              defaultValue: AnkiIntegrationMode.ankiMobile.name,
-            )
-            as String?;
+    final raw = (await _boxOrNull())?.get(
+      _ankiIntegrationMode,
+      defaultValue: AnkiIntegrationMode.ankiMobile.name,
+    ) as String?;
     return ankiIntegrationModeFromName(raw);
   }
 
@@ -991,10 +987,9 @@ class MiningPreferences {
     final box = await _boxOrNull();
     final sourceTypeName =
         box?.get(
-              _ankiAudioSourceType,
-              defaultValue: AnkiAudioSourceType.customJson.name,
-            )
-            as String? ??
+          _ankiAudioSourceType,
+          defaultValue: AnkiAudioSourceType.customJson.name,
+        ) as String? ??
         AnkiAudioSourceType.customJson.name;
     final legacyType = AnkiAudioSourceType.values.firstWhere(
       (value) => value.name == sourceTypeName,
@@ -1054,10 +1049,9 @@ class MiningPreferences {
   }) async {
     final name =
         (await _reader(readOnly: readOnly, snapshot: snapshot))?.get(
-              _ocrEngine,
-              defaultValue: OcrEnginePreference.automatic.name,
-            )
-            as String? ??
+          _ocrEngine,
+          defaultValue: OcrEnginePreference.automatic.name,
+        ) as String? ??
         OcrEnginePreference.automatic.name;
     final engine = OcrEnginePreference.values.firstWhere(
       (value) => value.name == name,
@@ -1076,10 +1070,9 @@ class MiningPreferences {
   }) async {
     final name =
         (await _reader(readOnly: readOnly, snapshot: snapshot))?.get(
-              _ocrScanTrigger,
-              defaultValue: OcrScanTrigger.automatic.name,
-            )
-            as String? ??
+          _ocrScanTrigger,
+          defaultValue: OcrScanTrigger.automatic.name,
+        ) as String? ??
         OcrScanTrigger.automatic.name;
     return OcrScanTrigger.values.firstWhere(
       (value) => value.name == name,
@@ -1126,10 +1119,9 @@ class MiningPreferences {
 
   static Future<bool> getMokuroWebsiteOcrEnabled() async {
     return (await _boxOrNull())?.get(
-              _mokuroWebsiteOcrEnabled,
-              defaultValue: true,
-            )
-            as bool? ??
+          _mokuroWebsiteOcrEnabled,
+          defaultValue: true,
+        ) as bool? ??
         true;
   }
 
@@ -1142,10 +1134,9 @@ class MiningPreferences {
     MiningPreferencesSnapshot? snapshot,
   }) async {
     return (await _reader(
-              readOnly: readOnly,
-              snapshot: snapshot,
-            ))?.get(_ocrOverlayEnabled, defaultValue: true)
-            as bool? ??
+          readOnly: readOnly,
+          snapshot: snapshot,
+        ))?.get(_ocrOverlayEnabled, defaultValue: true) as bool? ??
         true;
   }
 
@@ -1191,10 +1182,9 @@ class MiningPreferences {
   }) async {
     final value =
         (await _reader(readOnly: readOnly, snapshot: snapshot))?.get(
-              _ocrBackgroundOpacity,
-              defaultValue: defaultOcrBackgroundOpacity,
-            )
-            as num? ??
+          _ocrBackgroundOpacity,
+          defaultValue: defaultOcrBackgroundOpacity,
+        ) as num? ??
         defaultOcrBackgroundOpacity;
     return value.toDouble().clamp(0.0, 1.0).toDouble();
   }
@@ -1217,16 +1207,41 @@ class MiningPreferences {
   static Future<double> getOcrTextOpacity() async {
     final value =
         (await _boxOrNull())?.get(
-              _ocrTextOpacity,
-              defaultValue: defaultOcrTextOpacity,
-            )
-            as num? ??
+          _ocrTextOpacity,
+          defaultValue: defaultOcrTextOpacity,
+        ) as num? ??
         defaultOcrTextOpacity;
     return value.toDouble().clamp(0.0, 1.0).toDouble();
   }
 
   static Future<void> setOcrTextOpacity(double value) async {
     await (await _boxOrNull())?.put(_ocrTextOpacity, value.clamp(0.0, 1.0));
+  }
+
+  static Future<double> getActiveOcrBackgroundOpacity() async {
+    final value =
+        (await _boxOrNull())?.get(
+          _activeOcrBackgroundOpacity,
+          defaultValue: defaultActiveOcrBackgroundOpacity,
+        ) as num? ??
+        defaultActiveOcrBackgroundOpacity;
+    return value.toDouble().clamp(0.0, 1.0).toDouble();
+  }
+
+  static Future<void> setActiveOcrBackgroundOpacity(double value) async {
+    await (await _boxOrNull())?.put(
+      _activeOcrBackgroundOpacity,
+      value.clamp(0.0, 1.0),
+    );
+  }
+
+  static Future<bool> getPanelNavigationEnabled() async =>
+      (await _boxOrNull())?.get(_panelNavigationEnabled, defaultValue: false)
+          as bool? ??
+      false;
+
+  static Future<void> setPanelNavigationEnabled(bool value) async {
+    await (await _boxOrNull())?.put(_panelNavigationEnabled, value);
   }
 
   static Future<double> getOcrBoxScale() async {
@@ -1277,10 +1292,9 @@ class MiningPreferences {
     MiningPreferencesSnapshot? snapshot,
   }) async {
     return (await _reader(
-              readOnly: readOnly,
-              snapshot: snapshot,
-            ))?.get(_ocrOutlineVisible, defaultValue: false)
-            as bool? ??
+          readOnly: readOnly,
+          snapshot: snapshot,
+        ))?.get(_ocrOutlineVisible, defaultValue: false) as bool? ??
         true;
   }
 
@@ -1309,12 +1323,10 @@ class MiningPreferences {
   }
 
   static Future<DictionaryLookupTrigger> getDictionaryLookupTrigger() async {
-    final name =
-        (await _boxOrNull())?.get(
-              _dictionaryLookupTrigger,
-              defaultValue: DictionaryLookupTrigger.leftClick.name,
-            )
-            as String?;
+    final name = (await _boxOrNull())?.get(
+      _dictionaryLookupTrigger,
+      defaultValue: DictionaryLookupTrigger.leftClick.name,
+    ) as String?;
     return dictionaryLookupTriggerFromName(name);
   }
 
@@ -1326,10 +1338,9 @@ class MiningPreferences {
 
   static Future<bool> getDictionaryAdditionalLeftClick() async {
     return (await _boxOrNull())?.get(
-              _dictionaryAdditionalLeftClick,
-              defaultValue: false,
-            )
-            as bool? ??
+          _dictionaryAdditionalLeftClick,
+          defaultValue: false,
+        ) as bool? ??
         false;
   }
 
@@ -1342,12 +1353,10 @@ class MiningPreferences {
     MiningPreferencesSnapshot? snapshot,
   }) async {
     final reader = await _reader(readOnly: readOnly, snapshot: snapshot);
-    final themeName =
-        reader?.get(
-              _dictionaryTheme,
-              defaultValue: DictionaryThemePreference.system.name,
-            )
-            as String?;
+    final themeName = reader?.get(
+      _dictionaryTheme,
+      defaultValue: DictionaryThemePreference.system.name,
+    ) as String?;
     return DictionaryPopupPreferences(
       width:
           ((reader?.get(_dictionaryPopupWidth, defaultValue: 430) as num?) ??

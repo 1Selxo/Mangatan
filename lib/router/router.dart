@@ -66,6 +66,7 @@ import 'package:mangayomi/modules/more/settings/browse/extension_server_screen.d
 import 'package:mangayomi/modules/more/settings/general/general_screen.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_screen.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
+import 'package:mangayomi/modules/more/settings/ocr/ocr_settings_screen.dart';
 import 'package:mangayomi/modules/more/settings/player/player_subtitle_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
@@ -262,6 +263,7 @@ class RouterNotifier extends ChangeNotifier {
     _genericRoute(name: "general", child: const GeneralScreen()),
     _genericRoute(name: "readerMode", child: const ReaderScreen()),
     _genericRoute(name: "dictionary", child: const DictionaryScreen()),
+    _genericRoute(name: "ocrSettings", child: const OcrSettingsScreen()),
     _genericRoute(
       name: "dictionaryPopup",
       child: const DictionaryScreen(

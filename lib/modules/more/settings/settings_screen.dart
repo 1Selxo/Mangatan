@@ -88,6 +88,12 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => context.push('/dictionaryPopup'),
             ),
             ListTileWidget(
+              title: 'OCR & panel navigation',
+              subtitle: 'Recognition, overlays, queue, and AI panel reading',
+              icon: Icons.document_scanner_outlined,
+              onTap: () => context.push('/ocrSettings'),
+            ),
+            ListTileWidget(
               title: DictionarySettingsSection.anki.title,
               subtitle: DictionarySettingsSection.anki.summary,
               icon: Icons.style_outlined,

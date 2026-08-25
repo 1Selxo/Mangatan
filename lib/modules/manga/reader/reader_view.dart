@@ -38,6 +38,7 @@ import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/statistics/widgets/manga_stats_sheet.dart';
 import 'package:mangayomi/services/statistics/manga_statistics_tracker.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:mangayomi/utils/riverpod.dart';
@@ -864,7 +865,7 @@ class _MangaChapterPageGalleryState
     );
   }
 
-  void _handlePageNavigation({required bool forward}) {
+  Future<void> _handlePageNavigation({required bool forward}) async {
     final readerMode = ref.read(_currentReaderMode);
     final animatePageTransitions = ref.read(
       animatePageTransitionsStateProvider,
@@ -885,6 +886,23 @@ class _MangaChapterPageGalleryState
         curve: Curves.easeInOut,
       );
       return;
+    }
+
+    if (await MiningPreferences.getPanelNavigationEnabled()) {
+      final viewIndex = _extendedController.hasClients
+          ? (_extendedController.page?.round() ?? _currentIndex ?? 0)
+          : (_currentIndex ?? 0);
+      try {
+        final handled = await _pagedViewKeys[viewIndex]?.currentState
+            ?.navigatePanel(forward: forward);
+        if (handled ?? false) return;
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Panel detection failed: $error')),
+          );
+        }
+      }
     }
 
     if (forward) {

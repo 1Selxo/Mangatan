@@ -32,6 +32,12 @@ class ReaderOcrState {
   static final boxOpacity = ValueNotifier<double>(
     MiningPreferences.defaultOcrBackgroundOpacity,
   );
+  static final activeTextOpacity = ValueNotifier<double>(
+    MiningPreferences.defaultOcrTextOpacity,
+  );
+  static final activeBackgroundOpacity = ValueNotifier<double>(
+    MiningPreferences.defaultActiveOcrBackgroundOpacity,
+  );
   static final outlineVisible = ValueNotifier<bool>(false);
   static final lookupOnHover = ValueNotifier<bool>(false);
   static final engine = ValueNotifier<OcrEnginePreference>(
@@ -76,6 +82,8 @@ class ReaderOcrState {
       final values = await Future.wait<dynamic>([
         MiningPreferences.getOcrOverlayEnabled(),
         MiningPreferences.getOcrBoxOpacity(),
+        MiningPreferences.getOcrTextOpacity(),
+        MiningPreferences.getActiveOcrBackgroundOpacity(),
         MiningPreferences.getOcrOutlineVisible(),
         MiningPreferences.getOcrLookupOnHover(),
         MiningPreferences.getOcrEngine(),
@@ -85,11 +93,13 @@ class ReaderOcrState {
       ]);
       enabled.value = values[0] as bool;
       boxOpacity.value = values[1] as double;
-      outlineVisible.value = values[2] as bool;
-      lookupOnHover.value = values[3] as bool;
-      engine.value = values[4] as OcrEnginePreference;
-      parallelOcrLimit.value = values[5] as int;
-      scanTrigger.value = values[6] as OcrScanTrigger;
+      activeTextOpacity.value = values[2] as double;
+      activeBackgroundOpacity.value = values[3] as double;
+      outlineVisible.value = values[4] as bool;
+      lookupOnHover.value = values[5] as bool;
+      engine.value = values[6] as OcrEnginePreference;
+      parallelOcrLimit.value = values[7] as int;
+      scanTrigger.value = values[8] as OcrScanTrigger;
       _initialized = true;
     } finally {
       _initializing = null;
@@ -140,6 +150,20 @@ class ReaderOcrState {
     final clamped = value.clamp(0.0, 1.0).toDouble();
     boxOpacity.value = clamped;
     await MiningPreferences.setOcrBoxOpacity(clamped);
+  }
+
+  static Future<void> setActiveTextOpacity(double value) async {
+    await initialize();
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    activeTextOpacity.value = clamped;
+    await MiningPreferences.setOcrTextOpacity(clamped);
+  }
+
+  static Future<void> setActiveBackgroundOpacity(double value) async {
+    await initialize();
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    activeBackgroundOpacity.value = clamped;
+    await MiningPreferences.setActiveOcrBackgroundOpacity(clamped);
   }
 
   static Future<void> setOutlineVisible(bool value) async {
@@ -861,6 +885,8 @@ class ReaderOcrController extends ChangeNotifier {
   ReaderOcrController(this.data, {required this.imageKey}) {
     ReaderOcrState.enabled.addListener(_enabledChanged);
     ReaderOcrState.boxOpacity.addListener(_appearanceChanged);
+    ReaderOcrState.activeTextOpacity.addListener(_appearanceChanged);
+    ReaderOcrState.activeBackgroundOpacity.addListener(_appearanceChanged);
     ReaderOcrState.outlineVisible.addListener(_appearanceChanged);
     ReaderOcrState._controllers.add(this);
     unawaited(ReaderOcrState.initialize());
@@ -993,6 +1019,9 @@ class ReaderOcrController extends ChangeNotifier {
     }
     final paintedBlocks = <_PaintedOcrBlock>[];
     final boxOpacity = ReaderOcrState.boxOpacity.value;
+    final activeTextOpacity = ReaderOcrState.activeTextOpacity.value;
+    final activeBackgroundOpacity =
+        ReaderOcrState.activeBackgroundOpacity.value;
     final outlineVisible = ReaderOcrState.outlineVisible.value;
     for (final block in page.blocks) {
       final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
@@ -1027,6 +1056,8 @@ class ReaderOcrController extends ChangeNotifier {
           vertical: block.vertical,
           active: active,
           boxOpacity: boxOpacity,
+          activeTextOpacity: activeTextOpacity,
+          activeBackgroundOpacity: activeBackgroundOpacity,
           highlight: active
               ? _lineHighlightFor(
                   lineStart: 0,
@@ -1052,6 +1083,8 @@ class ReaderOcrController extends ChangeNotifier {
           vertical: lineBox.vertical,
           active: active,
           boxOpacity: boxOpacity,
+          activeTextOpacity: activeTextOpacity,
+          activeBackgroundOpacity: activeBackgroundOpacity,
           rotation: lineBox.rotation,
           highlight: active
               ? _lineHighlightFor(
@@ -1399,6 +1432,8 @@ class ReaderOcrController extends ChangeNotifier {
     _disposed = true;
     ReaderOcrState.enabled.removeListener(_enabledChanged);
     ReaderOcrState.boxOpacity.removeListener(_appearanceChanged);
+    ReaderOcrState.activeTextOpacity.removeListener(_appearanceChanged);
+    ReaderOcrState.activeBackgroundOpacity.removeListener(_appearanceChanged);
     ReaderOcrState.outlineVisible.removeListener(_appearanceChanged);
     ReaderOcrState._controllers.remove(this);
     super.dispose();
@@ -1553,12 +1588,16 @@ class ReaderOcrController extends ChangeNotifier {
     required bool vertical,
     required bool active,
     required double boxOpacity,
+    required double activeTextOpacity,
+    required double activeBackgroundOpacity,
     Rect? highlight,
     double rotation = 0,
   }) {
     if (text.isEmpty) return;
     final contentOpacity = readerOcrContentOpacities(
       boxOpacity: boxOpacity,
+      activeTextOpacity: activeTextOpacity,
+      activeBackgroundOpacity: activeBackgroundOpacity,
       active: active,
     );
     canvas.save();
@@ -1938,11 +1977,17 @@ double readerOcrVerticalFontSize({
 @visibleForTesting
 ({double background, double text}) readerOcrContentOpacities({
   required double boxOpacity,
+  double activeTextOpacity = 1.0,
+  double activeBackgroundOpacity = 0.7,
   required bool active,
 }) {
   final opacity = boxOpacity.clamp(0.0, 1.0).toDouble();
-  // The slider controls only the white OCR textbox. Recognized text remains
-  // readable at every setting, including a fully transparent background.
+  if (active) {
+    return (
+      background: activeBackgroundOpacity.clamp(0.0, 1.0).toDouble(),
+      text: activeTextOpacity.clamp(0.0, 1.0).toDouble(),
+    );
+  }
   return (background: opacity, text: 1.0);
 }
 

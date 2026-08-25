@@ -13,7 +13,9 @@ import 'package:mangayomi/modules/manga/reader/widgets/transition_view_paged.dar
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_vertical.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/reader/panel_detection_service.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 
@@ -97,6 +99,9 @@ class DoublePageViewState extends State<DoublePageView>
   final PhotoViewController _photoViewController = PhotoViewController();
   final PhotoViewScaleStateController _photoViewScaleStateController =
       PhotoViewScaleStateController();
+  List<Rect>? _panelStops;
+  int _panelStopIndex = -1;
+  Future<List<Rect>>? _panelDetection;
 
   Duration _doubleTapAnimationDuration() {
     final doubleTapAnimationValue =
@@ -142,6 +147,93 @@ class DoublePageViewState extends State<DoublePageView>
       _photoViewScaleStateController.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant DoublePageView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_samePages(oldWidget.pages, widget.pages)) {
+      _panelStops = null;
+      _panelDetection = null;
+      _panelStopIndex = -1;
+    }
+  }
+
+  bool _samePages(List<UChapDataPreload?> a, List<UChapDataPreload?> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!identical(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  /// Focuses the next or previous detected panel. Returns false only when the
+  /// reader should leave this page/spread.
+  Future<bool> navigatePanel({required bool forward}) async {
+    if (!widget.isPagedMode || !mounted) return false;
+    final stops = _panelStops ??= await (_panelDetection ??= _detectPanels());
+    if (!mounted || stops.isEmpty) return false;
+    final target = forward
+        ? _panelStopIndex + 1
+        : (_panelStopIndex < 0 ? stops.length - 1 : _panelStopIndex - 1);
+    if (target < 0 || target >= stops.length) {
+      _panelStopIndex = -1;
+      _photoViewScaleStateController.reset();
+      return false;
+    }
+    _panelStopIndex = target;
+    _focusPanel(stops[target]);
+    return true;
+  }
+
+  Future<List<Rect>> _detectPanels() async {
+    final pageData = widget.readingDirection.isRtl
+        ? widget.pages.reversed.whereType<UChapDataPreload>().toList()
+        : widget.pages.whereType<UChapDataPreload>().toList();
+    final stops = <Rect>[];
+    for (var pageIndex = 0; pageIndex < pageData.length; pageIndex++) {
+      final bytes = await pageData[pageIndex].getImageBytes;
+      if (bytes == null) continue;
+      final detections = await PanelDetectionService.instance.detect(bytes);
+      if (widget.readingDirection.isRtl) {
+        detections.sort((a, b) {
+          final rowDelta = a.rect.top - b.rect.top;
+          if (rowDelta.abs() > .08) return rowDelta.sign.toInt();
+          return b.rect.right.compareTo(a.rect.right);
+        });
+      }
+      for (final detection in detections) {
+        final rect = detection.rect;
+        stops.add(
+          Rect.fromLTRB(
+            (pageIndex + rect.left) / pageData.length,
+            rect.top,
+            (pageIndex + rect.right) / pageData.length,
+            rect.bottom,
+          ),
+        );
+      }
+    }
+    return stops;
+  }
+
+  void _focusPanel(Rect panel) {
+    final viewport = context.size ?? MediaQuery.sizeOf(context);
+    final scale =
+        (0.95 / panel.width < 0.95 / panel.height
+                ? 0.95 / panel.width
+                : 0.95 / panel.height)
+            .clamp(1.0, 8.0)
+            .toDouble();
+    _photoViewController.value = PhotoViewControllerValue(
+      position: Offset(
+        (.5 - panel.center.dx) * viewport.width * scale,
+        (.5 - panel.center.dy) * viewport.height * scale,
+      ),
+      scale: scale,
+      rotation: 0,
+      rotationFocusPoint: null,
+    );
   }
 
   void _toggleScale(Offset tapPosition) {

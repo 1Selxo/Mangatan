@@ -1120,9 +1120,9 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: HEAD
-      resolved-ref: e7ce3d1da8a8c91b2b69e26f6e340f690d36eaca
-      url: "https://github.com/kodjodevf/m_extension_server.git"
+      ref: a7bb34d0c092d8a3f7df9e2432092afbae4e94cd
+      resolved-ref: a7bb34d0c092d8a3f7df9e2432092afbae4e94cd
+      url: "https://github.com/1Selxo/m_extension_server.git"
     source: git
     version: "0.0.7"
   marquee:

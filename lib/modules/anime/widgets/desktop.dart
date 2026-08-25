@@ -10,6 +10,7 @@ import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/player_hotkeys.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/extensions/duration.dart';
@@ -76,11 +77,27 @@ class _DesktopControllerWidgetState
   DateTime last = DateTime.now();
   Timer? _tapTimer;
   DateTime? _lastSpaceShortcutAt;
+  List<PlayerHotkeyBinding> _hotkeys = PlayerHotkeyStore.defaults;
 
   @override
   void setState(VoidCallback fn) {
     if (mounted) {
       super.setState(fn);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadHotkeys());
+  }
+
+  Future<void> _loadHotkeys() async {
+    try {
+      final hotkeys = await PlayerHotkeyStore.load();
+      if (mounted) setState(() => _hotkeys = hotkeys);
+    } catch (error) {
+      debugPrint('Could not load player hotkeys: $error');
     }
   }
 
@@ -211,71 +228,58 @@ class _DesktopControllerWidgetState
     widget.videoController.player.playOrPause();
   }
 
+  Map<ShortcutActivator, VoidCallback> _playerHotkeyCallbacks() {
+    final callbacks = <ShortcutActivator, VoidCallback>{};
+    for (final binding in _hotkeys) {
+      final activator = binding.activator;
+      if (activator == null) continue;
+      callbacks[activator] = () => _performHotkeyAction(binding.action);
+    }
+    return callbacks;
+  }
+
+  void _performHotkeyAction(PlayerHotkeyAction action) {
+    final player = widget.videoController.player;
+    void seekBy(int seconds) {
+      player.seek(player.state.position + Duration(seconds: seconds));
+    }
+
+    switch (action) {
+      case PlayerHotkeyAction.playPause:
+        _handleSpaceShortcut();
+      case PlayerHotkeyAction.play:
+        player.play();
+      case PlayerHotkeyAction.pause:
+        player.pause();
+      case PlayerHotkeyAction.seekBackward5:
+        seekBy(-5);
+      case PlayerHotkeyAction.seekForward5:
+        seekBy(5);
+      case PlayerHotkeyAction.seekBackward10:
+        seekBy(-10);
+      case PlayerHotkeyAction.seekForward10:
+        seekBy(10);
+      case PlayerHotkeyAction.skipIntro:
+        seekBy(widget.defaultSkipIntroLength);
+      case PlayerHotkeyAction.toggleFullscreen:
+        unawaited(_changeFullScreen(ref, widget.desktopFullScreenPlayer));
+      case PlayerHotkeyAction.volumeUp:
+        player.setVolume((player.state.volume + 5.0).clamp(0.0, 100.0));
+      case PlayerHotkeyAction.volumeDown:
+        player.setVolume((player.state.volume - 5.0).clamp(0.0, 100.0));
+      case PlayerHotkeyAction.nextMedia:
+        player.next();
+      case PlayerHotkeyAction.previousMedia:
+        player.previous();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     _scheduleSubtitleAnchorUpdate();
     return CallbackShortcuts(
       bindings: {
-        // Default key-board shortcuts.
-        // https://support.google.com/youtube/answer/7631406
-        const SingleActivator(LogicalKeyboardKey.mediaPlay): () =>
-            widget.videoController.player.play(),
-        const SingleActivator(LogicalKeyboardKey.mediaPause): () =>
-            widget.videoController.player.pause(),
-        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): () =>
-            widget.videoController.player.playOrPause(),
-        const SingleActivator(LogicalKeyboardKey.mediaTrackNext): () =>
-            widget.videoController.player.next(),
-        const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious): () =>
-            widget.videoController.player.previous(),
-        const SingleActivator(LogicalKeyboardKey.space): _handleSpaceShortcut,
-        const SingleActivator(LogicalKeyboardKey.keyJ): () {
-          final rate =
-              widget.videoController.player.state.position -
-              const Duration(seconds: 10);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.keyL): () {
-          final rate =
-              widget.videoController.player.state.position +
-              const Duration(seconds: 10);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.enter): () {
-          final rate =
-              widget.videoController.player.state.position +
-              Duration(seconds: widget.defaultSkipIntroLength);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.keyS): () {
-          final rate =
-              widget.videoController.player.state.position +
-              Duration(seconds: widget.defaultSkipIntroLength);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
-          final rate =
-              widget.videoController.player.state.position -
-              const Duration(seconds: 5);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () {
-          final rate =
-              widget.videoController.player.state.position +
-              const Duration(seconds: 5);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowUp): () {
-          final volume = widget.videoController.player.state.volume + 5.0;
-          widget.videoController.player.setVolume(volume.clamp(0.0, 100.0));
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowDown): () {
-          final volume = widget.videoController.player.state.volume - 5.0;
-          widget.videoController.player.setVolume(volume.clamp(0.0, 100.0));
-        },
-        const SingleActivator(LogicalKeyboardKey.keyF): () async {
-          await _changeFullScreen(ref, widget.desktopFullScreenPlayer);
-        },
+        ..._playerHotkeyCallbacks(),
         const SingleActivator(LogicalKeyboardKey.digit0, control: true): () {
           (widget.videoController.player.platform as NativePlayer).command([
             "script-message",

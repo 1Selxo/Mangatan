@@ -28,7 +28,6 @@ import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.d
 import 'package:mangayomi/modules/manga/detail/providers/export_metadata.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/tracker_search_widget.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/tracker_widget.dart';
-import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
@@ -47,6 +46,8 @@ import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/get_chapter_pages.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
+import 'package:mangayomi/modules/mining/widgets/ocr_processing_queue_sheet.dart';
+import 'package:mangayomi/services/mining/ocr_processing_queue.dart';
 import 'package:mangayomi/services/sync/chimahon_local_chapter_overlay_service.dart';
 import 'package:mangayomi/services/sync/chimahon_local_chapter_policy.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
@@ -182,34 +183,33 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
 
   Future<void> _preOcrSelectedChapters(List<Chapter> chapters) async {
     if (chapters.isEmpty) return;
-    botToast('Preparing ${chapters.length} chapter(s) for OCR', second: 3);
-    final pageLists = <List<UChapDataPreload>>[];
-    var failures = 0;
-    for (final chapter in chapters) {
-      try {
-        final result = await ref.read(
-          getChapterPagesProvider(chapter: chapter).future,
-        );
-        if (result.uChapDataPreload.isNotEmpty) {
-          pageLists.add(result.uChapDataPreload);
-        }
-      } catch (error) {
-        failures++;
-        debugPrint('Could not prepare chapter ${chapter.id} for OCR: $error');
-      }
-    }
-    if (pageLists.isEmpty) {
-      botToast('No chapter pages were available for OCR', second: 4);
-      return;
-    }
+    final container = ProviderScope.containerOf(context, listen: false);
     await ReaderOcrState.setEnabled(true);
-    await ReaderOcrState.preOcrChapters(pageLists);
-    botToast(
-      failures == 0
-          ? 'Pre-OCR finished for ${pageLists.length} chapter(s)'
-          : 'Pre-OCR finished; $failures chapter(s) could not be loaded',
-      second: 4,
+    OcrProcessingQueueController.instance.enqueue(
+      chapters.map(
+        (chapter) => OcrQueueRequest(
+          id: 'chapter:${chapter.id ?? identityHashCode(chapter)}',
+          title: widget.manga!.name ?? 'Manga',
+          subtitle: chapter.name ?? 'Chapter',
+          operation: (onProgress) async {
+            final result = await container.read(
+              getChapterPagesProvider(chapter: chapter).future,
+            );
+            final pages = result.uChapDataPreload;
+            if (pages.isEmpty) {
+              throw StateError('No chapter pages were available for OCR');
+            }
+            await ReaderOcrState.preOcrChapters(
+              [pages],
+              onChapterProgress: (_, completed, total) {
+                onProgress(completed, total);
+              },
+            );
+          },
+        ),
+      ),
     );
+    if (mounted) await showOcrProcessingQueueSheet(context);
   }
 
   @override

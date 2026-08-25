@@ -10,6 +10,7 @@ import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dia
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_history_sheet.dart';
 import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
+import 'package:mangayomi/modules/mining/widgets/ocr_processing_queue_sheet.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
@@ -21,6 +22,7 @@ import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/dictionary_update_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/mining/ocr_processing_queue.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
@@ -759,9 +761,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       fields = _ankiMobileFieldsByModel[modelName] ?? const [];
     } else {
       try {
-        fields = await AnkiConnectService(
-          endpoint: _ankiEndpoint,
-        ).modelFieldNames(modelName);
+        fields = await AnkiConnectService(endpoint: _ankiEndpoint)
+            .modelFieldNames(modelName);
       } catch (error) {
         botToast('Could not fetch fields: $error', second: 5);
       }
@@ -1522,8 +1523,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     initialValue: _lookupTrigger,
                     decoration: const InputDecoration(
                       labelText: 'Lookup trigger',
-                      helperText:
-                          'Used in manga and EPUB readers when hover lookup is off',
+                      helperText: 'Used in manga and EPUB readers when hover lookup is off',
                       prefixIcon: Icon(Icons.mouse_outlined),
                     ),
                     items: const [
@@ -1630,6 +1630,38 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     },
                   ),
                 ),
+                ValueListenableBuilder<List<OcrQueueEntry>>(
+                  valueListenable:
+                      OcrProcessingQueueController.instance.entries,
+                  builder: (context, entries, _) {
+                    final failed = entries
+                        .where((entry) => entry.status == OcrQueueStatus.error)
+                        .length;
+                    final processing = entries
+                        .where(
+                          (entry) =>
+                              entry.status == OcrQueueStatus.pending ||
+                              entry.status == OcrQueueStatus.processing,
+                        )
+                        .length;
+                    return ListTile(
+                      leading: const Icon(
+                        Icons.playlist_add_check_circle_outlined,
+                      ),
+                      title: const Text('OCR processing queue'),
+                      subtitle: Text(
+                        failed > 0
+                            ? '$failed failed · tap a chapter to retry'
+                            : processing > 0
+                            ? '$processing chapter${processing == 1 ? '' : 's'} processing'
+                            : entries.isEmpty
+                            ? 'No queued chapters'
+                            : '${entries.length} finished chapter${entries.length == 1 ? '' : 's'}',
+                      ),
+                      onTap: () => showOcrProcessingQueueSheet(context),
+                    );
+                  },
+                ),
                 SwitchListTile(
                   secondary: const Icon(Icons.cloud_download_outlined),
                   title: const Text('Use Mokuro website OCR'),
@@ -1676,8 +1708,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 const SizedBox(height: 8),
                 _SliderSetting(
                   title: 'OCR text box opacity',
-                  description:
-                      '0% keeps the current transparent background; raise it for a more opaque white text box.',
+                  description: '0% keeps the current transparent background; raise it for a more opaque white text box.',
                   value: _backgroundOpacity,
                   min: 0,
                   max: 1,

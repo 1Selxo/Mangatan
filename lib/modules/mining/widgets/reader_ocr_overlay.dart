@@ -565,8 +565,10 @@ class ReaderOcrState {
   /// reader. Chapters are processed concurrently up to the configured limit,
   /// while pages within each chapter remain ordered to avoid request bursts.
   static Future<void> preOcrChapters(
-    List<List<UChapDataPreload>> chapters,
-  ) async {
+    List<List<UChapDataPreload>> chapters, {
+    void Function(int chapterIndex, int completed, int total)?
+    onChapterProgress,
+  }) async {
     await initialize();
     final queues = chapters
         .map(
@@ -584,22 +586,32 @@ class ReaderOcrState {
     final total = queues.fold<int>(0, (sum, pages) => sum + pages.length);
     var completed = 0;
     var nextChapter = 0;
+    var failedPages = 0;
     progress.value = _scanProgress(completed: 0, total: total);
 
     Future<void> worker() async {
       while (generation == _scanGeneration) {
         final chapterIndex = nextChapter++;
         if (chapterIndex >= queues.length) return;
-        for (final page in queues[chapterIndex]) {
+        final chapterPages = queues[chapterIndex];
+        var chapterCompleted = 0;
+        for (final page in chapterPages) {
           if (generation != _scanGeneration) return;
           try {
             await ReaderOcrController._preload(page);
           } catch (error) {
+            failedPages++;
             debugPrint('Pre-OCR page ${page.pageIndex} failed: $error');
           }
           if (generation == _scanGeneration) {
             completed++;
+            chapterCompleted++;
             progress.value = _scanProgress(completed: completed, total: total);
+            onChapterProgress?.call(
+              chapterIndex,
+              chapterCompleted,
+              chapterPages.length,
+            );
           }
         }
       }
@@ -609,6 +621,11 @@ class ReaderOcrState {
     await Future.wait(List.generate(workerCount, (_) => worker()));
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (generation == _scanGeneration) progress.value = null;
+    final unprocessedPages = math.max(0, total - completed);
+    final totalFailures = failedPages + unprocessedPages;
+    if (totalFailures > 0) {
+      throw OcrPreloadException(failedPages: totalFailures, totalPages: total);
+    }
   }
 
   static void cancelScan({bool clearLast = true}) {
@@ -679,6 +696,20 @@ class ReaderOcrState {
     }
     return 0;
   }
+}
+
+class OcrPreloadException implements Exception {
+  const OcrPreloadException({
+    required this.failedPages,
+    required this.totalPages,
+  });
+
+  final int failedPages;
+  final int totalPages;
+
+  @override
+  String toString() =>
+      'OCR failed for $failedPages of $totalPages page${totalPages == 1 ? '' : 's'}';
 }
 
 @visibleForTesting

@@ -14,21 +14,28 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.6",
-      "versionDate": "2026-08-17T21:51:03Z",
-      "versionDescription": "What's changed\r\n\r\nSubtitle appearance\r\n\u2022 Added adjustable subtitle textbox background opacity; the previous appearance remains the default.\r\n\u2022 Added font\u2022weight, outline\u2022thickness, shadow\u2022thickness, shadow\u2022blur, and shadow\u2022offset controls with live preview.\r\n\r\nSubtitle browsing\r\n\u2022 Reworked the video subtitle list to behave more like Memento, including active\u2022cue tracking, search, delay\u2022aware timestamps, and more direct seeking.\r\n\r\nDictionaries and upstream\r\n\u2022 Updated HoshiDicts integration and generated bindings.\r\n\u2022 Rebased the fork onto Mangayomi v0.8.5 while retaining Mangatan's iOS and language\u2022learning features.\r\n\r\nReliability and packaging\r\n\u2022 Repaired stale Riverpod, Isar, localization, and plugin outputs left by the upstream rebase.\r\n\u2022 Restored reader, local archive, extension, and platform integrations affected by the rebase.\r\n\u2022 Fixed iOS embedded\u2022Mihon tests and packaging while preserving lazy OpenJDK loading.\r\n\u2022 Aligned Flutter, Rust bridge, Windows, CocoaPods, and dependency versions for reproducible release builds.\r\n\u2022 Restored reliable Windows native builds with short build paths and an explicit Rust prebuild.\r\n\r\nRelease builds\r\n\u2022 iOS sideload IPA\r\n\u2022 macOS arm64 DMG\r\n\u2022 Windows installer and portable ZIP\r\n\u2022 Linux x86_64 archive\r\n\u2022 SHA\u2022256 checksum manifests\r\n\r\nVersion 1.2.5, build 177.\r\n\r\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.2.3...v1.2.5",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.6/Mangatan-v1.2.6-build.178-044cbc7-ios.ipa",
+      "version": "1.2.7",
+      "versionDate": "2026-08-25T07:13:00Z",
+      "versionDescription": "**Full Changelog**: https://github.com/1Selxo/Mangatan/commits/v1.2.7",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.7/Mangatan-v1.2.7-build.186-02e7cec-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 170987472,
+      "size": 176668903,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_2_default.webp"
       ],
       "versions": [
+        {
+          "version": "1.2.7",
+          "date": "2026-08-25T07:13:00Z",
+          "localizedDescription": "**Full Changelog**: https://github.com/1Selxo/Mangatan/commits/v1.2.7",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.7/Mangatan-v1.2.7-build.186-02e7cec-ios.ipa",
+          "size": 176668903
+        },
         {
           "version": "1.2.6",
           "date": "2026-08-17T21:51:03Z",
@@ -149,6 +156,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.6"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.7 - 25 Aug",
+      "identifier": "release-1.2.7",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-25T07:13:00Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.7"
     }
   ]
 }

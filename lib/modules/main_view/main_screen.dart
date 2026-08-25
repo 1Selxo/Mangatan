@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -149,6 +150,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _initializeProviders() {
+    // Mihon sources start the embedded OpenJDK runtime. On iOS, leave that
+    // heavyweight work to explicit extension and source actions instead of
+    // starting Java as a side effect of opening the main screen.
+    if (Platform.isIOS) return;
+
     // The extension-repo fetches (one per item type) and the GitHub update
     // check hit the network; delay them so they don't compete with the first
     // paint and the initial library queries.

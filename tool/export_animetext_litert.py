@@ -4,8 +4,7 @@ r"""Export the gated AnimeText YOLO12n checkpoint to a Mangatan LiteRT model.
 Install requirements with:
   python -m pip install huggingface_hub ultralytics tensorflow
 
-Accept deepghs/AnimeText_yolo's terms in a browser, create a read-only Hugging
-Face token, and expose it only for this command (HF_TOKEN environment variable).
+Log in once with ``hf auth login`` or expose a read-only ``HF_TOKEN``.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ CHECKPOINT = "yolo12n_animetext/model.pt"
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Export the gated GPL-3.0 AnimeText model for Mangatan."
+        description="Export the AnimeText model for Mangatan."
     )
     parser.add_argument(
         "--output",
@@ -36,17 +35,14 @@ def main() -> None:
     parser.add_argument(
         "--token",
         default=os.environ.get("HF_TOKEN"),
-        help="Hugging Face read token; prefer the HF_TOKEN environment variable.",
+        help="Hugging Face read token; otherwise use the cached CLI login.",
     )
     args = parser.parse_args()
-    if not args.token:
-        parser.error("HF_TOKEN is required after accepting the model terms")
-
     checkpoint = hf_hub_download(
         repo_id=REPOSITORY,
         filename=CHECKPOINT,
         revision=REVISION,
-        token=args.token,
+        token=args.token or True,
     )
     exported = Path(
         YOLO(checkpoint).export(

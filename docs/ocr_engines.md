@@ -102,15 +102,16 @@ is crop-level rather than full-page OCR; it is optional for Apple Vision,
 ScreenAI, and Google Lens. With Google Lens enabled, each crop is uploaded to
 Google separately.
 
-The upstream `deepghs/AnimeText_yolo` model is gated and GPL-3.0, so Mangatan
-does not redistribute it. After accepting the Hugging Face terms, run
-`tool/export_animetext_litert.py` with a read-only `HF_TOKEN`, then import the
-resulting `.tflite` file in OCR settings. The helper pins the nano checkpoint
-at revision `a180c191bfdb9f0e31b57e7de567e7b6bac50f84`.
+The upstream `deepghs/AnimeText_yolo` checkpoint requires Hugging Face account
+access. Log in once with `hf auth login` (or provide a read-only
+`HF_TOKEN`), export the nano model with `tool/export_animetext_litert.py`, then
+import the resulting `.tflite` file in OCR settings. The helper pins the nano
+checkpoint at revision `a180c191bfdb9f0e31b57e7de567e7b6bac50f84`.
 
 ```sh
 python -m pip install huggingface_hub ultralytics tensorflow
-HF_TOKEN="your-read-token" python tool/export_animetext_litert.py
+hf auth login
+python tool/export_animetext_litert.py
 ```
 
 ### Google Lens — remote, page image is uploaded

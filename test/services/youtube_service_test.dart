@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:mangayomi/modules/anime/youtube/youtube_browser_screen.dart';
@@ -36,9 +37,8 @@ void main() {
   });
 
   test('wraps YouTube library writes in explicit Isar transactions', () {
-    final source = File(
-      'lib/services/youtube/youtube_service.dart',
-    ).readAsStringSync();
+    final source = File('lib/services/youtube/youtube_service.dart')
+        .readAsStringSync();
 
     expect(
       source,
@@ -50,12 +50,10 @@ void main() {
   });
 
   test('prefers the cross-platform NewPipe bridge before Dart extraction', () {
-    final youtubeSource = File(
-      'lib/services/youtube/youtube_service.dart',
-    ).readAsStringSync();
-    final bridgeSource = File(
-      'lib/services/m_extension_server.dart',
-    ).readAsStringSync();
+    final youtubeSource = File('lib/services/youtube/youtube_service.dart')
+        .readAsStringSync();
+    final bridgeSource = File('lib/services/m_extension_server.dart')
+        .readAsStringSync();
 
     expect(youtubeSource, contains('prepareYouTubeResolverBridge()'));
     expect(youtubeSource, contains("'\$baseUrl/youtube/resolve'"));
@@ -96,6 +94,11 @@ void main() {
     expect(youtubeInterceptScript, contains('setTimeout(fallback, 350)'));
     expect(youtubeInterceptScript, contains('window.location.assign(href)'));
     expect(youtubeInterceptScript, contains('result === true'));
+  });
+
+  test('keeps YouTube embedded on Windows', () {
+    expect(usesExternalYouTubeWindow(TargetPlatform.windows), isFalse);
+    expect(usesExternalYouTubeWindow(TargetPlatform.linux), isTrue);
   });
 
   test('persists YouTube preferences after Hive startup', () async {

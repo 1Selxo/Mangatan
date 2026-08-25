@@ -260,7 +260,7 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
                     title: const Text('AnimeText YOLO12n LiteRT model'),
                     subtitle: Text(switch (status) {
                       AnimeTextModelStatus.missing =>
-                        'Export the gated model, then import its .tflite file',
+                        'Prepare the model once, then import its .tflite file',
                       AnimeTextModelStatus.importing => 'Importing…',
                       AnimeTextModelStatus.ready => 'Ready for offline use',
                       AnimeTextModelStatus.error =>
@@ -289,10 +289,10 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
                   ),
                 ),
                 const ListTile(
-                  leading: Icon(Icons.gavel_outlined),
-                  title: Text('Upstream model is gated and GPL-3.0'),
+                  leading: Icon(Icons.download_outlined),
+                  title: Text('Prepare AnimeText on a desktop'),
                   subtitle: Text(
-                    'Mangatan cannot redistribute it. Accept its Hugging Face terms and run tool/export_animetext_litert.py on a desktop.',
+                    'Hugging Face requires account access for the checkpoint. Run hf auth login, then run tool/export_animetext_litert.py and import the result here.',
                   ),
                 ),
                 const _SectionHeader('OCR boxes'),

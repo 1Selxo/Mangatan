@@ -10,11 +10,10 @@ import 'package:path_provider/path_provider.dart';
 
 enum AnimeTextModelStatus { missing, importing, ready, error }
 
-/// Runs a user-supplied LiteRT export of deepghs/AnimeText_yolo.
+/// Runs a LiteRT export of deepghs/AnimeText_yolo.
 ///
-/// The upstream weights are gated, so Mangatan cannot redistribute or fetch
-/// them before the user accepts their terms. `tool/export_animetext_litert.py`
-/// creates the supported file from the pinned nano checkpoint.
+/// `tool/export_animetext_litert.py` creates the supported file from the
+/// pinned nano checkpoint using the user's Hugging Face account access.
 class AnimeTextDetectionService {
   AnimeTextDetectionService._();
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +12,10 @@ const _youtubeHomeUrl = 'https://m.youtube.com/';
 const _youtubeBridgeName = 'openYouTubeVideo';
 const _desktopPlayScheme = 'mangatan-youtube';
 const _playerLaunchDebounce = Duration(milliseconds: 1500);
+
+@visibleForTesting
+bool usesExternalYouTubeWindow(TargetPlatform platform) =>
+    platform == TargetPlatform.linux;
 
 String? directYouTubeVideoId(String input) {
   final uri = Uri.tryParse(input.trim());
@@ -157,7 +160,6 @@ class YouTubeBrowserScreen extends StatefulWidget {
 class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
   final _youtube = YouTubeService();
   InAppWebViewController? _controller;
-  _YouTubeInAppBrowser? _browser;
   Webview? _desktopWebview;
   double _progress = 0;
   String _title = 'YouTube';
@@ -168,12 +170,15 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
   String? _sitePlaybackVideoId;
   DateTime? _lastLaunchAt;
 
-  bool get _usesDesktopWindow => Platform.isLinux || Platform.isWindows;
+  // Windows embeds WebView2 inside this Flutter page. Linux has no equivalent
+  // widget backend, so it keeps the external-window fallback.
+  bool get _usesExternalWindow =>
+      usesExternalYouTubeWindow(defaultTargetPlatform);
 
   @override
   void initState() {
     super.initState();
-    if (_usesDesktopWindow) {
+    if (_usesExternalWindow) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openDesktop());
     }
   }
@@ -182,80 +187,41 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
   void dispose() {
     _disposing = true;
     _youtube.close();
-    _browser?.close();
     if (!_externalWindowClosed) _desktopWebview?.close();
     super.dispose();
   }
 
   Future<void> _openDesktop() async {
     if (!mounted) return;
-    if (Platform.isLinux) {
-      final view = await WebviewWindow.create(
-        configuration: const CreateConfiguration(
-          title: 'Mangatan - YouTube',
-          openMaximized: true,
-        ),
-      );
-      if (!mounted) {
-        view.close();
-        return;
-      }
-      _desktopWebview = view;
-      view
-        ..addScriptToExecuteOnDocumentCreated(youtubeInterceptScript)
-        ..setOnUrlRequestCallback((url) {
-          final bridgedUrl = _desktopBridgeVideoUrl(url);
-          final playableUrl = bridgedUrl ?? url;
-          final videoId = directYouTubeVideoId(playableUrl);
-          if (videoId == _sitePlaybackVideoId) return true;
-          if (videoId != null) {
-            unawaited(_openVideo(playableUrl));
-            return false;
-          }
-          return true;
-        })
-        ..launch(_youtubeHomeUrl);
-      view.onClose.whenComplete(() {
-        _externalWindowClosed = true;
-        if (mounted && !_disposing && !_openingVideo) context.pop();
-      });
-      return;
-    }
-
-    final browser = _YouTubeInAppBrowser(
-      onCreated: (controller) {
-        _controller = controller;
-        _installBridge(controller);
-      },
-      onNavigate: _handleNavigation,
-      onProgress: _updateProgress,
-      onTitle: _updateTitle,
-      onClosed: () {
-        _externalWindowClosed = true;
-        if (mounted && !_disposing && !_openingVideo) context.pop();
-      },
-    );
-    _browser = browser;
-    await browser.openUrlRequest(
-      urlRequest: URLRequest(url: WebUri(_youtubeHomeUrl)),
-      settings: InAppBrowserClassSettings(
-        browserSettings: InAppBrowserSettings(
-          hideUrlBar: false,
-          hideToolbarTop: false,
-        ),
-        webViewSettings: InAppWebViewSettings(
-          isInspectable: kDebugMode,
-          javaScriptEnabled: true,
-          domStorageEnabled: true,
-          databaseEnabled: true,
-          mediaPlaybackRequiresUserGesture: false,
-          useShouldOverrideUrlLoading: true,
-          supportMultipleWindows: false,
-          thirdPartyCookiesEnabled: true,
-          sharedCookiesEnabled: true,
-        ),
+    final view = await WebviewWindow.create(
+      configuration: const CreateConfiguration(
+        title: 'Mangatan - YouTube',
+        openMaximized: true,
       ),
     );
+    if (!mounted) {
+      view.close();
+      return;
+    }
+    _desktopWebview = view;
+    view
+      ..addScriptToExecuteOnDocumentCreated(youtubeInterceptScript)
+      ..setOnUrlRequestCallback((url) {
+        final bridgedUrl = _desktopBridgeVideoUrl(url);
+        final playableUrl = bridgedUrl ?? url;
+        final videoId = directYouTubeVideoId(playableUrl);
+        if (videoId == _sitePlaybackVideoId) return true;
+        if (videoId != null) {
+          unawaited(_openVideo(playableUrl));
+          return false;
+        }
+        return true;
+      })
+      ..launch(_youtubeHomeUrl);
+    view.onClose.whenComplete(() {
+      _externalWindowClosed = true;
+      if (mounted && !_disposing && !_openingVideo) context.pop();
+    });
   }
 
   void _installBridge(InAppWebViewController controller) {
@@ -334,10 +300,8 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
       await _controller?.stopLoading();
       await _desktopWebview?.evaluateJavaScript(_stopYouTubePlaybackScript);
       await _controller?.evaluateJavascript(source: _stopYouTubePlaybackScript);
-      if (Platform.isLinux) {
+      if (_usesExternalWindow) {
         await _desktopWebview?.setWebviewWindowVisibility(false);
-      } else if (Platform.isWindows) {
-        await _browser?.hide();
       }
       final chapterId = await _youtube.prepareVideoUrlForPlayback(url);
       if (!mounted) return;
@@ -356,14 +320,12 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
       }
     } finally {
       _openingVideo = false;
-      if (Platform.isLinux && !_externalWindowClosed) {
+      if (_usesExternalWindow && !_externalWindowClosed) {
         await _desktopWebview?.setWebviewWindowVisibility(true);
         await _desktopWebview?.bringToForeground();
-      } else if (Platform.isWindows && !_externalWindowClosed) {
-        await _browser?.show();
       }
       if (extractionError != null && !_externalWindowClosed) {
-        if (Platform.isLinux) {
+        if (_usesExternalWindow) {
           _desktopWebview?.launch(url);
         } else {
           await _controller?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
@@ -443,7 +405,7 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_usesDesktopWindow) {
+    if (_usesExternalWindow) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('YouTube'),
@@ -551,58 +513,4 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
     }
     return 'YouTube could not open this video. $text';
   }
-}
-
-class _YouTubeInAppBrowser extends InAppBrowser {
-  _YouTubeInAppBrowser({
-    required this.onCreated,
-    required this.onNavigate,
-    required this.onProgress,
-    required this.onTitle,
-    required this.onClosed,
-  }) : super(webViewEnvironment: webViewEnvironment);
-
-  final void Function(InAppWebViewController) onCreated;
-  final Future<NavigationActionPolicy> Function(String? url) onNavigate;
-  final void Function(int progress) onProgress;
-  final void Function(String? title) onTitle;
-  final VoidCallback onClosed;
-
-  @override
-  Future<void> onBrowserCreated() async {
-    onCreated(webViewController!);
-  }
-
-  @override
-  Future<NavigationActionPolicy> shouldOverrideUrlLoading(
-    NavigationAction navigationAction,
-  ) => onNavigate(navigationAction.request.url?.toString());
-
-  @override
-  void onProgressChanged(int progress) => onProgress(progress);
-
-  @override
-  void onTitleChanged(String? title) => onTitle(title);
-
-  @override
-  Future<void> onLoadStop(WebUri? url) async {
-    onProgress(100);
-    await webViewController?.evaluateJavascript(source: youtubeInterceptScript);
-    final value = url?.toString();
-    if (directYouTubeVideoId(value ?? '') != null) {
-      await onNavigate(value);
-    }
-  }
-
-  @override
-  void onUpdateVisitedHistory(WebUri? url, bool? isReload) {
-    webViewController?.evaluateJavascript(source: youtubeInterceptScript);
-    final value = url?.toString();
-    if (directYouTubeVideoId(value ?? '') != null) {
-      unawaited(onNavigate(value));
-    }
-  }
-
-  @override
-  void onExit() => onClosed();
 }

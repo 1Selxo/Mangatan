@@ -104,7 +104,9 @@ class _DictionaryLookupScreenState extends State<DictionaryLookupScreen> {
   Future<void> _openDictionarySettings() async {
     await context.push('/dictionary');
     if (!mounted) return;
-    setState(() => _data = _loadData());
+    setState(() {
+      _data = _loadData();
+    });
     _focusNode.requestFocus();
   }
 

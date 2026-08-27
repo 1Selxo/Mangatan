@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.7",
-      "versionDate": "2026-08-25T07:13:00Z",
-      "versionDescription": "**Full Changelog**: https://github.com/1Selxo/Mangatan/commits/v1.2.7",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.7/Mangatan-v1.2.7-build.186-02e7cec-ios.ipa",
+      "version": "1.2.8",
+      "versionDate": "2026-08-27T12:17:42Z",
+      "versionDescription": "",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.8/Mangatan-v1.2.8-build.187-344572a-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176668903,
+      "size": 176667859,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.8",
+          "date": "2026-08-27T12:17:42Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.8/Mangatan-v1.2.8-build.187-344572a-ios.ipa",
+          "size": 176667859
+        },
+        {
           "version": "1.2.7",
           "date": "2026-08-25T07:13:00Z",
-          "localizedDescription": "**Full Changelog**: https://github.com/1Selxo/Mangatan/commits/v1.2.7",
+          "localizedDescription": "What's new\n\nOCR and manga reading\n\n\u2022 Added an OCR processing queue with automatic retries and tap\u2022to\u2022retry for failed chapters.\n\u2022 Added a dedicated, categorized OCR settings screen with active\u2022text and background opacity controls.\n\u2022 Added AnimeText YOLO textbox detection that can improve text\u2022region detection across OCR engines.\n\u2022 Added support for the latest Hayai OCR v2 through a configurable local server.\n\u2022 Added AI panel\u2022by\u2022panel manga navigation with panel and speech\u2022bubble detection.\n\nPlayer and desktop\n\n\u2022 Added customizable player hotkeys in Settings.\n\u2022 Added direct editing of \"mpv.conf\" and \"input.conf\" from Settings.\n\u2022 Embedded YouTube inside Mangatan on Windows instead of opening it in a separate browser window.\n\niOS and Mihon extensions\n\n\u2022 Added the sideloadable iOS build and on\u2022device Mihon extension bridge.\n\u2022 Fixed the source bundle ID mismatch by aligning it with \"com.selxo.mangatan\".\n\u2022 Improved Mihon bridge recovery when returning to the foreground, including serialized restarts and retry handling.\n\u2022 Published and pinned an immutable OpenJDK Zero runtime for ordinary signed iOS device builds.\n\u2022 Updated the iOS runtime plugin to the Mangatan\u2022maintained extension\u2022server fork.\n\nBase application and builds\n\n\u2022 Rebased Mangatan onto Mangayomi v0.8.9 while preserving Mangatan\u2022specific features.\n\u2022 Updated release builds to Flutter 3.47.1.\n\u2022 Published Windows, macOS, Linux, and unsigned iOS artifacts through GitHub Actions.\n\nDownloads\n\nChoose the archive or installer for your platform from the assets below. The iOS IPA is unsigned and must be sideloaded with your preferred signing method.\n\n**Full changelog:** [v1.2.6...v1.2.7](https://github.com/1Selxo/Mangatan/compare/v1.2.6...v1.2.7)",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.7/Mangatan-v1.2.7-build.186-02e7cec-ios.ipa",
           "size": 176668903
         },
@@ -167,6 +174,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.7"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.8 - 27 Aug",
+      "identifier": "release-1.2.8",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-27T12:17:42Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.8"
     }
   ]
 }

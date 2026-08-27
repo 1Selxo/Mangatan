@@ -58,6 +58,7 @@ void main() {
     );
     final nativeSource = _readNormalized('ios/Runner/MihonEmbeddedBridge.mm');
     final appDelegateSource = _readNormalized('ios/Runner/AppDelegate.swift');
+    final infoPlist = _readNormalized('ios/Runner/Info.plist');
     final runtimeBuilder = _readNormalized('tool/build_lazy_openjdk_ios.sh');
     final openJdkWorkflow = _readNormalized(
       '.github/workflows/build-openjdk-ios13.yml',
@@ -96,18 +97,23 @@ void main() {
     );
     expect(
       appDelegateSource,
-      contains('applicationWillResignActive'),
+      contains('override func sceneWillResignActive(_ scene: UIScene)'),
       reason: 'native pause must begin before iOS suspends the Dart isolate',
     );
     expect(
       appDelegateSource,
-      contains('applicationDidBecomeActive'),
-      reason: 'a listener paused natively must also resume natively',
+      isNot(contains('override func sceneDidBecomeActive(_ scene: UIScene)')),
+      reason: 'serialized Dart lifecycle handling must own bridge resume',
+    );
+    expect(
+      infoPlist,
+      contains(r'$(PRODUCT_MODULE_NAME).MihonSceneDelegate'),
+      reason: 'the native bridge lifecycle must follow the active UIScene',
     );
     expect(
       appDelegateSource,
       contains('MangatanEmbeddedMihonStart(port)'),
-      reason: 'existing image tokens must regain their original loopback port',
+      reason: 'the channel must pass Dart\'s preferred loopback port to native',
     );
     expect(
       serviceSource,
@@ -430,6 +436,49 @@ void main() {
     expect(
       xcodeProject,
       contains('OpenJDKRuntime.framework in Embed Lazy OpenJDK Runtime'),
+    );
+  });
+
+  test('registers native iOS channels from the implicit Flutter engine', () {
+    final appDelegateSource = _readNormalized('ios/Runner/AppDelegate.swift');
+
+    expect(
+      appDelegateSource,
+      contains('FlutterAppDelegate, FlutterImplicitEngineDelegate'),
+    );
+    expect(
+      appDelegateSource,
+      contains(
+        'didInitializeImplicitFlutterEngine('
+        '_ engineBridge: FlutterImplicitEngineBridge)',
+      ),
+    );
+    expect(
+      appDelegateSource,
+      contains(
+        'GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)',
+      ),
+    );
+    expect(
+      appDelegateSource,
+      contains('engineBridge.applicationRegistrar.messenger()'),
+    );
+    expect(appDelegateSource, isNot(contains('window?.rootViewController')));
+
+    for (final channel in [
+      'com.kodjodevf.mangayomi.libmtorrentserver',
+      'com.selxo.mangatan.ankimobile',
+      'com.selxo.mangatan.embedded_mihon',
+    ]) {
+      expect(appDelegateSource, contains(channel));
+    }
+    for (final method in ['start', 'pause', 'stop', 'status']) {
+      expect(appDelegateSource, contains('case "$method":'));
+    }
+    expect(appDelegateSource, contains('MangatanEmbeddedMihonStart(port)'));
+    expect(
+      appDelegateSource,
+      contains('AppleVisionOcrPlugin.register(binaryMessenger: messenger)'),
     );
   });
 }

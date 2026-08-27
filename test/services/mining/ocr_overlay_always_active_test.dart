@@ -4,20 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 
-/// Regression guard for issue #50 ("Always active overlay option").
+/// Regression guard for the persisted reader OCR enablement preference.
 ///
-/// The userscript era required a long-press to *activate* the OCR overlay on
-/// every page. The current rewrite replaces that with a single persistent
-/// preference — [MiningPreferences.getOcrOverlayEnabled] — that:
+/// This preference controls OCR processing and hit testing. Passive paint
+/// visibility is deliberately separate: inactive content follows the box
+/// opacity and is hidden at the default 0% until the user activates a hit.
 ///
-///   * defaults to ON, so a fresh install shows the overlay without any
-///     per-page long-press activation, and
-///   * persists the user's choice across reader sessions (box reopen), so the
-///     overlay stays in the state the user last left it — "always active"
-///     until the user explicitly turns it off.
-///
-/// These tests pin both halves of that contract so a future refactor cannot
-/// silently regress to the long-press-to-activate model.
+/// These tests keep the processing preference enabled by default and persistent
+/// without asserting that passive OCR text is permanently painted.
 void main() {
   late Directory tempDirectory;
 
@@ -46,10 +40,8 @@ void main() {
   });
 
   test(
-    'overlay is active by default on a fresh install (no long-press to activate)',
+    'OCR processing is enabled by default on a fresh install',
     () async {
-      // A fresh install has never written the key. The overlay must already be
-      // active — this is the "always active" default the issue asked for.
       expect(await MiningPreferences.getOcrOverlayEnabled(), isTrue);
     },
   );

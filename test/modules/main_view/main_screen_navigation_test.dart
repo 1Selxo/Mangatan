@@ -16,6 +16,11 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
 
 void main() {
+  test('mobile navigation keeps an accessible width for every destination', () {
+    expect(mobileNavigationContentWidth(320, 8), 576);
+    expect(mobileNavigationContentWidth(430, 4), 430);
+  });
+
   testWidgets('keeps the More rail destination aligned with its route', (
     tester,
   ) async {

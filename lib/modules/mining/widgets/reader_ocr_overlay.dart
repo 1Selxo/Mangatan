@@ -1988,7 +1988,11 @@ double readerOcrVerticalFontSize({
       text: activeTextOpacity.clamp(0.0, 1.0).toDouble(),
     );
   }
-  return (background: opacity, text: 1.0);
+  // Passive OCR is a hit target, not a permanent replacement for the page
+  // artwork. Coupling its text to the passive box opacity keeps both hidden at
+  // the default 0% until the user activates a block. Active blocks use their
+  // independent appearance settings above.
+  return (background: opacity, text: opacity);
 }
 
 /// Maps a block's normalized OCR coordinates onto [imageRect], scaling the box

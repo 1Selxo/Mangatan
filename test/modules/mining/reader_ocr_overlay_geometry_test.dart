@@ -12,10 +12,14 @@ void main() {
     expect(MiningPreferences.defaultActiveOcrBackgroundOpacity, 0.7);
   });
 
-  test('uses configured background and opaque text for passive boxes', () {
+  test('hides passive OCR text with the configured box opacity', () {
     expect(readerOcrContentOpacities(boxOpacity: 0.25, active: false), (
       background: 0.25,
-      text: 1.0,
+      text: 0.25,
+    ));
+    expect(readerOcrContentOpacities(boxOpacity: 0, active: false), (
+      background: 0.0,
+      text: 0.0,
     ));
   });
 

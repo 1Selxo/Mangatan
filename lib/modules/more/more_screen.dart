@@ -65,7 +65,7 @@ class MoreScreenState extends ConsumerState<MoreScreen> {
                   context.push('/downloadQueue');
                 },
                 icon: Icons.download_outlined,
-                title: l10n.download_queue,
+                title: l10n.downloads,
               ),
             // Mass migration is otherwise only reachable from a manga's
             // overflow menu, which the TV detail view does not have. It is a

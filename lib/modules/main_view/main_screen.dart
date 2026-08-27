@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -942,7 +943,7 @@ class _TabletLayoutState extends State<_TabletLayout> {
   }
 }
 
-class _MobileBottomNavigation extends StatelessWidget {
+class _MobileBottomNavigation extends StatefulWidget {
   const _MobileBottomNavigation({
     required this.isLongPressed,
     required this.location,
@@ -965,31 +966,8 @@ class _MobileBottomNavigation extends StatelessWidget {
   final Function(String) onDestinationSelected;
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 0),
-      width: context.width(1),
-      height: _getBottomNavigationHeight(isLongPressed, location),
-      child: NavigationBarTheme(
-        data: NavigationBarThemeData(
-          labelTextStyle: const WidgetStatePropertyAll(
-            TextStyle(overflow: TextOverflow.ellipsis),
-          ),
-          indicatorShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ),
-        child: NavigationBar(
-          animationDuration: const Duration(milliseconds: 500),
-          selectedIndex: currentIndex,
-          destinations: buildNavigationWidgetsMobile(ref, dest, context),
-          onDestinationSelected: (newIndex) {
-            onDestinationSelected(dest[newIndex]);
-          },
-        ),
-      ),
-    );
-  }
+  State<_MobileBottomNavigation> createState() =>
+      _MobileBottomNavigationState();
 
   static double? _getBottomNavigationHeight(
     bool isLongPressed,
@@ -1010,6 +988,87 @@ class _MobileBottomNavigation extends StatelessWidget {
     };
 
     return (location == null || validLocations.contains(location)) ? null : 0;
+  }
+}
+
+const double mobileNavigationMinDestinationWidth = 72;
+
+@visibleForTesting
+double mobileNavigationContentWidth(double viewportWidth, int itemCount) =>
+    math.max(viewportWidth, itemCount * mobileNavigationMinDestinationWidth);
+
+class _MobileBottomNavigationState extends State<_MobileBottomNavigation> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _revealSelected(double viewportWidth, double contentWidth) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients || widget.dest.isEmpty) {
+        return;
+      }
+      final itemWidth = contentWidth / widget.dest.length;
+      final centered =
+          (widget.currentIndex + 0.5) * itemWidth - viewportWidth / 2;
+      final target = centered.clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      if ((_scrollController.offset - target).abs() > 1) {
+        _scrollController.jumpTo(target);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 0),
+      width: context.width(1),
+      height: _MobileBottomNavigation._getBottomNavigationHeight(
+        widget.isLongPressed,
+        widget.location,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final contentWidth = mobileNavigationContentWidth(
+            constraints.maxWidth,
+            widget.dest.length,
+          );
+          _revealSelected(constraints.maxWidth, contentWidth);
+          return SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: contentWidth,
+              child: NavigationBarTheme(
+                data: NavigationBarThemeData(
+                  indicatorShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: NavigationBar(
+                  animationDuration: const Duration(milliseconds: 500),
+                  selectedIndex: widget.currentIndex,
+                  destinations: widget.buildNavigationWidgetsMobile(
+                    widget.ref,
+                    widget.dest,
+                    context,
+                  ),
+                  onDestinationSelected: (newIndex) {
+                    widget.onDestinationSelected(widget.dest[newIndex]);
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 

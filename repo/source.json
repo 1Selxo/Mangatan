@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.8",
-      "versionDate": "2026-08-27T12:17:42Z",
+      "version": "1.2.9",
+      "versionDate": "2026-08-27T16:39:14Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.8/Mangatan-v1.2.8-build.187-344572a-ios.ipa",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.9/Mangatan-v1.2.9-build.188-559a91e-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176667859,
+      "size": 176683164,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.9",
+          "date": "2026-08-27T16:39:14Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.9/Mangatan-v1.2.9-build.188-559a91e-ios.ipa",
+          "size": 176683164
+        },
+        {
           "version": "1.2.8",
           "date": "2026-08-27T12:17:42Z",
-          "localizedDescription": "",
+          "localizedDescription": "iOS embedded Mihon fix\n\n\u2022 Restores UIScene\u2022safe registration for the embedded Mihon, AnkiMobile, torrent server, and Apple Vision OCR Flutter integrations.\n\u2022 Keeps the embedded Mihon \"start\", \"pause\", \"stop\", and \"status\" native methods available through \"com.selxo.mangatan.embedded_mihon\".\n\u2022 Moves the early native Mihon pause to the UIScene lifecycle while retaining the serialized Dart resume path.\n\u2022 Includes unsigned iOS build 187, verified by the release workflow's embedded\u2022runtime and IPA checks.\n\nPhysical\u2022iPhone validation is still recommended for extension installation and sleep/resume behavior.\n\n**Full changelog:** https://github.com/1Selxo/Mangatan/compare/v1.2.7...v1.2.8",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.8/Mangatan-v1.2.8-build.187-344572a-ios.ipa",
           "size": 176667859
         },
@@ -185,6 +192,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.8"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.9 - 27 Aug",
+      "identifier": "release-1.2.9",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-27T16:39:14Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.9"
     }
   ]
 }

@@ -96,7 +96,12 @@ fn build_libarchive(project_root: &std::path::Path) {
         .define("ENABLE_CNG", "OFF");
 
     if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
-        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreadedDLL");
+        config
+            .define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreadedDLL")
+            // Windows has no libc POSIX regex implementation. Selecting LIBC
+            // explicitly prevents libarchive from falling through to its
+            // disabled libgcc/PCRE fallback; RAR support does not use regex.
+            .define("POSIX_REGEX_LIB", "LIBC");
     }
 
     config.build();

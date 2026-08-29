@@ -12,6 +12,10 @@ image = "0.25.10"
 chrono = "0.4.44"
 futures-util = "0.3.31"
 reqwest = { version = "0.13.2", default-features = false, features = ["charset", "http2", "rustls", "stream", "multipart", "socks", "brotli", "gzip"] }
+# Pinned to the version reqwest 0.13 resolves so the TLS client uses one
+# coherent rustls provider and trust-root type.
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws-lc-rs"] }
+webpki-roots = "1"
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-util = "0.7.16"
 epub = "2.1.5"

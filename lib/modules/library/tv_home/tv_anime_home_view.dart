@@ -1562,7 +1562,7 @@ class _TvHomeCard extends ConsumerWidget {
                   source,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 9),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
             ),

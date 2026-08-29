@@ -96,6 +96,23 @@ class AnimeStreamController extends _$AnimeStreamController
     }
   }
 
+  /// Persists the terminal playback state before the player route is replaced.
+  ///
+  /// Some backends emit `completed` before their final position event. Using
+  /// the known total duration here makes completion deterministic and awaiting
+  /// the history write keeps route disposal from racing it.
+  Future<void> completeEpisode(
+    Duration totalDuration, {
+    int elapsedSeconds = 0,
+  }) async {
+    if (incognitoMode) return;
+    final completedPosition = totalDuration > Duration.zero
+        ? totalDuration
+        : Duration(milliseconds: int.tryParse(episode.lastPageRead ?? '') ?? 0);
+    setCurrentPosition(completedPosition, totalDuration, save: true);
+    await setHistoryUpdate(elapsedSeconds: elapsedSeconds);
+  }
+
   // ---------------------------------------------------------------------------
   // AniSkip
   // ---------------------------------------------------------------------------

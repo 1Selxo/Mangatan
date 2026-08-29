@@ -6,9 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart' as app;
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 
 import '../../test_utils/isar_library.dart';
@@ -29,7 +31,14 @@ void main() {
       'mangatan-anime-position-',
     );
     database = await Isar.open(
-      [MangaSchema, ChapterSchema, SettingsSchema, SourceSchema],
+      [
+        MangaSchema,
+        ChapterSchema,
+        HistorySchema,
+        SettingsSchema,
+        SourceSchema,
+        TrackSchema,
+      ],
       directory: databaseDirectory.path,
       name: 'anime_position_test',
     );
@@ -62,4 +71,46 @@ void main() {
     expect(saved?.lastPageRead, '49000');
     expect(saved?.duration, '1440000');
   });
+
+  test(
+    'completing playback marks the episode seen and updates history',
+    () async {
+      final manga = Manga(
+        source: 'Source',
+        author: '',
+        artist: '',
+        genre: const [],
+        imageUrl: null,
+        lang: 'en',
+        link: '/anime',
+        name: 'Anime',
+        status: Status.ongoing,
+        description: '',
+        sourceId: 1,
+      );
+      await database.writeTxn(() => database.mangas.put(manga));
+      final episode = Chapter(
+        mangaId: manga.id,
+        name: 'Episode 1',
+        isRead: false,
+      )..manga.value = manga;
+      await database.writeTxn(() async {
+        await database.chapters.put(episode);
+        await episode.manga.save();
+      });
+
+      await container
+          .read(animeStreamControllerProvider(episode: episode).notifier)
+          .completeEpisode(const Duration(minutes: 24), elapsedSeconds: 42);
+
+      final saved = await database.chapters.get(episode.id!);
+      final history = await database.historys.where().findFirst();
+      expect(saved?.isRead, isTrue);
+      expect(saved?.lastPageRead, '1440000');
+      expect(saved?.duration, '1440000');
+      expect(history?.mangaId, manga.id);
+      expect(history?.chapterId, episode.id);
+      expect(history?.readingTimeSeconds, 42);
+    },
+  );
 }

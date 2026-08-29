@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:bot_toast/bot_toast.dart';
 import 'package:ffi/ffi.dart';
 import 'package:file_picker/file_picker.dart';
@@ -23,6 +24,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/providers/auto_play_next_provider.dart';
 import 'package:mangayomi/modules/anime/utils/audio_track_fallback.dart';
 import 'package:mangayomi/modules/anime/utils/audio_track_label.dart';
 import 'package:mangayomi/modules/anime/utils/playback_error_report.dart';
@@ -385,20 +387,38 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool get hasNextEpisode => _streamController.hasNextEpisode;
 
   late final StreamSubscription<bool> _completed = _player.stream.completed
-      .listen((val) {
-        if (hasNextEpisode && val) {
-          if (mounted) {
-            pushToNewEpisode(context, _streamController.getNextEpisode());
-          }
-        }
-        // If the last episode of an Anime has ended, exit fullscreen mode
-        final isFullScreen = ref.read(fullscreenProvider);
-        if (!hasNextEpisode && val && isDesktop && isFullScreen) {
-          setFullScreen(value: false);
-          ref.read(fullscreenProvider.notifier).state = false;
-          widget.desktopFullScreenPlayer.call(false);
-        }
-      });
+      .listen(_handlePlaybackCompleted);
+
+  Future<void> _handlePlaybackCompleted(bool completed) async {
+    if (!completed || !mounted) return;
+
+    _watchStopwatch.stop();
+    final reportedDuration = _currentTotalDuration.value;
+    final totalDuration =
+        reportedDuration != null && reportedDuration > Duration.zero
+        ? reportedDuration
+        : _player.state.duration;
+    await _streamController.completeEpisode(
+      totalDuration,
+      elapsedSeconds: _watchStopwatch.elapsed.inSeconds,
+    );
+    _watchStopwatch.reset();
+    if (!mounted) return;
+
+    final hasNext = hasNextEpisode;
+    if (hasNext && ref.read(autoPlayNextEpisodeProvider)) {
+      pushToNewEpisode(context, _streamController.getNextEpisode());
+      return;
+    }
+
+    // If the last episode of an Anime has ended, exit fullscreen mode.
+    final isFullScreen = ref.read(fullscreenProvider);
+    if (!hasNext && isDesktop && isFullScreen) {
+      setFullScreen(value: false);
+      ref.read(fullscreenProvider.notifier).state = false;
+      widget.desktopFullScreenPlayer.call(false);
+    }
+  }
 
   Future<void> _handleMpvEvents(Pointer<generated.mpv_event> event) async {
     try {
@@ -1693,8 +1713,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _completed;
     _currentTotalDurationSub;
     _loadAndroidFont().then((_) async {
+      if (!mounted) return;
       await _restoreEntryVideoStreamPreference();
+      if (!mounted) return;
       await _openMedia(_video.value!, _streamController.getCurrentPosition());
+      if (!mounted) return;
       await _restoreEntrySubtitleDelay();
       if (widget.isTorrent) {
         Future.delayed(const Duration(seconds: 10)).then((_) async {
@@ -1754,7 +1777,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           _player.stream.duration
               .firstWhere((duration) => duration > Duration.zero)
               .timeout(const Duration(seconds: 8))
-              .then((_) => _player.seek(start))
+              .then((_) => mounted ? _player.seek(start) : null)
               .catchError((_) {}),
         );
       }
@@ -1930,6 +1953,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   Future<void> _initAniSkip() async {
     await _player.stream.buffer.first;
+    if (!mounted) return;
     _streamController.getAniSkipResults((result) {
       final openingRes = result
           .where((element) => element.skipType == "op")
@@ -2406,13 +2430,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           GestureDetector(
             onTap: () async {
               try {
-                final subtitle =
-                    await subtitlesSearchraggableMenu(
-                          context,
-                          chapter: widget.episode,
-                          isLocal: widget.isLocal,
-                        )
-                        as ImdbSubtitle?;
+                final subtitle = await subtitlesSearchraggableMenu(
+                  context,
+                  chapter: widget.episode,
+                  isLocal: widget.isLocal,
+                ) as ImdbSubtitle?;
                 if (subtitle != null && context.mounted) {
                   await _setSubtitleTrack(
                     SubtitleTrack.uri(
@@ -3277,72 +3299,65 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                       ),
                       Row(
                         children: [
-                          button(
-                            context.l10n.set_as_cover,
-                            Icons.image_outlined,
-                            () async {
-                              final imageBytes = await _player.screenshot(
-                                format: "image/png",
-                                includeLibassSubtitles: _includeSubtitles,
-                              );
-                              if (context.mounted) {
-                                final res = await showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
-                                      content: Text(
-                                        context.l10n.use_this_as_cover_art,
+                          button(context.l10n.set_as_cover, Icons.image_outlined, () async {
+                            final imageBytes = await _player.screenshot(
+                              format: "image/png",
+                              includeLibassSubtitles: _includeSubtitles,
+                            );
+                            if (context.mounted) {
+                              final res = await showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return AlertDialog(
+                                    content: Text(
+                                      context.l10n.use_this_as_cover_art,
+                                    ),
+                                    actions: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                            },
+                                            child: Text(context.l10n.cancel),
+                                          ),
+                                          const SizedBox(width: 15),
+                                          TextButton(
+                                            onPressed: () {
+                                              final manga =
+                                                  episode.manga.value!;
+                                              isar.writeTxnSync(() {
+                                                isar.mangas.putSync(
+                                                  manga
+                                                    ..updatedAt = DateTime.now()
+                                                        .millisecondsSinceEpoch
+                                                    ..customCoverImage =
+                                                        imageBytes
+                                                            ?.getCoverImage,
+                                                );
+                                              });
+                                              if (context.mounted) {
+                                                Navigator.pop(context, "ok");
+                                              }
+                                            },
+                                            child: Text(context.l10n.ok),
+                                          ),
+                                        ],
                                       ),
-                                      actions: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.end,
-                                          children: [
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.pop(context);
-                                              },
-                                              child: Text(context.l10n.cancel),
-                                            ),
-                                            const SizedBox(width: 15),
-                                            TextButton(
-                                              onPressed: () {
-                                                final manga =
-                                                    episode.manga.value!;
-                                                isar.writeTxnSync(() {
-                                                  isar.mangas.putSync(
-                                                    manga
-                                                      ..updatedAt = DateTime.now()
-                                                          .millisecondsSinceEpoch
-                                                      ..customCoverImage =
-                                                          imageBytes
-                                                              ?.getCoverImage,
-                                                  );
-                                                });
-                                                if (context.mounted) {
-                                                  Navigator.pop(context, "ok");
-                                                }
-                                              },
-                                              child: Text(context.l10n.ok),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                                if (res != null &&
-                                    res == "ok" &&
-                                    context.mounted) {
-                                  Navigator.pop(context);
-                                  botToast(
-                                    context.l10n.cover_updated,
-                                    second: 3,
+                                    ],
                                   );
-                                }
+                                },
+                              );
+                              if (res != null &&
+                                  res == "ok" &&
+                                  context.mounted) {
+                                Navigator.pop(context);
+                                botToast(context.l10n.cover_updated, second: 3);
                               }
-                            },
-                          ),
+                            }
+                          }),
                           button(
                             context.l10n.share,
                             Icons.share_outlined,

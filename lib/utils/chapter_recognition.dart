@@ -86,6 +86,21 @@ class ChapterRecognition {
     return (ep ?? 0).toInt();
   }
 
+  /// Returns a season-aware identity key for chapter deduplication.
+  ///
+  /// Names with no positive episode number remain unkeyed so unrelated
+  /// specials and prologues are never folded together. Callers that need to
+  /// distinguish scanlator variants can include [scanlator].
+  String? chapterIdentityKey(
+    String mangaTitle,
+    String chapterName, [
+    String? scanlator,
+  ]) {
+    final (season, episode) = rawSeasonAndNumber(mangaTitle, chapterName);
+    if (episode == null || episode <= 0) return null;
+    return '$season::$episode::${scanlator ?? ''}';
+  }
+
   double resolveChapterNumber(
     String mangaTitle,
     String chapterName, {

@@ -15,15 +15,10 @@ part 'client.freezed.dart';
 // These functions are ignored (category: IgnoreBecauseNotAllowedOwner): `digest_ip`
 
 DnsSettings createStaticResolverSync({required StaticDnsSettings settings}) =>
-    RustLib.instance.api.crateApiRhttpClientCreateStaticResolverSync(
-      settings: settings,
-    );
+    RustLib.instance.api.crateApiRhttpClientCreateStaticResolverSync(settings: settings);
 
-DnsSettings createDynamicResolverSync({
-  required FutureOr<List<String>> Function(String) resolver,
-}) => RustLib.instance.api.crateApiRhttpClientCreateDynamicResolverSync(
-  resolver: resolver,
-);
+DnsSettings createDynamicResolverSync({required FutureOr<List<String>> Function(String) resolver}) =>
+    RustLib.instance.api.crateApiRhttpClientCreateDynamicResolverSync(resolver: resolver);
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DnsSettings>>
 abstract class DnsSettings implements RustOpaqueInterface {}
@@ -40,10 +35,7 @@ class ClientCertificate {
   final Uint8List certificate;
   final Uint8List privateKey;
 
-  const ClientCertificate({
-    required this.certificate,
-    required this.privateKey,
-  });
+  const ClientCertificate({required this.certificate, required this.privateKey});
 
   @override
   int get hashCode => certificate.hashCode ^ privateKey.hashCode;
@@ -74,8 +66,7 @@ class ClientSettings {
     this.dnsSettings,
   });
 
-  static Future<ClientSettings> default_() =>
-      RustLib.instance.api.crateApiRhttpClientClientSettingsDefault();
+  static Future<ClientSettings> default_() => RustLib.instance.api.crateApiRhttpClientClientSettingsDefault();
 
   @override
   int get hashCode =>
@@ -111,10 +102,7 @@ class CustomProxy {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is CustomProxy &&
-          runtimeType == other.runtimeType &&
-          url == other.url &&
-          condition == other.condition;
+      other is CustomProxy && runtimeType == other.runtimeType && url == other.url && condition == other.condition;
 }
 
 enum ProxyCondition { http, https, all }
@@ -124,8 +112,7 @@ sealed class ProxySettings with _$ProxySettings {
   const ProxySettings._();
 
   const factory ProxySettings.noProxy() = ProxySettings_NoProxy;
-  const factory ProxySettings.customProxyList(List<CustomProxy> field0) =
-      ProxySettings_CustomProxyList;
+  const factory ProxySettings.customProxyList(List<CustomProxy> field0) = ProxySettings_CustomProxyList;
 }
 
 @freezed
@@ -133,8 +120,7 @@ sealed class RedirectSettings with _$RedirectSettings {
   const RedirectSettings._();
 
   const factory RedirectSettings.noRedirect() = RedirectSettings_NoRedirect;
-  const factory RedirectSettings.limitedRedirects(int field0) =
-      RedirectSettings_LimitedRedirects;
+  const factory RedirectSettings.limitedRedirects(int field0) = RedirectSettings_LimitedRedirects;
 }
 
 class StaticDnsSettings {
@@ -161,19 +147,10 @@ class TimeoutSettings {
   final Duration? keepAliveTimeout;
   final Duration? keepAlivePing;
 
-  const TimeoutSettings({
-    this.timeout,
-    this.connectTimeout,
-    this.keepAliveTimeout,
-    this.keepAlivePing,
-  });
+  const TimeoutSettings({this.timeout, this.connectTimeout, this.keepAliveTimeout, this.keepAlivePing});
 
   @override
-  int get hashCode =>
-      timeout.hashCode ^
-      connectTimeout.hashCode ^
-      keepAliveTimeout.hashCode ^
-      keepAlivePing.hashCode;
+  int get hashCode => timeout.hashCode ^ connectTimeout.hashCode ^ keepAliveTimeout.hashCode ^ keepAlivePing.hashCode;
 
   @override
   bool operator ==(Object other) =>

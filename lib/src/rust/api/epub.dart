@@ -7,33 +7,19 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `declared_encoding`, `decode_text_resource`, `decode_utf16`, `epub_content_is_renderable`, `epub_paths_match`, `extract_resources_from_archive`, `extract_resources_with_content_from_bytes`, `extract_resources_with_content`, `find_chapter_name_from_toc`, `is_epub_reader_auxiliary_asset`, `normalize_epub_path`, `parse_epub_with_doc`, `percent_decode_path`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `attribute_value`, `bare_numeric_label`, `chimahon_epub_title`, `collect_navigation_entries`, `declared_encoding`, `decode_markup_entities`, `decode_text_resource`, `decode_utf16`, `element_content`, `epub_content_is_renderable`, `epub_paths_match`, `escape_html_attribute`, `extract_resources_from_archive`, `extract_resources_with_content_from_bytes`, `extract_resources_with_content`, `find_chapter_from_navigation`, `flatten_nav_points`, `is_epub_image_path`, `is_epub_reader_auxiliary_asset`, `mark_repeated_numeric_subsection_markers`, `mark_structural_navigation_entries`, `normalize_epub_path`, `opening_tag`, `parse_epub3_navigation`, `parse_epub3_structural_landmarks`, `parse_epub_with_doc`, `parse_navigation_links`, `parse_ncx_navigation`, `percent_decode_path`, `resolve_epub_reference`, `strip_markup`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `NavigationEntry`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
-Future<EpubNovel> parseEpubFromPath({
-  required String epubPath,
-  required bool fullData,
-}) => RustLib.instance.api.crateApiEpubParseEpubFromPath(
-  epubPath: epubPath,
-  fullData: fullData,
-);
+Future<EpubNovel> parseEpubFromPath({required String epubPath, required bool fullData}) =>
+    RustLib.instance.api.crateApiEpubParseEpubFromPath(epubPath: epubPath, fullData: fullData);
 
-Future<EpubNovel> parseEpubFromBytes({
-  required List<int> epubBytes,
-  required bool fullData,
-}) => RustLib.instance.api.crateApiEpubParseEpubFromBytes(
-  epubBytes: epubBytes,
-  fullData: fullData,
-);
+Future<EpubNovel> parseEpubFromBytes({required List<int> epubBytes, required bool fullData}) =>
+    RustLib.instance.api.crateApiEpubParseEpubFromBytes(epubBytes: epubBytes, fullData: fullData);
 
 /// Get chapter content from EPUB by path
-Future<String> getChapterContent({
-  required String epubPath,
-  required String chapterPath,
-}) => RustLib.instance.api.crateApiEpubGetChapterContent(
-  epubPath: epubPath,
-  chapterPath: chapterPath,
-);
+Future<String> getChapterContent({required String epubPath, required String chapterPath}) =>
+    RustLib.instance.api.crateApiEpubGetChapterContent(epubPath: epubPath, chapterPath: chapterPath);
 
 class EpubChapter {
   /// Logical section name inherited from the nearest preceding EPUB TOC
@@ -50,7 +36,8 @@ class EpubChapter {
   /// Stable position in the original OPF spine.
   final int spineIndex;
 
-  /// Whether this item participates in the OPF linear reading order.
+  /// Whether this item participates in the book's linear reading order.
+  /// Chimahon numbers bookmark chapters over this filtered sequence.
   final bool isLinear;
 
   /// Whether this spine item should appear in the user-facing chapter list.
@@ -63,7 +50,7 @@ class EpubChapter {
     required this.path,
     required this.href,
     required this.spineIndex,
-    this.isLinear = true,
+    required this.isLinear,
     required this.isNavigationEntry,
   });
 
@@ -154,8 +141,5 @@ class EpubResource {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is EpubResource &&
-          runtimeType == other.runtimeType &&
-          name == other.name &&
-          content == other.content;
+      other is EpubResource && runtimeType == other.runtimeType && name == other.name && content == other.content;
 }

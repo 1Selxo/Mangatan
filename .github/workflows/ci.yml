@@ -65,7 +65,7 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 
       - name: Install dependencies
         run: flutter pub get
@@ -110,7 +110,7 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 
       # Overwrite the default launcher icon (and banner) with the TV variants
       # from android/tv_res before building.
@@ -154,7 +154,7 @@ jobs:
           targets: aarch64-apple-ios,x86_64-apple-ios
 
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 
       - name: Select Xcode 16.4
         run: sudo xcode-select --switch /Applications/Xcode_16.4.app || true
@@ -188,7 +188,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 
       - name: Install dependencies
         run: flutter pub get
@@ -223,7 +223,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 
       - name: Install dependencies
         run: flutter pub get
@@ -263,7 +263,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 
       - name: Install dependencies
         run: flutter pub get

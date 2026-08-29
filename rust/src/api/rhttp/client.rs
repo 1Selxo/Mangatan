@@ -449,7 +449,9 @@ mod tls_tests {
     #[test]
     fn anything_deliberate_is_left_to_reqwest() {
         // Silently discarding one of these would be worse than the panic.
-        assert!(wants_custom_tls(&tls(|s| s.trust_root_certificates = false)));
+        assert!(wants_custom_tls(
+            &tls(|s| s.trust_root_certificates = false)
+        ));
         assert!(wants_custom_tls(&tls(|s| s.verify_certificates = false)));
         assert!(wants_custom_tls(&tls(|s| {
             s.trusted_root_certificates = vec![vec![1, 2, 3]]

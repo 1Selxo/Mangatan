@@ -14,21 +14,28 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.9",
-      "versionDate": "2026-08-27T16:39:14Z",
+      "version": "1.2.13",
+      "versionDate": "2026-08-29T21:22:12Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.9/Mangatan-v1.2.9-build.188-559a91e-ios.ipa",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.13/Mangatan-v1.2.13-build.193-5f57255-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176683164,
+      "size": 176972135,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_2_default.webp"
       ],
       "versions": [
+        {
+          "version": "1.2.13",
+          "date": "2026-08-29T21:22:12Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.13/Mangatan-v1.2.13-build.193-5f57255-ios.ipa",
+          "size": 176972135
+        },
         {
           "version": "1.2.9",
           "date": "2026-08-27T16:39:14Z",
@@ -214,6 +221,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.11"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.13 - 29 Aug",
+      "identifier": "release-1.2.13",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-29T21:22:12Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.13"
     }
   ]
 }

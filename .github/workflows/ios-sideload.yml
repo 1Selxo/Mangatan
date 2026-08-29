@@ -64,6 +64,7 @@ jobs:
             test/services/mining/dictionary_profile_test.dart \
             test/services/mining/mining_preferences_profile_test.dart \
             test/services/m_extension_server_test.dart \
+            test/modules/anime/player_lifecycle_test.dart \
             test/utils/app_font_fallback_test.dart
 
       - name: Verify native dictionary source

@@ -28,6 +28,7 @@ import 'package:mangayomi/modules/anime/providers/auto_play_next_provider.dart';
 import 'package:mangayomi/modules/anime/utils/audio_track_fallback.dart';
 import 'package:mangayomi/modules/anime/utils/audio_track_label.dart';
 import 'package:mangayomi/modules/anime/utils/playback_error_report.dart';
+import 'package:mangayomi/modules/anime/utils/player_lifecycle.dart';
 import 'package:mangayomi/modules/anime/utils/playback_media.dart';
 import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
 import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
@@ -743,8 +744,10 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
     if (!(await provider.requestPermission())) {
       return;
     }
+    if (!mounted) return;
     final dir = await provider.getMpvDirectory();
-    String scriptsDir = path.join(dir!.path, 'scripts');
+    if (!mounted || dir == null) return;
+    String scriptsDir = path.join(dir.path, 'scripts');
     final mpvFile = File('$scriptsDir/init_custom_buttons.lua');
     final content = StringBuffer();
     content.writeln("""local lua_modules = mp.find_config_file('scripts')
@@ -767,10 +770,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       );
     }
     await mpvFile.writeAsString(content.toString());
-    await (_player.platform as NativePlayer).command([
-      "load-script",
-      mpvFile.path,
-    ]);
+    if (!mounted) return;
+    try {
+      await (_player.platform as NativePlayer).command([
+        "load-script",
+        mpvFile.path,
+      ]);
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      _reportPlaybackError(error.toString(), stackTrace: stackTrace);
+      return;
+    }
+    if (!mounted) return;
     _customButton.value = ActiveCustomButton(
       currentTitle: primaryButton.title!,
       visible: true,
@@ -1712,28 +1723,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _playerErrorSub = _player.stream.error.listen(_reportPlaybackError);
     _completed;
     _currentTotalDurationSub;
-    _loadAndroidFont().then((_) async {
-      if (!mounted) return;
-      await _restoreEntryVideoStreamPreference();
-      if (!mounted) return;
-      await _openMedia(_video.value!, _streamController.getCurrentPosition());
-      if (!mounted) return;
-      await _restoreEntrySubtitleDelay();
-      if (widget.isTorrent) {
-        Future.delayed(const Duration(seconds: 10)).then((_) async {
-          if (mounted) {
-            await _openMedia(
-              _video.value!,
-              _streamController.getCurrentPosition(),
-            );
-            await _restoreEntrySubtitleDelay();
-          }
-        });
-      }
-      _setPlaybackSpeed(ref.read(defaultPlayBackSpeedStateProvider));
-      if (ref.read(enableAniSkipStateProvider)) _initAniSkip();
-    });
-    _initCustomButton();
+    unawaited(_initializePlayback());
+    unawaited(_initCustomButton());
     discordRpc?.showChapterDetails(ref, widget.episode);
     _currentPosition.addListener(_updateRpcTimestamp);
     _subDelayController.addListener(_onSubDelayChanged);
@@ -1745,6 +1736,39 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       }),
     );
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  Future<void> _initializePlayback() async {
+    try {
+      await _loadAndroidFont();
+      if (!mounted) return;
+      await _restoreEntryVideoStreamPreference();
+      if (!mounted) return;
+      await _openMedia(_video.value!, _streamController.getCurrentPosition());
+      if (!mounted) return;
+      await _restoreEntrySubtitleDelay();
+      if (!mounted) return;
+      if (widget.isTorrent) {
+        unawaited(
+          Future.delayed(const Duration(seconds: 10)).then((_) async {
+            if (mounted) {
+              await _openMedia(
+                _video.value!,
+                _streamController.getCurrentPosition(),
+              );
+              if (!mounted) return;
+              await _restoreEntrySubtitleDelay();
+            }
+          }),
+        );
+      }
+      await _setPlaybackSpeed(ref.read(defaultPlayBackSpeedStateProvider));
+      if (!mounted) return;
+      if (ref.read(enableAniSkipStateProvider)) await _initAniSkip();
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      _reportPlaybackError(error.toString(), stackTrace: stackTrace);
+    }
   }
 
   @override
@@ -1952,7 +1976,12 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   Future<void> _initAniSkip() async {
-    await _player.stream.buffer.first;
+    try {
+      await _player.stream.buffer.first;
+    } catch (_) {
+      if (!mounted) return;
+      rethrow;
+    }
     if (!mounted) return;
     _streamController.getAniSkipResults((result) {
       final openingRes = result
@@ -1980,13 +2009,25 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _nativeSubtitlePaintTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _setCurrentPosition(true, saveWatchTime: true);
-    _player.stop();
-    _completed.cancel();
-    _currentPositionSub.cancel();
-    _subtitleTextSub.cancel();
-    _selectedTrackSub.cancel();
-    _playerErrorSub.cancel();
-    _currentTotalDurationSub.cancel();
+    final playerCleanup = disposePlaybackSession(
+      listenerCancellations: [
+        _completed.cancel(),
+        _currentPositionSub.cancel(),
+        _subtitleTextSub.cancel(),
+        _selectedTrackSub.cancel(),
+        _playerErrorSub.cancel(),
+        _currentTotalDurationSub.cancel(),
+      ],
+      disposePlayer: _player.dispose,
+    );
+    unawaited(
+      playerCleanup.catchError((Object error, StackTrace stackTrace) {
+        AppLogger.log(
+          'Failed to dispose video player: $error\n$stackTrace',
+          logLevel: LogLevel.error,
+        );
+      }),
+    );
     _currentPosition.dispose();
     _currentTotalDuration.dispose();
     _video.dispose();
@@ -2008,7 +2049,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
     _sceneCaptures.clear();
     unawaited(_sceneJobController.dispose());
-    _player.dispose();
     super.dispose();
   }
 

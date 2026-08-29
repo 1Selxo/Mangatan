@@ -234,7 +234,8 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
         _AlwaysOnTopStateMixin,
         TickerProviderStateMixin,
         WidgetsBindingObserver {
-  bool _backNavigationInProgress = false;
+  bool _routeExitInProgress = false;
+  bool _videoTextureVisible = true;
   late final GlobalKey<VideoState> _key = GlobalKey<VideoState>();
   late final useLibass = ref.read(useLibassStateProvider);
   late final useMpvConfig = ref.read(useMpvConfigStateProvider);
@@ -408,7 +409,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
 
     final hasNext = hasNextEpisode;
     if (hasNext && ref.read(autoPlayNextEpisodeProvider)) {
-      pushToNewEpisode(context, _streamController.getNextEpisode());
+      await pushToNewEpisode(context, _streamController.getNextEpisode());
       return;
     }
 
@@ -798,11 +799,26 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _customButtons.value = customButtons;
   }
 
-  void pushToNewEpisode(BuildContext context, Chapter episode) {
+  Future<void> pushToNewEpisode(BuildContext context, Chapter episode) async {
+    if (_routeExitInProgress) return;
+    _routeExitInProgress = true;
     widget.desktopFullScreenPlayer.call(ref.read(fullscreenProvider));
+    await _retireVideoTexture();
     if (context.mounted) {
       pushReplacementMangaReaderView(context: context, chapter: episode);
     }
+  }
+
+  Future<void> _retireVideoTexture() async {
+    if (!_videoTextureVisible || !mounted) return;
+    await retirePlaybackSurface(
+      hideSurface: () {
+        if (mounted) {
+          setState(() => _videoTextureVisible = false);
+        }
+      },
+      waitForFrame: () => WidgetsBinding.instance.endOfFrame,
+    );
   }
 
   Future<void> _exitDesktopFullScreen() async {
@@ -821,12 +837,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   Future<void> _goBackToDetail() async {
-    if (_backNavigationInProgress) return;
-    _backNavigationInProgress = true;
+    if (_routeExitInProgress) return;
+    _routeExitInProgress = true;
     if (isDesktop && ref.read(fullscreenProvider)) {
       await _exitDesktopFullScreen();
     }
     restoreSystemUI();
+    await _retireVideoTexture();
     if (!mounted) return;
     _firstTime = true;
     Navigator.pop(context);
@@ -2018,6 +2035,12 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         _playerErrorSub.cancel(),
         _currentTotalDurationSub.cancel(),
       ],
+      // The Video widget is normally retired before route navigation. Keep a
+      // final Windows-only grace period for non-navigation disposal paths so
+      // Flutter's raster thread cannot race media_kit texture destruction.
+      beforeDisposePlayer: Platform.isWindows
+          ? () => Future<void>.delayed(const Duration(milliseconds: 250))
+          : null,
       disposePlayer: _player.dispose,
     );
     unawaited(
@@ -3067,48 +3090,51 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       onPointerCancel: _handleVideoOcrGestureCancel,
       child: Stack(
         children: [
-          Video(
-            subtitleViewConfiguration: SubtitleViewConfiguration(
-              visible: false,
-              style: subtileTextStyle(ref),
-            ),
-            fit: fit,
-            key: _key,
-            controls: (state) => isDesktop
-                ? DesktopControllerWidget(
-                    videoController: _controller,
-                    topButtonBarWidget: _topButtonBar(context),
-                    primaryButtonBarWidget: _primaryButtonBar(context),
-                    bottomButtonBarWidget: _desktopBottomButtonBar(context),
-                    tempDuration: (value) {
-                      _tempPosition.value = value;
-                    },
-                    doubleSpeed: (value) {
-                      _isDoubleSpeed.value = value ?? false;
-                    },
-                    defaultSkipIntroLength: skipIntroLength,
-                    desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-                    chapterMarks: _chapterMarks,
-                    subtitleMiningContextBuilder: _subtitleMiningContext,
-                    videoOcrActive: _videoOcrBytes != null,
-                    onVideoOcrShortcut: _handleVideoOcrShortcut,
-                  )
-                : MobileControllerWidget(
-                    videoController: _controller,
-                    topButtonBarWidget: _topButtonBar(context),
-                    primaryButtonBarWidget: _primaryButtonBar(context),
-                    bottomButtonBarWidget: _mobileBottomButtonBar(context),
-                    doubleSpeed: (value) {
-                      _isDoubleSpeed.value = value ?? false;
-                    },
-                    chapterMarks: _chapterMarks,
-                    subtitleMiningContextBuilder: _subtitleMiningContext,
-                  ),
-            controller: _controller,
-            width: context.width(1),
-            height: context.height(1),
-            resumeUponEnteringForegroundMode: true,
-          ),
+          if (_videoTextureVisible)
+            Video(
+              subtitleViewConfiguration: SubtitleViewConfiguration(
+                visible: false,
+                style: subtileTextStyle(ref),
+              ),
+              fit: fit,
+              key: _key,
+              controls: (state) => isDesktop
+                  ? DesktopControllerWidget(
+                      videoController: _controller,
+                      topButtonBarWidget: _topButtonBar(context),
+                      primaryButtonBarWidget: _primaryButtonBar(context),
+                      bottomButtonBarWidget: _desktopBottomButtonBar(context),
+                      tempDuration: (value) {
+                        _tempPosition.value = value;
+                      },
+                      doubleSpeed: (value) {
+                        _isDoubleSpeed.value = value ?? false;
+                      },
+                      defaultSkipIntroLength: skipIntroLength,
+                      desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
+                      chapterMarks: _chapterMarks,
+                      subtitleMiningContextBuilder: _subtitleMiningContext,
+                      videoOcrActive: _videoOcrBytes != null,
+                      onVideoOcrShortcut: _handleVideoOcrShortcut,
+                    )
+                  : MobileControllerWidget(
+                      videoController: _controller,
+                      topButtonBarWidget: _topButtonBar(context),
+                      primaryButtonBarWidget: _primaryButtonBar(context),
+                      bottomButtonBarWidget: _mobileBottomButtonBar(context),
+                      doubleSpeed: (value) {
+                        _isDoubleSpeed.value = value ?? false;
+                      },
+                      chapterMarks: _chapterMarks,
+                      subtitleMiningContextBuilder: _subtitleMiningContext,
+                    ),
+              controller: _controller,
+              width: context.width(1),
+              height: context.height(1),
+              resumeUponEnteringForegroundMode: true,
+            )
+          else
+            const SizedBox.expand(),
           Stack(
             alignment: AlignmentDirectional.center,
             children: [

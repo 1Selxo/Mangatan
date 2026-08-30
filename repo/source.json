@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.13",
-      "versionDate": "2026-08-29T21:22:12Z",
-      "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.13/Mangatan-v1.2.13-build.193-5f57255-ios.ipa",
+      "version": "1.2.14",
+      "versionDate": "2026-08-30T09:44:18Z",
+      "versionDescription": "Changelog\n\n\u2022 Fixed the repeatable Windows crash when pressing Back from the video player.\n\u2022 Fixed the same native texture teardown crash when moving to the next or previous episode, including automatic next\u2022episode playback.\n\u2022 The video texture is now removed from Flutter's render tree and the raster thread is drained before route navigation and player disposal.\n\u2022 Added lifecycle regression coverage for texture retirement, listener cancellation, and safe player cleanup.\n\nDownloads\n\nGitHub Actions is building the Windows installer and portable ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA from this tag. Checksums are included with the desktop artifacts.",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.14/Mangatan-v1.2.14-build.194-f36da9a-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176972135,
+      "size": 176973490,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,11 +30,11 @@
       ],
       "versions": [
         {
-          "version": "1.2.13",
-          "date": "2026-08-29T21:22:12Z",
-          "localizedDescription": "",
-          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.13/Mangatan-v1.2.13-build.193-5f57255-ios.ipa",
-          "size": 176972135
+          "version": "1.2.14",
+          "date": "2026-08-30T09:44:18Z",
+          "localizedDescription": "Changelog\n\n\u2022 Fixed the repeatable Windows crash when pressing Back from the video player.\n\u2022 Fixed the same native texture teardown crash when moving to the next or previous episode, including automatic next\u2022episode playback.\n\u2022 The video texture is now removed from Flutter's render tree and the raster thread is drained before route navigation and player disposal.\n\u2022 Added lifecycle regression coverage for texture retirement, listener cancellation, and safe player cleanup.\n\nDownloads\n\nGitHub Actions is building the Windows installer and portable ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA from this tag. Checksums are included with the desktop artifacts.",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.14/Mangatan-v1.2.14-build.194-f36da9a-ios.ipa",
+          "size": 176973490
         },
         {
           "version": "1.2.9",
@@ -232,6 +232,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.13"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.14 - 30 Aug",
+      "identifier": "release-1.2.14",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-30T09:44:18Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.14"
     }
   ]
 }

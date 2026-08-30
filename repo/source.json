@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.14",
-      "versionDate": "2026-08-30T09:44:18Z",
-      "versionDescription": "Changelog\n\n\u2022 Fixed the repeatable Windows crash when pressing Back from the video player.\n\u2022 Fixed the same native texture teardown crash when moving to the next or previous episode, including automatic next\u2022episode playback.\n\u2022 The video texture is now removed from Flutter's render tree and the raster thread is drained before route navigation and player disposal.\n\u2022 Added lifecycle regression coverage for texture retirement, listener cancellation, and safe player cleanup.\n\nDownloads\n\nGitHub Actions is building the Windows installer and portable ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA from this tag. Checksums are included with the desktop artifacts.",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.14/Mangatan-v1.2.14-build.194-f36da9a-ios.ipa",
+      "version": "1.2.15",
+      "versionDate": "2026-08-30T18:41:03Z",
+      "versionDescription": "Changelog\n\n\u2022 Preserved desktop fullscreen when automatic or manual episode navigation replaces the player route.\n\u2022 Fixed the remaining Windows native video crash identified in the latest crash dump.\n\u2022 Windows video rendering now uses media\u2022kit's stable pixel\u2022buffer output, bypassing Flutter's failing external GPU\u2022texture path while keeping hardware decoding independently configurable.\n\u2022 Added regression coverage for fullscreen episode replacement and Windows video\u2022output selection.\n\nDownloads\n\nGitHub Actions is building:\n\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 macOS Apple Silicon DMG\n\u2022 Sideloadable iOS IPA\n\nSHA\u2022256 checksum files are included with the desktop packages.",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.15/Mangatan-v1.2.15-build.195-fe21bbb-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176973490,
+      "size": 176973309,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.15",
+          "date": "2026-08-30T18:41:03Z",
+          "localizedDescription": "Changelog\n\n\u2022 Preserved desktop fullscreen when automatic or manual episode navigation replaces the player route.\n\u2022 Fixed the remaining Windows native video crash identified in the latest crash dump.\n\u2022 Windows video rendering now uses media\u2022kit's stable pixel\u2022buffer output, bypassing Flutter's failing external GPU\u2022texture path while keeping hardware decoding independently configurable.\n\u2022 Added regression coverage for fullscreen episode replacement and Windows video\u2022output selection.\n\nDownloads\n\nGitHub Actions is building:\n\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 macOS Apple Silicon DMG\n\u2022 Sideloadable iOS IPA\n\nSHA\u2022256 checksum files are included with the desktop packages.",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.15/Mangatan-v1.2.15-build.195-fe21bbb-ios.ipa",
+          "size": 176973309
+        },
+        {
           "version": "1.2.14",
           "date": "2026-08-30T09:44:18Z",
-          "localizedDescription": "Changelog\n\n\u2022 Fixed the repeatable Windows crash when pressing Back from the video player.\n\u2022 Fixed the same native texture teardown crash when moving to the next or previous episode, including automatic next\u2022episode playback.\n\u2022 The video texture is now removed from Flutter's render tree and the raster thread is drained before route navigation and player disposal.\n\u2022 Added lifecycle regression coverage for texture retirement, listener cancellation, and safe player cleanup.\n\nDownloads\n\nGitHub Actions is building the Windows installer and portable ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA from this tag. Checksums are included with the desktop artifacts.",
+          "localizedDescription": "Changelog\n\n\u2022 Fixed the repeatable Windows crash when pressing Back from the video player.\n\u2022 Fixed the same native texture teardown crash when moving to the next or previous episode, including automatic next\u2022episode playback.\n\u2022 The video texture is now removed from Flutter's render tree and the raster thread is drained before route navigation and player disposal.\n\u2022 Added lifecycle regression coverage for texture retirement, listener cancellation, and safe player cleanup.\n\nDownloads\n\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 macOS Apple Silicon DMG\n\u2022 Sideloadable iOS IPA\n\nSHA\u2022256 checksum files are included for the desktop packages.",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.14/Mangatan-v1.2.14-build.194-f36da9a-ios.ipa",
           "size": 176973490
         },
@@ -243,6 +250,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.14"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.15 - 30 Aug",
+      "identifier": "release-1.2.15",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-30T18:41:03Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.15"
     }
   ]
 }

@@ -26,6 +26,33 @@ void main() {
     );
   });
 
+  test('Windows avoids the crashing GPU texture output', () {
+    expect(
+      shouldUseHardwareAcceleratedVideoOutput(
+        userEnabled: true,
+        isWindows: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test('other platforms honor the GPU texture preference', () {
+    expect(
+      shouldUseHardwareAcceleratedVideoOutput(
+        userEnabled: true,
+        isWindows: false,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldUseHardwareAcceleratedVideoOutput(
+        userEnabled: false,
+        isWindows: false,
+      ),
+      isFalse,
+    );
+  });
+
   test('surface is hidden before waiting for the raster thread', () async {
     final events = <String>[];
 

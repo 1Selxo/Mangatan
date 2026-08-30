@@ -1702,7 +1702,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _player,
       configuration: VideoControllerConfiguration(
         hwdec: hwdecMode,
-        enableHardwareAcceleration: enableHardwareAccel,
+        enableHardwareAcceleration: shouldUseHardwareAcceleratedVideoOutput(
+          userEnabled: enableHardwareAccel,
+          isWindows: Platform.isWindows,
+        ),
         vo: Platform.isAndroid
             ? useGpuNext
                   ? "gpu-next"

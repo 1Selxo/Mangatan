@@ -43,3 +43,15 @@ bool shouldExitDesktopFullscreenOnDispose({
   required bool isFullscreen,
   required bool isEpisodeReplacement,
 }) => isDesktop && isFullscreen && !isEpisodeReplacement;
+
+/// Whether media_kit should expose video through a GPU-backed Flutter texture.
+///
+/// Flutter's Windows embedder can lose its Skia graphics context while an
+/// external texture is still being painted. media_kit's GPU output then calls
+/// `GrDirectContext::flush` through a null context and terminates the process.
+/// The pixel-buffer output avoids that engine path while leaving media decode
+/// acceleration controlled independently by `hwdec`.
+bool shouldUseHardwareAcceleratedVideoOutput({
+  required bool userEnabled,
+  required bool isWindows,
+}) => userEnabled && !isWindows;

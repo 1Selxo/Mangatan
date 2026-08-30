@@ -32,3 +32,14 @@ Future<void> retirePlaybackSurface({
     await Future<void>.delayed(rasterDrainDelay);
   }
 }
+
+/// Whether disposing the outer player route should leave desktop fullscreen.
+///
+/// Episode changes replace the route while continuing the same playback
+/// session, so the outgoing route must not undo the window mode that the next
+/// episode inherits.
+bool shouldExitDesktopFullscreenOnDispose({
+  required bool isDesktop,
+  required bool isFullscreen,
+  required bool isEpisodeReplacement,
+}) => isDesktop && isFullscreen && !isEpisodeReplacement;

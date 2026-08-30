@@ -100,9 +100,14 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
   late final Chapter episode = isar.chapters.getSync(widget.episodeId)!;
   List<String> _infoHashList = [];
   bool desktopFullScreenPlayer = false;
+  bool _episodeReplacementInProgress = false;
   @override
   void dispose() {
-    if (isDesktop && desktopFullScreenPlayer) {
+    if (shouldExitDesktopFullscreenOnDispose(
+      isDesktop: isDesktop,
+      isFullscreen: desktopFullScreenPlayer,
+      isEpisodeReplacement: _episodeReplacementInProgress,
+    )) {
       unawaited(setFullScreen(value: false));
     }
     for (var infoHash in _infoHashList) {
@@ -167,6 +172,9 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
           desktopFullScreenPlayer: (value) {
             desktopFullScreenPlayer = value;
           },
+          onEpisodeReplacement: () {
+            _episodeReplacementInProgress = true;
+          },
           mpvDirectory: mpvDirectory,
         );
       },
@@ -208,6 +216,7 @@ class AnimeStreamPage extends riv.ConsumerStatefulWidget {
   final bool isTorrent;
   final Directory? mpvDirectory;
   final void Function(bool) desktopFullScreenPlayer;
+  final VoidCallback onEpisodeReplacement;
   const AnimeStreamPage({
     super.key,
     required this.defaultSubtitle,
@@ -216,6 +225,7 @@ class AnimeStreamPage extends riv.ConsumerStatefulWidget {
     required this.episode,
     required this.isTorrent,
     required this.desktopFullScreenPlayer,
+    required this.onEpisodeReplacement,
     required this.mpvDirectory,
   });
 
@@ -803,6 +813,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     if (_routeExitInProgress) return;
     _routeExitInProgress = true;
     widget.desktopFullScreenPlayer.call(ref.read(fullscreenProvider));
+    widget.onEpisodeReplacement();
     await _retireVideoTexture();
     if (context.mounted) {
       pushReplacementMangaReaderView(context: context, chapter: episode);
@@ -1712,17 +1723,24 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         "$defaultSkipIntroLength",
       );
     } catch (_) {}
-    if (isDesktop && _firstTime) {
-      final globalFullscreen = ref.read(fullScreenPlayerStateProvider);
-      // Delay fullscreen until after the first frame so the window is ready.
-      // On Windows, calling setFullScreen before the widget tree is built
-      // can silently fail, leaving the title bar visible.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setFullScreen(value: globalFullscreen);
-        ref.read(fullscreenProvider.notifier).state = globalFullscreen;
-        widget.desktopFullScreenPlayer.call(globalFullscreen);
-      });
-      _firstTime = false;
+    if (isDesktop) {
+      if (_firstTime) {
+        final globalFullscreen = ref.read(fullScreenPlayerStateProvider);
+        // Delay fullscreen until after the first frame so the window is ready.
+        // On Windows, calling setFullScreen before the widget tree is built
+        // can silently fail, leaving the title bar visible.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setFullScreen(value: globalFullscreen);
+          ref.read(fullscreenProvider.notifier).state = globalFullscreen;
+          widget.desktopFullScreenPlayer.call(globalFullscreen);
+        });
+        _firstTime = false;
+      } else {
+        // Episode replacement keeps the process-wide fullscreen provider and
+        // native window mode. Mirror it into the new outer route so a later
+        // disposal still knows the real window state.
+        widget.desktopFullScreenPlayer.call(ref.read(fullscreenProvider));
+      }
     }
     if (!isDesktop) {
       final forceLandscape = ref.read(forceLandscapePlayerStateProvider);

@@ -4,6 +4,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/anime/utils/player_lifecycle.dart';
 
 void main() {
+  test('episode replacement preserves desktop fullscreen', () {
+    expect(
+      shouldExitDesktopFullscreenOnDispose(
+        isDesktop: true,
+        isFullscreen: true,
+        isEpisodeReplacement: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test('leaving the player exits desktop fullscreen', () {
+    expect(
+      shouldExitDesktopFullscreenOnDispose(
+        isDesktop: true,
+        isFullscreen: true,
+        isEpisodeReplacement: false,
+      ),
+      isTrue,
+    );
+  });
+
   test('surface is hidden before waiting for the raster thread', () async {
     final events = <String>[];
 
@@ -78,20 +100,23 @@ void main() {
     expect(disposeCalls, 1);
   });
 
-  test('player is still disposed when platform texture cleanup fails', () async {
-    var disposeCalls = 0;
+  test(
+    'player is still disposed when platform texture cleanup fails',
+    () async {
+      var disposeCalls = 0;
 
-    await expectLater(
-      disposePlaybackSession(
-        listenerCancellations: const [],
-        beforeDisposePlayer: () async => throw StateError('cleanup failed'),
-        disposePlayer: () async {
-          disposeCalls++;
-        },
-      ),
-      throwsStateError,
-    );
+      await expectLater(
+        disposePlaybackSession(
+          listenerCancellations: const [],
+          beforeDisposePlayer: () async => throw StateError('cleanup failed'),
+          disposePlayer: () async {
+            disposeCalls++;
+          },
+        ),
+        throwsStateError,
+      );
 
-    expect(disposeCalls, 1);
-  });
+      expect(disposeCalls, 1);
+    },
+  );
 }

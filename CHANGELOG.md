@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.2.16+196 - 2026-09-01
+
+- Fixed desktop video-player shortcuts intermittently stopping after the
+  controls faded out by preserving keyboard focus inside the player.
+- Fixed subtitle dictionary popups mixing stale results during rapid hover
+  lookups and improved dismissal when the native WebView misses mouse-exit
+  events.
+
 ## 1.2.7+179 - 2026-08-19
 
 - Rebased the latest Mangatan changes onto Mangayomi 0.8.6, including its

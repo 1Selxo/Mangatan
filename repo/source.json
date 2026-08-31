@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.15",
-      "versionDate": "2026-08-30T18:41:03Z",
-      "versionDescription": "Changelog\n\n\u2022 Preserved desktop fullscreen when automatic or manual episode navigation replaces the player route.\n\u2022 Fixed the remaining Windows native video crash identified in the latest crash dump.\n\u2022 Windows video rendering now uses media\u2022kit's stable pixel\u2022buffer output, bypassing Flutter's failing external GPU\u2022texture path while keeping hardware decoding independently configurable.\n\u2022 Added regression coverage for fullscreen episode replacement and Windows video\u2022output selection.\n\nDownloads\n\nGitHub Actions is building:\n\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 macOS Apple Silicon DMG\n\u2022 Sideloadable iOS IPA\n\nSHA\u2022256 checksum files are included with the desktop packages.",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.15/Mangatan-v1.2.15-build.195-fe21bbb-ios.ipa",
+      "version": "1.2.16",
+      "versionDate": "2026-08-31T22:58:10Z",
+      "versionDescription": "What's Changed\n\n\u2022 Fixed desktop video\u2022player shortcuts intermittently stopping after the controls faded out by preserving keyboard focus inside the player.\n\u2022 Fixed subtitle dictionary popups mixing stale results during rapid hover lookups and improved dismissal when the native WebView misses mouse\u2022exit events.\n\n**Full Changelog**: https://github.com/1Selxo/Mangatan/compare/v1.2.15...v1.2.16\r\n",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.16/Mangatan-v1.2.16-build.196-18c7795-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176973309,
+      "size": 176972363,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.16",
+          "date": "2026-08-31T22:58:10Z",
+          "localizedDescription": "What's Changed\n\n\u2022 Fixed desktop video\u2022player shortcuts intermittently stopping after the controls faded out by preserving keyboard focus inside the player.\n\u2022 Fixed subtitle dictionary popups mixing stale results during rapid hover lookups and improved dismissal when the native WebView misses mouse\u2022exit events.\n\n**Full Changelog**: https://github.com/1Selxo/Mangatan/compare/v1.2.15...v1.2.16\r\n",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.16/Mangatan-v1.2.16-build.196-18c7795-ios.ipa",
+          "size": 176972363
+        },
+        {
           "version": "1.2.15",
           "date": "2026-08-30T18:41:03Z",
-          "localizedDescription": "Changelog\n\n\u2022 Preserved desktop fullscreen when automatic or manual episode navigation replaces the player route.\n\u2022 Fixed the remaining Windows native video crash identified in the latest crash dump.\n\u2022 Windows video rendering now uses media\u2022kit's stable pixel\u2022buffer output, bypassing Flutter's failing external GPU\u2022texture path while keeping hardware decoding independently configurable.\n\u2022 Added regression coverage for fullscreen episode replacement and Windows video\u2022output selection.\n\nDownloads\n\nGitHub Actions is building:\n\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 macOS Apple Silicon DMG\n\u2022 Sideloadable iOS IPA\n\nSHA\u2022256 checksum files are included with the desktop packages.",
+          "localizedDescription": "Changelog\n\n\u2022 Fixed a Windows crash caused by GPU video texture teardown during player navigation.\n\u2022 Preserved fullscreen mode when automatically advancing to the next episode.\n\u2022 Updated the iOS source release metadata.\n\nDownloads\n\n\u2022 Windows installer and portable ZIP\n\u2022 Linux x86_64 archive\n\u2022 macOS Apple Silicon DMG\n\u2022 Sideloadable iOS IPA\n\nSHA\u2022256 checksum files are included for the desktop packages.\n\n**Full Changelog:** https://github.com/1Selxo/Mangatan/compare/v1.2.14...v1.2.15",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.15/Mangatan-v1.2.15-build.195-fe21bbb-ios.ipa",
           "size": 176973309
         },
@@ -261,6 +268,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.15"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.16 - 31 Aug",
+      "identifier": "release-1.2.16",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-08-31T22:58:10Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.16"
     }
   ]
 }

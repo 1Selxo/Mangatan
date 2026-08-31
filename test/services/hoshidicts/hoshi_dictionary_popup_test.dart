@@ -336,6 +336,26 @@ void main() {
     expect(script, contains('img.src = imageUrl'));
   });
 
+  test('superseded async renders cannot append stale dictionary entries', () {
+    final script = File('assets/hoshi_popup/popup.js').readAsStringSync();
+
+    expect(
+      script,
+      contains('const renderToken = window.__mangayomiHoshiRenderToken;'),
+    );
+    expect(
+      script,
+      contains(
+        'const isCurrentRender = () => renderToken === '
+        'window.__mangayomiHoshiRenderToken;',
+      ),
+    );
+    expect(
+      RegExp(r'if \(!isCurrentRender\(\)\) return;').allMatches(script),
+      hasLength(greaterThanOrEqualTo(6)),
+    );
+  });
+
   test('navigates from term headwords to Yomitan Kanji entries', () {
     final script = File('assets/hoshi_popup/popup.js').readAsStringSync();
     final styles = File('assets/hoshi_popup/popup.css').readAsStringSync();

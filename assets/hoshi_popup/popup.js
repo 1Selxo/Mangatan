@@ -2064,15 +2064,19 @@ window.renderPopup = function() {
     if (!window.entryCount) {
         return;
     }
+    const renderToken = window.__mangayomiHoshiRenderToken;
+    const isCurrentRender = () => renderToken === window.__mangayomiHoshiRenderToken;
     
     (async () => {
         for (let idx = 0; idx < window.entryCount; idx++) {
+            if (!isCurrentRender()) return;
             window.lookupEntries ??= [];
             if (!window.lookupEntries[idx]) {
                 const entries = await webkit.messageHandlers.getEntries.postMessage({
                     start: idx,
                     count: Math.min(4, window.entryCount - idx)
                 });
+                if (!isCurrentRender()) return;
                 entries.forEach((entry, offset) => {
                     window.lookupEntries[idx + offset] = entry;
                 });
@@ -2089,6 +2093,7 @@ window.renderPopup = function() {
             if (entry.type === 'mangatan-yomitan-kanji-v1') {
                 container.appendChild(createKanjiEntry(entry));
                 if (idx > 0) await new Promise(r => requestAnimationFrame(r));
+                if (!isCurrentRender()) return;
                 continue;
             }
 
@@ -2097,7 +2102,7 @@ window.renderPopup = function() {
             
             if (window.audioEnableAutoplay && window.audioSources?.length && idx === 0) {
                 setTimeout(() => {
-                    playEntryAudio(idx);
+                    if (isCurrentRender()) playEntryAudio(idx);
                 }, 70);
             }
             
@@ -2124,19 +2129,24 @@ window.renderPopup = function() {
             const openDictionaries = initialOpenDictionaries(dictNames);
             glossarySections.classList.toggle('single-section', dictNames.length === 1);
             for (let dictIdx = 0; dictIdx < dictNames.length; dictIdx++) {
+                if (!isCurrentRender()) return;
                 const dictName = dictNames[dictIdx];
                 glossarySections.appendChild(createGlossarySection(dictName, grouped[dictName], openDictionaries.has(dictName), idx));
                 if (idx === 0) {
                     scheduleMasonry();
                     await new Promise(r => requestAnimationFrame(r));
+                    if (!isCurrentRender()) return;
                 }
             }
             observeMasonry(glossarySections);
             
             if (idx > 0) {
                 await new Promise(r => requestAnimationFrame(r));
+                if (!isCurrentRender()) return;
             }
         }
+
+        if (!isCurrentRender()) return;
         
         container.querySelectorAll('.glossary-content ruby').forEach(ruby => {
             ruby.childNodes.forEach(node => {

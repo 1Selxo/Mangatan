@@ -409,6 +409,7 @@ class _DictionaryPopupOverlayHostState
   late double _width;
   late double _height;
   bool _dismissOnOutsideTap = true;
+  bool _reportedHovered = false;
   int _presentationGeneration = 0;
   int? _pendingOutsidePointer;
   int? _pendingOutsideGeneration;
@@ -451,6 +452,14 @@ class _DictionaryPopupOverlayHostState
   }
 
   void _handleGlobalPointer(PointerEvent event) {
+    if (event is PointerHoverEvent && _visible) {
+      // A native desktop WebView can swallow MouseRegion exit notifications.
+      // Flutter receives pointer events again as soon as the cursor returns
+      // to the surrounding reader, so use the global route as a fallback.
+      _reportHover(
+        _visiblePopupBounds.any((bounds) => bounds.contains(event.position)),
+      );
+    }
     if (event is PointerDownEvent) {
       if (_visiblePopupBounds.any(
         (bounds) => bounds.contains(event.position),
@@ -501,6 +510,12 @@ class _DictionaryPopupOverlayHostState
     _pendingOutsideGeneration = null;
   }
 
+  void _reportHover(bool hovered) {
+    if (!_visible || _reportedHovered == hovered) return;
+    _reportedHovered = hovered;
+    _request.onHoverChanged?.call(hovered);
+  }
+
   bool _handleHardwareKey(KeyEvent event) {
     if (!_visible || event is! KeyDownEvent) return false;
     if (!dictionaryPopupIsDismissKey(event.logicalKey)) return false;
@@ -547,6 +562,7 @@ class _DictionaryPopupOverlayHostState
       );
       _dismissed = completer;
       _visible = true;
+      _reportedHovered = false;
       _dismissOnOutsideTap = dismissOnOutsideTap;
       _left = popupRect.left;
       _top = popupRect.top;
@@ -599,6 +615,7 @@ class _DictionaryPopupOverlayHostState
     // lookup state survive dismissal and can be reused across reader bubbles.
     setState(() {
       _visible = false;
+      _reportedHovered = false;
       _children.clear();
       _childLookupGeneration++;
       _dismissOnOutsideTap = true;
@@ -699,8 +716,8 @@ class _DictionaryPopupOverlayHostState
             child: IgnorePointer(
               ignoring: !_visible,
               child: MouseRegion(
-                onEnter: (_) => request.onHoverChanged?.call(true),
-                onExit: (_) => request.onHoverChanged?.call(false),
+                onEnter: (_) => _reportHover(true),
+                onExit: (_) => _reportHover(false),
                 child: Theme(
                   data: popupTheme.copyWith(
                     textTheme: popupTheme.textTheme.apply(
@@ -751,8 +768,8 @@ class _DictionaryPopupOverlayHostState
             width: indexed.$2.rect.width,
             height: indexed.$2.rect.height,
             child: MouseRegion(
-              onEnter: (_) => indexed.$2.request.onHoverChanged?.call(true),
-              onExit: (_) => indexed.$2.request.onHoverChanged?.call(false),
+              onEnter: (_) => _reportHover(true),
+              onExit: (_) => _reportHover(false),
               child: Theme(
                 data: popupTheme.copyWith(
                   textTheme: popupTheme.textTheme.apply(

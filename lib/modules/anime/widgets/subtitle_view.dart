@@ -264,7 +264,9 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
       text: selection.text,
       miningContext: miningContext ?? _miningContextFor(subtitleText),
       prefetch: prefetch,
-      dismissOnOutsideTap: !hoverTriggered,
+      // Native desktop WebViews can occasionally miss a MouseRegion exit.
+      // Keep an outside click as a reliable escape hatch for hover popups.
+      dismissOnOutsideTap: true,
       onMatchChanged: (count) {
         if (!mounted || count <= 0) return;
         setState(() {

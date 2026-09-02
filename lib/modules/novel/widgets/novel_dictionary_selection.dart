@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
@@ -10,6 +13,16 @@ import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_progress_adapter.dart';
+
+@visibleForTesting
+bool novelSelectionShouldAutoLookup({
+  required TargetPlatform platform,
+  required PointerDeviceKind pointerKind,
+  required String selectedText,
+}) =>
+    platform == TargetPlatform.linux &&
+    pointerKind == PointerDeviceKind.mouse &&
+    selectedText.trim().isNotEmpty;
 
 /// Adds native text selection and a Hoshi dictionary action to novel content.
 ///
@@ -33,12 +46,21 @@ class NovelDictionarySelection extends StatefulWidget {
 
 class _NovelDictionarySelectionState extends State<NovelDictionarySelection> {
   String _selectedText = '';
+  Timer? _lookupDebounce;
+  Offset? _lastPointerPosition;
+  PointerDeviceKind _lastPointerKind = PointerDeviceKind.touch;
+  String _lastAutomaticLookup = '';
 
-  Future<void> _lookup(SelectableRegionState selectableRegionState) async {
+  @override
+  void dispose() {
+    _lookupDebounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _lookupAt(Offset anchor) async {
     final query = _selectedText.trim();
     if (query.isEmpty) return;
 
-    final anchor = selectableRegionState.contextMenuAnchors.primaryAnchor;
     ContextMenuController.removeAny();
     final manga = widget.chapter.manga.value;
     final source = manga?.sourceId == null
@@ -80,28 +102,64 @@ class _NovelDictionarySelectionState extends State<NovelDictionarySelection> {
     );
   }
 
+  Future<void> _lookup(SelectableRegionState selectableRegionState) =>
+      _lookupAt(selectableRegionState.contextMenuAnchors.primaryAnchor);
+
+  void _selectionChanged(SelectedContent? selection) {
+    _selectedText = selection?.plainText.trim() ?? '';
+    _lookupDebounce?.cancel();
+    if (_selectedText.isEmpty) {
+      _lastAutomaticLookup = '';
+      return;
+    }
+    if (!novelSelectionShouldAutoLookup(
+      platform: defaultTargetPlatform,
+      pointerKind: _lastPointerKind,
+      selectedText: _selectedText,
+    )) {
+      return;
+    }
+    final query = _selectedText;
+    if (query == _lastAutomaticLookup) return;
+    _lookupDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted || _selectedText != query) return;
+      _lastAutomaticLookup = query;
+      final anchor =
+          _lastPointerPosition ??
+          Offset(
+            MediaQuery.sizeOf(context).width / 2,
+            MediaQuery.sizeOf(context).height / 2,
+          );
+      unawaited(_lookupAt(anchor));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SelectionArea(
-      onSelectionChanged: (selection) {
-        _selectedText = selection?.plainText.trim() ?? '';
+    return Listener(
+      onPointerDown: (event) {
+        _lastPointerPosition = event.position;
+        _lastPointerKind = event.kind;
       },
-      contextMenuBuilder: (context, selectableRegionState) {
-        final buttons = <ContextMenuButtonItem>[
-          if (_selectedText.isNotEmpty)
-            ContextMenuButtonItem(
-              type: ContextMenuButtonType.lookUp,
-              label: 'Dictionary',
-              onPressed: () => unawaited(_lookup(selectableRegionState)),
-            ),
-          ...selectableRegionState.contextMenuButtonItems,
-        ];
-        return AdaptiveTextSelectionToolbar.buttonItems(
-          anchors: selectableRegionState.contextMenuAnchors,
-          buttonItems: buttons,
-        );
-      },
-      child: widget.child,
+      child: SelectionArea(
+        onSelectionChanged: _selectionChanged,
+        contextMenuBuilder: (context, selectableRegionState) {
+          final buttons = <ContextMenuButtonItem>[
+            if (_selectedText.isNotEmpty)
+              ContextMenuButtonItem(
+                type: ContextMenuButtonType.lookUp,
+                label: 'Dictionary',
+                onPressed: () => unawaited(_lookup(selectableRegionState)),
+              ),
+            ...selectableRegionState.contextMenuButtonItems,
+          ];
+          return AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: selectableRegionState.contextMenuAnchors,
+            buttonItems: buttons,
+          );
+        },
+        child: widget.child,
+      ),
     );
   }
 }

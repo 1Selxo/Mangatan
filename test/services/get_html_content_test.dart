@@ -13,6 +13,7 @@ void main() {
         path: 'chapter-1',
         href: 'OEBPS/chapter-1.xhtml',
         spineIndex: 0,
+        isLinear: true,
         isNavigationEntry: true,
       ),
       EpubChapter(
@@ -21,6 +22,7 @@ void main() {
         path: 'chapter-2',
         href: 'OEBPS/chapter-2.xhtml',
         spineIndex: 1,
+        isLinear: true,
         isNavigationEntry: true,
       ),
     ],
@@ -72,6 +74,7 @@ void main() {
           path: 'one',
           href: 'one.xhtml',
           spineIndex: 0,
+          isLinear: true,
           isNavigationEntry: true,
         ),
         EpubChapter(
@@ -80,6 +83,7 @@ void main() {
           path: 'one-b',
           href: 'one-b.xhtml',
           spineIndex: 1,
+          isLinear: true,
           isNavigationEntry: false,
         ),
         EpubChapter(
@@ -88,6 +92,7 @@ void main() {
           path: 'two',
           href: 'two.xhtml',
           spineIndex: 2,
+          isLinear: true,
           isNavigationEntry: true,
         ),
       ],
@@ -108,6 +113,52 @@ void main() {
       logical.last.querySelectorAll('section[data-mangatan-spine-index]'),
       hasLength(1),
     );
+  });
+
+  test('selects one logical EPUB section for the Linux fallback renderer', () {
+    const grouped = EpubNovel(
+      name: 'fixture',
+      chapters: [
+        EpubChapter(
+          name: 'One',
+          content: '<body><p>one</p></body>',
+          path: 'one',
+          href: 'one.xhtml',
+          spineIndex: 0,
+          isLinear: true,
+          isNavigationEntry: true,
+        ),
+        EpubChapter(
+          name: 'One continued',
+          content: '<body><p>continued</p></body>',
+          path: 'one-b',
+          href: 'one-b.xhtml',
+          spineIndex: 1,
+          isLinear: true,
+          isNavigationEntry: false,
+        ),
+        EpubChapter(
+          name: 'Two',
+          content: '<body><p>two</p></body>',
+          path: 'two',
+          href: 'two.xhtml',
+          spineIndex: 2,
+          isLinear: true,
+          isNavigationEntry: true,
+        ),
+      ],
+      images: [],
+      stylesheets: [],
+    );
+
+    final first = selectEpubLogicalSectionContent(grouped, 1);
+    expect(first, contains('one'));
+    expect(first, contains('continued'));
+    expect(first, isNot(contains('<p>two</p>')));
+
+    final second = selectEpubLogicalSectionContent(grouped, 2);
+    expect(second, contains('<p>two</p>'));
+    expect(second, isNot(contains('continued')));
   });
 
   test('uses Chimahon character counting semantics', () {
@@ -138,6 +189,7 @@ void main() {
           path: 'chapter',
           href: 'chapter.xhtml',
           spineIndex: 1,
+          isLinear: true,
           isNavigationEntry: true,
         ),
       ],

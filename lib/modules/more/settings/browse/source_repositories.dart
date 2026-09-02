@@ -197,9 +197,8 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                             IconButton(
                               onPressed: () => ref
                                   .read(
-                                    extensionsRepoStateProvider(
-                                      widget.itemType,
-                                    ).notifier,
+                                    extensionsRepoStateProvider(widget.itemType)
+                                        .notifier,
                                   )
                                   .setVisibility(repo, !isHidden),
                               icon: Stack(
@@ -273,7 +272,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
   /// #774: when a repo is removed, drop its *not-installed* sources so they
   /// don't linger as placeholders with a dead install button. Installed
   /// sources (non-empty [Source.sourceCode]) are kept so users don't lose them.
-  void _removeOrphanSources(Repo removedRepo) {
+  Future<void> _removeOrphanSources(Repo removedRepo) async {
     final repoUrl = removedRepo.jsonUrl;
     if (repoUrl == null) return;
     final orphanIds = isar.sources
@@ -286,7 +285,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
         .map((s) => s.id!)
         .toList();
     if (orphanIds.isNotEmpty) {
-      isar.writeTxnSync(() => isar.sources.deleteAllSync(orphanIds));
+      await isar.writeTxn(() => isar.sources.deleteAll(orphanIds));
     }
   }
 
@@ -312,21 +311,19 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                     ),
                     const SizedBox(width: 15),
                     TextButton(
-                      onPressed: () {
+                      onPressed: () async {
                         final removedRepo = _entries[index];
                         final mangaRepos = ref
                             .read(extensionsRepoStateProvider(widget.itemType))
                             .toList();
                         mangaRepos.removeWhere((url) => url == removedRepo);
-                        ref
+                        await ref
                             .read(
-                              extensionsRepoStateProvider(
-                                widget.itemType,
-                              ).notifier,
+                              extensionsRepoStateProvider(widget.itemType)
+                                  .notifier,
                             )
                             .set(mangaRepos);
-                        _removeOrphanSources(removedRepo);
-                        ref.watch(extensionsRepoStateProvider(widget.itemType));
+                        await _removeOrphanSources(removedRepo);
                         if (context.mounted) {
                           Navigator.pop(context);
                         }
@@ -438,11 +435,14 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                         ).future,
                                       );
                                       if (repo == null) {
+                                        if (context.mounted) {
+                                          setState(() => isLoading = false);
+                                        }
                                         botToast(l10n.unsupported_repo);
                                         return;
                                       }
                                       mangaRepos.add(repo);
-                                      ref
+                                      await ref
                                           .read(
                                             extensionsRepoStateProvider(
                                               widget.itemType,
@@ -450,8 +450,15 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                           )
                                           .set(mangaRepos);
                                     } catch (e, s) {
-                                      setState(() => isLoading = false);
-                                      toastError(e, stack: s, source: 'sourceRepositories');
+                                      if (context.mounted) {
+                                        setState(() => isLoading = false);
+                                      }
+                                      toastError(
+                                        e,
+                                        stack: s,
+                                        source: 'sourceRepositories',
+                                      );
+                                      return;
                                     }
 
                                     if (context.mounted) {

@@ -25,6 +25,7 @@ import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/ocr_processing_queue.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:path/path.dart' as p;
 
 class DictionaryScreen extends StatefulWidget {
   const DictionaryScreen({
@@ -220,14 +221,26 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   }
 
   Future<void> _importDictionary() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['zip'],
-      allowMultiple: true,
-    );
-    final paths =
-        result?.files.map((file) => file.path).nonNulls.toList() ?? [];
-    await _importDictionaryPaths(paths);
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['zip'],
+        allowMultiple: true,
+      );
+      final paths =
+          result?.files.map((file) => file.path).nonNulls.toList() ?? [];
+      await _importDictionaryPaths(paths);
+    } catch (error) {
+      if (!mounted) return;
+      botToast(
+        defaultTargetPlatform == TargetPlatform.linux
+            ? 'Could not open the file picker. Start a D-Bus session and an '
+                  'xdg-desktop-portal backend, or drag dictionary ZIP files '
+                  'onto this page. ($error)'
+            : 'Could not open the file picker: $error',
+        second: 7,
+      );
+    }
   }
 
   Future<void> _importDictionaryPaths(List<String> paths) async {
@@ -236,20 +249,33 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     try {
       final root = await DictionaryStorage.instance.rootDirectory;
       final importedNames = <String>[];
+      final failedImports = <String>[];
+      final batchImport = paths.length > 1;
       for (final path in paths) {
-        final imported = await HoshidictsLookupBackend.instance
-            .importDictionary(zipPath: path, outputDir: root.path);
-        if (!imported.success) {
-          throw StateError(imported.errors.join('\n'));
+        try {
+          final imported = await HoshidictsLookupBackend.instance
+              .importDictionary(
+                zipPath: path,
+                outputDir: root.path,
+                lowRam: batchImport,
+              );
+          if (!imported.success) {
+            failedImports.add(
+              '${p.basename(path)}: ${imported.errors.join('; ')}',
+            );
+            continue;
+          }
+          await DictionaryStorage.instance.recordImport(
+            name: imported.title,
+            termCount: imported.termCount,
+            frequencyCount: imported.freqCount,
+            pitchCount: imported.pitchCount,
+            kanjiCount: imported.kanjiCount,
+          );
+          importedNames.add(imported.title);
+        } catch (error) {
+          failedImports.add('${p.basename(path)}: $error');
         }
-        await DictionaryStorage.instance.recordImport(
-          name: imported.title,
-          termCount: imported.termCount,
-          frequencyCount: imported.freqCount,
-          pitchCount: imported.pitchCount,
-          kanjiCount: imported.kanjiCount,
-        );
-        importedNames.add(imported.title);
       }
       var updatedProfile = _activeProfile;
       for (final name in importedNames) {
@@ -258,9 +284,24 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       if (!identical(updatedProfile, _activeProfile)) {
         await _updateActiveProfile(updatedProfile);
       }
-      await HoshidictsLookupBackend.instance.reloadFromStorage();
+      if (importedNames.isNotEmpty) {
+        await HoshidictsLookupBackend.instance.reloadFromStorage();
+      }
       await _load();
-      botToast('Imported ${importedNames.join(', ')}', second: 4);
+      if (failedImports.isEmpty) {
+        botToast('Imported ${importedNames.join(', ')}', second: 4);
+      } else if (importedNames.isEmpty) {
+        botToast(
+          'Dictionary import failed: ${failedImports.join(' | ')}',
+          second: 7,
+        );
+      } else {
+        botToast(
+          'Imported ${importedNames.join(', ')}. Failed: '
+          '${failedImports.join(' | ')}',
+          second: 7,
+        );
+      }
     } catch (error) {
       botToast('Dictionary import failed: $error', second: 5);
     } finally {
@@ -761,8 +802,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       fields = _ankiMobileFieldsByModel[modelName] ?? const [];
     } else {
       try {
-        fields = await AnkiConnectService(endpoint: _ankiEndpoint)
-            .modelFieldNames(modelName);
+        fields = await AnkiConnectService(
+          endpoint: _ankiEndpoint,
+        ).modelFieldNames(modelName);
       } catch (error) {
         botToast('Could not fetch fields: $error', second: 5);
       }
@@ -1523,7 +1565,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     initialValue: _lookupTrigger,
                     decoration: const InputDecoration(
                       labelText: 'Lookup trigger',
-                      helperText: 'Used in manga and EPUB readers when hover lookup is off',
+                      helperText:
+                          'Used in manga and EPUB readers when hover lookup is off',
                       prefixIcon: Icon(Icons.mouse_outlined),
                     ),
                     items: const [
@@ -1708,7 +1751,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 const SizedBox(height: 8),
                 _SliderSetting(
                   title: 'OCR text box opacity',
-                  description: '0% keeps the current transparent background; raise it for a more opaque white text box.',
+                  description:
+                      '0% keeps the current transparent background; raise it for a more opaque white text box.',
                   value: _backgroundOpacity,
                   min: 0,
                   max: 1,

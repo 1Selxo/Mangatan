@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
@@ -120,38 +122,38 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
     set(value);
   }
 
-  void set(List<Repo> value) {
-    final settings = isar.settings.getSync(227)!;
+  Future<void> set(List<Repo> value) async {
     state = value;
-    isar.writeTxnSync(() {
-      final a = switch (itemType) {
-        ItemType.manga => isar.settings.putSync(
-          settings
-            ..mangaExtensionsRepo = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-        ItemType.anime => isar.settings.putSync(
-          settings
-            ..animeExtensionsRepo = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-        _ => isar.settings.putSync(
-          settings
-            ..novelExtensionsRepo = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-      };
-      a;
+    await isar.writeTxn(() async {
+      final settings = await isar.settings.get(227);
+      if (settings == null) return;
+      switch (itemType) {
+        case ItemType.manga:
+          settings.mangaExtensionsRepo = value;
+          break;
+        case ItemType.anime:
+          settings.animeExtensionsRepo = value;
+          break;
+        case ItemType.novel:
+          settings.novelExtensionsRepo = value;
+          break;
+      }
+      settings.updatedAt = DateTime.now().millisecondsSinceEpoch;
+      await isar.settings.put(settings);
     });
+    unawaited(_refreshSources());
+  }
+
+  Future<void> _refreshSources() async {
     try {
-      final a = ref.refresh(
+      final refresh = ref.refresh(
         fetchItemSourcesListProvider(
           id: null,
           reFresh: false,
           itemType: itemType,
         ).future,
       );
-      Future.wait([a]);
+      await refresh;
     } catch (_) {}
   }
 }

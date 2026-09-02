@@ -636,7 +636,10 @@ class _MyAppState extends ConsumerState<MyApp>
                       return;
                     }
 
-                    void addRepos(ItemType type, List<String>? urls) {
+                    Future<void> addRepos(
+                      ItemType type,
+                      List<String>? urls,
+                    ) async {
                       if (urls == null) return;
                       final current = ref.read(
                         extensionsRepoStateProvider(type),
@@ -651,14 +654,16 @@ class _MyAppState extends ConsumerState<MyApp>
                           ),
                         ),
                       ];
-                      ref
+                      await ref
                           .read(extensionsRepoStateProvider(type).notifier)
                           .set(updated);
                     }
 
-                    addRepos(ItemType.manga, mangaRepoUrls);
-                    addRepos(ItemType.anime, animeRepoUrls);
-                    addRepos(ItemType.novel, novelRepoUrls);
+                    await Future.wait([
+                      addRepos(ItemType.manga, mangaRepoUrls),
+                      addRepos(ItemType.anime, animeRepoUrls),
+                      addRepos(ItemType.novel, novelRepoUrls),
+                    ]);
                     botToast(l10n.repo_added);
                   },
                 ),

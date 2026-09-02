@@ -6,13 +6,19 @@ final _audioDecoderErrorPattern = RegExp(
   caseSensitive: false,
 );
 
+final _genericAudioDecoderErrorPattern = RegExp(
+  r'\berror decoding audio\b',
+  caseSensitive: false,
+);
+
 /// Returns the codec from a libmpv audio decoder initialization error.
 String? audioDecoderCodecFromError(String message) {
   return _audioDecoderErrorPattern.firstMatch(message)?.group(1)?.trim();
 }
 
 bool isAudioDecoderInitializationError(String message) {
-  return audioDecoderCodecFromError(message) != null;
+  return audioDecoderCodecFromError(message) != null ||
+      _genericAudioDecoderErrorPattern.hasMatch(message);
 }
 
 String audioTrackFallbackKey(AudioTrack track) {

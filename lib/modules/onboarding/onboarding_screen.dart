@@ -441,7 +441,10 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
       }
       final repos = ref.read(extensionsRepoStateProvider(_repoType)).toList()
         ..add(repo);
-      ref.read(extensionsRepoStateProvider(_repoType).notifier).set(repos);
+      await ref
+          .read(extensionsRepoStateProvider(_repoType).notifier)
+          .set(repos);
+      if (!mounted) return;
       setState(() {
         _added = repo;
         _addedFor = _repoType;
@@ -871,11 +874,18 @@ class _ChoiceRow<T> extends StatelessWidget {
       children: [
         for (final value in values)
           FilterChip(
+            avatar: Icon(
+              isSelected(value)
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 18,
+              color: isSelected(value) ? scheme.onPrimary : scheme.outline,
+            ),
             label: Text(label(value)),
             selected: isSelected(value),
-            // The tick would appear and disappear with the selection, so every
-            // chip in the row changed width and the row jumped around as the
-            // user tapped through it. The fill already says which is on.
+            // Reserve the same icon width in both states. This makes the
+            // initial all-selected state unambiguous without making the row
+            // jump when a library is toggled.
             showCheckmark: false,
             // The default selected fill comes from the scheme's secondary
             // container while the label stays on the surface colour, and on

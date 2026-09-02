@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -90,13 +91,13 @@ void main() {
 
   /// Mirrors how `lib/main.dart`'s `add-repo` deep-link handler turns the
   /// per-content-type query parameter URLs into [Repo] rows before persisting.
-  List<Repo> subscribe(
+  Future<List<Repo>> subscribe(
     ProviderContainer container,
     ItemType type,
     List<String> jsonUrls, {
     String? repoName,
     String? repoWebsite,
-  }) {
+  }) async {
     final notifier = container.read(extensionsRepoStateProvider(type).notifier);
     final current = container.read(extensionsRepoStateProvider(type));
     final updated = [
@@ -105,13 +106,13 @@ void main() {
         (url) => Repo(name: repoName, jsonUrl: url, website: repoWebsite),
       ),
     ];
-    notifier.set(updated);
+    await notifier.set(updated);
     return updated;
   }
 
   test(
     'subscribing to a manga repo persists it to the Settings row and reloads',
-    () {
+    () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -121,7 +122,7 @@ void main() {
         isEmpty,
       );
 
-      subscribe(
+      await subscribe(
         container,
         ItemType.manga,
         ['https://example.com/community/index.min.json'],
@@ -155,14 +156,14 @@ void main() {
 
   test(
     'repeated add-repo links append instead of replacing existing repos',
-    () {
+    () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      subscribe(container, ItemType.manga, [
+      await subscribe(container, ItemType.manga, [
         'https://a.example/repo.json',
       ], repoName: 'A');
-      subscribe(container, ItemType.manga, [
+      await subscribe(container, ItemType.manga, [
         'https://b.example/repo.json',
       ], repoName: 'B');
 
@@ -180,15 +181,23 @@ void main() {
 
   test(
     'a single add-repo link can subscribe repos for multiple content types',
-    () {
+    () async {
       // An add-repo deep link may carry manga_url, anime_url and novel_url at
       // once; each content type persists to its own preference list.
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      subscribe(container, ItemType.manga, ['https://repo.example/manga.json']);
-      subscribe(container, ItemType.anime, ['https://repo.example/anime.json']);
-      subscribe(container, ItemType.novel, ['https://repo.example/novel.json']);
+      await Future.wait([
+        subscribe(container, ItemType.manga, [
+          'https://repo.example/manga.json',
+        ]),
+        subscribe(container, ItemType.anime, [
+          'https://repo.example/anime.json',
+        ]),
+        subscribe(container, ItemType.novel, [
+          'https://repo.example/novel.json',
+        ]),
+      ]);
 
       final settings = app.isar.settings.getSync(227)!;
       expect(
@@ -205,6 +214,29 @@ void main() {
       );
     },
   );
+
+  test('repository writes queue behind an active async transaction', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final transactionStarted = Completer<void>();
+    final releaseTransaction = Completer<void>();
+    final activeWrite = app.isar.writeTxn(() async {
+      transactionStarted.complete();
+      await releaseTransaction.future;
+    });
+    await transactionStarted.future;
+
+    final subscription = subscribe(container, ItemType.anime, [
+      'https://repo.example/queued.json',
+    ]);
+    releaseTransaction.complete();
+    await Future.wait([activeWrite, subscription]);
+
+    expect(
+      app.isar.settings.getSync(227)!.animeExtensionsRepo!.single.jsonUrl,
+      'https://repo.example/queued.json',
+    );
+  });
 }
 
 Future<String> _isarLibraryPath() async {

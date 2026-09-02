@@ -53,6 +53,28 @@ void main() {
     );
   });
 
+  test('Linux video output follows the physical viewport', () {
+    expect(
+      linuxVideoOutputSize(
+        logicalWidth: 853,
+        logicalHeight: 480,
+        devicePixelRatio: 1.25,
+      ),
+      (width: 1068, height: 600),
+    );
+  });
+
+  test('Linux video output rejects an unbounded viewport', () {
+    expect(
+      linuxVideoOutputSize(
+        logicalWidth: double.infinity,
+        logicalHeight: 480,
+        devicePixelRatio: 1,
+      ),
+      isNull,
+    );
+  });
+
   test('surface is hidden before waiting for the raster thread', () async {
     final events = <String>[];
 

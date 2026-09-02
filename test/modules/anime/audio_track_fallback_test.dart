@@ -10,6 +10,13 @@ void main() {
     expect(audioDecoderCodecFromError(message), 'truehd');
   });
 
+  test('recognizes generic audio decode errors', () {
+    const message = 'Error decoding audio.';
+
+    expect(isAudioDecoderInitializationError(message), isTrue);
+    expect(audioDecoderCodecFromError(message), isNull);
+  });
+
   test('prefers an alternative in the failed track language', () {
     final failed = AudioTrack('2', 'English lossless', 'eng', codec: 'truehd');
     final candidates = audioTrackFallbackCandidates(

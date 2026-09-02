@@ -26,6 +26,12 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
 import 'package:mangayomi/utils/platform_utils.dart';
 
+@visibleForTesting
+String? linuxDocumentsFallbackPath(Map<String, String> environment) {
+  final home = environment['HOME']?.trim();
+  return home == null || home.isEmpty ? null : home;
+}
+
 class StorageProvider {
   static const _defaultDirectoryName = 'Mangatan';
   static const _legacyDirectoryName = 'Mangayomi';
@@ -33,6 +39,21 @@ class StorageProvider {
   static final StorageProvider _instance = StorageProvider._internal();
   StorageProvider._internal();
   factory StorageProvider() => _instance;
+
+  /// `path_provider_linux` asks `xdg-user-dir` for Documents. Minimal window
+  /// manager installations often do not ship that executable, which used to
+  /// make database initialization fail before the first frame. Preserve the
+  /// traditional `~/Mangatan` location when HOME is available.
+  Future<Directory> _documentsDirectory() async {
+    try {
+      return await getApplicationDocumentsDirectory();
+    } catch (_) {
+      if (!Platform.isLinux) rethrow;
+      final home = linuxDocumentsFallbackPath(Platform.environment);
+      if (home == null) rethrow;
+      return Directory(home);
+    }
+  }
 
   Future<bool> requestPermission() async {
     if (!Platform.isAndroid) return true;
@@ -59,7 +80,7 @@ class StorageProvider {
     if (Platform.isAndroid) {
       directory = Directory("/storage/emulated/0/Mangayomi/");
     } else {
-      final dir = await getApplicationDocumentsDirectory();
+      final dir = await _documentsDirectory();
       // The iOS documents directory is already app-specific, so appending an
       // additional branded directory would create unnecessary nesting.
       if (Platform.isIOS) return dir;
@@ -148,7 +169,7 @@ class StorageProvider {
         dPath.isEmpty ? "/storage/emulated/0/Mangayomi/" : "$dPath/",
       );
     } else {
-      final dir = await getApplicationDocumentsDirectory();
+      final dir = await _documentsDirectory();
       final p = dPath.isEmpty ? dir.path : dPath;
       // The iOS documents directory is already app-specific, so appending an
       // additional branded directory would create unnecessary nesting.
@@ -205,7 +226,7 @@ class StorageProvider {
     // untouched — Documents is the conventional location there.
     final dir = Platform.isMacOS
         ? await getApplicationSupportDirectory()
-        : await getApplicationDocumentsDirectory();
+        : await _documentsDirectory();
     String dbDir;
     if (Platform.isAndroid) return dir;
     if (Platform.isIOS) {

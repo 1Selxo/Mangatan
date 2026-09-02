@@ -68,114 +68,121 @@ class YomitanKanjiArchive {
   String get storageName => _safeFileName(title);
 
   static Future<YomitanKanjiArchive?> read(String zipPath) async {
-    final bytes = await File(zipPath).readAsBytes();
-    final archive = ZipDecoder().decodeBytes(bytes, verify: true);
-    final files = <String, ArchiveFile>{
-      for (final file in archive.files)
-        if (file.isFile) file.name.replaceAll('\\', '/'): file,
-    };
-    final indexFile = files['index.json'];
-    if (indexFile == null) return null;
-    final index = _decodeObject(indexFile);
-    final title = index['title'];
-    if (title is! String || title.trim().isEmpty) {
-      throw const FormatException('Dictionary index.json has no title.');
-    }
-    final kanjiFiles =
-        files.entries
-            .where(
-              (entry) =>
-                  RegExp(r'(^|/)kanji_bank_\d+\.json$').hasMatch(entry.key),
-            )
-            .toList()
-          ..sort((a, b) => _bankNumber(a.key).compareTo(_bankNumber(b.key)));
-    final kanjiMetaFiles =
-        files.entries
-            .where(
-              (entry) => RegExp(
-                r'(^|/)kanji_meta_bank_\d+\.json$',
-              ).hasMatch(entry.key),
-            )
-            .toList()
-          ..sort((a, b) => _bankNumber(a.key).compareTo(_bankNumber(b.key)));
-    if (kanjiFiles.isEmpty && kanjiMetaFiles.isEmpty) return null;
+    // Keep large dictionaries on disk. Reading the whole ZIP before handing
+    // the same file to the native term importer doubles peak memory during a
+    // batch import and can make the native iostream fail on later files.
+    final input = InputFileStream(zipPath);
+    try {
+      final archive = ZipDecoder().decodeStream(input, verify: true);
+      final files = <String, ArchiveFile>{
+        for (final file in archive.files)
+          if (file.isFile) file.name.replaceAll('\\', '/'): file,
+      };
+      final indexFile = files['index.json'];
+      if (indexFile == null) return null;
+      final index = _decodeObject(indexFile);
+      final title = index['title'];
+      if (title is! String || title.trim().isEmpty) {
+        throw const FormatException('Dictionary index.json has no title.');
+      }
+      final kanjiFiles =
+          files.entries
+              .where(
+                (entry) =>
+                    RegExp(r'(^|/)kanji_bank_\d+\.json$').hasMatch(entry.key),
+              )
+              .toList()
+            ..sort((a, b) => _bankNumber(a.key).compareTo(_bankNumber(b.key)));
+      final kanjiMetaFiles =
+          files.entries
+              .where(
+                (entry) => RegExp(
+                  r'(^|/)kanji_meta_bank_\d+\.json$',
+                ).hasMatch(entry.key),
+              )
+              .toList()
+            ..sort((a, b) => _bankNumber(a.key).compareTo(_bankNumber(b.key)));
+      if (kanjiFiles.isEmpty && kanjiMetaFiles.isEmpty) return null;
 
-    final tags = <String, Map<String, dynamic>>{};
-    final legacyTags = index['tagMeta'];
-    if (legacyTags is Map) {
-      for (final entry in legacyTags.entries) {
-        if (entry.key is! String || entry.value is! Map) continue;
-        final value = entry.value as Map;
-        tags[entry.key as String] = {
-          'name': entry.key,
-          'category': value['category'] is String ? value['category'] : '',
-          'order': value['order'] is num ? value['order'] : 0,
-          'notes': value['notes'] is String ? value['notes'] : '',
-          'score': value['score'] is num ? value['score'] : 0,
-        };
-      }
-    }
-    final tagFiles =
-        files.entries
-            .where(
-              (entry) =>
-                  RegExp(r'(^|/)tag_bank_\d+\.json$').hasMatch(entry.key),
-            )
-            .toList()
-          ..sort((a, b) => _bankNumber(a.key).compareTo(_bankNumber(b.key)));
-    for (final file in tagFiles) {
-      for (final raw in _decodeList(file.value)) {
-        if (raw is! List || raw.length < 5 || raw[0] is! String) continue;
-        tags[raw[0] as String] = {
-          'name': raw[0],
-          'category': raw[1] is String ? raw[1] : '',
-          'order': raw[2] is num ? raw[2] : 0,
-          'notes': raw[3] is String ? raw[3] : '',
-          'score': raw[4] is num ? raw[4] : 0,
-        };
-      }
-    }
-
-    final version = index['format'] ?? index['version'];
-    final entries = <Map<String, dynamic>>[];
-    for (final file in kanjiFiles) {
-      for (final raw in _decodeList(file.value)) {
-        final normalized = _normalizeEntry(raw, tags, version);
-        if (normalized != null) entries.add(normalized);
-      }
-    }
-    final frequencies = <Map<String, dynamic>>[];
-    for (final file in kanjiMetaFiles) {
-      for (final raw in _decodeList(file.value)) {
-        if (raw is! List ||
-            raw.length != 3 ||
-            raw[0] is! String ||
-            raw[1] != 'freq') {
-          continue;
+      final tags = <String, Map<String, dynamic>>{};
+      final legacyTags = index['tagMeta'];
+      if (legacyTags is Map) {
+        for (final entry in legacyTags.entries) {
+          if (entry.key is! String || entry.value is! Map) continue;
+          final value = entry.value as Map;
+          tags[entry.key as String] = {
+            'name': entry.key,
+            'category': value['category'] is String ? value['category'] : '',
+            'order': value['order'] is num ? value['order'] : 0,
+            'notes': value['notes'] is String ? value['notes'] : '',
+            'score': value['score'] is num ? value['score'] : 0,
+          };
         }
-        final data = raw[2];
-        final value = data is Map ? data['value'] : data;
-        final displayValue = data is Map ? data['displayValue'] : null;
-        if (value is! num && value is! String) continue;
-        frequencies.add({
-          'character': raw[0],
-          'value': value,
-          if (displayValue is String) 'displayValue': displayValue,
-        });
       }
+      final tagFiles =
+          files.entries
+              .where(
+                (entry) =>
+                    RegExp(r'(^|/)tag_bank_\d+\.json$').hasMatch(entry.key),
+              )
+              .toList()
+            ..sort((a, b) => _bankNumber(a.key).compareTo(_bankNumber(b.key)));
+      for (final file in tagFiles) {
+        for (final raw in _decodeList(file.value)) {
+          if (raw is! List || raw.length < 5 || raw[0] is! String) continue;
+          tags[raw[0] as String] = {
+            'name': raw[0],
+            'category': raw[1] is String ? raw[1] : '',
+            'order': raw[2] is num ? raw[2] : 0,
+            'notes': raw[3] is String ? raw[3] : '',
+            'score': raw[4] is num ? raw[4] : 0,
+          };
+        }
+      }
+
+      final version = index['format'] ?? index['version'];
+      final entries = <Map<String, dynamic>>[];
+      for (final file in kanjiFiles) {
+        for (final raw in _decodeList(file.value)) {
+          final normalized = _normalizeEntry(raw, tags, version);
+          if (normalized != null) entries.add(normalized);
+        }
+      }
+      final frequencies = <Map<String, dynamic>>[];
+      for (final file in kanjiMetaFiles) {
+        for (final raw in _decodeList(file.value)) {
+          if (raw is! List ||
+              raw.length != 3 ||
+              raw[0] is! String ||
+              raw[1] != 'freq') {
+            continue;
+          }
+          final data = raw[2];
+          final value = data is Map ? data['value'] : data;
+          final displayValue = data is Map ? data['displayValue'] : null;
+          if (value is! num && value is! String) continue;
+          frequencies.add({
+            'character': raw[0],
+            'value': value,
+            if (displayValue is String) 'displayValue': displayValue,
+          });
+        }
+      }
+      final hasNativeBanks = files.keys.any(
+        (name) =>
+            RegExp(r'(^|/)term_bank_\d+\.json$').hasMatch(name) ||
+            RegExp(r'(^|/)term_meta_bank_\d+\.json$').hasMatch(name),
+      );
+      return YomitanKanjiArchive(
+        title: title,
+        index: index,
+        entries: entries,
+        frequencies: frequencies,
+        hasNativeBanks: hasNativeBanks,
+      );
+    } finally {
+      await input.close();
     }
-    final hasNativeBanks = files.keys.any(
-      (name) =>
-          RegExp(r'(^|/)term_bank_\d+\.json$').hasMatch(name) ||
-          RegExp(r'(^|/)term_meta_bank_\d+\.json$').hasMatch(name),
-    );
-    return YomitanKanjiArchive(
-      title: title,
-      index: index,
-      entries: entries,
-      frequencies: frequencies,
-      hasNativeBanks: hasNativeBanks,
-    );
   }
 
   Future<void> persist(String outputDir) async {

@@ -246,6 +246,9 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
         WidgetsBindingObserver {
   bool _routeExitInProgress = false;
   bool _videoTextureVisible = true;
+  ({double width, double height})? _linuxVideoViewport;
+  ({int width, int height})? _linuxVideoOutputSize;
+  bool _linuxVideoResizeScheduled = false;
   late final GlobalKey<VideoState> _key = GlobalKey<VideoState>();
   late final useLibass = ref.read(useLibassStateProvider);
   late final useMpvConfig = ref.read(useMpvConfigStateProvider);
@@ -1832,6 +1835,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           start: start,
         ),
       );
+      _scheduleLinuxVideoOutputResize();
       if (start > Duration.zero) {
         // Media(start:) is unreliable for some sources. Seek again once the
         // stream reports a duration; a redundant seek is harmless.
@@ -2514,11 +2518,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           GestureDetector(
             onTap: () async {
               try {
-                final subtitle = await subtitlesSearchraggableMenu(
-                  context,
-                  chapter: widget.episode,
-                  isLocal: widget.isLocal,
-                ) as ImdbSubtitle?;
+                final subtitle =
+                    await subtitlesSearchraggableMenu(
+                          context,
+                          chapter: widget.episode,
+                          isLocal: widget.isLocal,
+                        )
+                        as ImdbSubtitle?;
                 if (subtitle != null && context.mounted) {
                   await _setSubtitleTrack(
                     SubtitleTrack.uri(
@@ -3104,172 +3110,226 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     final enableAutoSkip = ref.read(enableAutoSkipStateProvider);
     final aniSkipTimeoutLength = ref.read(aniSkipTimeoutLengthStateProvider);
     final skipIntroLength = ref.read(defaultSkipIntroLengthStateProvider);
-    return Listener(
-      onPointerDown: _handleVideoOcrGestureDown,
-      onPointerMove: _handleVideoOcrGestureMove,
-      onPointerUp: _handleVideoOcrGestureUp,
-      onPointerCancel: _handleVideoOcrGestureCancel,
-      child: Stack(
-        children: [
-          if (_videoTextureVisible)
-            Video(
-              subtitleViewConfiguration: SubtitleViewConfiguration(
-                visible: false,
-                style: subtileTextStyle(ref),
-              ),
-              fit: fit,
-              key: _key,
-              controls: (state) => isDesktop
-                  ? DesktopControllerWidget(
-                      videoController: _controller,
-                      topButtonBarWidget: _topButtonBar(context),
-                      primaryButtonBarWidget: _primaryButtonBar(context),
-                      bottomButtonBarWidget: _desktopBottomButtonBar(context),
-                      tempDuration: (value) {
-                        _tempPosition.value = value;
-                      },
-                      doubleSpeed: (value) {
-                        _isDoubleSpeed.value = value ?? false;
-                      },
-                      defaultSkipIntroLength: skipIntroLength,
-                      desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-                      chapterMarks: _chapterMarks,
-                      subtitleMiningContextBuilder: _subtitleMiningContext,
-                      videoOcrActive: _videoOcrBytes != null,
-                      onVideoOcrShortcut: _handleVideoOcrShortcut,
-                    )
-                  : MobileControllerWidget(
-                      videoController: _controller,
-                      topButtonBarWidget: _topButtonBar(context),
-                      primaryButtonBarWidget: _primaryButtonBar(context),
-                      bottomButtonBarWidget: _mobileBottomButtonBar(context),
-                      doubleSpeed: (value) {
-                        _isDoubleSpeed.value = value ?? false;
-                      },
-                      chapterMarks: _chapterMarks,
-                      subtitleMiningContextBuilder: _subtitleMiningContext,
-                    ),
-              controller: _controller,
-              width: context.width(1),
-              height: context.height(1),
-              resumeUponEnteringForegroundMode: true,
-            )
-          else
-            const SizedBox.expand(),
-          Stack(
-            alignment: AlignmentDirectional.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _linuxVideoViewport = (
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+        );
+        _scheduleLinuxVideoOutputResize();
+        return Listener(
+          onPointerDown: _handleVideoOcrGestureDown,
+          onPointerMove: _handleVideoOcrGestureMove,
+          onPointerUp: _handleVideoOcrGestureUp,
+          onPointerCancel: _handleVideoOcrGestureCancel,
+          child: Stack(
             children: [
-              Positioned(
-                top: 30,
-                child: ValueListenableBuilder<bool>(
-                  valueListenable: _isDoubleSpeed,
-                  builder: (context, snapshot, _) {
-                    return Text.rich(
-                      textAlign: TextAlign.center,
-                      TextSpan(
-                        style: TextStyle(
-                          background: Paint()
-                            ..color = Theme.of(context).scaffoldBackgroundColor
-                            ..strokeWidth = 30.0
-                            ..strokeJoin = StrokeJoin.round
-                            ..style = PaintingStyle.stroke,
+              if (_videoTextureVisible)
+                Video(
+                  subtitleViewConfiguration: SubtitleViewConfiguration(
+                    visible: false,
+                    style: subtileTextStyle(ref),
+                  ),
+                  fit: fit,
+                  key: _key,
+                  controls: (state) => isDesktop
+                      ? DesktopControllerWidget(
+                          videoController: _controller,
+                          topButtonBarWidget: _topButtonBar(context),
+                          primaryButtonBarWidget: _primaryButtonBar(context),
+                          bottomButtonBarWidget: _desktopBottomButtonBar(
+                            context,
+                          ),
+                          tempDuration: (value) {
+                            _tempPosition.value = value;
+                          },
+                          doubleSpeed: (value) {
+                            _isDoubleSpeed.value = value ?? false;
+                          },
+                          defaultSkipIntroLength: skipIntroLength,
+                          desktopFullScreenPlayer:
+                              widget.desktopFullScreenPlayer,
+                          chapterMarks: _chapterMarks,
+                          subtitleMiningContextBuilder: _subtitleMiningContext,
+                          videoOcrActive: _videoOcrBytes != null,
+                          onVideoOcrShortcut: _handleVideoOcrShortcut,
+                        )
+                      : MobileControllerWidget(
+                          videoController: _controller,
+                          topButtonBarWidget: _topButtonBar(context),
+                          primaryButtonBarWidget: _primaryButtonBar(context),
+                          bottomButtonBarWidget: _mobileBottomButtonBar(
+                            context,
+                          ),
+                          doubleSpeed: (value) {
+                            _isDoubleSpeed.value = value ?? false;
+                          },
+                          chapterMarks: _chapterMarks,
+                          subtitleMiningContextBuilder: _subtitleMiningContext,
                         ),
-                        children: snapshot
-                            ? [
-                                TextSpan(
-                                  text: " 2X ",
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                WidgetSpan(
-                                  alignment: PlaceholderAlignment.middle,
-                                  child: Icon(Icons.fast_forward),
-                                ),
-                              ]
-                            : [],
+                  controller: _controller,
+                  width: context.width(1),
+                  height: context.height(1),
+                  resumeUponEnteringForegroundMode: true,
+                )
+              else
+                const SizedBox.expand(),
+              Stack(
+                alignment: AlignmentDirectional.center,
+                children: [
+                  Positioned(
+                    top: 30,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _isDoubleSpeed,
+                      builder: (context, snapshot, _) {
+                        return Text.rich(
+                          textAlign: TextAlign.center,
+                          TextSpan(
+                            style: TextStyle(
+                              background: Paint()
+                                ..color = Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor
+                                ..strokeWidth = 30.0
+                                ..strokeJoin = StrokeJoin.round
+                                ..style = PaintingStyle.stroke,
+                            ),
+                            children: snapshot
+                                ? [
+                                    TextSpan(
+                                      text: " 2X ",
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    WidgetSpan(
+                                      alignment: PlaceholderAlignment.middle,
+                                      child: Icon(Icons.fast_forward),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              if (enableAniSkip && (_hasOpeningSkip || _hasEndingSkip))
+                Positioned(
+                  right: 0,
+                  bottom: 80,
+                  child: ValueListenableBuilder<_AniSkipPhase>(
+                    valueListenable: _skipPhase,
+                    builder: (context, phase, _) {
+                      if (phase == _AniSkipPhase.none) {
+                        return const SizedBox.shrink();
+                      }
+                      final isOpening = phase == _AniSkipPhase.opening;
+                      final result = isOpening
+                          ? _openingResult!
+                          : _endingResult!;
+                      return AniSkipCountDownButton(
+                        key: Key(isOpening ? 'skip_opening' : 'skip_ending'),
+                        active: true,
+                        autoSkip: enableAutoSkip,
+                        timeoutLength: aniSkipTimeoutLength,
+                        skipTypeText: isOpening
+                            ? context.l10n.skip_opening
+                            : context.l10n.skip_ending,
+                        player: _player,
+                        aniSkipResult: result,
+                      );
+                    },
+                  ),
+                ),
+              if (_showSubtitleList)
+                AnimeSubtitleListPanel(
+                  cues: _subtitleCues,
+                  position: _currentPosition,
+                  subtitleDelayMs: _subDelay,
+                  onSelect: (cue) {
+                    unawaited(
+                      _player.seek(
+                        subtitleCuePlaybackTime(
+                          cue,
+                          subtitleDelayMs: _subDelay,
+                        ),
                       ),
                     );
                   },
+                  onDismiss: () => setState(() => _showSubtitleList = false),
                 ),
-              ),
+              if (_videoOcrBytes case final imageBytes?)
+                VideoOcrOverlay(
+                  imageBytes: imageBytes,
+                  imagePosition: _videoOcrPosition,
+                  fit: fit,
+                  miningContextBuilder: (text, bytes, position) =>
+                      _subtitleMiningContext(
+                        text,
+                        frozenImageBytes: bytes,
+                        frozenPosition: position,
+                        ocrTiming: true,
+                      ),
+                  onDismiss: _dismissVideoOcr,
+                ),
+              if (_liveVideoOcrEnabled && _videoOcrBytes == null)
+                LiveVideoOcrOverlay(
+                  imageBytesLoader: _captureLiveVideoOcrFrame,
+                  fit: fit,
+                  miningContextBuilder: (text, bytes, position) =>
+                      _subtitleMiningContext(
+                        text,
+                        frozenImageBytes: bytes,
+                        frozenPosition: position,
+                        ocrTiming: true,
+                      ),
+                  onDismiss: () {
+                    DictionaryLookupPopup.dismissActive();
+                    setState(() => _liveVideoOcrEnabled = false);
+                    unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
+                  },
+                ),
             ],
           ),
-          if (enableAniSkip && (_hasOpeningSkip || _hasEndingSkip))
-            Positioned(
-              right: 0,
-              bottom: 80,
-              child: ValueListenableBuilder<_AniSkipPhase>(
-                valueListenable: _skipPhase,
-                builder: (context, phase, _) {
-                  if (phase == _AniSkipPhase.none) {
-                    return const SizedBox.shrink();
-                  }
-                  final isOpening = phase == _AniSkipPhase.opening;
-                  final result = isOpening ? _openingResult! : _endingResult!;
-                  return AniSkipCountDownButton(
-                    key: Key(isOpening ? 'skip_opening' : 'skip_ending'),
-                    active: true,
-                    autoSkip: enableAutoSkip,
-                    timeoutLength: aniSkipTimeoutLength,
-                    skipTypeText: isOpening
-                        ? context.l10n.skip_opening
-                        : context.l10n.skip_ending,
-                    player: _player,
-                    aniSkipResult: result,
-                  );
-                },
-              ),
-            ),
-          if (_showSubtitleList)
-            AnimeSubtitleListPanel(
-              cues: _subtitleCues,
-              position: _currentPosition,
-              subtitleDelayMs: _subDelay,
-              onSelect: (cue) {
-                unawaited(
-                  _player.seek(
-                    subtitleCuePlaybackTime(cue, subtitleDelayMs: _subDelay),
-                  ),
-                );
-              },
-              onDismiss: () => setState(() => _showSubtitleList = false),
-            ),
-          if (_videoOcrBytes case final imageBytes?)
-            VideoOcrOverlay(
-              imageBytes: imageBytes,
-              imagePosition: _videoOcrPosition,
-              fit: fit,
-              miningContextBuilder: (text, bytes, position) =>
-                  _subtitleMiningContext(
-                    text,
-                    frozenImageBytes: bytes,
-                    frozenPosition: position,
-                    ocrTiming: true,
-                  ),
-              onDismiss: _dismissVideoOcr,
-            ),
-          if (_liveVideoOcrEnabled && _videoOcrBytes == null)
-            LiveVideoOcrOverlay(
-              imageBytesLoader: _captureLiveVideoOcrFrame,
-              fit: fit,
-              miningContextBuilder: (text, bytes, position) =>
-                  _subtitleMiningContext(
-                    text,
-                    frozenImageBytes: bytes,
-                    frozenPosition: position,
-                    ocrTiming: true,
-                  ),
-              onDismiss: () {
-                DictionaryLookupPopup.dismissActive();
-                setState(() => _liveVideoOcrEnabled = false);
-                unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
-              },
-            ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  void _scheduleLinuxVideoOutputResize() {
+    if (!Platform.isLinux ||
+        _linuxVideoResizeScheduled ||
+        _linuxVideoViewport == null) {
+      return;
+    }
+    _linuxVideoResizeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _linuxVideoResizeScheduled = false;
+      if (!mounted) return;
+      final viewport = _linuxVideoViewport;
+      if (viewport == null) return;
+      final outputSize = linuxVideoOutputSize(
+        logicalWidth: viewport.width,
+        logicalHeight: viewport.height,
+        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+      if (outputSize == null || outputSize == _linuxVideoOutputSize) return;
+      try {
+        await _controller.setSize(
+          width: outputSize.width,
+          height: outputSize.height,
+        );
+        _linuxVideoOutputSize = outputSize;
+      } catch (error, stackTrace) {
+        AppLogger.log(
+          'Failed to resize Linux video output: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      }
+    });
   }
 
   void _handleVideoOcrGestureDown(PointerDownEvent event) {
@@ -3386,65 +3446,72 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                       ),
                       Row(
                         children: [
-                          button(context.l10n.set_as_cover, Icons.image_outlined, () async {
-                            final imageBytes = await _player.screenshot(
-                              format: "image/png",
-                              includeLibassSubtitles: _includeSubtitles,
-                            );
-                            if (context.mounted) {
-                              final res = await showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return AlertDialog(
-                                    content: Text(
-                                      context.l10n.use_this_as_cover_art,
-                                    ),
-                                    actions: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                            },
-                                            child: Text(context.l10n.cancel),
-                                          ),
-                                          const SizedBox(width: 15),
-                                          TextButton(
-                                            onPressed: () {
-                                              final manga =
-                                                  episode.manga.value!;
-                                              isar.writeTxnSync(() {
-                                                isar.mangas.putSync(
-                                                  manga
-                                                    ..updatedAt = DateTime.now()
-                                                        .millisecondsSinceEpoch
-                                                    ..customCoverImage =
-                                                        imageBytes
-                                                            ?.getCoverImage,
-                                                );
-                                              });
-                                              if (context.mounted) {
-                                                Navigator.pop(context, "ok");
-                                              }
-                                            },
-                                            child: Text(context.l10n.ok),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  );
-                                },
+                          button(
+                            context.l10n.set_as_cover,
+                            Icons.image_outlined,
+                            () async {
+                              final imageBytes = await _player.screenshot(
+                                format: "image/png",
+                                includeLibassSubtitles: _includeSubtitles,
                               );
-                              if (res != null &&
-                                  res == "ok" &&
-                                  context.mounted) {
-                                Navigator.pop(context);
-                                botToast(context.l10n.cover_updated, second: 3);
+                              if (context.mounted) {
+                                final res = await showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return AlertDialog(
+                                      content: Text(
+                                        context.l10n.use_this_as_cover_art,
+                                      ),
+                                      actions: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                              },
+                                              child: Text(context.l10n.cancel),
+                                            ),
+                                            const SizedBox(width: 15),
+                                            TextButton(
+                                              onPressed: () {
+                                                final manga =
+                                                    episode.manga.value!;
+                                                isar.writeTxnSync(() {
+                                                  isar.mangas.putSync(
+                                                    manga
+                                                      ..updatedAt = DateTime.now()
+                                                          .millisecondsSinceEpoch
+                                                      ..customCoverImage =
+                                                          imageBytes
+                                                              ?.getCoverImage,
+                                                  );
+                                                });
+                                                if (context.mounted) {
+                                                  Navigator.pop(context, "ok");
+                                                }
+                                              },
+                                              child: Text(context.l10n.ok),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (res != null &&
+                                    res == "ok" &&
+                                    context.mounted) {
+                                  Navigator.pop(context);
+                                  botToast(
+                                    context.l10n.cover_updated,
+                                    second: 3,
+                                  );
+                                }
                               }
-                            }
-                          }),
+                            },
+                          ),
                           button(
                             context.l10n.share,
                             Icons.share_outlined,

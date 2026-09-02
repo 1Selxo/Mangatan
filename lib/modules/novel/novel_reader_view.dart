@@ -1014,10 +1014,16 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                   _initializeSavedEpubSpine(epubBook!);
                   _updateStatsCharacterBounds(epubBook!);
                 }
-                _currentHtmlContent = data.$1;
+                final renderedHtml = data.$2 != null && Platform.isLinux
+                    ? selectEpubLogicalSectionContent(
+                        data.$2!,
+                        epubChapterSpineIndex(chapter),
+                      )
+                    : data.$1;
+                _currentHtmlContent = renderedHtml;
                 final chapterCharacterCount = _usingTtsuReader
                     ? 0
-                    : chimahonChapterCharacterCount(data.$1);
+                    : chimahonChapterCharacterCount(renderedHtml);
                 return Stack(
                   children: [
                     Column(
@@ -1195,14 +1201,15 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                 child: ValueListenableBuilder<({int paragraph, int wordStart, int wordEnd})>(
                                                   valueListenable: _ttsProgress,
                                                   builder: (context, tts, _) {
-                                                    String htmlData = data.$1;
+                                                    String htmlData =
+                                                        renderedHtml;
                                                     if (_showTts &&
                                                         tts.paragraph >= 0) {
                                                       final result =
                                                           NovelTtsService
                                                               .instance
                                                               .highlightHtml(
-                                                                data.$1,
+                                                                renderedHtml,
                                                                 tts.paragraph,
                                                                 wordStart: tts
                                                                     .wordStart,
@@ -1566,6 +1573,17 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                     ),
                     _appBar(),
                     _bottomBar(backgroundColor),
+                    if (isDesktop && !_isView)
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: FloatingActionButton.small(
+                          heroTag: null,
+                          tooltip: 'Show reader controls',
+                          onPressed: _isViewFunction,
+                          child: const Icon(Icons.tune_rounded),
+                        ),
+                      ),
                     ReaderAutoScrollButton(
                       isContinuousMode: true,
                       isUiVisible: _isView,

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -6,6 +7,33 @@ import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart'
 import 'package:mangayomi/services/get_html_content.dart';
 
 void main() {
+  test('Linux mouse selections trigger lookup without a context-menu step', () {
+    expect(
+      novelSelectionShouldAutoLookup(
+        platform: TargetPlatform.linux,
+        pointerKind: PointerDeviceKind.mouse,
+        selectedText: '辞書',
+      ),
+      isTrue,
+    );
+    expect(
+      novelSelectionShouldAutoLookup(
+        platform: TargetPlatform.linux,
+        pointerKind: PointerDeviceKind.touch,
+        selectedText: '辞書',
+      ),
+      isFalse,
+    );
+    expect(
+      novelSelectionShouldAutoLookup(
+        platform: TargetPlatform.windows,
+        pointerKind: PointerDeviceKind.mouse,
+        selectedText: '辞書',
+      ),
+      isFalse,
+    );
+  });
+
   testWidgets('novel content is exposed through Flutter text selection', (
     tester,
   ) async {

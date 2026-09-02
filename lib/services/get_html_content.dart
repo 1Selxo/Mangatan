@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:collection';
 import 'dart:io';
+
 import 'package:html/dom.dart' as dom;
 import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:html/parser.dart';
@@ -213,6 +214,47 @@ String selectEpubChapterContent(EpubNovel book, String? chapterPath) {
   }
 
   return buildContinuousEpubContent(book);
+}
+
+/// Builds only the logical EPUB section containing [spineIndex].
+///
+/// Linux currently uses the Flutter HTML compatibility renderer because the
+/// embedded browser plugin has no Linux implementation. Rendering a whole
+/// novel as one Flutter widget tree is prohibitively expensive, so keep the
+/// active TOC section and let the existing previous/next chapter navigation
+/// move between sections.
+String selectEpubLogicalSectionContent(EpubNovel book, int? spineIndex) {
+  if (spineIndex == null || book.chapters.isEmpty) {
+    return buildContinuousEpubContent(book);
+  }
+
+  var start = 0;
+  for (var index = 0; index < book.chapters.length; index++) {
+    final chapter = book.chapters[index];
+    if (chapter.spineIndex > spineIndex) break;
+    if (chapter.isNavigationEntry) start = index;
+  }
+  var end = book.chapters.length;
+  for (var index = start + 1; index < book.chapters.length; index++) {
+    if (book.chapters[index].isNavigationEntry) {
+      end = index;
+      break;
+    }
+  }
+
+  return buildContinuousEpubContent(
+    EpubNovel(
+      name: book.name,
+      cover: book.cover,
+      summary: book.summary,
+      author: book.author,
+      language: book.language,
+      artist: book.artist,
+      chapters: book.chapters.sublist(start, end),
+      images: book.images,
+      stylesheets: book.stylesheets,
+    ),
+  );
 }
 
 String epubSpineMarkerId(int spineIndex) => 'mangatan-spine-$spineIndex';

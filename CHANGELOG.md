@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.2.17+197 - 2026-09-02
+
+- Improved Linux video playback performance by sizing the native mpv texture
+  to the visible physical viewport instead of rendering unnecessarily large
+  source-resolution frames.
+- Made multi-dictionary imports use streaming ZIP inspection and the native
+  low-memory path, continue after an individual archive fails, and preserve
+  dictionaries that imported successfully.
+- Added a Linux documents-directory fallback when `xdg-user-dir` is missing
+  and clearer guidance when a D-Bus file picker is unavailable.
+- Fixed first-run content-type and extension-repository selection so manga,
+  anime, and novel repositories remain assigned to the intended sections.
+- Improved local EPUB performance by rendering one logical section at a time,
+  added an always-accessible reader-controls button, and enabled debounced
+  mouse-selection dictionary lookup on Linux.
+
 ## 1.2.16+196 - 2026-09-01
 
 - Fixed desktop video-player shortcuts intermittently stopping after the

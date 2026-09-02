@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 1.2.17+197 - 2026-09-02
+## 1.2.17+198 - 2026-09-02
 
 - Improved Linux video playback performance by sizing the native mpv texture
   to the visible physical viewport instead of rendering unnecessarily large
@@ -17,6 +17,8 @@
 - Improved local EPUB performance by rendering one logical section at a time,
   added an always-accessible reader-controls button, and enabled debounced
   mouse-selection dictionary lookup on Linux.
+- Repaired malformed MPEG-TS data from affected Mihon proxy streams before
+  decoding, preventing recurring AAC playback errors on VidPlay episodes.
 
 ## 1.2.16+196 - 2026-09-01
 

@@ -15,14 +15,14 @@
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
       "version": "1.2.17",
-      "versionDate": "2026-09-02T15:25:12Z",
+      "versionDate": "2026-09-02T19:09:21Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.197-b45f4f7-ios.ipa",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.198-93a2aca-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176978628,
+      "size": 176982154,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -31,10 +31,10 @@
       "versions": [
         {
           "version": "1.2.17",
-          "date": "2026-09-02T15:25:12Z",
+          "date": "2026-09-02T19:09:21Z",
           "localizedDescription": "",
-          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.197-b45f4f7-ios.ipa",
-          "size": 176978628
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.198-93a2aca-ios.ipa",
+          "size": 176982154
         },
         {
           "version": "1.2.16",

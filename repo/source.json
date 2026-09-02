@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.16",
-      "versionDate": "2026-08-31T22:58:10Z",
-      "versionDescription": "What's Changed\n\n\u2022 Fixed desktop video\u2022player shortcuts intermittently stopping after the controls faded out by preserving keyboard focus inside the player.\n\u2022 Fixed subtitle dictionary popups mixing stale results during rapid hover lookups and improved dismissal when the native WebView misses mouse\u2022exit events.\n\n**Full Changelog**: https://github.com/1Selxo/Mangatan/compare/v1.2.15...v1.2.16\r\n",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.16/Mangatan-v1.2.16-build.196-18c7795-ios.ipa",
+      "version": "1.2.17",
+      "versionDate": "2026-09-02T15:25:12Z",
+      "versionDescription": "",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.197-b45f4f7-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176972363,
+      "size": 176978628,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.17",
+          "date": "2026-09-02T15:25:12Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.197-b45f4f7-ios.ipa",
+          "size": 176978628
+        },
+        {
           "version": "1.2.16",
           "date": "2026-08-31T22:58:10Z",
-          "localizedDescription": "What's Changed\n\n\u2022 Fixed desktop video\u2022player shortcuts intermittently stopping after the controls faded out by preserving keyboard focus inside the player.\n\u2022 Fixed subtitle dictionary popups mixing stale results during rapid hover lookups and improved dismissal when the native WebView misses mouse\u2022exit events.\n\n**Full Changelog**: https://github.com/1Selxo/Mangatan/compare/v1.2.15...v1.2.16\r\n",
+          "localizedDescription": "What's Changed\n\n\u2022 Fixed desktop video\u2022player shortcuts intermittently stopping after the controls faded out by preserving keyboard focus inside the player.\n\u2022 Fixed subtitle dictionary popups mixing stale results during rapid hover lookups and improved dismissal when the native WebView misses mouse\u2022exit events.\n\n**Full Changelog**: https://github.com/1Selxo/Mangatan/compare/v1.2.15...v1.2.16",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.16/Mangatan-v1.2.16-build.196-18c7795-ios.ipa",
           "size": 176972363
         },
@@ -279,6 +286,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.16"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.17 - 02 Sep",
+      "identifier": "release-1.2.17",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-09-02T15:25:12Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.17"
     }
   ]
 }

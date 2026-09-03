@@ -1,0 +1,22 @@
+name: Private Build & Release
+
+on:
+  push:
+    tags:
+      - "private-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing private release tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    uses: ./.github/workflows/release.yml
+    with:
+      private_release: true
+      release_tag: ${{ inputs.release_tag || github.ref_name }}

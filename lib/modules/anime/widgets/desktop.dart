@@ -6,9 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
+import 'package:mangayomi/modules/anime/providers/state_provider.dart';
+import 'package:mangayomi/modules/anime/utils/player_keyboard_listener.dart';
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
-import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/player_hotkeys.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/extensions/duration.dart';
@@ -17,32 +20,31 @@ import 'package:window_manager/window_manager.dart';
 class DesktopControllerWidget extends ConsumerStatefulWidget {
   final Function(Duration?) tempDuration;
   final Function(bool?) doubleSpeed;
-  final AnimeStreamController streamController;
   final VideoController videoController;
   final Widget topButtonBarWidget;
-  final GlobalKey<VideoState> videoStatekey;
+  final Widget primaryButtonBarWidget;
   final Widget bottomButtonBarWidget;
-  final Widget seekToWidget;
   final int defaultSkipIntroLength;
   final void Function(bool) desktopFullScreenPlayer;
   final ValueNotifier<List<(String, int)>> chapterMarks;
-  // Bumped by the player on each d-pad key so the desktop controls can reveal on
-  // a TV remote — they otherwise only appear on mouse hover. Null off-TV.
-  final ValueNotifier<int>? revealControls;
+  final Future<MiningContext> Function(String text)?
+  subtitleMiningContextBuilder;
+  final bool videoOcrActive;
+  final Future<void> Function()? onVideoOcrShortcut;
   const DesktopControllerWidget({
     super.key,
     required this.videoController,
     required this.topButtonBarWidget,
+    required this.primaryButtonBarWidget,
     required this.bottomButtonBarWidget,
-    required this.streamController,
-    required this.videoStatekey,
-    required this.seekToWidget,
     required this.tempDuration,
     required this.doubleSpeed,
     required this.defaultSkipIntroLength,
     required this.desktopFullScreenPlayer,
     required this.chapterMarks,
-    this.revealControls,
+    this.subtitleMiningContextBuilder,
+    this.videoOcrActive = false,
+    this.onVideoOcrShortcut,
   });
 
   @override
@@ -67,27 +69,36 @@ class _DesktopControllerWidgetState
   final controlsHoverDuration = const Duration(seconds: 3);
   double buttonBarHeight = 100;
   final bottomButtonBarMargin = const EdgeInsets.only(left: 16.0, right: 8.0);
+  final GlobalKey _subtitleOverlayKey = GlobalKey();
+  final GlobalKey _seekBarKey = GlobalKey();
+  double _subtitleBottomInset = 24;
+  bool _subtitleAnchorUpdateScheduled = false;
 
   final List<StreamSubscription> subscriptions = [];
   DateTime last = DateTime.now();
   Timer? _tapTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Reveal on a d-pad key (TV remote) — the desktop controls otherwise only
-    // appear on mouse hover, which a remote can't trigger.
-    widget.revealControls?.addListener(_onRevealRequest);
-  }
-
-  void _onRevealRequest() {
-    if (mounted) onEnter();
-  }
+  DateTime? _lastSpaceShortcutAt;
+  List<PlayerHotkeyBinding> _hotkeys = PlayerHotkeyStore.defaults;
 
   @override
   void setState(VoidCallback fn) {
     if (mounted) {
       super.setState(fn);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadHotkeys());
+  }
+
+  Future<void> _loadHotkeys() async {
+    try {
+      final hotkeys = await PlayerHotkeyStore.load();
+      if (mounted) setState(() => _hotkeys = hotkeys);
+    } catch (error) {
+      debugPrint('Could not load player hotkeys: $error');
     }
   }
 
@@ -115,7 +126,6 @@ class _DesktopControllerWidgetState
 
   @override
   void dispose() {
-    widget.revealControls?.removeListener(_onRevealRequest);
     for (final subscription in subscriptions) {
       subscription.cancel();
     }
@@ -123,6 +133,12 @@ class _DesktopControllerWidgetState
     _timer?.cancel();
     _tapTimer?.cancel();
     super.dispose();
+  }
+
+  void _unmountHiddenControls() {
+    if (visible) return;
+
+    setState(() => mount = false);
   }
 
   void onHover() {
@@ -170,134 +186,178 @@ class _DesktopControllerWidgetState
     _timer?.cancel();
   }
 
+  void _scheduleSubtitleAnchorUpdate() {
+    if (_subtitleAnchorUpdateScheduled) return;
+    _subtitleAnchorUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _subtitleAnchorUpdateScheduled = false;
+      if (!mounted) return;
+      final overlay =
+          _subtitleOverlayKey.currentContext?.findRenderObject() as RenderBox?;
+      final seekBar =
+          _seekBarKey.currentContext?.findRenderObject() as RenderBox?;
+      if (overlay == null || seekBar == null) return;
+      final seekBarTop = overlay
+          .globalToLocal(seekBar.localToGlobal(Offset.zero))
+          .dy;
+      final inset = subtitleBottomInsetForSeekBar(
+        playerHeight: overlay.size.height,
+        seekBarTop: seekBarTop,
+      );
+      if ((inset - _subtitleBottomInset).abs() > 0.5) {
+        setState(() => _subtitleBottomInset = inset);
+      }
+    });
+  }
+
   final bool modifyVolumeOnScroll = true; // TODO. The variable is never changed
   final bool toggleFullscreenOnDoublePress = true; // TODO. variable not changed
+  static const _spaceDoublePressWindow = Duration(milliseconds: 360);
+
+  void _handleSpaceShortcut() {
+    final onVideoOcrShortcut = widget.onVideoOcrShortcut;
+    if (widget.videoOcrActive && onVideoOcrShortcut != null) {
+      _lastSpaceShortcutAt = null;
+      unawaited(onVideoOcrShortcut());
+      return;
+    }
+    final now = DateTime.now();
+    final lastSpaceShortcutAt = _lastSpaceShortcutAt;
+    if (lastSpaceShortcutAt != null &&
+        now.difference(lastSpaceShortcutAt) <= _spaceDoublePressWindow) {
+      _lastSpaceShortcutAt = null;
+      if (onVideoOcrShortcut != null) {
+        unawaited(onVideoOcrShortcut());
+        return;
+      }
+    }
+    _lastSpaceShortcutAt = now;
+    widget.videoController.player.playOrPause();
+  }
+
+  bool _handleHardwareKey(KeyEvent event) {
+    if (!isPlayerShortcutPress(event) ||
+        ModalRoute.of(context)?.isCurrent == false ||
+        _textInputHasFocus()) {
+      return false;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    for (final binding in _hotkeys) {
+      if (playerHotkeyMatches(
+        binding,
+        event,
+        controlPressed: keyboard.isControlPressed,
+        altPressed: keyboard.isAltPressed,
+        shiftPressed: keyboard.isShiftPressed,
+        metaPressed: keyboard.isMetaPressed,
+      )) {
+        _performHotkeyAction(binding.action);
+        return true;
+      }
+    }
+
+    if (keyboard.isControlPressed &&
+        !keyboard.isAltPressed &&
+        !keyboard.isShiftPressed &&
+        !keyboard.isMetaPressed) {
+      final scriptMessage = switch (event.logicalKey) {
+        LogicalKeyboardKey.digit0 => 'clear_anime',
+        LogicalKeyboardKey.digit1 => 'set_anime_a',
+        LogicalKeyboardKey.digit2 => 'set_anime_b',
+        LogicalKeyboardKey.digit3 => 'set_anime_c',
+        LogicalKeyboardKey.digit4 => 'set_anime_aa',
+        LogicalKeyboardKey.digit5 => 'set_anime_bb',
+        LogicalKeyboardKey.digit6 => 'set_anime_ca',
+        _ => null,
+      };
+      if (scriptMessage != null) {
+        unawaited(
+          (widget.videoController.player.platform as NativePlayer).command([
+            'script-message',
+            scriptMessage,
+          ]),
+        );
+        return true;
+      }
+    }
+
+    final mpvKey = mpvInputKeyForPlayerShortcut(event.logicalKey);
+    if (mpvKey != null &&
+        !keyboard.isControlPressed &&
+        !keyboard.isAltPressed &&
+        !keyboard.isShiftPressed &&
+        !keyboard.isMetaPressed) {
+      unawaited(
+        (widget.videoController.player.platform as NativePlayer).command([
+          'keypress',
+          mpvKey,
+        ]),
+      );
+      return true;
+    }
+    return false;
+  }
+
+  bool _textInputHasFocus() {
+    var context = FocusManager.instance.primaryFocus?.context;
+    if (context == null) return false;
+    if (context.widget is EditableText) return true;
+    var editable = false;
+    context.visitAncestorElements((element) {
+      if (element.widget is EditableText) {
+        editable = true;
+        return false;
+      }
+      return true;
+    });
+    return editable;
+  }
+
+  void _performHotkeyAction(PlayerHotkeyAction action) {
+    final player = widget.videoController.player;
+    void seekBy(int seconds) {
+      player.seek(player.state.position + Duration(seconds: seconds));
+    }
+
+    switch (action) {
+      case PlayerHotkeyAction.playPause:
+        _handleSpaceShortcut();
+      case PlayerHotkeyAction.play:
+        player.play();
+      case PlayerHotkeyAction.pause:
+        player.pause();
+      case PlayerHotkeyAction.seekBackward5:
+        seekBy(-5);
+      case PlayerHotkeyAction.seekForward5:
+        seekBy(5);
+      case PlayerHotkeyAction.seekBackward10:
+        seekBy(-10);
+      case PlayerHotkeyAction.seekForward10:
+        seekBy(10);
+      case PlayerHotkeyAction.skipIntro:
+        seekBy(widget.defaultSkipIntroLength);
+      case PlayerHotkeyAction.toggleFullscreen:
+        unawaited(_changeFullScreen(ref, widget.desktopFullScreenPlayer));
+      case PlayerHotkeyAction.volumeUp:
+        player.setVolume((player.state.volume + 5.0).clamp(0.0, 100.0));
+      case PlayerHotkeyAction.volumeDown:
+        player.setVolume((player.state.volume - 5.0).clamp(0.0, 100.0));
+      case PlayerHotkeyAction.nextMedia:
+        player.next();
+      case PlayerHotkeyAction.previousMedia:
+        player.previous();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return CallbackShortcuts(
-      bindings: {
-        // Default key-board shortcuts.
-        // https://support.google.com/youtube/answer/7631406
-        const SingleActivator(LogicalKeyboardKey.mediaPlay): () =>
-            widget.videoController.player.play(),
-        const SingleActivator(LogicalKeyboardKey.mediaPause): () =>
-            widget.videoController.player.pause(),
-        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): () =>
-            widget.videoController.player.playOrPause(),
-        const SingleActivator(LogicalKeyboardKey.mediaTrackNext): () =>
-            widget.videoController.player.next(),
-        const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious): () =>
-            widget.videoController.player.previous(),
-        const SingleActivator(LogicalKeyboardKey.space): () =>
-            widget.videoController.player.playOrPause(),
-        const SingleActivator(LogicalKeyboardKey.keyJ): () {
-          final rate =
-              widget.videoController.player.state.position -
-              const Duration(seconds: 10);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.keyL): () {
-          final rate =
-              widget.videoController.player.state.position +
-              const Duration(seconds: 10);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.enter): () {
-          final rate =
-              widget.videoController.player.state.position +
-              Duration(seconds: widget.defaultSkipIntroLength);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.keyS): () {
-          final rate =
-              widget.videoController.player.state.position +
-              Duration(seconds: widget.defaultSkipIntroLength);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
-          final rate =
-              widget.videoController.player.state.position -
-              const Duration(seconds: 5);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () {
-          final rate =
-              widget.videoController.player.state.position +
-              const Duration(seconds: 5);
-          widget.videoController.player.seek(rate);
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowUp): () {
-          final volume = widget.videoController.player.state.volume + 5.0;
-          widget.videoController.player.setVolume(volume.clamp(0.0, 100.0));
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowDown): () {
-          final volume = widget.videoController.player.state.volume - 5.0;
-          widget.videoController.player.setVolume(volume.clamp(0.0, 100.0));
-        },
-        const SingleActivator(LogicalKeyboardKey.keyF): () async {
-          await _changeFullScreen(ref, widget.desktopFullScreenPlayer);
-        },
-        const SingleActivator(LogicalKeyboardKey.escape): () async {
-          final desktopFullScreenPlayer = widget.desktopFullScreenPlayer;
-          await _changeFullScreen(ref, desktopFullScreenPlayer, value: false);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit0, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "clear_anime",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit1, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_a",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit2, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_b",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit3, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_c",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit4, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_aa",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit5, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_bb",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit6, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_ca",
-          ]);
-        },
-      },
+    _scheduleSubtitleAnchorUpdate();
+    return PlayerHardwareKeyboardListener(
+      onKeyEvent: _handleHardwareKey,
       child: Stack(
+        key: _subtitleOverlayKey,
         children: [
-          Consumer(
-            builder: (context, ref, _) => ref.read(useLibassStateProvider)
-                ? const SizedBox.shrink()
-                : Positioned(
-                    child: CustomSubtitleView(
-                      controller: widget.videoController,
-                      configuration: SubtitleViewConfiguration(
-                        style: subtileTextStyle(ref),
-                      ),
-                    ),
-                  ),
-          ),
           Focus(
             autofocus: true,
             child: Listener(
@@ -392,41 +452,23 @@ class _DesktopControllerWidgetState
                         opacity: visible ? 1.0 : 0.0,
                         duration: controlsTransitionDuration,
                         onEnd: () {
-                          if (!visible) {
-                            setState(() {
-                              mount = false;
-                            });
-                          }
+                          _unmountHiddenControls();
                         },
                         child: Stack(
                           clipBehavior: Clip.none,
                           alignment: Alignment.bottomCenter,
                           children: [
-                            // Top gradient.
                             Container(
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
-                                  stops: [0.0, 0.2],
+                                  stops: [0.0, 0.2, 0.7, 1.0],
                                   colors: [
-                                    Color(0x61000000),
+                                    Color(0xCC000000),
                                     Color(0x00000000),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Bottom gradient.
-                            Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  stops: [0.5, 1.0],
-                                  colors: [
                                     Color(0x00000000),
-                                    Color(0x61000000),
+                                    Color(0xCC000000),
                                   ],
                                 ),
                               ),
@@ -442,32 +484,48 @@ class _DesktopControllerWidgetState
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  // Expanded only controls the main axis of a
+                                  // Column. Stretch the cross axis as well so
+                                  // the centered control Stack gets the full
+                                  // player width instead of being pinned right.
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     widget.topButtonBarWidget,
-                                    // Only display [primaryButtonBar] if [buffering] is false.
                                     Expanded(
-                                      child: AnimatedOpacity(
-                                        curve: Curves.easeInOut,
-                                        opacity: buffering
-                                            ? 0.0
-                                            : !showSwipeDuration
-                                            ? 0.0
-                                            : 1.0,
-                                        duration: controlsTransitionDuration,
-                                        child: Center(
-                                          child: seekIndicatorTextWidget(
-                                            Duration(seconds: swipeDuration),
-                                            widget
-                                                .videoController
-                                                .player
-                                                .state
-                                                .position,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          AnimatedOpacity(
+                                            curve: Curves.easeInOut,
+                                            opacity:
+                                                !buffering && !showSwipeDuration
+                                                ? 1.0
+                                                : 0.0,
+                                            duration:
+                                                controlsTransitionDuration,
+                                            child:
+                                                widget.primaryButtonBarWidget,
                                           ),
-                                        ),
+                                          AnimatedOpacity(
+                                            curve: Curves.easeInOut,
+                                            opacity: showSwipeDuration
+                                                ? 1.0
+                                                : 0.0,
+                                            duration:
+                                                controlsTransitionDuration,
+                                            child: seekIndicatorTextWidget(
+                                              Duration(seconds: swipeDuration),
+                                              widget
+                                                  .videoController
+                                                  .player
+                                                  .state
+                                                  .position,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    widget.seekToWidget,
                                     Transform.translate(
                                       offset: Offset.zero,
                                       child: Padding(
@@ -475,6 +533,7 @@ class _DesktopControllerWidgetState
                                           horizontal: 5,
                                         ),
                                         child: CustomSeekBar(
+                                          key: _seekBarKey,
                                           onSeekStart: (value) {
                                             setState(() {
                                               swipeDuration = value.inSeconds;
@@ -573,6 +632,28 @@ class _DesktopControllerWidgetState
                 ),
               ),
             ),
+          ),
+          Consumer(
+            builder: (context, ref, _) {
+              final subtitleSettings = ref.watch(subtitleSettingsStateProvider);
+              return Positioned(
+                child: CustomSubtitleView(
+                  controller: widget.videoController,
+                  configuration: SubtitleViewConfiguration(
+                    style: subtileTextStyle(ref),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      _subtitleBottomInset,
+                    ),
+                  ),
+                  paintSubtitle: true,
+                  verticalOffset: (subtitleSettings.position ?? 0).toDouble(),
+                  miningContextBuilder: widget.subtitleMiningContextBuilder,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -885,12 +966,26 @@ class _CustomMaterialDesktopFullscreenButtonState
   }
 }
 
+bool _restoreMaximizedAfterFullscreen = false;
+
 Future<bool> setFullScreen({bool? value}) async {
-  if (value != null) {
-    await windowManager.setFullScreen(value);
-    return value;
+  final current = await windowManager.isFullScreen();
+  final target = value ?? !current;
+  if (target == current) return current;
+
+  if (target) {
+    _restoreMaximizedAfterFullscreen = await windowManager.isMaximized();
+    if (_restoreMaximizedAfterFullscreen) {
+      await windowManager.unmaximize();
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+    }
+    await windowManager.setFullScreen(true);
+  } else {
+    await windowManager.setFullScreen(false);
+    if (_restoreMaximizedAfterFullscreen) {
+      await windowManager.maximize();
+    }
+    _restoreMaximizedAfterFullscreen = false;
   }
-  final isFullScreen = await windowManager.isFullScreen();
-  await windowManager.setFullScreen(!isFullScreen);
-  return !isFullScreen;
+  return target;
 }

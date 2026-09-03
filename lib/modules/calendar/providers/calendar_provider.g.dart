@@ -64,7 +64,7 @@ final class GetCalendarStreamProvider
   }
 }
 
-String _$getCalendarStreamHash() => r'b82aed18cf81696e1e877506b86016f69f9efed9';
+String _$getCalendarStreamHash() => r'850d81742f8ac5ce88175732c0edf57a7a9295d4';
 
 final class GetCalendarStreamFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<Manga>>, ItemType?> {

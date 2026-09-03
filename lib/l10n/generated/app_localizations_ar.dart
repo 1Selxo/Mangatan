@@ -31,25 +31,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get import => 'استيراد';
 
   @override
-  String get filter => 'مرشح';
+  String get filter => 'تصفية';
 
   @override
-  String get ignore_filters => 'تجاهل مرشح';
+  String get ignore_filters => 'تجاهل عوامل التصفية';
 
   @override
-  String get downloaded => 'تم التحميل';
+  String get downloaded => 'تم تنزيله';
 
   @override
   String get unread => 'غير مقروء';
 
   @override
-  String get unwatched => 'لم يشاهد';
+  String get unwatched => 'غير مُشاهَد';
 
   @override
-  String get started => 'بدأ';
+  String get started => 'بدأت';
 
   @override
-  String get bookmarked => 'مُرجع';
+  String get bookmarked => 'في المفضلة';
 
   @override
   String get sort => 'ترتيب';
@@ -77,10 +77,10 @@ class AppLocalizationsAr extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'أنت بتحذف كل الـ$count $entryTypePlural من هذا الـ$mediaType من المكتبة.',
-      one: 'أنت بتحذف الـ$entryType الوحيد من هذا الـ$mediaType من المكتبة.',
+          'أنت تحذف جميع $count $entryTypePlural لهذا $mediaType من المكتبة.',
+      one: 'أنت تحذف $entryType الوحيد لهذا $mediaType من المكتبة.',
     );
-    return '$_temp0\nهذا كمان هيشيل الـ$mediaType بالكامل من مكتبتك.\n\nملاحظة: الملفات نفسها مش هتتحذف.';
+    return '$_temp0\nسيؤدي ذلك أيضًا إلى إزالة $mediaType بالكامل من مكتبتك.\n\nملاحظة: لن تُحذف الملفات نفسها.';
   }
 
   @override
@@ -155,7 +155,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get show_numbers_of_items => 'إظهار عدد العناصر';
 
   @override
-  String get other => 'آخر';
+  String get other => 'أخرى';
 
   @override
   String get show_continue_reading_buttons =>
@@ -500,6 +500,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statistics => 'الإحصائيات';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => 'الإعدادات';
 
   @override
@@ -526,14 +529,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get name => 'اسم';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label: $value';
-  }
-
-  @override
-  String get url => 'الرابط';
 
   @override
   String get category_name_required => '*مطلوب';
@@ -569,6 +564,18 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get appearance_subtitle => 'الثيم، تنسيق التاريخ والوقت';
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
 
   @override
   String get theme => 'الثيم';
@@ -628,10 +635,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get reading_mode_right_to_left => 'من اليمين إلى اليسار';
 
   @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
   String get reading_mode_vertical_continuous => 'عمودي مستمر';
 
   @override
   String get reading_mode_webtoon => 'ويبتون';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => 'سرعة النقر المزدوج';
@@ -695,11 +726,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get version => 'الإصدار';
 
   @override
-  String beta_version(Object version) {
-    return 'تجريبي ($version)';
-  }
-
-  @override
   String get check_for_update => 'التحقق من التحديثات';
 
   @override
@@ -753,20 +779,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unknown => 'غير معروف';
 
   @override
-  String get empty_placeholder => 'فارغ';
-
-  @override
-  String get error => 'خطأ';
-
-  @override
-  String error_with_message(Object error) {
-    return 'خطأ: $error';
-  }
-
-  @override
-  String get no_pages_available => 'خطأ: لا توجد صفحات متاحة';
-
-  @override
   String get set_categories => 'ضبط الفئات';
 
   @override
@@ -795,84 +807,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get source_title => 'عنوان المصدر';
-
-  @override
-  String get create_extension => 'إنشاء إضافة';
-
-  @override
-  String get choose_extension_language => 'اختر لغة الإضافة';
-
-  @override
-  String get lang => 'اللغة';
-
-  @override
-  String get base_url => 'الرابط الأساسي';
-
-  @override
-  String get api_url_optional => 'رابط API (اختياري)';
-
-  @override
-  String get icon_url => 'رابط الأيقونة';
-
-  @override
-  String get source_icon_url => 'رابط أيقونة المصدر';
-
-  @override
-  String get notes => 'ملاحظات';
-
-  @override
-  String get extension_name_example => 'مثال: myAnime';
-
-  @override
-  String get language_code_example => 'مثال: ar';
-
-  @override
-  String get base_url_example => 'مثال: https://example.com';
-
-  @override
-  String get api_url_example => 'مثال: https://api.example.com';
-
-  @override
-  String get extension_notes_example => 'مثال: هذه الإضافة تتطلب تسجيل الدخول';
-
-  @override
-  String get type => 'النوع';
-
-  @override
-  String get target => 'الهدف';
-
-  @override
-  String get source_type_single => 'فردي';
-
-  @override
-  String get source_type_multi => 'متعدد';
-
-  @override
-  String get source_type_torrent => 'تورنت';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'JS مجمع لـ LNReader';
-
-  @override
-  String get source_created_successfully => 'تم إنشاء المصدر بنجاح';
-
-  @override
-  String get source_already_exists => 'المصدر موجود بالفعل';
-
-  @override
-  String get error_when_creating_source => 'خطأ أثناء إنشاء المصدر';
-
-  @override
-  String get cookies_deleted => 'تم حذف ملفات تعريف الارتباط!';
-
-  @override
-  String get delete_all_cookies => 'حذف جميع ملفات تعريف الارتباط';
 
   @override
   String get chapter_number => 'رقم الفصل';
@@ -1051,7 +985,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tracking => 'تتبع';
 
   @override
-  String get syncing => 'مزامنة';
+  String get syncing => 'جارٍ إجراء المزامنة';
 
   @override
   String get sync_password => 'كلمة المرور (على الأقل 8 أحرف)';
@@ -1061,16 +995,16 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get syncing_subtitle =>
-      'قم بمزامنة تقدمك عبر أجهزة متعددة عبر خادم مستضاف ذاتيًا. اطّلع على خادم الخلاف الخاص بنا لمزيد من المعلومات!';
+      'زامن تقدمك على عدة أجهزة عبر خادم مستضاف ذاتيًا. اطّلع على خادم Discord الخاص بنا لمزيد من المعلومات!';
 
   @override
-  String get last_sync_manga => 'آخر مزامنة مانغا في:';
+  String get last_sync_manga => 'آخر مزامنة للمانجا:';
 
   @override
-  String get last_sync_history => 'آخر مزامنة للتاريخ في:';
+  String get last_sync_history => 'آخر مزامنة للسجل:';
 
   @override
-  String get last_sync_update => 'آخر مزامنة تحديث في:';
+  String get last_sync_update => 'آخر مزامنة للتحديثات:';
 
   @override
   String get sync_server => 'عنوان خادم المزامنة';
@@ -1085,7 +1019,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sync_finished => 'تم الانتهاء من المزامنة';
 
   @override
-  String get sync_failed => 'فشل المزامنة';
+  String get sync_failed => 'فشلت المزامنة';
 
   @override
   String get sync_restore_in_progress =>
@@ -1106,7 +1040,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      'ستستبدل هذه العملية البيانات المحلية بالكامل بالبيانات البعيدة!';
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_status_not_configured => 'غير متصل';
@@ -1569,11 +1503,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'اللغات المفضلة، تصحيح طبقة الصوت، قنوات الصوت';
 
   @override
-  String get player => 'لاعب';
+  String get player => 'المشغل';
 
   @override
   String get markEpisodeAsSeenSetting =>
-      'في أي نقطة لوضع علامة على الحلقة كمشاهدة';
+      'النقطة التي تُعلَّم عندها الحلقة كمُشاهدة';
 
   @override
   String get mark_duplicate_chapters_read =>
@@ -1624,7 +1558,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String updating_library(Object cur, Object failed, Object max) {
-    return 'جاري تحديث المكتبة ($max / $cur) - فشل: $failed';
+    return 'جارٍ تحديث المكتبة ($cur / $max) - الفاشلة: $failed';
   }
 
   @override
@@ -1802,7 +1736,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get use_native_http_client_info =>
-      'يدعم تلقائيًا ميزات المنصة مثل الشبكات الافتراضية الخاصة (VPNs)، ويدعم ميزات HTTP أكثر مثل HTTP/3 ومعالجة إعادة التوجيه المخصصة';
+      'يدعم تلقائيًا ميزات المنصة مثل الشبكات الافتراضية الخاصة (VPNs)، وميزات HTTP إضافية مثل HTTP/3 ومعالجة إعادة التوجيه المخصصة.';
 
   @override
   String n_hour_ago(Object hour) {
@@ -1941,8 +1875,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get url_cannot_be_empty => 'لا يمكن أن يكون عنوان URL فارغًا';
 
   @override
-  String get url_must_end_with_dot_json_or_dot_pb =>
-      'يجب أن ينتهي عنوان URL بـ .json / .pb';
+  String get url_must_end_with_dot_json => 'URL must end with .json';
 
   @override
   String get repo_url => 'عنوان URL للمستودع';
@@ -1958,7 +1891,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'سيؤدي هذا إلى مسح جميع مصادر التطبيق تمامًا. هل أنت متأكد أنك تريد المتابعة؟';
 
   @override
-  String get sources_cleared => 'تم مسح المصادر!!!';
+  String get sources_cleared => 'تم مسح المصادر!';
 
   @override
   String get repo_added => 'تمت إضافة مستودع المصدر!';
@@ -1970,10 +1903,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get add_repo => 'إضافة مستودع؟';
 
   @override
-  String get genre_search_library => 'بحث النوع في المكتبة';
+  String get genre_search_library => 'البحث عن نوع في المكتبة';
 
   @override
-  String get genre_search_source => 'تصفح في المصدر';
+  String get genre_search_source => 'البحث في المصدر';
 
   @override
   String get source_not_added => 'المصدر غير مثبت!';
@@ -1991,7 +1924,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get unsupported_repo =>
-      'لقد حاولت إضافة مستودع غير مدعوم. يرجى التحقق من خادم الخلاف للحصول على الدعم!';
+      'حاولت إضافة مستودع غير مدعوم. يرجى الرجوع إلى خادم Discord للحصول على الدعم!';
 
   @override
   String get end_of_chapter => 'نهاية الفصل';
@@ -2003,7 +1936,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get continue_to_next_chapter => 'استمر في التمرير لقراءة الفصل التالي';
 
   @override
-  String get no_next_chapter => 'لا يوجد فصل تالٍ';
+  String get no_next_chapter => 'لا يوجد فصل آخر';
 
   @override
   String get you_have_finished_reading => 'لقد انتهيت من القراءة';
@@ -2071,7 +2004,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sync_enable_settings => 'مزامنة الإعدادات';
 
   @override
-  String get enable_mpv => 'تمكين تظليل / سكريبتات mpv';
+  String get enable_mpv => 'تمكين Shaders / Scripts في mpv';
 
   @override
   String get mpv_info => 'يدعم سكريبتات .js تحت mpv/scripts/';
@@ -2236,71 +2169,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get rescan_local_folder => 'إعادة فحص جميع المجلدات المحلية الآن';
 
   @override
-  String get default_download_destination => 'مجلد التنزيل الافتراضي';
-
-  @override
-  String get ask_download_destination => 'السؤال عن وجهة التنزيل';
-
-  @override
-  String get ask_download_destination_desc => 'اختيار مجلد محلي عند كل تنزيل.';
-
-  @override
-  String get select_download_destination => 'تحديد وجهة التنزيل';
-
-  @override
-  String get clear_local_library => 'مسح المكتبة المحلية';
-
-  @override
-  String get clear_local_library_desc =>
-      'إزالة المجلدات والأرشيفات المحلية من المكتبة.';
-
-  @override
-  String get clear_local_library_msg =>
-      'سيؤدي هذا إلى إزالة المجلدات المحلية من المكتبة دون حذف الملفات من القرص.';
-
-  @override
-  String get custom => 'مخصص';
-
-  @override
-  String get no_local_folder_available_for_downloads =>
-      'لا يوجد مجلد محلي متاح للتنزيلات';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return 'فشل إنشاء CBZ: $error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return 'خطأ في قراءة صورة الغلاف: $error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return 'خطأ في قراءة البيانات الوصفية: $error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return 'خطأ في الحفظ بالمكتبة: $error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return 'خطأ في قراءة غلاف الفصل: $error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return 'خطأ في قراءة غلاف الأرشيف: $error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return 'خطأ في جلب المكتبة المحلية: $error';
-  }
-
-  @override
   String get export_metadata => 'تصدير البيانات الوصفية';
 
   @override
@@ -2419,7 +2287,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get keep_screen_on => 'إبقاء الشاشة مضاءة';
 
   @override
-  String get webtoon_side_padding => 'حشو جانب الويب توون';
+  String get webtoon_side_padding => 'الهامش الجانبي للويب تون';
 
   @override
   String get show_page_gaps => 'إظهار فجوات الصفحات';
@@ -2440,7 +2308,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get saturation => 'التشبع';
 
   @override
-  String get navigation_layout => 'تخطيط الملاحة';
+  String get navigation_layout => 'تخطيط التنقل';
 
   @override
   String get nav_layout_default => 'افتراضي';
@@ -2480,7 +2348,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String average_chapters_per_title(Object title) {
-    return 'متوسط الفصول لكل عنوان';
+    return 'متوسط الفصول لكل $title';
   }
 
   @override
@@ -2494,14 +2362,14 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get android_proxy_server_mihon_description =>
-      'قم بتنزيل وتكوين خادم البروكسي المطلوب لاستخدام امتدادات Mihon.';
+      'قم بتنزيل وتهيئة خادم الوكيل المطلوب لاستخدام إضافات Mihon.';
 
   @override
   String get mihon_proxy_server => 'خادم بروكسي Mihon';
 
   @override
   String get extension_server_intro_with_jre =>
-      'قم بتحميل حزمة خادم الوكيل قبل استخدام إضافات Mihon. تتضمن الحزمة JRE ومعلف JAR الخاص بخادم الإضافات.';
+      'قم بتنزيل حزمة خادم الوكيل قبل استخدام إضافات Mihon. تتضمن الحزمة JRE وملف JAR الخاص بخادم الإضافات.';
 
   @override
   String get extension_server_intro_ios =>
@@ -2585,7 +2453,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get ios_extension_server_import_hint =>
-      'في نظام iOS يتم تثبيت الخادم داخل صندوق رمال التطبيق. استخدم \"استيراد ملف JAR موجود\" لجلب ملف محمل.';
+      'في نظام iOS يُثبَّت الخادم داخل sandbox التطبيق. استخدم \"استيراد ملف JAR موجود\" لإضافة ملف تم تنزيله.';
 
   @override
   String get select_extension_server_folder => 'اختر مجلد خادم الإضافات';
@@ -2599,6 +2467,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get extension_server_files_linked => 'تم ربط ملفات خادم الإضافات.';
+
+  @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
 
   @override
   String get select_extension_server_jar => 'اختر ملف JAR لخادم الامتداد';
@@ -2620,35 +2495,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'عنوان IP للخادم (مثلاً 10.0.0.5 أو https://example.com)';
 
   @override
-  String get not_configured => 'غير مهيأ';
+  String get not_configured => 'لم تتم تهيئته';
 
   @override
-  String get zero_interpreter => 'مترجم Zero';
-
-  @override
-  String get zero_interpreter_description =>
-      'التحكم في خادم مترجم Zero تلقائياً أو يدوياً.';
-
-  @override
-  String get start_server_on_launch => 'تشغيل الخادم عند بدء التطبيق';
-
-  @override
-  String get runtime_status => 'حالة التشغيل';
-
-  @override
-  String get running => 'قيد التشغيل';
-
-  @override
-  String get stopped => 'متوقف';
-
-  @override
-  String get start => 'بدء';
-
-  @override
-  String get stop => 'إيقاف';
-
-  @override
-  String get webview => 'عرض الويب';
+  String get webview => 'WebView';
 
   @override
   String get tts => 'تحويل النص إلى كلام';
@@ -2657,7 +2507,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tts_speed => 'السرعة';
 
   @override
-  String get tts_pitch => 'التيمبر';
+  String get tts_pitch => 'طبقة الصوت';
 
   @override
   String get tts_language => 'اللغة';
@@ -2799,6 +2649,60 @@ class AppLocalizationsAr extends AppLocalizations {
   String get error_no_pages_available => 'خطأ: لا توجد صفحات متاحة';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
+  String get dictionary_lookup => 'Dictionary';
+
+  @override
+  String get dictionary_settings => 'Dictionary settings';
+
+  @override
+  String get dictionary_search_label => 'Search';
+
+  @override
+  String get dictionary_search_hint => 'Word, reading, or phrase';
+
+  @override
+  String get clear_search => 'Clear search';
+
+  @override
+  String dictionary_count(int count) {
+    return '$count dictionaries';
+  }
+
+  @override
+  String dictionary_anki_deck(String name) {
+    return 'Anki deck: $name';
+  }
+
+  @override
+  String get dictionary_load_failed => 'Dictionary data could not be loaded';
+
+  @override
+  String get no_dictionaries_title => 'No dictionaries installed';
+
+  @override
+  String get no_dictionaries_description =>
+      'Import a Yomitan dictionary to start looking up words.';
+
+  @override
+  String get manage_dictionaries => 'Set up dictionaries';
+
+  @override
+  String get dictionary_empty_title => 'Look up a word or phrase';
+
+  @override
+  String get dictionary_empty_description =>
+      'Search a term, expression, sentence, or block of text.';
+
+  @override
+  String get previous_lookup => 'Previous lookup';
+
+  @override
+  String get next_lookup => 'Next lookup';
+
+  @override
   String get app_ui_scale => 'حجم الواجهة';
 
   @override
@@ -2834,6 +2738,202 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get source => 'المصدر';
+
+  @override
+  String label_value(Object label, Object value) {
+    return '$label: $value';
+  }
+
+  @override
+  String get url => 'الرابط';
+
+  @override
+  String beta_version(Object version) {
+    return 'تجريبي ($version)';
+  }
+
+  @override
+  String get empty_placeholder => 'فارغ';
+
+  @override
+  String get error => 'خطأ';
+
+  @override
+  String error_with_message(Object error) {
+    return 'خطأ: $error';
+  }
+
+  @override
+  String get no_pages_available => 'خطأ: لا توجد صفحات متاحة';
+
+  @override
+  String get create_extension => 'إنشاء إضافة';
+
+  @override
+  String get choose_extension_language => 'اختر لغة الإضافة';
+
+  @override
+  String get lang => 'اللغة';
+
+  @override
+  String get base_url => 'الرابط الأساسي';
+
+  @override
+  String get api_url_optional => 'رابط API (اختياري)';
+
+  @override
+  String get icon_url => 'رابط الأيقونة';
+
+  @override
+  String get source_icon_url => 'رابط أيقونة المصدر';
+
+  @override
+  String get notes => 'ملاحظات';
+
+  @override
+  String get extension_name_example => 'مثال: myAnime';
+
+  @override
+  String get language_code_example => 'مثال: ar';
+
+  @override
+  String get base_url_example => 'مثال: https://example.com';
+
+  @override
+  String get api_url_example => 'مثال: https://api.example.com';
+
+  @override
+  String get extension_notes_example => 'مثال: هذه الإضافة تتطلب تسجيل الدخول';
+
+  @override
+  String get type => 'النوع';
+
+  @override
+  String get target => 'الهدف';
+
+  @override
+  String get source_type_single => 'فردي';
+
+  @override
+  String get source_type_multi => 'متعدد';
+
+  @override
+  String get source_type_torrent => 'تورنت';
+
+  @override
+  String get source_language_dart => 'Dart';
+
+  @override
+  String get source_language_javascript => 'JavaScript';
+
+  @override
+  String get source_language_lnreader_compiled_js => 'JS مجمع لـ LNReader';
+
+  @override
+  String get source_created_successfully => 'تم إنشاء المصدر بنجاح';
+
+  @override
+  String get source_already_exists => 'المصدر موجود بالفعل';
+
+  @override
+  String get error_when_creating_source => 'خطأ أثناء إنشاء المصدر';
+
+  @override
+  String get cookies_deleted => 'تم حذف ملفات تعريف الارتباط!';
+
+  @override
+  String get delete_all_cookies => 'حذف جميع ملفات تعريف الارتباط';
+
+  @override
+  String get url_must_end_with_dot_json_or_dot_pb =>
+      'يجب أن ينتهي عنوان URL بـ .json / .pb';
+
+  @override
+  String get default_download_destination => 'مجلد التنزيل الافتراضي';
+
+  @override
+  String get ask_download_destination => 'السؤال عن وجهة التنزيل';
+
+  @override
+  String get ask_download_destination_desc => 'اختيار مجلد محلي عند كل تنزيل.';
+
+  @override
+  String get select_download_destination => 'تحديد وجهة التنزيل';
+
+  @override
+  String get clear_local_library => 'مسح المكتبة المحلية';
+
+  @override
+  String get clear_local_library_desc =>
+      'إزالة المجلدات والأرشيفات المحلية من المكتبة.';
+
+  @override
+  String get clear_local_library_msg =>
+      'سيؤدي هذا إلى إزالة المجلدات المحلية من المكتبة دون حذف الملفات من القرص.';
+
+  @override
+  String get custom => 'مخصص';
+
+  @override
+  String get no_local_folder_available_for_downloads =>
+      'لا يوجد مجلد محلي متاح للتنزيلات';
+
+  @override
+  String failed_to_create_cbz(Object error) {
+    return 'فشل إنشاء CBZ: $error';
+  }
+
+  @override
+  String error_reading_cover_image(Object error) {
+    return 'خطأ في قراءة صورة الغلاف: $error';
+  }
+
+  @override
+  String error_reading_metadata(Object error) {
+    return 'خطأ في قراءة البيانات الوصفية: $error';
+  }
+
+  @override
+  String error_saving_chapter_episode_to_library(Object error) {
+    return 'خطأ في الحفظ بالمكتبة: $error';
+  }
+
+  @override
+  String error_reading_chapter_cover_image(Object error) {
+    return 'خطأ في قراءة غلاف الفصل: $error';
+  }
+
+  @override
+  String error_reading_archive_cover_image(Object error) {
+    return 'خطأ في قراءة غلاف الأرشيف: $error';
+  }
+
+  @override
+  String error_getting_local_library(Object error) {
+    return 'خطأ في جلب المكتبة المحلية: $error';
+  }
+
+  @override
+  String get zero_interpreter => 'مترجم Zero';
+
+  @override
+  String get zero_interpreter_description =>
+      'التحكم في خادم مترجم Zero تلقائياً أو يدوياً.';
+
+  @override
+  String get runtime_status => 'حالة التشغيل';
+
+  @override
+  String get running => 'قيد التشغيل';
+
+  @override
+  String get stopped => 'متوقف';
+
+  @override
+  String get start => 'بدء';
+
+  @override
+  String get stop => 'إيقاف';
 
   @override
   String get something_went_wrong => 'حدث خطأ ما';
@@ -2987,7 +3087,7 @@ class AppLocalizationsAr extends AppLocalizations {
     Object historyCount,
     Object updateCount,
   ) {
-    return 'سيؤدي هذا إلى حذف نهائي لـ $mangaCount مانغا و$chapterCount فصول و$historyCount سجلات.';
+    return 'سيؤدي هذا إلى حذف نهائي لـ $mangaCount مانغا و$chapterCount فصول و$historyCount سجلات و$updateCount سجلات تحديث. ستبقى روابط التتبع محفوظة. لا يمكن التراجع عن ذلك إلا باستعادة نسخة سابقة.';
   }
 
   @override
@@ -3058,7 +3158,7 @@ class AppLocalizationsAr extends AppLocalizations {
     Object keptChapters,
     Object duplicateTracks,
   ) {
-    return 'تم العثور على $totalChapters فصول. سيتم تجاهل $duplicateChapters مكررة وإضافة $keptChapters.';
+    return 'تم العثور على $totalChapters فصول في الإدخالات الأخرى. سيتم تجاهل $duplicateChapters مكررة (مع الاحتفاظ بالنسخة التي تحتوي على تقدم القراءة) وإضافة $keptChapters. كما سيتم تجاهل $duplicateTracks رابط تتبع مكرر.';
   }
 
   @override

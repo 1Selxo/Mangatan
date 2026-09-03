@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/download_repository.dart';
 import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/custom_floating_action_btn.dart';
 import 'package:mangayomi/modules/manga/download/providers/download_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -12,6 +15,8 @@ import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/global_style.dart';
 import 'package:mangayomi/modules/widgets/tv_menu.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/chapter.dart';
 
 class DownloadQueueScreen extends ConsumerStatefulWidget {
   const DownloadQueueScreen({super.key});
@@ -26,15 +31,33 @@ class _DownloadQueueScreenState extends ConsumerState<DownloadQueueScreen> {
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
     return StreamBuilder(
-      // No explicit sort: the natural (insertion) id order is the stable base
-      // the manual queue order is applied on top of, so rows don't reshuffle as
-      // download progress ticks.
-      stream: downloadRepository.watchPendingStarted(),
+      stream: isar.downloads.filter().idIsNotNull().watch(
+        fireImmediately: true,
+      ),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Scaffold(
+        final resolved = (snapshot.data ?? const <Download>[])
+            .map(resolveDownloadedChapter)
+            .nonNulls
+            .toList();
+        final completed = resolved
+            .where((entry) => entry.download.isDownload ?? false)
+            .toList();
+        final queued = DownloadQueueOrder.sorted(
+          resolved
+              .where(
+                (entry) =>
+                    !(entry.download.isDownload ?? false) &&
+                    (entry.download.isStartDownload ?? false),
+              )
+              .map((entry) => entry.download)
+              .toList(),
+        );
+
+        return DefaultTabController(
+          length: 2,
+          child: Scaffold(
             appBar: AppBar(
-              title: Text(l10n.download_queue),
+              title: Text(l10n.downloads),
               leading: isTv
                   ? IconButton(
                       autofocus: true,
@@ -42,89 +65,109 @@ class _DownloadQueueScreenState extends ConsumerState<DownloadQueueScreen> {
                       onPressed: () => Navigator.of(context).pop(),
                     )
                   : null,
+              bottom: TabBar(
+                tabs: [
+                  Tab(text: l10n.downloaded),
+                  Tab(text: l10n.download_queue),
+                ],
+              ),
             ),
-            body: Center(child: Text(l10n.no_downloads)),
-          );
-        }
-        // Filter out orphaned downloads (chapter or manga deleted) and auto-
-        // clean their records.
-        final orphanIds = <int>[];
-        final valid = <Download>[];
-        for (final d in snapshot.data!) {
-          if (d.chapter.value == null || d.chapter.value?.manga.value == null) {
-            if (d.id != null) orphanIds.add(d.id!);
-          } else {
-            valid.add(d);
-          }
-        }
-        if (orphanIds.isNotEmpty) {
-          downloadRepository.deleteAll(orphanIds);
-        }
-        if (valid.isEmpty) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(l10n.download_queue),
-              leading: isTv
-                  ? IconButton(
-                      autofocus: true,
-                      icon: const BackButtonIcon(),
-                      onPressed: () => Navigator.of(context).pop(),
-                    )
-                  : null,
-            ),
-            body: Center(child: Text(l10n.no_downloads)),
-          );
-        }
-        final entries = DownloadQueueOrder.sorted(valid);
-        return Scaffold(
-          appBar: AppBar(
-            title: Row(
+            body: TabBarView(
               children: [
-                Text(l10n.download_queue),
-                const SizedBox(width: 10),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Badge(
-                    backgroundColor: Theme.of(context).focusColor,
-                    label: Text(
-                      entries.length.toString(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).textTheme.bodySmall!.color,
-                      ),
-                    ),
-                  ),
-                ),
+                _buildCompletedDownloads(context, l10n, completed),
+                _buildQueue(context, l10n, queued),
               ],
             ),
-          ),
-          body: ReorderableListView.builder(
-            buildDefaultDragHandles: false,
-            itemCount: entries.length,
-            // onReorderItem already accounts for the item being lifted out at
-            // oldIndex, so newIndex arrives adjusted and must not be shifted
-            // again here.
-            onReorderItem: (oldIndex, newIndex) {
-              final ids = entries.map((e) => e.id!).toList();
-              final moved = ids.removeAt(oldIndex);
-              ids.insert(newIndex, moved);
-              DownloadQueueOrder.setOrder(ids);
-              setState(() {});
-            },
-            itemBuilder: (context, index) {
-              final element = entries[index];
-              return _buildRow(context, l10n, entries, element, index);
-            },
-          ),
-          floatingActionButton: CustomFloatingActionBtn(
-            isExtended: false,
-            label: l10n.download_queue,
-            onPressed: () {
-              ref.read(processDownloadsProvider());
-            },
+            floatingActionButton: queued.isEmpty
+                ? null
+                : CustomFloatingActionBtn(
+                    isExtended: false,
+                    label: l10n.download_queue,
+                    onPressed: () => ref.read(processDownloadsProvider()),
+                  ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCompletedDownloads(
+    BuildContext context,
+    AppLocalizations l10n,
+    List<DownloadedChapterEntry> entries,
+  ) {
+    if (entries.isEmpty) return Center(child: Text(l10n.no_downloads));
+    final groups = <int, List<DownloadedChapterEntry>>{};
+    for (final entry in entries) {
+      groups.putIfAbsent(entry.manga.id!, () => []).add(entry);
+    }
+    return ListView(
+      children: [
+        for (final group in groups.values)
+          ExpansionTile(
+            key: ValueKey('downloaded-manga-${group.first.manga.id}'),
+            leading: const Icon(Icons.download_done),
+            title: Text(group.first.manga.name ?? ''),
+            subtitle: Text(l10n.n_chapters(group.length)),
+            trailing: PopupMenuButton<String>(
+              tooltip: l10n.delete,
+              onSelected: (_) async {
+                for (final entry in group.toList()) {
+                  await entry.chapter.deleteDownloadedFiles();
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
+              ],
+            ),
+            children: [
+              for (final entry in group)
+                ListTile(
+                  title: Text(entry.chapter.name ?? ''),
+                  leading: const Icon(Icons.menu_book_outlined),
+                  onTap: () => _openDownloadedChapter(context, entry),
+                  trailing: IconButton(
+                    tooltip: l10n.delete,
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: entry.chapter.deleteDownloadedFiles,
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  void _openDownloadedChapter(
+    BuildContext context,
+    DownloadedChapterEntry entry,
+  ) {
+    final route = switch (entry.manga.itemType) {
+      ItemType.anime => '/animePlayerView',
+      ItemType.novel => '/novelReaderView',
+      _ => '/mangaReaderView',
+    };
+    context.push(route, extra: entry.chapter.id);
+  }
+
+  Widget _buildQueue(
+    BuildContext context,
+    AppLocalizations l10n,
+    List<Download> entries,
+  ) {
+    if (entries.isEmpty) return Center(child: Text(l10n.no_downloads));
+    return ReorderableListView.builder(
+      buildDefaultDragHandles: false,
+      itemCount: entries.length,
+      onReorderItem: (oldIndex, newIndex) {
+        final ids = entries.map((entry) => entry.id!).toList();
+        final moved = ids.removeAt(oldIndex);
+        ids.insert(newIndex, moved);
+        DownloadQueueOrder.setOrder(ids);
+        setState(() {});
+      },
+      itemBuilder: (context, index) =>
+          _buildRow(context, l10n, entries, entries[index], index),
     );
   }
 
@@ -265,4 +308,26 @@ class _DownloadQueueScreenState extends ConsumerState<DownloadQueueScreen> {
       }
     }
   }
+}
+
+class DownloadedChapterEntry {
+  const DownloadedChapterEntry(this.download, this.chapter, this.manga);
+
+  final Download download;
+  final Chapter chapter;
+  final Manga manga;
+}
+
+/// Resolves the persisted links needed to represent a download after an app
+/// restart. Isar links are lazy, so a null value before [loadSync] does not mean
+/// the download is orphaned.
+@visibleForTesting
+DownloadedChapterEntry? resolveDownloadedChapter(Download download) {
+  if (!download.chapter.isLoaded) download.chapter.loadSync();
+  final chapter = download.chapter.value;
+  if (chapter == null) return null;
+  if (!chapter.manga.isLoaded) chapter.manga.loadSync();
+  final manga = chapter.manga.value;
+  if (manga == null) return null;
+  return DownloadedChapterEntry(download, chapter, manga);
 }

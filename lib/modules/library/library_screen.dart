@@ -1,7 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -14,9 +13,11 @@ import 'package:mangayomi/modules/library/providers/add_torrent.dart';
 import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/library/widgets/library_app_bar.dart';
 import 'package:mangayomi/modules/library/widgets/library_body.dart';
 import 'package:mangayomi/modules/library/widgets/library_dialogs.dart';
+import 'package:mangayomi/modules/library/widgets/library_file_drop_target.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
 import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.dart';
@@ -27,6 +28,7 @@ import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:mangayomi/main.dart';
 
 /// Main library screen — refactored from 2309 lines to ~350 lines.
 ///
@@ -57,7 +59,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   bool _ignoreFiltersOnSearch = false;
   final _textEditingController = TextEditingController();
   TabController? tabBarController;
-  int _tabIndex = 0;
+  String? _selectedTabKey;
   Timer? _searchDebounce;
 
   @override
@@ -103,7 +105,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   Widget build(BuildContext context) {
     final settingsStream = ref.watch(getSettingsStreamProvider);
     return settingsStream.when(
-      data: (settings) => _buildWithSettings(settings),
+      data: (settings) => _buildWithSettings(settings.first),
       error: (error, _) => ErrorText(error),
       loading: () => const ProgressCenter(),
     );
@@ -196,151 +198,163 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     final searchQuery = _textEditingController.text;
 
-    return Scaffold(
-      body: mangaAll.when(
-        data: (man) {
-          return categories.when(
-            data: (data) {
-              final isNotFiltering = ref.watch(
-                mangasFilterResultStateProvider(
-                  itemType: widget.itemType,
-                  mangaList: man,
-                  settings: settings,
-                ),
-              );
-              final sourceFilterIds = ref
-                  .watch(
-                    mangaFilterSourceStateProvider(
-                      mangaList: man,
-                      itemType: widget.itemType,
-                      settings: settings,
-                    ),
-                  )
-                  .$2;
-
-              // Common body params
-              Widget bodyForCategory({
-                int? categoryId,
-                bool withoutCategories = false,
-              }) {
-                return LibraryBody(
-                  itemType: widget.itemType,
-                  categoryId: categoryId,
-                  withoutCategories: withoutCategories,
-                  downloadFilterType: downloadFilterType,
-                  unreadFilterType: unreadFilterType,
-                  startedFilterType: startedFilterType,
-                  bookmarkedFilterType: bookmarkedFilterType,
-                  completedFilterType: completedFilterType,
-                  trackingFilterType: trackingFilterType,
-                  reverse: reverse,
-                  downloadedChapter: downloadedChapter,
-                  continueReaderBtn: continueReaderBtn,
-                  localSource: localSource,
-                  language: language,
-                  displayType: displayType,
-                  settings: settings,
-                  downloadedOnly: downloadedOnly,
-                  searchQuery: searchQuery,
-                  ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
-                  sourceIds: sourceFilterIds,
-                );
-              }
-
-              Widget badgeForCategory(int categoryId) {
-                return CategoryBadge(
-                  itemType: widget.itemType,
-                  categoryId: categoryId,
-                  downloadFilterType: downloadFilterType,
-                  unreadFilterType: unreadFilterType,
-                  startedFilterType: startedFilterType,
-                  bookmarkedFilterType: bookmarkedFilterType,
-                  completedFilterType: completedFilterType,
-                  trackingFilterType: trackingFilterType,
-                  settings: settings,
-                  downloadedOnly: downloadedOnly,
-                  searchQuery: searchQuery,
-                  ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
-                  sourceIds: sourceFilterIds,
-                );
-              }
-
-              final withoutCategory = man
-                  .where((m) => m.categories == null || m.categories!.isEmpty)
-                  .toList();
-              // Get the number of items for the app bar
-              final numberOfItemsList = ref.watch(
-                filteredLibraryMangaProvider(
-                  data: man,
-                  downloadFilterType: downloadFilterType,
-                  unreadFilterType: unreadFilterType,
-                  startedFilterType: startedFilterType,
-                  bookmarkedFilterType: bookmarkedFilterType,
-                  completedFilterType: completedFilterType,
-                  trackingFilterType: trackingFilterType,
-                  sortType: sortType,
-                  downloadedOnly: downloadedOnly,
-                  searchQuery: searchQuery,
-                  ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
-                  sourceIds: sourceFilterIds,
-                  settings: settings,
-                ),
-              );
-
-              if (data.isNotEmpty && showCategoryTabs) {
-                return _buildWithCategories(
-                  data: data,
-                  withoutCategory: withoutCategory,
-                  man: man,
-                  settings: settings,
-                  showNumbersOfItems: showNumbersOfItems,
-                  isNotFiltering: isNotFiltering,
-                  numberOfItems: numberOfItemsList.length,
-                  bodyForCategory: bodyForCategory,
-                  badgeForCategory: badgeForCategory,
-                  downloadFilterType: downloadFilterType,
-                  downloadedOnly: downloadedOnly,
-                );
-              }
-
-              return Scaffold(
-                appBar: LibraryAppBar(
-                  itemType: widget.itemType,
-                  isNotFiltering: isNotFiltering,
-                  showNumbersOfItems: showNumbersOfItems,
-                  numberOfItems: numberOfItemsList.length,
-                  entries: man,
-                  isCategory: false,
-                  categoryId: null,
-                  settings: settings,
-                  isSearch: _isSearch,
-                  ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
-                  textEditingController: _textEditingController,
-                  onSearchToggle: () => setState(() => _isSearch = !_isSearch),
-                  onSearchClear: () {
-                    _searchDebounce?.cancel();
-                    _searchDebounce = Timer(
-                      const Duration(milliseconds: 300),
-                      () {
-                        if (mounted) setState(() {});
-                      },
-                    );
-                  },
-                  onIgnoreFiltersChanged: (val) =>
-                      setState(() => _ignoreFiltersOnSearch = val),
-                  vsync: this,
-                ),
-                body: bodyForCategory(),
-              );
-            },
-            error: (error, _) => ErrorText(error),
-            loading: () => const ProgressCenter(),
-          );
-        },
-        error: (error, _) => ErrorText(error),
-        loading: () => const ProgressCenter(),
+    return LibraryFileDropTarget(
+      itemType: widget.itemType,
+      onImport: (filePaths, importItemType) => ref.read(
+        importArchivesFromPathsProvider(
+          itemType: importItemType,
+          null,
+          filePaths: filePaths,
+          init: true,
+          splitChapters: false,
+        ).future,
       ),
-      bottomNavigationBar: _buildBottomBar(),
+      child: Scaffold(
+        body: mangaAll.when(
+          data: (man) {
+            return categories.when(
+              data: (data) {
+                final isNotFiltering = ref.watch(
+                  mangasFilterResultStateProvider(
+                    itemType: widget.itemType,
+                    mangaList: man,
+                    settings: settings,
+                  ),
+                );
+                final sourceFilterIds = ref
+                    .watch(
+                      mangaFilterSourceStateProvider(
+                        mangaList: man,
+                        itemType: widget.itemType,
+                        settings: settings,
+                      ),
+                    )
+                    .$2;
+
+                // Common body params
+                Widget bodyForCategory({
+                  int? categoryId,
+                  bool withoutCategories = false,
+                }) {
+                  return LibraryBody(
+                    itemType: widget.itemType,
+                    categoryId: categoryId,
+                    withoutCategories: withoutCategories,
+                    downloadFilterType: downloadFilterType,
+                    unreadFilterType: unreadFilterType,
+                    startedFilterType: startedFilterType,
+                    bookmarkedFilterType: bookmarkedFilterType,
+                    completedFilterType: completedFilterType,
+                    trackingFilterType: trackingFilterType,
+                    reverse: reverse,
+                    downloadedChapter: downloadedChapter,
+                    continueReaderBtn: continueReaderBtn,
+                    localSource: localSource,
+                    language: language,
+                    displayType: displayType,
+                    settings: settings,
+                    downloadedOnly: downloadedOnly,
+                    searchQuery: searchQuery,
+                    ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
+                    sourceIds: sourceFilterIds,
+                  );
+                }
+
+                Widget badgeForCategory(int categoryId) {
+                  return CategoryBadge(
+                    itemType: widget.itemType,
+                    categoryId: categoryId,
+                    downloadFilterType: downloadFilterType,
+                    unreadFilterType: unreadFilterType,
+                    startedFilterType: startedFilterType,
+                    bookmarkedFilterType: bookmarkedFilterType,
+                    completedFilterType: completedFilterType,
+                    trackingFilterType: trackingFilterType,
+                    settings: settings,
+                    downloadedOnly: downloadedOnly,
+                    searchQuery: searchQuery,
+                    ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
+                    sourceIds: sourceFilterIds,
+                  );
+                }
+
+                final withoutCategory = man
+                    .where((m) => m.categories == null || m.categories!.isEmpty)
+                    .toList();
+                // Get the number of items for the app bar
+                final numberOfItemsList = ref.watch(
+                  filteredLibraryMangaProvider(
+                    data: man,
+                    downloadFilterType: downloadFilterType,
+                    unreadFilterType: unreadFilterType,
+                    startedFilterType: startedFilterType,
+                    bookmarkedFilterType: bookmarkedFilterType,
+                    completedFilterType: completedFilterType,
+                    trackingFilterType: trackingFilterType,
+                    sortType: sortType,
+                    downloadedOnly: downloadedOnly,
+                    searchQuery: searchQuery,
+                    ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
+                    sourceIds: sourceFilterIds,
+                  ),
+                );
+
+                if (data.isNotEmpty && showCategoryTabs) {
+                  return _buildWithCategories(
+                    data: data,
+                    withoutCategory: withoutCategory,
+                    man: man,
+                    settings: settings,
+                    showNumbersOfItems: showNumbersOfItems,
+                    isNotFiltering: isNotFiltering,
+                    numberOfItems: numberOfItemsList.length,
+                    bodyForCategory: bodyForCategory,
+                    badgeForCategory: badgeForCategory,
+                    downloadFilterType: downloadFilterType,
+                    downloadedOnly: downloadedOnly,
+                  );
+                }
+
+                return Scaffold(
+                  appBar: LibraryAppBar(
+                    itemType: widget.itemType,
+                    isNotFiltering: isNotFiltering,
+                    showNumbersOfItems: showNumbersOfItems,
+                    numberOfItems: numberOfItemsList.length,
+                    entries: man,
+                    isCategory: false,
+                    categoryId: null,
+                    settings: settings,
+                    isSearch: _isSearch,
+                    ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
+                    textEditingController: _textEditingController,
+                    onSearchToggle: () =>
+                        setState(() => _isSearch = !_isSearch),
+                    onSearchClear: () {
+                      _searchDebounce?.cancel();
+                      _searchDebounce = Timer(
+                        const Duration(milliseconds: 300),
+                        () {
+                          if (mounted) setState(() {});
+                        },
+                      );
+                    },
+                    onIgnoreFiltersChanged: (val) =>
+                        setState(() => _ignoreFiltersOnSearch = val),
+                    vsync: this,
+                  ),
+                  body: bodyForCategory(),
+                );
+              },
+              error: (error, _) => ErrorText(error),
+              loading: () => const ProgressCenter(),
+            );
+          },
+          error: (error, _) => ErrorText(error),
+          loading: () => const ProgressCenter(),
+        ),
+        bottomNavigationBar: _buildBottomBar(),
+      ),
     );
   }
 
@@ -358,10 +372,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     required int downloadFilterType,
     required bool downloadedOnly,
   }) {
-    final sortedData = [...data]
-      ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
-    final entr = sortedData.where((e) => !(e.hide ?? false)).toList();
-    int tabCount = withoutCategory.isNotEmpty ? entr.length + 1 : entr.length;
+    data.sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
+    final entr = data.where((e) => !(e.hide ?? false)).toList();
+    final tabKeys = <String>[
+      if (withoutCategory.isNotEmpty) 'default',
+      ...entr.map((entry) => 'category:${entry.id}'),
+    ];
+    if (_selectedTabKey == null || !tabKeys.contains(_selectedTabKey)) {
+      _selectedTabKey = tabKeys.isEmpty ? null : tabKeys.first;
+    }
+    var selectedIndex = _selectedTabKey == null
+        ? 0
+        : tabKeys.indexOf(_selectedTabKey!);
+    if (selectedIndex < 0) selectedIndex = 0;
+    final tabCount = tabKeys.length;
 
     if (tabCount <= 0) {
       return bodyForCategory();
@@ -370,7 +394,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     // Manage TabController
     if (tabCount > 0 &&
         (tabBarController == null || tabBarController!.length != tabCount)) {
-      int newTabIndex = _tabIndex;
+      int newTabIndex = selectedIndex;
       if (newTabIndex >= tabCount) newTabIndex = tabCount - 1;
       // Retire the old one after this frame rather than here. Disposing a
       // TabController sets its animation to null, and the TabBar built in the
@@ -384,16 +408,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         vsync: this,
         initialIndex: newTabIndex,
       );
-      _tabIndex = newTabIndex;
       tabBarController!.addListener(() {
-        if (_tabIndex != tabBarController!.index) {
-          setState(() => _tabIndex = tabBarController!.index);
+        if (tabBarController!.index < tabKeys.length) {
+          _selectedTabKey = tabKeys[tabBarController!.index];
         }
+        setState(() {});
+      });
+    }
+    if (tabBarController != null &&
+        tabBarController!.length == tabCount &&
+        tabBarController!.index != selectedIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            tabBarController == null ||
+            tabBarController!.length != tabCount ||
+            tabBarController!.index == selectedIndex) {
+          return;
+        }
+        tabBarController!.animateTo(selectedIndex);
       });
     }
 
     return DefaultTabController(
-      length: entr.length,
+      length: tabCount,
       child: Scaffold(
         appBar: LibraryAppBar(
           itemType: widget.itemType,
@@ -402,10 +439,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           numberOfItems: numberOfItems,
           entries: man,
           isCategory: true,
-          categoryId: withoutCategory.isNotEmpty && _tabIndex == 0
+          categoryId: _selectedTabKey == 'default'
               ? null
-              : entr[withoutCategory.isNotEmpty ? _tabIndex - 1 : _tabIndex]
-                    .id!,
+              : (_selectedTabKey?.startsWith('category:') ?? false)
+              ? int.tryParse(_selectedTabKey!.substring(9))
+              : null,
           settings: settings,
           isSearch: _isSearch,
           ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
@@ -438,6 +476,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                     withoutCategory: withoutCategory,
                     showNumbersOfItems: showNumbersOfItems,
                     badgeForCategory: badgeForCategory,
+                    tabKeys: tabKeys,
                   ),
                   Flexible(
                     child: TabBarView(
@@ -460,11 +499,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     required List<Manga> withoutCategory,
     required bool showNumbersOfItems,
     required Widget Function(int categoryId) badgeForCategory,
+    required List<String> tabKeys,
   }) {
     final l10n = l10nLocalizations(context)!;
     return TabBar(
       isScrollable: true,
       controller: tabBarController,
+      onTap: (index) {
+        if (index < tabKeys.length) {
+          setState(() => _selectedTabKey = tabKeys[index]);
+        }
+      },
       tabs: [
         if (withoutCategory.isNotEmpty)
           Row(
@@ -731,10 +776,9 @@ void addTorrent(BuildContext context, {Manga? manga}) {
                                         Text(
                                           "import .torrent file",
                                           style: TextStyle(
-                                            color: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall!
-                                                .color,
+                                            color: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall!.color,
                                             fontSize: 10,
                                           ),
                                         ),
@@ -755,8 +799,9 @@ void addTorrent(BuildContext context, {Manga? manga}) {
                                   child: Container(
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(20),
-                                      color: Theme.of(context)
-                                          .scaffoldBackgroundColor,
+                                      color: Theme.of(
+                                        context,
+                                      ).scaffoldBackgroundColor,
                                     ),
                                     height: 50,
                                     width: 50,

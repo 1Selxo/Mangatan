@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -9,12 +8,12 @@ import 'package:media_kit_video/media_kit_video.dart';
 /// A material design play/pause button.
 class CustomPlayOrPauseButton extends StatefulWidget {
   final VideoController controller;
-  final FocusNode? focusNode;
+  final double? iconSize;
 
   const CustomPlayOrPauseButton({
     super.key,
     required this.controller,
-    this.focusNode,
+    this.iconSize,
   });
 
   @override
@@ -31,7 +30,7 @@ class CustomPlayOrPauseButtonState extends State<CustomPlayOrPauseButton>
 
   StreamSubscription<bool>? subscription;
 
-  double get iconSize => isDesktop ? 25 : 65;
+  double get iconSize => widget.iconSize ?? (isDesktop ? 25 : 65);
 
   @override
   void setState(VoidCallback fn) {
@@ -62,7 +61,6 @@ class CustomPlayOrPauseButtonState extends State<CustomPlayOrPauseButton>
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      focusNode: widget.focusNode,
       onPressed: widget.controller.player.playOrPause,
       iconSize: iconSize,
       color: Colors.white,

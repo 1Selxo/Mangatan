@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
@@ -21,10 +20,8 @@ class ChapterPreloadManager {
   /// Queue of chapter IDs in order of loading (for LRU eviction)
   final Queue<String> _chapterLoadOrder = Queue();
 
-  /// Set of chapter IDs whose page data has been evicted (image/archive data
-  /// cleared but the pages themselves still sit in [_pages]). Lets callers
-  /// cheaply check "does this chapter need a reload?" in O(1) instead of
-  /// scanning every page of the chapter looking for cleared data.
+  /// Chapters whose image/archive data was evicted while their page entries
+  /// remain available for navigation.
   final Set<String> _evictedChapterIds = {};
 
   /// Separate flags to allow concurrent prev/next preloading
@@ -53,6 +50,12 @@ class ChapterPreloadManager {
   bool isChapterLoaded(Chapter? chapter) {
     final id = _getChapterIdentifier(chapter);
     return id != null && _loadedChapterIds.contains(id);
+  }
+
+  /// Returns whether [chapter] needs its evicted page data reloaded.
+  bool isChapterEvicted(Chapter? chapter) {
+    final id = _getChapterIdentifier(chapter);
+    return id != null && _evictedChapterIds.contains(id);
   }
 
   /// Initializes the manager with the first chapter's pages.
@@ -305,12 +308,12 @@ class ChapterPreloadManager {
     return true;
   }
 
-  /// Returns `true` if [chapter]'s pages were evicted and still need a
-  /// reload before they can render. O(1) - use this to skip the more
-  /// expensive per-page scan in the common case where nothing was evicted.
-  bool isChapterEvicted(Chapter? chapter) {
-    final id = _getChapterIdentifier(chapter);
-    return id != null && _evictedChapterIds.contains(id);
+  /// Updates the cropped image cached for a page.
+  void updatePageCropImage(int index, Uint8List? cropImage) {
+    if (index >= 0 && index < _pages.length) {
+      _pages[index].cropImage = cropImage;
+      onPagesUpdated?.call();
+    }
   }
 
   /// Gets a unique identifier for a chapter.
@@ -332,11 +335,6 @@ class ChapterPreloadManager {
     final currentId = _getChapterIdentifier(currentChapter);
     if (currentId == null) return [];
 
-    // _chapterLoadOrder is already maintained incrementally in the same
-    // left-to-right order chapters appear in _pages (appended on next-chapter
-    // preload, prepended on prev-chapter preload, pruned on eviction) - reuse
-    // it directly instead of re-deriving the same ordering with a full O(N)
-    // scan over every page on every call.
     final loadedIdsInOrder = _chapterLoadOrder.toList();
 
     final currentIndex = loadedIdsInOrder.indexOf(currentId);

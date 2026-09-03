@@ -51,6 +51,9 @@ class NovelTtsService {
   int _resumeOffset = 0;
   int _currentUtteranceOffset = 0;
   bool _pausedNatively = false;
+  bool _hasStartedNativeSpeech = false;
+  Future<void>? _stopInFlight;
+  int _sessionGeneration = 0;
 
   double _speed = 0.5;
   double _pitch = 1.0;
@@ -64,15 +67,18 @@ class NovelTtsService {
 
     _flutterTts!.setCompletionHandler(() {
       if (_isManualInterruptionActive) return;
+      _hasStartedNativeSpeech = false;
       _onParagraphComplete();
     });
 
     _flutterTts!.setCancelHandler(() {
       if (_isManualInterruptionActive) return;
+      _hasStartedNativeSpeech = false;
       _setState(TtsState.stopped);
     });
 
     _flutterTts!.setErrorHandler((msg) {
+      _hasStartedNativeSpeech = false;
       _setState(TtsState.stopped);
     });
 
@@ -98,7 +104,11 @@ class NovelTtsService {
       }
     });
 
-    await _flutterTts!.awaitSpeakCompletion(true);
+    // flutter_tts 4.2.5's Windows plugin dereferences an unset native
+    // completion result when stop() is called after initialization but before
+    // speak(). Completion callbacks still work without awaiting the method
+    // result, so keep Windows on the safe non-blocking path.
+    await _flutterTts!.awaitSpeakCompletion(!Platform.isWindows);
   }
 
   void _setState(TtsState s) {
@@ -116,9 +126,22 @@ class NovelTtsService {
   }
 
   Future<void> _stopCurrentUtterance() async {
-    if (!_isSupported) return;
+    final activeStop = _stopInFlight;
+    if (activeStop != null) return activeStop;
+    if (!_isSupported || !_hasStartedNativeSpeech) return;
+    // Clear this before crossing the platform channel so dispose/skip cannot
+    // issue a second native stop while the first one is still completing.
+    _hasStartedNativeSpeech = false;
     _markManualInterruption();
-    await _flutterTts?.stop();
+    final tts = _flutterTts;
+    if (tts == null) return;
+    final stop = tts.stop().then<void>((_) {});
+    _stopInFlight = stop;
+    try {
+      await stop;
+    } finally {
+      if (identical(_stopInFlight, stop)) _stopInFlight = null;
+    }
   }
 
   void _emitIndex(int i) {
@@ -218,7 +241,11 @@ class NovelTtsService {
       _setState(TtsState.stopped);
       return;
     }
+    final session = ++_sessionGeneration;
+    await _stopCurrentUtterance();
+    if (session != _sessionGeneration) return;
     await _ensureInitialized();
+    if (session != _sessionGeneration) return;
     _paragraphs = extractParagraphs(htmlContent);
     if (_paragraphs.isEmpty) return;
 
@@ -230,18 +257,25 @@ class NovelTtsService {
     _currentUtteranceOffset = 0;
 
     await _flutterTts!.setSpeechRate(_speed);
+    if (session != _sessionGeneration) return;
     await _flutterTts!.setPitch(_pitch);
+    if (session != _sessionGeneration) return;
     if (_language != null) {
       await _flutterTts!.setLanguage(_language!);
+      if (session != _sessionGeneration) return;
     }
 
     _setState(TtsState.playing);
     _emitIndex(_currentIndex);
-    await _speakCurrent();
+    await _speakCurrent(session: session);
   }
 
-  Future<void> _speakCurrent({int? fromOffset}) async {
+  Future<void> _speakCurrent({int? fromOffset, int? session}) async {
     if (!_isSupported) return;
+    final expectedSession = session ?? _sessionGeneration;
+    final activeStop = _stopInFlight;
+    if (activeStop != null) await activeStop;
+    if (expectedSession != _sessionGeneration) return;
     if (_currentIndex >= _paragraphs.length) {
       _setState(TtsState.stopped);
       return;
@@ -260,7 +294,13 @@ class NovelTtsService {
 
     _currentUtteranceOffset = startOffset;
     _resumeOffset = startOffset;
-    await _flutterTts!.speak(paragraph.substring(startOffset));
+    _hasStartedNativeSpeech = true;
+    try {
+      await _flutterTts!.speak(paragraph.substring(startOffset));
+    } catch (_) {
+      _hasStartedNativeSpeech = false;
+      rethrow;
+    }
   }
 
   void _onParagraphComplete() {
@@ -269,7 +309,7 @@ class NovelTtsService {
       _currentIndex++;
       _resetWordProgress();
       _emitIndex(_currentIndex);
-      _speakCurrent();
+      _speakCurrent(session: _sessionGeneration);
     } else {
       _setState(TtsState.stopped);
     }
@@ -278,6 +318,7 @@ class NovelTtsService {
   Future<void> pause() async {
     if (!_isSupported) return;
     if (_state == TtsState.playing) {
+      final session = _sessionGeneration;
       if (_currentWordStart >= 0) {
         _resumeOffset = _currentWordStart;
       } else if (_currentWordEnd >= 0) {
@@ -285,6 +326,7 @@ class NovelTtsService {
       }
 
       final result = await _flutterTts?.pause();
+      if (session != _sessionGeneration) return;
       _setState(TtsState.paused);
       _pausedNatively = result == 1;
 
@@ -297,20 +339,28 @@ class NovelTtsService {
   Future<void> resume() async {
     if (!_isSupported) return;
     if (_state == TtsState.paused && _paragraphs.isNotEmpty) {
+      final session = _sessionGeneration;
       _setState(TtsState.playing);
       _emitIndex(_currentIndex);
       if (_pausedNatively) {
         // flutter_tts resumes native paused speech when speak() is called
         // with the same text on Android, iOS and macOS.
         _pausedNatively = false;
-        await _flutterTts!.speak(_paragraphs[_currentIndex]);
+        _hasStartedNativeSpeech = true;
+        try {
+          await _flutterTts!.speak(_paragraphs[_currentIndex]);
+        } catch (_) {
+          _hasStartedNativeSpeech = false;
+          rethrow;
+        }
       } else {
-        await _speakCurrent(fromOffset: _resumeOffset);
+        await _speakCurrent(fromOffset: _resumeOffset, session: session);
       }
     }
   }
 
   Future<void> stop() async {
+    _sessionGeneration++;
     _setState(TtsState.stopped);
     _currentIndex = 0;
     _resetWordProgress();
@@ -325,12 +375,14 @@ class NovelTtsService {
   Future<void> skipNext() async {
     if (!_isSupported) return;
     if (_currentIndex < _paragraphs.length - 1) {
+      final session = _sessionGeneration;
       await _stopCurrentUtterance();
+      if (session != _sessionGeneration) return;
       _currentIndex++;
       _resetWordProgress();
       _emitIndex(_currentIndex);
       if (_state == TtsState.playing) {
-        await _speakCurrent();
+        await _speakCurrent(session: session);
       }
     }
   }
@@ -338,12 +390,14 @@ class NovelTtsService {
   Future<void> skipPrevious() async {
     if (!_isSupported) return;
     if (_currentIndex > 0) {
+      final session = _sessionGeneration;
       await _stopCurrentUtterance();
+      if (session != _sessionGeneration) return;
       _currentIndex--;
       _resetWordProgress();
       _emitIndex(_currentIndex);
       if (_state == TtsState.playing) {
-        await _speakCurrent();
+        await _speakCurrent(session: session);
       }
     }
   }
@@ -351,25 +405,26 @@ class NovelTtsService {
   Future<void> jumpTo(int index) async {
     if (!_isSupported) return;
     if (index >= 0 && index < _paragraphs.length) {
+      final session = _sessionGeneration;
       await _stopCurrentUtterance();
+      if (session != _sessionGeneration) return;
       _currentIndex = index;
       _resetWordProgress();
       _emitIndex(_currentIndex);
       if (_state == TtsState.playing) {
-        await _speakCurrent();
+        await _speakCurrent(session: session);
       }
     }
   }
 
   Future<void> dispose() async {
-    _setState(TtsState.stopped);
+    await stop();
     if (!_isSupported) {
       _paragraphs = [];
       _currentIndex = 0;
       _resetWordProgress();
       return;
     }
-    await _flutterTts?.stop();
     _paragraphs = [];
     _currentIndex = 0;
     _resetWordProgress();

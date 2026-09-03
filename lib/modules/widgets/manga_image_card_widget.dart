@@ -17,6 +17,8 @@ import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/utils/headers.dart';
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
 
 class MangaImageCardWidget extends ConsumerWidget {
   final Source source;
@@ -291,20 +293,22 @@ Future<void> pushToMangaReaderDetail({
             artist: getManga.artist ?? '',
             sourceId: sourceId,
           );
-      final empty = await mangaRepository.isEmptyByLangNameSource(
-        lang,
-        manga.name,
-        manga.source,
-      );
+      final empty = await isar.mangas
+          .filter()
+          .langEqualTo(lang)
+          .titleMatchesSourceIdentity(manga.sourceTitle ?? manga.name)
+          .sourceEqualTo(manga.source)
+          .isEmpty();
       if (empty) {
         await mangaRepository.save(manga);
       }
 
-      final foundMangas = await mangaRepository.findAllByLangNameSource(
-        lang,
-        manga.name,
-        manga.source,
-      );
+      final foundMangas = await isar.mangas
+          .filter()
+          .langEqualTo(lang)
+          .titleMatchesSourceIdentity(manga.sourceTitle ?? manga.name)
+          .sourceEqualTo(manga.source)
+          .findAll();
       Manga? matchedManga;
       for (final foundManga in foundMangas) {
         if (foundManga.sourceId == null || foundManga.sourceId == sourceId) {
@@ -362,7 +366,11 @@ Future<void> pushToMangaReaderDetail({
       }
     }
   } else {
-    final getManga = await mangaRepository.findByIdAsync(mangaId);
-    await mangaRepository.save(getManga!..favorite = !getManga.favorite!);
+    final getManga = await isar.mangas.get(mangaId);
+    await isar.writeTxn(() async {
+      await isar.mangas.put(
+        getManga!..updateFavorite(!(getManga.favorite ?? false)),
+      );
+    });
   }
 }

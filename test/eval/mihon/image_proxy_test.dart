@@ -1,0 +1,111 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/eval/mihon/image_proxy.dart';
+
+void main() {
+  group('Mihon image proxy URLs', () {
+    test('recognizes transient loopback image URLs', () {
+      expect(
+        isTransientMihonImageUrl('http://127.0.0.1:39641/image/6e7a9ad0-token'),
+        isTrue,
+      );
+      expect(
+        isTransientMihonImageUrl('http://[::1]:39641/image/token'),
+        isTrue,
+      );
+      expect(
+        isTransientMihonImageUrl('http://localhost:39641/image/token'),
+        isTrue,
+      );
+    });
+
+    test('does not classify ordinary image URLs as transient', () {
+      expect(
+        isTransientMihonImageUrl('https://cdn.example/image/page.jpg'),
+        isFalse,
+      );
+      expect(
+        isTransientMihonImageUrl('http://192.168.1.20:39641/image/token'),
+        isFalse,
+      );
+      expect(
+        containsTransientMihonImageUrl([
+          'https://cdn.example/001.jpg',
+          'https://cdn.example/002.jpg',
+        ]),
+        isFalse,
+      );
+    });
+
+    test('recognizes bridge UUID tokens through LAN and hosted origins', () {
+      const token = '6e7a9ad0-a45a-4cb7-8b34-e83cdd38c985';
+      expect(
+        isTransientMihonImageUrl(
+          'http://192.168.2.112:8080/image/$token',
+        ),
+        isTrue,
+      );
+      expect(
+        isTransientMihonImageUrl(
+          'https://bridge.example/image/$token',
+        ),
+        isTrue,
+      );
+    });
+
+    test('recognizes legacy Mokuro CBZ-entry URLs as transient', () {
+      expect(
+        isTransientMihonImageUrl(
+          'https://mokuro.moe/volume.cbz#%7B%22name%22:%22001.jpg%22%7D',
+        ),
+        isTrue,
+      );
+    });
+
+    test('routes loopback proxy images through a LAN bridge', () {
+      expect(
+        resolveMihonImageUrl(
+          'http://192.168.2.112:8080',
+          'http://127.0.0.1:39641/image/6e7a9ad0-token',
+        ),
+        'http://192.168.2.112:8080/image/6e7a9ad0-token',
+      );
+    });
+
+    test('routes loopback proxy images through a hosted HTTPS bridge', () {
+      expect(
+        resolveMihonImageUrl(
+          'https://bridge.mangayomi.30062022.xyz/',
+          'http://localhost:39641/image/token',
+        ),
+        'https://bridge.mangayomi.30062022.xyz/image/token',
+      );
+    });
+
+    test('leaves ordinary and synthetic extension URLs unchanged', () {
+      const ordinaryUrl = 'https://cdn.example/001.jpg';
+      const syntheticUrl =
+          'https://mokuro.moe/volume.cbz#%7B%22name%22:%22001.jpg%22%7D';
+
+      expect(
+        resolveMihonImageUrl('http://192.168.2.112:8080', ordinaryUrl),
+        ordinaryUrl,
+      );
+      expect(
+        resolveMihonImageUrl('http://192.168.2.112:8080', syntheticUrl),
+        syntheticUrl,
+      );
+    });
+
+    test('persists transient URLs for metadata but never reuses them', () {
+      final proxyUrls = [
+        'http://192.168.2.112:8080/image/'
+            '6e7a9ad0-a45a-4cb7-8b34-e83cdd38c985',
+      ];
+      final ordinaryUrls = ['https://cdn.example/001.jpg'];
+
+      expect(canReuseCachedMihonPageUrls(proxyUrls), isFalse);
+      expect(canReuseCachedMihonPageUrls(ordinaryUrls), isTrue);
+      expect(canReuseCachedMihonPageUrls(const []), isFalse);
+    });
+  });
+}

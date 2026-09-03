@@ -6,6 +6,9 @@ import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/download_repository.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/download.dart';
 part 'state_providers.g.dart';
 
 @riverpod
@@ -112,13 +115,30 @@ class SortChapterState extends _$SortChapterState {
   }
 
   void update(bool reverse, int index) {
-    var value = SortChapter()
-      ..index = index
-      ..mangaId = mangaId
-      ..reverse = state.index == index ? !reverse : reverse;
-    final settings = settingsRepository.current;
-    List<SortChapter>? sortChapterList = [];
-    for (var sortChapter in settings.sortChapterList!) {
+    final value = SortChapter(
+      mangaId: mangaId,
+      index: index,
+      reverse: state.index == index ? !reverse : reverse,
+      displayMode: state.displayMode,
+    );
+    _persist(value);
+  }
+
+  void setDisplayMode(int displayMode) {
+    if (displayMode == state.displayMode) return;
+    final value = SortChapter(
+      mangaId: mangaId,
+      index: state.index,
+      reverse: state.reverse,
+      displayMode: displayMode,
+    );
+    _persist(value);
+  }
+
+  void _persist(SortChapter value) {
+    final settings = isar.settings.getSync(227)!;
+    final sortChapterList = <SortChapter>[];
+    for (final sortChapter in settings.sortChapterList ?? const []) {
       if (sortChapter.mangaId != mangaId) {
         sortChapterList.add(sortChapter);
       }
@@ -135,7 +155,7 @@ class SortChapterState extends _$SortChapterState {
   }
 
   bool isReverse() {
-    return state.reverse!;
+    return state.reverse ?? false;
   }
 }
 

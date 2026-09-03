@@ -3,16 +3,26 @@ import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/source.dart';
 
 Future<void> pushMangaReaderView({
   required BuildContext context,
   required Chapter chapter,
 }) async {
-  final sourceExist = sourceRepository.isNotEmptyActiveByItemTypeLangName(
-    chapter.manga.value!.itemType,
-    chapter.manga.value!.lang!,
-    chapter.manga.value!.source!,
-  );
+  // Do not gate library reading on the Browse language visibility filter.
+  final sourceExist = isar.sources
+      .filter()
+      .langContains(chapter.manga.value!.lang!, caseSensitive: false)
+      .and()
+      .nameContains(chapter.manga.value!.source!, caseSensitive: false)
+      .and()
+      .idIsNotNull()
+      .and()
+      .isAddedEqualTo(true)
+      .findAllSync()
+      .isNotEmpty;
   if (sourceExist || chapter.manga.value!.isLocalArchive!) {
     switch (chapter.manga.value!.itemType) {
       case ItemType.manga:

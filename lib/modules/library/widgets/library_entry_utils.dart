@@ -1,17 +1,23 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mangayomi/models/settings.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/eval/model/m_bridge.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
+import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/widgets/manga_image_card_widget.dart';
 import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/headers.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 
 /// Resolves the correct [ImageProvider] for a manga entry, preferring a custom
@@ -22,25 +28,17 @@ ImageProvider resolveCoverImage(Manga entry, WidgetRef ref) {
   if (entry.customCoverImage != null) {
     return MemoryImage(entry.customCoverImage as Uint8List);
   }
-  // An orphaned/corrupted entry can have a null source or lang (e.g. its
-  // source was uninstalled, or a legacy record). Skip source headers in that
-  // case instead of force-unwrapping — otherwise the whole tile throws while
-  // building and the entry becomes an un-removable "gray square". See #708.
-  final canUseSourceHeaders =
-      !(entry.isLocalArchive ?? false) &&
-      entry.source != null &&
-      entry.lang != null;
   return coverProvider(
     toImgUrl(entry.customCoverFromTracker ?? entry.imageUrl ?? ''),
-    headers: canUseSourceHeaders
-        ? ref.watch(
+    headers: (entry.isLocalArchive ?? false)
+        ? null
+        : ref.watch(
             headersProvider(
               source: entry.source!,
               lang: entry.lang!,
               sourceId: entry.sourceId,
             ),
-          )
-        : null,
+          ),
   );
 }
 
@@ -70,16 +68,66 @@ Future<void> onTapEntry({
     return;
   }
 
+  if (isMissingCloudNovelEntry(entry)) {
+    botToast(chimahonMissingEpubGuidance, second: 4);
+    await ref.read(
+      importArchivesFromFileProvider(
+        itemType: ItemType.novel,
+        entry,
+        init: false,
+        splitChapters: false,
+      ).future,
+    );
+    if (context.mounted) {
+      ref.invalidate(
+        getAllMangaWithoutCategoriesStreamProvider(itemType: ItemType.novel),
+      );
+      ref.invalidate(
+        getAllMangaStreamProvider(categoryId: null, itemType: ItemType.novel),
+      );
+    }
+    return;
+  }
+
   final isLocalArchive = entry.isLocalArchive ?? false;
   await pushToMangaReaderDetail(
     ref: ref,
     archiveId: isLocalArchive ? entry.id : null,
     context: context,
-    lang: entry.lang ?? '',
+    lang: entry.lang!,
     mangaM: entry,
-    source: entry.source ?? '',
+    source: entry.source!,
     sourceId: entry.sourceId,
   );
+
+  if (context.mounted) {
+    ref.invalidate(
+      getAllMangaWithoutCategoriesStreamProvider(itemType: entry.itemType),
+    );
+    ref.invalidate(
+      getAllMangaStreamProvider(categoryId: null, itemType: entry.itemType),
+    );
+  }
+}
+
+Set<int> missingCloudNovelParentIds() =>
+    const ChimahonNovelMaterializer().missingEpubParentIds(
+      isar.epubBookProgress.filter().archivePathEqualTo('').findAllSync(),
+    );
+
+bool isMissingCloudNovelEntry(Manga entry, {Set<int>? missingParentIds}) {
+  final mangaId = entry.id;
+  if (mangaId == null ||
+      entry.itemType != ItemType.novel ||
+      entry.isLocalArchive != true) {
+    return false;
+  }
+  if (missingParentIds != null) return missingParentIds.contains(mangaId);
+  return isar.epubBookProgress
+      .filter()
+      .mangaIdEqualTo(mangaId)
+      .archivePathEqualTo('')
+      .isNotEmptySync();
 }
 
 /// A small rounded chip using the theme's hint colour as its background.
@@ -114,6 +162,30 @@ class EntryBadgeChip extends StatelessWidget {
   }
 }
 
+/// Shows the number of downloaded chapters for [entry], or nothing when zero.
+///
+/// Uses a [Consumer] internally so it can watch [downloadedChapterIdsProvider]
+/// without forcing its parent to rebuild.
+class DownloadCountBadge extends ConsumerWidget {
+  const DownloadCountBadge({super.key, required this.entry});
+
+  final Manga entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final downloadedIds =
+        ref.watch(downloadedChapterIdsProvider).asData?.value ?? const <int>{};
+
+    final count = userFacingChapters(
+      entry,
+    ).where((c) => c.id != null && downloadedIds.contains(c.id)).length;
+
+    if (count == 0) return const SizedBox.shrink();
+
+    return EntryBadgeChip(label: count.toString());
+  }
+}
+
 /// A unified badge widget that combines Local, Download, and Unread counts.
 /// Only renders a non-empty widget when there is actually something to display,
 /// resolving the "0 unread" empty badge container UX bug.
@@ -121,14 +193,12 @@ class LibraryBadgeWidget extends ConsumerWidget {
   final Manga entry;
   final bool showLocal;
   final bool showDownloaded;
-  final Settings settings;
 
   const LibraryBadgeWidget({
     super.key,
     required this.entry,
     required this.showLocal,
     required this.showDownloaded,
-    required this.settings,
   });
 
   @override
@@ -149,7 +219,7 @@ class LibraryBadgeWidget extends ConsumerWidget {
     }
 
     // Scanlator-aware: the badge count respects the per-manga scanlator filter.
-    final unreadCount = entry.unreadChaptersCount(settings);
+    final unreadCount = entry.unreadChaptersCount;
 
     // If there is nothing to show (no local, no download, no unread), return empty
     if (!hasLocal && downloadCount == 0 && unreadCount == 0) {
@@ -173,7 +243,11 @@ class LibraryBadgeWidget extends ConsumerWidget {
               padding: const EdgeInsets.only(left: 3),
               child: Text(
                 unreadCount.toString(),
-                style: TextStyle(color: context.dynamicBlackWhiteColor),
+                style: TextStyle(
+                  color: context.dynamicBlackWhiteColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
               ),
             ),
         ],

@@ -8,15 +8,23 @@
 		<true/>
 	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Mangayomi needs access to your photo library to save and restore backups.</string>
+	<string>Mangatan needs access to your photo library to save and restore backups.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Mangatan needs permission to save exported images to your photo library.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Mangatan connects to extension, Hayai OCR, and AnkiConnect servers, and temporarily shares mined images and audio with AnkiMobile.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>anki</string>
+	</array>
 	<key>NSDocumentUsageDescription</key>
-	<string>Mangayomi needs access to your files to create and restore backups.</string>
+	<string>Mangatan needs access to your files to create and restore backups.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mangayomi</string>
+	<string>Mangatan</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,7 +32,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>mangayomi</string>
+	<string>Mangatan</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -43,7 +51,7 @@
 		<string>fetch</string>
 	</array>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Mangayomi needs to authenticate using Face ID.</string>
+	<string>Mangatan needs to authenticate using Face ID.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIApplicationSceneManifest</key>
@@ -60,7 +68,7 @@
 					<key>UISceneConfigurationName</key>
 					<string>flutter</string>
 					<key>UISceneDelegateClassName</key>
-					<string>FlutterSceneDelegate</string>
+					<string>$(PRODUCT_MODULE_NAME).MihonSceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
 				</dict>

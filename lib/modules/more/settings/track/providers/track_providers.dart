@@ -1,9 +1,15 @@
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
+import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
+import 'package:mangayomi/services/sync/chimahon_tracking_adapter.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/changed.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/repositories/track_repository.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'track_providers.g.dart';
 
 @riverpod
@@ -44,7 +50,23 @@ class Tracks extends _$Tracks {
   }
 
   void deleteTrackManga(Track track) {
-    trackRepository.delete(ref, track);
+    final deletedAt = DateTime.now().millisecondsSinceEpoch;
+    final deletionMarker = ChimahonTrackingDeletionMarker(
+      mangaId: track.mangaId,
+      syncId: track.syncId,
+      modifiedAt: deletedAt,
+    );
+    isar.writeTxnSync(() {
+      isar.tracks.deleteSync(track.id!);
+      ref
+          .read(synchingProvider(syncId: 1).notifier)
+          .addChangedPart(
+            ActionType.removeTrack,
+            track.id,
+            deletionMarker.toJson(),
+            false,
+          );
+    });
   }
 }
 

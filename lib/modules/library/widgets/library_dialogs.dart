@@ -1,9 +1,15 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/history.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
+import 'package:mangayomi/models/update.dart';
+import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
@@ -16,6 +22,8 @@ import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:path/path.dart' as p;
+import 'package:mangayomi/modules/library/providers/file_scanner.dart';
+import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 
 /// Shows a dialog for deleting selected manga from library and/or device.
 void showDeleteMangaDialog({
@@ -75,12 +83,20 @@ void showDeleteMangaDialog({
                         onPressed: () async {
                           // From Library
                           if (deleteFromLib) {
-                            for (var manga in mangasList) {
-                              await mangaRepository.removeFromLibrary(
-                                ref,
-                                manga,
-                              );
-                            }
+                            isar.writeTxnSync(() {
+                              for (var manga in mangasList) {
+                                if (manga.isLocalArchive ?? false) {
+                                  // Local archives have no remote source, so removing from the
+                                  // library means wiping every related Isar record entirely.
+                                  _removeImport(ref, manga);
+                                } else {
+                                  // Regular manga: just unfavourite so it disappears from the
+                                  // library without losing chapter/history data.
+                                  manga.updateFavorite(false);
+                                  isar.mangas.putSync(manga);
+                                }
+                              }
+                            });
                           }
                           // Downloaded Chapters
                           if (deleteDownloads) {
@@ -90,7 +106,7 @@ void showDeleteMangaDialog({
                                 // For local archives the archive file IS the chapter — there is
                                 // nothing to re-download. So we delete the physical files and
                                 // remove all Isar records, mirroring a full library removal.
-                                mangaDirectory = await _deleteImport(
+                                mangaDirectory = _deleteImport(
                                   manga,
                                   mangaDirectory,
                                 );
@@ -141,17 +157,50 @@ void showDeleteMangaDialog({
   );
 }
 
+/// Removes a local-archive manga and all related records from Isar:
+/// history, updates, downloads, chapters, and the manga itself.
+/// Also notifies the sync provider so the removal is propagated.
+void _removeImport(WidgetRef ref, Manga manga) {
+  final provider = ref.read(synchingProvider(syncId: 1).notifier);
+  final histories = isar.historys
+      .filter()
+      .mangaIdEqualTo(manga.id)
+      .findAllSync();
+  for (var history in histories) {
+    isar.historys.deleteSync(history.id!);
+    provider.addChangedPart(ActionType.removeHistory, history.id, "{}", false);
+  }
+
+  for (var chapter in manga.chapters) {
+    final updates = isar.updates
+        .filter()
+        .mangaIdEqualTo(chapter.mangaId)
+        .chapterNameEqualTo(chapter.name)
+        .findAllSync();
+    for (var update in updates) {
+      isar.updates.deleteSync(update.id!);
+      provider.addChangedPart(ActionType.removeUpdate, update.id, "{}", false);
+    }
+    // Remove associated download record to prevent ghost entries
+    isar.downloads.deleteSync(chapter.id!);
+    isar.chapters.deleteSync(chapter.id!);
+    provider.addChangedPart(ActionType.removeChapter, chapter.id, "{}", false);
+  }
+  isar.epubBookProgress.filter().mangaIdEqualTo(manga.id!).deleteAllSync();
+  isar.mangas.deleteSync(manga.id!);
+  provider.addChangedPart(ActionType.removeItem, manga.id, "{}", false);
+}
+
 /// Deletes the physical archive files (zip/cbz/mp4/epub) for a local-archive
 /// manga from disk. Returns the parent directory path so the caller can clean
 /// up the now-empty folder afterwards.
-Future<String> _deleteImport(Manga manga, String mangaDirectory) async {
+String _deleteImport(Manga manga, String mangaDirectory) {
   for (var chapter in manga.chapters) {
     final path = chapter.archivePath;
-    if (path == null) continue;
-    final resolvedPath = await resolveLocalArchivePath(path);
-    final chapterFile = File(resolvedPath);
+    if (path == null || path.trim().isEmpty) continue;
+    final chapterFile = File(path);
     if (mangaDirectory.isEmpty) {
-      mangaDirectory = p.dirname(resolvedPath);
+      mangaDirectory = p.dirname(path);
     }
     try {
       if (chapterFile.existsSync()) {
@@ -188,12 +237,11 @@ Future<String> _deleteDownload(Manga manga, String mangaDirectory) async {
 void showImportLocalDialog(BuildContext context, ItemType itemType) {
   final l10n = l10nLocalizations(context)!;
   final filesText = switch (itemType) {
-    ItemType.manga => ".zip, .cbz, .rar, .cbr",
+    ItemType.manga => ".zip, .cbz, .epub",
     ItemType.anime => ".mp4, .mkv, .avi, and more",
     ItemType.novel => ".epub",
   };
   bool isLoading = false;
-  bool splitChapters = true;
   showDialog(
     context: context,
     barrierDismissible: !isLoading,
@@ -205,27 +253,11 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
             return Consumer(
               builder: (context, ref, child) {
                 return SizedBox(
-                  height: itemType == ItemType.novel ? 150 : 100,
+                  height: 100,
                   child: Stack(
                     children: [
                       Column(
                         children: [
-                          if (itemType == ItemType.novel)
-                            SwitchListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                l10n.split_epub_chapters,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              subtitle: Text(
-                                l10n.split_epub_chapters_description,
-                                style: const TextStyle(fontSize: 10),
-                              ),
-                              value: splitChapters,
-                              onChanged: (v) =>
-                                  setState(() => splitChapters = v),
-                            ),
                           Expanded(
                             child: Row(
                               children: [
@@ -247,7 +279,7 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
                                             itemType: itemType,
                                             null,
                                             init: true,
-                                            splitChapters: splitChapters,
+                                            splitChapters: false,
                                           ).future,
                                         );
                                         setState(() => isLoading = false);
@@ -262,10 +294,9 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
                                           Text(
                                             "${l10n.import_files} ( $filesText )",
                                             style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall!
-                                                  .color,
+                                              color: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall!.color,
                                               fontSize: 10,
                                             ),
                                           ),
@@ -288,8 +319,9 @@ void showImportLocalDialog(BuildContext context, ItemType itemType) {
                             child: Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(20),
-                                color: Theme.of(context)
-                                    .scaffoldBackgroundColor,
+                                color: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
                               ),
                               height: 50,
                               width: 50,

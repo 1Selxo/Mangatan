@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/eval/model/m_bridge.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
+import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/repositories/history_repository.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
+import 'package:mangayomi/services/epub_chapter_metadata.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
+import 'package:mangayomi/repositories/history_repository.dart';
 
 class ContinueReaderButton extends ConsumerWidget {
   final Manga entry;
@@ -13,33 +22,59 @@ class ContinueReaderButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // The button looks the same regardless of history, so the last-read
-    // chapter is resolved on tap — a live watch per grid cell made scrolling
-    // large libraries churn dozens of query subscriptions.
-    return GestureDetector(
-      onTap: () {
-        final incognitoMode = ref.read(incognitoModeStateProvider);
-        final history = incognitoMode
-            ? null
-            : historyRepository.findByMangaId(entry.id!);
-        if (history != null && !history.chapter.isLoaded) {
-          history.chapter.loadSync();
-        }
-        final lastReadChapter = history?.chapter.value;
-        if (lastReadChapter != null) {
-          lastReadChapter.pushToReaderView(context);
-        } else {
-          entry.chapters.first.pushToReaderView(context);
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          color: context.primaryColor.withValues(alpha: 0.9),
-        ),
-        child: const Padding(
-          padding: EdgeInsets.all(7),
-          child: Icon(Icons.play_arrow, size: 19, color: Colors.white),
+    return StreamBuilder(
+      stream: isar.historys
+          .filter()
+          .mangaIdEqualTo(entry.id!)
+          .watch(fireImmediately: true),
+      builder: (context, snapshot) => GestureDetector(
+        onTap: () async {
+          final isMissingEpub =
+              entry.itemType == ItemType.novel &&
+              entry.isLocalArchive == true &&
+              isar.epubBookProgress
+                  .filter()
+                  .mangaIdEqualTo(entry.id!)
+                  .archivePathEqualTo('')
+                  .isNotEmptySync();
+          if (isMissingEpub) {
+            botToast(chimahonMissingEpubGuidance, second: 4);
+            await ref.read(
+              importArchivesFromFileProvider(
+                itemType: ItemType.novel,
+                entry,
+                init: false,
+                splitChapters: false,
+              ).future,
+            );
+            return;
+          }
+          if (isLocalEpubManga(entry)) {
+            await repairLocalEpubChapterMetadata(entry);
+            final shortcuts = epubNavigationChaptersInSpineOrder(
+              isar.chapters.filter().mangaIdEqualTo(entry.id).findAllSync(),
+            );
+            if (context.mounted && shortcuts.isNotEmpty) {
+              shortcuts.first.pushToReaderView(context);
+            }
+            return;
+          }
+          final incognitoMode = ref.read(incognitoModeStateProvider);
+          if (snapshot.hasData && snapshot.data!.isNotEmpty && !incognitoMode) {
+            snapshot.data!.first.chapter.value!.pushToReaderView(context);
+          } else {
+            userFacingChapters(entry).first.pushToReaderView(context);
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            color: context.primaryColor.withValues(alpha: 0.9),
+          ),
+          child: const Padding(
+            padding: EdgeInsets.all(7),
+            child: Icon(Icons.play_arrow, size: 19, color: Colors.white),
+          ),
         ),
       ),
     );

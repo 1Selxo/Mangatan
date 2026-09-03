@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mangayomi/utils/constant.dart';
@@ -30,6 +32,10 @@ import 'package:mangayomi/services/sync_server.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/models/update.dart';
 
 final libLocationRegex = RegExp(r"^/(Manga|Anime|Novel)Library$");
 
@@ -148,6 +154,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _initializeProviders() {
+    // Mihon sources start the embedded OpenJDK runtime. On iOS, leave that
+    // heavyweight work to explicit extension and source actions instead of
+    // starting Java as a side effect of opening the main screen.
+    if (Platform.isIOS) return;
+
     // The extension-repo fetches (one per item type) and the GitHub update
     // check hit the network; delay them so they don't compete with the first
     // paint and the initial library queries.
@@ -479,6 +490,18 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ),
       );
     }
+    if (dest.contains("/dictionaryLookup")) {
+      destinations[dest.indexOf(
+        "/dictionaryLookup",
+      )] = NavigationRailDestination(
+        selectedIcon: const Icon(Icons.translate),
+        icon: const Icon(Icons.translate_outlined),
+        label: Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Text(l10n.dictionary_lookup),
+        ),
+      );
+    }
     if (dest.contains("/more")) {
       destinations[dest.indexOf("/more")] = NavigationRailDestination(
         // Even breathing room between tabs on TV; null off-TV.
@@ -504,6 +527,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       );
     }
 
+    // Keep this list aligned with dest: the tablet layout uses the destination
+    // index to resolve the route selected by the user.
     final result = destinations.nonNulls.toList();
     _desktopDestinationsCache[cacheKey] = result;
     return result;
@@ -591,6 +616,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ref: ref,
         ),
         label: l10n.browse,
+      );
+    }
+    if (dest.contains("/dictionaryLookup")) {
+      destinations[dest.indexOf("/dictionaryLookup")] = NavigationDestination(
+        selectedIcon: const Icon(Icons.translate),
+        icon: const Icon(Icons.translate_outlined),
+        label: l10n.dictionary_lookup,
       );
     }
     if (dest.contains("/more")) {
@@ -905,6 +937,7 @@ class _TabletLayoutState extends State<_TabletLayout> {
       '/history',
       '/updates',
       '/browse',
+      '/dictionaryLookup',
       '/more',
       '/trackerLibrary',
     };
@@ -913,7 +946,7 @@ class _TabletLayoutState extends State<_TabletLayout> {
   }
 }
 
-class _MobileBottomNavigation extends StatelessWidget {
+class _MobileBottomNavigation extends StatefulWidget {
   const _MobileBottomNavigation({
     required this.isLongPressed,
     required this.location,
@@ -936,31 +969,8 @@ class _MobileBottomNavigation extends StatelessWidget {
   final Function(String) onDestinationSelected;
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 0),
-      width: context.width(1),
-      height: _getBottomNavigationHeight(isLongPressed, location),
-      child: NavigationBarTheme(
-        data: NavigationBarThemeData(
-          labelTextStyle: const WidgetStatePropertyAll(
-            TextStyle(overflow: TextOverflow.ellipsis),
-          ),
-          indicatorShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ),
-        child: NavigationBar(
-          animationDuration: const Duration(milliseconds: 500),
-          selectedIndex: currentIndex,
-          destinations: buildNavigationWidgetsMobile(ref, dest, context),
-          onDestinationSelected: (newIndex) {
-            onDestinationSelected(dest[newIndex]);
-          },
-        ),
-      ),
-    );
-  }
+  State<_MobileBottomNavigation> createState() =>
+      _MobileBottomNavigationState();
 
   static double? _getBottomNavigationHeight(
     bool isLongPressed,
@@ -975,11 +985,93 @@ class _MobileBottomNavigation extends StatelessWidget {
       '/history',
       '/updates',
       '/browse',
+      '/dictionaryLookup',
       '/more',
       '/trackerLibrary',
     };
 
     return (location == null || validLocations.contains(location)) ? null : 0;
+  }
+}
+
+const double mobileNavigationMinDestinationWidth = 72;
+
+@visibleForTesting
+double mobileNavigationContentWidth(double viewportWidth, int itemCount) =>
+    math.max(viewportWidth, itemCount * mobileNavigationMinDestinationWidth);
+
+class _MobileBottomNavigationState extends State<_MobileBottomNavigation> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _revealSelected(double viewportWidth, double contentWidth) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients || widget.dest.isEmpty) {
+        return;
+      }
+      final itemWidth = contentWidth / widget.dest.length;
+      final centered =
+          (widget.currentIndex + 0.5) * itemWidth - viewportWidth / 2;
+      final target = centered.clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      if ((_scrollController.offset - target).abs() > 1) {
+        _scrollController.jumpTo(target);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 0),
+      width: context.width(1),
+      height: _MobileBottomNavigation._getBottomNavigationHeight(
+        widget.isLongPressed,
+        widget.location,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final contentWidth = mobileNavigationContentWidth(
+            constraints.maxWidth,
+            widget.dest.length,
+          );
+          _revealSelected(constraints.maxWidth, contentWidth);
+          return SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: contentWidth,
+              child: NavigationBarTheme(
+                data: NavigationBarThemeData(
+                  indicatorShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: NavigationBar(
+                  animationDuration: const Duration(milliseconds: 500),
+                  selectedIndex: widget.currentIndex,
+                  destinations: widget.buildNavigationWidgetsMobile(
+                    widget.ref,
+                    widget.dest,
+                    context,
+                  ),
+                  onDestinationSelected: (newIndex) {
+                    widget.onDestinationSelected(widget.dest[newIndex]);
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 

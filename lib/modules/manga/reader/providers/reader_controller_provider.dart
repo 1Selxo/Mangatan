@@ -12,6 +12,7 @@ import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/modules/more/settings/downloads/providers/downloads_state_provider.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:mangayomi/main.dart';
 part 'reader_controller_provider.g.dart';
 
 @riverpod
@@ -57,6 +58,9 @@ class ReaderController extends _$ReaderController
   @override
   final bool incognitoMode = settingsRepository.current.incognitoMode!;
 
+  @override
+  Settings getIsarSetting() => isar.settings.getSync(227)!;
+
   // ---------------------------------------------------------------------------
   // Reader-specific settings
   // ---------------------------------------------------------------------------
@@ -68,9 +72,21 @@ class ReaderController extends _$ReaderController
       (element) => element.mangaId == getManga().id,
     );
     if (personalReaderMode.isNotEmpty) {
-      return personalReaderMode.first.readerMode;
+      return personalReaderMode.first.readerMode.normalized;
     }
-    return ref.read(defaultReadingModeStateProvider);
+    return getIsarSetting().effectiveDefaultReaderMode;
+  }
+
+  ReadingDirection getReadingDirection() {
+    final settings = getIsarSetting();
+    final personalReaderMode = (settings.personalReaderModeList ?? [])
+        .where((element) => element.mangaId == getManga().id)
+        .firstOrNull;
+    final personalDirection = personalReaderMode?.readingDirectionIndex;
+    return personalDirection == null
+        ? personalReaderMode?.readerMode.legacyReadingDirection ??
+              settings.effectiveDefaultReadingDirection
+        : ReadingDirectionExtension.fromPersistedIndex(personalDirection);
   }
 
   PageMode getPageMode() {
@@ -81,24 +97,44 @@ class ReaderController extends _$ReaderController
     if (personalPageMode.isNotEmpty) {
       return personalPageMode.first.pageMode;
     }
-    return PageMode.onePage;
+    return getIsarSetting().defaultPageMode;
   }
 
   void setReaderMode(ReaderMode newReaderMode) {
-    List<PersonalReaderMode>? personalReaderModeLists = [];
-    for (var personalReaderMode
-        in getIsarSetting().personalReaderModeList ?? []) {
-      if (personalReaderMode.mangaId != getManga().id) {
-        personalReaderModeLists.add(personalReaderMode);
-      }
-    }
-    personalReaderModeLists.add(
-      PersonalReaderMode()
-        ..mangaId = getManga().id
-        ..readerMode = newReaderMode,
+    _setPersonalReaderPreference(
+      readerMode: newReaderMode.normalized,
+      readingDirection: getReadingDirection(),
     );
-    settingsRepository.save(
-      getIsarSetting()..personalReaderModeList = personalReaderModeLists,
+  }
+
+  void setReadingDirection(ReadingDirection newReadingDirection) {
+    _setPersonalReaderPreference(
+      readerMode: getReaderMode(),
+      readingDirection: newReadingDirection,
+    );
+  }
+
+  void _setPersonalReaderPreference({
+    required ReaderMode readerMode,
+    required ReadingDirection readingDirection,
+  }) {
+    final personalReaderModes =
+        (getIsarSetting().personalReaderModeList ?? [])
+            .where((preference) => preference.mangaId != getManga().id)
+            .toList()
+          ..add(
+            PersonalReaderMode(
+              mangaId: getManga().id,
+              readerMode: readerMode,
+              readingDirectionIndex: readingDirection.index,
+            ),
+          );
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        getIsarSetting()
+          ..personalReaderModeList = personalReaderModes
+          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+      ),
     );
     onSettingsMutated();
   }
@@ -119,6 +155,24 @@ class ReaderController extends _$ReaderController
       getIsarSetting()..personalPageModeList = personalPageModeLists,
     );
     onSettingsMutated();
+  }
+
+  void setShowPageNumber(bool value) {
+    if (!incognitoMode) {
+      isar.writeTxnSync(
+        () => isar.settings.putSync(
+          getIsarSetting()
+            ..showPagesNumber = value
+            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+      onSettingsMutated();
+    }
+  }
+
+  bool getShowPageNumber() {
+    if (!incognitoMode) return getIsarSetting().showPagesNumber!;
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -163,25 +217,18 @@ class ReaderController extends _$ReaderController
         ? (newIndex + 2) >= pageLength - 1
         : (newIndex + 2) >= pageLength;
     if (isRead || save) {
-      // Zero-index entries mean "start from the beginning", exactly like a
-      // missing entry (see getPageIndex), so they are pruned instead of kept —
-      // this stops the list (and the settings row) growing with every chapter
-      // ever finished.
       List<ChapterPageIndex>? chapterPageIndexs = [];
       for (var chapterPageIndex
           in getIsarSetting().chapterPageIndexList ?? []) {
-        if (chapterPageIndex.chapterId != chapter.id &&
-            (chapterPageIndex.index ?? 0) > 0) {
+        if (chapterPageIndex.chapterId != chapter.id) {
           chapterPageIndexs.add(chapterPageIndex);
         }
       }
-      if (!isRead && newIndex > 0) {
-        chapterPageIndexs.add(
-          ChapterPageIndex()
-            ..chapterId = chapter.id
-            ..index = newIndex,
-        );
-      }
+      chapterPageIndexs.add(
+        ChapterPageIndex()
+          ..chapterId = chapter.id
+          ..index = isRead ? 0 : newIndex,
+      );
       final autoReadDuplChap = ref.read(autoReadDuplicateChaptersStateProvider);
       final now = DateTime.now().millisecondsSinceEpoch;
       // When the chapter is finished, mark every other scanlation of the same
@@ -190,21 +237,26 @@ class ReaderController extends _$ReaderController
       if (isRead && autoReadDuplChap) {
         final manga = chapter.manga.value;
         if (manga != null) {
-          final chapterNumber = ChapterRecognition().parseChapterNumber(
+          final recognition = ChapterRecognition();
+          final chapterNumber = recognition.resolveChapterNumber(
             manga.name!,
             chapter.name!,
+            sourceChapterNumber: chapter.chapterNumber,
           );
-          for (final c in manga.chapters) {
-            if (c.id == chapter.id || (c.isRead ?? false)) continue;
-            final n = ChapterRecognition().parseChapterNumber(
-              manga.name!,
-              c.name!,
-            );
-            if (n == chapterNumber) {
-              c.isRead = true;
-              c.lastPageRead = '1';
-              c.updatedAt = now;
-              siblings.add(c);
+          if (chapterNumber > 0) {
+            for (final c in manga.chapters) {
+              if (c.id == chapter.id || (c.isRead ?? false)) continue;
+              final n = recognition.resolveChapterNumber(
+                manga.name!,
+                c.name!,
+                sourceChapterNumber: c.chapterNumber,
+              );
+              if (n == chapterNumber) {
+                c.isRead = true;
+                c.lastPageRead = '1';
+                c.updatedAt = now;
+                siblings.add(c);
+              }
             }
           }
         }

@@ -47,7 +47,17 @@ class _TtsPlayerBarState extends ConsumerState<TtsPlayerBar> {
         widget.onParagraphChanged?.call(i);
       }
     });
-    _initAndPlay();
+    unawaited(_startSafely());
+  }
+
+  Future<void> _startSafely() async {
+    try {
+      await _initAndPlay();
+      if (!mounted) await _tts.stop();
+    } catch (_) {
+      await _tts.stop();
+      if (mounted) widget.onClose();
+    }
   }
 
   Future<void> _initAndPlay() async {
@@ -56,12 +66,16 @@ class _TtsPlayerBarState extends ConsumerState<TtsPlayerBar> {
     final language = ref.read(ttsLanguageStateProvider);
 
     await _tts.setSpeed(speed);
+    if (!mounted) return;
     await _tts.setPitch(pitch);
+    if (!mounted) return;
     if (language != null) {
       await _tts.setLanguage(language);
+      if (!mounted) return;
     }
 
     final paragraphs = _tts.extractParagraphs(widget.htmlContent);
+    if (!mounted) return;
     setState(() => _totalParagraphs = paragraphs.length);
     await _tts.speak(widget.htmlContent);
   }
@@ -70,7 +84,7 @@ class _TtsPlayerBarState extends ConsumerState<TtsPlayerBar> {
   void dispose() {
     _stateSub?.cancel();
     _indexSub?.cancel();
-    _tts.stop();
+    unawaited(_tts.stop());
     super.dispose();
   }
 
@@ -198,7 +212,6 @@ class _TtsPlayerBarState extends ConsumerState<TtsPlayerBar> {
                 IconButton(
                   onPressed: () async {
                     await _tts.stop();
-                    widget.onClose();
                   },
                   icon: const Icon(Icons.stop_rounded),
                   iconSize: 24,

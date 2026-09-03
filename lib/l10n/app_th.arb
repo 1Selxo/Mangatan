@@ -1,7 +1,7 @@
 {
   "@@locale": "th",
-  "library": "ชั้นหนังสือ",
-  "updates": "อัพเดท",
+  "library": "คลัง",
+  "updates": "อัปเดต",
   "history": "ประวัติ",
   "browse": "เรียกดู",
   "more": "เพิ่มเติม",
@@ -19,7 +19,7 @@
   "sort": "เรียง",
   "alphabetically": "ตามตัวอักษร",
   "last_read": "อ่านล่าสุด",
-  "last_update_check": "ตรวจการอัพเดท",
+  "last_update_check": "ตรวจสอบการอัปเดตล่าสุด",
   "last_entry_delete_warning": "{count, plural, =1{คุณกำลังลบ{entryType}เดียวของ{mediaType}นี้ออกจากคลังของคุณ} other{คุณกำลังลบทั้งหมด {count} {entryTypePlural}ของ{mediaType}นี้ออกจากคลังของคุณ}}\nสิ่งนี้จะลบ{mediaType}ทั้งหมดออกจากคลังของคุณด้วย\n\nหมายเหตุ: ไฟล์จะไม่ถูกลบ",
   "@last_entry_delete_warning": {
     "placeholders": {
@@ -31,12 +31,12 @@
   },
   "chapter": "บท",
   "episode": "ตอน",
-  "unread_count": "ที่ยังไม่อ่าน",
+  "unread_count": "จำนวนที่ยังไม่อ่าน",
   "latest_chapter": "ตอนล่าสุด",
   "date_added": "วันที่เพิ่ม",
   "display": "แสดงผล",
   "display_mode": "โหมดแสดงผล",
-  "compact_grid": "กระทัดรัด",
+  "compact_grid": "กะทัดรัด",
   "comfortable_grid": "พอดี",
   "cover_only_grid": "ภาพปกเท่านั้น",
   "list": "รายการ",
@@ -49,7 +49,7 @@
   "show_numbers_of_items": "แสดงจำนวนรายการ",
   "other": "อื่น ๆ",
   "show_continue_reading_buttons": "แสดงปุ่มอ่านต่อ",
-  "empty_library": "ชั้นหนังสือว่างเปล่า",
+  "empty_library": "คลังว่างเปล่า",
   "search": "ค้นหา...",
   "no_recent_updates": "ยังไม่มีการอัพเดท",
   "remove_everything": "ลบออกทุกอย่าง",
@@ -65,7 +65,7 @@
   "update": "อัพเดท",
   "latest": "ล่าสุด",
   "extensions": "ส่วนขยาย",
-  "migrate": "ผนวก",
+  "migrate": "โยกย้าย",
   "incognito_mode": "โหมดไม่ระบุตัวตน",
   "incognito_mode_description": "หยุดประวัติการอ่านชั่วคราว",
   "download_queue": "คิวดาวน์โหลด",
@@ -97,12 +97,12 @@
   "timestamp": "ลงเวลา",
   "relative_timestamp": "รูปแบบการลงเวลา",
   "relative_timestamp_short": "สั้น (วันนี้, เมื่อวาน)",
-  "relative_timestamp_long": "ยาว (Short+, n วันที่แล้ว)",
+  "relative_timestamp_long": "แบบยาว (แบบสั้น+, n วันที่แล้ว)",
   "date_format": "รูปแบบวันที่",
   "reader": "การอ่าน",
   "refresh": "รีเฟรช",
   "reader_subtitle": "โหมดการอ่าน, การแสดงผล, การนำทาง",
-  "default_reading_mode": "ค่าเริ่มตต้นโหมดการอ่าน",
+  "default_reading_mode": "โหมดการอ่านเริ่มต้น",
   "reading_mode_vertical": "แนวตั้ง",
   "reading_mode_horizontal": "แนวนอน",
   "reading_mode_left_to_right": "ซ้ายไปขวา",
@@ -121,7 +121,7 @@
   "custom_location": "ตำแหน่งที่กำหนดเอง",
   "only_on_wifi": "เมื่อใช้ไวไฟเท่านั้น",
   "save_as_cbz_archive": "จัดเก็บเป็น CBZ",
-  "browse_subtitle": "Sources, global search",
+  "browse_subtitle": "แหล่งข้อมูล, การค้นหาทั่วโลก",
   "only_include_pinned_sources": "เฉพาะแหล่งที่ปักหมุดเท่านั้น",
   "nsfw_sources": "แหล่ง NSFW (18+)",
   "nsfw_sources_show": "แสดงในแหลงที่มาและรายการส่วนขยาย",
@@ -163,7 +163,7 @@
   "downloaded_chapter": "ตอนที่ดาวน์โหลด",
   "page": "หน้าที่ {page}",
   "global_search": "ค้นหาจากทั้งหมด",
-  "color_blend_level": "Color blend level",
+  "color_blend_level": "ระดับการผสมสี",
   "current": "ปัจจุบัน {char}",
   "finished": "สุดท้าย {char}",
   "next": "ถัดไป {char}",
@@ -436,7 +436,7 @@
   "manage_anime_repo_urls": "จัดการ URL ที่เก็บอนิเมะ",
   "manage_novel_repo_urls": "จัดการ URL ที่เก็บโนเวล",
   "url_cannot_be_empty": "URL ไม่สามารถเว้นว่างได้",
-  "url_must_end_with_dot_json_or_dot_pb": "URL ต้องลงท้ายด้วย .json / .pb",
+  "url_must_end_with_dot_json": "URL ต้องลงท้ายด้วย .json",
   "repo_url": "URL ที่เก็บข้อมูล",
   "invalid_url_format": "รูปแบบ URL ไม่ถูกต้อง",
   "clear_all_sources": "ล้างแหล่งข้อมูลทั้งหมด",
@@ -460,7 +460,6 @@
   "sync_button_upload": "อัปโหลดเท่านั้น",
   "sync_button_upload_info": "การดำเนินการนี้จะแทนที่ข้อมูลระยะไกลด้วยข้อมูลในเครื่องทั้งหมด!",
   "sync_button_download": "ดาวน์โหลดเท่านั้น",
-  "sync_button_download_info": "การดำเนินการนี้จะแทนที่ข้อมูลในเครื่องด้วยข้อมูลระยะไกลทั้งหมด!",
   "extension_settings": "การตั้งค่าส่วนขยาย",
   "video_audio_info": "ภาษาที่ต้องการ, การแก้ไขระดับเสียง, ช่องเสียง",
   "all_chapters": "ทุกตอน",
@@ -503,7 +502,7 @@
   "sync_enable_histories": "ซิงค์ข้อมูลประวัติ",
   "sync_enable_updates": "ซิงค์ข้อมูลอัปเดต",
   "sync_enable_settings": "ซิงค์การตั้งค่า",
-  "enable_mpv": "เปิดใช้งาน mpv shaders / scripts",
+  "enable_mpv": "เปิดใช้ shader / สคริปต์ของ mpv",
   "mpv_info": "รองรับสคริปต์ .js ใน mpv/scripts/",
   "mpv_redownload": "ดาวน์โหลดไฟล์กำหนดค่า mpv อีกครั้ง",
   "mpv_redownload_info": "แทนที่ไฟล์กำหนดค่าเก่าด้วยไฟล์ใหม่!",
@@ -568,8 +567,8 @@
   "dns_over_https": "DNS-over-HTTPS (DoH)",
   "dns_provider": "ผู้ให้บริการ DNS",
   "tracked": "ติดตามแล้ว",
-  "auth_unlock_msg": "ยืนยันตัวตนเพื่อปลดล็อก Mangayomi",
-  "app_locked": "Mangayomi ถูกล็อก",
+  "auth_unlock_msg": "ยืนยันตัวตนเพื่อปลดล็อก Mangatan",
+  "app_locked": "Mangatan ถูกล็อก",
   "auth_to_continue": "ยืนยันตัวตนเพื่อดำเนินการต่อ",
   "authenticating": "กำลังยืนยันตัวตน...",
   "unlock": "ปลดล็อก",
@@ -585,7 +584,7 @@
   "invert_colors": "กลับสี",
   "grayscale": "โทนสีเทา",
   "brightness": "ความสว่าง",
-  "contrast": "ความเปนสัน",
+  "contrast": "ความเปรียบต่าง",
   "saturation": "ความเข้ม",
   "navigation_layout": "เลย์เอาต์การนำทาง",
   "nav_layout_default": "ค่าเริ่มต้น",
@@ -599,106 +598,106 @@
   "split_epub_chapters_description": "นำเข้าแต่ละบท EPUB เป็นรายการแยกต่างหาก",
   "compression_level": "ระดับการบีบอัด",
   "compression_info": "การบีบอัดที่สูงขึ้น = พื้นที่น้อยลง แต่ CPU มากขึ้น ค่าเริ่มต้น: {level}",
-  "mass_migration_title": "การอพยพแบบรวม",
+  "mass_migration_title": "การโยกย้ายจำนวนมาก",
   "mass_migration_preview_items": "ตัวอย่างรายการ",
   "delete_download_after_reading": "ลบหลังอ่าน",
   "total": "รวม",
   "mean_per_title": "ค่าเฉลี่ยต่อชื่อเรื่อง",
   "completion_rate": "อัตราการเสร็จสิ้น",
-  "watching_time": "เวลาการดู",
-  "reading_time": "เวลาการอ่าน",
-  "average_chapters_per_title": "บทเฉลี่ยต่อชื่อเรื่อง",
+  "watching_time": "เวลารับชม",
+  "reading_time": "เวลาอ่าน",
+  "average_chapters_per_title": "จำนวนตอนโดยเฉลี่ยต่อ {title}",
   "read_percentage": "เปอร์เซ็นต์การอ่าน",
   "entries": "รายการ",
-  "mass_migration_destination_source": "Destination source",
-  "mass_migration_no_library_items": "No library items are available for mass migration.",
-  "mass_migration_no_destination_sources": "No installed destination sources are available.",
-  "mass_migration_installed": "Installed",
-  "mass_migration_items_ready_for_review": "{count, plural, =1{1 item ready for review} other{{count} items ready for review}}",
-  "mass_migration_item_count": "{count, plural, =1{1 item} other{{count} items}}",
-  "mass_migration_select_destination_source": "Select destination source",
-  "mass_migration_finding_matches": "Finding matches in {source} • {language}",
-  "mass_migration_processing_item": "Processing item {current} of {total}",
-  "mass_migration_waiting_next_item": "Waiting 2 seconds before the next item...",
-  "mass_migration_waiting_next_migration": "Waiting 2 seconds before the next migration...",
-  "mass_migration_matched_so_far": "Matched so far: {count}",
-  "mass_migration_no_match_count": "No match: {count}",
-  "mass_migration_review_matches": "Review matches for {source}",
-  "mass_migration_found_matches": "Found matches: {count}",
-  "mass_migration_no_matches": "No matches: {count}",
-  "mass_migration_selected_to_migrate": "Selected to migrate: {count}",
-  "mass_migration_finish_review": "Finish review",
-  "mass_migration_migrate_selected": "Migrate selected items ({count})",
-  "mass_migration_migrating_selected": "Migrating selected items to {source}",
-  "mass_migration_no_items_selected": "No items selected for migration.",
-  "mass_migration_migrating_item": "Migrating item {current} of {total}",
-  "mass_migration_complete": "Mass migration complete",
-  "mass_migration_complete_success_message": "All selected items were processed successfully.",
-  "mass_migration_complete_partial_message": "Migration finished with a few items that still need manual attention.",
+  "mass_migration_destination_source": "แหล่งข้อมูลปลายทาง",
+  "mass_migration_no_library_items": "ไม่มีรายการในคลังสำหรับการโยกย้ายจำนวนมาก",
+  "mass_migration_no_destination_sources": "ไม่มีแหล่งข้อมูลปลายทางที่ติดตั้งไว้",
+  "mass_migration_installed": "ติดตั้งแล้ว",
+  "mass_migration_items_ready_for_review": "{count, plural, =1{พร้อมตรวจสอบ 1 รายการ} other{พร้อมตรวจสอบ {count} รายการ}}",
+  "mass_migration_item_count": "{count, plural, =1{1 รายการ} other{{count} รายการ}}",
+  "mass_migration_select_destination_source": "เลือกแหล่งข้อมูลปลายทาง",
+  "mass_migration_finding_matches": "กำลังค้นหารายการที่ตรงกันใน {source} • {language}",
+  "mass_migration_processing_item": "กำลังประมวลผลรายการ {current} จาก {total}",
+  "mass_migration_waiting_next_item": "กำลังรอ 2 วินาทีก่อนรายการถัดไป...",
+  "mass_migration_waiting_next_migration": "กำลังรอ 2 วินาทีก่อนการโยกย้ายครั้งถัดไป...",
+  "mass_migration_matched_so_far": "ตรงกันแล้ว: {count}",
+  "mass_migration_no_match_count": "ไม่ตรงกัน: {count}",
+  "mass_migration_review_matches": "ตรวจสอบรายการที่ตรงกันสำหรับ {source}",
+  "mass_migration_found_matches": "พบรายการที่ตรงกัน: {count}",
+  "mass_migration_no_matches": "ไม่พบรายการที่ตรงกัน: {count}",
+  "mass_migration_selected_to_migrate": "เลือกเพื่อโยกย้ายแล้ว: {count}",
+  "mass_migration_finish_review": "เสร็จสิ้นการตรวจสอบ",
+  "mass_migration_migrate_selected": "โยกย้ายรายการที่เลือก ({count})",
+  "mass_migration_migrating_selected": "กำลังโยกย้ายรายการที่เลือกไปยัง {source}",
+  "mass_migration_no_items_selected": "ยังไม่ได้เลือกรายการสำหรับการโยกย้าย",
+  "mass_migration_migrating_item": "กำลังโยกย้ายรายการ {current} จาก {total}",
+  "mass_migration_complete": "โยกย้ายจำนวนมากเสร็จสิ้น",
+  "mass_migration_complete_success_message": "ประมวลผลรายการที่เลือกทั้งหมดเรียบร้อยแล้ว",
+  "mass_migration_complete_partial_message": "การโยกย้ายเสร็จสิ้น แต่ยังมีบางรายการที่ต้องจัดการด้วยตนเอง",
   "mass_migration_route_summary": "{source} → {destination}",
-  "mass_migration_processed": "Processed",
-  "mass_migration_matched": "Matched",
-  "mass_migration_migrated": "Migrated",
-  "mass_migration_skipped": "Skipped",
-  "mass_migration_failed": "Failed",
-  "mass_migration_failed_items": "Failed Items",
-  "mass_migration_exit": "Exit Mass Migration",
-  "mass_migration_no_destination_match": "No destination match found",
-  "mass_migration_query": "Query: {query}",
-  "mass_migration_skip": "Skip",
-  "mass_migration_loading": "Loading...",
-  "mass_migration_choose_another_result": "Choose another result",
-  "mass_migration_source_chapters": "Source chapters",
-  "mass_migration_destination_chapters": "Destination chapters",
-  "mass_migration_chapter_count": "{count, plural, =1{1 chapter} other{{count} chapters}}",
-  "mass_migration_source_chapter_count": "{count, plural, =1{1 source chapter} other{{count} source chapters}}",
-  "mass_migration_destination_chapter_count": "{count, plural, =1{1 destination chapter} other{{count} destination chapters}}",
-  "mass_migration_no_chapters_found": "No chapters found.",
-  "mass_migration_and_more_chapters": "And {count} more...",
-  "mass_migration_unknown_title": "Unknown title",
-  "mass_migration_unknown_match": "Unknown match",
-  "mass_migration_unknown_source": "Unknown source",
-  "mass_migration_unknown_chapter": "Unknown chapter",
-  "no_extension_server_bundle_available_for_this_platform": "No extension server bundle is available for this platform.",
-  "extension_server_intro_with_jre": "Download the proxy server bundle before using Mihon extensions. The bundle includes the JRE and extension server JAR.",
-  "failed_to_download_bundle": "Failed to download bundle ({statusCode}).",
-  "selected_folder_does_not_exist": "The selected folder does not exist.",
-  "jre_executable": "JRE executable",
-  "installed_version": "Installed version",
-  "choose_location": "Choose location",
-  "extension_server_intro_ios": "Download the proxy server JAR before using Mihon extensions. iOS only needs the extension server JAR.",
-  "import_existing_jar": "Import existing JAR",
-  "android_proxy_server_mihon_description": "Download and configure the proxy server required to use Mihon extensions.",
-  "files_missing": "Files missing",
-  "select_extension_server_folder": "Select extension server folder",
-  "up_to_date": "Up to date",
-  "preparing_download": "Preparing download...",
-  "could_not_launch_apk_bridge_page": "Could not launch the M-Extension-Server page.",
-  "could_not_check_proxy_server_updates": "Could not check for proxy server updates.",
-  "m_extension_server_description": "Use M-Extension-Server when you need a separate Android device proxy. Set the proxy address here and download the APK from GitHub.",
-  "install_location": "Install location",
-  "not_configured": "Not configured",
-  "detect_files_in_selected_folder": "Detect files in selected folder",
-  "ios_extension_server_import_hint": "On iOS the server is installed inside the app sandbox. Use \"Import existing JAR\" to bring in a downloaded file.",
-  "app_install_location": "App install location",
-  "files_installed": "Files installed",
-  "no_extension_server_files_found_in_selected_folder": "No extension server files were found in the selected folder.",
-  "extension_server_jar_imported": "Extension server JAR was imported.",
-  "proxy_server_ip_hint": "Server IP (e.g., 10.0.0.5 or https://example.com)",
-  "selected_file_could_not_be_accessed": "The selected file could not be accessed.",
-  "no_newer_proxy_server_release_available": "No newer proxy server release is available.",
-  "latest_version": "Latest version",
-  "extension_server_jar": "Extension server JAR",
-  "set_proxy_address": "Set proxy address",
-  "mihon_proxy_server": "Mihon proxy server",
-  "extension_server_files_linked": "Extension server files were linked.",
-  "extension_server_files_ready": "Extension server files are ready.",
-  "webview": "Webview",
-  "update_files": "Update files",
-  "checking_files": "Checking files",
-  "downloaded_bundle_missing_expected_files": "The downloaded bundle does not contain the expected files.",
-  "android_proxy_server_mihon": "Android Proxy Server (Mihon)",
-  "select_extension_server_jar": "Select extension server JAR",
+  "mass_migration_processed": "ประมวลผลแล้ว",
+  "mass_migration_matched": "ตรงกัน",
+  "mass_migration_migrated": "โยกย้ายแล้ว",
+  "mass_migration_skipped": "ข้ามแล้ว",
+  "mass_migration_failed": "ล้มเหลว",
+  "mass_migration_failed_items": "รายการที่ล้มเหลว",
+  "mass_migration_exit": "ออกจากการโยกย้ายจำนวนมาก",
+  "mass_migration_no_destination_match": "ไม่พบรายการที่ตรงกันในปลายทาง",
+  "mass_migration_query": "คำค้น: {query}",
+  "mass_migration_skip": "ข้าม",
+  "mass_migration_loading": "กำลังโหลด...",
+  "mass_migration_choose_another_result": "เลือกผลลัพธ์อื่น",
+  "mass_migration_source_chapters": "ตอนจากแหล่งข้อมูลเดิม",
+  "mass_migration_destination_chapters": "ตอนจากแหล่งข้อมูลปลายทาง",
+  "mass_migration_chapter_count": "{count, plural, =1{1 ตอน} other{{count} ตอน}}",
+  "mass_migration_source_chapter_count": "{count, plural, =1{1 ตอนจากแหล่งเดิม} other{{count} ตอนจากแหล่งเดิม}}",
+  "mass_migration_destination_chapter_count": "{count, plural, =1{1 ตอนจากปลายทาง} other{{count} ตอนจากปลายทาง}}",
+  "mass_migration_no_chapters_found": "ไม่พบตอน",
+  "mass_migration_and_more_chapters": "และอีก {count} รายการ...",
+  "mass_migration_unknown_title": "ไม่ทราบชื่อเรื่อง",
+  "mass_migration_unknown_match": "ไม่ทราบรายการที่ตรงกัน",
+  "mass_migration_unknown_source": "ไม่ทราบแหล่งข้อมูล",
+  "mass_migration_unknown_chapter": "ไม่ทราบตอน",
+  "no_extension_server_bundle_available_for_this_platform": "แพ็กเกจเซิร์ฟเวอร์ส่วนขยายไม่พร้อมใช้งานสำหรับแพลตฟอร์มนี้",
+  "extension_server_intro_with_jre": "ดาวน์โหลดแพ็กเกจเซิร์ฟเวอร์พร็อกซีก่อนใช้ส่วนขยาย Mihon แพ็กเกจนี้มี JRE และ JAR ของเซิร์ฟเวอร์ส่วนขยาย",
+  "failed_to_download_bundle": "ดาวน์โหลดแพ็กเกจไม่สำเร็จ ({statusCode})",
+  "selected_folder_does_not_exist": "โฟลเดอร์ที่เลือกไม่มีอยู่",
+  "jre_executable": "ไฟล์ปฏิบัติการ JRE",
+  "installed_version": "เวอร์ชันที่ติดตั้ง",
+  "choose_location": "เลือกตำแหน่ง",
+  "extension_server_intro_ios": "ดาวน์โหลด JAR ของเซิร์ฟเวอร์พร็อกซีก่อนใช้ส่วนขยาย Mihon iOS ต้องการเพียง JAR ของเซิร์ฟเวอร์ส่วนขยาย",
+  "import_existing_jar": "นำเข้า JAR ที่มีอยู่",
+  "android_proxy_server_mihon_description": "ดาวน์โหลดและกำหนดค่าเซิร์ฟเวอร์พร็อกซีที่จำเป็นสำหรับการใช้ส่วนขยาย Mihon",
+  "files_missing": "ไฟล์ไม่ครบ",
+  "select_extension_server_folder": "เลือกโฟลเดอร์เซิร์ฟเวอร์ส่วนขยาย",
+  "up_to_date": "เป็นปัจจุบัน",
+  "preparing_download": "กำลังเตรียมดาวน์โหลด...",
+  "could_not_launch_apk_bridge_page": "เปิดหน้าของ M-Extension-Server ไม่ได้",
+  "could_not_check_proxy_server_updates": "ตรวจสอบการอัปเดตเซิร์ฟเวอร์พร็อกซีไม่ได้",
+  "m_extension_server_description": "ใช้ M-Extension-Server เมื่อต้องการพร็อกซีบนอุปกรณ์ Android แยกต่างหาก ตั้งค่าที่อยู่พร็อกซีที่นี่และดาวน์โหลด APK จาก GitHub",
+  "install_location": "ตำแหน่งติดตั้ง",
+  "not_configured": "ยังไม่ได้กำหนดค่า",
+  "detect_files_in_selected_folder": "ค้นหาไฟล์ในโฟลเดอร์ที่เลือก",
+  "ios_extension_server_import_hint": "บน iOS เซิร์ฟเวอร์จะติดตั้งอยู่ใน sandbox ของแอป ใช้ \"นำเข้า JAR ที่มีอยู่\" เพื่อนำเข้าไฟล์ที่ดาวน์โหลดไว้",
+  "app_install_location": "ตำแหน่งติดตั้งแอป",
+  "files_installed": "ติดตั้งไฟล์แล้ว",
+  "no_extension_server_files_found_in_selected_folder": "ไม่พบไฟล์เซิร์ฟเวอร์ส่วนขยายในโฟลเดอร์ที่เลือก",
+  "extension_server_jar_imported": "นำเข้า JAR ของเซิร์ฟเวอร์ส่วนขยายแล้ว",
+  "proxy_server_ip_hint": "IP ของเซิร์ฟเวอร์ (เช่น 10.0.0.5 หรือ https://example.com)",
+  "selected_file_could_not_be_accessed": "เข้าถึงไฟล์ที่เลือกไม่ได้",
+  "no_newer_proxy_server_release_available": "ไม่มีรุ่นเซิร์ฟเวอร์พร็อกซีที่ใหม่กว่า",
+  "latest_version": "เวอร์ชันล่าสุด",
+  "extension_server_jar": "JAR ของเซิร์ฟเวอร์ส่วนขยาย",
+  "set_proxy_address": "ตั้งค่าที่อยู่พร็อกซี",
+  "mihon_proxy_server": "เซิร์ฟเวอร์พร็อกซี Mihon",
+  "extension_server_files_linked": "เชื่อมโยงไฟล์เซิร์ฟเวอร์ส่วนขยายแล้ว",
+  "extension_server_files_ready": "ไฟล์เซิร์ฟเวอร์ส่วนขยายพร้อมใช้งาน",
+  "webview": "WebView",
+  "update_files": "อัปเดตไฟล์",
+  "checking_files": "กำลังตรวจสอบไฟล์",
+  "downloaded_bundle_missing_expected_files": "แพ็กเกจที่ดาวน์โหลดไม่มีไฟล์ที่คาดไว้",
+  "android_proxy_server_mihon": "เซิร์ฟเวอร์พร็อกซี Android (Mihon)",
+  "select_extension_server_jar": "เลือก JAR ของเซิร์ฟเวอร์ส่วนขยาย",
   "webtoon_disable_zoom_out": "ปิดการใช้งานการซูมออกสำหรับเว็บตูน",
   "webtoon_double_tap_zoom_enabled": "แตะสองครั้งเพื่อซูมเว็บตูน",
   "navigate_to_pan": "เลื่อนภาพที่ซูมก่อนเปลี่ยนหน้า",
@@ -746,541 +745,5 @@
   "reader_hide_threshold_high": "เร็ว (13 px)",
   "reader_hide_threshold_low": "ช้า (31 px)",
   "reader_hide_threshold_lowest": "ช้าที่สุด (47 px)",
-  "error_no_pages_available": "เกิดข้อผิดพลาด: ไม่มีหน้าที่พร้อมใช้งาน",
-  "mark_duplicate_chapters_read": "ทำเครื่องหมายหมายเลขบทที่ซ้ำกันว่าอ่านแล้ว",
-  "tts": "ข้อความเป็นเสียง",
-  "tts_speed": "ความเร็ว",
-  "tts_pitch": "เสียง",
-  "tts_language": "ภาษา",
-  "tts_voice": "เสียง",
-  "tts_stop": "หยุด",
-  "tts_play": "เล่น",
-  "tts_pause": "ชั่วพัก",
-  "tts_previous": "ย่อหน้าก่อนหน้า",
-  "tts_next": "ย่อหน้าถัดไป",
-  "tts_paragraph_progress": "ย่อหน้า {current} จาก {total}",
-  "tts_settings": "การตั้งค่า TTS",
-  "tts_default": "ค่าเริ่มต้น",
-  "app_ui_scale": "สเกลอินเทอร์เฟซ",
-  "app_ui_scale_subtitle": "ทำให้อินเทอร์เฟซใหญ่ขึ้นหรือเล็กลงเพื่อให้เหมาะกับหน้าจอและระยะการมองของคุณ",
-  "allow_concurrent_downloads": "อนุญาตให้ดาวน์โหลดพร้อมกัน",
-  "allow_concurrent_downloads_subtitle": "ดาวน์โหลดจากแหล่งที่มาต่างๆในเวลาเดียวกัน แหล่งที่มาเดียวจะยังคงดาวน์โหลดหนึ่งบทในครั้งเดียวเพื่อไม่ให้โอเวอร์โหลด ปิดเพื่อดาวน์โหลดทีละอันทุกที่",
-  "download_delay": "ความล่าช้าในการดาวน์โหลด",
-  "download_delay_subtitle": "ปิด เพิ่มการรอคอยพร้อมกับการสั่นสะเทือนแบบสุ่มระหว่างบทเพื่อให้นุ่มนวลกับแหล่งที่มา",
-  "save_search": "บันทึกการค้นหา",
-  "saved_searches": "การค้นหาที่บันทึกไว้",
-  "enter_search_to_save_first": "ป้อนการค้นหาเพื่อบันทึกก่อน",
-  "no_saved_searches": "ไม่มีการค้นหาที่บันทึกไว้สำหรับแหล่งที่มานี้เพื่อ\nทำการค้นหาแล้วเลือก \"บันทึกการค้นหา\"",
-  "source": "แหล่งที่มา",
-  "label_value": "{label}: {value}",
-  "url": "URL",
-  "beta_version": "เบต้า ({version})",
-  "empty_placeholder": "ว่าง",
-  "error": "ข้อผิดพลาด",
-  "error_with_message": "ข้อผิดพลาด: {error}",
-  "no_pages_available": "ข้อผิดพลาด: ไม่มีหน้าว่าง",
-  "create_extension": "สร้างส่วนขยาย",
-  "choose_extension_language": "เลือกภาษาส่วนขยาย",
-  "lang": "ภาษา",
-  "base_url": "URL ฐาน",
-  "api_url_optional": "API URL (ทางเลือก)",
-  "icon_url": "URL ไอคอน",
-  "source_icon_url": "URL ไอคอนแหล่งที่มา",
-  "notes": "หมายเหตุ",
-  "extension_name_example": "ตัวอย่าง: myAnime",
-  "language_code_example": "ตัวอย่าง: th",
-  "base_url_example": "ตัวอย่าง: https://example.com",
-  "api_url_example": "ตัวอย่าง: https://api.example.com",
-  "extension_notes_example": "ตัวอย่าง: ส่วนขยายนี้ต้องเข้าสู่ระบบ",
-  "type": "ประเภท",
-  "target": "เป้าหมาย",
-  "source_type_single": "เดี่ยว",
-  "source_type_multi": "หลายรายการ",
-  "source_type_torrent": "ทอร์เรนต์",
-  "source_language_dart": "Dart",
-  "source_language_javascript": "JavaScript",
-  "source_language_lnreader_compiled_js": "JS คอมไพล์ของ LNReader",
-  "source_created_successfully": "สร้างแหล่งที่มาเรียบร้อยแล้ว",
-  "source_already_exists": "แหล่งที่มามีอยู่แล้ว",
-  "error_when_creating_source": "เกิดข้อผิดพลาดในการสร้างแหล่งที่มา",
-  "cookies_deleted": "ลบคุกกี้แล้ว!",
-  "delete_all_cookies": "ลบคุกกี้ทั้งหมด",
-  "missing_chapters": "ขาด {count} ตอน",
-  "sync_restore_in_progress": "ข้ามการซิงค์ — กำลังกู้คืน",
-  "sync_status_not_configured": "ไม่ได้เชื่อมต่อ",
-  "sync_status_checking": "กำลังตรวจสอบการเชื่อมต่อ...",
-  "sync_status_connected": "เชื่อมต่อแล้ว",
-  "sync_status_unauthorized": "เซสชันหมดอายุ โปรดเข้าสู่ระบบอีกครั้ง",
-  "sync_status_unreachable": "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้",
-  "sync_section_general": "ทั่วไป",
-  "sync_section_data_types": "สิ่งที่ต้องการซิงค์",
-  "missing_episodes": "ขาด {count} ตอน",
-  "encrypt_backups": "เข้ารหัสข้อมูลสำรอง",
-  "encrypt_backups_info": "ป้องกันไฟล์สำรองด้วยรหัสผ่านโดยใช้การเข้ารหัส AES",
-  "no_secure_storage": "ไม่พบที่จัดเก็บที่ปลอดภัย",
-  "no_keyring_warning": "ระบบนี้ไม่มีบริการพวงกุญแจ รหัสผ่านจึงไม่สามารถจัดเก็บได้อย่างปลอดภัย",
-  "enter_backup_password": "ป้อนรหัสผ่านข้อมูลสำรอง",
-  "incorrect_password_try_again": "รหัสผ่านไม่ถูกต้อง โปรดลองอีกครั้ง",
-  "set_backup_password": "ตั้งรหัสผ่านข้อมูลสำรอง",
-  "confirm_password": "ยืนยันรหัสผ่าน",
-  "passwords_do_not_match": "รหัสผ่านไม่ตรงกัน",
-  "password_required_to_restore": "จำเป็นต้องใช้รหัสผ่านในการกู้คืนข้อมูลสำรองนี้",
-  "restore_sync_question_title": "ซิงค์การกู้คืนนี้หรือไม่?",
-  "restore_sync_question_message": "อุปกรณ์นี้เชื่อมต่อกับเซิร์ฟเวอร์ซิงค์ ต้องการอัปโหลดข้อมูลที่กู้คืนตอนนี้หรือไม่?",
-  "restore_sync_question_confirm": "ใช่ ซิงค์",
-  "restore_sync_question_deny": "ไม่ ปิดใช้งานการซิงค์",
-  "sync_disabled_after_restore": "การซิงค์ถูกปิดใช้งาน คุณสามารถเปิดใช้งานได้ในการตั้งค่า",
-  "restore_sync_disabled_question_title": "การซิงค์ถูกปิดใช้งานอยู่",
-  "restore_sync_disabled_question_message": "การซิงค์ปิดอยู่ ต้องการเปิดใช้งานและอัปโหลดข้อมูลไปยังเซิร์ฟเวอร์หรือไม่?",
-  "restore_sync_question_reenable": "ใช่ เปิดใช้งานและซิงค์",
-  "restore_sync_question_keep_disabled": "ปิดไว้ต่อไป",
-  "restore_sync_uploading": "กำลังซิงค์ข้อมูลกับเซิร์ฟเวอร์…",
-  "restore_sync_upload_success": "ซิงค์ข้อมูลกับเซิร์ฟเวอร์สำเร็จ",
-  "default_download_destination": "ตำแหน่งดาวน์โหลดเริ่มต้น",
-  "ask_download_destination": "ถามตำแหน่งดาวน์โหลด",
-  "ask_download_destination_desc": "เลือกโฟลเดอร์ในเครื่องทุกครั้งที่เริ่มดาวน์โหลด",
-  "select_download_destination": "เลือกตำแหน่งดาวน์โหลด",
-  "clear_local_library": "ล้างคลังในเครื่อง",
-  "clear_local_library_desc": "ลบโฟลเดอร์และไฟล์เก็บถาวรในเครื่องออกจากคลัง",
-  "clear_local_library_msg": "การดำเนินการนี้จะลบรายการในเครื่องออกจากคลัง (ไฟล์ในเครื่องจะไม่ถูกลบ)",
-  "custom": "กำหนดเอง",
-  "no_local_folder_available_for_downloads": "ไม่มีโฟลเดอร์ในเครื่องสำหรับการดาวน์โหลด",
-  "failed_to_create_cbz": "สร้าง CBZ ล้มเหลว: {error}",
-  "error_reading_cover_image": "เกิดข้อผิดพลาดในการอ่านภาพหน้าปก: {error}",
-  "error_reading_metadata": "เกิดข้อผิดพลาดในการอ่านข้อมูลเมตา: {error}",
-  "error_saving_chapter_episode_to_library": "เกิดข้อผิดพลาดในการบันทึกลงคลัง: {error}",
-  "error_reading_chapter_cover_image": "เกิดข้อผิดพลาดในการอ่านหน้าปกตอน: {error}",
-  "error_reading_archive_cover_image": "เกิดข้อผิดพลาดในการอ่านหน้าปกไฟล์เก็บถาวร: {error}",
-  "error_getting_local_library": "เกิดข้อผิดพลาดในการรับคลังในเครื่อง: {error}",
-  "failed_to_export_metadata": "ส่งออกข้อมูลเมตาล้มเหลว: {error}",
-  "unrecognized_chapter_numbers": "มี {count} ตอนที่ไม่สามารถใส่หมายเลขอัตโนมัติได้",
-  "cloudflare_resolution_webview_server_start_failed": "ไม่สามารถเริ่มเซิร์ฟเวอร์แก้ปัญหา Cloudflare ได้",
-  "tracker_token_expired": "โทเค็น {tracker} หมดอายุ",
-  "video_list_empty": "รายการวิดีโอว่างเปล่า",
-  "playback_speed_multiplier": "x{value}",
-  "could_not_launch_url": "ไม่สามารถเปิด {url} ได้",
-  "zero_interpreter": "ตัวแปล Zero",
-  "zero_interpreter_description": "ควบคุมเซิร์ฟเวอร์ตัวแปล Zero อัตโนมัติหรือด้วยตนเอง",
-  "start_server_on_launch": "เริ่มเซิร์ฟเวอร์เมื่อเปิดแอป",
-  "runtime_status": "สถานะการทำงาน",
-  "running": "กำลังทำงาน",
-  "stopped": "หยุดแล้ว",
-  "start": "เริ่ม",
-  "stop": "หยุด",
-  "something_went_wrong": "เกิดข้อผิดพลาดบางอย่าง",
-  "startup_failed": "Mangayomi ไม่สามารถเริ่มต้นทำงานได้",
-  "sources_with_no_results": "{count, plural, other{{count} แหล่งที่มาไม่มีผลลัพธ์}}",
-  "import_mode_title": "ต้องการนำเข้าอย่างไร?",
-  "import_mode_message": "เลือกว่าจะผสานข้อมูลสำรองนี้เข้ากับคลังปัจจุบัน หรือแทนที่ทั้งคลัง",
-  "import_mode_keep_existing": "ผสาน",
-  "import_mode_keep_existing_subtitle": "เพิ่มเรื่องใหม่และอัปเดตเรื่องที่ตรงกัน",
-  "import_mode_replace": "แทนที่",
-  "import_mode_replace_subtitle": "ลบคลังปัจจุบันทั้งหมดและแทนที่ด้วยข้อมูลสำรองนี้",
-  "replace_summary_title": "พร้อมแทนที่คลังของคุณ",
-  "replace_summary_message": "การดำเนินการนี้จะลบคลังปัจจุบัน ({currentCount} เรื่อง) และแทนที่ด้วย {backupCount} เรื่อง",
-  "replace_summary_confirm": "แทนที่",
-  "replace_result_message": "แทนที่คลังด้วย {count} เรื่องจากข้อมูลสำรองเรียบร้อยแล้ว",
-  "category_conflict_title": "พบหมวดหมู่ที่มีอยู่แล้ว",
-  "category_conflict_message": "ข้อมูลสำรองมีหมวดหมู่ที่มีอยู่แล้วในคลัง",
-  "category_conflict_keep": "เก็บไว้ — ผสานเข้ากับหมวดหมู่ที่มีอยู่",
-  "category_conflict_delete": "ลบ — ปล่อยให้ไม่มีหมวดหมู่",
-  "source_conflict_title": "ไม่พบแหล่งที่มา",
-  "source_conflict_message": "บางแหล่งที่มาไม่ตรงกับส่วนขยายที่ติดตั้งไว้",
-  "source_conflict_keep": "เก็บชื่อเดิมไว้",
-  "import_summary_title": "พร้อมนำเข้า",
-  "import_summary_message": "เพิ่ม {newSeries} เรื่องใหม่ อัปเดต {updatedSeries} เรื่อง และเพิ่ม {newChapters} ตอนใหม่",
-  "import_summary_confirm": "นำเข้า",
-  "import_result_message": "นำเข้า {newSeries} เรื่องใหม่ อัปเดต {updatedSeries} เรื่อง และเพิ่ม {newChapters} ตอน",
-  "roll_back": "ย้อนกลับ",
-  "roll_back_confirm_message": "กู้คืนคลังกลับไปยังสแนปช็อตก่อนการเปลี่ยนแปลงนี้",
-  "roll_back_done": "ย้อนกลับไปยังสแนปช็อตก่อนหน้าเรียบร้อยแล้ว",
-  "restoring_backup": "กำลังกู้คืนคลัง…",
-  "roll_back_last_change": "ย้อนกลับการเปลี่ยนแปลงล่าสุด",
-  "roll_back_last_change_subtitle": "สแนปช็อตเมื่อ {date} — {description}",
-  "roll_back_available_count": "มี {count} การเปลี่ยนแปลงล่าสุดที่สามารถย้อนกลับได้",
-  "delete_source_title": "ลบแหล่งที่มาและมังงะ",
-  "delete_source_subtitle": "ลบมังงะ ตอน การดาวน์โหลด และประวัติทั้งหมดของแหล่งที่มานี้",
-  "delete_source_pick_title": "เลือกแหล่งที่มาที่จะลบ",
-  "delete_source_empty": "ไม่พบแหล่งที่มาในคลัง",
-  "delete_source_confirm_title": "ลบ {sourceName} หรือไม่?",
-  "delete_source_confirm_message": "การดำเนินการนี้จะลบ {mangaCount} เรื่อง {chapterCount} ตอน และ {historyCount} ประวัติอย่างถาวร",
-  "delete_source_also_remove_extension": "ถอนการติดตั้งส่วนขยายด้วย",
-  "delete_source_keep_history": "เก็บประวัติการอ่านไว้",
-  "delete_source_keep_downloads": "เก็บบันทึกการดาวน์โหลดไว้",
-  "delete_source_button": "ลบ",
-  "delete_source_result_message": "ลบ {mangaCount} เรื่องจาก {sourceName} เรียบร้อยแล้ว",
-  "merge_manga_title": "ผสานมังงะที่ซ้ำกัน",
-  "merge_manga_subtitle": "ค้นหามังงะที่มีชื่อตรงกันภายใต้แหล่งที่มาเดียวกันและรวมเข้าด้วยกัน",
-  "merge_manga_none_found": "ไม่พบมังงะที่ซ้ำกัน",
-  "merge_manga_pick_title": "มังงะที่อาจซ้ำกัน",
-  "merge_manga_choose_primary_title": "ต้องการผสานเรื่องอื่นเข้ากับเรื่องใด?",
-  "merge_manga_choose_primary_message": "ตอน ประวัติ และการติดตามจะถูกรวมเข้ากับเรื่องที่เลือก",
-  "merge_manga_chapters_subtitle": "{count, plural, other{{count} ตอน}}",
-  "merge_manga_button": "ผสาน",
-  "merge_manga_result_message": "ผสาน {count} มังงะที่ซ้ำกันเข้ากับ {mangaName} เรียบร้อยแล้ว",
-  "merge_preview_title": "ยืนยันการผสาน",
-  "merge_manga_preview_message": "พบทั้งหมด {totalChapters} ตอน จะตัด {duplicateChapters} ตอนที่ซ้ำกันออก และเพิ่ม {keptChapters} ตอน",
-  "beta": "เบต้า",
-  "error_reports": "รายงานข้อผิดพลาด",
-  "error_reports_subtitle": "ข้อผิดพลาดที่พบและวิธีการรายงาน",
-  "error_reports_empty": "ไม่พบข้อผิดพลาด",
-  "error_reports_likely_cause": "สาเหตุที่เป็นไปได้",
-  "error_reports_report": "รายงานบน GitHub",
-  "error_reports_banner": "Mangayomi พบข้อผิดพลาด",
-  "error_reports_banner_action": "ดู",
-  "error_reports_copy": "คัดลอก",
-  "error_reports_copied": "คัดลอกไปยังคลิปบอร์ดแล้ว",
-  "error_reports_clear": "ล้าง",
-  "share_unavailable_copied": "ไม่สามารถแชร์ได้ จึงคัดลอกไปยังคลิปบอร์ดแทน",
-  "onboarding_title": "ยินดีต้อนรับสู่ Mangayomi",
-  "onboarding_libraries_body": "เลือกสิ่งที่คุณต้องการอ่านและดู",
-  "onboarding_nav_title": "คลังของคุณ",
-  "onboarding_nav_body": "แยกแท็บสำหรับแต่ละประเภท หรือรวมไว้ในแท็บคลังเดียว",
-  "onboarding_nav_split": "แยกแท็บ",
-  "onboarding_nav_merged": "แท็บคลังเดียว",
-  "onboarding_nav_inside": "แตะคลังเพื่อสลับแท็บเหล่านี้",
-  "onboarding_next": "ถัดไป",
-  "onboarding_restore": "กู้คืนข้อมูลสำรอง",
-  "onboarding_or_local": "หรือใช้ไฟล์ที่คุณมีอยู่แล้ว",
-  "onboarding_local_folder": "เพิ่มโฟลเดอร์",
-  "onboarding_local_existing": "ตั้งค่าแล้ว {count} โฟลเดอร์",
-  "onboarding_local_any_type": "รองรับมังงะ อนิเมะ และนิยาย",
-  "onboarding_local_scanning": "กำลังสแกนโฟลเดอร์",
-  "onboarding_local_found": "พบ {count} เรื่อง",
-  "onboarding_local_remove": "ลบโฟลเดอร์",
-  "onboarding_local_in_downloads": "นี่คือโฟลเดอร์ดาวน์โหลดของแอป",
-  "onboarding_local_empty": "ไม่พบอะไรเลย โปรดเลือกโฟลเดอร์หลัก",
-  "onboarding_repo_failed": "ไม่สามารถอ่านที่เก็บข้อมูลนี้ได้",
-  "onboarding_repo_title": "เพิ่มแหล่งที่มา",
-  "onboarding_body": "เพิ่มที่เก็บข้อมูลเพื่อติดตั้งส่วนขยาย",
-  "onboarding_add": "เพิ่มที่เก็บข้อมูล",
-  "onboarding_skip": "ข้ามไปก่อน",
-  "onboarding_continue": "ดำเนินการต่อ",
-  "onboarding_later": "คุณสามารถเพิ่มได้ในภายหลังที่ การตั้งค่า > เรียกดู",
-  "onboarding_replay": "แสดงหน้าจอต้อนรับ",
-  "onboarding_replay_subtitle": "เปิดหน้าจอตั้งค่าเริ่มต้นอีกครั้ง",
-  "missing_source_check_title": "ตรวจสอบแหล่งที่มาที่หายไป",
-  "missing_source_check_subtitle": "ค้นหารายการที่ยังไม่ได้ติดตั้งส่วนขยาย",
-  "missing_source_check_none_found": "ติดตั้งแหล่งที่มาทั้งหมดแล้ว",
-  "missing_source_check_result_title": "{count, plural, other{ขาด {count} แหล่งที่มา}}",
-  "missing_source_check_result_message": "รายการเหล่านี้เชื่อมโยงกับแหล่งที่มาที่ไม่ได้ติดตั้ง แตะเพื่อย้ายหรือติดตั้งส่วนขยาย",
-  "@mass_migration_items_ready_for_review": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_item_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_finding_matches": {
-    "placeholders": {
-      "source": {},
-      "language": {}
-    }
-  },
-  "@mass_migration_processing_item": {
-    "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_matched_so_far": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_no_match_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_review_matches": {
-    "placeholders": {
-      "source": {}
-    }
-  },
-  "@mass_migration_found_matches": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_no_matches": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_selected_to_migrate": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_migrate_selected": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_migrating_selected": {
-    "placeholders": {
-      "source": {}
-    }
-  },
-  "@mass_migration_migrating_item": {
-    "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_route_summary": {
-    "placeholders": {
-      "source": {},
-      "destination": {}
-    }
-  },
-  "@mass_migration_query": {
-    "placeholders": {
-      "query": {}
-    }
-  },
-  "@mass_migration_chapter_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_source_chapter_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_destination_chapter_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_and_more_chapters": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@failed_to_download_bundle": {
-    "placeholders": {
-      "statusCode": {}
-    }
-  },
-  "@tts_paragraph_progress": {
-    "placeholders": {
-      "current": {},
-      "total": {}
-    }
-  },
-  "@label_value": {
-    "placeholders": {
-      "label": {},
-      "value": {}
-    }
-  },
-  "@beta_version": {
-    "placeholders": {
-      "version": {}
-    }
-  },
-  "@error_with_message": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@failed_to_create_cbz": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_metadata": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_saving_chapter_episode_to_library": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_chapter_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_archive_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_getting_local_library": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@failed_to_export_metadata": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@unrecognized_chapter_numbers": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@tracker_token_expired": {
-    "placeholders": {
-      "tracker": {}
-    }
-  },
-  "@playback_speed_multiplier": {
-    "placeholders": {
-      "value": {}
-    }
-  },
-  "@could_not_launch_url": {
-    "placeholders": {
-      "url": {}
-    }
-  },
-  "@sources_with_no_results": {
-    "description": "Header of the collapsed group in global search holding every source that failed or found nothing.",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@replace_summary_message": {
-    "placeholders": {
-      "currentCount": {},
-      "backupCount": {}
-    }
-  },
-  "@replace_result_message": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@import_summary_message": {
-    "placeholders": {
-      "newSeries": {},
-      "updatedSeries": {},
-      "newChapters": {}
-    }
-  },
-  "@import_result_message": {
-    "placeholders": {
-      "newSeries": {},
-      "updatedSeries": {},
-      "newChapters": {}
-    }
-  },
-  "@roll_back_last_change_subtitle": {
-    "placeholders": {
-      "date": {},
-      "description": {}
-    }
-  },
-  "@roll_back_available_count": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@delete_source_confirm_title": {
-    "placeholders": {
-      "sourceName": {}
-    }
-  },
-  "@delete_source_confirm_message": {
-    "placeholders": {
-      "mangaCount": {},
-      "chapterCount": {},
-      "historyCount": {},
-      "updateCount": {}
-    }
-  },
-  "@delete_source_result_message": {
-    "placeholders": {
-      "mangaCount": {},
-      "sourceName": {}
-    }
-  },
-  "@merge_manga_chapters_subtitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@merge_manga_result_message": {
-    "placeholders": {
-      "count": {},
-      "mangaName": {}
-    }
-  },
-  "@merge_manga_preview_message": {
-    "placeholders": {
-      "totalChapters": {},
-      "duplicateChapters": {},
-      "keptChapters": {},
-      "duplicateTracks": {}
-    }
-  },
-  "@onboarding_local_existing": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@onboarding_local_found": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@missing_source_check_result_title": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  }
+  "error_no_pages_available": "เกิดข้อผิดพลาด: ไม่มีหน้าที่พร้อมใช้งาน"
 }

@@ -17,6 +17,9 @@ import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/track_preference.dart';
 
 /// Cover height over width, taken from the artwork itself: AniList serves
 /// these at 230x320. Matching it means BoxFit.cover has nothing to crop, so
@@ -533,14 +536,26 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
         if (isOverflowing) {
           return SizedBox(
             height: 20,
-            child: Marquee(
-              text: text,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              blankSpace: 40.0,
-              velocity: 30.0,
-              pauseAfterRound: const Duration(seconds: 1),
-              startPadding: 10.0,
-            ),
+            child: MediaQuery.disableAnimationsOf(context)
+                ? Text(
+                    text,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Marquee(
+                    text: text,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    blankSpace: 40.0,
+                    velocity: 30.0,
+                    pauseAfterRound: const Duration(seconds: 1),
+                    startPadding: 10.0,
+                  ),
           );
         } else {
           return Text(

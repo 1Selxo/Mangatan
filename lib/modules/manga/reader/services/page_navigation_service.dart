@@ -5,7 +5,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 /// Service for handling page navigation in the manga reader.
 ///
 /// Abstracts the complexity of navigating between different reader modes:
-/// - Paged modes (vertical, LTR, RTL)
+/// - Paged modes (vertical and horizontal)
 /// - Continuous modes (vertical continuous, webtoon, horizontal continuous)
 class PageNavigationService {
   final ItemScrollController itemScrollController;

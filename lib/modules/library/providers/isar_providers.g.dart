@@ -68,7 +68,7 @@ final class GetAllMangaStreamProvider
   }
 }
 
-String _$getAllMangaStreamHash() => r'95240271805b7dc64e47c37b7e6fcf5d06d32cab';
+String _$getAllMangaStreamHash() => r'245e968614894d0e346ac76bfa8000584ea54f70';
 
 final class GetAllMangaStreamFamily extends $Family
     with
@@ -156,7 +156,7 @@ final class GetAllMangaWithoutCategoriesStreamProvider
 }
 
 String _$getAllMangaWithoutCategoriesStreamHash() =>
-    r'7e22e4f7c5ebe653eb6b40e85d1bf7fedc86e2cb';
+    r'eda35eda52985b3d529266b4169527a974f8de29';
 
 final class GetAllMangaWithoutCategoriesStreamFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<Manga>>, ItemType> {
@@ -185,8 +185,12 @@ final getSettingsStreamProvider = GetSettingsStreamProvider._();
 
 final class GetSettingsStreamProvider
     extends
-        $FunctionalProvider<AsyncValue<Settings>, Settings, Stream<Settings>>
-    with $FutureModifier<Settings>, $StreamProvider<Settings> {
+        $FunctionalProvider<
+          AsyncValue<List<Settings>>,
+          List<Settings>,
+          Stream<List<Settings>>
+        >
+    with $FutureModifier<List<Settings>>, $StreamProvider<List<Settings>> {
   GetSettingsStreamProvider._()
     : super(
         from: null,
@@ -203,13 +207,14 @@ final class GetSettingsStreamProvider
 
   @$internal
   @override
-  $StreamProviderElement<Settings> $createElement($ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
+  $StreamProviderElement<List<Settings>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
 
   @override
-  Stream<Settings> create(Ref ref) {
+  Stream<List<Settings>> create(Ref ref) {
     return getSettingsStream(ref);
   }
 }
 
-String _$getSettingsStreamHash() => r'bbd743d60324ae71865df45d563399f8189de8f1';
+String _$getSettingsStreamHash() => r'c5a51e0e3473b25d2365025832a27ed2cc029b27';

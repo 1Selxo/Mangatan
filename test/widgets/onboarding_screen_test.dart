@@ -44,6 +44,11 @@ void main() {
           getRepoInfosProvider(jsonUrl: _goodUrl).overrideWith(
             (ref) async => Repo(name: 'Test repo', jsonUrl: _goodUrl),
           ),
+          // Keep the error-state test deterministic and offline. Without this
+          // override, local DNS proxies may turn the reserved invalid domain
+          // into an HTTP response instead of the intended lookup failure.
+          getRepoInfosProvider(jsonUrl: 'https://example.invalid')
+              .overrideWith((ref) async => throw StateError('offline test')),
           // Reads Isar, which is not open in a test.
           localFoldersStateProvider.overrideWith(_StubLocalFolders.new),
           hideItemsStateProvider.overrideWith(_StubHideItems.new),
@@ -602,15 +607,15 @@ class _StubRepoState extends ExtensionsRepoState {
   // Without this the real one writes to Isar, throws, and the screen reports
   // the add as failed.
   @override
-  void set(List<Repo> value) => state = value;
+  Future<void> set(List<Repo> value) async => state = value;
 }
 
 class _StubLocalFolders extends LocalFoldersState {
   @override
-  List<LocalFolder> build() => const [];
+  List<String> build() => const [];
 
   @override
-  void set(List<LocalFolder> value) => state = value;
+  void set(List<String> value) => state = value;
 }
 
 class _StubHideItems extends HideItemsState {

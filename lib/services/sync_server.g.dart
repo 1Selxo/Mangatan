@@ -57,7 +57,7 @@ final class SyncServerProvider extends $NotifierProvider<SyncServer, void> {
   }
 }
 
-String _$syncServerHash() => r'abccc3c672a497d390da8da82f88e27dc0c19525';
+String _$syncServerHash() => r'f5ad6303efdd6c52ba9ea73ebebcd8614437c749';
 
 final class SyncServerFamily extends $Family
     with $ClassFamilyOverride<SyncServer, void, void, void, int> {

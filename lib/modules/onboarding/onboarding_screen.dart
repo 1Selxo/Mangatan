@@ -23,6 +23,8 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
 
 /// The nav destination for each library, so a library the user does not read
 /// can be kept out of the bar.
@@ -126,8 +128,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   ///
   /// The default `local` folder is not among these; the provider holds the
   /// ones a user has added themselves.
-  List<LocalFolder> get _existingFolders =>
-      ref.watch(localFoldersStateProvider);
+  List<String> get _existingFolders => ref.watch(localFoldersStateProvider);
 
   /// Whether the folder this screen added is still on the list.
   ///
@@ -136,9 +137,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   /// used to leave this step still reporting a folder that had gone.
   bool get _addedLocalFolder =>
       _addedFolderPath != null &&
-      ref
-          .watch(localFoldersStateProvider)
-          .any((folder) => folder.path == _addedFolderPath);
+      ref.watch(localFoldersStateProvider).contains(_addedFolderPath);
 
   /// The folder that was added here, so a wrong pick can be undone without
   /// going to look for it in Settings.
@@ -308,13 +307,8 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
     // de-duplication turned that into "Manga 2", "Manga 3" and so on. Trying
     // again after a scan found nothing is the most likely thing a user does
     // here, so it has to be the cheapest.
-    if (!folders.any((folder) => folder.path == path)) {
-      folders.add(
-        LocalFolder(
-          name: LocalFolder.fromPath(path: path).name ?? p.basename(path),
-          path: path,
-        ),
-      );
+    if (!folders.contains(path)) {
+      folders.add(path);
       ref.read(localFoldersStateProvider.notifier).set(folders);
     }
     // The downloads directory already belongs to the app. Scanning it as a
@@ -375,7 +369,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
         .set(
           ref
               .read(localFoldersStateProvider)
-              .where((folder) => folder.path != path)
+              .where((folder) => folder != path)
               .toList(),
         );
     setState(() {
@@ -445,19 +439,12 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
         setState(() => _error = l10n.unsupported_repo);
         return;
       }
-      final currentRepos = ref.read(extensionsRepoStateProvider(_repoType));
-      final alreadyExists = currentRepos.any((r) {
-        final rUrl = r.jsonUrl?.trim().toLowerCase();
-        final newUrl = repo.jsonUrl?.trim().toLowerCase();
-        return (rUrl != null &&
-                (rUrl == newUrl ||
-                    rUrl == '$newUrl/' ||
-                    '$rUrl/' == newUrl)) ||
-            r == repo;
-      });
-      if (!alreadyExists) {
-        ref.read(extensionsRepoStateProvider(_repoType).notifier).set([...currentRepos, repo]);
-      }
+      final repos = ref.read(extensionsRepoStateProvider(_repoType)).toList()
+        ..add(repo);
+      await ref
+          .read(extensionsRepoStateProvider(_repoType).notifier)
+          .set(repos);
+      if (!mounted) return;
       setState(() {
         _added = repo;
         _addedFor = _repoType;
@@ -788,7 +775,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
         _FolderStatus(
           message: l10n.onboarding_local_existing('${_existingFolders.length}'),
           titles: _existingFolders
-              .map((folder) => folder.name ?? '')
+              .map(p.basename)
               .where((name) => name.isNotEmpty)
               .toList(),
         ),
@@ -887,11 +874,18 @@ class _ChoiceRow<T> extends StatelessWidget {
       children: [
         for (final value in values)
           FilterChip(
+            avatar: Icon(
+              isSelected(value)
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 18,
+              color: isSelected(value) ? scheme.onPrimary : scheme.outline,
+            ),
             label: Text(label(value)),
             selected: isSelected(value),
-            // The tick would appear and disappear with the selection, so every
-            // chip in the row changed width and the row jumped around as the
-            // user tapped through it. The fill already says which is on.
+            // Reserve the same icon width in both states. This makes the
+            // initial all-selected state unambiguous without making the row
+            // jump when a library is toggled.
             showCheckmark: false,
             // The default selected fill comes from the scheme's secondary
             // container while the label stays on the surface colour, and on

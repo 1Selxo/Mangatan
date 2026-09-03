@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:mangayomi/main.dart';
 
 part 'player_decoder_state_provider.g.dart';
 
@@ -46,10 +47,8 @@ class HwdecModeState extends _$HwdecModeState {
 class EnableHardwareAccelState extends _$EnableHardwareAccelState {
   @override
   bool build() {
-    return settingsRepository.current.enableHardwareAcceleration ??
-            Platform.isMacOS
-        ? false
-        : true;
+    return isar.settings.getSync(227)!.enableHardwareAcceleration ??
+        (Platform.isMacOS ? false : true);
   }
 
   void set(bool value) {

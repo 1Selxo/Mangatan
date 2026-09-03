@@ -1,8 +1,8 @@
 {
   "@@locale": "zh",
-  "library": "图书馆",
+  "library": "书架",
   "updates": "更新",
-  "history": "历史",
+  "history": "阅读记录",
   "browse": "浏览",
   "more": "更多",
   "open_random_entry": "随机打开条目",
@@ -15,12 +15,12 @@
   "downloaded": "已下载",
   "unread": "未读",
   "started": "已开始",
-  "bookmarked": "已书签",
+  "bookmarked": "已收藏",
   "sort": "排序",
   "alphabetically": "按字母顺序",
   "last_read": "最后阅读",
   "last_update_check": "最后更新检查",
-  "last_entry_delete_warning": "{count, plural, =1{你正在从你的库中删除此{mediaType}的唯一{entryType}。} other{你正在从你的库中删除此{mediaType}的全部{count}{entryTypePlural}。}}\n这也会将整个{mediaType}从你的库中移除。\n\n注意：文件本身不会被删除。",
+  "last_entry_delete_warning": "{count, plural, =1{您正在从书架中删除此{mediaType}的唯一{entryType}。} other{您正在从书架中删除此{mediaType}的全部{count}{entryTypePlural}。}}\n这也会将整个{mediaType}从书架中移除。\n\n注意：文件本身不会被删除。",
   "@last_entry_delete_warning": {
     "placeholders": {
       "count": {},
@@ -31,7 +31,7 @@
   },
   "chapter": "章节",
   "episode": "剧集",
-  "unread_count": "未读计数",
+  "unread_count": "未读数量",
   "latest_chapter": "最新章节",
   "date_added": "添加日期",
   "display": "显示",
@@ -49,15 +49,15 @@
   "show_numbers_of_items": "显示项目数",
   "other": "其他",
   "show_continue_reading_buttons": "显示继续阅读按钮",
-  "empty_library": "空图书馆",
-  "search": "搜索...",
-  "no_recent_updates": "无最近更新",
+  "empty_library": "书架为空",
+  "search": "搜索…",
+  "no_recent_updates": "暂无最近更新",
   "remove_everything": "删除所有",
-  "remove_everything_msg": "你确定吗？所有历史将丢失",
+  "remove_everything_msg": "确定要删除吗？所有阅读记录都将丢失。",
   "ok": "好",
   "cancel": "取消",
   "remove": "移除",
-  "remove_history_msg": "这将移除此章节的阅读日期。你确定吗？",
+  "remove_history_msg": "这将移除此章节的阅读日期。确定要继续吗？",
   "last_used": "最后使用",
   "pinned": "已固定",
   "sources": "来源",
@@ -90,10 +90,10 @@
   "appearance": "外观",
   "appearance_subtitle": "主题，日期和时间格式",
   "theme": "主题",
-  "dark_mode": "暗模式",
+  "dark_mode": "深色模式",
   "on": "开",
   "off": "关",
-  "pure_black_dark_mode": "纯黑暗模式",
+  "pure_black_dark_mode": "纯黑深色模式",
   "timestamp": "时间戳",
   "relative_timestamp": "相对时间戳",
   "relative_timestamp_short": "短（今天，昨天）",
@@ -113,14 +113,14 @@
   "normal": "正常",
   "fast": "快",
   "no_animation": "无动画",
-  "animate_page_transitions": "动画页面过渡",
+  "animate_page_transitions": "页面切换动画",
   "crop_borders": "裁剪边框",
   "downloads": "下载",
   "downloads_subtitle": "下载设置",
   "download_location": "下载位置",
   "custom_location": "自定义位置",
-  "only_on_wifi": "仅在wifi下",
-  "save_as_cbz_archive": "保存为CBZ档案",
+  "only_on_wifi": "仅在 Wi-Fi 下",
+  "save_as_cbz_archive": "保存为 CBZ 压缩包",
   "browse_subtitle": "来源，全球搜索",
   "only_include_pinned_sources": "仅包括固定来源",
   "nsfw_sources": "NSFW（18+）来源",
@@ -213,7 +213,7 @@
   "download": "下载",
   "new_update_available": "有新更新可用",
   "app_version": "应用版本：v{v}",
-  "searching_for_updates": "正在搜索更新...",
+  "searching_for_updates": "正在搜索更新…",
   "no_new_updates_available": "没有新的更新可用",
   "uninstall": "卸载",
   "uninstall_extension": "卸载 {ext} 扩展？",
@@ -287,14 +287,14 @@
   "auto_scroll": "自动滚动",
   "video_audio": "音频",
   "player": "播放器",
-  "markEpisodeAsSeenSetting": "标记剧集为已看的时间点",
-  "default_skip_intro_length": "默认跳过介绍长度",
-  "default_playback_speed_length": "默认播放速度长度",
+  "markEpisodeAsSeenSetting": "将剧集标记为已观看的时间点",
+  "default_skip_intro_length": "默认片头跳过时长",
+  "default_playback_speed_length": "默认播放速度",
   "updateProgressAfterReading": "阅读后更新进度",
   "no_sources_installed": "未安装任何来源！",
   "show_extensions": "显示扩展",
-  "default_skip_forward_skip_length": "默认向前跳过长度",
-  "aniskip_requires_info": "AniSkip需要跟踪使用MAL或Anilist进行的动漫才能工作。",
+  "default_skip_forward_skip_length": "默认快进时长",
+  "aniskip_requires_info": "要使用 AniSkip，必须通过 MAL 或 AniList 追踪该动画。",
   "enable_aniskip": "启用AniSkip",
   "enable_auto_skip": "启用自动跳过",
   "aniskip_button_timeout": "按钮超时",
@@ -302,7 +302,7 @@
   "skip_ending": "跳过片尾",
   "fullscreen": "全屏",
   "update_library": "更新库",
-  "updating_library": "正在更新库 ({cur} / {max}) - 失败: {failed}",
+  "updating_library": "正在更新书架（{cur} / {max}）— 失败：{failed}",
   "next_chapter": "下一章",
   "next_5_chapters": "下5章",
   "next_10_chapters": "下10章",
@@ -350,8 +350,8 @@
   "torrent_url": "种子 URL",
   "or": "或",
   "advanced": "高级",
-  "use_native_http_client": "使用本地 HTTP 客户端",
-  "use_native_http_client_info": "它自动支持平台特性，如 VPN，支持更多 HTTP 特性，如 HTTP/3 和自定义重定向处理",
+  "use_native_http_client": "使用原生 HTTP 客户端",
+  "use_native_http_client_info": "自动支持 VPN 等平台功能、HTTP/3 等额外 HTTP 功能，以及自定义重定向处理。",
   "unwatched": "未观看",
   "last_watched": "上次观看",
   "unwatched_count": "未观看计数",
@@ -366,16 +366,16 @@
   "next_10_episodes": "接下来的 10 集",
   "next_25_episodes": "接下来的 25 集",
   "remove_all_update_msg": "你确定吗？所有更新将被清除",
-  "syncing": "同步",
+  "syncing": "正在同步",
   "sync_password": "密码（至少8个字符）",
   "sync_logged": "登录成功",
-  "syncing_subtitle": "通过自托管的 \n服务器在多个设备上同步你的进度。查看我们的 discord 服务器，了解更多信息！",
-  "last_sync_manga": "最新漫画同步于: ",
-  "last_sync_history": "最后历史同步时间：",
-  "last_sync_update": "最后更新同步于: ",
+  "syncing_subtitle": "通过自托管服务器在多个设备上同步您的进度。查看我们的 Discord 服务器，了解更多信息！",
+  "last_sync_manga": "上次同步漫画：",
+  "last_sync_history": "上次同步阅读记录：",
+  "last_sync_update": "上次同步更新：",
   "sync_server": "同步服务器地址",
   "sync_login_invalid_creds": "无效的电子邮件或密码",
-  "sync_starting": "开始同步...",
+  "sync_starting": "开始同步…",
   "sync_finished": "同步完成",
   "sync_failed": "同步失败",
   "sync_button_sync": "同步进度",
@@ -391,7 +391,7 @@
   "n_minutes_ago": "{minutes}分钟前",
   "n_day_ago": "{day}天前",
   "now": "现在",
-  "library_last_updated": "图书馆最近更新时间：{lastUpdated}",
+  "library_last_updated": "书架最近更新时间：{lastUpdated}",
   "data_and_storage": "数据与存储",
   "download_location_info": "用于章节下载",
   "storage": "存储",
@@ -404,8 +404,8 @@
   "create": "创建",
   "migrate_confirm": "迁移到另一个来源",
   "clean_database": "清理数据库",
-  "cleaned_database": "数据库已清理！已移除 {x} 条目",
-  "clean_database_desc": "这将移除所有未添加到图书馆的项目！",
+  "cleaned_database": "数据库已清理！已移除 {x} 个条目。",
+  "clean_database_desc": "这将移除所有未添加到书架的项目！",
   "statistics": "统计",
   "default_subtitle_language": "默认字幕语言",
   "follow_system_theme": "跟随系统主题",
@@ -448,7 +448,7 @@
   "genre_search_source": "按类别搜索来源",
   "source_not_added": "来源未添加",
   "load_own_subtitles": "加载自定义字幕",
-  "unsupported_repo": "您试图添加不支持的版本库。请查看 discord 服务器以获得支持！",
+  "unsupported_repo": "您尝试添加不受支持的仓库。请前往 Discord 服务器获取帮助。",
   "downloaded_only": "仅已下载",
   "downloaded_only_description": "仅显示库中已下载的条目",
   "concurrent_downloads": "并发下载",
@@ -460,7 +460,6 @@
   "sync_button_upload": "仅上传",
   "sync_button_upload_info": "此操作将完全用本地数据替换远程数据！",
   "sync_button_download": "仅下载",
-  "sync_button_download_info": "此操作将完全用远程数据替换本地数据！",
   "extension_settings": "扩展设置",
   "video_audio_info": "首选语言、音调校正、音频通道",
   "all_chapters": "所有章节",
@@ -470,14 +469,14 @@
   "recommendations_similar": "相似",
   "recommendations_weights": "推荐权重",
   "recommendations_weights_genre": "类型相似度",
-  "recommendations_weights_setting": "设定相似度",
-  "recommendations_weights_synopsis": "故事相似度",
+  "recommendations_weights_setting": "设置相似度",
+  "recommendations_weights_synopsis": "简介相似度",
   "recommendations_weights_theme": "主题相似度",
   "custom_dns": "自定义 DNS（留空使用系统 DNS）",
   "android_proxy_server": "Android 代理服务器（M-Extension-Server）",
   "get_m_extension_server": "获取 M-Extension-Server",
   "get_sync_server": "在此获取同步服务器",
-  "search_subtitles": "在线搜索字幕...",
+  "search_subtitles": "在线搜索字幕…",
   "extension_notes": "备注：{notes}",
   "end_of_chapter": "章节结束",
   "chapter_completed": "章节完成",
@@ -529,7 +528,7 @@
   "use_yuv420p": "使用 YUV420P 像素格式",
   "use_yuv420p_info": "可以修复某些视频编解码器上的黑屏，也可以以质量为代价提高性能",
   "audio_preferred_languages": "首选语言",
-  "audio_preferred_languages_info": "在具有多个音频流的视频上默认选择的音频语言，2/3 字母语言代码（例如：zh、en、ja）。多个值可以用逗号分隔。",
+  "audio_preferred_languages_info": "具有多个音频流的视频默认选择的音频语言。支持两位或三位语言代码（例如：zh、en、ja）。多个值请用逗号分隔。",
   "enable_audio_pitch_correction": "启用音频音调校正",
   "enable_audio_pitch_correction_info": "防止音频在较快速度时变高音，在较慢速度时变低音",
   "audio_channels": "音频通道",
@@ -578,7 +577,7 @@
   "app_lock": "应用锁",
   "require_biometric_or_device_credential": "需要生物识别或设备凭证才能打开应用",
   "biometric_or_device_credential_not_available": "此设备上没有生物识别",
-  "app_lock_description": "启用应用锁后，每次打开应用或从后台返回时都会要求您进行身份验证。",
+  "app_lock_description": "启用应用锁后，每次打开应用或从后台返回时，都需要进行身份验证。",
   "keep_screen_on": "保持屏幕开启",
   "webtoon_side_padding": "Webtoon侧边填充",
   "show_page_gaps": "显示页面间隙",
@@ -600,11 +599,11 @@
   "compression_info": "压缩率越高，备份文件占用的空间越小，但会消耗更多的CPU。默认值：{level}",
   "mass_migration_title": "批量迁移",
   "mass_migration_preview_items": "预览项目",
-  "mass_migration_destination_source": "目标源",
-  "mass_migration_no_library_items": "没有可供批量迁移的图库项目。",
-  "mass_migration_no_destination_sources": "没有可用的已安装目标源。",
+  "mass_migration_destination_source": "目标来源",
+  "mass_migration_no_library_items": "书架中没有可供批量迁移的项目。",
+  "mass_migration_no_destination_sources": "没有可用的已安装目标来源。",
   "mass_migration_installed": "已安装",
-  "mass_migration_items_ready_for_review": "{count, plural, =1{1个项目准备好复检} other{{count}个项目准备好复检}}",
+  "mass_migration_items_ready_for_review": "{count, plural, =1{1 个项目可供审核} other{{count} 个项目可供审核}}",
   "@mass_migration_items_ready_for_review": {
     "placeholders": {
       "count": {
@@ -612,7 +611,7 @@
       }
     }
   },
-  "mass_migration_item_count": "{count, plural, =1{1个项目} other{{count}个项目}}",
+  "mass_migration_item_count": "{count, plural, =1{1 个项目} other{{count} 个项目}}",
   "@mass_migration_item_count": {
     "placeholders": {
       "count": {
@@ -620,8 +619,8 @@
       }
     }
   },
-  "mass_migration_select_destination_source": "选择目标源",
-  "mass_migration_finding_matches": "正在 {source} • {language} 中寻找匹配项",
+  "mass_migration_select_destination_source": "选择目标来源",
+  "mass_migration_finding_matches": "正在 {source} • {language} 中查找匹配项",
   "@mass_migration_finding_matches": {
     "placeholders": {
       "source": {},
@@ -639,9 +638,9 @@
       }
     }
   },
-  "mass_migration_waiting_next_item": "等待2秒后处理下一个项目...",
-  "mass_migration_waiting_next_migration": "等待2秒后处理下一项迁移...",
-  "mass_migration_matched_so_far": "目前已匹配: {count}",
+  "mass_migration_waiting_next_item": "等待 2 秒后处理下一个项目…",
+  "mass_migration_waiting_next_migration": "等待 2 秒后进行下一次迁移…",
+  "mass_migration_matched_so_far": "目前已匹配：{count}",
   "@mass_migration_matched_so_far": {
     "placeholders": {
       "count": {
@@ -649,7 +648,7 @@
       }
     }
   },
-  "mass_migration_no_match_count": "未匹配: {count}",
+  "mass_migration_no_match_count": "未匹配：{count}",
   "@mass_migration_no_match_count": {
     "placeholders": {
       "count": {
@@ -657,13 +656,13 @@
       }
     }
   },
-  "mass_migration_review_matches": "复检 {source} 的匹配项",
+  "mass_migration_review_matches": "审核 {source} 的匹配项",
   "@mass_migration_review_matches": {
     "placeholders": {
       "source": {}
     }
   },
-  "mass_migration_found_matches": "找到匹配项: {count}",
+  "mass_migration_found_matches": "找到匹配项：{count}",
   "@mass_migration_found_matches": {
     "placeholders": {
       "count": {
@@ -671,7 +670,7 @@
       }
     }
   },
-  "mass_migration_no_matches": "未找到匹配: {count}",
+  "mass_migration_no_matches": "未找到匹配项：{count}",
   "@mass_migration_no_matches": {
     "placeholders": {
       "count": {
@@ -679,7 +678,7 @@
       }
     }
   },
-  "mass_migration_selected_to_migrate": "选定迁移: {count}",
+  "mass_migration_selected_to_migrate": "选定迁移：{count}",
   "@mass_migration_selected_to_migrate": {
     "placeholders": {
       "count": {
@@ -687,8 +686,8 @@
       }
     }
   },
-  "mass_migration_finish_review": "结束复检",
-  "mass_migration_migrate_selected": "迁移选定项目 ({count})",
+  "mass_migration_finish_review": "完成审核",
+  "mass_migration_migrate_selected": "迁移选定项目（{count}）",
   "@mass_migration_migrate_selected": {
     "placeholders": {
       "count": {
@@ -739,7 +738,7 @@
     }
   },
   "mass_migration_skip": "跳过",
-  "mass_migration_loading": "正在加载...",
+  "mass_migration_loading": "正在加载…",
   "mass_migration_choose_another_result": "选择其他结果",
   "mass_migration_source_chapters": "原章节",
   "mass_migration_destination_chapters": "目标章节",
@@ -768,7 +767,7 @@
     }
   },
   "mass_migration_no_chapters_found": "未找到章节。",
-  "mass_migration_and_more_chapters": "以及更多 {count} 个...",
+  "mass_migration_and_more_chapters": "以及另外 {count} 个…",
   "@mass_migration_and_more_chapters": {
     "placeholders": {
       "count": {
@@ -778,7 +777,7 @@
   },
   "mass_migration_unknown_title": "未知标题",
   "mass_migration_unknown_match": "未知匹配",
-  "mass_migration_unknown_source": "未知源",
+  "mass_migration_unknown_source": "未知来源",
   "mass_migration_unknown_chapter": "未知章节",
   "delete_download_after_reading": "完成阅读后删除下载内容",
   "total": "总计",
@@ -786,11 +785,11 @@
   "completion_rate": "完成率",
   "watching_time": "观看时间",
   "reading_time": "阅读时间",
-  "average_chapters_per_title": "单个标题平均章节数",
+  "average_chapters_per_title": "每个{title}的平均章节数",
   "read_percentage": "阅读百分比",
   "entries": "条目",
-  "extension_server_intro_with_jre": "在使用 Mihon 扩展前请先下载代理服务器包。该包内含 JRE 和扩展服务器 JAR。",
-  "extension_server_intro_ios": "在使用 Mihon 扩展前请先下载代理服务器 JAR。iOS 仅需扩展服务器 JAR。",
+  "extension_server_intro_with_jre": "使用 Mihon 扩展前，请先下载代理服务器包。该包包含 JRE 和扩展服务器 JAR。",
+  "extension_server_intro_ios": "使用 Mihon 扩展前，请先下载代理服务器 JAR。iOS 仅需扩展服务器 JAR。",
   "checking_files": "正在检查文件",
   "files_installed": "文件已安装",
   "files_missing": "文件缺失",
@@ -799,23 +798,23 @@
   "choose_location": "选择路径",
   "import_existing_jar": "导入现有 JAR",
   "detect_files_in_selected_folder": "在选定文件夹中检测文件",
-  "preparing_download": "正在准备下载...",
-  "app_install_location": "应用安装路径",
+  "preparing_download": "正在准备下载…",
+  "app_install_location": "应用安装位置",
   "install_location": "安装位置",
   "jre_executable": "JRE 可执行文件",
   "extension_server_jar": "扩展服务器 JAR",
-  "installed_version": "当前版本",
+  "installed_version": "已安装版本",
   "latest_version": "最新版本",
   "m_extension_server_description": "当您需要独立的 Android 设备代理时，请使用 M-Extension-Server。在此设置代理地址，并从 GitHub 下载 APK。",
   "set_proxy_address": "设置代理地址",
   "no_extension_server_bundle_available_for_this_platform": "当前平台没有可用的扩展服务器包。",
-  "failed_to_download_bundle": "下载包失败 ({statusCode})。",
+  "failed_to_download_bundle": "下载软件包失败（{statusCode}）。",
   "@failed_to_download_bundle": {
     "placeholders": {
       "statusCode": {}
     }
   },
-  "downloaded_bundle_missing_expected_files": "下载的项目不包含预期文件。",
+  "downloaded_bundle_missing_expected_files": "下载的软件包不包含所需文件。",
   "extension_server_files_ready": "扩展服务器文件已就绪。",
   "ios_extension_server_import_hint": "在 iOS 上，服务器安装在应用沙盒内。请使用“导入现有 JAR”来导入已下载的文件。",
   "select_extension_server_folder": "选择扩展服务器文件夹",
@@ -826,13 +825,13 @@
   "extension_server_jar_imported": "扩展服务器 JAR 已导入。",
   "could_not_launch_apk_bridge_page": "无法启动 M-Extension-Server 页面。",
   "not_configured": "未配置",
-  "webview": "Webview",
-  "mass_migration_description": "将您的图库条目从一个源迁移到另一个源。",
+  "webview": "WebView",
+  "mass_migration_description": "将书架中的项目从一个来源迁移到另一个来源。",
   "mass_migration_selection_title": "迁移选择",
   "mass_migration_source_selecting_description": "选择要迁移到的一个或多个源。",
   "mass_migration_manga_selecting_description": "选择要迁移到新源的标题。",
   "mass_migration_status_idle": "空闲",
-  "mass_migration_status_searching": "正在搜索...",
+  "mass_migration_status_searching": "正在搜索…",
   "mass_migration_status_migrating": "正在迁移...",
   "mass_migration_status_finished": "已完成",
   "mass_migration_action_migrate": "迁移",
@@ -842,7 +841,7 @@
   "mass_migration_dialog_title": "迁移 {count, plural, other{{count} 个标题}}？",
   "mass_migration_dialog_content": "这将从所选源中用新条目替换当前条目。",
   "mass_migration_help_title": "如何使用批量迁移",
-  "mass_migration_help_content": "1. 选择源源。\n2. 选择您要迁移的任务标题。\n3. 选择目的地源。\n4. 检查匹配情况并开始迁移。",
+  "mass_migration_help_content": "1. 选择来源。\n2. 选择要迁移的标题。\n3. 选择目标来源。\n4. 检查匹配情况并开始迁移。",
   "mihon_proxy_server": "Mihon 代理服务器",
   "android_proxy_server_mihon_description": "下载并配置使用 Mihon 扩展所需的代理服务器。",
   "could_not_check_proxy_server_updates": "无法检查代理服务器更新。",
@@ -1069,7 +1068,7 @@
   "delete_source_pick_title": "选择要删除的图源",
   "delete_source_empty": "书库中没有找到图源。",
   "delete_source_confirm_title": "删除 {sourceName}？",
-  "delete_source_confirm_message": "将永久删除 {mangaCount} 部漫画、{chapterCount} 个章节和 {historyCount} 条历史记录。",
+  "delete_source_confirm_message": "将永久删除 {mangaCount} 部漫画、{chapterCount} 个章节、{historyCount} 条历史记录和 {updateCount} 条更新记录。跟踪链接会保留。除回滚外，此操作无法撤销。",
   "delete_source_also_remove_extension": "同时卸载对应扩展",
   "delete_source_keep_history": "保留阅读历史",
   "delete_source_keep_downloads": "保留下载记录",
@@ -1085,7 +1084,7 @@
   "merge_manga_button": "合并",
   "merge_manga_result_message": "已将 {count} 部重复漫画合并到 {mangaName}。",
   "merge_preview_title": "确认合并",
-  "merge_manga_preview_message": "在其他条目中共找到 {totalChapters} 个章节。将丢弃 {duplicateChapters} 个重复项并添加 {keptChapters} 个新章节。",
+  "merge_manga_preview_message": "在其他条目中共找到 {totalChapters} 个章节。将丢弃 {duplicateChapters} 个重复项（保留有阅读进度的版本）并添加 {keptChapters} 个新章节。此外，还将丢弃 {duplicateTracks} 个重复跟踪链接。",
   "beta": "Beta",
   "error_reports": "错误报告",
   "error_reports_subtitle": "应用捕获的错误及反馈入口",

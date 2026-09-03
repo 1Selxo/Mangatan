@@ -1,0 +1,326 @@
+name: Build compatible OpenJDK iOS runtime
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-openjdk-ios13.yml"
+      - "tool/openjdk/*.patch"
+      - "tool/verify_macho_min_ios.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  MOBILE_REPOSITORY: https://github.com/openjdk/mobile.git
+  MOBILE_COMMIT: fc10224720ee1c109b1207daeba8878822bb5363
+  IOS_TOOLS_REPOSITORY: https://github.com/openjdk-mobile/ios-tools.git
+  IOS_TOOLS_COMMIT: f8524c91c012040e40e7f8af34e7a0f11af0da83
+  LIBFFI_IOS_URL: https://github.com/openjdk-mobile/ios-tools/releases/download/libffi-build/libffi-ios.zip
+  LIBFFI_IOS_SHA256: 4f39fd1d53fbd69d1bdbd915413077d130daa3f6792d1b3a03a690a9cbd4dea3
+  IOS_MINIMUM_VERSION: "13.0"
+  RUNTIME_RELEASE_TAG: embedded-openjdk-ios13-v16
+
+jobs:
+  validate-runtime-tag:
+    name: Verify immutable runtime tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to replace a published runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RUNTIME_RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Runtime release $RUNTIME_RELEASE_TAG already exists." >&2
+            echo "Bump RUNTIME_RELEASE_TAG before publishing new assets." >&2
+            exit 1
+          fi
+
+  build-device:
+    name: Build iOS device VM
+    needs: validate-runtime-tag
+    runs-on: macos-14
+    timeout-minutes: 240
+    steps:
+      - name: Check out verifier
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          brew install autoconf make
+          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Set up bootstrap JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Download pinned iOS libffi support
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            --output libffi-ios.zip "$LIBFFI_IOS_URL"
+          printf '%s  %s\n' "$LIBFFI_IOS_SHA256" libffi-ios.zip |
+            shasum -a 256 --check
+          mkdir support
+          unzip -q libffi-ios.zip -d support
+
+      - name: Fetch pinned OpenJDK sources and iOS patches
+        run: |
+          set -euo pipefail
+          git init -q mobile
+          git -C mobile remote add origin "$MOBILE_REPOSITORY"
+          git -C mobile fetch --depth 1 origin "$MOBILE_COMMIT"
+          git -C mobile -c advice.detachedHead=false checkout --detach FETCH_HEAD
+          test "$(git -C mobile rev-parse HEAD)" = "$MOBILE_COMMIT"
+          for patch in "$GITHUB_WORKSPACE"/tool/openjdk/*.patch; do
+            git -C mobile apply --check "$patch"
+            git -C mobile apply "$patch"
+          done
+
+          git init -q ios-tools
+          git -C ios-tools remote add origin "$IOS_TOOLS_REPOSITORY"
+          git -C ios-tools fetch --depth 1 origin "$IOS_TOOLS_COMMIT"
+          git -C ios-tools -c advice.detachedHead=false \
+            checkout --detach FETCH_HEAD
+          test "$(git -C ios-tools rev-parse HEAD)" = "$IOS_TOOLS_COMMIT"
+          cp ios-tools/openjdk-ext/src/hotspot/symbol_keeper.cpp \
+            mobile/src/hotspot/os/bsd/
+
+      - name: Configure and build OpenJDK Mobile
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          support_dir=$(realpath ../support)
+          iphone_sdk=$(xcrun --sdk iphoneos --show-sdk-path)
+          macos_sdk=$(xcrun --sdk macosx --show-sdk-path)
+          minimum_flag="-miphoneos-version-min=$IOS_MINIMUM_VERSION"
+
+          bash configure \
+            --with-conf-name=ios-aarch64-zero-release \
+            --disable-warnings-as-errors \
+            --openjdk-target=aarch64-macos-ios \
+            --with-sysroot="$iphone_sdk" \
+            --with-libffi-include="$support_dir/include/ffi" \
+            --with-libffi-lib="$support_dir" \
+            --with-cups-include="$macos_sdk/usr/include" \
+            --with-extra-cflags="$minimum_flag" \
+            --with-extra-cxxflags="$minimum_flag" \
+            --with-extra-ldflags="$minimum_flag"
+          make LOG=info CONF=ios-aarch64-zero-release static-libs-image
+
+      - name: Create device static library
+        run: |
+          set -euo pipefail
+          build="$GITHUB_WORKSPACE/mobile/build/ios-aarch64-zero-release"
+          output="$RUNNER_TEMP/openjdk-device"
+          mkdir -p "$output/include" "$output/java.base"
+          cp "$GITHUB_WORKSPACE/support/libffi.a" "$output/"
+          cp "$build/images/static-libs/lib/zero/libjvm.a" "$output/"
+          cp "$build/images/static-libs/lib/"lib{java,jimage,net,nio,verify,zip}.a \
+            "$output/"
+          cp -R "$build/jdk/include/." "$output/include/"
+          cp "$output/include/ios/"* "$output/include/"
+          cp -R "$build/jdk/modules/java.base/." "$output/java.base/"
+          (
+            cd "$output"
+            libtool -static -o libdevice.a \
+              libjvm.a libffi.a libjava.a libzip.a \
+              libnet.a libnio.a libjimage.a libverify.a
+          )
+
+      - name: Verify iOS deployment target
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/openjdk-device/libdevice.a"
+          objects="$RUNNER_TEMP/openjdk-device-objects"
+          mkdir "$objects"
+          (
+            cd "$objects"
+            ar -x "$archive"
+          )
+          python3 tool/verify_macho_min_ios.py \
+            --maximum "$IOS_MINIMUM_VERSION" "$objects"
+
+      - name: Write source manifest
+        run: |
+          cat > "$RUNNER_TEMP/openjdk-device/SOURCE_MANIFEST.txt" <<EOF
+          OpenJDK Mobile repository: $MOBILE_REPOSITORY
+          OpenJDK Mobile commit: $MOBILE_COMMIT
+          ios-tools repository: $IOS_TOOLS_REPOSITORY
+          ios-tools commit: $IOS_TOOLS_COMMIT
+          OpenJDK patches:
+          $(for patch in tool/openjdk/*.patch; do
+              printf '%s  %s\n' \
+                "$(shasum -a 256 "$patch" | cut -d ' ' -f 1)" "$patch"
+            done)
+          libffi iOS SHA-256: $LIBFFI_IOS_SHA256
+          Minimum iOS deployment target: $IOS_MINIMUM_VERSION
+          EOF
+
+      - name: Upload device build
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-ios13-device
+          path: ${{ runner.temp }}/openjdk-device
+          if-no-files-found: error
+          retention-days: 7
+
+  build-host:
+    name: Build matching host JDK
+    needs: validate-runtime-tag
+    runs-on: macos-14
+    timeout-minutes: 240
+    steps:
+      - name: Install build tools
+        run: |
+          brew install autoconf make
+          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Set up bootstrap JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Fetch pinned OpenJDK sources
+        run: |
+          set -euo pipefail
+          git init -q mobile
+          git -C mobile remote add origin "$MOBILE_REPOSITORY"
+          git -C mobile fetch --depth 1 origin "$MOBILE_COMMIT"
+          git -C mobile -c advice.detachedHead=false checkout --detach FETCH_HEAD
+          test "$(git -C mobile rev-parse HEAD)" = "$MOBILE_COMMIT"
+
+      - name: Build matching native host JDK
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          bash configure \
+            --with-conf-name=macos-host \
+            --with-boot-jdk="$JAVA_HOME" \
+            --disable-warnings-as-errors
+          make LOG=info CONF=macos-host jdk-image
+
+      - name: Upload matching host JDK
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-matching-host
+          path: mobile/build/macos-host/images/jdk
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    name: Package verified runtime
+    needs:
+      - build-device
+      - build-host
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Check out verifier
+        uses: actions/checkout@v4
+
+      - name: Download device build
+        uses: actions/download-artifact@v4
+        with:
+          name: openjdk-ios13-device
+          path: device
+
+      - name: Download matching host JDK
+        uses: actions/download-artifact@v4
+        with:
+          name: openjdk-matching-host
+          path: host-jdk
+
+      - name: Create matching java.base image
+        run: |
+          set -euo pipefail
+          chmod +x host-jdk/bin/jmod host-jdk/bin/jlink
+          mkdir jmods-device
+          host-jdk/bin/jmod create \
+            --class-path device/java.base \
+            --target-platform ios-aarch64 \
+            jmods-device/java.base.jmod
+          host-jdk/bin/jlink \
+            --module-path jmods-device \
+            --add-modules java.base \
+            --output java_bundle-device
+          cp -R host-jdk/conf java_bundle-device/conf
+          cp host-jdk/lib/tzdb.dat java_bundle-device/lib/tzdb.dat
+          mkdir -p java_bundle-device/lib/security
+          cp -R host-jdk/lib/security/. java_bundle-device/lib/security/
+
+      - name: Create device XCFramework
+        run: |
+          set -euo pipefail
+          xcodebuild -create-xcframework \
+            -library device/libdevice.a \
+            -headers device/include \
+            -output OpenJDK.xcframework
+
+      - name: Reverify packaged native objects
+        run: |
+          set -euo pipefail
+          archive=$(find OpenJDK.xcframework -name libdevice.a -print -quit)
+          test -n "$archive"
+          objects="$RUNNER_TEMP/packaged-openjdk-objects"
+          mkdir "$objects"
+          (
+            cd "$objects"
+            ar -x "$GITHUB_WORKSPACE/$archive"
+          )
+          python3 tool/verify_macho_min_ios.py \
+            --maximum "$IOS_MINIMUM_VERSION" "$objects"
+
+      - name: Compress and checksum runtime
+        run: |
+          set -euo pipefail
+          cp device/SOURCE_MANIFEST.txt .
+          ditto -c -k --sequesterRsrc --keepParent \
+            OpenJDK.xcframework OpenJDK.xcframework.zip
+          ditto -c -k --sequesterRsrc --keepParent \
+            java_bundle-device java_bundle-device.zip
+          shasum -a 256 \
+            OpenJDK.xcframework.zip \
+            java_bundle-device.zip > SHA256SUMS
+
+      - name: Upload packaged runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-ios13-runtime
+          path: |
+            OpenJDK.xcframework.zip
+            java_bundle-device.zip
+            SHA256SUMS
+            SOURCE_MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish pinned runtime release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RUNTIME_RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Embedded OpenJDK runtime for iOS 13+
+          body: |
+            OpenJDK Mobile runtime built specifically for Mangatan's embedded
+            on-device Mihon extension host.
+
+            Every native object is checked to target iOS 13.0 or earlier. The
+            VM and `java.base` image are built from the exact source commit
+            recorded in `SOURCE_MANIFEST.txt`.
+          files: |
+            OpenJDK.xcframework.zip
+            java_bundle-device.zip
+            SHA256SUMS
+            SOURCE_MANIFEST.txt
+          fail_on_unmatched_files: true
+          prerelease: true
+          make_latest: false

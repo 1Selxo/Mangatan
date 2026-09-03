@@ -8,12 +8,13 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:ffi/ffi.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riv;
+import 'package:go_router/go_router.dart';
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
@@ -21,35 +22,55 @@ import 'package:mangayomi/repositories/custom_button_repository.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/custom_button.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 import 'package:mangayomi/modules/anime/providers/auto_play_next_provider.dart';
+import 'package:mangayomi/modules/anime/utils/audio_track_fallback.dart';
+import 'package:mangayomi/modules/anime/utils/audio_track_label.dart';
+import 'package:mangayomi/modules/anime/utils/playback_error_report.dart';
+import 'package:mangayomi/modules/anime/utils/player_lifecycle.dart';
+import 'package:mangayomi/modules/anime/utils/playback_media.dart';
+import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
+import 'package:mangayomi/modules/anime/utils/video_stream_preference.dart';
+import 'package:mangayomi/modules/anime/utils/video_track_from_video.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
-import 'package:mangayomi/modules/anime/widgets/tv_player_controls.dart';
-import 'package:mangayomi/modules/anime/widgets/tv_player_settings_panel.dart';
-import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
+import 'package:mangayomi/modules/anime/widgets/chimahon_primary_controls.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
-import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
-import 'package:mangayomi/utils/manga_cover_actions.dart';
+import 'package:mangayomi/modules/anime/widgets/jimaku_subtitle_dialog.dart';
+import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.dart';
 import 'package:mangayomi/modules/anime/widgets/mobile.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_setting_widget.dart';
+import 'package:mangayomi/modules/anime/widgets/subtitle_cue_list.dart';
+import 'package:mangayomi/modules/anime/widgets/video_ocr_overlay.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_audio_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_decoder_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/modules/widgets/error_state.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/aniskip.dart';
 import 'package:mangayomi/services/fetch_subtitles.dart';
+import 'package:mangayomi/services/mining/anime_sentence_audio_service.dart';
 import 'package:mangayomi/services/get_video_list.dart';
+import 'package:mangayomi/services/mining/jimaku_service.dart';
+import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
+import 'package:mangayomi/services/mining/desktop_scene_capture.dart';
+import 'package:mangayomi/services/mining/mining_models.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/scene_capture_timing.dart';
 import 'package:mangayomi/services/torrent_server.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/share.dart';
 import 'package:mangayomi/utils/system_ui.dart';
@@ -65,6 +86,15 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:window_manager/window_manager.dart' show windowManager;
 
 import 'widgets/search_subtitles.dart';
+import 'package:flutter/gestures.dart';
+import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
+import 'package:mangayomi/modules/anime/widgets/tv_player_controls.dart';
+import 'package:mangayomi/modules/anime/widgets/tv_player_settings_panel.dart';
+import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
+import 'package:mangayomi/utils/manga_cover_actions.dart';
+
+final Map<int, String> _sessionVideoStreamPreferences = {};
 
 class AnimePlayerView extends riv.ConsumerStatefulWidget {
   final int episodeId;
@@ -78,10 +108,15 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
   late final Chapter episode = chapterRepository.getById(widget.episodeId);
   List<String> _infoHashList = [];
   bool desktopFullScreenPlayer = false;
+  bool _episodeReplacementInProgress = false;
   @override
   void dispose() {
-    if (isDesktop) {
-      setFullScreen(value: desktopFullScreenPlayer);
+    if (shouldExitDesktopFullscreenOnDispose(
+      isDesktop: isDesktop,
+      isFullscreen: desktopFullScreenPlayer,
+      isEpisodeReplacement: _episodeReplacementInProgress,
+    )) {
+      unawaited(setFullScreen(value: false));
     }
     for (var infoHash in _infoHashList) {
       MTorrentServer().removeTorrent(infoHash);
@@ -98,8 +133,6 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
         title: const Text(''),
         leading: IconButton(
           color: Colors.white,
-          // Lets the remote bail out of a hung load. IconButton, not
-          // BackButton, because only it takes autofocus.
           autofocus: isTv,
           icon: const BackButtonIcon(),
           onPressed: () {
@@ -132,7 +165,7 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
                 },
               ),
             ),
-            body: Center(child: Text(context.l10n.video_list_empty)),
+            body: const Center(child: Text("Video list is empty")),
           );
         }
 
@@ -147,6 +180,9 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
           desktopFullScreenPlayer: (value) {
             desktopFullScreenPlayer = value;
           },
+          onEpisodeReplacement: () {
+            _episodeReplacementInProgress = true;
+          },
           mpvDirectory: mpvDirectory,
         );
       },
@@ -159,8 +195,6 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
           appBar: AppBar(
             title: const Text(''),
             leading: IconButton(
-              // The error body is just text, so focus this or the remote is stuck.
-              // IconButton, not BackButton, because only it takes autofocus.
               autofocus: isTv,
               icon: const BackButtonIcon(),
               onPressed: () {
@@ -169,8 +203,6 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
               },
             ),
           ),
-          // The back button above already claims TV focus, so the retry must
-          // not also ask for it; it stays reachable with the d-pad.
           body: ErrorState(
             autofocusRetry: false,
             detail: error.toString(),
@@ -179,9 +211,7 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
           ),
         );
       },
-      loading: () {
-        return _buildLoading();
-      },
+      loading: _buildLoading,
     );
   }
 }
@@ -194,6 +224,7 @@ class AnimeStreamPage extends riv.ConsumerStatefulWidget {
   final bool isTorrent;
   final Directory? mpvDirectory;
   final void Function(bool) desktopFullScreenPlayer;
+  final VoidCallback onEpisodeReplacement;
   const AnimeStreamPage({
     super.key,
     required this.defaultSubtitle,
@@ -202,6 +233,7 @@ class AnimeStreamPage extends riv.ConsumerStatefulWidget {
     required this.episode,
     required this.isTorrent,
     required this.desktopFullScreenPlayer,
+    required this.onEpisodeReplacement,
     required this.mpvDirectory,
   });
 
@@ -220,6 +252,12 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
         _AlwaysOnTopStateMixin,
         TickerProviderStateMixin,
         WidgetsBindingObserver {
+  bool _routeExitInProgress = false;
+  bool _videoTextureVisible = true;
+  bool _resumePlaybackAfterWindowsSuspend = false;
+  ({double width, double height})? _linuxVideoViewport;
+  ({int width, int height})? _linuxVideoOutputSize;
+  bool _linuxVideoResizeScheduled = false;
   late final GlobalKey<VideoState> _key = GlobalKey<VideoState>();
   late final useLibass = ref.read(useLibassStateProvider);
   late final useMpvConfig = ref.read(useMpvConfigStateProvider);
@@ -248,6 +286,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
           "audio-channels": audioChannel.mpvName,
         if (audioChannel == AudioChannel.reverseStereo)
           "af": audioChannel.mpvName,
+        "sub-visibility": "no",
       },
       observeProperties: {
         "user-data/aniyomi/show_text": generated.mpv_format.MPV_FORMAT_NODE,
@@ -288,14 +327,13 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
     animeStreamControllerProvider(episode: widget.episode).notifier,
   );
   final Stopwatch _watchStopwatch = Stopwatch();
-  late final _firstVid = widget.videos.first;
+  late vid.Video _firstVid = preferredVideoStream(
+    widget.videos,
+    _sessionVideoStreamPreferences[widget.episode.manga.value?.id] ?? '',
+  );
   late final ValueNotifier<VideoPrefs?> _video = ValueNotifier(
     VideoPrefs(
-      videoTrack: VideoTrack(
-        _firstVid.originalUrl,
-        _firstVid.quality,
-        _firstVid.quality,
-      ),
+      videoTrack: videoTrackFromVideo(_firstVid),
       headers: _firstVid.headers,
     ),
   );
@@ -314,6 +352,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   final ValueNotifier<String> _selectedShader = ValueNotifier("");
   final ValueNotifier<ActiveCustomButton?> _customButton = ValueNotifier(null);
   final ValueNotifier<List<CustomButton>?> _customButtons = ValueNotifier(null);
+  Timer? _nativeSubtitlePaintTimer;
   late final ValueNotifier<_AniSkipPhase> _skipPhase = ValueNotifier(
     _AniSkipPhase.none,
   );
@@ -323,13 +362,43 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _hasEndingSkip = false;
   bool _initSubtitleAndAudio = true;
   bool _includeSubtitles = false;
+  bool _bitmapSubtitleActive = false;
+  bool _jimakuAutoLoadAttempted = false;
+  bool _jimakuLoading = false;
+  final List<SubtitleTrack> _jimakuSubtitleTracks = [];
+  String? _activeJimakuSubtitlePath;
+  bool _showSubtitleList = false;
+  bool _videoOcrCapturing = false;
+  bool _liveVideoOcrEnabled = false;
+  Uint8List? _videoOcrBytes;
+  Duration? _videoOcrPosition;
+  final Set<int> _videoOcrGesturePointers = {};
+  final Map<int, Offset> _videoOcrGestureStarts = {};
+  DateTime? _videoOcrGestureStartedAt;
+  bool _videoOcrGestureCandidate = false;
+  List<AnimeSubtitleCue> _subtitleCues = const [];
+  final Map<String, List<AnimeSubtitleCue>> _subtitleCuesByTitle = {};
+  String _lastSubtitleHistoryText = '';
+  int _nextSubtitleHistoryIndex = 0;
   int _subDelay = 0;
   final _subDelayController = TextEditingController(text: "0");
   double _subSpeed = 1;
   final _subSpeedController = TextEditingController(text: "1");
   int lastRpcTimestampUpdate = DateTime.now().millisecondsSinceEpoch;
+  final AnkiExportJobController _sceneJobController = AnkiExportJobController();
+  final Set<AnkiSceneCaptureHandle> _sceneCaptures = {};
 
   late final StreamSubscription<Duration> _currentPositionSub;
+  late final StreamSubscription<List<String>> _subtitleTextSub;
+  late final StreamSubscription<Track> _selectedTrackSub;
+  late final StreamSubscription<String> _playerErrorSub;
+  String? _lastPlayerError;
+  DateTime? _lastPlayerErrorAt;
+  final Set<String> _failedAudioTrackKeys = {};
+  final Set<String> _failedAudioCodecs = {};
+  String? _requestedAudioLanguage;
+  bool _audioFallbackInProgress = false;
+  bool _audioFallbackErrorQueued = false;
 
   late final StreamSubscription<Duration> _currentTotalDurationSub = _player
       .stream
@@ -342,20 +411,38 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool get hasNextEpisode => _streamController.hasNextEpisode;
 
   late final StreamSubscription<bool> _completed = _player.stream.completed
-      .listen((val) {
-        if (hasNextEpisode && val && ref.read(autoPlayNextEpisodeProvider)) {
-          if (mounted) {
-            pushToNewEpisode(context, _streamController.getNextEpisode());
-          }
-        }
-        // If the last episode of an Anime has ended, exit fullscreen mode
-        final isFullScreen = ref.read(fullscreenProvider);
-        if (!hasNextEpisode && val && isDesktop && isFullScreen) {
-          setFullScreen(value: false);
-          ref.read(fullscreenProvider.notifier).state = false;
-          widget.desktopFullScreenPlayer.call(false);
-        }
-      });
+      .listen(_handlePlaybackCompleted);
+
+  Future<void> _handlePlaybackCompleted(bool completed) async {
+    if (!completed || !mounted) return;
+
+    _watchStopwatch.stop();
+    final reportedDuration = _currentTotalDuration.value;
+    final totalDuration =
+        reportedDuration != null && reportedDuration > Duration.zero
+        ? reportedDuration
+        : _player.state.duration;
+    await _streamController.completeEpisode(
+      totalDuration,
+      elapsedSeconds: _watchStopwatch.elapsed.inSeconds,
+    );
+    _watchStopwatch.reset();
+    if (!mounted) return;
+
+    final hasNext = hasNextEpisode;
+    if (hasNext && ref.read(autoPlayNextEpisodeProvider)) {
+      await pushToNewEpisode(context, _streamController.getNextEpisode());
+      return;
+    }
+
+    // If the last episode of an Anime has ended, exit fullscreen mode.
+    final isFullScreen = ref.read(fullscreenProvider);
+    if (!hasNext && isDesktop && isFullScreen) {
+      setFullScreen(value: false);
+      ref.read(fullscreenProvider.notifier).state = false;
+      widget.desktopFullScreenPlayer.call(false);
+    }
+  }
 
   Future<void> _handleMpvEvents(Pointer<generated.mpv_event> event) async {
     try {
@@ -667,7 +754,11 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
 
   Future<void> _initCustomButton() async {
     if (!useMpvConfig) return;
-    final customButtons = customButtonRepository.getAllSortedByPos();
+    final customButtons = isar.customButtons
+        .filter()
+        .idIsNotNull()
+        .sortByPos()
+        .findAllSync();
     if (customButtons.isEmpty) return;
     final primaryButton =
         customButtons.firstWhereOrNull((e) => e.isFavourite ?? false) ??
@@ -676,8 +767,10 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
     if (!(await provider.requestPermission())) {
       return;
     }
+    if (!mounted) return;
     final dir = await provider.getMpvDirectory();
-    String scriptsDir = path.join(dir!.path, 'scripts');
+    if (!mounted || dir == null) return;
+    String scriptsDir = path.join(dir.path, 'scripts');
     final mpvFile = File('$scriptsDir/init_custom_buttons.lua');
     final content = StringBuffer();
     content.writeln("""local lua_modules = mp.find_config_file('scripts')
@@ -700,10 +793,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       );
     }
     await mpvFile.writeAsString(content.toString());
-    await (_player.platform as NativePlayer).command([
-      "load-script",
-      mpvFile.path,
-    ]);
+    if (!mounted) return;
+    try {
+      await (_player.platform as NativePlayer).command([
+        "load-script",
+        mpvFile.path,
+      ]);
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      _reportPlaybackError(error.toString(), stackTrace: stackTrace);
+      return;
+    }
+    if (!mounted) return;
     _customButton.value = ActiveCustomButton(
       currentTitle: primaryButton.title!,
       visible: true,
@@ -720,11 +821,55 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _customButtons.value = customButtons;
   }
 
-  void pushToNewEpisode(BuildContext context, Chapter episode) {
+  Future<void> pushToNewEpisode(BuildContext context, Chapter episode) async {
+    if (_routeExitInProgress) return;
+    _routeExitInProgress = true;
     widget.desktopFullScreenPlayer.call(ref.read(fullscreenProvider));
+    widget.onEpisodeReplacement();
+    await _retireVideoTexture();
     if (context.mounted) {
       pushReplacementMangaReaderView(context: context, chapter: episode);
     }
+  }
+
+  Future<void> _retireVideoTexture() async {
+    if (!_videoTextureVisible || !mounted) return;
+    await retirePlaybackSurface(
+      hideSurface: () {
+        if (mounted) {
+          setState(() => _videoTextureVisible = false);
+        }
+      },
+      waitForFrame: () => WidgetsBinding.instance.endOfFrame,
+    );
+  }
+
+  Future<void> _exitDesktopFullScreen() async {
+    final isFullScreen = await setFullScreen(value: false);
+    if (!mounted) return;
+    ref.read(fullscreenProvider.notifier).state = isFullScreen;
+    widget.desktopFullScreenPlayer.call(isFullScreen);
+  }
+
+  Future<void> _handleEscape() async {
+    if (isDesktop && ref.read(fullscreenProvider)) {
+      await _exitDesktopFullScreen();
+      return;
+    }
+    await _goBackToDetail();
+  }
+
+  Future<void> _goBackToDetail() async {
+    if (_routeExitInProgress) return;
+    _routeExitInProgress = true;
+    if (isDesktop && ref.read(fullscreenProvider)) {
+      await _exitDesktopFullScreen();
+    }
+    restoreSystemUI();
+    await _retireVideoTexture();
+    if (!mounted) return;
+    _firstTime = true;
+    Navigator.pop(context);
   }
 
   void _unifiedPositionHandler(Duration position) {
@@ -733,39 +878,312 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _setSkipPhase(currentSecs);
   }
 
+  Future<void> _setSubtitleTrack(SubtitleTrack track) async {
+    await _player.setSubtitleTrack(track);
+    _activeJimakuSubtitlePath = _jimakuSubtitlePathFor(track);
+    _activateSubtitleCuesForTrack(track);
+    _syncNativeSubtitlePaintSoon();
+  }
+
+  String? _jimakuSubtitlePathFor(SubtitleTrack track) {
+    for (final subtitle in _jimakuSubtitleTracks) {
+      if (track.id == subtitle.id || track.title == subtitle.title) {
+        return subtitle.id;
+      }
+    }
+    return null;
+  }
+
+  void _activateSubtitleCuesForTrack(SubtitleTrack track) {
+    List<AnimeSubtitleCue>? cues;
+    for (final key in [track.title, track.language, track.id]) {
+      if (key == null || key.trim().isEmpty) continue;
+      cues ??= _subtitleCuesByTitle[key];
+      cues ??= _subtitleCuesByTitle[path.basename(key)];
+    }
+    if (cues == null && track.uri) {
+      final uri = Uri.tryParse(track.id);
+      final filePath = uri?.scheme == 'file' ? uri!.toFilePath() : track.id;
+      final file = File(filePath);
+      if (file.existsSync()) {
+        cues = parseAnimeSubtitleFile(file);
+        _rememberSubtitleCues(track.title ?? path.basename(file.path), cues);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _subtitleCues = cues ?? const [];
+      _lastSubtitleHistoryText = '';
+      _nextSubtitleHistoryIndex = _subtitleCues.length;
+    });
+  }
+
+  void _rememberSubtitleCues(String title, List<AnimeSubtitleCue> cues) {
+    if (title.trim().isEmpty || cues.isEmpty) return;
+    _subtitleCuesByTitle[title] = cues;
+    _subtitleCuesByTitle[path.basename(title)] = cues;
+    _subtitleCuesByTitle['Jimaku $title'] = cues;
+  }
+
+  void _updateSubtitleHistory(List<String> lines) {
+    if (_subtitleCues.isNotEmpty) return;
+    final text = lines
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .join('\n');
+    if (text.isEmpty) {
+      _lastSubtitleHistoryText = '';
+      return;
+    }
+    if (text == _lastSubtitleHistoryText) return;
+    _lastSubtitleHistoryText = text;
+    final cue = AnimeSubtitleCue(
+      index: _nextSubtitleHistoryIndex++,
+      text: text,
+      start: _currentPosition.value,
+      end: _currentPosition.value + const Duration(seconds: 5),
+    );
+    if (mounted) {
+      setState(() {
+        final updated = [..._subtitleCues, cue];
+        _subtitleCues = updated.length > 500
+            ? updated.sublist(updated.length - 500)
+            : updated;
+      });
+    }
+  }
+
+  Future<void> _showVideoOcr() async {
+    if (_videoOcrCapturing || _videoOcrBytes != null) return;
+    setState(() {
+      _videoOcrCapturing = true;
+      _liveVideoOcrEnabled = false;
+    });
+    unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
+    await _player.pause();
+    try {
+      final position = _currentPosition.value;
+      final bitmapSubtitleActive = await _syncNativeSubtitlePaint();
+      final bytes = await _player.screenshot(
+        format: 'image/png',
+        includeLibassSubtitles: _includeSubtitles || bitmapSubtitleActive,
+      );
+      if (!mounted) return;
+      if (bytes == null || bytes.isEmpty) {
+        botToast('Unable to capture the current video frame', second: 4);
+        return;
+      }
+      setState(() {
+        _videoOcrBytes = bytes;
+        _videoOcrPosition = position;
+      });
+    } catch (error) {
+      if (mounted) botToast('Video OCR capture failed: $error', second: 5);
+    } finally {
+      if (mounted) setState(() => _videoOcrCapturing = false);
+    }
+  }
+
+  void _dismissVideoOcr() {
+    DictionaryLookupPopup.dismissActive();
+    final wasLiveOcrEnabled = _liveVideoOcrEnabled;
+    setState(() {
+      _videoOcrBytes = null;
+      _videoOcrPosition = null;
+      _liveVideoOcrEnabled = false;
+    });
+    if (wasLiveOcrEnabled) {
+      unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
+    }
+  }
+
+  Future<void> _handleVideoOcrShortcut() async {
+    if (_videoOcrBytes != null) {
+      _dismissVideoOcr();
+      return;
+    }
+    await _showVideoOcr();
+  }
+
+  Future<void> _toggleLiveVideoOcr() async {
+    final enabled = !_liveVideoOcrEnabled;
+    DictionaryLookupPopup.dismissActive();
+    setState(() {
+      _liveVideoOcrEnabled = enabled;
+      if (enabled) {
+        _videoOcrBytes = null;
+      }
+    });
+    await MiningPreferences.setLiveVideoOcrEnabled(enabled);
+  }
+
+  Future<VideoOcrFrame?> _captureLiveVideoOcrFrame() async {
+    final position = _currentPosition.value;
+    final bitmapSubtitleActive = await _syncNativeSubtitlePaint();
+    final bytes = await _player.screenshot(
+      format: 'image/png',
+      includeLibassSubtitles: _includeSubtitles || bitmapSubtitleActive,
+    );
+    if (bytes == null || bytes.isEmpty) return null;
+    return VideoOcrFrame(bytes: bytes, position: position);
+  }
+
+  void _syncNativeSubtitlePaintSoon() {
+    unawaited(_syncNativeSubtitlePaint());
+    _nativeSubtitlePaintTimer?.cancel();
+    _nativeSubtitlePaintTimer = Timer(
+      const Duration(milliseconds: 250),
+      () => unawaited(_syncNativeSubtitlePaint()),
+    );
+  }
+
+  Future<bool> _syncNativeSubtitlePaint() async {
+    try {
+      final active = await updateNativeSubtitleVisibility(_player);
+      _bitmapSubtitleActive = active;
+      return active;
+    } catch (_) {
+      return _bitmapSubtitleActive;
+    }
+  }
+
   void _setCurrentAudSub(Duration position, int secs) {
     final totalSecs = _player.state.duration.inSeconds;
     _isCompleted.value = (totalSecs - secs) <= 10;
     _currentPosition.value = position;
     if (_initSubtitleAndAudio) {
       _initSubtitleAndAudio = false;
-      if (_firstVid.subtitles?.isNotEmpty ?? false) {
-        try {
-          final defaultTrack = _firstVid.subtitles!.firstWhere(
-            (sub) => sub.label == widget.defaultSubtitle,
-            orElse: () => _firstVid.subtitles!.first,
-          );
-          final file = defaultTrack.file ?? "";
-          final label = defaultTrack.label;
-          final track = (file.startsWith("http") || file.startsWith("file"))
-              ? SubtitleTrack.uri(file, title: label, language: label)
-              : SubtitleTrack.data(file, title: label, language: label);
-          _player.setSubtitleTrack(track);
-        } catch (_) {}
-        if (_firstVid.audios?.isNotEmpty ?? false) {
-          try {
-            final at = _firstVid.audios!.first;
-            _player.setAudioTrack(
-              AudioTrack.uri(
-                at.file ?? "",
-                title: at.label,
-                language: at.label,
-              ),
-            );
-          } catch (_) {}
-        }
-      }
+      unawaited(_initializeSubtitleAndAudio());
     }
+  }
+
+  Future<AudioTrack> _activeAudioTrack() async {
+    final selectedAudio = _player.state.track.audio;
+    if (selectedAudio.id != 'auto' && selectedAudio.id != 'no') {
+      return selectedAudio;
+    }
+
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return selectedAudio;
+
+    final aid = await _nativeAudioProperty(platform, 'aid');
+    final explicitlySelected = _audioTrackForNativeId(aid);
+    if (explicitlySelected != null) return explicitlySelected;
+
+    final activeId = await _nativeAudioProperty(
+      platform,
+      'current-tracks/audio/id',
+    );
+    return _audioTrackForNativeId(activeId) ?? selectedAudio;
+  }
+
+  Future<bool> _shouldPreserveAudioSelection() async {
+    final selectedAudio = _player.state.track.audio;
+    if (selectedAudio.id != 'auto') return true;
+
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return false;
+    final aid = await _nativeAudioProperty(platform, 'aid');
+    if (aid != null && aid != 'auto' && aid != '-1') return true;
+
+    final preferredLanguage =
+        _preferredAudioLanguage() ?? await _nativePreferredAudioLanguage();
+    if (preferredLanguage == null) return false;
+
+    final activeAudio = await _activeAudioTrack();
+    return activeAudio.id != 'auto' &&
+        activeAudio.id != 'no' &&
+        audioTrackLanguagesMatch(activeAudio.language, preferredLanguage);
+  }
+
+  Future<String?> _nativeAudioProperty(
+    NativePlayer platform,
+    String property,
+  ) async {
+    try {
+      final value = (await platform.getProperty(property)).trim();
+      return value.isEmpty ? null : value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _nativePreferredAudioLanguage() async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return null;
+
+    final alang = await _nativeAudioProperty(platform, 'alang');
+    for (final language in alang?.split(',') ?? const <String>[]) {
+      final value = language.trim();
+      if (value.isNotEmpty && value != 'auto') return value;
+    }
+    return null;
+  }
+
+  AudioTrack? _audioTrackForNativeId(String? id) {
+    if (id == null || id == 'auto' || id == 'no' || id == '-1') return null;
+    for (final track in _player.state.tracks.audio) {
+      if (track.id == id) return track;
+    }
+    // Keep an unknown concrete native selection from being mistaken for auto
+    // while the track list is still being populated.
+    return AudioTrack(id, null, null);
+  }
+
+  bool _isVideoDecoderError(String? codec, AudioTrack activeAudio) {
+    final normalized = codec?.trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) return false;
+    if (activeAudio.codec?.trim().toLowerCase() == normalized) return false;
+
+    final hasAudioCodec = _player.state.tracks.audio.any(
+      (track) => track.codec?.trim().toLowerCase() == normalized,
+    );
+    final hasVideoCodec = _player.state.tracks.video.any(
+      (track) => track.codec?.trim().toLowerCase() == normalized,
+    );
+    return hasVideoCodec && !hasAudioCodec;
+  }
+
+  Future<void> _initializeSubtitleAndAudio() async {
+    final restoredJimaku = await _restoreJimakuSubtitles();
+    if (!restoredJimaku && (_firstVid.subtitles?.isNotEmpty ?? false)) {
+      try {
+        final defaultTrack = _firstVid.subtitles!.firstWhere(
+          (sub) => (sub.label ?? sub.language) == widget.defaultSubtitle,
+          orElse: () => _firstVid.subtitles!.first,
+        );
+        final file = defaultTrack.file ?? "";
+        final label = defaultTrack.label;
+        final language = defaultTrack.language ?? label;
+        final track = (file.startsWith("http") || file.startsWith("file"))
+            ? SubtitleTrack.uri(file, title: label, language: language)
+            : SubtitleTrack.data(file, title: label, language: language);
+        await _setSubtitleTrack(track);
+      } catch (_) {}
+    }
+    if (_firstVid.audios?.isNotEmpty ?? false) {
+      try {
+        final preferredLanguage =
+            _preferredAudioLanguage() ?? await _nativePreferredAudioLanguage();
+        if (!await _shouldPreserveAudioSelection()) {
+          final at = _firstVid.audios!.firstWhere(
+            (sourceTrack) => audioTrackLanguagesMatch(
+              sourceTrack.language ?? sourceTrack.label,
+              preferredLanguage,
+            ),
+            orElse: () => _firstVid.audios!.first,
+          );
+          await _setAudioTrack(
+            AudioTrack.uri(
+              at.file ?? "",
+              title: at.label,
+              language: at.language ?? at.label,
+            ),
+          );
+        }
+      } catch (_) {}
+    }
+    await _autoLoadJimakuSubtitle();
   }
 
   void _setSkipPhase(int secs) {
@@ -782,6 +1200,392 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       newPhase = _AniSkipPhase.none;
     }
     if (_skipPhase.value != newPhase) _skipPhase.value = newPhase;
+  }
+
+  Future<MiningContext> _subtitleMiningContext(
+    String subtitleText, {
+    Uint8List? frozenImageBytes,
+    Duration? frozenPosition,
+    bool ocrTiming = false,
+  }) async {
+    final manga = widget.episode.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
+    final capturePosition = frozenPosition ?? _currentPosition.value;
+    final imageBytes =
+        frozenImageBytes ??
+        await _player.screenshot(
+          format: 'image/png',
+          includeLibassSubtitles: _includeSubtitles,
+        );
+    final capture = imageBytes == null || imageBytes.isEmpty
+        ? null
+        : await _createSceneCapture(
+            subtitleText: subtitleText,
+            frozenImageBytes: imageBytes,
+            frozenPosition: capturePosition,
+            ocrTiming: ocrTiming,
+          );
+    final video = _video.value;
+    final fallbackSource = video?.videoTrack?.id ?? _firstVid.url;
+    final audioTiming = capture == null
+        ? subtitleAudioTimingForCue(
+            currentPosition: capturePosition,
+            subtitleDelay: Duration(milliseconds: _subDelay),
+          )
+        : SubtitleAudioTiming(start: capture.audioStart, end: capture.audioEnd);
+    final audioSource = capture?.playerSource ?? fallbackSource;
+    final activeAudio = _player.state.track.audio;
+    final selectedAudioSource = activeAudio.uri && activeAudio.id != 'no'
+        ? activeAudio.id
+        : audioSource;
+    final headers = video?.headers == null
+        ? const <String, String>{}
+        : Map<String, String>.unmodifiable(video!.headers!);
+    final position = capture?.position ?? capturePosition;
+    return MiningContext(
+      mediaType: MiningMediaType.anime,
+      mangaId: manga?.id,
+      sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+      sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+        source,
+        fallback: manga?.lang ?? '',
+      ),
+      sourceTitle: manga?.name ?? '',
+      chapterTitle: widget.episode.name ?? '',
+      sentence: subtitleText,
+      position: position,
+      sourceUri: Uri.tryParse(_firstVid.originalUrl),
+      imageBytesLoader: imageBytes == null
+          ? null
+          : () async => Uint8List.fromList(imageBytes),
+      sentenceAudioLoader: selectedAudioSource.trim().isEmpty
+          ? null
+          : (format) => AnimeSentenceAudioService().capture(
+              source: selectedAudioSource,
+              headers: headers,
+              timing: audioTiming,
+              format: format,
+              sourceTitle: widget.episode.manga.value?.name ?? '',
+              chapterTitle: widget.episode.name ?? '',
+              audioStreamIndex:
+                  capture != null && selectedAudioSource == capture.playerSource
+                  ? capture.audioStreamIndex
+                  : null,
+            ),
+      sceneCapture: capture,
+    );
+  }
+
+  Future<AnkiSceneCaptureHandle> _createSceneCapture({
+    required String subtitleText,
+    required Uint8List frozenImageBytes,
+    Duration? frozenPosition,
+    required bool ocrTiming,
+  }) async {
+    final native = _player.platform;
+    Future<String?> property(String name) async {
+      if (native is! NativePlayer) return null;
+      try {
+        final value = await native.getProperty(name);
+        return value.trim().isEmpty ? null : value.trim();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final values = await Future.wait([
+      property('path'),
+      property('time-pos'),
+      property('duration'),
+      property('sub-start/full'),
+      property('sub-end/full'),
+      property('seekable'),
+      property('current-tracks/video/ff-index'),
+      property('current-tracks/audio/ff-index'),
+    ]);
+    final video = _video.value;
+    final selectedSource = video?.videoTrack?.id ?? _firstVid.url;
+    final liveSource = values[0];
+    final source = liveSource ?? selectedSource.trim();
+    final position =
+        frozenPosition ??
+        _durationFromSeconds(values[1]) ??
+        _currentPosition.value;
+    final duration =
+        _durationFromSeconds(values[2]) ??
+        _currentTotalDuration.value ??
+        _player.state.duration;
+    final timing = ocrTiming
+        ? resolveOcrSceneTiming(
+            playbackPosition: position,
+            mediaDuration: duration,
+          )
+        : resolveSubtitleSceneTiming(
+            subtitleText: subtitleText,
+            playbackPosition: position,
+            mediaDuration: duration,
+            liveSubtitleStart: _durationFromSeconds(values[3]),
+            liveSubtitleEnd: _durationFromSeconds(values[4]),
+            parsedCues: [
+              for (final cue in _subtitleCues)
+                ParsedSubtitleTiming(
+                  text: cue.text,
+                  start: cue.start,
+                  end: cue.end,
+                ),
+            ],
+            subtitleSpeed: _subSpeed,
+            subtitleDelay: Duration(milliseconds: _subDelay),
+          );
+    final videoIndex = int.tryParse(values[6] ?? '');
+    final audioIndex = int.tryParse(values[7] ?? '');
+    final selectedVideoId = _player.state.track.video.id;
+    final selectedAudioId = _player.state.track.audio.id;
+    final headers = Map<String, String>.unmodifiable(
+      video?.headers ?? const {},
+    );
+    late final AnkiSceneCaptureHandle handle;
+    handle = AnkiSceneCaptureHandle(
+      fallbackScreenshot: frozenImageBytes,
+      playerSource: source,
+      position: position,
+      duration: duration,
+      sceneStart: timing.scene.start,
+      sceneEnd: timing.scene.end,
+      audioStart: timing.audio.start,
+      audioEnd: timing.audio.end,
+      subtitleDelay: Duration(milliseconds: _subDelay),
+      subtitleSpeed: _subSpeed,
+      videoStreamIndex: videoIndex,
+      audioStreamIndex: audioIndex,
+      headers: headers,
+      seekable: _booleanProperty(values[5], fallback: widget.isLocal),
+      jobController: _sceneJobController,
+      validatePlayerState: () async =>
+          mounted &&
+          _player.state.track.video.id == selectedVideoId &&
+          _player.state.track.audio.id == selectedAudioId,
+      prepareAnimatedScreenshot: (session) => const DesktopSceneCaptureService()
+          .prepare(capture: handle, session: session),
+      disposeCapture: () async {
+        _sceneCaptures.remove(handle);
+      },
+    );
+    _sceneCaptures.add(handle);
+    return handle;
+  }
+
+  Future<void> _autoLoadJimakuSubtitle() async {
+    if (_jimakuAutoLoadAttempted || _jimakuLoading) return;
+    _jimakuAutoLoadAttempted = true;
+    if (!await MiningPreferences.getAutoJimakuEnabled()) return;
+    final apiKey = await MiningPreferences.getJimakuApiKey();
+    if (apiKey.trim().isEmpty) return;
+    await _loadJimakuSubtitle(apiKey: apiKey, showFeedback: false);
+  }
+
+  Future<void> _showJimakuSubtitleDialog({required bool resumePlayback}) async {
+    final mediaId = widget.episode.manga.value?.id;
+    var apiKey = await MiningPreferences.getJimakuApiKey();
+    final apiKeyController = isDesktop
+        ? null
+        : TextEditingController(text: apiKey);
+    final titleController = TextEditingController(
+      text: await MiningPreferences.getJimakuTitleOverride(mediaId),
+    );
+    var playbackRestored = false;
+
+    Future<void> restorePlayback() async {
+      if (playbackRestored) return;
+      playbackRestored = true;
+      if (resumePlayback && mounted) await _player.play();
+    }
+
+    try {
+      if (!mounted) return;
+      while (true) {
+        if (!mounted) return;
+        final action = await showDialog<JimakuSubtitleDialogAction>(
+          context: context,
+          builder: (dialogContext) => JimakuSubtitleDialog(
+            apiKeyConfigured: apiKey.trim().isNotEmpty,
+            apiKeyController: apiKeyController,
+            titleController: titleController,
+            titleHint: widget.episode.manga.value?.name ?? '',
+            cancelLabel: dialogContext.l10n.cancel,
+          ),
+        );
+        if (!mounted || action == null) return;
+
+        if (action == JimakuSubtitleDialogAction.openSettings) {
+          await context.push('/playerSubtitles');
+          if (!mounted) return;
+          apiKey = await MiningPreferences.getJimakuApiKey();
+          if (!mounted || apiKey.trim().isEmpty) return;
+          continue;
+        }
+
+        final searchApiKey = apiKeyController?.text ?? apiKey;
+        if (apiKeyController != null) {
+          await MiningPreferences.setJimakuApiKey(searchApiKey);
+        }
+        await MiningPreferences.setJimakuTitleOverride(
+          mediaId,
+          titleController.text,
+        );
+        await restorePlayback();
+        await _loadJimakuSubtitle(
+          apiKey: searchApiKey,
+          titleOverride: titleController.text,
+          showFeedback: true,
+        );
+        return;
+      }
+    } finally {
+      await restorePlayback();
+      apiKeyController?.dispose();
+      titleController.dispose();
+    }
+  }
+
+  Future<void> _loadJimakuSubtitle({
+    required String apiKey,
+    String titleOverride = '',
+    required bool showFeedback,
+  }) async {
+    if (_jimakuLoading) return;
+    _jimakuLoading = true;
+    try {
+      final guess = await _currentJimakuGuess(titleOverride);
+      if (guess.title.trim().isEmpty) {
+        if (showFeedback) botToast('Set a Jimaku title first', second: 3);
+        return;
+      }
+      if (showFeedback) {
+        botToast('Searching Jimaku: ${guess.displayName}');
+      }
+      final service = JimakuSubtitleService();
+      final entries = await service.searchEntries(
+        apiKey: apiKey,
+        query: guess.title,
+      );
+      if (entries.isEmpty) {
+        if (showFeedback) {
+          botToast('No Jimaku entries found for "${guess.title}"', second: 4);
+        }
+        return;
+      }
+      final entry =
+          selectBestJimakuEntry(entries, guess.title) ?? entries.first;
+      final files = await service.matchingFiles(
+        apiKey: apiKey,
+        entry: entry,
+        guess: guess,
+      );
+      if (files.isEmpty) {
+        final episodeText = guess.episode == null
+            ? ''
+            : ' episode ${guess.episode}';
+        if (showFeedback) {
+          botToast(
+            'No matching SRT Jimaku subtitles found for '
+            '${entry.name}$episodeText',
+            second: 4,
+          );
+        }
+        return;
+      }
+      final outputDir = Directory(
+        path.join((await getTemporaryDirectory()).path, 'jimaku_subtitles'),
+      );
+      final subtitleFiles = await service.downloadFiles(
+        apiKey: apiKey,
+        files: files,
+        outputDirectory: outputDir,
+      );
+      _jimakuSubtitleTracks
+        ..clear()
+        ..addAll([
+          for (var index = 0; index < subtitleFiles.length; index++)
+            SubtitleTrack.uri(
+              subtitleFiles[index].path,
+              title: files[index].name,
+              language: 'ja',
+            ),
+        ]);
+      for (var index = 0; index < subtitleFiles.length; index++) {
+        final subtitleFile = subtitleFiles[index];
+        final file = files[index];
+        final cues = parseAnimeSubtitleFile(subtitleFile);
+        _rememberSubtitleCues(file.name, cues);
+      }
+      await _attachJimakuSubtitles(_jimakuSubtitleTracks.first.id);
+      if (showFeedback) {
+        botToast(
+          subtitleFiles.length == 1
+              ? 'Jimaku subtitle added'
+              : 'Added ${subtitleFiles.length} Jimaku subtitles',
+          second: 3,
+        );
+      }
+    } catch (e) {
+      if (showFeedback) botToast('Jimaku failed: $e', second: 5);
+    } finally {
+      _jimakuLoading = false;
+    }
+  }
+
+  Future<JimakuMediaGuess> _currentJimakuGuess(String titleOverride) async {
+    final overrideTitle = titleOverride.trim().isNotEmpty
+        ? titleOverride.trim()
+        : await MiningPreferences.getJimakuTitleOverride(
+            widget.episode.manga.value?.id,
+          );
+    final animeTitle = widget.episode.manga.value?.name ?? '';
+    final episode = ChapterRecognition().parseEpisodeNumber(
+      animeTitle,
+      widget.episode.name ?? '',
+    );
+    return buildChimahonJimakuGuess(
+      overrideTitle: overrideTitle,
+      animeTitle: animeTitle,
+      mediaTitle: widget.episode.name ?? '',
+      videoTitle: _firstVid.quality,
+      videoUrl: _firstVid.originalUrl,
+      episodeNumber: episode > 0 ? episode : null,
+    );
+  }
+
+  Future<bool> _restoreJimakuSubtitles() async {
+    final activePath = _activeJimakuSubtitlePath;
+    if (activePath == null ||
+        !_jimakuSubtitleTracks.any((track) => track.id == activePath)) {
+      return false;
+    }
+    await _attachJimakuSubtitles(activePath);
+    return true;
+  }
+
+  Future<void> _attachJimakuSubtitles(String selectedPath) async {
+    final selected = _jimakuSubtitleTracks.firstWhere(
+      (track) => track.id == selectedPath,
+    );
+    final platform = _player.platform;
+    if (platform is NativePlayer) {
+      for (final subtitle in _jimakuSubtitleTracks) {
+        if (subtitle == selected) continue;
+        await platform.command([
+          'sub-add',
+          subtitle.id,
+          'auto',
+          subtitle.title ?? path.basename(subtitle.id),
+          subtitle.language ?? 'ja',
+        ]);
+      }
+    }
+    await _setSubtitleTrack(selected);
   }
 
   void _updateRpcTimestamp() {
@@ -812,7 +1616,71 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       malloc.free(namePtr);
       malloc.free(valuePtr);
       _subDelay = delayMs;
+      unawaited(
+        MiningPreferences.setSubtitleDelay(
+          widget.episode.manga.value?.id,
+          delayMs,
+        ),
+      );
     }
+  }
+
+  Future<void> _restoreEntrySubtitleDelay() async {
+    final delay = await MiningPreferences.getSubtitleDelay(
+      widget.episode.manga.value?.id,
+    );
+    if (!mounted) return;
+    _subDelayController.value = TextEditingValue(text: '$delay');
+  }
+
+  Future<void> _restoreEntryVideoStreamPreference() async {
+    final mediaId = widget.episode.manga.value?.id;
+    final preference = mediaId == null
+        ? ''
+        : _sessionVideoStreamPreferences[mediaId] ??
+              await MiningPreferences.getVideoStreamPreference(mediaId);
+    if (!mounted || preference.isEmpty) return;
+    final selected = preferredVideoStream(widget.videos, preference);
+    _sessionVideoStreamPreferences[mediaId!] = preference;
+    _firstVid = selected;
+    _video.value = VideoPrefs(
+      videoTrack: videoTrackFromVideo(selected),
+      headers: selected.headers,
+      isLocal: false,
+    );
+  }
+
+  void _rememberVideoStreamPreference(String preference) {
+    final mediaId = widget.episode.manga.value?.id;
+    if (mediaId == null || preference.trim().isEmpty) return;
+    _sessionVideoStreamPreferences[mediaId] = preference.trim();
+    unawaited(MiningPreferences.setVideoStreamPreference(mediaId, preference));
+  }
+
+  Future<void> _snapSubtitleDelay({required bool next}) async {
+    final platform = _player.platform;
+    if (platform is NativePlayer) {
+      try {
+        await platform.command(['sub-step', next ? '1' : '-1']);
+        final seconds = double.tryParse(
+          await platform.getProperty('sub-delay'),
+        );
+        if (seconds != null) {
+          _subDelayController.value = TextEditingValue(
+            text: '${(seconds * 1000).round()}',
+          );
+          return;
+        }
+      } catch (_) {}
+    }
+    final delay = subtitleDelayForAdjacentCue(
+      cues: _subtitleCues,
+      playbackPosition: _currentPosition.value,
+      currentDelayMs: _subDelay,
+      next: next,
+    );
+    if (delay == null) return;
+    _subDelayController.value = TextEditingValue(text: '$delay');
   }
 
   void _onSubSpeedChanged() {
@@ -846,7 +1714,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _player,
       configuration: VideoControllerConfiguration(
         hwdec: hwdecMode,
-        enableHardwareAcceleration: enableHardwareAccel,
+        enableHardwareAcceleration: shouldUseHardwareAcceleratedVideoOutput(
+          userEnabled: enableHardwareAccel,
+          isWindows: Platform.isWindows,
+        ),
         vo: Platform.isAndroid
             ? useGpuNext
                   ? "gpu-next"
@@ -854,21 +1725,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             : "libmpv",
       ),
     );
-    // Picture-in-Picture is still off, but the reason has changed.
-    //
-    // It was disabled because the second UIScene PiP creates re-entered
-    // didFinishLaunchingWithOptions and re-ran plugin registration, which
-    // segfaulted connectivity_plus. That cause is now gone: the app is on the
-    // UIScene lifecycle and registration happens once per engine in
-    // didInitializeImplicitFlutterEngine.
-    //
-    // What blocks it now is the media_kit fork. The old call was
-    // `_controller.enableAutoPictureInPicture()`, and that method no longer
-    // exists: the fork moved PiP onto `VideoController.pictureInPicture`, a
-    // PictureInPictureController with `isSupported()` and
-    // `start(handle:, videoSize:, autoEnter:)` taking a native libmpv handle.
-    // Re-enabling means porting to that API and testing on a device, so it is
-    // deliberately left for its own change. See closed #757.
     // If player is being launched the first time,
     // use global "Use Fullscreen" setting.
     // Else (if user already watches an episode and just changes it),
@@ -882,63 +1738,108 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         "$defaultSkipIntroLength",
       );
     } catch (_) {}
-    if (isDesktop && _firstTime) {
-      final globalFullscreen = ref.read(fullScreenPlayerStateProvider);
-      // Delay fullscreen until after the first frame so the window is ready.
-      // On Windows, calling setFullScreen before the widget tree is built
-      // can silently fail, leaving the title bar visible.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setFullScreen(value: globalFullscreen);
-        ref.read(fullscreenProvider.notifier).state = globalFullscreen;
-        widget.desktopFullScreenPlayer.call(globalFullscreen);
-      });
-      _firstTime = false;
+    if (isDesktop) {
+      if (_firstTime) {
+        final globalFullscreen = ref.read(fullScreenPlayerStateProvider);
+        // Delay fullscreen until after the first frame so the window is ready.
+        // On Windows, calling setFullScreen before the widget tree is built
+        // can silently fail, leaving the title bar visible.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setFullScreen(value: globalFullscreen);
+          ref.read(fullscreenProvider.notifier).state = globalFullscreen;
+          widget.desktopFullScreenPlayer.call(globalFullscreen);
+        });
+        _firstTime = false;
+      } else {
+        // Episode replacement keeps the process-wide fullscreen provider and
+        // native window mode. Mirror it into the new outer route so a later
+        // disposal still knows the real window state.
+        widget.desktopFullScreenPlayer.call(ref.read(fullscreenProvider));
+      }
     }
     if (!isDesktop) {
       final forceLandscape = ref.read(forceLandscapePlayerStateProvider);
-      // Preserve the player orientation across episode changes. Playing the next
-      // episode pushes a fresh player, and the old one's dispose() resets the
-      // orientation to portrait. So if the viewer is still in fullscreen — from
-      // the force-landscape setting or a manual toggle that persists across
-      // episodes (fullscreenProvider is global) — re-apply landscape here rather
-      // than stranding them in portrait with the fullscreen button still active.
-      if (forceLandscape || ref.read(fullscreenProvider)) {
+      if (forceLandscape) {
         _setLandscapeMode(true);
       }
     }
     _currentPositionSub = _player.stream.position.listen(
       _unifiedPositionHandler,
     );
+    _subtitleTextSub = _player.stream.subtitle.listen(_updateSubtitleHistory);
+    _selectedTrackSub = _player.stream.track.listen((_) {
+      _syncNativeSubtitlePaintSoon();
+    });
+    _playerErrorSub = _player.stream.error.listen(_reportPlaybackError);
     _completed;
     _currentTotalDurationSub;
-    _loadAndroidFont().then((_) {
-      // Loading the subtitle font writes a file, so this callback can arrive
-      // after the reader has already left. Everything below it touches the
-      // player, and media_kit asserts "[Player] has been disposed" the moment
-      // it is used after dispose. That is #925. The torrent branch further
-      // down already checked for this; the path everyone takes did not.
-      if (!mounted) return;
-      _openMedia(_video.value!, _streamController.getCurrentPosition());
-      if (widget.isTorrent) {
-        Future.delayed(const Duration(seconds: 10)).then((_) {
-          if (mounted) {
-            _openMedia(_video.value!, _streamController.getCurrentPosition());
-          }
-        });
-      }
-      _setPlaybackSpeed(ref.read(defaultPlayBackSpeedStateProvider));
-      if (ref.read(enableAniSkipStateProvider)) _initAniSkip();
-    });
-    _initCustomButton();
+    unawaited(_initializePlayback());
+    unawaited(_initCustomButton());
     discordRpc?.showChapterDetails(ref, widget.episode);
     _currentPosition.addListener(_updateRpcTimestamp);
     _subDelayController.addListener(_onSubDelayChanged);
     _subSpeedController.addListener(_onSubSpeedChanged);
+    unawaited(
+      MiningPreferences.getLiveVideoOcrEnabled().then((enabled) {
+        if (!mounted) return;
+        setState(() => _liveVideoOcrEnabled = enabled);
+      }),
+    );
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  Future<void> _initializePlayback() async {
+    try {
+      await _loadAndroidFont();
+      if (!mounted) return;
+      await _restoreEntryVideoStreamPreference();
+      if (!mounted) return;
+      await _openMedia(_video.value!, _streamController.getCurrentPosition());
+      if (!mounted) return;
+      await _restoreEntrySubtitleDelay();
+      if (!mounted) return;
+      if (widget.isTorrent) {
+        unawaited(
+          Future.delayed(const Duration(seconds: 10)).then((_) async {
+            if (mounted) {
+              await _openMedia(
+                _video.value!,
+                _streamController.getCurrentPosition(),
+              );
+              if (!mounted) return;
+              await _restoreEntrySubtitleDelay();
+            }
+          }),
+        );
+      }
+      await _setPlaybackSpeed(ref.read(defaultPlayBackSpeedStateProvider));
+      if (!mounted) return;
+      if (ref.read(enableAniSkipStateProvider)) await _initAniSkip();
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      _reportPlaybackError(error.toString(), stackTrace: stackTrace);
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (Platform.isWindows) {
+      if (shouldSuspendWindowsPlaybackSurface(state)) {
+        _resumePlaybackAfterWindowsSuspend =
+            _resumePlaybackAfterWindowsSuspend || _player.state.playing;
+        _setWindowsVideoSurfaceVisible(false);
+      } else if (shouldResumeWindowsPlaybackSurface(state)) {
+        _setWindowsVideoSurfaceVisible(true);
+        if (_resumePlaybackAfterWindowsSuspend) {
+          _resumePlaybackAfterWindowsSuspend = false;
+          unawaited(
+            WidgetsBinding.instance.endOfFrame.then((_) {
+              if (mounted && _videoTextureVisible) return _player.play();
+            }),
+          );
+        }
+      }
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _watchStopwatch.stop();
@@ -948,28 +1849,181 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
   }
 
+  void _setWindowsVideoSurfaceVisible(bool visible) {
+    if (!mounted || _routeExitInProgress || _videoTextureVisible == visible) {
+      return;
+    }
+    setState(() => _videoTextureVisible = visible);
+  }
+
   Future<void> _openMedia(VideoPrefs prefs, [Duration? position]) async {
     final start = position ?? _currentPosition.value;
-    await _player.open(
-      Media(prefs.videoTrack!.id, httpHeaders: prefs.headers, start: start),
-    );
-    if (start > Duration.zero) {
-      // media_kit's Media(start:) is unreliable for some sources — playback can
-      // begin at 0 even though the resume position was passed. Seek explicitly
-      // once the media reports a duration (i.e. it has loaded). Fire-and-forget
-      // so open() isn't delayed; the timeout guards a source that never reports
-      // one, and a redundant seek (when start: did work) is harmless.
-      unawaited(
-        _player.stream.duration
-            .firstWhere((d) => d > Duration.zero)
-            .timeout(const Duration(seconds: 8))
-            // Up to eight seconds after the media opened, which is long
-            // enough for the reader to have gone. Seeking a disposed player
-            // reaches native state that has already been torn down.
-            .then((_) => mounted ? _player.seek(start) : null)
-            .catchError((_) {}),
+    _resetAudioFallbackState(resetRequestedLanguage: true);
+    try {
+      await _player.open(
+        playbackMedia(
+          prefs.videoTrack!.id,
+          isLocal: widget.isLocal,
+          httpHeaders: prefs.headers,
+          start: start,
+        ),
+      );
+      _scheduleLinuxVideoOutputResize();
+      if (start > Duration.zero) {
+        // Media(start:) is unreliable for some sources. Seek again once the
+        // stream reports a duration; a redundant seek is harmless.
+        unawaited(
+          _player.stream.duration
+              .firstWhere((duration) => duration > Duration.zero)
+              .timeout(const Duration(seconds: 8))
+              .then((_) => mounted ? _player.seek(start) : null)
+              .catchError((_) {}),
+        );
+      }
+    } catch (error, stackTrace) {
+      _reportPlaybackError(error.toString(), stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _setAudioTrack(AudioTrack track) async {
+    _resetAudioFallbackState();
+    _requestedAudioLanguage = track.language ?? _preferredAudioLanguage();
+    await _player.setAudioTrack(track);
+  }
+
+  String? _preferredAudioLanguage() {
+    for (final language in audioPreferredLang.split(',')) {
+      final value = language.trim();
+      if (value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  List<AudioTrack> _audioTracksForFallback() {
+    final tracks = _player.state.tracks.audio.toList();
+    for (final sourceTrack in _firstVid.audios ?? const <vid.Track>[]) {
+      final file = sourceTrack.file;
+      if (file == null || file.isEmpty) continue;
+      tracks.add(
+        AudioTrack.uri(
+          file,
+          title: sourceTrack.label,
+          language: sourceTrack.language ?? sourceTrack.label,
+        ),
       );
     }
+    return tracks;
+  }
+
+  void _resetAudioFallbackState({bool resetRequestedLanguage = false}) {
+    _failedAudioTrackKeys.clear();
+    _failedAudioCodecs.clear();
+    _audioFallbackErrorQueued = false;
+    if (resetRequestedLanguage) _requestedAudioLanguage = null;
+  }
+
+  void _reportPlaybackError(String error, {StackTrace? stackTrace}) {
+    final message = error.trim();
+    if (message.isEmpty) return;
+
+    if (isAudioDecoderInitializationError(message)) {
+      if (_audioFallbackInProgress) {
+        _audioFallbackErrorQueued = true;
+        return;
+      }
+      unawaited(_recoverFromAudioDecoderError(message, stackTrace: stackTrace));
+      return;
+    }
+
+    _surfacePlaybackError(message, stackTrace: stackTrace);
+  }
+
+  Future<void> _recoverFromAudioDecoderError(
+    String message, {
+    StackTrace? stackTrace,
+  }) async {
+    _audioFallbackInProgress = true;
+    try {
+      final failedTrack = await _activeAudioTrack();
+      final failedCodec = audioDecoderCodecFromError(message);
+      if (_isVideoDecoderError(failedCodec, failedTrack)) {
+        _surfacePlaybackError(message, stackTrace: stackTrace);
+        return;
+      }
+
+      _failedAudioTrackKeys.add(audioTrackFallbackKey(failedTrack));
+      if (failedCodec != null) {
+        _failedAudioCodecs.add(failedCodec.toLowerCase());
+      }
+
+      final requestedLanguage =
+          failedTrack.language ??
+          _requestedAudioLanguage ??
+          _preferredAudioLanguage() ??
+          await _nativePreferredAudioLanguage();
+      final candidates = audioTrackFallbackCandidates(
+        failedTrack: failedTrack,
+        availableTracks: _audioTracksForFallback(),
+        requestedLanguage: requestedLanguage,
+        failedTrackKeys: _failedAudioTrackKeys,
+        failedCodecs: _failedAudioCodecs,
+      );
+      final fallback = candidates.isEmpty ? null : candidates.first;
+
+      if (fallback == null) {
+        _surfacePlaybackError(message, stackTrace: stackTrace);
+        return;
+      }
+
+      _requestedAudioLanguage = requestedLanguage;
+      AppLogger.log(
+        'Audio decoder failed for ${audioTrackLabel(failedTrack)}; '
+        'trying ${audioTrackLabel(fallback)}.',
+        logLevel: LogLevel.warning,
+      );
+      try {
+        await _player.setAudioTrack(fallback);
+      } catch (error, fallbackStackTrace) {
+        _surfacePlaybackError(
+          '$message\nAudio fallback failed: $error',
+          stackTrace: fallbackStackTrace,
+        );
+      }
+    } finally {
+      _audioFallbackInProgress = false;
+      if (_audioFallbackErrorQueued) {
+        _audioFallbackErrorQueued = false;
+        unawaited(
+          _recoverFromAudioDecoderError(message, stackTrace: stackTrace),
+        );
+      }
+    }
+  }
+
+  void _surfacePlaybackError(String message, {StackTrace? stackTrace}) {
+    AppLogger.log(
+      'Video playback error: $message'
+      '${stackTrace == null ? '' : '\n$stackTrace'}',
+      logLevel: LogLevel.error,
+    );
+
+    final now = DateTime.now();
+    final shouldReport = shouldReportPlaybackError(
+      message: message,
+      lastMessage: _lastPlayerError,
+      lastReportedAt: _lastPlayerErrorAt,
+      now: now,
+    );
+    _lastPlayerError = message;
+    _lastPlayerErrorAt = now;
+    if (!mounted || !shouldReport) return;
+
+    BotToast.showText(
+      text: 'Playback error: ${formatPlaybackErrorToast(message)}',
+      onlyOne: true,
+      align: const Alignment(0, 0.90),
+      duration: const Duration(seconds: 5),
+    );
   }
 
   Future<void> _loadAndroidFont() async {
@@ -997,8 +2051,12 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   Future<void> _initAniSkip() async {
-    // Waits for the media to buffer, which the reader can outlast.
-    await _player.stream.buffer.first;
+    try {
+      await _player.stream.buffer.first;
+    } catch (_) {
+      if (!mounted) return;
+      rethrow;
+    }
     if (!mounted) return;
     _streamController.getAniSkipResults((result) {
       final openingRes = result
@@ -1017,32 +2075,40 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     });
   }
 
-  // Bumped on each d-pad key (see _onPlayerKey) so the mobile controls reveal
-  // themselves on a TV remote.
-  final ValueNotifier<int> _revealControls = ValueNotifier(0);
-  // TV-only: when the advanced settings panel is open the video docks left and
-  // the panel slides in on the right (YouTube-style), instead of a bottom sheet.
-  bool _tvSettingsOpen = false;
-  // Owned focus anchors for the split view so Left/Right cross deterministically
-  // (geometric directional focus was losing focus entirely).
-  final FocusNode _tvVideoFocus = FocusNode(debugLabel: 'tvVideoFrame');
-  final FocusNode _tvPanelFocus = FocusNode(debugLabel: 'tvPanelHeader');
-
   @override
   void dispose() {
-    _revealControls.dispose();
-    _tvVideoFocus.dispose();
-    _tvPanelFocus.dispose();
     _watchStopwatch.stop();
     _currentPosition.removeListener(_updateRpcTimestamp);
     _subDelayController.removeListener(_onSubDelayChanged);
     _subSpeedController.removeListener(_onSubSpeedChanged);
+    _nativeSubtitlePaintTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _setCurrentPosition(true, saveWatchTime: true);
-    _player.stop();
-    _completed.cancel();
-    _currentPositionSub.cancel();
-    _currentTotalDurationSub.cancel();
+    final playerCleanup = disposePlaybackSession(
+      listenerCancellations: [
+        _completed.cancel(),
+        _currentPositionSub.cancel(),
+        _subtitleTextSub.cancel(),
+        _selectedTrackSub.cancel(),
+        _playerErrorSub.cancel(),
+        _currentTotalDurationSub.cancel(),
+      ],
+      // The Video widget is normally retired before route navigation. Keep a
+      // final Windows-only grace period for non-navigation disposal paths so
+      // Flutter's raster thread cannot race media_kit texture destruction.
+      beforeDisposePlayer: Platform.isWindows
+          ? () => Future<void>.delayed(const Duration(milliseconds: 250))
+          : null,
+      disposePlayer: _player.dispose,
+    );
+    unawaited(
+      playerCleanup.catchError((Object error, StackTrace stackTrace) {
+        AppLogger.log(
+          'Failed to dispose video player: $error\n$stackTrace',
+          logLevel: LogLevel.error,
+        );
+      }),
+    );
     _currentPosition.dispose();
     _currentTotalDuration.dispose();
     _video.dispose();
@@ -1059,7 +2125,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     discordRpc?.showIdleText();
     discordRpc?.showOriginalTimestamp();
     _streamController.keepAliveLink?.close();
-    _player.dispose();
+    for (final capture in _sceneCaptures.toList(growable: false)) {
+      unawaited(capture.dispose());
+    }
+    _sceneCaptures.clear();
+    unawaited(_sceneJobController.dispose());
     super.dispose();
   }
 
@@ -1069,8 +2139,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _currentTotalDuration.value,
       save: save,
     );
-    _streamController.setHistoryUpdate(
-      elapsedSeconds: saveWatchTime ? _watchStopwatch.elapsed.inSeconds : 0,
+    unawaited(
+      _streamController.setHistoryUpdate(
+        elapsedSeconds: saveWatchTime ? _watchStopwatch.elapsed.inSeconds : 0,
+      ),
     );
   }
 
@@ -1125,7 +2197,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       for (var video in widget.videos) {
         videoQuality.add(
           VideoPrefs(
-            videoTrack: VideoTrack(video.url, video.quality, video.quality),
+            videoTrack: videoTrackFromVideo(video),
             headers: video.headers,
             isLocal: false,
           ),
@@ -1151,17 +2223,24 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 return;
               }
               _video.value = quality;
-              _player.stop();
-              if (quality.isLocal) {
-                if (widget.isLocal) {
-                  _player.setVideoTrack(quality.videoTrack!);
-                } else {
-                  _openMedia(quality);
+              final preference = quality.videoTrack?.title ?? '';
+              _rememberVideoStreamPreference(preference);
+              for (final video in widget.videos) {
+                if (video.url == quality.videoTrack?.id) {
+                  _firstVid = video;
+                  break;
                 }
-              } else {
-                _openMedia(quality);
               }
-              _initSubtitleAndAudio = true;
+              await _player.stop();
+              if (quality.isLocal && widget.isLocal) {
+                await _player.setVideoTrack(quality.videoTrack!);
+                _initSubtitleAndAudio = true;
+              } else {
+                _initSubtitleAndAudio = false;
+                await _openMedia(quality);
+                await _initializeSubtitleAndAudio();
+              }
+              if (!context.mounted) return;
               Navigator.pop(context);
             },
           );
@@ -1170,10 +2249,16 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
   }
 
-  void _videoSettingDraggableMenu(BuildContext context) async {
+  Future<void> _videoSettingDraggableMenu(
+    BuildContext context, {
+    int initialIndex = 0,
+  }) async {
     final l10n = l10nLocalizations(context)!;
     bool hasSubtitleTrack = false;
-    _player.pause();
+    var openJimaku = false;
+    final resumePlayback = _player.state.playing;
+    await _player.pause();
+    if (!context.mounted) return;
     await customDraggableTabBar(
       tabs: [
         Tab(text: l10n.video_quality),
@@ -1182,12 +2267,17 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       ],
       children: [
         _videoQualityWidget(context),
-        _videoSubtitle(context, (value) => hasSubtitleTrack = value),
+        _videoSubtitle(
+          context,
+          (value) => hasSubtitleTrack = value,
+          onSearchJimaku: () => openJimaku = true,
+        ),
         _videoAudios(context),
       ],
       context: context,
       vsync: this,
       fullWidth: true,
+      initialIndex: initialIndex,
       moreWidget: IconButton(
         onPressed: () async {
           if (useLibass) {
@@ -1204,10 +2294,12 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               tabs: [
                 Tab(text: l10n.font),
                 Tab(text: l10n.color),
+                const Tab(text: 'Filters'),
               ],
               children: [
                 FontSettingWidget(hasSubtitleTrack: hasSubtitleTrack),
                 ColorSettingWidget(hasSubtitleTrack: hasSubtitleTrack),
+                const SubtitleFilterSettingWidget(),
               ],
               context: context,
               vsync: this,
@@ -1221,11 +2313,20 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         icon: const Icon(Icons.settings_outlined),
       ),
     );
+    if (!mounted) return;
     setState(() {});
-    _player.play();
+    if (openJimaku) {
+      await _showJimakuSubtitleDialog(resumePlayback: resumePlayback);
+    } else if (resumePlayback) {
+      await _player.play();
+    }
   }
 
-  Widget _videoSubtitle(BuildContext context, Function(bool) hasSubtitleTrack) {
+  Widget _videoSubtitle(
+    BuildContext context,
+    Function(bool) hasSubtitleTrack, {
+    required VoidCallback onSearchJimaku,
+  }) {
     List<VideoPrefs> videoSubtitle = _player.state.tracks.subtitle
         .toList()
         .map((e) => VideoPrefs(isLocal: true, subtitle: e))
@@ -1238,12 +2339,17 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           if (!subs.contains(sub.file)) {
             final file = sub.file!;
             final label = sub.label;
+            final language = sub.language ?? label;
             videoSubtitle.add(
               VideoPrefs(
                 isLocal: widget.isLocal,
                 subtitle: (file.startsWith("http") || file.startsWith("file"))
-                    ? SubtitleTrack.uri(file, title: label, language: label)
-                    : SubtitleTrack.data(file, title: label, language: label),
+                    ? SubtitleTrack.uri(file, title: label, language: language)
+                    : SubtitleTrack.data(
+                        file,
+                        title: label,
+                        language: language,
+                      ),
               ),
             );
             subs.add(sub.file!);
@@ -1315,6 +2421,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           Row(
             children: [
               IconButton(
+                tooltip: 'Snap delay to previous subtitle',
+                onPressed:
+                    _subtitleCues.isEmpty && _player.platform is! NativePlayer
+                    ? null
+                    : () => unawaited(_snapSubtitleDelay(next: false)),
+                icon: const Icon(Icons.skip_previous_rounded),
+              ),
+              IconButton(
                 onPressed: () {
                   _subDelay -= 50;
                   _subDelayController.value = TextEditingValue(
@@ -1341,6 +2455,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   );
                 },
                 icon: const Icon(Icons.add_circle),
+              ),
+              IconButton(
+                tooltip: 'Snap delay to next subtitle',
+                onPressed:
+                    _subtitleCues.isEmpty && _player.platform is! NativePlayer
+                    ? null
+                    : () => unawaited(_snapSubtitleDelay(next: true)),
+                icon: const Icon(Icons.skip_next_rounded),
               ),
             ],
           ),
@@ -1397,7 +2519,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               onTap: () {
                 Navigator.pop(context);
                 try {
-                  _player.setSubtitleTrack(sub.subtitle!);
+                  unawaited(_setSubtitleTrack(sub.subtitle!));
                 } catch (_) {}
               },
               child: textWidget(title, selected),
@@ -1407,15 +2529,19 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           GestureDetector(
             onTap: () async {
               try {
-                final file = await FilePicker.pickFile();
+                FilePickerResult? result = await FilePicker.pickFiles(
+                  allowMultiple: false,
+                );
 
-                if (file != null && context.mounted) {
-                  _player.setSubtitleTrack(SubtitleTrack.uri(file.path!));
+                if (result != null && context.mounted) {
+                  await _setSubtitleTrack(
+                    SubtitleTrack.uri(result.files.first.path!),
+                  );
                 }
                 if (!context.mounted) return;
                 Navigator.pop(context);
               } catch (e) {
-                botToast(context.l10n.error_with_message(e));
+                botToast("Error: $e");
                 Navigator.pop(context);
               }
             },
@@ -1425,13 +2551,15 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           GestureDetector(
             onTap: () async {
               try {
-                final subtitle = await subtitlesSearchraggableMenu(
-                  context,
-                  chapter: widget.episode,
-                  isLocal: widget.isLocal,
-                ) as ImdbSubtitle?;
+                final subtitle =
+                    await subtitlesSearchraggableMenu(
+                          context,
+                          chapter: widget.episode,
+                          isLocal: widget.isLocal,
+                        )
+                        as ImdbSubtitle?;
                 if (subtitle != null && context.mounted) {
-                  _player.setSubtitleTrack(
+                  await _setSubtitleTrack(
                     SubtitleTrack.uri(
                       subtitle.url!,
                       title: subtitle.language,
@@ -1442,11 +2570,19 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 if (!context.mounted) return;
                 Navigator.pop(context);
               } catch (_) {
-                botToast(context.l10n.error);
+                botToast("Error");
                 Navigator.pop(context);
               }
             },
             child: textWidget(context.l10n.search_subtitles, false),
+          ),
+          const SizedBox(height: 30),
+          GestureDetector(
+            onTap: () {
+              onSearchJimaku();
+              Navigator.pop(context);
+            },
+            child: textWidget('Search Jimaku', false),
           ),
         ],
       ),
@@ -1470,7 +2606,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 audio: AudioTrack.uri(
                   audio.file!,
                   title: audio.label,
-                  language: audio.label,
+                  language: audio.language ?? audio.label,
                 ),
               ),
             );
@@ -1483,11 +2619,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     videoAudio = videoAudio
         .map((e) {
           VideoPrefs vid = e;
-          vid.title =
-              vid.audio?.title ??
-              vid.audio?.language ??
-              vid.audio?.channels ??
-              "";
+          vid.title = audioTrackLabel(vid.audio);
           return vid;
         })
         .toList()
@@ -1499,19 +2631,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
       child: Column(
         children: videoAudio.toSet().toList().map((aud) {
-          final title =
-              aud.title ??
-              aud.audio?.title ??
-              aud.audio?.language ??
-              aud.audio?.channels ??
-              "None";
+          final title = aud.title ?? audioTrackLabel(aud.audio);
           final selected =
               (aud.audio == audio) || (audio.id == "no" && title == "None");
           return GestureDetector(
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
               try {
-                _player.setAudioTrack(aud.audio!);
+                await _setAudioTrack(aud.audio!);
               } catch (_) {}
             },
             child: textWidget(title, selected),
@@ -1519,202 +2646,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         }).toList(),
       ),
     );
-  }
-
-  // d-pad-focusable option data for the TV settings panel — the same track
-  // switching the bottom-sheet widgets do, minus the Navigator.pop (the panel
-  // is not a route). Records: (label, selected, onTap).
-  List<({String label, bool selected, VoidCallback onTap})>
-  _tvQualityOptions() {
-    List<VideoPrefs> videoQuality = _player.state.tracks.video
-        .where(
-          (element) => element.w != null && element.h != null && widget.isLocal,
-        )
-        .toList()
-        .map((e) => VideoPrefs(videoTrack: e, isLocal: true))
-        .toList();
-    if (widget.videos.isNotEmpty && !widget.isLocal) {
-      for (var video in widget.videos) {
-        videoQuality.add(
-          VideoPrefs(
-            videoTrack: VideoTrack(video.url, video.quality, video.quality),
-            headers: video.headers,
-            isLocal: false,
-          ),
-        );
-      }
-    }
-    return videoQuality.map((quality) {
-      final selected =
-          _video.value!.videoTrack!.title == quality.videoTrack!.title ||
-          widget.isLocal;
-      return (
-        label: widget.isLocal ? _firstVid.quality : quality.videoTrack!.title!,
-        selected: selected,
-        onTap: () {
-          if (_video.value?.videoTrack?.id == quality.videoTrack?.id) return;
-          _video.value = quality;
-          _player.stop();
-          if (quality.isLocal) {
-            if (widget.isLocal) {
-              _player.setVideoTrack(quality.videoTrack!);
-            } else {
-              _openMedia(quality);
-            }
-          } else {
-            _openMedia(quality);
-          }
-          _initSubtitleAndAudio = true;
-        },
-      );
-    }).toList();
-  }
-
-  List<({String label, bool selected, VoidCallback onTap})>
-  _tvSubtitleOptions() {
-    List<VideoPrefs> videoSubtitle = _player.state.tracks.subtitle
-        .toList()
-        .map((e) => VideoPrefs(isLocal: true, subtitle: e))
-        .toList();
-    List<String> subs = [];
-    if (widget.videos.isNotEmpty) {
-      for (var video in widget.videos) {
-        for (var sub in video.subtitles ?? []) {
-          if (!subs.contains(sub.file)) {
-            final file = sub.file!;
-            final label = sub.label;
-            videoSubtitle.add(
-              VideoPrefs(
-                isLocal: widget.isLocal,
-                subtitle: (file.startsWith("http") || file.startsWith("file"))
-                    ? SubtitleTrack.uri(file, title: label, language: label)
-                    : SubtitleTrack.data(file, title: label, language: label),
-              ),
-            );
-            subs.add(sub.file!);
-          }
-        }
-      }
-    }
-    final subtitle = _player.state.track.subtitle;
-    videoSubtitle = videoSubtitle
-        .map((e) {
-          e.title =
-              e.subtitle?.title ??
-              e.subtitle?.language ??
-              e.subtitle?.channels ??
-              "";
-          return e;
-        })
-        .toList()
-        .where((element) => element.title!.isNotEmpty)
-        .toList();
-    videoSubtitle.sort((a, b) => a.title!.compareTo(b.title!));
-    videoSubtitle.insert(
-      0,
-      VideoPrefs(isLocal: false, subtitle: SubtitleTrack.no()),
-    );
-    final List<VideoPrefs> last = [];
-    for (var element in videoSubtitle) {
-      final key =
-          element.title ??
-          element.subtitle?.title ??
-          element.subtitle?.language ??
-          element.subtitle?.channels ??
-          "None";
-      final contains = last.any(
-        (sub) =>
-            (sub.title ??
-                sub.subtitle?.title ??
-                sub.subtitle?.language ??
-                sub.subtitle?.channels ??
-                "None") ==
-            key,
-      );
-      if (!contains) last.add(element);
-    }
-    return last.toSet().toList().map((sub) {
-      final title =
-          sub.title ??
-          sub.subtitle?.title ??
-          sub.subtitle?.language ??
-          sub.subtitle?.channels ??
-          "None";
-      final selected =
-          (title ==
-              (subtitle.title ??
-                  subtitle.language ??
-                  subtitle.channels ??
-                  "None")) ||
-          (subtitle.id == "no" && title == "None");
-      return (
-        label: title == "None" ? "Off" : title,
-        selected: selected,
-        onTap: () {
-          try {
-            _player.setSubtitleTrack(sub.subtitle!);
-          } catch (_) {}
-        },
-      );
-    }).toList();
-  }
-
-  List<({String label, bool selected, VoidCallback onTap})> _tvAudioOptions() {
-    List<VideoPrefs> videoAudio = _player.state.tracks.audio
-        .toList()
-        .map((e) => VideoPrefs(isLocal: true, audio: e))
-        .toList();
-    List<String> audios = [];
-    if (widget.videos.isNotEmpty && !widget.isLocal) {
-      for (var video in widget.videos) {
-        for (var audio in video.audios ?? []) {
-          if (!audios.contains(audio.file)) {
-            videoAudio.add(
-              VideoPrefs(
-                isLocal: false,
-                audio: AudioTrack.uri(
-                  audio.file!,
-                  title: audio.label,
-                  language: audio.label,
-                ),
-              ),
-            );
-            audios.add(audio.file!);
-          }
-        }
-      }
-    }
-    final audio = _player.state.track.audio;
-    videoAudio = videoAudio
-        .map((e) {
-          e.title =
-              e.audio?.title ?? e.audio?.language ?? e.audio?.channels ?? "";
-          return e;
-        })
-        .toList()
-        .where((element) => element.title!.isNotEmpty)
-        .toList();
-    videoAudio.sort((a, b) => a.title!.compareTo(b.title!));
-    videoAudio.insert(0, VideoPrefs(isLocal: false, audio: AudioTrack.no()));
-    return videoAudio.toSet().toList().map((aud) {
-      final title =
-          aud.title ??
-          aud.audio?.title ??
-          aud.audio?.language ??
-          aud.audio?.channels ??
-          "None";
-      final selected =
-          (aud.audio == audio) || (audio.id == "no" && title == "None");
-      return (
-        label: title == "None" ? "Off" : title,
-        selected: selected,
-        onTap: () {
-          try {
-            _player.setAudioTrack(aud.audio!);
-          } catch (_) {}
-        },
-      );
-    }).toList();
   }
 
   Future<void> _setPlaybackSpeed(double speed) async {
@@ -1821,233 +2752,118 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
   }
 
-  Widget _tvControls() {
-    return TvPlayerControls(
-      player: _player,
-      revealControls: _revealControls,
-      title: widget.episode.manga.value?.name ?? '',
-      episodeLabel: widget.episode.name ?? '',
-      // Direct pop, not maybePop: the on-screen back arrow always exits the
-      // player, bypassing the PopScope that makes the remote Back hide the
-      // panel first.
-      onBack: () => Navigator.pop(context),
-      onRestart: () => _player.seek(Duration.zero),
-      onSettings: () {
-        // On TV the settings open as the docked side panel; phones/desktop keep
-        // the bottom-sheet menu.
-        if (isTv) {
-          setState(() => _tvSettingsOpen = true);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _tvPanelFocus.requestFocus();
-          });
-        } else {
-          _videoSettingDraggableMenu(context);
-        }
-      },
-      hasNext: hasNextEpisode,
-      onNext: hasNextEpisode
-          ? () => pushToNewEpisode(context, _streamController.getNextEpisode())
-          : null,
-      qualityListenable: _video,
-      buildQualityOptions: _buildTvQualityOptions,
-      speedListenable: _playbackSpeed,
-      onSetSpeed: _setPlaybackSpeed,
-    );
-  }
-
-  // The source video list is the real dub/sub control (entries like "1080p Sub"
-  // / "1080p Dub"); switching re-opens the stream at that source. Mirrors
-  // _videoQualityWidget's selection logic for the TV pill bar.
-  List<TvTrackOption> _buildTvQualityOptions() {
-    if (widget.isLocal || widget.videos.isEmpty) return const <TvTrackOption>[];
-    final currentTitle = _video.value?.videoTrack?.title;
-    return [
-      for (final video in widget.videos)
-        TvTrackOption(
-          label: _shortQuality(video.quality),
-          selected: currentTitle == video.quality,
-          onSelect: () {
-            if (_video.value?.videoTrack?.title == video.quality) return;
-            final prefs = VideoPrefs(
-              videoTrack: VideoTrack(video.url, video.quality, video.quality),
-              headers: video.headers,
-              isLocal: false,
-            );
-            _video.value = prefs;
-            _player.stop();
-            _openMedia(prefs);
-            _initSubtitleAndAudio = true;
-          },
-        ),
-    ];
-  }
-
-  // Shorten a source quality label like "1080p (Sub)" to "1080-sub"/"1080-dub".
-  String _shortQuality(String raw) {
-    final lower = raw.toLowerCase();
-    final res = RegExp(r'(\d{3,4})\s*p?').firstMatch(lower)?.group(1);
-    final tag = lower.contains('sub')
-        ? 'sub'
-        : lower.contains('dub')
-        ? 'dub'
-        : null;
-    if (res != null && tag != null) return '$res-$tag';
-    if (res != null) return '${res}p';
-    return raw;
-  }
-
   Widget _mobileBottomButtonBar(BuildContext context) {
+    return _playerBottomButtonBar(context);
+  }
+
+  Widget _desktopBottomButtonBar(BuildContext context) {
+    return _playerBottomButtonBar(context);
+  }
+
+  Widget _playerBottomButtonBar(BuildContext context) {
+    final isFullScreen = ref.watch(fullscreenProvider);
+    const speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 30),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
+      padding: EdgeInsets.fromLTRB(12, 0, 8, isDesktop ? 4 : 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                _seekToWidget(),
-                _chapterMarkWidget(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true,
-                    child: _buildSettingsButtons(context),
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  if (isDesktop)
+                    CustomMaterialDesktopVolumeButton(controller: _controller),
+                  ValueListenableBuilder<double>(
+                    valueListenable: _playbackSpeed,
+                    builder: (context, speed, _) => PopupMenuButton<double>(
+                      tooltip: 'Playback speed',
+                      onSelected: _setPlaybackSpeed,
+                      itemBuilder: (context) => speeds
+                          .map(
+                            (value) => PopupMenuItem<double>(
+                              value: value,
+                              child: Text('${value}x'),
+                            ),
+                          )
+                          .toList(),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Text(
+                          '${speed}x',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  _chapterMarkWidget(),
+                ],
+              ),
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_subtitleCues.isNotEmpty ||
+                      _player.platform is NativePlayer) ...[
+                    IconButton(
+                      tooltip: 'Snap delay to previous subtitle',
+                      icon: const Icon(Icons.skip_previous_rounded),
+                      color: Colors.white,
+                      onPressed: () =>
+                          unawaited(_snapSubtitleDelay(next: false)),
+                    ),
+                    IconButton(
+                      tooltip: 'Snap delay to next subtitle',
+                      icon: const Icon(Icons.skip_next_rounded),
+                      color: Colors.white,
+                      onPressed: () =>
+                          unawaited(_snapSubtitleDelay(next: true)),
+                    ),
+                  ],
+                  _seekToWidget(),
+                  if (isDesktop && useMpvConfig)
+                    ..._buildMpvSettingsButton(context),
+                  IconButton(
+                    tooltip: 'Aspect ratio',
+                    icon: const Icon(Icons.aspect_ratio_rounded),
+                    color: Colors.white,
+                    onPressed: () => _changeFitLabel(ref),
+                  ),
+                  if (isDesktop)
+                    CustomMaterialDesktopFullscreenButton(
+                      controller: _controller,
+                      desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
+                    )
+                  else
+                    IconButton(
+                      tooltip: isFullScreen ? 'Exit fullscreen' : 'Fullscreen',
+                      icon: Icon(
+                        isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                      ),
+                      color: Colors.white,
+                      onPressed: () {
+                        _setLandscapeMode(!isFullScreen);
+                        ref.read(fullscreenProvider.notifier).state =
+                            !isFullScreen;
+                        widget.desktopFullScreenPlayer(!isFullScreen);
+                      },
+                    ),
+                ],
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _desktopBottomButtonBar(BuildContext context) {
-    final skipDuration = ref.watch(defaultDoubleTapToSkipLengthStateProvider);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    if (_streamController.hasPreviousEpisode)
-                      IconButton(
-                        onPressed: () {
-                          pushToNewEpisode(
-                            context,
-                            _streamController.getPrevEpisode(),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.skip_previous,
-                          color: Colors.white,
-                        ),
-                      ),
-                    CustomPlayOrPauseButton(controller: _controller),
-                    if (hasNextEpisode)
-                      IconButton(
-                        onPressed: () async {
-                          pushToNewEpisode(
-                            context,
-                            _streamController.getNextEpisode(),
-                          );
-                        },
-                        icon: const Icon(Icons.skip_next, color: Colors.white),
-                      ),
-                    SizedBox(
-                      height: 50,
-                      width: 50,
-                      child: IconButton(
-                        onPressed: () async => await _seekBy(-skipDuration),
-                        icon: Stack(
-                          children: [
-                            const Positioned.fill(
-                              child: Icon(
-                                Icons.rotate_left_outlined,
-                                color: Colors.white,
-                                size: 30,
-                              ),
-                            ),
-                            Positioned.fill(
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    skipDuration.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 50,
-                      width: 50,
-                      child: IconButton(
-                        onPressed: () async => await _seekBy(skipDuration),
-                        icon: Stack(
-                          children: [
-                            const Positioned.fill(
-                              child: Icon(
-                                Icons.rotate_right_outlined,
-                                color: Colors.white,
-                                size: 30,
-                              ),
-                            ),
-                            Positioned.fill(
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    skipDuration.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    CustomMaterialDesktopVolumeButton(controller: _controller),
-                    ValueListenableBuilder(
-                      valueListenable: _tempPosition,
-                      builder: (context, value, child) =>
-                          CustomMaterialDesktopPositionIndicator(
-                            delta: value,
-                            controller: _controller,
-                          ),
-                    ),
-                    _chapterMarkWidget(),
-                  ],
-                ),
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                reverse: true,
-                child: _buildSettingsButtons(context),
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -2156,72 +2972,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     ];
   }
 
-  /// helper method for _mobileBottomButtonBar() and _desktopBottomButtonBar()
-  Widget _buildSettingsButtons(BuildContext context) {
-    final isFullscreen = ref.watch(fullscreenProvider);
-    return Row(
-      children: [
-        IconButton(
-          padding: isDesktop ? EdgeInsets.zero : const EdgeInsets.all(5),
-          onPressed: () => _videoSettingDraggableMenu(context),
-          icon: const Icon(Icons.video_settings, color: Colors.white),
-        ),
-        if (useMpvConfig) ..._buildMpvSettingsButton(context),
-        PopupMenuButton<double>(
-          tooltip: '', // Remove default tooltip "Show menu" for consistency
-          icon: const Icon(Icons.speed, color: Colors.white),
-          itemBuilder: (context) =>
-              [0.25, 0.5, 0.75, 1.0, 1.25, 1.50, 1.75, 2.0]
-                  .map(
-                    (speed) => PopupMenuItem<double>(
-                      value: speed,
-                      child: Text("${speed}x"),
-                      onTap: () {
-                        _setPlaybackSpeed(speed);
-                      },
-                    ),
-                  )
-                  .toList(),
-        ),
-        // PiP button stays off. The UIScene crash that originally disabled it
-        // is fixed, but the media_kit fork moved the API; see the note on
-        // pictureInPicture above and closed #757.
-        // if (Platform.isIOS && _controller.isPictureInPictureAvailable())
-        //   IconButton(
-        //     tooltip: 'Picture in Picture',
-        //     icon: const Icon(
-        //       Icons.picture_in_picture_alt,
-        //       color: Colors.white,
-        //     ),
-        //     onPressed: () => _controller.enterPictureInPicture(),
-        //   ),
-        IconButton(
-          icon: const Icon(Icons.fit_screen_outlined, color: Colors.white),
-          onPressed: () async {
-            _changeFitLabel(ref);
-          },
-        ),
-        if (isDesktop)
-          CustomMaterialDesktopFullscreenButton(
-            controller: _controller,
-            desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-          )
-        // A TV is always fullscreen, so the toggle is useless there — hide it.
-        else if (!isTv)
-          IconButton(
-            icon: Icon(isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
-            iconSize: 25,
-            color: Colors.white,
-            onPressed: () {
-              _setLandscapeMode(!isFullscreen);
-              ref.read(fullscreenProvider.notifier).state = !isFullscreen;
-              widget.desktopFullScreenPlayer.call(!isFullscreen);
-            },
-          ),
-      ],
-    );
-  }
-
   Widget _topButtonBar(BuildContext context) {
     final fullScreen = ref.watch(fullscreenProvider);
     return Padding(
@@ -2230,24 +2980,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       ),
       child: Row(
         children: [
-          BackButton(
-            color: Colors.white,
-            onPressed: () {
-              if (isDesktop && fullScreen) {
-                setFullScreen(value: !fullScreen);
-                ref.read(fullscreenProvider.notifier).state = !fullScreen;
-                widget.desktopFullScreenPlayer.call(!fullScreen);
-              } else {
-                restoreSystemUI();
-              }
-              if (mounted) {
-                // Set variable to true, so the player uses the global
-                // "Use Fullscreen" setting again.
-                _firstTime = true;
-                Navigator.pop(context);
-              }
-            },
-          ),
+          BackButton(color: Colors.white, onPressed: _goBackToDetail),
           Flexible(
             child: ListTile(
               dense: true,
@@ -2267,9 +3000,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 child: Text(
                   widget.episode.name!,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: Colors.white.withValues(alpha: 0.7),
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white.withValues(alpha: 0.5),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -2278,34 +3012,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           ),
           Row(
             children: [
-              Consumer(
-                builder: (context, ref, _) {
-                  final autoPlay = ref.watch(autoPlayNextEpisodeProvider);
-                  // Same drawn play/pause switch as the TV player, for a
-                  // consistent autoplay toggle across all players.
-                  return Tooltip(
-                    message: autoPlay
-                        ? 'Autoplay next episode: on'
-                        : 'Autoplay next episode: off',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => ref
-                          .read(autoPlayNextEpisodeProvider.notifier)
-                          .toggle(),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                        child: AutoplaySwitch(
-                          on: autoPlay,
-                          accent: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
               if (_supportAlwaysOnTop())
                 IconButton(
                   icon: Icon(
@@ -2317,6 +3023,62 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                     windowManager.setAlwaysOnTop(_alwaysOnTop);
                   },
                 ),
+              IconButton(
+                tooltip: 'Video OCR',
+                icon: _videoOcrCapturing
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.document_scanner_rounded),
+                color: Colors.white,
+                onPressed: _videoOcrCapturing ? null : _showVideoOcr,
+              ),
+              IconButton(
+                tooltip: _liveVideoOcrEnabled
+                    ? 'Turn off live OCR'
+                    : 'Turn on live OCR',
+                icon: Icon(
+                  _liveVideoOcrEnabled
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_outlined,
+                ),
+                color: _liveVideoOcrEnabled
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.white,
+                onPressed: _videoOcrCapturing ? null : _toggleLiveVideoOcr,
+              ),
+              IconButton(
+                tooltip: 'Subtitle list',
+                icon: const Icon(Icons.format_list_bulleted_rounded),
+                color: Colors.white,
+                onPressed: () {
+                  setState(() => _showSubtitleList = !_showSubtitleList);
+                },
+              ),
+              IconButton(
+                tooltip: context.l10n.video_subtitle,
+                icon: const Icon(Icons.subtitles_rounded),
+                color: Colors.white,
+                onPressed: () =>
+                    _videoSettingDraggableMenu(context, initialIndex: 1),
+              ),
+              IconButton(
+                tooltip: context.l10n.video_audio,
+                icon: const Icon(Icons.audiotrack_rounded),
+                color: Colors.white,
+                onPressed: () =>
+                    _videoSettingDraggableMenu(context, initialIndex: 2),
+              ),
+              IconButton(
+                tooltip: context.l10n.video_quality,
+                icon: const Icon(Icons.high_quality_rounded),
+                color: Colors.white,
+                onPressed: () => _videoSettingDraggableMenu(context),
+              ),
               btnToShowChapterListDialog(
                 context,
                 context.l10n.episodes,
@@ -2362,6 +3124,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     }
   }
 
+  Widget _primaryButtonBar(BuildContext context) {
+    return ChimahonPrimaryControls(
+      controller: _controller,
+      hasPrevious: _streamController.hasPreviousEpisode,
+      hasNext: _streamController.hasNextEpisode,
+      onPrevious: () =>
+          pushToNewEpisode(context, _streamController.getPrevEpisode()),
+      onNext: () =>
+          pushToNewEpisode(context, _streamController.getNextEpisode()),
+    );
+  }
+
   Widget _videoPlayer(BuildContext context) {
     final fit = _fit.value;
     _resize(fit);
@@ -2369,165 +3143,274 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     final enableAutoSkip = ref.read(enableAutoSkipStateProvider);
     final aniSkipTimeoutLength = ref.read(aniSkipTimeoutLengthStateProvider);
     final skipIntroLength = ref.read(defaultSkipIntroLengthStateProvider);
-    final splitSettings = isTv && _tvSettingsOpen;
-    final Widget player = Stack(
-      children: [
-        Video(
-          pip: const PipConfig(autoEnter: true),
-          subtitleViewConfiguration: SubtitleViewConfiguration(
-            visible: false,
-            style: subtileTextStyle(ref),
-          ),
-          // Docked in the split view, always contain so the whole frame shows
-          // at its true aspect ratio rather than cropping to the narrower slot.
-          fit: splitSettings ? BoxFit.contain : fit,
-          key: _key,
-          controls: (state) => (isTv && ref.read(tvPlayerStyleProvider))
-              ? (_tvSettingsOpen ? const SizedBox.shrink() : _tvControls())
-              : (isDesktop || isTv)
-              ? DesktopControllerWidget(
-                  videoController: _controller,
-                  topButtonBarWidget: _topButtonBar(context),
-                  videoStatekey: _key,
-                  bottomButtonBarWidget: _desktopBottomButtonBar(context),
-                  streamController: _streamController,
-                  seekToWidget: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    child: Row(children: [_seekToWidget()]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _linuxVideoViewport = (
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+        );
+        _scheduleLinuxVideoOutputResize();
+        return Listener(
+          onPointerDown: _handleVideoOcrGestureDown,
+          onPointerMove: _handleVideoOcrGestureMove,
+          onPointerUp: _handleVideoOcrGestureUp,
+          onPointerCancel: _handleVideoOcrGestureCancel,
+          child: Stack(
+            children: [
+              if (_videoTextureVisible)
+                Video(
+                  subtitleViewConfiguration: SubtitleViewConfiguration(
+                    visible: false,
+                    style: subtileTextStyle(ref),
                   ),
-                  tempDuration: (value) {
-                    _tempPosition.value = value;
-                  },
-                  doubleSpeed: (value) {
-                    _isDoubleSpeed.value = value ?? false;
-                  },
-                  defaultSkipIntroLength: skipIntroLength,
-                  desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-                  chapterMarks: _chapterMarks,
-                  revealControls: _revealControls,
+                  fit: fit,
+                  key: _key,
+                  controls: (state) => isDesktop
+                      ? DesktopControllerWidget(
+                          videoController: _controller,
+                          topButtonBarWidget: _topButtonBar(context),
+                          primaryButtonBarWidget: _primaryButtonBar(context),
+                          bottomButtonBarWidget: _desktopBottomButtonBar(
+                            context,
+                          ),
+                          tempDuration: (value) {
+                            _tempPosition.value = value;
+                          },
+                          doubleSpeed: (value) {
+                            _isDoubleSpeed.value = value ?? false;
+                          },
+                          defaultSkipIntroLength: skipIntroLength,
+                          desktopFullScreenPlayer:
+                              widget.desktopFullScreenPlayer,
+                          chapterMarks: _chapterMarks,
+                          subtitleMiningContextBuilder: _subtitleMiningContext,
+                          videoOcrActive: _videoOcrBytes != null,
+                          onVideoOcrShortcut: _handleVideoOcrShortcut,
+                        )
+                      : MobileControllerWidget(
+                          videoController: _controller,
+                          topButtonBarWidget: _topButtonBar(context),
+                          primaryButtonBarWidget: _primaryButtonBar(context),
+                          bottomButtonBarWidget: _mobileBottomButtonBar(
+                            context,
+                          ),
+                          doubleSpeed: (value) {
+                            _isDoubleSpeed.value = value ?? false;
+                          },
+                          chapterMarks: _chapterMarks,
+                          subtitleMiningContextBuilder: _subtitleMiningContext,
+                        ),
+                  controller: _controller,
+                  width: context.width(1),
+                  height: context.height(1),
+                  resumeUponEnteringForegroundMode: true,
                 )
-              : MobileControllerWidget(
-                  videoController: _controller,
-                  topButtonBarWidget: _topButtonBar(context),
-                  videoStatekey: _key,
-                  bottomButtonBarWidget: _mobileBottomButtonBar(context),
-                  streamController: _streamController,
-                  revealControls: _revealControls,
-                  doubleSpeed: (value) {
-                    _isDoubleSpeed.value = value ?? false;
-                  },
-                  chapterMarks: _chapterMarks,
-                ),
-          controller: _controller,
-          // When docked left for the settings panel, fill the (narrower) slot
-          // the Row gives us rather than forcing full-screen width.
-          width: splitSettings ? null : context.width(1),
-          height: splitSettings ? null : context.height(1),
-          resumeUponEnteringForegroundMode: true,
-        ),
-        Stack(
-          alignment: AlignmentDirectional.center,
-          children: [
-            Positioned(
-              top: 30,
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _isDoubleSpeed,
-                builder: (context, snapshot, _) {
-                  return Text.rich(
-                    textAlign: TextAlign.center,
-                    TextSpan(
-                      style: TextStyle(
-                        background: Paint()
-                          ..color = Theme.of(context).scaffoldBackgroundColor
-                          ..strokeWidth = 30.0
-                          ..strokeJoin = StrokeJoin.round
-                          ..style = PaintingStyle.stroke,
-                      ),
-                      children: snapshot
-                          ? [
-                              TextSpan(
-                                text: " 2X ",
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: Icon(Icons.fast_forward),
-                              ),
-                            ]
-                          : [],
+              else
+                const SizedBox.expand(),
+              Stack(
+                alignment: AlignmentDirectional.center,
+                children: [
+                  Positioned(
+                    top: 30,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _isDoubleSpeed,
+                      builder: (context, snapshot, _) {
+                        return Text.rich(
+                          textAlign: TextAlign.center,
+                          TextSpan(
+                            style: TextStyle(
+                              background: Paint()
+                                ..color = Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor
+                                ..strokeWidth = 30.0
+                                ..strokeJoin = StrokeJoin.round
+                                ..style = PaintingStyle.stroke,
+                            ),
+                            children: snapshot
+                                ? [
+                                    TextSpan(
+                                      text: " 2X ",
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    WidgetSpan(
+                                      alignment: PlaceholderAlignment.middle,
+                                      child: Icon(Icons.fast_forward),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        if (enableAniSkip && (_hasOpeningSkip || _hasEndingSkip))
-          Positioned(
-            right: 0,
-            bottom: 80,
-            child: ValueListenableBuilder<_AniSkipPhase>(
-              valueListenable: _skipPhase,
-              builder: (context, phase, _) {
-                if (phase == _AniSkipPhase.none) return const SizedBox.shrink();
-                final isOpening = phase == _AniSkipPhase.opening;
-                final result = isOpening ? _openingResult! : _endingResult!;
-                return AniSkipCountDownButton(
-                  key: Key(isOpening ? 'skip_opening' : 'skip_ending'),
-                  active: true,
-                  autoSkip: enableAutoSkip,
-                  timeoutLength: aniSkipTimeoutLength,
-                  skipTypeText: isOpening
-                      ? context.l10n.skip_opening
-                      : context.l10n.skip_ending,
-                  player: _player,
-                  aniSkipResult: result,
-                );
-              },
-            ),
+              if (enableAniSkip && (_hasOpeningSkip || _hasEndingSkip))
+                Positioned(
+                  right: 0,
+                  bottom: 80,
+                  child: ValueListenableBuilder<_AniSkipPhase>(
+                    valueListenable: _skipPhase,
+                    builder: (context, phase, _) {
+                      if (phase == _AniSkipPhase.none) {
+                        return const SizedBox.shrink();
+                      }
+                      final isOpening = phase == _AniSkipPhase.opening;
+                      final result = isOpening
+                          ? _openingResult!
+                          : _endingResult!;
+                      return AniSkipCountDownButton(
+                        key: Key(isOpening ? 'skip_opening' : 'skip_ending'),
+                        active: true,
+                        autoSkip: enableAutoSkip,
+                        timeoutLength: aniSkipTimeoutLength,
+                        skipTypeText: isOpening
+                            ? context.l10n.skip_opening
+                            : context.l10n.skip_ending,
+                        player: _player,
+                        aniSkipResult: result,
+                      );
+                    },
+                  ),
+                ),
+              if (_showSubtitleList)
+                AnimeSubtitleListPanel(
+                  cues: _subtitleCues,
+                  position: _currentPosition,
+                  subtitleDelayMs: _subDelay,
+                  onSelect: (cue) {
+                    unawaited(
+                      _player.seek(
+                        subtitleCuePlaybackTime(
+                          cue,
+                          subtitleDelayMs: _subDelay,
+                        ),
+                      ),
+                    );
+                  },
+                  onDismiss: () => setState(() => _showSubtitleList = false),
+                ),
+              if (_videoOcrBytes case final imageBytes?)
+                VideoOcrOverlay(
+                  imageBytes: imageBytes,
+                  imagePosition: _videoOcrPosition,
+                  fit: fit,
+                  miningContextBuilder: (text, bytes, position) =>
+                      _subtitleMiningContext(
+                        text,
+                        frozenImageBytes: bytes,
+                        frozenPosition: position,
+                        ocrTiming: true,
+                      ),
+                  onDismiss: _dismissVideoOcr,
+                ),
+              if (_liveVideoOcrEnabled && _videoOcrBytes == null)
+                LiveVideoOcrOverlay(
+                  imageBytesLoader: _captureLiveVideoOcrFrame,
+                  fit: fit,
+                  miningContextBuilder: (text, bytes, position) =>
+                      _subtitleMiningContext(
+                        text,
+                        frozenImageBytes: bytes,
+                        frozenPosition: position,
+                        ocrTiming: true,
+                      ),
+                  onDismiss: () {
+                    DictionaryLookupPopup.dismissActive();
+                    setState(() => _liveVideoOcrEnabled = false);
+                    unawaited(MiningPreferences.setLiveVideoOcrEnabled(false));
+                  },
+                ),
+            ],
           ),
-      ],
+        );
+      },
     );
-    if (!splitSettings) return player;
-    // YouTube-style split: video docks left (a single focusable unit — Left
-    // from the panel focuses it, Select toggles play/pause), a gap, then the
-    // settings panel on the right.
-    final accent = Theme.of(context).colorScheme.primary;
-    return ColoredBox(
-      color: Colors.black,
-      child: Row(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: TvVideoFocusFrame(
-                accent: accent,
-                player: _player,
-                focusNode: _tvVideoFocus,
-                onSelect: () => _player.playOrPause(),
-                onExitRight: () => _tvPanelFocus.requestFocus(),
-                child: player,
-              ),
-            ),
-          ),
-          TvPlayerSettingsPanel(
-            player: _player,
-            speedListenable: _playbackSpeed,
-            onSetSpeed: _setPlaybackSpeed,
-            selectedShaderListenable: _selectedShader,
-            qualityOptions: _tvQualityOptions,
-            subtitleOptions: _tvSubtitleOptions,
-            audioOptions: _tvAudioOptions,
-            headerFocusNode: _tvPanelFocus,
-            onExitLeft: () => _tvVideoFocus.requestFocus(),
-            onClose: () => setState(() => _tvSettingsOpen = false),
-          ),
-        ],
-      ),
-    );
+  }
+
+  void _scheduleLinuxVideoOutputResize() {
+    if (!Platform.isLinux ||
+        _linuxVideoResizeScheduled ||
+        _linuxVideoViewport == null) {
+      return;
+    }
+    _linuxVideoResizeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _linuxVideoResizeScheduled = false;
+      if (!mounted) return;
+      final viewport = _linuxVideoViewport;
+      if (viewport == null) return;
+      final outputSize = linuxVideoOutputSize(
+        logicalWidth: viewport.width,
+        logicalHeight: viewport.height,
+        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+      if (outputSize == null || outputSize == _linuxVideoOutputSize) return;
+      try {
+        await _controller.setSize(
+          width: outputSize.width,
+          height: outputSize.height,
+        );
+        _linuxVideoOutputSize = outputSize;
+      } catch (error, stackTrace) {
+        AppLogger.log(
+          'Failed to resize Linux video output: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      }
+    });
+  }
+
+  void _handleVideoOcrGestureDown(PointerDownEvent event) {
+    if (isDesktop) return;
+    _videoOcrGesturePointers.add(event.pointer);
+    _videoOcrGestureStarts[event.pointer] = event.position;
+    if (_videoOcrGesturePointers.length == 2) {
+      _videoOcrGestureStartedAt = DateTime.now();
+      _videoOcrGestureCandidate = true;
+    } else if (_videoOcrGesturePointers.length > 2) {
+      _videoOcrGestureCandidate = false;
+    }
+  }
+
+  void _handleVideoOcrGestureMove(PointerMoveEvent event) {
+    if (!_videoOcrGestureCandidate) return;
+    final start = _videoOcrGestureStarts[event.pointer];
+    if (start != null && (event.position - start).distance > 24) {
+      _videoOcrGestureCandidate = false;
+    }
+  }
+
+  void _handleVideoOcrGestureUp(PointerUpEvent event) {
+    final shouldToggle =
+        _videoOcrGestureCandidate &&
+        _videoOcrGesturePointers.length == 2 &&
+        _videoOcrGestureStartedAt != null &&
+        DateTime.now().difference(_videoOcrGestureStartedAt!) <=
+            const Duration(milliseconds: 350);
+    _videoOcrGesturePointers.remove(event.pointer);
+    _videoOcrGestureStarts.remove(event.pointer);
+    if (shouldToggle) {
+      _videoOcrGestureCandidate = false;
+      unawaited(_handleVideoOcrShortcut());
+    }
+    if (_videoOcrGesturePointers.isEmpty) {
+      _videoOcrGestureCandidate = false;
+      _videoOcrGestureStartedAt = null;
+    }
+  }
+
+  void _handleVideoOcrGestureCancel(PointerCancelEvent event) {
+    _videoOcrGesturePointers.remove(event.pointer);
+    _videoOcrGestureStarts.remove(event.pointer);
+    _videoOcrGestureCandidate = false;
+    if (_videoOcrGesturePointers.isEmpty) {
+      _videoOcrGestureStartedAt = null;
+    }
   }
 
   Widget btnToShowShareScreenshot(
@@ -2604,17 +3487,62 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                                 format: "image/png",
                                 includeLibassSubtitles: _includeSubtitles,
                               );
-                              if (!context.mounted) return;
-                              final confirmed = await confirmUseAsMangaCover(
-                                context,
-                              );
-                              if (!confirmed || !context.mounted) return;
-                              await applyMangaCover(
-                                context,
-                                episode.manga.value!,
-                                imageBytes,
-                              );
-                              if (context.mounted) Navigator.pop(context);
+                              if (context.mounted) {
+                                final res = await showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return AlertDialog(
+                                      content: Text(
+                                        context.l10n.use_this_as_cover_art,
+                                      ),
+                                      actions: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                              },
+                                              child: Text(context.l10n.cancel),
+                                            ),
+                                            const SizedBox(width: 15),
+                                            TextButton(
+                                              onPressed: () {
+                                                final manga =
+                                                    episode.manga.value!;
+                                                isar.writeTxnSync(() {
+                                                  isar.mangas.putSync(
+                                                    manga
+                                                      ..updatedAt = DateTime.now()
+                                                          .millisecondsSinceEpoch
+                                                      ..customCoverImage =
+                                                          imageBytes
+                                                              ?.getCoverImage,
+                                                  );
+                                                });
+                                                if (context.mounted) {
+                                                  Navigator.pop(context, "ok");
+                                                }
+                                              },
+                                              child: Text(context.l10n.ok),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (res != null &&
+                                    res == "ok" &&
+                                    context.mounted) {
+                                  Navigator.pop(context);
+                                  botToast(
+                                    context.l10n.cover_updated,
+                                    second: 3,
+                                  );
+                                }
+                              }
                             },
                           ),
                           button(
@@ -2692,11 +3620,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   @override
   Widget build(BuildContext context) {
     final body = _videoPlayer(context);
-    // Desktop already gets player keyboard shortcuts through media_kit's
-    // DesktopControllerWidget. On mobile / Android TV the controls have none,
-    // so wrap the player so a physical keyboard or TV remote can drive
-    // playback too. See #668 / #729.
-    return Scaffold(body: isDesktop ? body : _wrapWithPlayerShortcuts(body));
+    final shortcutBody = isDesktop ? body : _wrapWithPlayerShortcuts(body);
+    return DesktopBackNavigationScope(
+      onBack: _handleEscape,
+      child: Scaffold(body: shortcutBody),
+    );
   }
 
   /// Maps keyboard and TV-remote keys to player actions for non-desktop
@@ -2742,46 +3670,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           }
         },
       },
-      child: MouseRegion(
-        // Desktop debugging: a mouse has no d-pad, so let hover and clicks
-        // reveal the auto-hiding controls (bumping the same notifier the remote
-        // does). No-op on a TV, which sends no pointer-hover events.
-        onEnter: (_) => _revealControls.value++,
-        onHover: (_) => _revealControls.value++,
-        child: Listener(
-          // Reveal on a mouse click (desktop), but NOT on touch. On a touch
-          // device the mobile controls handle tap-to-toggle themselves, so
-          // revealing here on finger-down makes the following tap immediately
-          // hide them again (controls flash and vanish in under a second).
-          onPointerDown: (event) {
-            if (event.kind == PointerDeviceKind.mouse) _revealControls.value++;
-          },
-          child: Focus(autofocus: true, onKeyEvent: _onPlayerKey, child: child),
-        ),
-      ),
+      child: Focus(autofocus: true, child: child),
     );
-  }
-
-  // On a TV remote / keyboard, reveal the on-screen controls when the user
-  // presses the d-pad. The arrow keys stay unbound above (so they still drive
-  // focus traversal between the control buttons) — we just bump [_revealControls]
-  // so the controls become visible and the focus is on something the user can
-  // see. Returns ignored so traversal + the media shortcuts still run.
-  KeyEventResult _onPlayerKey(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent || event is KeyRepeatEvent) {
-      final k = event.logicalKey;
-      final isNav =
-          k == LogicalKeyboardKey.arrowUp ||
-          k == LogicalKeyboardKey.arrowDown ||
-          k == LogicalKeyboardKey.arrowLeft ||
-          k == LogicalKeyboardKey.arrowRight ||
-          k == LogicalKeyboardKey.select ||
-          k == LogicalKeyboardKey.enter ||
-          k == LogicalKeyboardKey.numpadEnter ||
-          k == LogicalKeyboardKey.gameButtonA;
-      if (isNav) _revealControls.value++;
-    }
-    return KeyEventResult.ignored;
   }
 }
 
@@ -2809,6 +3699,22 @@ Widget seekIndicatorTextWidget(Duration duration, Duration currentPosition) {
       ),
     ],
   );
+}
+
+Duration? _durationFromSeconds(String? value) {
+  final seconds = double.tryParse(value ?? '');
+  if (seconds == null || !seconds.isFinite || seconds < 0) return null;
+  return Duration(
+    microseconds: (seconds * Duration.microsecondsPerSecond).round(),
+  );
+}
+
+bool _booleanProperty(String? value, {required bool fallback}) {
+  return switch (value?.trim().toLowerCase()) {
+    'yes' || 'true' || '1' => true,
+    'no' || 'false' || '0' => false,
+    _ => fallback,
+  };
 }
 
 class VideoPrefs {

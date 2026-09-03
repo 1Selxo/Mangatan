@@ -1,48 +1,49 @@
-import 'dart:async';
+import 'dart:convert';
 
 import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/repositories/source_preference_repository.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
 import 'package:mangayomi/services/get_source_preference.dart';
+import 'package:mangayomi/services/mihon_source_preferences.dart';
 
 import 'package:mangayomi/eval/aidoku/aidoku_ext_dart.dart' as aidoku;
+import 'dart:async';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
 
 void setPreferenceSetting(SourcePreference sourcePreference, Source source) {
-  final sourcePref = sourcePreferenceRepository.findByKey(
-    source.id,
-    sourcePreference.key,
-  );
-  unawaited(
-    sourcePreferenceRepository
-        .save(sourcePreference, source, sourcePref)
-        .catchError((_) {}),
-  );
-
-  if (source.sourceCodeLanguage == SourceCodeLanguage.aidoku &&
-      sourcePreference.key != null) {
-    final key = sourcePreference.key!;
-    dynamic val;
-    if (sourcePreference.listPreference != null) {
-      final p = sourcePreference.listPreference!;
-      val = (p.entryValues != null &&
-              p.valueIndex != null &&
-              p.valueIndex! < p.entryValues!.length)
-          ? p.entryValues![p.valueIndex!]
-          : p.valueIndex;
-    } else if (sourcePreference.checkBoxPreference != null) {
-      val = sourcePreference.checkBoxPreference!.value;
-    } else if (sourcePreference.switchPreferenceCompat != null) {
-      val = sourcePreference.switchPreferenceCompat!.value;
-    } else if (sourcePreference.multiSelectListPreference != null) {
-      val = sourcePreference.multiSelectListPreference!.values;
-    } else if (sourcePreference.editTextPreference != null) {
-      val = sourcePreference.editTextPreference!.value;
+  final sourcePref = isar.sourcePreferences
+      .filter()
+      .sourceIdEqualTo(source.id)
+      .keyEqualTo(sourcePreference.key)
+      .findFirstSync();
+  isar.writeTxnSync(() {
+    if (source.sourceCodeLanguage == SourceCodeLanguage.mihon &&
+        source.preferenceList != null) {
+      final prefs = decodeMihonSourcePreferences(source.preferenceList);
+      final idx = prefs.indexWhere((e) => e.key == sourcePreference.key);
+      if (idx != -1) {
+        prefs[idx] = SourcePreference.fromJson(sourcePreference.toJson())
+          ..id = null;
+        isar.sources.putSync(
+          source
+            ..preferenceList = jsonEncode(
+              prefs.map((e) => e.toJson()).toList(),
+            ),
+        );
+      }
     }
-    if (val != null) {
-      aidoku.SettingsStore.shared.setValue(key, val);
+    if (sourcePref != null) {
+      isar.sourcePreferences.putSync(
+        sourcePreference
+          ..id = sourcePref.id
+          ..sourceId = source.id,
+      );
+    } else {
+      isar.sourcePreferences.putSync(sourcePreference..sourceId = source.id);
     }
-  }
+  });
 }
 
 dynamic getPreferenceValue(int sourceId, String key) {
@@ -50,7 +51,11 @@ dynamic getPreferenceValue(int sourceId, String key) {
 
   if (sourcePreference.listPreference != null) {
     final pref = sourcePreference.listPreference!;
-    return pref.entryValues![pref.valueIndex!];
+    final index = pref.valueIndex;
+    final values = pref.entryValues ?? const <String>[];
+    return index != null && index >= 0 && index < values.length
+        ? values[index]
+        : null;
   } else if (sourcePreference.checkBoxPreference != null) {
     return sourcePreference.checkBoxPreference!.value;
   } else if (sourcePreference.switchPreferenceCompat != null) {
@@ -94,13 +99,21 @@ String getSourcePreferenceStringValue(
 }
 
 void setSourcePreferenceStringValue(int sourceId, String key, String value) {
-  final sourcePref = sourcePreferenceRepository.findStringValueByKey(
-    sourceId,
-    key,
-  );
-  unawaited(
-    sourcePreferenceRepository
-        .saveStringValue(sourceId, key, value, sourcePref)
-        .catchError((_) {}),
-  );
+  final sourcePref = isar.sourcePreferenceStringValues
+      .filter()
+      .sourceIdEqualTo(sourceId)
+      .keyEqualTo(key)
+      .findFirstSync();
+  isar.writeTxnSync(() {
+    if (sourcePref != null) {
+      isar.sourcePreferenceStringValues.putSync(sourcePref..value = value);
+    } else {
+      isar.sourcePreferenceStringValues.putSync(
+        SourcePreferenceStringValue()
+          ..key = key
+          ..sourceId = sourceId
+          ..value = value,
+      );
+    }
+  });
 }

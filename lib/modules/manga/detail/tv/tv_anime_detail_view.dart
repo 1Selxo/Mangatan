@@ -20,6 +20,10 @@ import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/utils.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/history.dart';
+import 'package:mangayomi/models/track_preference.dart';
 
 /// TV-only, d-pad-first anime detail. Equal split, screen-padded: the hero
 /// (cover, title, meta, synopsis) and a vertical list of actions on the left,
@@ -274,9 +278,13 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
 
   void _toggleLibrary() {
     final model = manga;
-    model.favorite = !(model.favorite ?? false);
-    model.dateAdded = model.favorite! ? DateTime.now().millisecondsSinceEpoch : 0;
-    mangaRepository.save(model);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    isar.writeTxnSync(() {
+      model.updateFavorite(!(model.favorite ?? false));
+      model.dateAdded = model.favorite! ? now : 0;
+      model.updatedAt = now;
+      isar.mangas.putSync(model);
+    });
     setState(() {});
   }
 

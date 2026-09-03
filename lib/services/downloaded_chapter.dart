@@ -1,12 +1,15 @@
 import 'dart:io';
 
 import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
+import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/repositories/download_repository.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/downloaded_page_file.dart';
 import 'package:path/path.dart' as p;
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 
 /// Where a downloaded chapter's pages actually sit on disk.
 ///
@@ -49,9 +52,9 @@ Future<List<Directory>> downloadedMangaDirectories(Chapter chapter) async {
 
   final mangaName = chapter.manga.value?.name;
   if (mangaName == null) return directories;
-  for (final folder in await getAllLocalFolders()) {
-    final folderPath = folder.path;
-    if (folderPath == null || folderPath.isEmpty) continue;
+  for (final folderPath
+      in isar.settings.getSync(227)?.localFolders ?? const <String>[]) {
+    if (folderPath.isEmpty) continue;
     directories.add(
       Directory(p.join(folderPath, mangaName.replaceForbiddenCharacters('_'))),
     );

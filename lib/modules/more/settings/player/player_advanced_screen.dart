@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/player/widgets/mpv_config_editor.dart';
+import 'package:mangayomi/modules/more/settings/player/widgets/player_hotkey_editor.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
@@ -54,9 +56,48 @@ class _PlayerAdvancedScreenState extends ConsumerState<PlayerAdvancedScreen> {
                 style: TextStyle(fontSize: 11, color: context.secondaryColor),
               ),
             ),
+            ListTile(
+              leading: const Icon(Icons.tune),
+              title: const Text('Edit mpv.conf'),
+              subtitle: const Text(
+                'Edit MPV options directly. Changes apply to newly opened players.',
+              ),
+              onTap: () => _openMpvConfigEditor(context, 'mpv.conf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.keyboard),
+              title: const Text('Customize player hotkeys'),
+              subtitle: const Text(
+                'Add, change, remove, or restore desktop player keyboard shortcuts.',
+              ),
+              onTap: () => showPlayerHotkeyEditor(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('Edit input.conf'),
+              subtitle: const Text(
+                'Advanced: edit raw MPV keyboard and remote bindings.',
+              ),
+              onTap: () => _openMpvConfigEditor(context, 'input.conf'),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openMpvConfigEditor(
+    BuildContext context,
+    String fileName,
+  ) async {
+    final provider = StorageProvider();
+    if (!await provider.requestPermission()) return;
+    final directory = await provider.getMpvDirectory();
+    if (directory == null || !context.mounted) return;
+    await showMpvConfigEditor(
+      context: context,
+      directory: directory,
+      fileName: fileName,
     );
   }
 

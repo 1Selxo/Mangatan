@@ -9,15 +9,15 @@
   "import": "Importer",
   "filter": "Filtre",
   "ignore_filters": "Ignorer les filtres",
-  "downloaded": "Téléchargé",
+  "downloaded": "Téléchargés",
   "unread": "Non lus",
   "started": "Commencé",
-  "bookmarked": "Signets",
+  "bookmarked": "Ajoutés aux favoris",
   "sort": "Trier",
   "alphabetically": "Alphabétiquement",
-  "last_read": "Dernier lu",
+  "last_read": "Dernière lecture",
   "last_update_check": "Dernière mise à jour",
-  "last_entry_delete_warning": "{count, plural, =1{Tu es en train de supprimer le seul {entryType} de ce {mediaType} de ta bibliothèque.} other{Tu es en train de supprimer les {count} {entryTypePlural} de ce {mediaType} de ta bibliothèque.}}\nÇa va aussi supprimer tout le {mediaType} de ta bibliothèque.\n\nNote : Les fichiers ne seront pas supprimés.",
+  "last_entry_delete_warning": "{count, plural, =1{Vous êtes sur le point de supprimer le seul {entryType} de ce {mediaType} de votre bibliothèque.} other{Vous êtes sur le point de supprimer les {count} {entryTypePlural} de ce {mediaType} de votre bibliothèque.}}\nCela supprimera également tout le {mediaType} de votre bibliothèque.\n\nRemarque : les fichiers eux-mêmes ne seront pas supprimés.",
   "@last_entry_delete_warning": {
     "placeholders": {
       "count": {},
@@ -28,9 +28,9 @@
   },
   "chapter": "chapitre",
   "episode": "épisode",
-  "unread_count": "Nombre de non-lus",
+  "unread_count": "Nombre d'éléments non lus",
   "latest_chapter": "Dernier chapitre",
-  "date_added": "Date ajoutée",
+  "date_added": "Date d'ajout",
   "display": "Affichage",
   "display_mode": "Mode d'affichage",
   "compact_grid": "Grille compacte",
@@ -45,22 +45,22 @@
   "show_category_tabs": "Afficher les onglets des catégories",
   "show_numbers_of_items": "Afficher le nombre d’entrées",
   "other": "Autre",
-  "show_continue_reading_buttons": "Afficher le bouton Continuer la lecture",
+  "show_continue_reading_buttons": "Afficher les boutons pour continuer la lecture",
   "empty_library": "Votre bibliothèque est vide",
   "search": "Rechercher...",
-  "no_recent_updates": "Aucune mise à jour disponible",
+  "no_recent_updates": "Aucune mise à jour récente",
   "remove_everything": "Tout retirer",
   "remove_everything_msg": "Êtes-vous sûr(e) ? Tout l'historique sera effacé.",
   "ok": "OK",
   "cancel": "Annuler",
   "remove": "Supprimer",
-  "remove_history_msg": "Ceci enlèvera la date de lecture de ce chapitre. Êtes-vous sûr(e) ?",
-  "last_used": "Dernière utilisée",
+  "remove_history_msg": "La date de lecture de ce chapitre sera supprimée. Êtes-vous sûr ?",
+  "last_used": "Dernier usage",
   "pinned": "Épinglé",
   "sources": "Sources",
   "install": "Installer",
   "update": "Mettre à jour",
-  "latest": "Récents",
+  "latest": "Nouveautés",
   "extensions": "Extensions",
   "migrate": "Migrer",
   "incognito_mode": "Mode navigation privée",
@@ -78,8 +78,8 @@
   "name": "Nom",
   "category_name_required": "*obligatoire",
   "add_category_error_exist": "Une catégorie avec ce nom existe déjà !",
-  "delete_category": "Effacer catégorie",
-  "delete_category_msg": "Souhaitez-vous supprimer la catégorie {name}?",
+  "delete_category": "Supprimer la catégorie",
+  "delete_category_msg": "Souhaitez-vous supprimer la catégorie {name} ?",
   "rename_category": "Renommer la catégorie",
   "general": "Général",
   "general_subtitle": "Langue de l'application",
@@ -89,7 +89,7 @@
   "theme": "Thème",
   "dark_mode": "Mode sombre",
   "on": "Activé",
-  "off": "Desactivé",
+  "off": "Désactivé",
   "pure_black_dark_mode": "Mode noir pur",
   "timestamp": "Horodatage",
   "relative_timestamp": "Horodatages relatifs",
@@ -273,7 +273,7 @@
   "weekly": "Chaque semaine",
   "restore_backup_warning_title": "La restauration d'une sauvegarde écrasera toutes les données existantes.\n\nContinuer la restauration ?",
   "services": "Services",
-  "tracking_warning_info": "Synchronisation à sens unique pour mettre à jour la progression du chapitre dans les services de suivi. Configurez le suivi des entrées individuelles à partir de leur boutton de suivi.",
+  "tracking_warning_info": "Synchronisation à sens unique pour mettre à jour la progression des chapitres dans les services de suivi. Configurez le suivi de chaque entrée depuis son bouton de suivi.",
   "use_page_tap_zones": "Utiliser les zones tactiles",
   "manage_trackers": "Gérer les suivis",
   "restore": "Restaurer",
@@ -284,21 +284,21 @@
   "auto_scroll": "Défilement automatique",
   "video_audio": "Audio",
   "player": "Lecteur",
-  "markEpisodeAsSeenSetting": "À quel moment marquer l'épisode comme vu",
+  "markEpisodeAsSeenSetting": "À partir de quel moment marquer l'épisode comme vu ?",
   "default_skip_intro_length": "Longueur par défaut du passage de l'intro",
-  "default_playback_speed_length": "Longueur par défaut de la vitesse de lecture",
-  "updateProgressAfterReading": "Synchroniser la progression après lecture",
+  "default_playback_speed_length": "Vitesse de lecture par défaut",
+  "updateProgressAfterReading": "Mettre à jour la progression après la lecture",
   "no_sources_installed": "Aucune source installée !",
   "show_extensions": "Afficher les extensions",
   "default_skip_forward_skip_length": "Longueur de saut par défaut",
-  "aniskip_requires_info": "AniSkip nécessite que l'anime soit suivi sur MAL ou Anilist pour fonctionner.",
+  "aniskip_requires_info": "AniSkip nécessite que l'anime soit suivi sur MAL ou AniList pour fonctionner.",
   "enable_aniskip": "Activer AniSkip",
   "enable_auto_skip": "Activer le saut automatique",
   "aniskip_button_timeout": "Délai du bouton",
-  "skip_opening": "Passer l'opening",
-  "skip_ending": "Passer l'ending",
+  "skip_opening": "Passer l'intro",
+  "skip_ending": "Passer l'outro",
   "update_library": "Mettre à jour la bibliothèque",
-  "updating_library": "Mise à jour de la bibliothèque ({cur} / {max}) - Échec: {failed}",
+  "updating_library": "Mise à jour de la bibliothèque ({cur} / {max}) - Échecs : {failed}",
   "next_chapter": "Chapitre suivant",
   "next_5_chapters": "5 chapitres suivants",
   "next_10_chapters": "10 chapitres suivants",
@@ -313,14 +313,14 @@
   "blend_mode_multiply": "Multiplier",
   "blend_mode_screen": "Écran",
   "blend_mode_overlay": "Incrustation",
-  "blend_mode_colorDodge": "Densité Couleur",
+  "blend_mode_colorDodge": "Densité couleur -",
   "blend_mode_lighten": "Éclaircir",
-  "blend_mode_colorBurn": "Incandescence",
+  "blend_mode_colorBurn": "Densité couleur +",
   "blend_mode_darken": "Assombrir",
   "blend_mode_difference": "Différence",
   "blend_mode_saturation": "Saturation",
-  "blend_mode_softLight": "Lumière Douce",
-  "blend_mode_plus": "Ajout",
+  "blend_mode_softLight": "Lumière douce",
+  "blend_mode_plus": "Addition",
   "blend_mode_exclusion": "Exclusion",
   "custom_color_filter": "Filtre de couleur personnalisé",
   "color_filter_blend_mode": "Mode de fusion du filtre de couleur",
@@ -332,7 +332,7 @@
   "text": "Texte",
   "border": "Bordure",
   "background": "Arrière-plan",
-  "no_subtite_warning_message": "N'a aucun effet car il n'y a pas de pistes de sous-titres dans cette vidéo",
+  "no_subtite_warning_message": "Aucun effet : cette vidéo ne contient aucune piste de sous-titres.",
   "grid_size": "Taille de la grille",
   "n_per_row": "{n} par ligne",
   "horizontal_continious": "Horizontal continu",
@@ -347,10 +347,10 @@
   "or": "OU",
   "advanced": "Avancé",
   "use_native_http_client": "Utiliser le client HTTP natif",
-  "use_native_http_client_info": "Il supporte automatiquement les fonctionnalités de la plateforme telles que les VPN, et prend en charge plus de fonctionnalités HTTP telles que HTTP/3 et la gestion personnalisée des redirections.",
-  "unwatched": "Non regardé",
-  "last_watched": "Dernièrement regardé",
-  "unwatched_count": "Nombre non vu",
+  "use_native_http_client_info": "Prend automatiquement en charge les fonctionnalités de la plateforme, comme les VPN, ainsi que des fonctions HTTP supplémentaires comme HTTP/3 et la gestion personnalisée des redirections.",
+  "unwatched": "Non vus",
+  "last_watched": "Dernier visionnage",
+  "unwatched_count": "Nombre de contenus non vus",
   "latest_episode": "Dernier épisode",
   "downloaded_episodes": "Épisodes téléchargés",
   "show_continue_watching_buttons": "Afficher les boutons de reprise",
@@ -361,20 +361,20 @@
   "next_5_episodes": "5 épisodes suivants",
   "next_10_episodes": "10 épisodes suivants",
   "next_25_episodes": "25 épisodes suivants",
-  "remove_all_update_msg": "Êtes-vous sûr ? Toute la mise à jour sera effacée",
-  "syncing": "Synchronisation",
+  "remove_all_update_msg": "Êtes-vous sûr ? La mise à jour entière sera supprimée.",
+  "syncing": "Synchronisation en cours",
   "sync_password": "Mot de passe (au moins 8 caractères)",
   "sync_logged": "Connexion réussie",
-  "syncing_subtitle": "Synchronisez votre progression sur plusieurs appareils via un serveur auto-hébergé. Consultez notre serveur discord pour plus d'informations !",
-  "last_sync_manga": "Dernière synchro du manga à :",
-  "last_sync_history": "Dernière synchro historique au :",
-  "last_sync_update": "Dernière mise à jour de la synchronisation au :",
+  "syncing_subtitle": "Synchronisez votre progression sur plusieurs appareils via un serveur auto-hébergé. Consultez notre serveur Discord pour plus d'informations !",
+  "last_sync_manga": "Dernière synchronisation du manga :",
+  "last_sync_history": "Dernière synchronisation de l'historique :",
+  "last_sync_update": "Dernière synchronisation des mises à jour :",
   "sync_server": "Adresse du serveur de synchronisation",
   "sync_login_invalid_creds": "E-mail ou mot de passe invalide",
-  "sync_starting": "Synchronisation de départ...",
+  "sync_starting": "Démarrage de la synchronisation...",
   "sync_finished": "Synchronisation terminée",
   "sync_failed": "Échec de la synchronisation",
-  "sync_button_sync": "Synchroniser les progrès",
+  "sync_button_sync": "Synchroniser la progression",
   "dialog_confirm": "Confirmer",
   "full_screen_player": "Utiliser le mode plein écran",
   "full_screen_player_info": "Utiliser automatiquement le mode plein écran lors de la lecture d'une vidéo.",
@@ -386,7 +386,7 @@
   "n_minute_ago": "Il y a {minute} minute",
   "n_minutes_ago": "Il y a {minutes} minutes",
   "n_day_ago": "Il y a {day} jour",
-  "now": "maintenant",
+  "now": "Maintenant",
   "library_last_updated": "Dernière mise à jour de la bibliothèque : {lastUpdated}",
   "data_and_storage": "Données et stockage",
   "download_location_info": "Utilisé pour les téléchargements de chapitres",
@@ -413,7 +413,7 @@
   "sync_auto_5_minutes": "Toutes les 5 minutes",
   "sync_auto_10_minutes": "Toutes les 10 minutes",
   "sync_auto_30_minutes": "Toutes les 30 minutes",
-  "sync_auto_1_hour": "Toutes les 1 heure",
+  "sync_auto_1_hour": "Toutes les heures",
   "sync_auto_3_hours": "Toutes les 3 heures",
   "sync_auto_6_hours": "Toutes les 6 heures",
   "sync_auto_12_hours": "Toutes les 12 heures",
@@ -433,7 +433,7 @@
   "manage_anime_repo_urls": "Gérer les URL du dépôt d'anime",
   "manage_novel_repo_urls": "Gérer les URL du dépôt de romans",
   "url_cannot_be_empty": "L'URL ne peut pas être vide",
-  "url_must_end_with_dot_json_or_dot_pb": "L'URL doit se terminer par .json / .pb",
+  "url_must_end_with_dot_json": "L'URL doit se terminer par .json",
   "repo_url": "URL du dépôt",
   "invalid_url_format": "Format d'URL invalide",
   "clear_all_sources": "Effacer toutes les sources",
@@ -443,16 +443,16 @@
   "repo_already_exists": "Le dépôt existe déjà !",
   "add_repo": "Ajouter un dépôt ?",
   "genre_search_library": "Rechercher un genre dans la bibliothèque",
-  "genre_search_source": "Explorer dans la source",
+  "genre_search_source": "Rechercher dans la source",
   "source_not_added": "La source n'est pas installée !",
   "load_own_subtitles": "Charger vos propres sous-titres...",
-  "unsupported_repo": "Vous avez essayé d'ajouter un dépôt qui n'est pas pris en charge. Veuillez consulter le serveur discord pour obtenir de l'aide!",
+  "unsupported_repo": "Vous avez essayé d'ajouter un dépôt non pris en charge. Consultez le serveur Discord pour obtenir de l'aide !",
   "end_of_chapter": "Fin du chapitre",
   "chapter_completed": "Chapitre terminé",
   "continue_to_next_chapter": "Continuez à faire défiler pour lire le chapitre suivant",
-  "no_next_chapter": "Pas de prochain chapitre",
+  "no_next_chapter": "Aucun autre chapitre",
   "you_have_finished_reading": "Vous avez terminé la lecture",
-  "return_to_the_list_of_chapters": "Retournez à la liste des chapitres",
+  "return_to_the_list_of_chapters": "Retourner à la liste des chapitres",
   "downloaded_only": "Téléchargés uniquement",
   "downloaded_only_description": "Afficher uniquement les entrées téléchargées dans votre bibliothèque",
   "concurrent_downloads": "Téléchargements simultanés",
@@ -464,7 +464,6 @@
   "sync_button_upload": "Téléverser uniquement",
   "sync_button_upload_info": "Cette opération remplacera complètement les données distantes par les données locales !",
   "sync_button_download": "Télécharger uniquement",
-  "sync_button_download_info": "Cette opération remplacera complètement les données locales par les données distantes !",
   "extension_settings": "Paramètres de l'extension",
   "video_audio_info": "Langues préférées, correction de la hauteur tonale, canaux audio",
   "all_chapters": "Tous les chapitres",
@@ -474,8 +473,8 @@
   "recommendations_similar": "similaire",
   "recommendations_weights": "Poids des recommandations",
   "recommendations_weights_genre": "Similarité de genre",
-  "recommendations_weights_setting": "Similarité de cadre",
-  "recommendations_weights_synopsis": "Similarité d'histoire",
+  "recommendations_weights_setting": "Similarité des paramètres",
+  "recommendations_weights_synopsis": "Similarité du synopsis",
   "recommendations_weights_theme": "Similarité de thème",
   "custom_dns": "DNS personnalisé (laisser vide pour utiliser le DNS système)",
   "android_proxy_server": "Serveur proxy Android (M-Extension-Server)",
@@ -566,8 +565,8 @@
   "dns_over_https": "DNS-sur-HTTPS (DoH)",
   "dns_provider": "Fournisseur DNS",
   "tracked": "Suivi",
-  "auth_unlock_msg": "Authentifiez-vous pour déverrouiller Mangayomi",
-  "app_locked": "Mangayomi est verrouillé",
+  "auth_unlock_msg": "Authentifiez-vous pour déverrouiller Mangatan",
+  "app_locked": "Mangatan est verrouillé",
   "auth_to_continue": "Authentifiez-vous pour continuer",
   "authenticating": "Authentification en cours...",
   "unlock": "Déverrouiller",
@@ -605,98 +604,99 @@
   "completion_rate": "Taux de réussite",
   "watching_time": "Temps de visionnage",
   "reading_time": "Temps de lecture",
-  "average_chapters_per_title": "Chapitres moyens par titre",
+  "average_chapters_per_title": "Nombre moyen de chapitres par {title}",
   "read_percentage": "Pourcentage lu",
   "entries": "Entrées",
-  "mass_migration_destination_source": "Destination source",
-  "mass_migration_no_library_items": "No library items are available for mass migration.",
-  "mass_migration_no_destination_sources": "No installed destination sources are available.",
-  "mass_migration_installed": "Installed",
-  "mass_migration_items_ready_for_review": "{count, plural, =1{1 item ready for review} other{{count} items ready for review}}",
-  "mass_migration_item_count": "{count, plural, =1{1 item} other{{count} items}}",
-  "mass_migration_select_destination_source": "Select destination source",
-  "mass_migration_finding_matches": "Finding matches in {source} • {language}",
-  "mass_migration_processing_item": "Processing item {current} of {total}",
-  "mass_migration_waiting_next_item": "Waiting 2 seconds before the next item...",
-  "mass_migration_waiting_next_migration": "Waiting 2 seconds before the next migration...",
-  "mass_migration_matched_so_far": "Matched so far: {count}",
-  "mass_migration_no_match_count": "No match: {count}",
-  "mass_migration_review_matches": "Review matches for {source}",
-  "mass_migration_found_matches": "Found matches: {count}",
-  "mass_migration_no_matches": "No matches: {count}",
-  "mass_migration_selected_to_migrate": "Selected to migrate: {count}",
-  "mass_migration_finish_review": "Finish review",
-  "mass_migration_migrate_selected": "Migrate selected items ({count})",
-  "mass_migration_migrating_selected": "Migrating selected items to {source}",
-  "mass_migration_no_items_selected": "No items selected for migration.",
-  "mass_migration_migrating_item": "Migrating item {current} of {total}",
-  "mass_migration_complete": "Mass migration complete",
-  "mass_migration_complete_success_message": "All selected items were processed successfully.",
-  "mass_migration_complete_partial_message": "Migration finished with a few items that still need manual attention.",
+  "mass_migration_destination_source": "Source de destination",
+  "mass_migration_no_library_items": "Aucun élément de la bibliothèque n'est disponible pour la migration massive.",
+  "mass_migration_no_destination_sources": "Aucune source de destination installée n'est disponible.",
+  "mass_migration_installed": "Installée",
+  "mass_migration_items_ready_for_review": "{count, plural, =1{1 élément prêt à être vérifié} other{{count} éléments prêts à être vérifiés}}",
+  "mass_migration_item_count": "{count, plural, =1{1 élément} other{{count} éléments}}",
+  "mass_migration_select_destination_source": "Sélectionner la source de destination",
+  "mass_migration_finding_matches": "Recherche de correspondances dans {source} • {language}",
+  "mass_migration_processing_item": "Traitement de l'élément {current} sur {total}",
+  "mass_migration_waiting_next_item": "Attente de 2 secondes avant l'élément suivant...",
+  "mass_migration_waiting_next_migration": "Attente de 2 secondes avant la migration suivante...",
+  "mass_migration_matched_so_far": "Correspondances trouvées jusqu'à présent : {count}",
+  "mass_migration_no_match_count": "Sans correspondance : {count}",
+  "mass_migration_review_matches": "Vérifier les correspondances pour {source}",
+  "mass_migration_found_matches": "Correspondances trouvées : {count}",
+  "mass_migration_no_matches": "Aucune correspondance : {count}",
+  "mass_migration_selected_to_migrate": "Sélectionnés pour migration : {count}",
+  "mass_migration_finish_review": "Terminer la vérification",
+  "mass_migration_migrate_selected": "Migrer les éléments sélectionnés ({count})",
+  "mass_migration_migrating_selected": "Migration des éléments sélectionnés vers {source}",
+  "mass_migration_no_items_selected": "Aucun élément sélectionné pour la migration.",
+  "mass_migration_migrating_item": "Migration de l'élément {current} sur {total}",
+  "mass_migration_complete": "Migration massive terminée",
+  "mass_migration_complete_success_message": "Tous les éléments sélectionnés ont été traités avec succès.",
+  "mass_migration_complete_partial_message": "Migration terminée, mais certains éléments nécessitent encore une intervention manuelle.",
   "mass_migration_route_summary": "{source} → {destination}",
-  "mass_migration_processed": "Processed",
-  "mass_migration_matched": "Matched",
-  "mass_migration_migrated": "Migrated",
-  "mass_migration_skipped": "Skipped",
-  "mass_migration_failed": "Failed",
-  "mass_migration_failed_items": "Failed Items",
-  "mass_migration_exit": "Exit Mass Migration",
-  "mass_migration_no_destination_match": "No destination match found",
-  "mass_migration_query": "Query: {query}",
-  "mass_migration_skip": "Skip",
-  "mass_migration_loading": "Loading...",
-  "mass_migration_choose_another_result": "Choose another result",
-  "mass_migration_source_chapters": "Source chapters",
-  "mass_migration_destination_chapters": "Destination chapters",
-  "mass_migration_chapter_count": "{count, plural, =1{1 chapter} other{{count} chapters}}",
-  "mass_migration_source_chapter_count": "{count, plural, =1{1 source chapter} other{{count} source chapters}}",
-  "mass_migration_destination_chapter_count": "{count, plural, =1{1 destination chapter} other{{count} destination chapters}}",
-  "mass_migration_no_chapters_found": "No chapters found.",
-  "mass_migration_and_more_chapters": "And {count} more...",
-  "mass_migration_unknown_title": "Unknown title",
-  "mass_migration_unknown_match": "Unknown match",
-  "mass_migration_unknown_source": "Unknown source",
-  "mass_migration_unknown_chapter": "Unknown chapter",
-  "no_extension_server_bundle_available_for_this_platform": "No extension server bundle is available for this platform.",
-  "extension_server_intro_with_jre": "Download the proxy server bundle before using Mihon extensions. The bundle includes the JRE and extension server JAR.",
-  "failed_to_download_bundle": "Failed to download bundle ({statusCode}).",
-  "selected_folder_does_not_exist": "The selected folder does not exist.",
-  "jre_executable": "JRE executable",
-  "installed_version": "Installed version",
-  "choose_location": "Choose location",
-  "extension_server_intro_ios": "Download the proxy server JAR before using Mihon extensions. iOS only needs the extension server JAR.",
-  "import_existing_jar": "Import existing JAR",
+  "mass_migration_processed": "Traités",
+  "mass_migration_matched": "Correspondance trouvée",
+  "mass_migration_migrated": "Migrés",
+  "mass_migration_skipped": "Ignorés",
+  "mass_migration_failed": "Échec",
+  "mass_migration_failed_items": "Éléments en échec",
+  "mass_migration_exit": "Quitter la migration massive",
+  "mass_migration_no_destination_match": "Aucune correspondance trouvée dans la destination",
+  "mass_migration_query": "Requête : {query}",
+  "mass_migration_skip": "Ignorer",
+  "mass_migration_loading": "Chargement...",
+  "mass_migration_choose_another_result": "Choisir un autre résultat",
+  "mass_migration_source_chapters": "Chapitres de la source",
+  "mass_migration_destination_chapters": "Chapitres de destination",
+  "mass_migration_chapter_count": "{count, plural, =1{1 chapitre} other{{count} chapitres}}",
+  "mass_migration_source_chapter_count": "{count, plural, =1{1 chapitre source} other{{count} chapitres sources}}",
+  "mass_migration_destination_chapter_count": "{count, plural, =1{1 chapitre de destination} other{{count} chapitres de destination}}",
+  "mass_migration_no_chapters_found": "Aucun chapitre trouvé.",
+  "mass_migration_and_more_chapters": "Et {count} de plus...",
+  "mass_migration_unknown_title": "Titre inconnu",
+  "mass_migration_unknown_match": "Correspondance inconnue",
+  "mass_migration_unknown_source": "Source inconnue",
+  "mass_migration_unknown_chapter": "Chapitre inconnu",
+  "no_extension_server_bundle_available_for_this_platform": "Aucun bundle de serveur d'extensions n'est disponible pour cette plateforme.",
+  "extension_server_intro_with_jre": "Téléchargez le bundle du serveur proxy avant d'utiliser les extensions Mihon. Le bundle contient la JRE et le JAR du serveur d'extensions.",
+  "failed_to_download_bundle": "Échec du téléchargement du bundle ({statusCode}).",
+  "selected_folder_does_not_exist": "Le dossier sélectionné n'existe pas.",
+  "jre_executable": "Exécutable JRE",
+  "installed_version": "Version installée",
+  "choose_location": "Choisir un emplacement",
+  "extension_server_intro_ios": "Téléchargez le JAR du serveur proxy avant d'utiliser les extensions Mihon. iOS nécessite uniquement le JAR du serveur d'extensions.",
+  "import_existing_jar": "Importer un JAR existant",
   "android_proxy_server_mihon_description": "Téléchargez et configurez le serveur proxy requis pour utiliser les extensions Mihon.",
-  "files_missing": "Files missing",
-  "select_extension_server_folder": "Select extension server folder",
-  "up_to_date": "Up to date",
-  "preparing_download": "Preparing download...",
-  "could_not_launch_apk_bridge_page": "Could not launch the M-Extension-Server page.",
+  "files_missing": "Fichiers manquants",
+  "select_extension_server_folder": "Sélectionner le dossier du serveur d'extensions",
+  "up_to_date": "À jour",
+  "preparing_download": "Préparation du téléchargement...",
+  "could_not_launch_apk_bridge_page": "Impossible d'ouvrir la page de M-Extension-Server.",
   "could_not_check_proxy_server_updates": "Impossible de vérifier les mises à jour du serveur proxy.",
-  "m_extension_server_description": "Use M-Extension-Server when you need a separate Android device proxy. Set the proxy address here and download the APK from GitHub.",
-  "install_location": "Install location",
-  "not_configured": "Not configured",
-  "detect_files_in_selected_folder": "Detect files in selected folder",
-  "ios_extension_server_import_hint": "On iOS the server is installed inside the app sandbox. Use \"Import existing JAR\" to bring in a downloaded file.",
-  "app_install_location": "App install location",
-  "files_installed": "Files installed",
-  "no_extension_server_files_found_in_selected_folder": "No extension server files were found in the selected folder.",
-  "extension_server_jar_imported": "Extension server JAR was imported.",
-  "proxy_server_ip_hint": "IP du serveur (ex: 10.0.0.5 ou https://example.com)",
-  "selected_file_could_not_be_accessed": "The selected file could not be accessed.",
-  "no_newer_proxy_server_release_available": "Aucune nouvelle version du serveur proxy disponible.",
-  "latest_version": "Latest version",
-  "extension_server_jar": "Extension server JAR",
-  "set_proxy_address": "Set proxy address",
+  "m_extension_server_description": "Utilisez M-Extension-Server lorsque vous avez besoin d'un proxy sur un appareil Android distinct. Définissez l'adresse du proxy ici et téléchargez l'APK depuis GitHub.",
+  "install_location": "Emplacement d'installation",
+  "not_configured": "Non configuré",
+  "detect_files_in_selected_folder": "Rechercher les fichiers dans le dossier sélectionné",
+  "ios_extension_server_import_hint": "Sur iOS, le serveur est installé dans le sandbox de l'application. Utilisez « Importer un JAR existant » pour ajouter un fichier téléchargé.",
+  "app_install_location": "Emplacement d'installation de l'application",
+  "files_installed": "Fichiers installés",
+  "no_extension_server_files_found_in_selected_folder": "Aucun fichier du serveur d'extensions n'a été trouvé dans le dossier sélectionné.",
+  "extension_server_jar_imported": "Le JAR du serveur d'extensions a été importé.",
+  "proxy_server_ip_hint": "IP du serveur (par ex. 10.0.0.5 ou https://example.com)",
+  "selected_file_could_not_be_accessed": "Impossible d'accéder au fichier sélectionné.",
+  "no_newer_proxy_server_release_available": "Aucune version plus récente du serveur proxy n'est disponible.",
+  "latest_version": "Dernière version",
+  "extension_server_jar": "JAR du serveur d'extensions",
+  "set_proxy_address": "Définir l'adresse du proxy",
   "mihon_proxy_server": "Serveur proxy Mihon",
-  "extension_server_files_linked": "Extension server files were linked.",
-  "extension_server_files_ready": "Extension server files are ready.",
-  "webview": "Webview",
-  "update_files": "Update files",
-  "checking_files": "Checking files",
-  "downloaded_bundle_missing_expected_files": "The downloaded bundle does not contain the expected files.",
+  "extension_server_files_linked": "Les fichiers du serveur d'extensions ont été associés.",
+  "extension_server_files_ready": "Les fichiers du serveur d'extensions sont prêts.",
+  "webview": "WebView",
+  "update_files": "Mettre à jour les fichiers",
+  "checking_files": "Vérification des fichiers",
+  "downloaded_bundle_missing_expected_files": "Le bundle téléchargé ne contient pas les fichiers attendus.",
   "android_proxy_server_mihon": "Serveur proxy Android (Mihon)",
-  "select_extension_server_jar": "Sélectionner le JAR du serveur d'extension",
+  "select_extension_server_jar": "Sélectionner le JAR du serveur d'extensions",
+  "mass_migration_title": "Migration massive",
   "mass_migration_description": "Migrer les entrées de votre bibliothèque d'une source à une autre.",
   "mass_migration_selection_title": "Sélection de la migration",
   "mass_migration_source_selecting_description": "Sélectionnez une ou plusieurs sources vers lesquelles migrer.",
@@ -713,6 +713,11 @@
   "mass_migration_dialog_content": "Cela remplacera les entrées actuelles par les nouvelles de la source sélectionnée.",
   "mass_migration_help_title": "Comment utiliser la migration massive",
   "mass_migration_help_content": "1. Sélectionnez la source d'origine.\n2. Sélectionnez les titres que vous souhaitez migrer.\n3. Sélectionnez la ou les sources de destination.\n4. Vérifiez les correspondances et lancez la migration.",
+  "mihon_proxy_server": "Serveur proxy Mihon",
+  "android_proxy_server_mihon_description": "Téléchargez et configurez le serveur proxy requis pour utiliser les extensions Mihon.",
+  "could_not_check_proxy_server_updates": "Impossible de vérifier les mises à jour du serveur proxy.",
+  "proxy_server_ip_hint": "IP du serveur (ex: 10.0.0.5 ou https://example.com)",
+  "no_newer_proxy_server_release_available": "Aucune nouvelle version du serveur proxy disponible.",
   "statistics_title": "Statistiques",
   "statistics_total_manga": "Total Manga",
   "statistics_total_anime": "Total Anime",
@@ -727,6 +732,8 @@
   "statistics_reading_time_unit_minute": "{count, plural, one{1 minute} other{{count} minutes}}",
   "statistics_reading_time_unit_day": "{count, plural, one{1 jour} other{{count} jours}}",
   "statistics_no_data": "Pas assez de données pour afficher les statistiques.",
+  "split_epub_chapters": "Diviser en chapitres",
+  "split_epub_chapters_description": "Importer chaque chapitre EPUB comme une entrée séparée",
   "tts": "Synthèse vocale",
   "tts_speed": "Vitesse",
   "tts_pitch": "Tonalité",
@@ -787,528 +794,5 @@
   "reader_hide_threshold_high": "Sensible (13 px)",
   "reader_hide_threshold_low": "Faible (31 px)",
   "reader_hide_threshold_lowest": "Le moins sensible (47 px)",
-  "error_no_pages_available": "Erreur : aucune page disponible",
-  "mark_duplicate_chapters_read": "Marquer les numéros de chapitres en double comme lus",
-  "app_ui_scale": "Échelle de l'interface",
-  "app_ui_scale_subtitle": "Rendez l'interface plus grande ou plus petite pour adapter votre écran et votre distance de visionnage.",
-  "allow_concurrent_downloads": "Autoriser les téléchargements simultanés",
-  "allow_concurrent_downloads_subtitle": "Télécharger à partir de différentes sources en même temps. Une seule source télécharge encore un chapitre à la fois pour qu'elle ne soit pas surchargée. Désactivez pour télécharger un à la fois partout.",
-  "download_delay": "Délai de téléchargement",
-  "download_delay_subtitle": "Désactivé. Ajouter une attente avec un dégradé aléatoire entre les chapitres pour être plus doux sur les sources.",
-  "save_search": "Enregistrer la recherche",
-  "saved_searches": "Recherches enregistrées",
-  "enter_search_to_save_first": "Entrez une recherche à enregistrer en premier",
-  "no_saved_searches": "Aucune recherche enregistrée pour cette source pour le moment.\nEffectuez une recherche, puis choisissez \"Enregistrer la recherche\".",
-  "source": "Source",
-  "label_value": "{label} : {value}",
-  "url": "URL",
-  "beta_version": "Bêta ({version})",
-  "empty_placeholder": "VIDE",
-  "error": "Erreur",
-  "error_with_message": "Erreur : {error}",
-  "no_pages_available": "Erreur : aucune page disponible",
-  "create_extension": "Créer une extension",
-  "choose_extension_language": "Choisir la langue de l'extension",
-  "lang": "Langue",
-  "base_url": "URL de base",
-  "api_url_optional": "URL de l'API (optionnel)",
-  "icon_url": "URL de l'icône",
-  "source_icon_url": "URL de l'icône de la source",
-  "notes": "Remarques",
-  "extension_name_example": "ex : monAnime",
-  "language_code_example": "ex : fr",
-  "base_url_example": "ex : https://exemple.com",
-  "api_url_example": "ex : https://api.exemple.com",
-  "extension_notes_example": "ex : cette extension nécessite une connexion",
-  "type": "Type",
-  "target": "Cible",
-  "source_type_single": "unique",
-  "source_type_multi": "multiple",
-  "source_type_torrent": "torrent",
-  "source_language_dart": "Dart",
-  "source_language_javascript": "JavaScript",
-  "source_language_lnreader_compiled_js": "JS compilé LNReader",
-  "source_created_successfully": "Source créée avec succès",
-  "source_already_exists": "La source existe déjà",
-  "error_when_creating_source": "Erreur lors de la création de la source",
-  "cookies_deleted": "Cookies supprimés !",
-  "delete_all_cookies": "Supprimer tous les cookies",
-  "missing_chapters": "{count} chapitres manquants",
-  "sync_restore_in_progress": "Synchronisation ignorée — restauration en cours",
-  "sync_status_not_configured": "Non connecté",
-  "sync_status_checking": "Vérification de la connexion...",
-  "sync_status_connected": "Connecté",
-  "sync_status_unauthorized": "Session expirée, veuillez vous reconnecter",
-  "sync_status_unreachable": "Serveur inaccessible",
-  "sync_section_general": "Général",
-  "sync_section_data_types": "Éléments à synchroniser",
-  "missing_episodes": "{count} épisodes manquants",
-  "encrypt_backups": "Chiffrer les sauvegardes",
-  "encrypt_backups_info": "Protéger les sauvegardes par mot de passe avec le chiffrement AES",
-  "no_secure_storage": "Aucun stockage sécurisé trouvé",
-  "no_keyring_warning": "Ce système ne dispose pas d'un service de trousseau de clés (ex. gnome-keyring ou kwallet sur Linux), le mot de passe ne peut donc pas être stocké de façon sécurisée.\n\nLe stocker en clair dans la base de données locale de l'application ? Toute personne ayant accès aux données de l'application pourra le lire.",
-  "enter_backup_password": "Entrer le mot de passe de la sauvegarde",
-  "incorrect_password_try_again": "Mot de passe incorrect, réessayez.",
-  "set_backup_password": "Définir le mot de passe de sauvegarde",
-  "confirm_password": "Confirmer le mot de passe",
-  "passwords_do_not_match": "Les mots de passe ne correspondent pas",
-  "password_required_to_restore": "Un mot de passe est requis pour restaurer cette sauvegarde.",
-  "restore_sync_question_title": "Synchroniser cette restauration ?",
-  "restore_sync_question_message": "Cet appareil est connecté à un serveur de synchronisation. Envoyer ces données restaurées maintenant ? Sinon, la synchronisation sera désactivée pour éviter que les anciennes données du serveur n'écrasent ce que vous venez de restaurer.",
-  "restore_sync_question_confirm": "Oui, synchroniser",
-  "restore_sync_question_deny": "Non, désactiver la synchro",
-  "sync_disabled_after_restore": "La synchronisation est désactivée. Vous pouvez la réactiver dans les Paramètres.",
-  "restore_sync_disabled_question_title": "La synchronisation est actuellement désactivée",
-  "restore_sync_disabled_question_message": "La synchronisation est coupée. La réactiver et envoyer ces données restaurées sur votre serveur ?",
-  "restore_sync_question_reenable": "Oui, réactiver et synchroniser",
-  "restore_sync_question_keep_disabled": "Laisser désactivée",
-  "restore_sync_uploading": "Synchronisation des données restaurées vers le serveur…",
-  "restore_sync_upload_success": "Données restaurées synchronisées avec le serveur",
-  "default_download_destination": "Dossier de téléchargement par défaut",
-  "ask_download_destination": "Demander le dossier de téléchargement",
-  "ask_download_destination_desc": "Choisir un dossier local à chaque début de téléchargement.",
-  "select_download_destination": "Choisir le dossier de téléchargement",
-  "clear_local_library": "Vider la bibliothèque locale",
-  "clear_local_library_desc": "Supprimer les dossiers locaux et les archives de la bibliothèque.",
-  "clear_local_library_msg": "Cela supprimera les dossiers locaux et les archives de votre bibliothèque. Les fichiers sur le disque ne seront pas supprimés.",
-  "custom": "Personnalisé",
-  "no_local_folder_available_for_downloads": "Aucun dossier local disponible pour les téléchargements",
-  "failed_to_create_cbz": "Échec de la création du CBZ : {error}",
-  "error_reading_cover_image": "Erreur de lecture de l'image de couverture : {error}",
-  "error_reading_metadata": "Erreur de lecture des métadonnées : {error}",
-  "error_saving_chapter_episode_to_library": "Erreur lors de l'enregistrement du chapitre/épisode dans la bibliothèque : {error}",
-  "error_reading_chapter_cover_image": "Erreur de lecture de la couverture du chapitre : {error}",
-  "error_reading_archive_cover_image": "Erreur de lecture de la couverture de l'archive : {error}",
-  "error_getting_local_library": "Erreur lors de la récupération de la bibliothèque locale : {error}",
-  "failed_to_export_metadata": "Échec de l'exportation des métadonnées : {error}",
-  "unrecognized_chapter_numbers": "{count} chapitre(s) n'ont pas pu être numérotés automatiquement et peuvent être désordonnés ou manquants dans le lecteur.",
-  "cloudflare_resolution_webview_server_start_failed": "Impossible de démarrer le serveur Webview de résolution Cloudflare.",
-  "tracker_token_expired": "Jeton {tracker} expiré",
-  "video_list_empty": "La liste des vidéos est vide",
-  "playback_speed_multiplier": "x{value}",
-  "could_not_launch_url": "Impossible d'ouvrir {url}",
-  "zero_interpreter": "Interpréteur Zero",
-  "zero_interpreter_description": "Contrôler le serveur de l'interpréteur Zero automatiquement ou manuellement.",
-  "start_server_on_launch": "Démarrer le serveur au lancement",
-  "runtime_status": "État du runtime",
-  "running": "En cours d'exécution",
-  "stopped": "Arrêté",
-  "start": "Démarrer",
-  "stop": "Arrêter",
-  "something_went_wrong": "Une erreur est survenue",
-  "startup_failed": "Mangayomi n'a pas pu terminer son démarrage",
-  "sources_with_no_results": "{count, plural, =1{1 source sans résultat} other{{count} sources sans résultat}}",
-  "import_mode_title": "Comment effectuer l'importation ?",
-  "import_mode_message": "Choisissez de fusionner cette sauvegarde avec votre bibliothèque actuelle ou de remplacer toute votre bibliothèque par celle-ci.",
-  "import_mode_keep_existing": "Fusionner",
-  "import_mode_keep_existing_subtitle": "Ajoute les nouvelles séries et met à jour celles correspondantes. Rien n'est supprimé de votre bibliothèque actuelle.",
-  "import_mode_replace": "Remplacer",
-  "import_mode_replace_subtitle": "Supprime toute votre bibliothèque actuelle et la remplace par cette sauvegarde.",
-  "replace_summary_title": "Prêt à remplacer votre bibliothèque",
-  "replace_summary_message": "Cela supprimera l'intégralité de votre bibliothèque actuelle ({currentCount} séries) et la remplacera par {backupCount} séries de cette sauvegarde. Cette action ne peut être annulée que par une restauration précédente.",
-  "replace_summary_confirm": "Remplacer",
-  "replace_result_message": "Bibliothèque remplacée par {count} séries de cette sauvegarde.",
-  "category_conflict_title": "Catégories existantes trouvées",
-  "category_conflict_message": "La sauvegarde contient des catégories qui existent déjà dans votre bibliothèque. Conserver pour fusionner les séries entrantes dans la catégorie existante, ou supprimer pour laisser ces séries sans catégorie.",
-  "category_conflict_keep": "Conserver — fusionner dans la catégorie existante",
-  "category_conflict_delete": "Supprimer — laisser les séries sans catégorie",
-  "source_conflict_title": "Sources introuvables",
-  "source_conflict_message": "Ces sources de sauvegarde ne correspondent à aucune extension installée. Conserver le nom original (importé sans source active), ou migrer vers une extension installée pour permettre les mises à jour.",
-  "source_conflict_keep": "Conserver le nom original (aucune source active)",
-  "import_summary_title": "Prêt à importer",
-  "import_summary_message": "{newSeries} nouvelles séries, {updatedSeries} séries existantes seront mises à jour, et {newChapters} nouveaux chapitres seront ajoutés. Rien dans votre bibliothèque actuelle ne sera supprimé.",
-  "import_summary_confirm": "Importer",
-  "import_result_message": "{newSeries} nouvelles séries importées, {updatedSeries} existantes mises à jour, {newChapters} nouveaux chapitres ajoutés.",
-  "roll_back": "Restaurer l'état précédent",
-  "roll_back_confirm_message": "Cela restaure votre bibliothèque à l'instantané de sécurité pris juste avant cette modification, annulant tout ce qui vient d'être fait.",
-  "roll_back_done": "Retour effectué à l'instantané précédant la modification.",
-  "restoring_backup": "Restauration de votre bibliothèque…",
-  "roll_back_last_change": "Annuler la dernière modification",
-  "roll_back_last_change_subtitle": "Instantané du {date} — {description}",
-  "roll_back_available_count": "{count} modifications récentes disponibles pour restauration",
-  "delete_source_title": "Supprimer une source et ses mangas",
-  "delete_source_subtitle": "Choisissez une source et supprimez tous ses mangas de votre bibliothèque, ainsi que leurs chapitres, téléchargements, historique et suivi.",
-  "delete_source_pick_title": "Choisir une source à supprimer",
-  "delete_source_empty": "Aucune source trouvée dans votre bibliothèque.",
-  "delete_source_confirm_title": "Supprimer {sourceName} ?",
-  "delete_source_confirm_message": "Cela supprimera définitivement {mangaCount} mangas, {chapterCount} chapitres, {historyCount} entrées d'historique et {updateCount} entrées de mise à jour. Les liens de suivi sont conservés. Cette action est irréversible sauf en cas de restauration.",
-  "delete_source_also_remove_extension": "Supprimer également l'extension installée",
-  "delete_source_keep_history": "Conserver l'historique de lecture",
-  "delete_source_keep_downloads": "Conserver les enregistrements de téléchargement",
-  "delete_source_button": "Supprimer",
-  "delete_source_result_message": "{mangaCount} mangas supprimés de {sourceName}.",
-  "merge_manga_title": "Fusionner les mangas en double",
-  "merge_manga_subtitle": "Recherche les mangas ayant des titres identiques sous la même source (par exemple après avoir fusionné des sources en double) et les regroupe en un seul, sans rien supprimer de ce que vous souhaitez conserver.",
-  "merge_manga_none_found": "Aucun manga en double potentiel trouvé.",
-  "merge_manga_pick_title": "Mangas en double possibles",
-  "merge_manga_choose_primary_title": "Dans lequel les autres doivent-ils être fusionnés ?",
-  "merge_manga_choose_primary_message": "Les chapitres, l'historique et le suivi des autres entrées seront intégrés à celle que vous choisissez — rien n'est supprimé.",
-  "merge_manga_chapters_subtitle": "{count, plural, =1{1 chapitre} other{{count} chapitres}}",
-  "merge_manga_button": "Fusionner",
-  "merge_manga_result_message": "{count} mangas en double fusionnés dans {mangaName}.",
-  "merge_preview_title": "Confirmer la fusion",
-  "merge_manga_preview_message": "{totalChapters} chapitres trouvés dans les autres entrées. {duplicateChapters} sont des doublons et seront ignorés (en gardant la copie avec progression de lecture) ; {keptChapters} seront ajoutés. {duplicateTracks} lien(s) de suivi en double seront également ignorés.",
-  "beta": "Bêta",
-  "error_reports": "Rapports d'erreur",
-  "error_reports_subtitle": "Erreurs interceptées par l'application et moyen de les signaler",
-  "error_reports_empty": "Aucun problème rencontré. Les erreurs interceptées par l'application sont conservées ici afin que vous puissiez les signaler.",
-  "error_reports_likely_cause": "Cause probable",
-  "error_reports_report": "Signaler sur GitHub",
-  "error_reports_banner": "Mangayomi a rencontré une erreur",
-  "error_reports_banner_action": "Voir",
-  "error_reports_copy": "Copier",
-  "error_reports_copied": "Copié dans le presse-papiers",
-  "error_reports_clear": "Effacer",
-  "share_unavailable_copied": "Le partage n'est pas disponible sur cette plateforme, le lien a donc été copié dans le presse-papiers.",
-  "onboarding_title": "Bienvenue sur Mangayomi",
-  "onboarding_libraries_body": "Choisissez ce que vous lisez et regardez. Les éléments que vous laissez de côté n'apparaîtront pas dans la barre de navigation, vous pourrez modifier cela plus tard dans Apparence.",
-  "onboarding_nav_title": "Vos bibliothèques",
-  "onboarding_nav_body": "Gardez un onglet pour chacune d'elles, ou regroupez-les sous un seul onglet Bibliothèque dans lequel vous pourrez basculer.",
-  "onboarding_nav_split": "Un onglet par catégorie",
-  "onboarding_nav_merged": "Un seul onglet Bibliothèque",
-  "onboarding_nav_inside": "Appuyer sur Bibliothèque échange la barre pour ceux-ci",
-  "onboarding_next": "Suivant",
-  "onboarding_restore": "Restaurer une sauvegarde",
-  "onboarding_or_local": "Ou utilisez les fichiers que vous avez déjà",
-  "onboarding_local_folder": "Ajouter un dossier",
-  "onboarding_local_existing": "{count} dossiers déjà configurés",
-  "onboarding_local_any_type": "Manga, anime et romans fonctionnent tous. Chaque titre est placé dans la bonne bibliothèque selon son contenu.",
-  "onboarding_local_scanning": "Analyse du dossier en cours",
-  "onboarding_local_found": "{count} titres trouvés",
-  "onboarding_local_remove": "Supprimer ce dossier",
-  "onboarding_local_in_downloads": "C'est le dossier des téléchargements de l'application. L'ajouter crée une seconde copie locale d'une bibliothèque déjà gérée par l'application.",
-  "onboarding_local_empty": "Rien trouvé. Choisissez le dossier qui contient vos dossiers de mangas, pas un manga individuel.",
-  "onboarding_repo_failed": "Impossible de lire ce dépôt. Vérifiez l'adresse et votre connexion.",
-  "onboarding_repo_title": "Ajouter une source",
-  "onboarding_body": "Mangayomi ne contient aucune source intégrée. Ajoutez un dépôt pour rendre ses extensions disponibles à l'installation et à l'exploration.",
-  "onboarding_add": "Ajouter un dépôt",
-  "onboarding_skip": "Ignorer pour l'instant",
-  "onboarding_continue": "Continuer",
-  "onboarding_later": "Vous pourrez en ajouter plus tard dans Paramètres > Explorer.",
-  "onboarding_replay": "Afficher l'écran de bienvenue",
-  "onboarding_replay_subtitle": "Ouvre à nouveau l'écran du premier lancement, celui sur lequel démarre une nouvelle installation.",
-  "missing_source_check_title": "Vérifier les sources manquantes",
-  "missing_source_check_subtitle": "Trouver les entrées dont l'extension n'est pas installée — restaurer une sauvegarde peut laisser des entrées pointant vers une source jamais installée sur cet appareil.",
-  "missing_source_check_none_found": "La source de chaque entrée de la bibliothèque est installée.",
-  "missing_source_check_result_title": "{count, plural, =1{1 source manquante} other{{count} sources manquantes}}",
-  "missing_source_check_result_message": "Ces entrées de bibliothèque pointent vers une source non installée sur cet appareil. Touchez-en une pour la migrer vers une source installée, installez l'extension correspondante ou utilisez « Supprimer une source et ses mangas » pour les retirer.",
-  "@mass_migration_items_ready_for_review": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_item_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_finding_matches": {
-    "placeholders": {
-      "source": {},
-      "language": {}
-    }
-  },
-  "@mass_migration_processing_item": {
-    "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_matched_so_far": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_no_match_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_review_matches": {
-    "placeholders": {
-      "source": {}
-    }
-  },
-  "@mass_migration_found_matches": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_no_matches": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_selected_to_migrate": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_migrate_selected": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_migrating_selected": {
-    "placeholders": {
-      "source": {}
-    }
-  },
-  "@mass_migration_migrating_item": {
-    "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_route_summary": {
-    "placeholders": {
-      "source": {},
-      "destination": {}
-    }
-  },
-  "@mass_migration_query": {
-    "placeholders": {
-      "query": {}
-    }
-  },
-  "@mass_migration_chapter_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_source_chapter_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_destination_chapter_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@mass_migration_and_more_chapters": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@failed_to_download_bundle": {
-    "placeholders": {
-      "statusCode": {}
-    }
-  },
-  "@tts_paragraph_progress": {
-    "placeholders": {
-      "current": {},
-      "total": {}
-    }
-  },
-  "@label_value": {
-    "placeholders": {
-      "label": {},
-      "value": {}
-    }
-  },
-  "@beta_version": {
-    "placeholders": {
-      "version": {}
-    }
-  },
-  "@error_with_message": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@failed_to_create_cbz": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_metadata": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_saving_chapter_episode_to_library": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_chapter_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_archive_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_getting_local_library": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@failed_to_export_metadata": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@unrecognized_chapter_numbers": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@tracker_token_expired": {
-    "placeholders": {
-      "tracker": {}
-    }
-  },
-  "@playback_speed_multiplier": {
-    "placeholders": {
-      "value": {}
-    }
-  },
-  "@could_not_launch_url": {
-    "placeholders": {
-      "url": {}
-    }
-  },
-  "@sources_with_no_results": {
-    "description": "Header of the collapsed group in global search holding every source that failed or found nothing.",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@replace_summary_message": {
-    "placeholders": {
-      "currentCount": {},
-      "backupCount": {}
-    }
-  },
-  "@replace_result_message": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@import_summary_message": {
-    "placeholders": {
-      "newSeries": {},
-      "updatedSeries": {},
-      "newChapters": {}
-    }
-  },
-  "@import_result_message": {
-    "placeholders": {
-      "newSeries": {},
-      "updatedSeries": {},
-      "newChapters": {}
-    }
-  },
-  "@roll_back_last_change_subtitle": {
-    "placeholders": {
-      "date": {},
-      "description": {}
-    }
-  },
-  "@roll_back_available_count": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@delete_source_confirm_title": {
-    "placeholders": {
-      "sourceName": {}
-    }
-  },
-  "@delete_source_confirm_message": {
-    "placeholders": {
-      "mangaCount": {},
-      "chapterCount": {},
-      "historyCount": {},
-      "updateCount": {}
-    }
-  },
-  "@delete_source_result_message": {
-    "placeholders": {
-      "mangaCount": {},
-      "sourceName": {}
-    }
-  },
-  "@merge_manga_chapters_subtitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@merge_manga_result_message": {
-    "placeholders": {
-      "count": {},
-      "mangaName": {}
-    }
-  },
-  "@merge_manga_preview_message": {
-    "placeholders": {
-      "totalChapters": {},
-      "duplicateChapters": {},
-      "keptChapters": {},
-      "duplicateTracks": {}
-    }
-  },
-  "@onboarding_local_existing": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@onboarding_local_found": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@missing_source_check_result_title": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  }
+  "error_no_pages_available": "Erreur : aucune page disponible"
 }

@@ -1,214 +1,353 @@
-use rars::ArchiveReader;
-use std::collections::HashMap;
-use std::io::Write;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
-
 #[derive(Debug, Clone)]
-pub struct LocalRarImage {
+pub struct RarEntry {
     pub name: String,
-    pub image: Vec<u8>,
+    pub is_file: bool,
 }
 
 #[derive(Debug, Clone)]
-pub struct LocalRarArchive {
+pub struct RarEntryData {
     pub name: String,
-    pub cover_image: Option<Vec<u8>>,
-    pub images: Vec<LocalRarImage>,
-    pub path: String,
+    pub content: Vec<u8>,
 }
 
-#[derive(Debug, Clone)]
-pub struct LocalRarMetadata {
-    pub name: String,
-    pub cover_image: Vec<u8>,
-    pub path: String,
+pub fn list_rar_entries(archive_path: String) -> Result<Vec<RarEntry>, String> {
+    implementation::list_rar_entries(archive_path)
 }
 
-fn is_image_file(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    lower.ends_with(".jpg")
-        || lower.ends_with(".jpeg")
-        || lower.ends_with(".png")
-        || lower.ends_with(".webp")
-        || lower.ends_with(".gif")
-        || lower.ends_with(".avif")
-        || lower.ends_with(".jxl")
-        || lower.ends_with(".bmp")
-        || lower.ends_with(".heic")
-        || lower.ends_with(".heif")
+pub fn extract_rar_entries(
+    archive_path: String,
+    entry_names: Vec<String>,
+) -> Result<Vec<RarEntryData>, String> {
+    implementation::extract_rar_entries(archive_path, entry_names)
 }
 
-struct SharedBufferWriter {
-    buffer: Arc<Mutex<Vec<u8>>>,
-}
+#[cfg(not(target_arch = "wasm32"))]
+mod implementation {
+    use super::{RarEntry, RarEntryData};
+    use std::{
+        collections::HashSet,
+        ffi::{CStr, CString},
+        os::raw::{c_char, c_int, c_void},
+        ptr,
+    };
 
-impl Write for SharedBufferWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let mut b = self.buffer.lock().map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, format!("Mutex poison error: {}", e))
-        })?;
-        b.write(buf)
+    const ARCHIVE_EOF: c_int = 1;
+    const ARCHIVE_WARN: c_int = -20;
+    const READ_BLOCK_SIZE: usize = 64 * 1024;
+
+    enum ArchiveHandle {}
+    enum ArchiveEntryHandle {}
+
+    unsafe extern "C" {
+        fn archive_read_new() -> *mut ArchiveHandle;
+        fn archive_read_support_filter_none(archive: *mut ArchiveHandle) -> c_int;
+        fn archive_read_support_format_rar(archive: *mut ArchiveHandle) -> c_int;
+        fn archive_read_support_format_rar5(archive: *mut ArchiveHandle) -> c_int;
+        fn archive_read_open_filename(
+            archive: *mut ArchiveHandle,
+            filename: *const c_char,
+            block_size: usize,
+        ) -> c_int;
+        #[cfg(target_os = "windows")]
+        fn archive_read_open_filename_w(
+            archive: *mut ArchiveHandle,
+            filename: *const u16,
+            block_size: usize,
+        ) -> c_int;
+        fn archive_read_next_header(
+            archive: *mut ArchiveHandle,
+            entry: *mut *mut ArchiveEntryHandle,
+        ) -> c_int;
+        fn archive_read_data(
+            archive: *mut ArchiveHandle,
+            buffer: *mut c_void,
+            size: usize,
+        ) -> isize;
+        fn archive_read_data_skip(archive: *mut ArchiveHandle) -> c_int;
+        fn archive_read_free(archive: *mut ArchiveHandle) -> c_int;
+        fn archive_error_string(archive: *mut ArchiveHandle) -> *const c_char;
+        fn archive_entry_pathname(entry: *mut ArchiveEntryHandle) -> *const c_char;
+        fn archive_entry_pathname_utf8(entry: *mut ArchiveEntryHandle) -> *const c_char;
+        fn mangatan_libarchive_entry_is_regular(entry: *mut ArchiveEntryHandle) -> c_int;
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
-        let mut b = self.buffer.lock().map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, format!("Mutex poison error: {}", e))
-        })?;
-        b.flush()
-    }
-}
+    struct ArchiveReader(*mut ArchiveHandle);
 
-/// Extract metadata (including cover image) from a CBR/RAR file
-pub fn extract_rar_metadata(archive_path: String) -> Result<LocalRarMetadata, String> {
-    let path = Path::new(&archive_path);
-    if !path.exists() {
-        return Err(format!("File not found: {}", archive_path));
-    }
+    impl ArchiveReader {
+        fn open(path: &str) -> Result<Self, String> {
+            validate_path(path, "archive path")?;
 
-    let file_name = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("Unknown")
-        .to_string();
-
-    let archive = ArchiveReader::read_path(path)
-        .map_err(|e| format!("Failed to read RAR archive {}: {}", archive_path, e))?;
-
-    // Collect all image entry names and indices
-    let mut image_entries: Vec<(usize, String, Vec<u8>)> = Vec::new();
-
-    for (idx, member) in archive.members().enumerate() {
-        if member.meta.is_directory {
-            continue;
-        }
-        let name_str = String::from_utf8_lossy(&member.meta.name).to_string();
-        if is_image_file(&name_str) {
-            image_entries.push((idx, name_str, member.meta.name.clone()));
-        }
-    }
-
-    if image_entries.is_empty() {
-        return Err(format!("No images found in RAR archive: {}", archive_path));
-    }
-
-    // Sort alphabetically by name
-    image_entries.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
-
-    // Try to find a cover image first, otherwise use the first alphabetical image
-    let target = image_entries
-        .iter()
-        .find(|(_, name, _)| name.to_lowercase().contains("cover"))
-        .unwrap_or(&image_entries[0]);
-
-    let cover_bytes = archive
-        .read_member(&target.2, None)
-        .map_err(|e| format!("Failed to extract cover image {}: {}", target.1, e))?
-        .ok_or_else(|| format!("Cover image member {} not found in archive", target.1))?;
-
-    Ok(LocalRarMetadata {
-        name: file_name,
-        cover_image: cover_bytes,
-        path: archive_path,
-    })
-}
-
-/// Extract all images from a CBR/RAR archive
-pub fn extract_rar_archive(archive_path: String) -> Result<LocalRarArchive, String> {
-    let path = Path::new(&archive_path);
-    if !path.exists() {
-        return Err(format!("File not found: {}", archive_path));
-    }
-
-    let file_name = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("Unknown")
-        .to_string();
-
-    let archive = ArchiveReader::read_path(path)
-        .map_err(|e| format!("Failed to read RAR archive {}: {}", archive_path, e))?;
-
-    let buffers: Arc<Mutex<HashMap<String, Arc<Mutex<Vec<u8>>>>>> =
-        Arc::new(Mutex::new(HashMap::new()));
-    let buffers_clone = Arc::clone(&buffers);
-
-    // Extract all entries in streaming fashion
-    archive
-        .extract_to(None, move |meta| {
-            let name_str = String::from_utf8_lossy(&meta.name).to_string();
-            if !meta.is_directory && is_image_file(&name_str) {
-                let buf = Arc::new(Mutex::new(Vec::new()));
-                let mut map = buffers_clone
-                    .lock()
-                    .map_err(|_| rars::error::Error::Cancelled)?;
-                map.insert(name_str, Arc::clone(&buf));
-                Ok(Box::new(SharedBufferWriter { buffer: buf }) as Box<dyn Write>)
-            } else {
-                Ok(Box::new(std::io::sink()) as Box<dyn Write>)
+            // SAFETY: libarchive returns an owned handle that is released by Drop.
+            let handle = unsafe { archive_read_new() };
+            if handle.is_null() {
+                return Err("Failed to allocate a libarchive reader".to_owned());
             }
-        })
-        .map_err(|e| format!("Failed to extract RAR archive {}: {}", archive_path, e))?;
+            let reader = Self(handle);
 
-    let map = Arc::try_unwrap(buffers)
-        .map_err(|_| "Failed to unwrap buffer map".to_string())?
-        .into_inner()
-        .map_err(|e| format!("Mutex error: {}", e))?;
+            // RAR data is self-contained, so no external compression filters or
+            // helper programs need to be enabled.
+            reader.check(
+                unsafe { archive_read_support_filter_none(handle) },
+                "Failed to enable the unfiltered archive reader",
+            )?;
+            reader.check(
+                unsafe { archive_read_support_format_rar(handle) },
+                "Failed to enable RAR support",
+            )?;
+            reader.check(
+                unsafe { archive_read_support_format_rar5(handle) },
+                "Failed to enable RAR5 support",
+            )?;
+            reader.open_path(path)?;
 
-    let mut images: Vec<LocalRarImage> = Vec::new();
-    for (name, buf_arc) in map {
-        let data = Arc::try_unwrap(buf_arc)
-            .map_err(|_| "Failed to unwrap image buffer".to_string())?
-            .into_inner()
-            .map_err(|e| format!("Mutex error: {}", e))?;
-        if !data.is_empty() {
-            images.push(LocalRarImage { name, image: data });
+            Ok(reader)
+        }
+
+        #[cfg(target_os = "windows")]
+        fn open_path(&self, path: &str) -> Result<(), String> {
+            let mut path = path.encode_utf16().collect::<Vec<_>>();
+            path.push(0);
+            // SAFETY: the UTF-16 path is null-terminated and remains alive for
+            // the duration of the call. The handle is valid while self exists.
+            self.check(
+                unsafe { archive_read_open_filename_w(self.0, path.as_ptr(), READ_BLOCK_SIZE) },
+                "Failed to open RAR archive",
+            )
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        fn open_path(&self, path: &str) -> Result<(), String> {
+            let path = CString::new(path)
+                .map_err(|_| "Invalid archive path: contains a null character".to_owned())?;
+            // SAFETY: the path is null-terminated and remains alive for the
+            // duration of the call. The handle is valid while self exists.
+            self.check(
+                unsafe { archive_read_open_filename(self.0, path.as_ptr(), READ_BLOCK_SIZE) },
+                "Failed to open RAR archive",
+            )
+        }
+
+        fn next_header(&self) -> Result<Option<*mut ArchiveEntryHandle>, String> {
+            let mut entry = ptr::null_mut();
+            // SAFETY: libarchive owns the returned entry and keeps it valid until
+            // the next header is read from this live reader.
+            let status = unsafe { archive_read_next_header(self.0, &mut entry) };
+            if status == ARCHIVE_EOF {
+                return Ok(None);
+            }
+            self.check(status, "Failed to read RAR archive header")?;
+            if entry.is_null() {
+                return Err("libarchive returned an empty RAR archive header".to_owned());
+            }
+            Ok(Some(entry))
+        }
+
+        fn skip_data(&self, name: &str) -> Result<(), String> {
+            // SAFETY: self owns a valid reader positioned at the current entry.
+            self.check(
+                unsafe { archive_read_data_skip(self.0) },
+                &format!("Failed to skip RAR entry {name}"),
+            )
+        }
+
+        fn read_data(&self, name: &str) -> Result<Vec<u8>, String> {
+            let mut content = Vec::new();
+            let mut buffer = [0_u8; READ_BLOCK_SIZE];
+            loop {
+                // SAFETY: buffer is writable for its full length and self owns a
+                // valid reader positioned at the current entry.
+                let read = unsafe {
+                    archive_read_data(self.0, buffer.as_mut_ptr().cast::<c_void>(), buffer.len())
+                };
+                if read == 0 {
+                    return Ok(content);
+                }
+                if read < 0 {
+                    return Err(self.error(&format!("Failed to extract RAR entry {name}")));
+                }
+                content.extend_from_slice(&buffer[..read as usize]);
+            }
+        }
+
+        fn check(&self, status: c_int, context: &str) -> Result<(), String> {
+            if status < ARCHIVE_WARN {
+                Err(self.error(context))
+            } else {
+                Ok(())
+            }
+        }
+
+        fn error(&self, context: &str) -> String {
+            // SAFETY: the returned message belongs to this live reader and is
+            // either null or a null-terminated string.
+            let detail = unsafe {
+                let message = archive_error_string(self.0);
+                (!message.is_null()).then(|| CStr::from_ptr(message).to_string_lossy())
+            };
+            match detail {
+                Some(detail) if !detail.is_empty() => format!("{context}: {detail}"),
+                _ => context.to_owned(),
+            }
         }
     }
 
-    if images.is_empty() {
-        return Err(format!("No images found in RAR archive: {}", archive_path));
+    impl Drop for ArchiveReader {
+        fn drop(&mut self) {
+            // SAFETY: this is the unique owned reader handle and it is released
+            // exactly once here.
+            unsafe {
+                archive_read_free(self.0);
+            }
+        }
     }
 
-    // Sort images naturally/alphabetically by name
-    images.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    pub(super) fn list_rar_entries(archive_path: String) -> Result<Vec<RarEntry>, String> {
+        let reader = ArchiveReader::open(&archive_path)?;
+        let mut entries = Vec::new();
 
-    // Cover image is the one with 'cover' in its name, or the first image
-    let cover_image = images
-        .iter()
-        .find(|img| img.name.to_lowercase().contains("cover"))
-        .or_else(|| images.first())
-        .map(|img| img.image.clone());
+        while let Some(entry) = reader.next_header()? {
+            let name = entry_name(entry)?;
+            entries.push(RarEntry {
+                name: name.clone(),
+                is_file: is_regular_file(entry),
+            });
+            reader.skip_data(&name)?;
+        }
 
-    Ok(LocalRarArchive {
-        name: file_name,
-        cover_image,
-        images,
-        path: archive_path,
-    })
+        Ok(entries)
+    }
+
+    pub(super) fn extract_rar_entries(
+        archive_path: String,
+        entry_names: Vec<String>,
+    ) -> Result<Vec<RarEntryData>, String> {
+        for entry_name in &entry_names {
+            validate_path(entry_name, "RAR entry name")?;
+        }
+
+        let mut remaining = entry_names.into_iter().collect::<HashSet<_>>();
+        if remaining.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let reader = ArchiveReader::open(&archive_path)?;
+        let mut extracted = Vec::new();
+        while let Some(entry) = reader.next_header()? {
+            let name = entry_name(entry)?;
+            if is_regular_file(entry) && remaining.remove(&name) {
+                extracted.push(RarEntryData {
+                    content: reader.read_data(&name)?,
+                    name,
+                });
+            } else {
+                reader.skip_data(&name)?;
+            }
+        }
+
+        if !remaining.is_empty() {
+            let mut missing = remaining.into_iter().collect::<Vec<_>>();
+            missing.sort_unstable();
+            return Err(format!(
+                "RAR archive did not contain the requested entries: {}",
+                missing.join(", ")
+            ));
+        }
+
+        Ok(extracted)
+    }
+
+    fn entry_name(entry: *mut ArchiveEntryHandle) -> Result<String, String> {
+        // SAFETY: entry belongs to the active reader and both accessors return
+        // strings owned by that reader. The fallback preserves legacy names
+        // when UTF-8 conversion is unavailable.
+        let name = unsafe {
+            let utf8 = archive_entry_pathname_utf8(entry);
+            let raw = if utf8.is_null() {
+                archive_entry_pathname(entry)
+            } else {
+                utf8
+            };
+            if raw.is_null() {
+                return Err("RAR archive entry has no pathname".to_owned());
+            }
+            CStr::from_ptr(raw).to_string_lossy().into_owned()
+        };
+        Ok(name)
+    }
+
+    fn is_regular_file(entry: *mut ArchiveEntryHandle) -> bool {
+        // SAFETY: entry belongs to the active reader. The small C bridge
+        // normalizes platform-specific mode_t widths to an int result.
+        unsafe { mangatan_libarchive_entry_is_regular(entry) != 0 }
+    }
+
+    fn validate_path(value: &str, label: &str) -> Result<(), String> {
+        if value.contains('\0') {
+            Err(format!("Invalid {label}: contains a null character"))
+        } else {
+            Ok(())
+        }
+    }
 }
 
-#[cfg(test)]
+#[cfg(target_arch = "wasm32")]
+mod implementation {
+    use super::{RarEntry, RarEntryData};
+
+    const UNSUPPORTED_MESSAGE: &str = "RAR archives are not supported in web builds";
+
+    pub(super) fn list_rar_entries(_archive_path: String) -> Result<Vec<RarEntry>, String> {
+        Err(UNSUPPORTED_MESSAGE.to_owned())
+    }
+
+    pub(super) fn extract_rar_entries(
+        _archive_path: String,
+        _entry_names: Vec<String>,
+    ) -> Result<Vec<RarEntryData>, String> {
+        Err(UNSUPPORTED_MESSAGE.to_owned())
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-    use super::*;
+    use super::{extract_rar_entries, list_rar_entries};
+    use base64::Engine;
+    use std::fs;
 
     #[test]
-    fn test_is_image_file() {
-        assert!(is_image_file("page01.jpg"));
-        assert!(is_image_file("page01.JPEG"));
-        assert!(is_image_file("chapter/cover.png"));
-        assert!(is_image_file("01.webp"));
-        assert!(is_image_file("01.avif"));
-        assert!(is_image_file("01.jxl"));
-        assert!(!is_image_file("metadata.xml"));
-        assert!(!is_image_file("comicinfo.json"));
-        assert!(!is_image_file("style.css"));
-    }
+    fn lists_and_extracts_rar5_comic_images() {
+        let path =
+            std::env::temp_dir().join(format!("mangatan-rar-test-{}.cbr", std::process::id()));
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(include_str!("../../test_data/manga.cbr.base64").trim())
+            .expect("fixture base64 should decode");
+        fs::write(&path, bytes).expect("fixture should be writable");
 
-    #[test]
-    fn test_non_existent_file() {
-        assert!(extract_rar_metadata("non_existent_archive.cbr".to_string()).is_err());
-        assert!(extract_rar_archive("non_existent_archive.cbr".to_string()).is_err());
+        let path_string = path.to_string_lossy().into_owned();
+        let entries = list_rar_entries(path_string.clone()).expect("fixture should list");
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|entry| entry.is_file)
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            ["2.png", "10.png", "cover.png"]
+        );
+
+        let extracted = extract_rar_entries(
+            path_string.clone(),
+            vec!["cover.png".to_owned(), "2.png".to_owned()],
+        )
+        .expect("selected images should extract");
+        assert_eq!(extracted.len(), 2);
+        assert!(extracted
+            .iter()
+            .all(|entry| entry.content.starts_with(b"\x89PNG\r\n\x1a\n")));
+
+        let error = extract_rar_entries(path_string, vec!["missing.png".to_owned()])
+            .expect_err("missing entries should be reported");
+        assert!(error.contains("missing.png"));
+
+        fs::remove_file(path).expect("fixture should be removable");
     }
 }
-

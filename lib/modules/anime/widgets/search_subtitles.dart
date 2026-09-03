@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/modules/widgets/custom_extended_image_provider.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
@@ -19,6 +18,7 @@ import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as path;
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 
 class SubtitlesWidgetSearch extends ConsumerStatefulWidget {
   final Chapter chapter;
@@ -336,9 +336,8 @@ class _SubtitlesWidgetSearchState extends ConsumerState<SubtitlesWidgetSearch> {
     try {
       final subtitle = subtitles![index];
       final storageProvider = StorageProvider();
-      final resolvedArchivePath =
-          widget.chapter.archivePath?.isNotEmpty ?? false
-          ? await resolveLocalArchivePath(widget.chapter.archivePath!)
+      final resolvedArchivePath = widget.chapter.archivePath?.isNotEmpty ?? false
+          ? widget.chapter.archivePath
           : null;
       final animeDir =
           resolvedArchivePath != null &&

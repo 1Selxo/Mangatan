@@ -10,15 +10,16 @@ import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
+import 'package:mangayomi/modules/anime/youtube/youtube_browser_screen.dart';
 import 'package:mangayomi/modules/browse/extension/edit_code.dart';
 import 'package:mangayomi/modules/browse/extension/extension_detail.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/create_extension.dart';
 import 'package:mangayomi/modules/browse/sources/sources_filter_screen.dart';
 import 'package:mangayomi/modules/calendar/calendar_screen.dart';
+import 'package:mangayomi/modules/dictionary/dictionary_lookup_screen.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/migrate_screen.dart';
 import 'package:mangayomi/modules/mass_migration/mass_migration_source_selection_screen.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/recommendation_screen.dart';
-import 'package:mangayomi/modules/manga/detail/widgets/related_screen.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/watch_order_screen.dart';
 import 'package:mangayomi/modules/more/data_and_storage/create_backup.dart';
 import 'package:mangayomi/modules/more/data_and_storage/data_and_storage.dart';
@@ -30,6 +31,10 @@ import 'package:mangayomi/modules/more/settings/player/player_audio_screen.dart'
 import 'package:mangayomi/modules/more/settings/player/player_decoder_screen.dart';
 import 'package:mangayomi/modules/more/settings/player/player_overview_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
+import 'package:mangayomi/modules/more/statistics/immersion_stats_data.dart';
+import 'package:mangayomi/modules/more/statistics/immersion_stats_screen.dart';
+import 'package:mangayomi/modules/more/statistics/immersion_stats_titles_screen.dart';
 import 'package:mangayomi/modules/more/statistics/statistics_screen.dart';
 import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/modules/tracker_library/tracker_library_screen.dart';
@@ -59,12 +64,16 @@ import 'package:mangayomi/modules/more/settings/appearance/appearance_screen.dar
 import 'package:mangayomi/modules/more/settings/browse/browse_screen.dart';
 import 'package:mangayomi/modules/more/settings/browse/extension_server_screen.dart';
 import 'package:mangayomi/modules/more/settings/general/general_screen.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/dictionary_screen.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
+import 'package:mangayomi/modules/more/settings/ocr/ocr_settings_screen.dart';
+import 'package:mangayomi/modules/more/settings/player/player_subtitle_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
 import 'package:mangayomi/modules/more/settings/security/security_screen.dart';
 import 'package:mangayomi/services/crash_route_observer.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/cupertino.dart';
 part 'router.g.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -78,7 +87,11 @@ GoRouter router(Ref ref) {
       .first;
 
   return GoRouter(
-    observers: [BotToastNavigatorObserver(), CrashRouteObserver()],
+    observers: [
+      BotToastNavigatorObserver(),
+      CrashRouteObserver(),
+      DictionaryPopupDismissNavigatorObserver(),
+    ],
     initialLocation: initLocation,
     debugLogDiagnostics: kDebugMode,
     refreshListenable: router,
@@ -127,55 +140,36 @@ class RouterCurrentLocationState extends _$RouterCurrentLocationState {
 
 class RouterNotifier extends ChangeNotifier {
   List<RouteBase> get _routes => [
-    // Each tab lives in its own StatefulShellBranch so switching tabs keeps
-    // the other screens mounted (scroll position, queries, images preserved).
-    //
-    // Except on a television, where that retention is not affordable. Measured
-    // on a Fire TV: every branch left mounted holds roughly 14 MB of GPU
-    // surfaces, three tabs took Graphics from 27 MB to 69 MB, and the box has
-    // around 300 MB free with most of its swap already spent. Off TV the
-    // trade is the other way round and IndexedStack stays.
-    StatefulShellRoute(
-      builder: (context, state, navigationShell) =>
-          MainScreen(child: navigationShell),
-      navigatorContainerBuilder: (context, navigationShell, children) => isTv
-          ? children[navigationShell.currentIndex]
-          : IndexedStack(
-              index: navigationShell.currentIndex,
-              children: children,
-            ),
-      branches: [
-        _branch(
-          _genericRoute<String?>(
-            name: "MangaLibrary",
-            builder: (id) =>
-                LibraryScreen(itemType: ItemType.manga, presetInput: id),
-          ),
+    ShellRoute(
+      builder: (context, state, child) => MainScreen(child: child),
+      routes: [
+        _genericRoute<String?>(
+          name: "MangaLibrary",
+          builder: (id) =>
+              LibraryScreen(itemType: ItemType.manga, presetInput: id),
         ),
-        _branch(
-          _genericRoute<String?>(
-            name: "AnimeLibrary",
-            builder: (id) =>
-                LibraryScreen(itemType: ItemType.anime, presetInput: id),
-          ),
+        _genericRoute<String?>(
+          name: "AnimeLibrary",
+          builder: (id) =>
+              LibraryScreen(itemType: ItemType.anime, presetInput: id),
         ),
-        _branch(
-          _genericRoute<String?>(
-            name: "NovelLibrary",
-            builder: (id) =>
-                LibraryScreen(itemType: ItemType.novel, presetInput: id),
-          ),
+        _genericRoute<String?>(
+          name: "NovelLibrary",
+          builder: (id) =>
+              LibraryScreen(itemType: ItemType.novel, presetInput: id),
         ),
-        _branch(
-          _genericRoute<String?>(
-            name: "trackerLibrary",
-            builder: (id) => TrackerLibraryScreen(presetInput: id),
-          ),
+        _genericRoute<String?>(
+          name: "trackerLibrary",
+          builder: (id) => TrackerLibraryScreen(presetInput: id),
         ),
-        _branch(_genericRoute(name: "history", child: const HistoryScreen())),
-        _branch(_genericRoute(name: "updates", child: const UpdatesScreen())),
-        _branch(_genericRoute(name: "browse", child: const BrowseScreen())),
-        _branch(_genericRoute(name: "more", child: const MoreScreen())),
+        _genericRoute(name: "history", child: const HistoryScreen()),
+        _genericRoute(name: "updates", child: const UpdatesScreen()),
+        _genericRoute(name: "browse", child: const BrowseScreen()),
+        _genericRoute(
+          name: "dictionaryLookup",
+          child: const DictionaryLookupScreen(),
+        ),
+        _genericRoute(name: "more", child: const MoreScreen()),
       ],
     ),
     _genericRoute<(Source?, bool)>(
@@ -198,10 +192,22 @@ class RouterNotifier extends ChangeNotifier {
       builder: (id) =>
           AnimePlayerView(key: ValueKey('animePlayer-$id'), episodeId: id),
     ),
-    _genericRoute<int>(
+    _genericRoute(name: "youtubeBrowser", child: const YouTubeBrowserScreen()),
+    _genericRoute<Object>(
       name: "novelReaderView",
-      builder: (id) =>
-          NovelReaderView(key: ValueKey('novelReader-$id'), chapterId: id),
+      builder: (extra) => switch (extra) {
+        NovelReaderRouteArgs args => NovelReaderView(
+          key: ValueKey('novelReader-${args.chapterId}'),
+          chapterId: args.chapterId,
+          initialProgress: args.initialProgress,
+          initialEpubSpineIndex: args.initialEpubSpineIndex,
+        ),
+        int id => NovelReaderView(
+          key: ValueKey('novelReader-$id'),
+          chapterId: id,
+        ),
+        _ => throw ArgumentError.value(extra, 'extra', 'Invalid novel route'),
+      },
     ),
     _genericRoute<ItemType>(
       name: "ExtensionLang",
@@ -230,13 +236,44 @@ class RouterNotifier extends ChangeNotifier {
       name: "mangawebview",
       builder: (data) => MangaWebView(url: data["url"]!, title: data['title']!),
     ),
-    _genericRoute<(bool, int)>(
+    _genericRoute<(bool, ItemType)>(
       name: "categories",
       builder: (data) => CategoriesScreen(data: data),
     ),
     _genericRoute(name: "statistics", child: const StatisticsScreen()),
+    _genericRoute(
+      path: "/statistics/immersion",
+      name: "immersionStatistics",
+      child: const ImmersionStatsScreen(),
+    ),
+    _genericRoute<ImmersionStatsQuery>(
+      path: "/statistics/titles",
+      name: "immersionStatisticsTitles",
+      builder: (query) => ImmersionStatsTitlesScreen(query: query),
+    ),
+    _genericRoute<ImmersionStatsTitle>(
+      path: "/statistics/title",
+      name: "immersionStatisticsTitle",
+      builder: (title) => ImmersionStatsScreen(
+        titleId: title.id,
+        isNovel: title.isNovel,
+        titleName: title.title,
+      ),
+    ),
     _genericRoute(name: "general", child: const GeneralScreen()),
     _genericRoute(name: "readerMode", child: const ReaderScreen()),
+    _genericRoute(name: "dictionary", child: const DictionaryScreen()),
+    _genericRoute(name: "ocrSettings", child: const OcrSettingsScreen()),
+    _genericRoute(
+      name: "dictionaryPopup",
+      child: const DictionaryScreen(
+        section: DictionarySettingsSection.dictionaryPopup,
+      ),
+    ),
+    _genericRoute(
+      name: "ankiSettings",
+      child: const DictionaryScreen(section: DictionarySettingsSection.anki),
+    ),
     _genericRoute(name: "browseS", child: const BrowseSScreen()),
     _genericRoute(
       name: "extensionServer",
@@ -256,14 +293,12 @@ class RouterNotifier extends ChangeNotifier {
     ),
     _genericRoute(name: "playerOverview", child: const PlayerOverviewScreen()),
     _genericRoute(name: "playerMode", child: const PlayerScreen()),
+    _genericRoute(name: "playerSubtitles", child: const PlayerSubtitleScreen()),
     _genericRoute<int>(
       name: "codeEditor",
       builder: (sourceId) => CodeEditorPage(sourceId: sourceId),
     ),
-    _genericRoute<Source?>(
-      name: "createExtension",
-      builder: (source) => CreateExtension(editSource: source),
-    ),
+    _genericRoute(name: "createExtension", child: const CreateExtension()),
     _genericRoute(name: "createBackup", child: const CreateBackup()),
     _genericRoute(
       name: "customNavigationSettings",
@@ -301,10 +336,6 @@ class RouterNotifier extends ChangeNotifier {
       name: "migrate/tracker",
       builder: (data) => MigrationScreen(manga: data.$1, trackSearch: data.$2),
     ),
-    _genericRoute<(String, ItemType)>(
-      name: "related",
-      builder: (data) => RelatedScreen(name: data.$1, itemType: data.$2),
-    ),
     _genericRoute<(String, ItemType, AlgorithmWeights)>(
       name: "recommendations",
       builder: (data) => RecommendationScreen(
@@ -318,9 +349,6 @@ class RouterNotifier extends ChangeNotifier {
       builder: (data) => WatchOrderScreen(name: data.$1, track: data.$2),
     ),
   ];
-
-  StatefulShellBranch _branch(GoRoute route) =>
-      StatefulShellBranch(routes: [route]);
 
   GoRoute _genericRoute<T>({
     String? name,

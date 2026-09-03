@@ -3,9 +3,38 @@ syntax = "proto3";
 import "BackupManga.proto";
 import "BackupCategory.proto";
 import "BackupSource.proto";
+import "BackupAnime.proto";
+import "BackupExtensionRepos.proto";
+import "BackupExtensionStore.proto";
+import "BackupFeed.proto";
+import "BackupNovel.proto";
+import "BackupPreference.proto";
+import "BackupSavedSearch.proto";
+import "BackupSearchHistory.proto";
+import "BackupStatistics.proto";
 
 message BackupMihon {
     repeated BackupManga backupManga = 1;
     repeated BackupCategory backupCategories = 2;
     repeated BackupSource backupSources = 101;
+    repeated BackupPreference backupPreferences = 104;
+    repeated BackupSourcePreferences backupSourcePreferences = 105;
+    repeated BackupExtensionStore backupExtensionStores = 106;
+
+    // Aniyomi/Anikku fields used by Chimahon's common backup envelope.
+    repeated BackupAnime backupAnime = 501;
+    repeated BackupCategory backupAnimeCategories = 502;
+    repeated BackupSource backupAnimeSources = 503;
+    repeated BackupExtensionRepos backupAnimeExtensionRepo = 505;
+
+    // TachiyomiSY and Komikku additions.
+    repeated BackupSavedSearch backupSavedSearches = 600;
+    repeated BackupFeed backupFeeds = 610;
+    repeated BackupSearchHistory backupSearchHistory = 650;
+
+    // Chimahon additions. Keep these tags stable for cross-device sync.
+    repeated BackupNovel backupNovels = 700;
+    repeated BackupNovelCategory backupNovelCategories = 701;
+    repeated BackupMangaStats backupMangaStats = 710;
+    repeated BackupAnkiStats backupAnkiStats = 711;
 }

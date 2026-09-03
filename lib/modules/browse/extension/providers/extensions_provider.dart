@@ -2,9 +2,22 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/settings.dart';
 part 'extensions_provider.g.dart';
 
 @riverpod
 Stream<List<Source>> getExtensionsStream(Ref ref, ItemType itemType) async* {
-  yield* sourceRepository.watchActiveVisibleByItemType(itemType);
+  yield* isar.sources
+      .filter()
+      .idIsNotNull()
+      .and()
+      .group(
+        (q) => q.repoIsNull().or().repo(
+          (q) => q.hiddenIsNull().or().hiddenEqualTo(false),
+        ),
+      )
+      .itemTypeEqualTo(itemType)
+      .watch(fireImmediately: true);
 }

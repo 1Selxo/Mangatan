@@ -65,7 +65,7 @@ final class GetExtensionsStreamProvider
 }
 
 String _$getExtensionsStreamHash() =>
-    r'9b75909791610244bdbd420ec7d722108cfb7f33';
+    r'33927d48e0e27fe9a6800e809c3e79f7d9873cf3';
 
 final class GetExtensionsStreamFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<Source>>, ItemType> {

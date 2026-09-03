@@ -7,86 +7,51 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `is_image_file`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `SharedBufferWriter`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `flush`, `fmt`, `fmt`, `fmt`, `write`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`
 
-/// Extract metadata (including cover image) from a CBR/RAR file
-Future<LocalRarMetadata> extractRarMetadata({required String archivePath}) =>
-    RustLib.instance.api.crateApiRarExtractRarMetadata(
-      archivePath: archivePath,
-    );
+Future<List<RarEntry>> listRarEntries({required String archivePath}) =>
+    RustLib.instance.api.crateApiRarListRarEntries(archivePath: archivePath);
 
-/// Extract all images from a CBR/RAR archive
-Future<LocalRarArchive> extractRarArchive({required String archivePath}) =>
-    RustLib.instance.api.crateApiRarExtractRarArchive(archivePath: archivePath);
+Future<List<RarEntryData>> extractRarEntries({
+  required String archivePath,
+  required List<String> entryNames,
+}) => RustLib.instance.api.crateApiRarExtractRarEntries(
+  archivePath: archivePath,
+  entryNames: entryNames,
+);
 
-class LocalRarArchive {
+class RarEntry {
   final String name;
-  final Uint8List? coverImage;
-  final List<LocalRarImage> images;
-  final String path;
+  final bool isFile;
 
-  const LocalRarArchive({
-    required this.name,
-    this.coverImage,
-    required this.images,
-    required this.path,
-  });
+  const RarEntry({required this.name, required this.isFile});
 
   @override
-  int get hashCode =>
-      name.hashCode ^ coverImage.hashCode ^ images.hashCode ^ path.hashCode;
+  int get hashCode => name.hashCode ^ isFile.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is LocalRarArchive &&
+      other is RarEntry &&
           runtimeType == other.runtimeType &&
           name == other.name &&
-          coverImage == other.coverImage &&
-          images == other.images &&
-          path == other.path;
+          isFile == other.isFile;
 }
 
-class LocalRarImage {
+class RarEntryData {
   final String name;
-  final Uint8List image;
+  final Uint8List content;
 
-  const LocalRarImage({required this.name, required this.image});
+  const RarEntryData({required this.name, required this.content});
 
   @override
-  int get hashCode => name.hashCode ^ image.hashCode;
+  int get hashCode => name.hashCode ^ content.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is LocalRarImage &&
+      other is RarEntryData &&
           runtimeType == other.runtimeType &&
           name == other.name &&
-          image == other.image;
-}
-
-class LocalRarMetadata {
-  final String name;
-  final Uint8List coverImage;
-  final String path;
-
-  const LocalRarMetadata({
-    required this.name,
-    required this.coverImage,
-    required this.path,
-  });
-
-  @override
-  int get hashCode => name.hashCode ^ coverImage.hashCode ^ path.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is LocalRarMetadata &&
-          runtimeType == other.runtimeType &&
-          name == other.name &&
-          coverImage == other.coverImage &&
-          path == other.path;
+          content == other.content;
 }

@@ -14,7 +14,7 @@ class ReleaseAsset(TypedDict):
 class GitHubRelease(TypedDict):
     tag_name: str
     published_at: str
-    body: str
+    body: Optional[str]
     assets: List[ReleaseAsset]
 
 
@@ -62,6 +62,48 @@ class AppConfig(TypedDict):
     image_url: str
 
 
+def apply_source_identity(data: AppData, config: AppConfig) -> None:
+    """Keep the AltStore source and app identity aligned with the IPA."""
+    repository_url = f"https://github.com/{config['repo_url']}"
+    raw_assets_url = (
+        f"https://raw.githubusercontent.com/{config['repo_url']}"
+        "/refs/heads/main/repo/images"
+    )
+    data.update(
+        {
+            "name": config["app_name"],
+            "identifier": config["app_id"],
+            "headerURL": f"{raw_assets_url}/headers/source_header_default.webp",
+            "website": repository_url,
+            "iconURL": f"{raw_assets_url}/icons/icon_default.webp",
+            "subtitle": "Read, watch, and learn.",
+            "description": (
+                f"The official sideloading source for {config['app_name']}.\n\n"
+                "For full details, check the GitHub repository:\n"
+                f"{repository_url}"
+            ),
+        }
+    )
+
+    app = data["apps"][0]
+    app.update(
+        {
+            "name": config["app_name"],
+            "bundleIdentifier": config["app_id"],
+            "developerName": f"{config['app_name']} contributors",
+            "localizedDescription": (
+                f"{config['app_name']} is an open-source Flutter app for "
+                "reading manga and novels, watching anime, and language learning."
+            ),
+            "iconURL": f"{raw_assets_url}/icons/icon_default.webp",
+            "screenshotURLs": [
+                f"{raw_assets_url}/screenshots/image_{index}_default.webp"
+                for index in range(3)
+            ],
+        }
+    )
+
+
 def load_config(config_path: str) -> AppConfig:
     """
     Load repo configuration values.
@@ -69,7 +111,7 @@ def load_config(config_path: str) -> AppConfig:
     try:
         with open(config_path, 'r') as config_file:
             config_data = json.load(config_file)
-        
+
         return {
             "repo_url": config_data["repo_url"],
             "json_file": config_data["json_file"],
@@ -79,7 +121,7 @@ def load_config(config_path: str) -> AppConfig:
             "tint_colour": config_data["tint_colour"],
             "image_url": config_data["image_url"],
         }
-    
+
     except FileNotFoundError:
         print(f"Configuration file not found at {config_path}")
         raise
@@ -105,31 +147,6 @@ def fetch_all_releases(repo_url: str) -> List[GitHubRelease]:
     sorted_releases = sorted(releases, key=lambda x: x["published_at"], reverse=False)
 
     return sorted_releases
-
-
-def fetch_latest_release(repo_url: str) -> GitHubRelease:
-    """
-    Fetch the latest GitHub release for the repository.
-
-    Returns:
-        GitHubRelease: The latest release
-
-    Raises:
-        ValueError: If no releases are found
-    """
-    api_url: str = f"https://api.github.com/repos/{repo_url}/releases"
-    headers: Dict[str, str] = {"Accept": "application/vnd.github+json"}
-
-    response = requests.get(api_url, headers=headers)
-    response.raise_for_status()  # Raise exception for HTTP errors
-
-    releases: List[GitHubRelease] = response.json()
-    sorted_releases = sorted(releases, key=lambda x: x["published_at"], reverse=True)
-
-    if sorted_releases:
-        return sorted_releases[0]
-
-    raise ValueError("No release found.")
 
 
 # 2025-03-25: Reimplement this at a later date (@tanakrit-d)
@@ -269,6 +286,7 @@ def update_json_file(
     with open(json_file, "r") as file:
         data: AppData = json.load(file)
 
+    apply_source_identity(data, config)
     app = data["apps"][0]
 
     releases = []
@@ -287,7 +305,7 @@ def update_json_file(
         base_version = normalize_version(full_version)
 
         # Clean up description
-        description = release["body"]
+        description = release.get("body") or ""
         keyword = "{APP_NAME} Release Information"
         if keyword in description:
             description = description.split(keyword, 1)[1].strip()
@@ -327,21 +345,25 @@ def update_json_file(
     if not version_match:
         raise ValueError("Invalid version format")
 
-    app["version"] = normalize_version(full_version)
+    app["version"] = normalize_version(latest_version)
     app["versionDate"] = fetched_data_latest["published_at"]
-    app["versionDescription"] = format_description(fetched_data_latest["body"])
+    app["versionDescription"] = format_description(
+        fetched_data_latest.get("body") or ""
+    )
 
     # Find latest download URL and size
     download_url, size = find_download_url_and_size(fetched_data_latest)
     app["downloadURL"] = download_url
     app["size"] = size
 
-    # Update news entries
-    # 2025-03-25: Reimplement this at a later date (@tanakrit-d)
-    # purge_old_news(data, fetched_versions)
-
-    if "news" not in data:
-        data["news"] = []
+    # Drop stale entries generated by a previous fork configuration. Historical
+    # releases remain available through the repository's releases page.
+    release_url_prefix = f"https://github.com/{config['repo_url']}/releases/"
+    data["news"] = [
+        item
+        for item in data.get("news", [])
+        if str(item.get("url", "")).startswith(release_url_prefix)
+    ]
 
     # Add news entry for the latest version if it doesn't exist
     news_identifier = f"release-{latest_version}"
@@ -374,11 +396,27 @@ def main() -> None:
     try:
         config = load_config("repo/config.json")
         fetched_data_all = fetch_all_releases(config["repo_url"])
-        fetched_data_latest = fetch_latest_release(config["repo_url"])
-        update_json_file(config, "repo/source.json", fetched_data_all, fetched_data_latest)
+        releases_with_ipa = [
+            release
+            for release in fetched_data_all
+            if find_download_url_and_size(release)[0] is not None
+        ]
+        if not releases_with_ipa:
+            raise ValueError("No release containing an iOS IPA was found.")
+        fetched_data_latest = max(
+            releases_with_ipa,
+            key=lambda release: release["published_at"],
+        )
+        update_json_file(
+            config,
+            "repo/source.json",
+            releases_with_ipa,
+            fetched_data_latest,
+        )
         print("Successfully updated repo/source.json with latest releases.")
     except Exception as e:
         print(f"Error updating releases: {e}")
+        raise
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ class BackupChapter extends $pb.GeneratedMessage {
     $fixnum.Int64? sourceOrder,
     $fixnum.Int64? lastModifiedAt,
     $fixnum.Int64? version,
+    $core.List<$core.int>? memo,
   }) {
     final result = create();
     if (url != null) result.url = url;
@@ -45,6 +46,7 @@ class BackupChapter extends $pb.GeneratedMessage {
     if (sourceOrder != null) result.sourceOrder = sourceOrder;
     if (lastModifiedAt != null) result.lastModifiedAt = lastModifiedAt;
     if (version != null) result.version = version;
+    if (memo != null) result.memo = memo;
     return result;
   }
 
@@ -75,6 +77,8 @@ class BackupChapter extends $pb.GeneratedMessage {
     ..aInt64(11, _omitFieldNames ? '' : 'lastModifiedAt',
         protoName: 'lastModifiedAt')
     ..aInt64(12, _omitFieldNames ? '' : 'version')
+    ..a<$core.List<$core.int>>(
+        13, _omitFieldNames ? '' : 'memo', $pb.PbFieldType.OY)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -205,6 +209,15 @@ class BackupChapter extends $pb.GeneratedMessage {
   $core.bool hasVersion() => $_has(11);
   @$pb.TagNumber(12)
   void clearVersion() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.List<$core.int> get memo => $_getN(12);
+  @$pb.TagNumber(13)
+  set memo($core.List<$core.int> value) => $_setBytes(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasMemo() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearMemo() => $_clearField(13);
 }
 
 const $core.bool _omitFieldNames =

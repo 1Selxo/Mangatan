@@ -10,13 +10,13 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get library => '图书馆';
+  String get library => '书架';
 
   @override
   String get updates => '更新';
 
   @override
-  String get history => '历史';
+  String get history => '阅读记录';
 
   @override
   String get browse => '浏览';
@@ -49,7 +49,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get started => '已开始';
 
   @override
-  String get bookmarked => '已书签';
+  String get bookmarked => '已收藏';
 
   @override
   String get sort => '排序';
@@ -76,10 +76,10 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '你正在从你的库中删除此$mediaType的全部$count$entryTypePlural。',
-      one: '你正在从你的库中删除此$mediaType的唯一$entryType。',
+      other: '您正在从书架中删除此$mediaType的全部$count$entryTypePlural。',
+      one: '您正在从书架中删除此$mediaType的唯一$entryType。',
     );
-    return '$_temp0\n这也会将整个$mediaType从你的库中移除。\n\n注意：文件本身不会被删除。';
+    return '$_temp0\n这也会将整个$mediaType从书架中移除。\n\n注意：文件本身不会被删除。';
   }
 
   @override
@@ -89,7 +89,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get episode => '剧集';
 
   @override
-  String get unread_count => '未读计数';
+  String get unread_count => '未读数量';
 
   @override
   String get unwatched_count => '未观看计数';
@@ -163,19 +163,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get show_continue_watching_buttons => '显示继续观看按钮';
 
   @override
-  String get empty_library => '空图书馆';
+  String get empty_library => '书架为空';
 
   @override
-  String get search => '搜索...';
+  String get search => '搜索…';
 
   @override
-  String get no_recent_updates => '无最近更新';
+  String get no_recent_updates => '暂无最近更新';
 
   @override
   String get remove_everything => '删除所有';
 
   @override
-  String get remove_everything_msg => '你确定吗？所有历史将丢失';
+  String get remove_everything_msg => '确定要删除吗？所有阅读记录都将丢失。';
 
   @override
   String get remove_all_update_msg => '你确定吗？所有更新将被清除';
@@ -190,7 +190,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get remove => '移除';
 
   @override
-  String get remove_history_msg => '这将移除此章节的阅读日期。你确定吗？';
+  String get remove_history_msg => '这将移除此章节的阅读日期。确定要继续吗？';
 
   @override
   String get last_used => '最后使用';
@@ -223,13 +223,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mass_migration_preview_items => '预览项目';
 
   @override
-  String get mass_migration_destination_source => '目标源';
+  String get mass_migration_destination_source => '目标来源';
 
   @override
-  String get mass_migration_no_library_items => '没有可供批量迁移的图库项目。';
+  String get mass_migration_no_library_items => '书架中没有可供批量迁移的项目。';
 
   @override
-  String get mass_migration_no_destination_sources => '没有可用的已安装目标源。';
+  String get mass_migration_no_destination_sources => '没有可用的已安装目标来源。';
 
   @override
   String get mass_migration_installed => '已安装';
@@ -239,8 +239,8 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count个项目准备好复检',
-      one: '1个项目准备好复检',
+      other: '$count 个项目可供审核',
+      one: '1 个项目可供审核',
     );
     return '$_temp0';
   }
@@ -250,18 +250,18 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count个项目',
-      one: '1个项目',
+      other: '$count 个项目',
+      one: '1 个项目',
     );
     return '$_temp0';
   }
 
   @override
-  String get mass_migration_select_destination_source => '选择目标源';
+  String get mass_migration_select_destination_source => '选择目标来源';
 
   @override
   String mass_migration_finding_matches(Object source, Object language) {
-    return '正在 $source • $language 中寻找匹配项';
+    return '正在 $source • $language 中查找匹配项';
   }
 
   @override
@@ -270,47 +270,47 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get mass_migration_waiting_next_item => '等待2秒后处理下一个项目...';
+  String get mass_migration_waiting_next_item => '等待 2 秒后处理下一个项目…';
 
   @override
-  String get mass_migration_waiting_next_migration => '等待2秒后处理下一项迁移...';
+  String get mass_migration_waiting_next_migration => '等待 2 秒后进行下一次迁移…';
 
   @override
   String mass_migration_matched_so_far(int count) {
-    return '目前已匹配: $count';
+    return '目前已匹配：$count';
   }
 
   @override
   String mass_migration_no_match_count(int count) {
-    return '未匹配: $count';
+    return '未匹配：$count';
   }
 
   @override
   String mass_migration_review_matches(Object source) {
-    return '复检 $source 的匹配项';
+    return '审核 $source 的匹配项';
   }
 
   @override
   String mass_migration_found_matches(int count) {
-    return '找到匹配项: $count';
+    return '找到匹配项：$count';
   }
 
   @override
   String mass_migration_no_matches(int count) {
-    return '未找到匹配: $count';
+    return '未找到匹配项：$count';
   }
 
   @override
   String mass_migration_selected_to_migrate(int count) {
-    return '选定迁移: $count';
+    return '选定迁移：$count';
   }
 
   @override
-  String get mass_migration_finish_review => '结束复检';
+  String get mass_migration_finish_review => '完成审核';
 
   @override
   String mass_migration_migrate_selected(int count) {
-    return '迁移选定项目 ($count)';
+    return '迁移选定项目（$count）';
   }
 
   @override
@@ -373,7 +373,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mass_migration_skip => '跳过';
 
   @override
-  String get mass_migration_loading => '正在加载...';
+  String get mass_migration_loading => '正在加载…';
 
   @override
   String get mass_migration_choose_another_result => '选择其他结果';
@@ -422,7 +422,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String mass_migration_and_more_chapters(int count) {
-    return '以及更多 $count 个...';
+    return '以及另外 $count 个…';
   }
 
   @override
@@ -432,7 +432,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mass_migration_unknown_match => '未知匹配';
 
   @override
-  String get mass_migration_unknown_source => '未知源';
+  String get mass_migration_unknown_source => '未知来源';
 
   @override
   String get mass_migration_unknown_chapter => '未知章节';
@@ -445,11 +445,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String cleaned_database(Object x) {
-    return '数据库已清理！已移除 $x 条目';
+    return '数据库已清理！已移除 $x 个条目。';
   }
 
   @override
-  String get clean_database_desc => '这将移除所有未添加到图书馆的项目！';
+  String get clean_database_desc => '这将移除所有未添加到书架的项目！';
 
   @override
   String get incognito_mode => '隐身模式';
@@ -471,6 +471,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get statistics => '统计';
+
+  @override
+  String get library_statistics => 'Library statistics';
 
   @override
   String get settings => '设置';
@@ -498,14 +501,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get name => '名称';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label：$value';
-  }
-
-  @override
-  String get url => 'URL';
 
   @override
   String get category_name_required => '*必填';
@@ -543,10 +538,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearance_subtitle => '主题，日期和时间格式';
 
   @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
   String get theme => '主题';
 
   @override
-  String get dark_mode => '暗模式';
+  String get dark_mode => '深色模式';
 
   @override
   String get follow_system_theme => '跟随系统主题';
@@ -558,7 +565,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get off => '关';
 
   @override
-  String get pure_black_dark_mode => '纯黑暗模式';
+  String get pure_black_dark_mode => '纯黑深色模式';
 
   @override
   String get timestamp => '时间戳';
@@ -600,10 +607,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reading_mode_right_to_left => '从右到左';
 
   @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
   String get reading_mode_vertical_continuous => '垂直连续';
 
   @override
   String get reading_mode_webtoon => '网络漫画';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => '双击动画速度';
@@ -618,7 +649,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get no_animation => '无动画';
 
   @override
-  String get animate_page_transitions => '动画页面过渡';
+  String get animate_page_transitions => '页面切换动画';
 
   @override
   String get crop_borders => '裁剪边框';
@@ -636,10 +667,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get custom_location => '自定义位置';
 
   @override
-  String get only_on_wifi => '仅在wifi下';
+  String get only_on_wifi => '仅在 Wi-Fi 下';
 
   @override
-  String get save_as_cbz_archive => '保存为CBZ档案';
+  String get save_as_cbz_archive => '保存为 CBZ 压缩包';
 
   @override
   String get delete_download_after_reading => '完成阅读后删除下载内容';
@@ -664,11 +695,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get version => '版本';
-
-  @override
-  String beta_version(Object version) {
-    return '测试版 ($version)';
-  }
 
   @override
   String get check_for_update => '检查更新';
@@ -724,20 +750,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unknown => '未知';
 
   @override
-  String get empty_placeholder => '空';
-
-  @override
-  String get error => '错误';
-
-  @override
-  String error_with_message(Object error) {
-    return '错误：$error';
-  }
-
-  @override
-  String get no_pages_available => '错误：无可用页面';
-
-  @override
   String get set_categories => '设置类别';
 
   @override
@@ -766,84 +778,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get source_title => '来源标题';
-
-  @override
-  String get create_extension => '创建扩展';
-
-  @override
-  String get choose_extension_language => '选择扩展语言';
-
-  @override
-  String get lang => '语言';
-
-  @override
-  String get base_url => '基础 URL';
-
-  @override
-  String get api_url_optional => 'API URL（可选）';
-
-  @override
-  String get icon_url => '图标 URL';
-
-  @override
-  String get source_icon_url => '图源图标 URL';
-
-  @override
-  String get notes => '备注';
-
-  @override
-  String get extension_name_example => '例如：myAnime';
-
-  @override
-  String get language_code_example => '例如：zh';
-
-  @override
-  String get base_url_example => '例如：https://example.com';
-
-  @override
-  String get api_url_example => '例如：https://api.example.com';
-
-  @override
-  String get extension_notes_example => '例如：此扩展需要登录';
-
-  @override
-  String get type => '类型';
-
-  @override
-  String get target => '目标';
-
-  @override
-  String get source_type_single => '单一';
-
-  @override
-  String get source_type_multi => '多源';
-
-  @override
-  String get source_type_torrent => '种子 (Torrent)';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'LNReader 编译 JS';
-
-  @override
-  String get source_created_successfully => '图源创建成功';
-
-  @override
-  String get source_already_exists => '图源已存在';
-
-  @override
-  String get error_when_creating_source => '创建图源时出错';
-
-  @override
-  String get cookies_deleted => 'Cookie 已删除！';
-
-  @override
-  String get delete_all_cookies => '删除所有 Cookie';
 
   @override
   String get chapter_number => '章节号';
@@ -1021,7 +955,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tracking => '追踪';
 
   @override
-  String get syncing => '同步';
+  String get syncing => '正在同步';
 
   @override
   String get sync_password => '密码（至少8个字符）';
@@ -1031,16 +965,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get syncing_subtitle =>
-      '通过自托管的 \n服务器在多个设备上同步你的进度。查看我们的 discord 服务器，了解更多信息！';
+      '通过自托管服务器在多个设备上同步您的进度。查看我们的 Discord 服务器，了解更多信息！';
 
   @override
-  String get last_sync_manga => '最新漫画同步于: ';
+  String get last_sync_manga => '上次同步漫画：';
 
   @override
-  String get last_sync_history => '最后历史同步时间：';
+  String get last_sync_history => '上次同步阅读记录：';
 
   @override
-  String get last_sync_update => '最后更新同步于: ';
+  String get last_sync_update => '上次同步更新：';
 
   @override
   String get sync_server => '同步服务器地址';
@@ -1049,7 +983,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sync_login_invalid_creds => '无效的电子邮件或密码';
 
   @override
-  String get sync_starting => '开始同步...';
+  String get sync_starting => '开始同步…';
 
   @override
   String get sync_finished => '同步完成';
@@ -1073,7 +1007,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sync_button_download => '仅下载';
 
   @override
-  String get sync_button_download_info => '此操作将完全用远程数据替换本地数据！';
+  String get sync_button_download_info =>
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
   String get sync_status_not_configured => '未连接';
@@ -1222,7 +1157,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get searching_for_updates => '正在搜索更新...';
+  String get searching_for_updates => '正在搜索更新…';
 
   @override
   String get no_new_updates_available => '没有新的更新可用';
@@ -1518,16 +1453,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get player => '播放器';
 
   @override
-  String get markEpisodeAsSeenSetting => '标记剧集为已看的时间点';
+  String get markEpisodeAsSeenSetting => '将剧集标记为已观看的时间点';
 
   @override
   String get mark_duplicate_chapters_read => '将重复的章节号标记为已读';
 
   @override
-  String get default_skip_intro_length => '默认跳过介绍长度';
+  String get default_skip_intro_length => '默认片头跳过时长';
 
   @override
-  String get default_playback_speed_length => '默认播放速度长度';
+  String get default_playback_speed_length => '默认播放速度';
 
   @override
   String get updateProgressAfterReading => '阅读后更新进度';
@@ -1539,10 +1474,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get show_extensions => '显示扩展';
 
   @override
-  String get default_skip_forward_skip_length => '默认向前跳过长度';
+  String get default_skip_forward_skip_length => '默认快进时长';
 
   @override
-  String get aniskip_requires_info => 'AniSkip需要跟踪使用MAL或Anilist进行的动漫才能工作。';
+  String get aniskip_requires_info => '要使用 AniSkip，必须通过 MAL 或 AniList 追踪该动画。';
 
   @override
   String get enable_aniskip => '启用AniSkip';
@@ -1567,7 +1502,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String updating_library(Object cur, Object failed, Object max) {
-    return '正在更新库 ($cur / $max) - 失败: $failed';
+    return '正在更新书架（$cur / $max）— 失败：$failed';
   }
 
   @override
@@ -1738,11 +1673,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advanced_info => 'mpv 配置';
 
   @override
-  String get use_native_http_client => '使用本地 HTTP 客户端';
+  String get use_native_http_client => '使用原生 HTTP 客户端';
 
   @override
   String get use_native_http_client_info =>
-      '它自动支持平台特性，如 VPN，支持更多 HTTP 特性，如 HTTP/3 和自定义重定向处理';
+      '自动支持 VPN 等平台功能、HTTP/3 等额外 HTTP 功能，以及自定义重定向处理。';
 
   @override
   String n_hour_ago(Object hour) {
@@ -1774,7 +1709,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String library_last_updated(Object lastUpdated) {
-    return '图书馆最近更新时间：$lastUpdated';
+    return '书架最近更新时间：$lastUpdated';
   }
 
   @override
@@ -1823,10 +1758,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get recommendations_weights_genre => '类型相似度';
 
   @override
-  String get recommendations_weights_setting => '设定相似度';
+  String get recommendations_weights_setting => '设置相似度';
 
   @override
-  String get recommendations_weights_synopsis => '故事相似度';
+  String get recommendations_weights_synopsis => '简介相似度';
 
   @override
   String get recommendations_weights_theme => '主题相似度';
@@ -1877,7 +1812,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get url_cannot_be_empty => 'URL不能为空';
 
   @override
-  String get url_must_end_with_dot_json_or_dot_pb => 'URL必须以.json结尾';
+  String get url_must_end_with_dot_json => 'URL must end with .json';
 
   @override
   String get repo_url => '库URL';
@@ -1916,7 +1851,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get load_own_subtitles => '加载自定义字幕';
 
   @override
-  String get search_subtitles => '在线搜索字幕...';
+  String get search_subtitles => '在线搜索字幕…';
 
   @override
   String extension_notes(Object notes) {
@@ -1924,7 +1859,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get unsupported_repo => '您试图添加不支持的版本库。请查看 discord 服务器以获得支持！';
+  String get unsupported_repo => '您尝试添加不受支持的仓库。请前往 Discord 服务器获取帮助。';
 
   @override
   String get end_of_chapter => '章节结束';
@@ -2080,7 +2015,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get audio_preferred_languages_info =>
-      '在具有多个音频流的视频上默认选择的音频语言，2/3 字母语言代码（例如：zh、en、ja）。多个值可以用逗号分隔。';
+      '具有多个音频流的视频默认选择的音频语言。支持两位或三位语言代码（例如：zh、en、ja）。多个值请用逗号分隔。';
 
   @override
   String get enable_audio_pitch_correction => '启用音频音调校正';
@@ -2158,68 +2093,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get rescan_local_folder => '立即重新扫描所有本地文件夹';
-
-  @override
-  String get default_download_destination => '默认下载位置';
-
-  @override
-  String get ask_download_destination => '每次下载前询问位置';
-
-  @override
-  String get ask_download_destination_desc => '每次开始下载时选择本地文件夹。';
-
-  @override
-  String get select_download_destination => '选择下载位置';
-
-  @override
-  String get clear_local_library => '清空本地书库';
-
-  @override
-  String get clear_local_library_desc => '从书库中移除本地文件夹和压缩包条目。';
-
-  @override
-  String get clear_local_library_msg => '这将从书库中移除本地条目，不会删除磁盘上的文件。';
-
-  @override
-  String get custom => '自定义';
-
-  @override
-  String get no_local_folder_available_for_downloads => '没有可用于下载的本地文件夹';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return '创建 CBZ 失败：$error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return '读取封面出错：$error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return '读取元数据出错：$error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return '保存到书库时出错：$error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return '读取章节封面出错：$error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return '读取归档封面出错：$error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return '获取本地书库时出错：$error';
-  }
 
   @override
   String get export_metadata => '导出元数据';
@@ -2328,7 +2201,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get biometric_or_device_credential_not_available => '此设备上没有生物识别';
 
   @override
-  String get app_lock_description => '启用应用锁后，每次打开应用或从后台返回时都会要求您进行身份验证。';
+  String get app_lock_description => '启用应用锁后，每次打开应用或从后台返回时，都需要进行身份验证。';
 
   @override
   String get keep_screen_on => '保持屏幕开启';
@@ -2395,7 +2268,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String average_chapters_per_title(Object title) {
-    return '单个标题平均章节数';
+    return '每个$title的平均章节数';
   }
 
   @override
@@ -2416,11 +2289,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get extension_server_intro_with_jre =>
-      '在使用 Mihon 扩展前请先下载代理服务器包。该包内含 JRE 和扩展服务器 JAR。';
+      '使用 Mihon 扩展前，请先下载代理服务器包。该包包含 JRE 和扩展服务器 JAR。';
 
   @override
   String get extension_server_intro_ios =>
-      '在使用 Mihon 扩展前请先下载代理服务器 JAR。iOS 仅需扩展服务器 JAR。';
+      '使用 Mihon 扩展前，请先下载代理服务器 JAR。iOS 仅需扩展服务器 JAR。';
 
   @override
   String get checking_files => '正在检查文件';
@@ -2447,10 +2320,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get detect_files_in_selected_folder => '在选定文件夹中检测文件';
 
   @override
-  String get preparing_download => '正在准备下载...';
+  String get preparing_download => '正在准备下载…';
 
   @override
-  String get app_install_location => '应用安装路径';
+  String get app_install_location => '应用安装位置';
 
   @override
   String get install_location => '安装位置';
@@ -2462,7 +2335,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extension_server_jar => '扩展服务器 JAR';
 
   @override
-  String get installed_version => '当前版本';
+  String get installed_version => '已安装版本';
 
   @override
   String get latest_version => '最新版本';
@@ -2486,11 +2359,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String failed_to_download_bundle(Object statusCode) {
-    return '下载包失败 ($statusCode)。';
+    return '下载软件包失败（$statusCode）。';
   }
 
   @override
-  String get downloaded_bundle_missing_expected_files => '下载的项目不包含预期文件。';
+  String get downloaded_bundle_missing_expected_files => '下载的软件包不包含所需文件。';
 
   @override
   String get extension_server_files_ready => '扩展服务器文件已就绪。';
@@ -2513,6 +2386,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extension_server_files_linked => '扩展服务器文件已链接。';
 
   @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
   String get select_extension_server_jar => '选择扩展服务器 JAR';
 
   @override
@@ -2532,31 +2412,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get not_configured => '未配置';
 
   @override
-  String get zero_interpreter => 'Zero 解释器';
-
-  @override
-  String get zero_interpreter_description => '自动或手动控制 Zero 解释器服务。';
-
-  @override
-  String get start_server_on_launch => '启动时开启服务';
-
-  @override
-  String get runtime_status => '运行状态';
-
-  @override
-  String get running => '运行中';
-
-  @override
-  String get stopped => '已停止';
-
-  @override
-  String get start => '启动';
-
-  @override
-  String get stop => '停止';
-
-  @override
-  String get webview => 'Webview';
+  String get webview => 'WebView';
 
   @override
   String get tts => '文字转语音';
@@ -2706,6 +2562,60 @@ class AppLocalizationsZh extends AppLocalizations {
   String get error_no_pages_available => '错误：无可用页面';
 
   @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
+  String get dictionary_lookup => 'Dictionary';
+
+  @override
+  String get dictionary_settings => 'Dictionary settings';
+
+  @override
+  String get dictionary_search_label => 'Search';
+
+  @override
+  String get dictionary_search_hint => 'Word, reading, or phrase';
+
+  @override
+  String get clear_search => 'Clear search';
+
+  @override
+  String dictionary_count(int count) {
+    return '$count dictionaries';
+  }
+
+  @override
+  String dictionary_anki_deck(String name) {
+    return 'Anki deck: $name';
+  }
+
+  @override
+  String get dictionary_load_failed => 'Dictionary data could not be loaded';
+
+  @override
+  String get no_dictionaries_title => 'No dictionaries installed';
+
+  @override
+  String get no_dictionaries_description =>
+      'Import a Yomitan dictionary to start looking up words.';
+
+  @override
+  String get manage_dictionaries => 'Set up dictionaries';
+
+  @override
+  String get dictionary_empty_title => 'Look up a word or phrase';
+
+  @override
+  String get dictionary_empty_description =>
+      'Search a term, expression, sentence, or block of text.';
+
+  @override
+  String get previous_lookup => 'Previous lookup';
+
+  @override
+  String get next_lookup => 'Next lookup';
+
+  @override
   String get app_ui_scale => '界面缩放';
 
   @override
@@ -2738,6 +2648,197 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get source => '来源';
+
+  @override
+  String label_value(Object label, Object value) {
+    return '$label：$value';
+  }
+
+  @override
+  String get url => 'URL';
+
+  @override
+  String beta_version(Object version) {
+    return '测试版 ($version)';
+  }
+
+  @override
+  String get empty_placeholder => '空';
+
+  @override
+  String get error => '错误';
+
+  @override
+  String error_with_message(Object error) {
+    return '错误：$error';
+  }
+
+  @override
+  String get no_pages_available => '错误：无可用页面';
+
+  @override
+  String get create_extension => '创建扩展';
+
+  @override
+  String get choose_extension_language => '选择扩展语言';
+
+  @override
+  String get lang => '语言';
+
+  @override
+  String get base_url => '基础 URL';
+
+  @override
+  String get api_url_optional => 'API URL（可选）';
+
+  @override
+  String get icon_url => '图标 URL';
+
+  @override
+  String get source_icon_url => '图源图标 URL';
+
+  @override
+  String get notes => '备注';
+
+  @override
+  String get extension_name_example => '例如：myAnime';
+
+  @override
+  String get language_code_example => '例如：zh';
+
+  @override
+  String get base_url_example => '例如：https://example.com';
+
+  @override
+  String get api_url_example => '例如：https://api.example.com';
+
+  @override
+  String get extension_notes_example => '例如：此扩展需要登录';
+
+  @override
+  String get type => '类型';
+
+  @override
+  String get target => '目标';
+
+  @override
+  String get source_type_single => '单一';
+
+  @override
+  String get source_type_multi => '多源';
+
+  @override
+  String get source_type_torrent => '种子 (Torrent)';
+
+  @override
+  String get source_language_dart => 'Dart';
+
+  @override
+  String get source_language_javascript => 'JavaScript';
+
+  @override
+  String get source_language_lnreader_compiled_js => 'LNReader 编译 JS';
+
+  @override
+  String get source_created_successfully => '图源创建成功';
+
+  @override
+  String get source_already_exists => '图源已存在';
+
+  @override
+  String get error_when_creating_source => '创建图源时出错';
+
+  @override
+  String get cookies_deleted => 'Cookie 已删除！';
+
+  @override
+  String get delete_all_cookies => '删除所有 Cookie';
+
+  @override
+  String get url_must_end_with_dot_json_or_dot_pb => 'URL必须以.json结尾';
+
+  @override
+  String get default_download_destination => '默认下载位置';
+
+  @override
+  String get ask_download_destination => '每次下载前询问位置';
+
+  @override
+  String get ask_download_destination_desc => '每次开始下载时选择本地文件夹。';
+
+  @override
+  String get select_download_destination => '选择下载位置';
+
+  @override
+  String get clear_local_library => '清空本地书库';
+
+  @override
+  String get clear_local_library_desc => '从书库中移除本地文件夹和压缩包条目。';
+
+  @override
+  String get clear_local_library_msg => '这将从书库中移除本地条目，不会删除磁盘上的文件。';
+
+  @override
+  String get custom => '自定义';
+
+  @override
+  String get no_local_folder_available_for_downloads => '没有可用于下载的本地文件夹';
+
+  @override
+  String failed_to_create_cbz(Object error) {
+    return '创建 CBZ 失败：$error';
+  }
+
+  @override
+  String error_reading_cover_image(Object error) {
+    return '读取封面出错：$error';
+  }
+
+  @override
+  String error_reading_metadata(Object error) {
+    return '读取元数据出错：$error';
+  }
+
+  @override
+  String error_saving_chapter_episode_to_library(Object error) {
+    return '保存到书库时出错：$error';
+  }
+
+  @override
+  String error_reading_chapter_cover_image(Object error) {
+    return '读取章节封面出错：$error';
+  }
+
+  @override
+  String error_reading_archive_cover_image(Object error) {
+    return '读取归档封面出错：$error';
+  }
+
+  @override
+  String error_getting_local_library(Object error) {
+    return '获取本地书库时出错：$error';
+  }
+
+  @override
+  String get zero_interpreter => 'Zero 解释器';
+
+  @override
+  String get zero_interpreter_description => '自动或手动控制 Zero 解释器服务。';
+
+  @override
+  String get runtime_status => '运行状态';
+
+  @override
+  String get running => '运行中';
+
+  @override
+  String get stopped => '已停止';
+
+  @override
+  String get start => '启动';
+
+  @override
+  String get stop => '停止';
 
   @override
   String get something_went_wrong => '出错了';
@@ -2883,7 +2984,7 @@ class AppLocalizationsZh extends AppLocalizations {
     Object historyCount,
     Object updateCount,
   ) {
-    return '将永久删除 $mangaCount 部漫画、$chapterCount 个章节和 $historyCount 条历史记录。';
+    return '将永久删除 $mangaCount 部漫画、$chapterCount 个章节、$historyCount 条历史记录和 $updateCount 条更新记录。跟踪链接会保留。除回滚外，此操作无法撤销。';
   }
 
   @override
@@ -2949,7 +3050,7 @@ class AppLocalizationsZh extends AppLocalizations {
     Object keptChapters,
     Object duplicateTracks,
   ) {
-    return '在其他条目中共找到 $totalChapters 个章节。将丢弃 $duplicateChapters 个重复项并添加 $keptChapters 个新章节。';
+    return '在其他条目中共找到 $totalChapters 个章节。将丢弃 $duplicateChapters 个重复项（保留有阅读进度的版本）并添加 $keptChapters 个新章节。此外，还将丢弃 $duplicateTracks 个重复跟踪链接。';
   }
 
   @override

@@ -3,6 +3,8 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
 
 class MassMigrationSourceGroup {
   const MassMigrationSourceGroup({
@@ -93,7 +95,16 @@ List<MassMigrationSourceGroup> buildMassMigrationSourceGroups({
   required ItemType itemType,
   Manga? prioritizedManga,
 }) {
-  final libraryItems = mangaRepository.getFavoritesByItemType(itemType);
+  final libraryItems = isar.mangas
+      .filter()
+      .group(
+        (query) => query
+            .favoriteEqualTo(true)
+            .or()
+            .hasLocalChapterOverlayEqualTo(true),
+      )
+      .itemTypeEqualTo(itemType)
+      .findAllSync();
 
   final grouped = <String, List<Manga>>{};
   for (final manga in libraryItems) {

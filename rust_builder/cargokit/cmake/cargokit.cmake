@@ -25,7 +25,22 @@ function(apply_cargokit target manifest_dir lib_name any_symbol_name)
         set(CARGOKIT_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
         set(OUTPUT_LIB "${CMAKE_CURRENT_BINARY_DIR}/${CARGOKIT_LIB_FULL_NAME}")
     endif()
-    set(CARGOKIT_TEMP_DIR "${CMAKE_CURRENT_BINARY_DIR}/cargokit_build")
+    # Native Rust dependencies can create deeply nested CMake scratch paths.
+    # Keeping those under the plugin build directory exceeds MAX_PATH in
+    # ordinary Windows workspaces and causes MSVC C1083/FTK1011 failures.
+    if(WIN32 AND DEFINED ENV{CARGOKIT_CACHE_ROOT})
+        string(MD5 CARGOKIT_PROJECT_HASH "${CMAKE_SOURCE_DIR}")
+        string(SUBSTRING "${CARGOKIT_PROJECT_HASH}" 0 8 CARGOKIT_PROJECT_SHORT_HASH)
+        file(TO_CMAKE_PATH "$ENV{CARGOKIT_CACHE_ROOT}" CARGOKIT_SYSTEM_TEMP)
+        set(CARGOKIT_TEMP_DIR "${CARGOKIT_SYSTEM_TEMP}/${CARGOKIT_PROJECT_SHORT_HASH}")
+    elseif(WIN32 AND DEFINED ENV{LOCALAPPDATA})
+        string(MD5 CARGOKIT_PROJECT_HASH "${CMAKE_SOURCE_DIR}")
+        string(SUBSTRING "${CARGOKIT_PROJECT_HASH}" 0 8 CARGOKIT_PROJECT_SHORT_HASH)
+        file(TO_CMAKE_PATH "$ENV{LOCALAPPDATA}" CARGOKIT_SYSTEM_TEMP)
+        set(CARGOKIT_TEMP_DIR "${CARGOKIT_SYSTEM_TEMP}/mc/${CARGOKIT_PROJECT_SHORT_HASH}")
+    else()
+        set(CARGOKIT_TEMP_DIR "${CMAKE_CURRENT_BINARY_DIR}/cargokit_build")
+    endif()
 
     if (FLUTTER_TARGET_PLATFORM)
         set(CARGOKIT_TARGET_PLATFORM "${FLUTTER_TARGET_PLATFORM}")

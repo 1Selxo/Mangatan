@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/custom_floating_action_btn.dart';
+import 'package:mangayomi/modules/manga/detail/resume_chapter.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/repositories/category_repository.dart';
@@ -13,15 +15,26 @@ import 'package:mangayomi/modules/manga/detail/manga_detail_view.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
+import 'package:mangayomi/utils/extensions/manga_extensions.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/category.dart';
+import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/history.dart';
+
+String mangaDetailValueOrFallback(String? value, String fallback) =>
+    value == null || value.isEmpty ? fallback : value;
 
 class MangaDetailsView extends ConsumerStatefulWidget {
   final Manga manga;
+  final Source? source;
   final bool sourceExist;
   final Function(bool) checkForUpdate;
   const MangaDetailsView({
     super.key,
     required this.sourceExist,
     required this.manga,
+    this.source,
     required this.checkForUpdate,
   });
 
@@ -51,6 +64,14 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
     bool? isLocalArchive = widget.manga.isLocalArchive ?? false;
+    final sourceName = mangaDetailValueOrFallback(
+      widget.source?.name ?? widget.manga.source,
+      l10n.unknown,
+    );
+    final sourceLanguage = mangaDetailValueOrFallback(
+      widget.source?.lang ?? widget.manga.lang,
+      l10n.unknown,
+    );
     return Scaffold(
       floatingActionButton: Consumer(
         builder: (context, ref, child) {
@@ -71,10 +92,9 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                     String buttonLabel = widget.manga.itemType != ItemType.anime
                         ? l10n.read
                         : l10n.watch;
+                    Chapter? historyChapter;
+                    final incognitoMode = ref.watch(incognitoModeStateProvider);
                     if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                      final incognitoMode = ref.watch(
-                        incognitoModeStateProvider,
-                      );
                       final entries = snapshot.data!
                           .where(
                             (element) => element.mangaId == widget.manga.id,
@@ -82,23 +102,21 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                           .toList();
 
                       if (entries.isNotEmpty && !incognitoMode) {
-                        final chap = entries.last.chapter.value!;
-                        return CustomFloatingActionBtn(
-                          isExtended: !isExtended,
-                          label: l10n.resume,
-                          onPressed: () {
-                            chap.pushToReaderView(context);
-                          },
-                        );
+                        historyChapter = entries.last.chapter.value;
+                        buttonLabel = l10n.resume;
                       }
                     }
+                    final chapter = selectResumeChapter(
+                      widget.manga.getChapterListForReading(
+                        sourceChapters: chaptersList,
+                      ),
+                      historyChapter: historyChapter,
+                    );
                     return CustomFloatingActionBtn(
                       isExtended: !isExtended,
                       label: buttonLabel,
                       onPressed: () {
-                        widget.manga.chapters.toList().first.pushToReaderView(
-                          context,
-                        );
+                        chapter?.pushToReaderView(context);
                       },
                     );
                   },
@@ -116,9 +134,7 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                 Icon(Icons.person_outline, size: 14),
                 const SizedBox(width: 4),
                 Text(
-                  (widget.manga.author?.isEmpty ?? false)
-                      ? l10n.unknown
-                      : widget.manga.author!,
+                  mangaDetailValueOrFallback(widget.manga.author, l10n.unknown),
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ],
@@ -130,9 +146,8 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                 const SizedBox(width: 4),
                 Text(getMangaStatusName(widget.manga.status, context)),
                 if (!isLocalArchive) const Text(' • '),
-                if (!isLocalArchive) Text(widget.manga.source!),
-                if (!isLocalArchive)
-                  Text(' (${widget.manga.lang!.toUpperCase()})'),
+                if (!isLocalArchive) Text(sourceName),
+                if (!isLocalArchive) Text(' (${sourceLanguage.toUpperCase()})'),
                 if (!isLocalArchive && !widget.sourceExist)
                   const Padding(
                     padding: EdgeInsets.all(3),
@@ -155,9 +170,11 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                   ),
                   onPressed: () async {
                     final model = widget.manga;
-                    model.favorite = false;
-                    model.dateAdded = 0;
-                    await mangaRepository.save(model);
+                    isar.writeTxnSync(() {
+                      model.updateFavorite(false);
+                      model.dateAdded = 0;
+                      isar.mangas.putSync(model);
+                    });
                   },
                   child: Column(
                     children: [
@@ -189,9 +206,11 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                       singleManga: model,
                     );
                   } else {
-                    model.favorite = true;
-                    model.dateAdded = DateTime.now().millisecondsSinceEpoch;
-                    await mangaRepository.save(model);
+                    isar.writeTxnSync(() {
+                      model.updateFavorite(true);
+                      model.dateAdded = DateTime.now().millisecondsSinceEpoch;
+                      isar.mangas.putSync(model);
+                    });
                   }
                 },
                 child: Column(

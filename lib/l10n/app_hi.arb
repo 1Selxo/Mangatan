@@ -8,21 +8,21 @@
   "open_random_entry": "कोई भी प्रविष्टि खोलें",
   "import": "आयात",
   "filter": "फ़िल्टर",
-  "downloaded": "डाउनलोड किया गया",
+  "downloaded": "डाउनलोड किए गए",
   "unread": "अपठित",
-  "started": "शुरू किया",
-  "bookmarked": "बुकमार्क किया",
+  "started": "शुरू किए गए",
+  "bookmarked": "बुकमार्क किए गए",
   "sort": "छाँटें",
   "alphabetically": "वर्णानुक्रम",
   "last_read": "आखिरी बार पढ़ा",
   "last_update_check": "आखिरी अपडेट जांच",
-  "unread_count": "अपठित गिनती",
+  "unread_count": "अपठित की संख्या",
   "latest_chapter": "नवीनतम अध्याय",
-  "date_added": "जोड़ा गया तारीख",
+  "date_added": "जोड़ने की तारीख",
   "display": "प्रदर्शन",
   "display_mode": "प्रदर्शन मोड",
   "compact_grid": "संक्षिप्त ग्रिड",
-  "comfortable_grid": "आरामदायक ग्रिड",
+  "comfortable_grid": "सुविधाजनक ग्रिड",
   "cover_only_grid": "केवल कवर ग्रिड",
   "list": "सूची",
   "badges": "बैज",
@@ -48,14 +48,14 @@
   "sources": "स्रोत",
   "install": "स्थापित करें",
   "update": "अपडेट करें",
-  "latest": "नवीनतम",
+  "latest": "सबसे नया",
   "extensions": "एक्सटेंशन",
-  "migrate": "स्थानांतरण",
+  "migrate": "स्थानांतरित करें",
   "incognito_mode": "गुप्त मोड",
   "incognito_mode_description": "पढ़ने का इतिहास रोकता है",
   "download_queue": "डाउनलोड कतार",
   "categories": "श्रेणियाँ",
-  "settings": "सेटिंग्स",
+  "settings": "सेटिंग",
   "about": "के बारे में",
   "help": "मदद",
   "no_downloads": "कोई डाउनलोड नहीं",
@@ -276,8 +276,8 @@
   "updateProgressAfterReading": "पढ़ने के बाद प्रगति अपडेट करें",
   "no_sources_installed": "कोई स्रोत स्थापित नहीं है!",
   "show_extensions": "एक्सटेंशन दिखाएँ",
-  "ignore_filters": "फ़िल्टर नजरअंदाज करें",
-  "unwatched": "अनदेखा",
+  "ignore_filters": "फ़िल्टरों को अनदेखा करें",
+  "unwatched": "नहीं देखे गए",
   "last_watched": "अंतिम बार देखा गया",
   "last_entry_delete_warning": "{count, plural, =1{आप इस {mediaType} की एकमात्र {entryType} को अपनी लाइब्रेरी से हटा रहे हैं।} other{आप इस {mediaType} के सभी {count} {entryTypePlural} को अपनी लाइब्रेरी से हटा रहे हैं।}}\nइससे पूरी {mediaType} भी आपकी लाइब्रेरी से हट जाएगी।\n\nनोट: फ़ाइलें स्वयं हटाई नहीं जाएंगी।",
   "@last_entry_delete_warning": {
@@ -290,7 +290,7 @@
   },
   "chapter": "अध्याय",
   "episode": "एपिसोड",
-  "unwatched_count": "अनदेखी गिनती",
+  "unwatched_count": "नहीं देखे गए की संख्या",
   "latest_episode": "नवीनतम एपिसोड",
   "downloaded_episodes": "डाउनलोड किए गए एपिसोड",
   "show_continue_watching_buttons": "देखना जारी रखें बटन दिखाएँ",
@@ -317,11 +317,11 @@
   "syncing": "समन्वयित हो रहा है",
   "sync_password": "पासवर्ड (कम से कम 8 अक्षर)",
   "sync_logged": "लॉगिन सफल",
-  "syncing_subtitle": "स्व-होस्ट किए गए सर्वर के माध्यम से कई उपकरणों में अपनी प्रगति को समन्वयित करें। अधिक जानकारी के लिए हमारे डिस्कॉर्ड सर्वर देखें!",
+  "syncing_subtitle": "स्व-होस्ट किए गए सर्वर के माध्यम से कई उपकरणों पर अपनी प्रगति सिंक करें। अधिक जानकारी के लिए हमारे Discord सर्वर पर जाएँ!",
   "last_sync_manga": "अंतिम मंगा सिंक: ",
   "last_sync_history": "अंतिम इतिहास सिंक: ",
   "last_sync_update": "अंतिम अपडेट सिंक: ",
-  "sync_server": "सिंक सर्वर पता",
+  "sync_server": "सिंक सर्वर का पता",
   "sync_login_invalid_creds": "अमान्य ईमेल या पासवर्ड",
   "sync_starting": "सिंक शुरू हो रहा है...",
   "sync_finished": "सिंक पूर्ण",
@@ -330,7 +330,6 @@
   "sync_button_upload": "केवल अपलोड करें",
   "sync_button_upload_info": "यह ऑपरेशन रिमोट डेटा को पूरी तरह से लोकल डेटा से बदल देगा!",
   "sync_button_download": "केवल डाउनलोड करें",
-  "sync_button_download_info": "यह ऑपरेशन लोकल डेटा को पूरी तरह से रिमोट डेटा से बदल देगा!",
   "sync_on": "सिंक सक्षम करें",
   "sync_auto": "स्वचालित सिंक",
   "sync_auto_warning": "स्वचालित सिंक वर्तमान में एक प्रयोगात्मक सुविधा है!",
@@ -443,8 +442,8 @@
   "recommendations_similar": "समान",
   "recommendations_weights": "सिफ़ारिश भार",
   "recommendations_weights_genre": "शैली समानता",
-  "recommendations_weights_setting": "सेटिंग समानता",
-  "recommendations_weights_synopsis": "कहानी समानता",
+  "recommendations_weights_setting": "सेटिंग की समानता",
+  "recommendations_weights_synopsis": "कहानी की समानता",
   "recommendations_weights_theme": "थीम समानता",
   "manga_extensions_repo": "मंगा एक्सटेंशन रेपो",
   "anime_extensions_repo": "एनीमे एक्सटेंशन रेपो",
@@ -461,7 +460,7 @@
   "manage_anime_repo_urls": "एनीमे रेपो URL प्रबंधित करें",
   "manage_novel_repo_urls": "उपन्यास रेपो URL प्रबंधित करें",
   "url_cannot_be_empty": "URL खाली नहीं हो सकता",
-  "url_must_end_with_dot_json_or_dot_pb": "URL .json / .pb के साथ समाप्त होना चाहिए",
+  "url_must_end_with_dot_json": "URL .json के साथ समाप्त होना चाहिए",
   "repo_url": "रेपो URL",
   "invalid_url_format": "अमान्य URL प्रारूप",
   "clear_all_sources": "सभी स्रोत साफ़ करें",
@@ -470,7 +469,7 @@
   "repo_added": "स्रोत रिपोजिटरी जोड़ी गई!",
   "add_repo": "रिपोजिटरी जोड़ें?",
   "genre_search_library": "लाइब्रेरी में शैली खोजें",
-  "genre_search_source": "स्रोत में ब्राउज़ करें",
+  "genre_search_source": "स्रोत में खोजें",
   "source_not_added": "स्रोत स्थापित नहीं है!",
   "load_own_subtitles": "अपने स्वयं के उपशीर्षक लोड करें...",
   "search_subtitles": "उपशीर्षक ऑनलाइन खोजें...",
@@ -479,9 +478,9 @@
   "end_of_chapter": "अध्याय का अंत",
   "chapter_completed": "अध्याय पूर्ण",
   "continue_to_next_chapter": "अगला अध्याय पढ़ने के लिए स्क्रॉल करना जारी रखें",
-  "no_next_chapter": "कोई अगला अध्याय नहीं",
+  "no_next_chapter": "अगला अध्याय उपलब्ध नहीं है",
   "you_have_finished_reading": "आपने पढ़ना समाप्त कर लिया है",
-  "return_to_the_list_of_chapters": "अध्यायों की सूची में वापस जाएं",
+  "return_to_the_list_of_chapters": "अध्यायों की सूची पर लौटें",
   "hwdec": "हार्डवेयर डिकोडर",
   "enable_hardware_accel": "हार्डवेयर त्वरण",
   "enable_hardware_accel_info": "यदि आप बग या क्रैश का सामना कर रहे हैं तो इसे चालू/बंद करें",
@@ -784,28 +783,28 @@
   "completion_rate": "पूर्णता दर",
   "watching_time": "देखने का समय",
   "reading_time": "पढ़ने का समय",
-  "average_chapters_per_title": "प्रति शीर्षक औसत अध्याय",
+  "average_chapters_per_title": "प्रति {title} औसत अध्याय",
   "read_percentage": "पढ़ने का प्रतिशत",
   "entries": "प्रविष्टियाँ",
-  "extension_server_intro_with_jre": "मिहोन एक्सटेंशन (Mihon extensions) का उपयोग करने से पहले प्रॉक्सी सर्वर बंडल डाउनलोड करें। बंडल में JRE और एक्सटेंशन सर्वर JAR शामिल है।",
+  "extension_server_intro_with_jre": "Mihon एक्सटेंशन का उपयोग करने से पहले प्रॉक्सी सर्वर बंडल डाउनलोड करें। बंडल में JRE और एक्सटेंशन सर्वर JAR शामिल हैं।",
   "extension_server_intro_ios": "मिहोन एक्सटेंशन का उपयोग करने से पहले प्रॉक्सी सर्वर JAR डाउनलोड करें। iOS को केवल एक्सटेंशन सर्वर JAR की आवश्यकता है।",
-  "checking_files": "Checking files",
-  "files_installed": "Files installed",
+  "checking_files": "फ़ाइलों की जाँच हो रही है",
+  "files_installed": "फ़ाइलें इंस्टॉल हो गई हैं",
   "files_missing": "फ़ाइलें गायब हैं",
-  "update_files": "Update files",
+  "update_files": "फ़ाइलें अपडेट करें",
   "up_to_date": "अप-टू-डेट",
   "choose_location": "स्थान चुनें",
   "import_existing_jar": "मौजूदा JAR आयात करें",
-  "detect_files_in_selected_folder": "Detect files in selected folder",
+  "detect_files_in_selected_folder": "चयनित फ़ोल्डर में फ़ाइलें खोजें",
   "preparing_download": "डाउनलोड की तैयारी की जा रही है...",
-  "app_install_location": "App install location",
-  "install_location": "Install location",
-  "jre_executable": "JRE निष्पादन योग्य (Executable)",
-  "extension_server_jar": "Extension server JAR",
+  "app_install_location": "ऐप इंस्टॉल करने का स्थान",
+  "install_location": "इंस्टॉल करने का स्थान",
+  "jre_executable": "JRE एक्ज़ीक्यूटेबल",
+  "extension_server_jar": "एक्सटेंशन सर्वर JAR",
   "installed_version": "स्थापित संस्करण",
-  "latest_version": "Latest version",
-  "m_extension_server_description": "Use M-Extension-Server when you need a separate Android device proxy. Set the proxy address here and download the APK from GitHub.",
-  "set_proxy_address": "Set proxy address",
+  "latest_version": "नवीनतम संस्करण",
+  "m_extension_server_description": "अलग Android डिवाइस प्रॉक्सी की आवश्यकता होने पर M-Extension-Server का उपयोग करें। यहाँ प्रॉक्सी का पता सेट करें और GitHub से APK डाउनलोड करें।",
+  "set_proxy_address": "प्रॉक्सी का पता सेट करें",
   "no_extension_server_bundle_available_for_this_platform": "इस प्लेटफ़ॉर्म के लिए कोई एक्सटेंशन सर्वर बंडल उपलब्ध नहीं है।",
   "failed_to_download_bundle": "बंडल डाउनलोड करने में विफल रहा ({statusCode})।",
   "@failed_to_download_bundle": {
@@ -813,17 +812,17 @@
       "statusCode": {}
     }
   },
-  "downloaded_bundle_missing_expected_files": "The downloaded bundle does not contain the expected files.",
-  "extension_server_files_ready": "Extension server files are ready.",
-  "ios_extension_server_import_hint": "On iOS the server is installed inside the app sandbox. Use \"Import existing JAR\" to bring in a downloaded file.",
+  "downloaded_bundle_missing_expected_files": "डाउनलोड किए गए बंडल में अपेक्षित फ़ाइलें नहीं हैं।",
+  "extension_server_files_ready": "एक्सटेंशन सर्वर की फ़ाइलें तैयार हैं।",
+  "ios_extension_server_import_hint": "iOS पर सर्वर ऐप के sandbox में इंस्टॉल होता है। डाउनलोड की गई फ़ाइल लाने के लिए \"मौजूदा JAR आयात करें\" चुनें।",
   "select_extension_server_folder": "एक्सटेंशन सर्वर फ़ोल्डर चुनें",
   "selected_folder_does_not_exist": "चयनित फ़ोल्डर मौजूद नहीं है।",
-  "no_extension_server_files_found_in_selected_folder": "No extension server files were found in the selected folder.",
-  "extension_server_files_linked": "Extension server files were linked.",
-  "selected_file_could_not_be_accessed": "The selected file could not be accessed.",
-  "extension_server_jar_imported": "Extension server JAR was imported.",
-  "could_not_launch_apk_bridge_page": "Could not launch the M-Extension-Server page.",
-  "not_configured": "Not configured",
+  "no_extension_server_files_found_in_selected_folder": "चयनित फ़ोल्डर में एक्सटेंशन सर्वर की फ़ाइलें नहीं मिलीं।",
+  "extension_server_files_linked": "एक्सटेंशन सर्वर की फ़ाइलें लिंक कर दी गई हैं।",
+  "selected_file_could_not_be_accessed": "चयनित फ़ाइल को एक्सेस नहीं किया जा सका।",
+  "extension_server_jar_imported": "एक्सटेंशन सर्वर JAR आयात कर लिया गया है।",
+  "could_not_launch_apk_bridge_page": "M-Extension-Server पृष्ठ नहीं खोला जा सका।",
+  "not_configured": "कॉन्फ़िगर नहीं किया गया",
   "webview": "Webview",
   "could_not_check_proxy_server_updates": "प्रॉक्सी सर्वर अपडेट की जांच नहीं की जा सकी।",
   "proxy_server_ip_hint": "सर्वर IP (उदा: 10.0.0.5 या https://example.com)",
@@ -909,405 +908,5 @@
   "reader_hide_threshold_high": "उच्च (13 px)",
   "reader_hide_threshold_low": "निम्न (31 px)",
   "reader_hide_threshold_lowest": "न्यूनतम (47 px)",
-  "error_no_pages_available": "त्रुटि: कोई पन्ने उपलब्ध नहीं हैं",
-  "mark_duplicate_chapters_read": "डुप्लिकेट अध्याय संख्याओं को पढ़ा गया के रूप में चिह्नित करें",
-  "tts": "पाठ-से-बोली",
-  "tts_speed": "गति",
-  "tts_pitch": "पिच",
-  "tts_language": "भाषा",
-  "tts_voice": "आवाज",
-  "tts_stop": "रोकें",
-  "tts_play": "चलाएं",
-  "tts_pause": "रोकें",
-  "tts_previous": "पिछला अनुच्छेद",
-  "tts_next": "अगला अनुच्छेद",
-  "tts_paragraph_progress": "अनुच्छेद {current} का {total}",
-  "tts_settings": "TTS सेटिंग्स",
-  "tts_default": "डिफ़ॉल्ट",
-  "app_ui_scale": "इंटरफ़ेस स्केल",
-  "app_ui_scale_subtitle": "इंटरफ़ेस को अपने स्क्रीन और देखने की दूरी के अनुसार बड़ा या छोटा बनाएं।",
-  "allow_concurrent_downloads": "समवर्ती डाउनलोड की अनुमति दें",
-  "allow_concurrent_downloads_subtitle": "विभिन्न स्रोतों से एक साथ डाउनलोड करें। एक एकल स्रोत अभी भी एक समय में एक अध्याय डाउनलोड करता है ताकि इसे अभिभूत न किया जाए। हर जगह एक-एक करके डाउनलोड करने के लिए बंद करें।",
-  "download_delay": "डाउनलोड में देरी",
-  "download_delay_subtitle": "बंद। स्रोतों के लिए अधिक सौम्य होने के लिए अध्यायों के बीच यादृच्छिक जिटर के साथ प्रतीक्षा जोड़ें।",
-  "save_search": "खोज सहेजें",
-  "saved_searches": "सहेजी गई खोजें",
-  "enter_search_to_save_first": "पहले खोज दर्ज करें",
-  "no_saved_searches": "इस स्रोत के लिए अभी तक कोई सहेजी गई खोज नहीं है।\nएक खोज चलाएं, फिर \"खोज सहेजें\" चुनें।",
-  "source": "स्रोत",
-  "label_value": "{label}: {value}",
-  "url": "यूआरएल",
-  "beta_version": "बीटा ({version})",
-  "empty_placeholder": "खाली",
-  "error": "त्रुटि",
-  "error_with_message": "त्रुटि: {error}",
-  "no_pages_available": "त्रुटि: कोई पृष्ठ उपलब्ध नहीं है",
-  "create_extension": "एक्सटेंशन बनाएं",
-  "choose_extension_language": "एक्सटेंशन की भाषा चुनें",
-  "lang": "भाषा",
-  "base_url": "आधार यूआरएल",
-  "api_url_optional": "एपीआई यूआरएल (वैकल्पिक)",
-  "icon_url": "आइकन यूआरएल",
-  "source_icon_url": "स्रोत आइकन यूआरएल",
-  "notes": "नोट्स",
-  "extension_name_example": "उदा: myAnime",
-  "language_code_example": "उदा: hi",
-  "base_url_example": "उदा: https://example.com",
-  "api_url_example": "उदा: https://api.example.com",
-  "extension_notes_example": "उदा: इस एक्सटेंशन के लिए लॉगिन आवश्यक है",
-  "type": "प्रकार",
-  "target": "लक्ष्य",
-  "source_type_single": "एकल",
-  "source_type_multi": "बहु",
-  "source_type_torrent": "टोरेंट",
-  "source_language_dart": "Dart",
-  "source_language_javascript": "JavaScript",
-  "source_language_lnreader_compiled_js": "LNReader संकलित JS",
-  "source_created_successfully": "स्रोत सफलतापूर्वक बनाया गया",
-  "source_already_exists": "स्रोत पहले से मौजूद है",
-  "error_when_creating_source": "स्रोत बनाते समय त्रुटि",
-  "cookies_deleted": "कुकीज़ हटा दी गईं!",
-  "delete_all_cookies": "सभी कुकीज़ हटाएं",
-  "missing_chapters": "{count} अध्याय अनुपलब्ध",
-  "sync_restore_in_progress": "सिंक छोड़ दिया गया — पुनर्स्थापना जारी है",
-  "sync_status_not_configured": "कनेक्ट नहीं है",
-  "sync_status_checking": "कनेक्शन की जाँच की जा रही है...",
-  "sync_status_connected": "कनेक्टेड",
-  "sync_status_unauthorized": "सत्र समाप्त हो गया, कृपया पुनः लॉगिन करें",
-  "sync_status_unreachable": "सर्वर तक पहुंच संभव नहीं है",
-  "sync_section_general": "सामान्य",
-  "sync_section_data_types": "क्या सिंक करना है",
-  "missing_episodes": "{count} एपिसोड अनुपलब्ध",
-  "encrypt_backups": "बैकअप एन्क्रिप्ट करें",
-  "encrypt_backups_info": "AES एन्क्रिप्शन के साथ पासवर्ड से बैकअप सुरक्षित करें",
-  "no_secure_storage": "कोई सुरक्षित स्टोरेज नहीं मिला",
-  "no_keyring_warning": "सिस्टम में कोई कीरिंग सेवा उपलब्ध नहीं है, इसलिए पासवर्ड सुरक्षित रूप से संग्रहीत नहीं किया जा सकता।",
-  "enter_backup_password": "बैकअप पासवर्ड दर्ज करें",
-  "incorrect_password_try_again": "गलत पासवर्ड, पुनः प्रयास करें।",
-  "set_backup_password": "बैकअप पासवर्ड सेट करें",
-  "confirm_password": "पासवर्ड की पुष्टि करें",
-  "passwords_do_not_match": "पासवर्ड मेल नहीं खाते",
-  "password_required_to_restore": "इस बैकअप को पुनर्स्थापित करने के लिए पासवर्ड आवश्यक है।",
-  "restore_sync_question_title": "इस पुनर्स्थापना को सिंक करें?",
-  "restore_sync_question_message": "यह उपकरण सिंक सर्वर से जुड़ा है। क्या पुनर्स्थापित डेटा अभी अपलोड करना चाहते हैं?",
-  "restore_sync_question_confirm": "हाँ, सिंक करें",
-  "restore_sync_question_deny": "नहीं, सिंक अक्षम करें",
-  "sync_disabled_after_restore": "सिंक अक्षम कर दिया गया है। आप सेटिंग्स में इसे फिर से सक्षम कर सकते हैं।",
-  "restore_sync_disabled_question_title": "सिंक वर्तमान में अक्षम है",
-  "restore_sync_disabled_question_message": "सिंक बंद है। क्या इसे पुनः सक्षम करके सर्वर पर अपलोड करना चाहते हैं?",
-  "restore_sync_question_reenable": "हाँ, पुनः सक्षम और सिंक करें",
-  "restore_sync_question_keep_disabled": "अक्षम रखें",
-  "restore_sync_uploading": "पुनर्स्थापित डेटा सर्वर पर सिंक हो रहा है…",
-  "restore_sync_upload_success": "डेटा सर्वर पर सफलतापूर्वक सिंक हो गया",
-  "default_download_destination": "डिफ़ॉल्ट डाउनलोड स्थान",
-  "ask_download_destination": "डाउनलोड स्थान पूछें",
-  "ask_download_destination_desc": "प्रत्येक डाउनलोड से पहले फ़ोल्डर चुनें।",
-  "select_download_destination": "डाउनलोड स्थान चुनें",
-  "clear_local_library": "स्थानीय लाइब्रेरी साफ़ करें",
-  "clear_local_library_desc": "लाइब्रेरी से स्थानीय फ़ोल्डर और संग्रह हटाएं।",
-  "clear_local_library_msg": "यह आपकी लाइब्रेरी से स्थानीय प्रविष्टियों को हटा देगा (फ़ाइलें डिस्क से नहीं हटेंगी)।",
-  "custom": "कस्टम",
-  "no_local_folder_available_for_downloads": "डाउनलोड के लिए कोई स्थानीय फ़ोल्डर उपलब्ध नहीं है",
-  "failed_to_create_cbz": "CBZ बनाने में विफल: {error}",
-  "error_reading_cover_image": "कवर छवि पढ़ने में त्रुटि: {error}",
-  "error_reading_metadata": "मेटाडेटा पढ़ने में त्रुटि: {error}",
-  "error_saving_chapter_episode_to_library": "लाइब्रेरी में सहेजने में त्रुटि: {error}",
-  "error_reading_chapter_cover_image": "अध्याय कवर छवि पढ़ने में त्रुटि: {error}",
-  "error_reading_archive_cover_image": "संग्रह कवर छवि पढ़ने में त्रुटि: {error}",
-  "error_getting_local_library": "स्थानीय लाइब्रेरी प्राप्त करने में त्रुटि: {error}",
-  "failed_to_export_metadata": "मेटाडेटा निर्यात करने में विफल: {error}",
-  "unrecognized_chapter_numbers": "{count} अध्यायों को स्वतः क्रमांकित नहीं किया जा सका।",
-  "cloudflare_resolution_webview_server_start_failed": "क्लाउडफ्लेयर रिज़ॉल्यूशन सर्वर प्रारंभ नहीं हो सका।",
-  "tracker_token_expired": "{tracker} टोकन समाप्त हो गया",
-  "video_list_empty": "वीडियो सूची खाली है",
-  "playback_speed_multiplier": "x{value}",
-  "could_not_launch_url": "{url} को खोला नहीं जा सका",
-  "zero_interpreter": "Zero दुभाषिया",
-  "zero_interpreter_description": "Zero दुभाषिया सर्वर को स्वतः या मैन्युअल नियंत्रित करें।",
-  "start_server_on_launch": "लॉन्च पर सर्वर प्रारंभ करें",
-  "runtime_status": "रनटाइम स्थिति",
-  "running": "चल रहा है",
-  "stopped": "रुका हुआ",
-  "start": "प्रारंभ",
-  "stop": "रोकें",
-  "something_went_wrong": "कुछ गलत हो गया",
-  "startup_failed": "Mangayomi प्रारंभ नहीं हो सका",
-  "sources_with_no_results": "{count, plural, =1{1 स्रोत जिसमें कोई परिणाम नहीं है} other{{count} स्रोत जिनमें कोई परिणाम नहीं है}}",
-  "import_mode_title": "इसे कैसे आयात किया जाना चाहिए?",
-  "import_mode_message": "इस बैकअप को वर्तमान लाइब्रेरी में मर्ज करें या पूरी लाइब्रेरी बदलें।",
-  "import_mode_keep_existing": "मर्ज करें",
-  "import_mode_keep_existing_subtitle": "नई श्रृंखला जोड़ता है और मौजूदा को अपडेट करता है।",
-  "import_mode_replace": "बदलें",
-  "import_mode_replace_subtitle": "वर्तमान लाइब्रेरी को हटाकर बैकअप से बदलता है।",
-  "replace_summary_title": "लाइब्रेरी बदलने के लिए तैयार",
-  "replace_summary_message": "यह वर्तमान {currentCount} श्रृंखलाओं को हटाकर {backupCount} श्रृंखलाओं से बदल देगा।",
-  "replace_summary_confirm": "बदलें",
-  "replace_result_message": "लाइब्रेरी को बैकअप से {count} श्रृंखलाओं से बदल दिया गया।",
-  "category_conflict_title": "मौजूदा श्रेणियां मिलीं",
-  "category_conflict_message": "बैकअप में ऐसी श्रेणियां हैं जो पहले से मौजूद हैं।",
-  "category_conflict_keep": "रखें — मौजूदा श्रेणी में मर्ज करें",
-  "category_conflict_delete": "हटाएं — बिना श्रेणी छोड़ें",
-  "source_conflict_title": "स्रोत नहीं मिले",
-  "source_conflict_message": "कुछ स्रोत स्थापित एक्सटेंशन से मेल नहीं खाते।",
-  "source_conflict_keep": "मूल नाम रखें",
-  "import_summary_title": "आयात करने के लिए तैयार",
-  "import_summary_message": "{newSeries} नई श्रृंखलाएं, {updatedSeries} अपडेटेड, और {newChapters} नए अध्याय।",
-  "import_summary_confirm": "आयात करें",
-  "import_result_message": "{newSeries} नई श्रृंखलाएं आयात की गईं, {updatedSeries} अपडेटेड, {newChapters} अध्याय जोड़े गए।",
-  "roll_back": "रोलबैक करें",
-  "roll_back_confirm_message": "यह लाइब्रेरी को इस बदलाव से ठीक पहले के स्नैपशॉट पर पुनर्स्थापित करता है।",
-  "roll_back_done": "पिछले स्नैपशॉट पर रोलबैक कर दिया गया।",
-  "restoring_backup": "लाइब्रेरी पुनर्स्थापित हो रही है…",
-  "roll_back_last_change": "अंतिम परिवर्तन वापस लें",
-  "roll_back_last_change_subtitle": "{date} का स्नैपशॉट — {description}",
-  "roll_back_available_count": "रोलबैक के लिए {count} हालिया परिवर्तन उपलब्ध हैं",
-  "delete_source_title": "स्रोत और उसकी मंगा हटाएं",
-  "delete_source_subtitle": "स्रोत और उससे जुड़ी सभी मंगा, अध्याय, डाउनलोड और इतिहास हटाएं।",
-  "delete_source_pick_title": "हटाने के लिए स्रोत चुनें",
-  "delete_source_empty": "लाइब्रेरी में कोई स्रोत नहीं मिला।",
-  "delete_source_confirm_title": "{sourceName} हटाएं?",
-  "delete_source_confirm_message": "यह स्थायी रूप से {mangaCount} मंगा, {chapterCount} अध्याय और {historyCount} इतिहास प्रविष्टियां हटा देगा।",
-  "delete_source_also_remove_extension": "स्थापित एक्सटेंशन भी हटाएं",
-  "delete_source_keep_history": "पठन इतिहास रखें",
-  "delete_source_keep_downloads": "डाउनलोड रिकॉर्ड रखें",
-  "delete_source_button": "हटाएं",
-  "delete_source_result_message": "{sourceName} से {mangaCount} मंगा हटा दी गईं।",
-  "merge_manga_title": "डुप्लिकेट मंगा मर्ज करें",
-  "merge_manga_subtitle": "समान शीर्षक वाली मंगा को एक में संयोजित करता है।",
-  "merge_manga_none_found": "कोई डुप्लिकेट मंगा नहीं मिली।",
-  "merge_manga_pick_title": "संभावित डुप्लिकेट मंगा",
-  "merge_manga_choose_primary_title": "दूसरों को किसमें मर्ज किया जाना चाहिए?",
-  "merge_manga_choose_primary_message": "अध्याय, इतिहास और ट्रैकिंग चुनी गई प्रविष्टि में शामिल हो जाएंगे।",
-  "merge_manga_chapters_subtitle": "{count, plural, =1{1 अध्याय} other{{count} अध्याय}}",
-  "merge_manga_button": "मर्ज करें",
-  "merge_manga_result_message": "{count} डुप्लिकेट मंगा को {mangaName} में मर्ज कर दिया गया।",
-  "merge_preview_title": "मर्ज की पुष्टि करें",
-  "merge_manga_preview_message": "कुल {totalChapters} अध्याय मिले। {duplicateChapters} डुप्लिकेट छोड़ दिए जाएंगे, {keptChapters} जोड़े जाएंगे।",
-  "beta": "बीटा",
-  "error_reports": "त्रुटि रिपोर्ट",
-  "error_reports_subtitle": "ऐप द्वारा पकड़ी गई त्रुटियां और रिपोर्ट करने का तरीका",
-  "error_reports_empty": "कोई त्रुटि नहीं है।",
-  "error_reports_likely_cause": "संभावित कारण",
-  "error_reports_report": "GitHub पर रिपोर्ट करें",
-  "error_reports_banner": "Mangayomi में त्रुटि आई",
-  "error_reports_banner_action": "देखें",
-  "error_reports_copy": "कॉपी करें",
-  "error_reports_copied": "क्लिपबोर्ड पर कॉपी किया गया",
-  "error_reports_clear": "साफ़ करें",
-  "share_unavailable_copied": "साझाकरण उपलब्ध नहीं है, क्लिपबोर्ड पर कॉपी किया गया।",
-  "onboarding_title": "Mangayomi में आपका स्वागत है",
-  "onboarding_libraries_body": "चुनें कि आप क्या पढ़ना और देखना चाहते हैं।",
-  "onboarding_nav_title": "आपकी लाइब्रेरी",
-  "onboarding_nav_body": "प्रत्येक के लिए अलग टैब रखें या एक लाइब्रेरी टैब में संयोजित करें।",
-  "onboarding_nav_split": "अलग-अलग टैब",
-  "onboarding_nav_merged": "एक लाइब्रेरी टैब",
-  "onboarding_nav_inside": "लाइब्रेरी टैप करने पर ये टैब बदल जाते हैं",
-  "onboarding_next": "अगला",
-  "onboarding_restore": "बैकअप पुनर्स्थापित करें",
-  "onboarding_or_local": "या मौजूदा फ़ाइलों का उपयोग करें",
-  "onboarding_local_folder": "फ़ोल्डर जोड़ें",
-  "onboarding_local_existing": "{count} फ़ोल्डर पहले से सेट हैं",
-  "onboarding_local_any_type": "मंगा, एनीमे और उपन्यास समर्थित हैं।",
-  "onboarding_local_scanning": "फ़ोल्डर स्कैन किया जा रहा है",
-  "onboarding_local_found": "{count} शीर्षक मिले",
-  "onboarding_local_remove": "फ़ोल्डर हटाएं",
-  "onboarding_local_in_downloads": "यह ऐप का डाउनलोड फ़ोल्डर है।",
-  "onboarding_local_empty": "कुछ नहीं मिला। मुख्य फ़ोल्डर चुनें।",
-  "onboarding_repo_failed": "रिपॉजिटरी पढ़ने में असमर्थ।",
-  "onboarding_repo_title": "स्रोत जोड़ें",
-  "onboarding_body": "एक्सटेंशन स्थापित करने के लिए रिपॉजिटरी जोड़ें।",
-  "onboarding_add": "रिपॉजिटरी जोड़ें",
-  "onboarding_skip": "अभी छोड़ें",
-  "onboarding_continue": "जारी रखें",
-  "onboarding_later": "आप इसे बाद में सेटिंग्स > ब्राउज़ में जोड़ सकते हैं।",
-  "onboarding_replay": "स्वागत स्क्रीन दिखाएं",
-  "onboarding_replay_subtitle": "प्रारंभिक सेटअप स्क्रीन पुनः खोलें।",
-  "missing_source_check_title": "अनुपलब्ध स्रोतों की जाँच करें",
-  "missing_source_check_subtitle": "ऐसी प्रविष्टियाँ खोजें जिनका एक्सटेंशन स्थापित नहीं है।",
-  "missing_source_check_none_found": "सभी स्रोत स्थापित हैं।",
-  "missing_source_check_result_title": "{count, plural, =1{1 स्रोत अनुपलब्ध} other{{count} स्रोत अनुपलब्ध}}",
-  "missing_source_check_result_message": "ये प्रविष्टियां ऐसे स्रोत की ओर इशारा करती हैं जो स्थापित नहीं है। माइग्रेट करने के लिए टैप करें या एक्सटेंशन स्थापित करें।",
-  "@tts_paragraph_progress": {
-    "placeholders": {
-      "current": {},
-      "total": {}
-    }
-  },
-  "@label_value": {
-    "placeholders": {
-      "label": {},
-      "value": {}
-    }
-  },
-  "@beta_version": {
-    "placeholders": {
-      "version": {}
-    }
-  },
-  "@error_with_message": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@failed_to_create_cbz": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_metadata": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_saving_chapter_episode_to_library": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_chapter_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_reading_archive_cover_image": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@error_getting_local_library": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@failed_to_export_metadata": {
-    "placeholders": {
-      "error": {}
-    }
-  },
-  "@unrecognized_chapter_numbers": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@tracker_token_expired": {
-    "placeholders": {
-      "tracker": {}
-    }
-  },
-  "@playback_speed_multiplier": {
-    "placeholders": {
-      "value": {}
-    }
-  },
-  "@could_not_launch_url": {
-    "placeholders": {
-      "url": {}
-    }
-  },
-  "@sources_with_no_results": {
-    "description": "Header of the collapsed group in global search holding every source that failed or found nothing.",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@replace_summary_message": {
-    "placeholders": {
-      "currentCount": {},
-      "backupCount": {}
-    }
-  },
-  "@replace_result_message": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@import_summary_message": {
-    "placeholders": {
-      "newSeries": {},
-      "updatedSeries": {},
-      "newChapters": {}
-    }
-  },
-  "@import_result_message": {
-    "placeholders": {
-      "newSeries": {},
-      "updatedSeries": {},
-      "newChapters": {}
-    }
-  },
-  "@roll_back_last_change_subtitle": {
-    "placeholders": {
-      "date": {},
-      "description": {}
-    }
-  },
-  "@roll_back_available_count": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@delete_source_confirm_title": {
-    "placeholders": {
-      "sourceName": {}
-    }
-  },
-  "@delete_source_confirm_message": {
-    "placeholders": {
-      "mangaCount": {},
-      "chapterCount": {},
-      "historyCount": {},
-      "updateCount": {}
-    }
-  },
-  "@delete_source_result_message": {
-    "placeholders": {
-      "mangaCount": {},
-      "sourceName": {}
-    }
-  },
-  "@merge_manga_chapters_subtitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@merge_manga_result_message": {
-    "placeholders": {
-      "count": {},
-      "mangaName": {}
-    }
-  },
-  "@merge_manga_preview_message": {
-    "placeholders": {
-      "totalChapters": {},
-      "duplicateChapters": {},
-      "keptChapters": {},
-      "duplicateTracks": {}
-    }
-  },
-  "@onboarding_local_existing": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@onboarding_local_found": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "@missing_source_check_result_title": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  }
+  "error_no_pages_available": "त्रुटि: कोई पन्ने उपलब्ध नहीं हैं"
 }

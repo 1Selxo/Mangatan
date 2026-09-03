@@ -9,7 +9,7 @@ import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/adapters.dart';
@@ -25,19 +25,32 @@ import 'package:mangayomi/repositories/track_repository.dart';
 import 'package:mangayomi/models/track.dart' as track;
 import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/storage_usage.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/general_state_provider.dart';
+import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/modules/onboarding/onboarding_screen.dart';
 import 'package:mangayomi/modules/onboarding/providers/onboarding_state_provider.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/services/http/m_client.dart';
+import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
+import 'package:mangayomi/services/sync/google_drive_app_diagnostic.dart';
+import 'package:mangayomi/services/sync/google_drive_chimahon_preview_runner.dart';
+import 'package:mangayomi/services/sync/google_drive_platform_support.dart';
+import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
+import 'package:mangayomi/services/reconcile_mihon_sources.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
+import 'package:mangayomi/services/mining/mining_preferences.dart';
+import 'package:mangayomi/services/mining/dictionary_update_service.dart';
+import 'package:mangayomi/services/mining/anki_mobile_service.dart';
+import 'package:mangayomi/services/youtube/youtube_preferences.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
 import 'package:mangayomi/utils/discord_rpc.dart';
 import 'package:mangayomi/services/crash_native.dart';
@@ -55,128 +68,179 @@ import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle, LogicalKeyboardKey;
 import 'package:mangayomi/utils/window_geometry.dart';
-import 'package:mangayomi/modules/more/settings/general/providers/memory_probe_provider.dart';
-import 'package:mangayomi/modules/widgets/memory_overlay.dart';
+import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart';
 import 'package:mangayomi/modules/widgets/app_ui_scale.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mangayomi/models/track_preference.dart';
+import 'package:mangayomi/modules/more/settings/general/providers/memory_probe_provider.dart';
+import 'package:mangayomi/modules/widgets/memory_overlay.dart';
 
 late Isar isar;
 DiscordRPC? discordRpc;
 WebViewEnvironment? webViewEnvironment;
 String? customDns;
+bool _didMountApplication = false;
+
+/// Captures a supported cold-start URI supplied directly to a desktop runner.
+///
+/// Linux depends on this because GTK's command-line signal can precede the
+/// Dart app-links listener. Windows can also supply the initial URI in argv;
+/// duplicate native delivery is harmless because [_MyAppState.lastUri]
+/// de-duplicates it. The normal stream handles links sent to a running app.
+@visibleForTesting
+Uri? initialDesktopAppLinkFromArguments(
+  List<String> arguments, {
+  required TargetPlatform platform,
+}) {
+  if (!supportsGoogleDriveChimahonSync(platform)) return null;
+  const supportedSchemes = {'mangayomi', 'app.chimahon.google.oauth'};
+  for (final argument in arguments) {
+    final uri = Uri.tryParse(argument);
+    if (uri != null && supportedSchemes.contains(uri.scheme.toLowerCase())) {
+      return uri;
+    }
+  }
+  return null;
+}
+
 void main(List<String> args) async {
   // Zone-level catch-all for anything that slips through both layers
-  runZonedGuarded(
-    () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      if (Platform.isLinux && runWebViewTitleBarWidget(args)) return;
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    _registerBundledLibraryLicenses();
+    if (Platform.isLinux && runWebViewTitleBarWidget(args)) return;
 
-      // Cap the decoded image cache so a large library grid can't fill the
-      // default 100 MB ceiling with full-resolution covers and OOM constrained
-      // mobile heaps. Mobile gets a tight 64 MB; desktop keeps 256 MB.
-      PaintingBinding.instance.imageCache.maximumSizeBytes = isMobile
-          ? 64 << 20
-          : 256 << 20;
+    // Cap the decoded image cache so a large library grid can't fill the
+    // default 100 MB ceiling with full-resolution covers and OOM constrained
+    // mobile heaps. Mobile gets a tight 64 MB; desktop keeps 256 MB. The
+    // encoded-bytes LRU in CustomExtendedNetworkImageProvider (50 MB) is a
+    // separate cache and is not affected by this setting.
+    PaintingBinding.instance.imageCache.maximumSizeBytes = isMobile
+        ? 64 << 20
+        : 256 << 20;
 
-      // Widget-layer errors (build / layout / paint)
-      FlutterError.onError = (FlutterErrorDetails details) {
-        FlutterError.presentError(details); // keep default red-screen in debug
-        AppLogger.log(
-          'FlutterError: ${details.exceptionAsString()}\n${details.stack}',
-          logLevel: LogLevel.error,
-        );
-        CrashReports.record(
-          source: 'FlutterError',
-          error: details.exceptionAsString(),
-          stack: details.stack,
-        );
-      };
-
-      // Async errors that escape the Flutter framework (PlatformDispatcher)
-      PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-        AppLogger.log(
-          'PlatformDispatcher error: $error\n$stack',
-          logLevel: LogLevel.error,
-        );
-        CrashReports.record(
-          source: 'PlatformDispatcher',
-          error: error,
-          stack: stack,
-        );
-        return true; // handled — prevent app termination
-      };
-
-      MediaKit.ensureInitialized();
-      await RustLib.init();
-      // Detect Android TV / leanback so the UI can branch on form factor.
-      // No-op on other platforms. See #729.
-      await initIsTv();
-      // Expensive worker isolates start lazily on first use instead of delaying
-      // the first frame.
-      if (!isMobile) {
-        await windowManager.ensureInitialized();
-        await WindowGeometry.restore();
-      }
-      if (Platform.isWindows) {
-        registerProtocolHandler("mangayomi");
-      }
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-        final availableVersion = await WebViewEnvironment.getAvailableVersion();
-        if (availableVersion != null) {
-          final document = await getApplicationDocumentsDirectory();
-          webViewEnvironment = await WebViewEnvironment.create(
-            settings: WebViewEnvironmentSettings(
-              userDataFolder: p.join(document.path, 'flutter_inappwebview'),
-            ),
-          );
-        }
-      }
-      final storage = StorageProvider();
-      // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
-      // prompt at launch. The database lives in scoped app storage, so the app
-      // can start, browse and read online without it. The permission is still
-      // requested lazily by `createDirectorySafely` / `initDB` the first time a
-      // public path actually needs to be written (e.g. a download). See #740.
-      // Caught errors are kept for everyone, unlike the verbose log behind
-      // "Enable logs". Anything raised before this is held in memory and
-      // written out here.
-      unawaited(
-        storage
-            .getDefaultDirectory()
-            .then((directory) async {
-              await CrashReports.init(directory);
-              // After CrashReports, because a native crash from the last run
-              // is recorded into it.
-              await NativeCrashHandler.init(directory);
-            })
-            .catchError((_) {}),
-      );
-      Object? startupError;
-      try {
-        isar = await storage.initDB(null, inspector: kDebugMode);
-      } catch (e, st) {
-        AppLogger.log('DB init failed: $e\n$st', logLevel: LogLevel.error);
-        startupError = e;
-      }
-      runApp(
-        startupError != null
-            ? _StartupErrorApp(error: startupError.toString())
-            : ProviderScope(child: MyApp(), retry: (retryCount, error) => null),
-      );
-      if (startupError == null) unawaited(_postLaunchInit(storage));
-    },
-    (Object error, StackTrace stack) {
+    // Widget-layer errors (build / layout / paint)
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details); // keep default red-screen in debug
       AppLogger.log(
-        'runZonedGuarded error: $error\n$stack',
+        'FlutterError: ${details.exceptionAsString()}\n${details.stack}',
         logLevel: LogLevel.error,
       );
       CrashReports.record(
-        source: 'runZonedGuarded',
+        source: 'FlutterError',
+        error: details.exceptionAsString(),
+        stack: details.stack,
+      );
+    };
+
+    // Async errors that escape the Flutter framework (PlatformDispatcher)
+    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+      AppLogger.log(
+        'PlatformDispatcher error: $error\n$stack',
+        logLevel: LogLevel.error,
+      );
+      CrashReports.record(
+        source: 'PlatformDispatcher',
         error: error,
         stack: stack,
       );
-    },
+      return true; // handled — prevent app termination
+    };
+
+    MediaKit.ensureInitialized();
+    await RustLib.init();
+    // Detect Android TV / leanback so the UI can branch on form factor.
+    // No-op on other platforms. See #729.
+    await initIsTv();
+    if (!isMobile) {
+      await windowManager.ensureInitialized();
+      await WindowGeometry.restore();
+    }
+    if (Platform.isWindows || Platform.isLinux) {
+      try {
+        registerPersistentProtocolHandler("mangayomi");
+      } catch (error, stackTrace) {
+        // A protocol collision must not prevent Mangatan itself from opening.
+        // The conflicting handler is deliberately left untouched.
+        debugPrint('Could not register the mangayomi URL protocol: $error');
+        AppLogger.log(
+          'Could not register the desktop mangayomi URL protocol: '
+          '$error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      }
+    }
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      final availableVersion = await WebViewEnvironment.getAvailableVersion();
+      if (availableVersion != null) {
+        final document = await getApplicationDocumentsDirectory();
+        webViewEnvironment = await WebViewEnvironment.create(
+          settings: WebViewEnvironmentSettings(
+            userDataFolder: p.join(document.path, 'flutter_inappwebview'),
+          ),
+        );
+      }
+    }
+    final storage = StorageProvider();
+    // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
+    // prompt at launch. The database lives in scoped app storage, so the app
+    // can start, browse and read online without it. The permission is still
+    // requested lazily by `createDirectorySafely` / `initDB` the first time a
+    // public path actually needs to be written (e.g. a download). See #740.
+    unawaited(
+      storage.getDefaultDirectory().then(CrashReports.init).catchError((_) {}),
+    );
+    Object? startupError;
+    try {
+      isar = await storage.initDB(null, inspector: kDebugMode);
+    } catch (e, st) {
+      AppLogger.log('DB init failed: $e\n$st', logLevel: LogLevel.error);
+      startupError = e;
+    }
+    runApp(
+      startupError != null
+          ? _StartupErrorApp(error: startupError.toString())
+          : ProviderScope(
+              child: MyApp(
+                initialAppLink: initialDesktopAppLinkFromArguments(
+                  args,
+                  platform: defaultTargetPlatform,
+                ),
+              ),
+              retry: (retryCount, error) => null,
+            ),
+    );
+    _didMountApplication = true;
+    if (startupError == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_postLaunchInit(storage));
+      });
+    }
+  }, _handleUncaughtError);
+}
+
+void _registerBundledLibraryLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    final notice = await rootBundle.loadString(
+      'third_party/libarchive/COPYING',
+    );
+    yield LicenseEntryWithLineBreaks(const ['libarchive'], notice);
+  });
+}
+
+void _handleUncaughtError(Object error, StackTrace stack) {
+  debugPrint('Uncaught startup error: $error\n$stack');
+  AppLogger.log(
+    'runZonedGuarded error: $error\n$stack',
+    logLevel: LogLevel.error,
   );
+  CrashReports.record(source: 'runZonedGuarded', error: error, stack: stack);
+  if (_didMountApplication) return;
+
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(_StartupErrorApp(error: error.toString()));
+  _didMountApplication = true;
 }
 
 class _StartupErrorApp extends StatelessWidget {
@@ -196,7 +260,7 @@ class _StartupErrorApp extends StatelessWidget {
                 const Icon(Icons.error_outline, size: 64, color: Colors.red),
                 const SizedBox(height: 16),
                 const Text(
-                  'Failed to start Mangayomi',
+                  'Failed to start Mangatan',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -214,11 +278,29 @@ class _StartupErrorApp extends StatelessWidget {
 }
 
 Future<void> _postLaunchInit(StorageProvider storage) async {
+  // These services spawn five isolates in total, and the extension workers
+  // each open the database. Warming them before runApp can consume the iOS
+  // launch-watchdog window without presenting a frame.
+  unawaited(getIsolateService.start());
+  unawaited(ffiImageDecoder.start());
   await AppLogger.init();
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
-  final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
-  await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
+  if (isApple || Platform.isAndroid) {
+    await Hive.initFlutter(isApple ? "databases" : "");
+    if (Platform.isMacOS) {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      MiningPreferences.configureStorageDirectory(
+        p.join(documentsDirectory.path, 'databases'),
+      );
+    }
+  } else {
+    final databaseDirectory = await storage.getDatabaseDirectory();
+    Hive.init(databaseDirectory!.path);
+    MiningPreferences.configureStorageDirectory(databaseDirectory.path);
+  }
   Hive.registerAdapter(TrackSearchAdapter());
+  YouTubePreferences.markStorageReady();
+  unawaited(DictionaryUpdateService.instance.runAutomaticIfDue());
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");
     await discordRpc?.initialize();
@@ -228,30 +310,50 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
 }
 
 class MyApp extends ConsumerStatefulWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.initialAppLink});
+
+  final Uri? initialAppLink;
 
   @override
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends ConsumerState<MyApp>
-    with WidgetsBindingObserver, WindowListener {
+    with
+        WidgetsBindingObserver,
+        WindowListener,
+        SingleTickerProviderStateMixin {
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
+  GoogleDriveDebugDiagnosticHandler? _googleDriveDiagnosticHandler;
   Uri? lastUri;
+  late final AnimationController _disabledProgressController;
+  late final MExtensionServerPlatform _mExtensionServer;
 
   @override
   void initState() {
     super.initState();
+    _disabledProgressController = AnimationController(vsync: this, value: 0.5);
+    _mExtensionServer = MExtensionServerPlatform(ref, persistent: true);
     WidgetsBinding.instance.addObserver(this);
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
     customDns = ref.read(customDnsStateProvider);
+    if (kDebugMode && supportsGoogleDriveChimahonSyncOnCurrentPlatform) {
+      final previewRunner = GoogleDriveChimahonPreviewRunner.forDatabase(isar);
+      _googleDriveDiagnosticHandler = GoogleDriveDebugDiagnosticHandler(
+        syncPreview: (referenceBackupBytes) =>
+            ChimahonRestoreSyncCoordinator.shared.duringReadOnlyPreview(
+              () async => (await previewRunner.run(
+                referenceBackupBytes: referenceBackupBytes,
+              )).toSafeJson(),
+            ),
+      );
+    }
+    _checkTrackerRefresh();
     _initDeepLinks();
     _setupMpvConfig();
-
-    // Tracker refresh and the local-library filesystem scan compete with the
-    // first paint for network/CPU; run them shortly after the UI is up.
+    unawaited(ref.read(scanLocalLibraryProvider.future));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
@@ -261,9 +363,16 @@ class _MyAppState extends ConsumerState<MyApp>
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!Platform.isIOS ||
-          ref.read(autoStartExtensionServerOnLaunchStateProvider)) {
-        MExtensionServerPlatform(ref).startServer();
+      // OpenJDK Mobile initialization is intentionally lazy on iOS. Starting
+      // a full embedded VM during the first frame can terminate the app before
+      // Flutter has finished restoring its UI. Mihon operations call
+      // prepareMihonBridge and start it when it is actually needed.
+      if (!Platform.isIOS) {
+        if (isDesktop) {
+          unawaited(_startBridgeAndRefreshFactorySources());
+        } else {
+          unawaited(_mExtensionServer.startServer());
+        }
       }
       if (ref.read(clearChapterCacheOnAppLaunchStateProvider)) {
         // Watch before calling clearcache to keep it alive, so that _getTotalDiskSpace completes safely
@@ -275,16 +384,38 @@ class _MyAppState extends ConsumerState<MyApp>
     });
   }
 
+  Future<void> _startBridgeAndRefreshFactorySources() async {
+    try {
+      await _mExtensionServer.startServer();
+      await ref.read(refreshInstalledMihonFactorySourcesProvider.future);
+    } on Object catch (error) {
+      AppLogger.log(
+        'Mihon source refresh failed (${error.runtimeType}).',
+        logLevel: LogLevel.warning,
+      );
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (Platform.isIOS) {
+      if (state == AppLifecycleState.inactive) {
+        // iOS can leave OpenJDK's blocking accept call spinning after device
+        // sleep. Stop the loopback listener before suspension; loaded Mihon
+        // extension instances remain cached in the embedded JVM.
+        unawaited(_mExtensionServer.suspendEmbeddedIosBridge());
+      } else if (state == AppLifecycleState.resumed) {
+        unawaited(_mExtensionServer.resumeEmbeddedIosBridge());
+      }
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       if (Platform.isLinux) {
         return;
       }
       // Lock the app when going to background (if lock is enabled)
-      final lockEnabled = ref.read(appLockEnabledStateProvider);
+      final lockEnabled = isar.settings.getSync(227)!.appLockEnabled ?? false;
       if (lockEnabled) {
         ref.read(appUnlockedStateProvider.notifier).lock();
       }
@@ -293,6 +424,14 @@ class _MyAppState extends ConsumerState<MyApp>
 
   @override
   Widget build(BuildContext context) {
+    final animationDurationScale = isMobile
+        ? defaultAnimationDurationScale
+        : ref.watch(animationDurationScaleProvider);
+    if (!isMobile) {
+      final dilation = animationTimeDilation(animationDurationScale);
+      if (timeDilation != dilation) timeDilation = dilation;
+    }
+
     final followSystem = ref.watch(followSystemThemeStateProvider);
     final forcedDark = ref.watch(themeModeStateProvider);
     final themeMode = followSystem
@@ -353,56 +492,61 @@ class _MyAppState extends ConsumerState<MyApp>
           child: content,
         );
         final base = BotToastInit()(context, scaledChild);
-        final withBackHandler = !isMobile
-            ? _MouseBackButtonHandler(router: router, child: base)
+        content = !isMobile
+            ? DesktopBackNavigationHandler(
+                canGoBack: router.canPop,
+                onBack: router.pop,
+                dismissTransientUi: DictionaryLookupPopup.dismissActive,
+                child: base,
+              )
             : base;
 
         if (!Platform.isLinux) {
           final isUnlocked = ref.watch(appUnlockedStateProvider);
           final lockEnabled = ref.watch(appLockEnabledStateProvider);
           if (lockEnabled && !isUnlocked) {
-            return Stack(
+            content = Stack(
               fit: StackFit.expand,
-              children: [withBackHandler, const AppLockScreen()],
+              children: [content, const AppLockScreen()],
             );
           }
         }
 
-        // Sits above everything, including the lock screen, because a
-        // measurement is not worth taking if navigating away ends it.
-        if (ref.watch(memoryOverlayVisibleProvider)) {
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              withBackHandler,
-              MemoryOverlay(
-                probe: ref.read(memoryProbeProvider),
-                onClose: () =>
-                    ref.read(memoryOverlayVisibleProvider.notifier).set(false),
-              ),
-            ],
+        if (!isMobile &&
+            animationDurationScale == minimumAnimationDurationScale) {
+          content = ProgressIndicatorTheme(
+            data: Theme.of(context).progressIndicatorTheme
+                .copyWith(controller: _disabledProgressController),
+            child: content,
+          );
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: content,
           );
         }
 
-        return withBackHandler;
+        return content;
       },
       routeInformationParser: router.routeInformationParser,
       routerDelegate: router.routerDelegate,
       routeInformationProvider: router.routeInformationProvider,
-      title: 'MangaYomi',
+      title: 'Mangatan',
       scrollBehavior: AllowScrollBehavior(),
     );
   }
 
   @override
   void dispose() {
+    if (!isMobile) timeDilation = defaultAnimationDurationScale;
+    _disabledProgressController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     if (!isMobile) {
       windowManager.removeListener(this);
       WindowGeometry.save();
     }
-    MExtensionServerPlatform(ref).stopServer();
+    unawaited(_mExtensionServer.stopServer());
     _linkSubscription?.cancel();
+    _googleDriveDiagnosticHandler?.close();
     discordRpc?.destroy();
     stopwebviewServer();
     AppLogger.dispose();
@@ -422,156 +566,170 @@ class _MyAppState extends ConsumerState<MyApp>
     if (Platform.isLinux) exit(0);
   }
 
-  Future<void> _initDeepLinks() async {
+  void _initDeepLinks() {
     _appLinks = AppLinks();
-    _linkSubscription = _appLinks.uriLinkStream.listen((uri) async {
-      if (uri == lastUri) return; // Debouncing Deep Links
-      lastUri = uri;
-      switch (uri.host) {
-        case "add-repo":
-          final repoName = uri.queryParameters["repo_name"];
-          final repoUrl = uri.queryParameters["repo_url"];
-          final mangaRepoUrls = uri.queryParametersAll["manga_url"];
-          final animeRepoUrls = uri.queryParametersAll["anime_url"];
-          final novelRepoUrls = uri.queryParametersAll["novel_url"];
-          final context = navigatorKey.currentContext;
-          if (context == null || !context.mounted) return;
-          final l10n = context.l10n;
-          showDialog(
-            context: navigatorKey.currentContext!,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: Text(l10n.add_repo),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l10n.label_value(l10n.name, repoName ?? l10n.unknown)),
-                    const SizedBox(height: 8),
-                    Text(l10n.label_value(l10n.url, repoUrl ?? l10n.unknown)),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    child: Text(l10n.cancel),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  FilledButton(
-                    child: Text(l10n.add),
-                    onPressed: () async {
-                      if (context.mounted) Navigator.of(context).pop();
+    _linkSubscription = _appLinks.uriLinkStream.listen(_handleDeepLink);
+    final initialAppLink = widget.initialAppLink;
+    if (initialAppLink != null) {
+      unawaited(_handleDeepLink(initialAppLink));
+    }
+  }
 
-                      final validUrls = await _checkValidUrls([
-                        ...mangaRepoUrls ?? [],
-                        ...animeRepoUrls ?? [],
-                        ...novelRepoUrls ?? [],
-                      ]);
-
-                      if (!validUrls) {
-                        botToast(l10n.unsupported_repo);
-                        return;
-                      }
-
-                      void addRepos(ItemType type, List<String>? urls) {
-                        if (urls == null) return;
-                        final current = ref.read(
-                          extensionsRepoStateProvider(type),
-                        );
-                        final existingUrls = current
-                            .map((r) => r.jsonUrl?.trim().toLowerCase())
-                            .whereType<String>()
-                            .toSet();
-                        final newRepos = urls
-                            .where((e) {
-                              final clean = e.trim().toLowerCase();
-                              return !existingUrls.contains(clean) &&
-                                  !existingUrls.contains('$clean/') &&
-                                  !existingUrls.contains(clean.endsWith('/')
-                                      ? clean.substring(0, clean.length - 1)
-                                      : clean);
-                            })
-                            .map(
-                              (e) => Repo(
-                                name: repoName,
-                                jsonUrl: e,
-                                website: repoUrl,
-                              ),
-                            )
-                            .toList();
-                        if (newRepos.isEmpty) return;
-                        final updated = [...current, ...newRepos];
-                        ref
-                            .read(extensionsRepoStateProvider(type).notifier)
-                            .set(updated);
-                      }
-
-                      addRepos(ItemType.manga, mangaRepoUrls);
-                      addRepos(ItemType.anime, animeRepoUrls);
-                      addRepos(ItemType.novel, novelRepoUrls);
-                      botToast(l10n.repo_added);
-                    },
-                  ),
-                ],
-              );
-            },
-          );
-          break;
-        case "add-button":
-          final buttonDataRaw = uri.queryParametersAll["button"];
-          final context = navigatorKey.currentContext;
-          if (context == null || !context.mounted || buttonDataRaw == null) {
-            return;
-          }
-          final l10n = context.l10n;
-          for (final buttonRaw in buttonDataRaw) {
-            final buttonData = jsonDecode(
-              utf8.decode(base64.decode(buttonRaw)),
-            );
-            if (buttonData is Map<String, dynamic>) {
-              final customButton = CustomButton.fromJson(buttonData);
-              await showDialog(
-                context: navigatorKey.currentContext!,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: Text(l10n.custom_buttons_add),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "${l10n.name}: ${customButton.title ?? 'Unknown'}",
-                        ),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        child: Text(l10n.cancel),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      FilledButton(
-                        child: Text(l10n.add),
-                        onPressed: () async {
-                          if (context.mounted) Navigator.of(context).pop();
-                          final pos = await customButtonRepository.count();
-                          await customButtonRepository.save(
-                            customButton
-                              ..pos = pos
-                              ..isFavourite = false
-                              ..id = null,
-                          );
-                          botToast(l10n.custom_buttons_added);
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            }
-          }
-          break;
-        default:
+  Future<void> _handleDeepLink(Uri uri) async {
+    if (uri == lastUri) return; // Debouncing Deep Links
+    lastUri = uri;
+    final ankiMobileCallback = AnkiMobileCallbackCoordinator.instance.handle(
+      uri,
+    );
+    if (ankiMobileCallback != null) {
+      if (ankiMobileCallback == AnkiMobileCallbackKind.added) {
+        botToast('Added to AnkiMobile', second: 3);
       }
-    });
+      return;
+    }
+    final googleDriveDiagnosticHandler = _googleDriveDiagnosticHandler;
+    if (googleDriveDiagnosticHandler != null &&
+        await googleDriveDiagnosticHandler.handle(uri)) {
+      // AppLinks exposes a broadcast stream. Returning here only stops normal
+      // app routing; it cannot consume the callback from an active OAuth
+      // listener subscribed to the same URI event.
+      return;
+    }
+    switch (uri.host) {
+      case "add-repo":
+        final repoName = uri.queryParameters["repo_name"];
+        final repoUrl = uri.queryParameters["repo_url"];
+        final mangaRepoUrls = uri.queryParametersAll["manga_url"];
+        final animeRepoUrls = uri.queryParametersAll["anime_url"];
+        final novelRepoUrls = uri.queryParametersAll["novel_url"];
+        final context = navigatorKey.currentContext;
+        if (context == null || !context.mounted) return;
+        final l10n = context.l10n;
+        showDialog(
+          context: navigatorKey.currentContext!,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(l10n.add_repo),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("${l10n.name}: ${repoName ?? 'Unknown'}"),
+                  const SizedBox(height: 8),
+                  Text("URL: ${repoUrl ?? 'Unknown'}"),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: Text(l10n.cancel),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                FilledButton(
+                  child: Text(l10n.add),
+                  onPressed: () async {
+                    if (context.mounted) Navigator.of(context).pop();
+
+                    final validUrls = await _checkValidUrls([
+                      ...mangaRepoUrls ?? [],
+                      ...animeRepoUrls ?? [],
+                      ...novelRepoUrls ?? [],
+                    ]);
+
+                    if (!validUrls) {
+                      botToast(l10n.unsupported_repo);
+                      return;
+                    }
+
+                    Future<void> addRepos(
+                      ItemType type,
+                      List<String>? urls,
+                    ) async {
+                      if (urls == null) return;
+                      final current = ref.read(
+                        extensionsRepoStateProvider(type),
+                      );
+                      final updated = [
+                        ...current,
+                        ...urls.map(
+                          (e) => Repo(
+                            name: repoName,
+                            jsonUrl: e,
+                            website: repoUrl,
+                          ),
+                        ),
+                      ];
+                      await ref
+                          .read(extensionsRepoStateProvider(type).notifier)
+                          .set(updated);
+                    }
+
+                    await Future.wait([
+                      addRepos(ItemType.manga, mangaRepoUrls),
+                      addRepos(ItemType.anime, animeRepoUrls),
+                      addRepos(ItemType.novel, novelRepoUrls),
+                    ]);
+                    botToast(l10n.repo_added);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+        break;
+      case "add-button":
+        final buttonDataRaw = uri.queryParametersAll["button"];
+        final context = navigatorKey.currentContext;
+        if (context == null || !context.mounted || buttonDataRaw == null) {
+          return;
+        }
+        final l10n = context.l10n;
+        for (final buttonRaw in buttonDataRaw) {
+          final buttonData = jsonDecode(utf8.decode(base64.decode(buttonRaw)));
+          if (buttonData is Map<String, dynamic>) {
+            final customButton = CustomButton.fromJson(buttonData);
+            await showDialog(
+              context: navigatorKey.currentContext!,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text(l10n.custom_buttons_add),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("${l10n.name}: ${customButton.title ?? 'Unknown'}"),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      child: Text(l10n.cancel),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    FilledButton(
+                      child: Text(l10n.add),
+                      onPressed: () async {
+                        if (context.mounted) Navigator.of(context).pop();
+                        await isar.writeTxn(() async {
+                          await isar.customButtons.put(
+                            customButton
+                              ..pos = await isar.customButtons.count()
+                              ..isFavourite = false
+                              ..id = null
+                              ..updatedAt =
+                                  DateTime.now().millisecondsSinceEpoch,
+                          );
+                        });
+                        botToast(l10n.custom_buttons_added);
+                      },
+                    ),
+                  ],
+                );
+              },
+            );
+          }
+        }
+        break;
+      default:
+    }
   }
 
   Future<bool> _checkValidUrls(List<String> urls) async {
@@ -654,25 +812,6 @@ class _MyAppState extends ConsumerState<MyApp>
           )
           .checkRefresh();
     }
-  }
-}
-
-class _MouseBackButtonHandler extends StatelessWidget {
-  final GoRouter router;
-  final Widget child;
-
-  const _MouseBackButtonHandler({required this.router, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: (event) {
-        if (event.buttons & kBackMouseButton != 0) {
-          if (router.canPop()) router.pop();
-        }
-      },
-      child: child,
-    );
   }
 }
 

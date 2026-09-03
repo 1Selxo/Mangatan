@@ -19,13 +19,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get history => '履歴';
 
   @override
-  String get browse => 'ブラウズ';
+  String get browse => '閲覧';
 
   @override
   String get more => 'その他';
 
   @override
-  String get open_random_entry => 'ランダムに開く';
+  String get open_random_entry => 'ランダムな項目を開く';
 
   @override
   String get import => 'インポート';
@@ -117,11 +117,11 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String compression_info(Object level) {
-    return '圧縮が高い=スペースが少ないがCPUが多い。デフォルト: $level';
+    return '圧縮率を高くするとファイルサイズは小さくなりますが、CPU使用量が増えます。デフォルト: $level';
   }
 
   @override
-  String get comfortable_grid => '快適グリッド';
+  String get comfortable_grid => '快適なグリッド';
 
   @override
   String get cover_only_grid => 'カバーのみグリッド';
@@ -178,7 +178,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get remove_everything_msg => '本当にすべてを削除しますか？すべての履歴が失われます';
 
   @override
-  String get remove_all_update_msg => '本当によろしいですか？すべての更新がクリアされます';
+  String get remove_all_update_msg => '本当によろしいですか？すべての更新が削除されます。';
 
   @override
   String get ok => 'OK';
@@ -190,7 +190,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get remove => '削除';
 
   @override
-  String get remove_history_msg => 'このチャプターの読取日を削除します。よろしいですか？';
+  String get remove_history_msg => 'このチャプターの読了日を削除します。よろしいですか？';
 
   @override
   String get last_used => '最後に使用';
@@ -223,26 +223,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get mass_migration_preview_items => 'プレビューアイテム';
 
   @override
-  String get mass_migration_destination_source => 'Destination source';
+  String get mass_migration_destination_source => '移行先ソース';
 
   @override
-  String get mass_migration_no_library_items =>
-      'No library items are available for mass migration.';
+  String get mass_migration_no_library_items => '一括移行できるライブラリ項目がありません。';
 
   @override
-  String get mass_migration_no_destination_sources =>
-      'No installed destination sources are available.';
+  String get mass_migration_no_destination_sources => 'インストール済みの移行先ソースがありません。';
 
   @override
-  String get mass_migration_installed => 'Installed';
+  String get mass_migration_installed => 'インストール済み';
 
   @override
   String mass_migration_items_ready_for_review(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items ready for review',
-      one: '1 item ready for review',
+      other: '$count件が確認待ちです',
+      one: '1件が確認待ちです',
     );
     return '$_temp0';
   }
@@ -252,96 +250,91 @@ class AppLocalizationsJa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items',
-      one: '1 item',
+      other: '$count件',
+      one: '1件',
     );
     return '$_temp0';
   }
 
   @override
-  String get mass_migration_select_destination_source =>
-      'Select destination source';
+  String get mass_migration_select_destination_source => '移行先ソースを選択';
 
   @override
   String mass_migration_finding_matches(Object source, Object language) {
-    return 'Finding matches in $source • $language';
+    return '$source • $languageで候補を検索中';
   }
 
   @override
   String mass_migration_processing_item(int current, int total) {
-    return 'Processing item $current of $total';
+    return '項目 $current / $total を処理中';
   }
 
   @override
-  String get mass_migration_waiting_next_item =>
-      'Waiting 2 seconds before the next item...';
+  String get mass_migration_waiting_next_item => '次の項目まで2秒待機中…';
 
   @override
-  String get mass_migration_waiting_next_migration =>
-      'Waiting 2 seconds before the next migration...';
+  String get mass_migration_waiting_next_migration => '次の移行まで2秒待機中…';
 
   @override
   String mass_migration_matched_so_far(int count) {
-    return 'Matched so far: $count';
+    return '現在の一致件数: $count';
   }
 
   @override
   String mass_migration_no_match_count(int count) {
-    return 'No match: $count';
+    return '一致なし: $count';
   }
 
   @override
   String mass_migration_review_matches(Object source) {
-    return 'Review matches for $source';
+    return '$sourceの候補を確認';
   }
 
   @override
   String mass_migration_found_matches(int count) {
-    return 'Found matches: $count';
+    return '一致候補: $count';
   }
 
   @override
   String mass_migration_no_matches(int count) {
-    return 'No matches: $count';
+    return '一致なし: $count';
   }
 
   @override
   String mass_migration_selected_to_migrate(int count) {
-    return 'Selected to migrate: $count';
+    return '移行対象: $count';
   }
 
   @override
-  String get mass_migration_finish_review => 'Finish review';
+  String get mass_migration_finish_review => '確認を完了';
 
   @override
   String mass_migration_migrate_selected(int count) {
-    return 'Migrate selected items ($count)';
+    return '選択した項目を移行（$count）';
   }
 
   @override
   String mass_migration_migrating_selected(Object source) {
-    return 'Migrating selected items to $source';
+    return '選択した項目を$sourceへ移行中';
   }
 
   @override
-  String get mass_migration_no_items_selected =>
-      'No items selected for migration.';
+  String get mass_migration_no_items_selected => '移行する項目が選択されていません。';
 
   @override
   String mass_migration_migrating_item(int current, int total) {
-    return 'Migrating item $current of $total';
+    return '項目 $current / $total を移行中';
   }
 
   @override
-  String get mass_migration_complete => 'Mass migration complete';
+  String get mass_migration_complete => '一括移行が完了しました';
 
   @override
-  String get mass_migration_complete_success_message =>
-      'All selected items were processed successfully.';
+  String get mass_migration_complete_success_message => '選択した項目をすべて正常に処理しました。';
 
   @override
   String get mass_migration_complete_partial_message =>
-      'Migration finished with a few items that still need manual attention.';
+      '移行が完了しました。一部の項目には手動対応が必要です。';
 
   @override
   String mass_migration_route_summary(Object source, Object destination) {
@@ -349,57 +342,56 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get mass_migration_processed => 'Processed';
+  String get mass_migration_processed => '処理済み';
 
   @override
-  String get mass_migration_matched => 'Matched';
+  String get mass_migration_matched => '一致';
 
   @override
-  String get mass_migration_migrated => 'Migrated';
+  String get mass_migration_migrated => '移行済み';
 
   @override
-  String get mass_migration_skipped => 'Skipped';
+  String get mass_migration_skipped => 'スキップ';
 
   @override
-  String get mass_migration_failed => 'Failed';
+  String get mass_migration_failed => '失敗';
 
   @override
-  String get mass_migration_failed_items => 'Failed Items';
+  String get mass_migration_failed_items => '失敗した項目';
 
   @override
-  String get mass_migration_exit => 'Exit Mass Migration';
+  String get mass_migration_exit => '一括移行を終了';
 
   @override
-  String get mass_migration_no_destination_match =>
-      'No destination match found';
+  String get mass_migration_no_destination_match => '移行先の一致候補が見つかりません';
 
   @override
   String mass_migration_query(Object query) {
-    return 'Query: $query';
+    return '検索: $query';
   }
 
   @override
-  String get mass_migration_skip => 'Skip';
+  String get mass_migration_skip => 'スキップ';
 
   @override
-  String get mass_migration_loading => 'Loading...';
+  String get mass_migration_loading => '読み込み中…';
 
   @override
-  String get mass_migration_choose_another_result => 'Choose another result';
+  String get mass_migration_choose_another_result => '別の結果を選択';
 
   @override
-  String get mass_migration_source_chapters => 'Source chapters';
+  String get mass_migration_source_chapters => '元ソースのチャプター';
 
   @override
-  String get mass_migration_destination_chapters => 'Destination chapters';
+  String get mass_migration_destination_chapters => '移行先のチャプター';
 
   @override
   String mass_migration_chapter_count(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count chapters',
-      one: '1 chapter',
+      other: '$countチャプター',
+      one: '1チャプター',
     );
     return '$_temp0';
   }
@@ -409,8 +401,8 @@ class AppLocalizationsJa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count source chapters',
-      one: '1 source chapter',
+      other: '$count元ソースのチャプター',
+      one: '1元ソースのチャプター',
     );
     return '$_temp0';
   }
@@ -420,31 +412,31 @@ class AppLocalizationsJa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count destination chapters',
-      one: '1 destination chapter',
+      other: '$count移行先のチャプター',
+      one: '1移行先のチャプター',
     );
     return '$_temp0';
   }
 
   @override
-  String get mass_migration_no_chapters_found => 'No chapters found.';
+  String get mass_migration_no_chapters_found => 'チャプターが見つかりません。';
 
   @override
   String mass_migration_and_more_chapters(int count) {
-    return 'And $count more...';
+    return '他に$count件…';
   }
 
   @override
-  String get mass_migration_unknown_title => 'Unknown title';
+  String get mass_migration_unknown_title => '不明なタイトル';
 
   @override
-  String get mass_migration_unknown_match => 'Unknown match';
+  String get mass_migration_unknown_match => '不明な一致候補';
 
   @override
-  String get mass_migration_unknown_source => 'Unknown source';
+  String get mass_migration_unknown_source => '不明なソース';
 
   @override
-  String get mass_migration_unknown_chapter => 'Unknown chapter';
+  String get mass_migration_unknown_chapter => '不明なチャプター';
 
   @override
   String get migrate_confirm => '別のソースに移行';
@@ -482,6 +474,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get statistics => '統計';
 
   @override
+  String get library_statistics => 'Library statistics';
+
+  @override
   String get settings => '設定';
 
   @override
@@ -508,14 +503,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get name => '名前';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label: $value';
-  }
-
-  @override
-  String get url => 'URL';
 
   @override
   String get category_name_required => '*必須';
@@ -553,6 +540,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get appearance_subtitle => 'テーマ、日時形式';
 
   @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
   String get theme => 'テーマ';
 
   @override
@@ -568,7 +567,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get off => 'オフ';
 
   @override
-  String get pure_black_dark_mode => '純黒ダークモード';
+  String get pure_black_dark_mode => '完全な黒のダークモード';
 
   @override
   String get timestamp => 'タイムスタンプ';
@@ -610,10 +609,34 @@ class AppLocalizationsJa extends AppLocalizations {
   String get reading_mode_right_to_left => '右から左へ';
 
   @override
+  String get reading_direction => '読み方向';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
   String get reading_mode_vertical_continuous => '垂直連続';
 
   @override
   String get reading_mode_webtoon => 'ウェブトゥーン';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => 'ダブルタップアニメーション速度';
@@ -677,11 +700,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get version => 'バージョン';
 
   @override
-  String beta_version(Object version) {
-    return 'ベータ ($version)';
-  }
-
-  @override
   String get check_for_update => '更新を確認';
 
   @override
@@ -735,20 +753,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get unknown => '不明';
 
   @override
-  String get empty_placeholder => '空';
-
-  @override
-  String get error => 'エラー';
-
-  @override
-  String error_with_message(Object error) {
-    return 'エラー: $error';
-  }
-
-  @override
-  String get no_pages_available => 'エラー: 利用可能なページがありません';
-
-  @override
   String get set_categories => 'カテゴリを設定';
 
   @override
@@ -779,84 +783,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get source_title => 'ソースタイトル';
 
   @override
-  String get create_extension => '拡張機能を作成';
-
-  @override
-  String get choose_extension_language => '拡張機能の言語を選択';
-
-  @override
-  String get lang => '言語';
-
-  @override
-  String get base_url => 'ベースURL';
-
-  @override
-  String get api_url_optional => 'API URL（任意）';
-
-  @override
-  String get icon_url => 'アイコンURL';
-
-  @override
-  String get source_icon_url => 'ソースアイコンURL';
-
-  @override
-  String get notes => '備考';
-
-  @override
-  String get extension_name_example => '例: myAnime';
-
-  @override
-  String get language_code_example => '例: ja';
-
-  @override
-  String get base_url_example => '例: https://example.com';
-
-  @override
-  String get api_url_example => '例: https://api.example.com';
-
-  @override
-  String get extension_notes_example => '例: この拡張機能にはログインが必要です';
-
-  @override
-  String get type => 'タイプ';
-
-  @override
-  String get target => 'ターゲット';
-
-  @override
-  String get source_type_single => '単一';
-
-  @override
-  String get source_type_multi => '複数';
-
-  @override
-  String get source_type_torrent => 'トレント';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'LNReaderコンパイル済みJS';
-
-  @override
-  String get source_created_successfully => 'ソースが正常に作成されました';
-
-  @override
-  String get source_already_exists => 'ソースは既に存在します';
-
-  @override
-  String get error_when_creating_source => 'ソース作成エラー';
-
-  @override
-  String get cookies_deleted => 'Cookieを削除しました！';
-
-  @override
-  String get delete_all_cookies => 'すべてのCookieを削除';
-
-  @override
   String get chapter_number => 'チャプター番号';
 
   @override
@@ -872,7 +798,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String missing_chapters(Object count) {
-    return '不足している話数: $count';
+    return 'Missing $count chapters';
   }
 
   @override
@@ -907,7 +833,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String page(Object page) {
-    return 'ページ';
+    return 'ページ$page';
   }
 
   @override
@@ -928,12 +854,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String next(Object char) {
-    return '次へ';
+    return '次へ$char';
   }
 
   @override
   String previous(Object char) {
-    return '前へ';
+    return '前へ$char';
   }
 
   @override
@@ -1069,7 +995,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sync_failed => '同期失敗';
 
   @override
-  String get sync_restore_in_progress => '同期をスキップ — 復元中';
+  String get sync_restore_in_progress => 'Sync skipped — restore in progress';
 
   @override
   String get sync_button_sync => '進行状況を同期';
@@ -1084,28 +1010,29 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sync_button_download => 'ダウンロードのみ';
 
   @override
-  String get sync_button_download_info => 'この操作はローカルデータを完全にリモートデータで置き換えます！';
+  String get sync_button_download_info =>
+      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
 
   @override
-  String get sync_status_not_configured => '未接続';
+  String get sync_status_not_configured => 'Not connected';
 
   @override
-  String get sync_status_checking => '接続を確認中...';
+  String get sync_status_checking => 'Checking connection...';
 
   @override
-  String get sync_status_connected => '接続済み';
+  String get sync_status_connected => 'Connected';
 
   @override
-  String get sync_status_unauthorized => 'セッションが切れました。再ログインしてください';
+  String get sync_status_unauthorized => 'Session expired, please log in again';
 
   @override
-  String get sync_status_unreachable => 'サーバーに接続できません';
+  String get sync_status_unreachable => 'Can\'t reach server';
 
   @override
-  String get sync_section_general => '一般';
+  String get sync_section_general => 'General';
 
   @override
-  String get sync_section_data_types => '同期する項目';
+  String get sync_section_data_types => 'What to sync';
 
   @override
   String get sync_on => '同期を有効化';
@@ -1174,7 +1101,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String missing_episodes(Object count) {
-    return '不足しているエピソード: $count';
+    return 'Missing $count episodes';
   }
 
   @override
@@ -1380,35 +1307,37 @@ class AppLocalizationsJa extends AppLocalizations {
   String get restore_backup => 'バックアップを復元';
 
   @override
-  String get encrypt_backups => 'バックアップを暗号化';
+  String get encrypt_backups => 'Encrypt backups';
 
   @override
-  String get encrypt_backups_info => 'AES暗号化によりバックアップをパスワード保護します';
+  String get encrypt_backups_info =>
+      'Password-protect backup files using AES encryption';
 
   @override
-  String get no_secure_storage => '安全なストレージが見つかりません';
+  String get no_secure_storage => 'No secure storage found';
 
   @override
   String get no_keyring_warning =>
-      'キーリングサービスがないためパスワードを安全に保存できません。\n\nローカルデータベースに暗号化なしで保存しますか？';
+      'This system doesn\'t have a keyring service available (e.g. gnome-keyring or kwallet on Linux), so the password can\'t be stored securely.\n\nStore it unencrypted in the local app database instead? Anyone with access to this device\'s app data would be able to read it.';
 
   @override
-  String get enter_backup_password => 'バックアップパスワードを入力';
+  String get enter_backup_password => 'Enter backup password';
 
   @override
-  String get incorrect_password_try_again => 'パスワードが正しくありません。再試行してください。';
+  String get incorrect_password_try_again => 'Incorrect password, try again.';
 
   @override
-  String get set_backup_password => 'バックアップパスワードを設定';
+  String get set_backup_password => 'Set backup password';
 
   @override
-  String get confirm_password => 'パスワードを確認';
+  String get confirm_password => 'Confirm password';
 
   @override
-  String get passwords_do_not_match => 'パスワードが一致しません';
+  String get passwords_do_not_match => 'Passwords do not match';
 
   @override
-  String get password_required_to_restore => '復元にはパスワードが必要です。';
+  String get password_required_to_restore =>
+      'A password is required to restore this backup.';
 
   @override
   String get restore_backup_subtitle => 'バックアップファイルからライブラリを復元';
@@ -1461,38 +1390,41 @@ class AppLocalizationsJa extends AppLocalizations {
       'バックアップを復元すると、すべての既存データが上書きされます。\\n\\n復元を続けますか？';
 
   @override
-  String get restore_sync_question_title => 'この復元を同期しますか？';
+  String get restore_sync_question_title => 'Sync this restore?';
 
   @override
-  String get restore_sync_question_message => '復元されたデータを今すぐ同期サーバーにアップロードしますか？';
+  String get restore_sync_question_message =>
+      'This device is connected to a sync server. Upload this restored data to it now? If not, sync will be turned off so the server\'s old data doesn\'t overwrite what you just restored.';
 
   @override
-  String get restore_sync_question_confirm => 'はい、同期する';
+  String get restore_sync_question_confirm => 'Yes, sync';
 
   @override
-  String get restore_sync_question_deny => 'いいえ、同期を無効化';
+  String get restore_sync_question_deny => 'No, disable sync';
 
   @override
-  String get sync_disabled_after_restore => '同期が無効になりました。設定から再度有効にできます。';
+  String get sync_disabled_after_restore =>
+      'Sync is disabled. You can turn it on again in Settings.';
 
   @override
-  String get restore_sync_disabled_question_title => '同期は現在無効です';
+  String get restore_sync_disabled_question_title =>
+      'Sync is currently disabled';
 
   @override
   String get restore_sync_disabled_question_message =>
-      '同期を再有効化してサーバーにアップロードしますか？';
+      'Sync is turned off. Turn it back on and upload this restored data to your server?';
 
   @override
-  String get restore_sync_question_reenable => 'はい、有効化して同期';
+  String get restore_sync_question_reenable => 'Yes, re-enable and sync';
 
   @override
-  String get restore_sync_question_keep_disabled => '無効のままにする';
+  String get restore_sync_question_keep_disabled => 'Keep it disabled';
 
   @override
-  String get restore_sync_uploading => '復元データをサーバーに同期中…';
+  String get restore_sync_uploading => 'Syncing restored data to server…';
 
   @override
-  String get restore_sync_upload_success => '復元データをサーバーに同期しました';
+  String get restore_sync_upload_success => 'Restored data synced to server';
 
   @override
   String get services => 'サービス';
@@ -1532,13 +1464,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get video_audio_info => '優先言語、ピッチ補正、オーディオチャンネル';
 
   @override
-  String get player => 'プレーヤー';
+  String get player => 'プレイヤー';
 
   @override
   String get markEpisodeAsSeenSetting => 'エピソードを視聴済みにするタイミング';
 
   @override
-  String get mark_duplicate_chapters_read => '重複する章番号を読済みとしてマーク';
+  String get mark_duplicate_chapters_read =>
+      'Mark duplicate chapter numbers as read';
 
   @override
   String get default_skip_intro_length => 'デフォルトイントロスキップ長';
@@ -1556,7 +1489,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get show_extensions => '拡張機能を表示';
 
   @override
-  String get default_skip_forward_skip_length => 'デフォルトスキップフォワードスキップ長';
+  String get default_skip_forward_skip_length => 'デフォルトの早送り時間';
 
   @override
   String get aniskip_requires_info =>
@@ -1585,7 +1518,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String updating_library(Object cur, Object failed, Object max) {
-    return 'ライブラリを更新中 ($cur / $max) - 失敗: $failed';
+    return 'ライブラリを更新中（$cur / $max）— 失敗: $failed';
   }
 
   @override
@@ -1652,13 +1585,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get blend_mode_overlay => 'オーバーレイ';
 
   @override
-  String get blend_mode_colorDodge => 'ColorDodge';
+  String get blend_mode_colorDodge => '覆い焼きカラー';
 
   @override
   String get blend_mode_lighten => '明るく';
 
   @override
-  String get blend_mode_colorBurn => 'ColorBurn';
+  String get blend_mode_colorBurn => '焼き込みカラー';
 
   @override
   String get blend_mode_darken => '暗く';
@@ -1670,10 +1603,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get blend_mode_saturation => '彩度';
 
   @override
-  String get blend_mode_softLight => 'SoftLight';
+  String get blend_mode_softLight => 'ソフトライト';
 
   @override
-  String get blend_mode_plus => 'プラス';
+  String get blend_mode_plus => '加算';
 
   @override
   String get blend_mode_exclusion => '除外';
@@ -1709,7 +1642,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get background => '背景';
 
   @override
-  String get no_subtite_warning_message => 'このビデオには字幕トラックがないため効果はありません';
+  String get no_subtite_warning_message => 'この動画には字幕トラックがないため、効果はありません。';
 
   @override
   String get grid_size => 'グリッドサイズ';
@@ -1757,11 +1690,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get advanced_info => 'mpv設定';
 
   @override
-  String get use_native_http_client => 'ネイティブhttpクライアントを使用';
+  String get use_native_http_client => 'ネイティブHTTPクライアントを使用';
 
   @override
   String get use_native_http_client_info =>
-      'VPNのようなプラットフォーム機能を自動的にサポートし、HTTP/3のようなより多くのHTTP機能をサポートし、カスタムリダイレクト処理';
+      'VPNなどのプラットフォーム機能、HTTP/3などの追加HTTP機能、カスタムリダイレクト処理を自動的にサポートします。';
 
   @override
   String n_hour_ago(Object hour) {
@@ -1793,7 +1726,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String library_last_updated(Object lastUpdated) {
-    return 'ライブラリ最終更新: $lastUpdated';
+    return 'ライブラリの最終更新: $lastUpdated';
   }
 
   @override
@@ -1843,10 +1776,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get recommendations_weights_genre => 'ジャンル類似度';
 
   @override
-  String get recommendations_weights_setting => '設定類似度';
+  String get recommendations_weights_setting => '設定の類似度';
 
   @override
-  String get recommendations_weights_synopsis => 'あらすじ類似度';
+  String get recommendations_weights_synopsis => 'あらすじの類似度';
 
   @override
   String get recommendations_weights_theme => 'テーマ類似度';
@@ -1897,7 +1830,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get url_cannot_be_empty => 'URLは空にできません';
 
   @override
-  String get url_must_end_with_dot_json_or_dot_pb => 'URLは.jsonで終わる必要があります';
+  String get url_must_end_with_dot_json => 'URLは.jsonで終わる必要があります';
 
   @override
   String get repo_url => 'リポジトリURL';
@@ -1913,7 +1846,7 @@ class AppLocalizationsJa extends AppLocalizations {
       'これによりアプリケーションのすべてのソースが完全に削除されます。続行してもよろしいですか？';
 
   @override
-  String get sources_cleared => 'ソースがクリアされました！！！';
+  String get sources_cleared => 'ソースを削除しました！';
 
   @override
   String get repo_added => 'ソースリポジトリが追加されました！';
@@ -1928,16 +1861,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get genre_search_library => 'ライブラリでジャンル検索';
 
   @override
-  String get genre_search_source => 'ソースでブラウズ';
+  String get genre_search_source => 'ソースで検索';
 
   @override
   String get source_not_added => 'ソースがインストールされていません！';
 
   @override
-  String get load_own_subtitles => '独自の字幕を読み込む...';
+  String get load_own_subtitles => '独自の字幕を読み込む…';
 
   @override
-  String get search_subtitles => 'オンラインで字幕を検索...';
+  String get search_subtitles => 'オンラインで字幕を検索…';
 
   @override
   String extension_notes(Object notes) {
@@ -2022,7 +1955,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sync_enable_settings => '設定を同期';
 
   @override
-  String get enable_mpv => 'mpvシェーダー/スクリプトを有効化';
+  String get enable_mpv => 'mpvのシェーダー/スクリプトを有効化';
 
   @override
   String get mpv_info => 'mpv/scripts/配下の.jsスクリプトをサポート';
@@ -2104,7 +2037,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get audio_preferred_languages_info =>
-      '複数のオーディオストリームを持つビデオでデフォルトで選択されるオーディオ言語、2/3文字の言語コード（例：ja、en）。複数の値はカンマで区切ることができます。';
+      '複数の音声ストリームがある動画でデフォルトに選択する音声言語です。2文字または3文字の言語コード（例: ja、en、de）に対応しています。複数の値はカンマで区切ってください。';
 
   @override
   String get enable_audio_pitch_correction => 'オーディオピッチ補正を有効化';
@@ -2186,68 +2119,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get rescan_local_folder => 'すべてのローカルフォルダを今すぐ再スキャン';
 
   @override
-  String get default_download_destination => 'デフォルトのダウンロード先';
-
-  @override
-  String get ask_download_destination => 'ダウンロード先を毎回確認';
-
-  @override
-  String get ask_download_destination_desc => 'ダウンロード開始時にフォルダを選択します。';
-
-  @override
-  String get select_download_destination => 'ダウンロード先を選択';
-
-  @override
-  String get clear_local_library => 'ローカルライブラリをクリア';
-
-  @override
-  String get clear_local_library_desc => 'ローカルフォルダおよびアーカイブをライブラリから削除します。';
-
-  @override
-  String get clear_local_library_msg => 'ライブラリから削除されます（ファイル自体は削除されません）。';
-
-  @override
-  String get custom => 'カスタム';
-
-  @override
-  String get no_local_folder_available_for_downloads => '利用可能なダウンロードフォルダがありません';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return 'CBZの作成に失敗しました: $error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return 'カバー画像の読み込みエラー: $error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return 'メタデータの読み込みエラー: $error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return 'ライブラリ保存エラー: $error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return '章カバー画像の読み込みエラー: $error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return 'アーカイブカバー画像の読み込みエラー: $error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return 'ローカルライブラリ取得エラー: $error';
-  }
-
-  @override
   String get export_metadata => 'メタデータをエクスポート';
 
   @override
@@ -2255,25 +2126,25 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String failed_to_export_metadata(Object error) {
-    return 'メタデータのエクスポートに失敗: $error';
+    return 'Failed to export metadata: $error';
   }
 
   @override
   String unrecognized_chapter_numbers(Object count) {
-    return '$count話の番号を自動取得できませんでした。';
+    return '$count chapter(s) couldn\'t be auto-numbered and may be out of order or missing from the reader.';
   }
 
   @override
   String get cloudflare_resolution_webview_server_start_failed =>
-      'Cloudflare解決サーバーを起動できませんでした。';
+      'Couldn\'t start Cloudflare Resolution Webview Server.';
 
   @override
   String tracker_token_expired(Object tracker) {
-    return '$trackerのトークンが期限切れです';
+    return '$tracker Token expired';
   }
 
   @override
-  String get video_list_empty => '動画リストが空です';
+  String get video_list_empty => 'Video list is empty';
 
   @override
   String playback_speed_multiplier(Object value) {
@@ -2282,7 +2153,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String could_not_launch_url(Object url) {
-    return '$url を開けませんでした';
+    return 'Could not launch $url';
   }
 
   @override
@@ -2324,10 +2195,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tracked => '追跡中';
 
   @override
-  String get auth_unlock_msg => 'Mangayomiのロックを解除するために認証してください';
+  String get auth_unlock_msg => 'Mangatanのロックを解除するために認証してください';
 
   @override
-  String get app_locked => 'Mangayomiはロックされています';
+  String get app_locked => 'Mangatanはロックされています';
 
   @override
   String get auth_to_continue => '続行するために認証してください';
@@ -2424,7 +2295,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String average_chapters_per_title(Object title) {
-    return 'タイトルあたりの平均章数';
+    return '$titleあたりの平均章数';
   }
 
   @override
@@ -2434,209 +2305,185 @@ class AppLocalizationsJa extends AppLocalizations {
   String get entries => 'エントリ';
 
   @override
-  String get android_proxy_server_mihon => 'Android Proxy Server (Mihon)';
+  String get android_proxy_server_mihon => 'Androidプロキシサーバー（Mihon）';
 
   @override
   String get android_proxy_server_mihon_description =>
-      'Download and configure the proxy server required to use Mihon extensions.';
+      'Mihonの拡張機能に必要なプロキシサーバーをダウンロードして設定します。';
 
   @override
-  String get mihon_proxy_server => 'Mihon proxy server';
+  String get mihon_proxy_server => 'Mihonプロキシサーバー';
 
   @override
   String get extension_server_intro_with_jre =>
-      'Download the proxy server bundle before using Mihon extensions. The bundle includes the JRE and extension server JAR.';
+      'Mihonの拡張機能を使う前に、プロキシサーバーのバンドルをダウンロードしてください。バンドルにはJREと拡張機能サーバーのJARが含まれます。';
 
   @override
   String get extension_server_intro_ios =>
-      'Download the proxy server JAR before using Mihon extensions. iOS only needs the extension server JAR.';
+      'Mihonの拡張機能を使う前に、プロキシサーバーのJARをダウンロードしてください。iOSでは拡張機能サーバーのJARのみ必要です。';
 
   @override
-  String get checking_files => 'Checking files';
+  String get checking_files => 'ファイルを確認中';
 
   @override
-  String get files_installed => 'Files installed';
+  String get files_installed => 'ファイルをインストールしました';
 
   @override
-  String get files_missing => 'Files missing';
+  String get files_missing => 'ファイルがありません';
 
   @override
-  String get update_files => 'Update files';
+  String get update_files => 'ファイルを更新';
 
   @override
   String get up_to_date => '最新';
 
   @override
-  String get choose_location => 'Choose location';
+  String get choose_location => '場所を選択';
 
   @override
-  String get import_existing_jar => 'Import existing JAR';
+  String get import_existing_jar => '既存のJARをインポート';
 
   @override
-  String get detect_files_in_selected_folder =>
-      'Detect files in selected folder';
+  String get detect_files_in_selected_folder => '選択したフォルダーのファイルを検出';
 
   @override
-  String get preparing_download => 'Preparing download...';
+  String get preparing_download => 'ダウンロードを準備中…';
 
   @override
-  String get app_install_location => 'App install location';
+  String get app_install_location => 'アプリのインストール先';
 
   @override
-  String get install_location => 'Install location';
+  String get install_location => 'インストール先';
 
   @override
-  String get jre_executable => 'JRE executable';
+  String get jre_executable => 'JRE実行ファイル';
 
   @override
-  String get extension_server_jar => 'Extension server JAR';
+  String get extension_server_jar => '拡張機能サーバーのJAR';
 
   @override
-  String get installed_version => 'Installed version';
+  String get installed_version => 'インストール済みバージョン';
 
   @override
-  String get latest_version => 'Latest version';
+  String get latest_version => '最新バージョン';
 
   @override
   String get m_extension_server_description =>
-      'Use M-Extension-Server when you need a separate Android device proxy. Set the proxy address here and download the APK from GitHub.';
+      '別のAndroid端末用のプロキシが必要な場合は、M-Extension-Serverを使います。ここでプロキシアドレスを設定し、GitHubからAPKをダウンロードしてください。';
 
   @override
-  String get set_proxy_address => 'Set proxy address';
+  String get set_proxy_address => 'プロキシアドレスを設定';
 
   @override
   String get no_newer_proxy_server_release_available =>
-      'No newer proxy server release is available.';
+      '新しいプロキシサーバーのリリースはありません。';
 
   @override
-  String get could_not_check_proxy_server_updates =>
-      'Could not check for proxy server updates.';
+  String get could_not_check_proxy_server_updates => 'プロキシサーバーの更新を確認できませんでした。';
 
   @override
   String get no_extension_server_bundle_available_for_this_platform =>
-      'No extension server bundle is available for this platform.';
+      'このプラットフォームでは拡張機能サーバーのバンドルを利用できません。';
 
   @override
   String failed_to_download_bundle(Object statusCode) {
-    return 'Failed to download bundle ($statusCode).';
+    return 'バンドルのダウンロードに失敗しました（$statusCode）。';
   }
 
   @override
   String get downloaded_bundle_missing_expected_files =>
-      'The downloaded bundle does not contain the expected files.';
+      'ダウンロードしたバンドルに必要なファイルが含まれていません。';
 
   @override
-  String get extension_server_files_ready =>
-      'Extension server files are ready.';
+  String get extension_server_files_ready => '拡張機能サーバーのファイルを使用できます。';
 
   @override
   String get ios_extension_server_import_hint =>
-      'On iOS the server is installed inside the app sandbox. Use \"Import existing JAR\" to bring in a downloaded file.';
+      'iOSではサーバーがアプリのsandbox内にインストールされます。ダウンロードしたファイルを取り込むには「既存のJARをインポート」を使ってください。';
 
   @override
-  String get select_extension_server_folder => 'Select extension server folder';
+  String get select_extension_server_folder => '拡張機能サーバーのフォルダーを選択';
 
   @override
-  String get selected_folder_does_not_exist =>
-      'The selected folder does not exist.';
+  String get selected_folder_does_not_exist => '選択したフォルダーは存在しません。';
 
   @override
   String get no_extension_server_files_found_in_selected_folder =>
-      'No extension server files were found in the selected folder.';
+      '選択したフォルダーに拡張機能サーバーのファイルが見つかりません。';
 
   @override
-  String get extension_server_files_linked =>
-      'Extension server files were linked.';
+  String get extension_server_files_linked => '拡張機能サーバーのファイルをリンクしました。';
 
   @override
-  String get select_extension_server_jar => 'Select extension server JAR';
-
-  @override
-  String get selected_file_could_not_be_accessed =>
-      'The selected file could not be accessed.';
-
-  @override
-  String get extension_server_jar_imported =>
-      'Extension server JAR was imported.';
-
-  @override
-  String get could_not_launch_apk_bridge_page =>
-      'Could not launch the M-Extension-Server page.';
-
-  @override
-  String get proxy_server_ip_hint =>
-      'Server IP (e.g., 10.0.0.5 or https://example.com)';
-
-  @override
-  String get not_configured => 'Not configured';
-
-  @override
-  String get zero_interpreter => 'Zero インタープリタ';
-
-  @override
-  String get zero_interpreter_description => 'Zero インタープリタサーバーを制御します。';
-
-  @override
-  String get start_server_on_launch => '起動時にサーバーを開始';
-
-  @override
-  String get runtime_status => '実行状態';
-
-  @override
-  String get running => '実行中';
-
-  @override
-  String get stopped => '停止';
-
-  @override
-  String get start => '開始';
-
-  @override
-  String get stop => '停止';
-
-  @override
-  String get webview => 'Webview';
-
-  @override
-  String get tts => 'テキスト読み上げ';
-
-  @override
-  String get tts_speed => '速度';
-
-  @override
-  String get tts_pitch => 'ピッチ';
-
-  @override
-  String get tts_language => '言語';
-
-  @override
-  String get tts_voice => 'ボイス';
-
-  @override
-  String get tts_stop => '停止';
-
-  @override
-  String get tts_play => '再生';
-
-  @override
-  String get tts_pause => '一時停止';
-
-  @override
-  String get tts_previous => '前の段落';
-
-  @override
-  String get tts_next => '次の段落';
-
-  @override
-  String tts_paragraph_progress(Object current, Object total) {
-    return '段落$current/$total';
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
   }
 
   @override
-  String get tts_settings => 'TTS設定';
+  String get select_extension_server_jar => '拡張機能サーバーのJARを選択';
 
   @override
-  String get tts_default => 'デフォルト';
+  String get selected_file_could_not_be_accessed => '選択したファイルにアクセスできませんでした。';
+
+  @override
+  String get extension_server_jar_imported => '拡張機能サーバーのJARをインポートしました。';
+
+  @override
+  String get could_not_launch_apk_bridge_page =>
+      'M-Extension-Serverのページを開けませんでした。';
+
+  @override
+  String get proxy_server_ip_hint =>
+      'サーバーのIP（例: 10.0.0.5 または https://example.com）';
+
+  @override
+  String get not_configured => '未設定';
+
+  @override
+  String get webview => 'WebView';
+
+  @override
+  String get tts => 'Text-to-Speech';
+
+  @override
+  String get tts_speed => 'Speed';
+
+  @override
+  String get tts_pitch => 'Pitch';
+
+  @override
+  String get tts_language => 'Language';
+
+  @override
+  String get tts_voice => 'Voice';
+
+  @override
+  String get tts_stop => 'Stop';
+
+  @override
+  String get tts_play => 'Play';
+
+  @override
+  String get tts_pause => 'Pause';
+
+  @override
+  String get tts_previous => 'Previous paragraph';
+
+  @override
+  String get tts_next => 'Next paragraph';
+
+  @override
+  String tts_paragraph_progress(Object current, Object total) {
+    return 'Paragraph $current of $total';
+  }
+
+  @override
+  String get tts_settings => 'TTS Settings';
+
+  @override
+  String get tts_default => 'Default';
 
   @override
   String get webtoon_disable_zoom_out => 'Webtoonの縮小を無効化';
@@ -2745,115 +2592,372 @@ class AppLocalizationsJa extends AppLocalizations {
   String get error_no_pages_available => 'エラー：利用可能なページがありません';
 
   @override
-  String get app_ui_scale => 'インターフェーススケール';
+  String get subtitle_position => 'Subtitle position';
+
+  @override
+  String get dictionary_lookup => 'Dictionary';
+
+  @override
+  String get dictionary_settings => 'Dictionary settings';
+
+  @override
+  String get dictionary_search_label => 'Search';
+
+  @override
+  String get dictionary_search_hint => 'Word, reading, or phrase';
+
+  @override
+  String get clear_search => 'Clear search';
+
+  @override
+  String dictionary_count(int count) {
+    return '$count dictionaries';
+  }
+
+  @override
+  String dictionary_anki_deck(String name) {
+    return 'Anki deck: $name';
+  }
+
+  @override
+  String get dictionary_load_failed => 'Dictionary data could not be loaded';
+
+  @override
+  String get no_dictionaries_title => 'No dictionaries installed';
+
+  @override
+  String get no_dictionaries_description =>
+      'Import a Yomitan dictionary to start looking up words.';
+
+  @override
+  String get manage_dictionaries => 'Set up dictionaries';
+
+  @override
+  String get dictionary_empty_title => 'Look up a word or phrase';
+
+  @override
+  String get dictionary_empty_description =>
+      'Search a term, expression, sentence, or block of text.';
+
+  @override
+  String get previous_lookup => 'Previous lookup';
+
+  @override
+  String get next_lookup => 'Next lookup';
+
+  @override
+  String get app_ui_scale => 'Interface scale';
 
   @override
   String get app_ui_scale_subtitle =>
-      'インターフェースをお使いのスクリーンと視聴距離に合わせて大きくまたは小さくします。';
+      'Make the interface larger or smaller to suit your screen and viewing distance.';
 
   @override
-  String get allow_concurrent_downloads => '同時ダウンロードを許可';
+  String get allow_concurrent_downloads => 'Allow concurrent downloads';
 
   @override
   String get allow_concurrent_downloads_subtitle =>
-      '異なるソースから同時にダウンロードします。1つのソースは依然として一度に1つの章をダウンロードするため、過負荷になりません。すべての場所で1つずつダウンロードするには、オフにしてください。';
+      'Download from different sources at the same time. A single source still downloads one chapter at a time so it isn\'t overloaded. Turn off to download one at a time everywhere.';
 
   @override
-  String get download_delay => 'ダウンロード遅延';
+  String get download_delay => 'Download delay';
 
   @override
   String get download_delay_subtitle =>
-      'オフ。ソースに優しくするために、章間にランダムジッターを伴う待機を追加します。';
+      'Off. Add a wait with random jitter between chapters to be gentler on sources.';
 
   @override
-  String get save_search => '検索を保存';
+  String get save_search => 'Save search';
 
   @override
-  String get saved_searches => '保存済み検索';
+  String get saved_searches => 'Saved searches';
 
   @override
-  String get enter_search_to_save_first => 'まず検索を入力して保存してください';
+  String get enter_search_to_save_first => 'Enter a search to save first';
 
   @override
   String get no_saved_searches =>
-      'このソースの保存済み検索はまだありません。\n検索を実行してから、「検索を保存」を選択してください。';
+      'No saved searches for this source yet.\nRun a search, then pick \"Save search\".';
 
   @override
   String get source => 'ソース';
 
   @override
-  String get something_went_wrong => '問題が発生しました';
+  String label_value(Object label, Object value) {
+    return '$label: $value';
+  }
 
   @override
-  String get startup_failed => 'Mangayomiの起動に失敗しました';
+  String get url => 'URL';
+
+  @override
+  String beta_version(Object version) {
+    return 'Beta ($version)';
+  }
+
+  @override
+  String get empty_placeholder => 'EMPTY\nMPTY\nMTY\nMT\n\n';
+
+  @override
+  String get error => 'エラー';
+
+  @override
+  String error_with_message(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get no_pages_available => 'Error: no pages available';
+
+  @override
+  String get create_extension => 'Create Extension';
+
+  @override
+  String get choose_extension_language => 'Choose extension language';
+
+  @override
+  String get lang => 'Lang';
+
+  @override
+  String get base_url => 'BaseUrl';
+
+  @override
+  String get api_url_optional => 'ApiUrl (optional)';
+
+  @override
+  String get icon_url => 'iconUrl';
+
+  @override
+  String get source_icon_url => 'Source icon url';
+
+  @override
+  String get notes => 'notes';
+
+  @override
+  String get extension_name_example => 'ex: myAnime';
+
+  @override
+  String get language_code_example => 'ex: en';
+
+  @override
+  String get base_url_example => 'ex: https://example.com';
+
+  @override
+  String get api_url_example => 'ex: https://api.example.com';
+
+  @override
+  String get extension_notes_example => 'ex: this extension requires login';
+
+  @override
+  String get type => 'タイプ';
+
+  @override
+  String get target => 'Target';
+
+  @override
+  String get source_type_single => 'single';
+
+  @override
+  String get source_type_multi => 'multi';
+
+  @override
+  String get source_type_torrent => 'torrent';
+
+  @override
+  String get source_language_dart => 'Dart';
+
+  @override
+  String get source_language_javascript => 'JavaScript';
+
+  @override
+  String get source_language_lnreader_compiled_js => 'LNReader compiled JS';
+
+  @override
+  String get source_created_successfully => 'Source created successfully';
+
+  @override
+  String get source_already_exists => 'Source already exists';
+
+  @override
+  String get error_when_creating_source => 'Error when creating source';
+
+  @override
+  String get cookies_deleted => 'Cookies deleted!';
+
+  @override
+  String get delete_all_cookies => 'Delete all cookies';
+
+  @override
+  String get url_must_end_with_dot_json_or_dot_pb =>
+      'URL must end with .json / .pb';
+
+  @override
+  String get default_download_destination => 'Default download destination';
+
+  @override
+  String get ask_download_destination => 'Ask for download destination';
+
+  @override
+  String get ask_download_destination_desc =>
+      'Choose a local folder each time a download starts.';
+
+  @override
+  String get select_download_destination => 'Select download destination';
+
+  @override
+  String get clear_local_library => 'Clear local library';
+
+  @override
+  String get clear_local_library_desc =>
+      'Remove local folder and archive entries from the library.';
+
+  @override
+  String get clear_local_library_msg =>
+      'This will remove local folder and archive entries from your library. It will not delete files from disk.';
+
+  @override
+  String get custom => 'カスタム';
+
+  @override
+  String get no_local_folder_available_for_downloads =>
+      'No local folder is available for downloads';
+
+  @override
+  String failed_to_create_cbz(Object error) {
+    return 'Failed to create CBZ: $error';
+  }
+
+  @override
+  String error_reading_cover_image(Object error) {
+    return 'Error reading cover image: $error';
+  }
+
+  @override
+  String error_reading_metadata(Object error) {
+    return 'Error reading metadata: $error';
+  }
+
+  @override
+  String error_saving_chapter_episode_to_library(Object error) {
+    return 'Error saving chapter/episode to library: $error';
+  }
+
+  @override
+  String error_reading_chapter_cover_image(Object error) {
+    return 'Error reading chapter cover image: $error';
+  }
+
+  @override
+  String error_reading_archive_cover_image(Object error) {
+    return 'Error reading archive cover image: $error';
+  }
+
+  @override
+  String error_getting_local_library(Object error) {
+    return 'Error getting local library: $error';
+  }
+
+  @override
+  String get zero_interpreter => 'Zero interpreter';
+
+  @override
+  String get zero_interpreter_description =>
+      'The server starts automatically on launch. You can also control it manually.';
+
+  @override
+  String get runtime_status => 'Runtime status';
+
+  @override
+  String get running => 'Running';
+
+  @override
+  String get stopped => 'Stopped';
+
+  @override
+  String get start => '開始';
+
+  @override
+  String get stop => 'Stop';
+
+  @override
+  String get something_went_wrong => 'Something went wrong';
+
+  @override
+  String get startup_failed => 'Mangayomi could not finish starting up';
 
   @override
   String sources_with_no_results(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count件のソースで結果なし',
+      other: '$count sources with no results',
+      one: '1 source with no results',
     );
     return '$_temp0';
   }
 
   @override
-  String get import_mode_title => 'どのようにインポートしますか？';
+  String get import_mode_title => 'How should this be imported?';
 
   @override
-  String get import_mode_message => '現在のライブラリに統合するか、完全に置き換えるか選択してください。';
+  String get import_mode_message =>
+      'Choose whether to merge this backup into your current library, or replace your entire library with it.';
 
   @override
-  String get import_mode_keep_existing => '統合';
+  String get import_mode_keep_existing => 'Merge';
 
   @override
-  String get import_mode_keep_existing_subtitle => '新しい作品を追加し、一致するものを更新します。';
+  String get import_mode_keep_existing_subtitle =>
+      'Adds new series and updates matching ones. Nothing in your current library is removed.';
 
   @override
-  String get import_mode_replace => '置換';
+  String get import_mode_replace => 'Replace';
 
   @override
-  String get import_mode_replace_subtitle => '現在のライブラリを削除しバックアップで置き換えます。';
+  String get import_mode_replace_subtitle =>
+      'Deletes your entire current library and replaces it with this backup.';
 
   @override
-  String get replace_summary_title => 'ライブラリを置き換える準備ができました';
+  String get replace_summary_title => 'Ready to replace your library';
 
   @override
   String replace_summary_message(Object currentCount, Object backupCount) {
-    return '現在の$currentCount作品を削除し、バックアップの$backupCount作品に置き換えます。';
+    return 'This deletes your entire current library ($currentCount series) and replaces it with $backupCount series from this backup. This can only be undone by rolling back.';
   }
 
   @override
-  String get replace_summary_confirm => '置換';
+  String get replace_summary_confirm => 'Replace';
 
   @override
   String replace_result_message(Object count) {
-    return 'ライブラリを$count作品に置き換えました。';
+    return 'Replaced your library with $count series from this backup.';
   }
 
   @override
-  String get category_conflict_title => '既存のカテゴリが見つかりました';
+  String get category_conflict_title => 'Existing categories found';
 
   @override
-  String get category_conflict_message => 'バックアップに既存のカテゴリが含まれています。';
+  String get category_conflict_message =>
+      'The backup has categories that already exist in your library. Keep to fold incoming series into the existing category, or delete to leave those series uncategorized instead.';
 
   @override
-  String get category_conflict_keep => '保持 — 既存カテゴリに統合';
+  String get category_conflict_keep => 'Keep — merge into existing category';
 
   @override
-  String get category_conflict_delete => '削除 — 未分類にする';
+  String get category_conflict_delete => 'Delete — leave series uncategorized';
 
   @override
-  String get source_conflict_title => 'ソースが見つかりません';
+  String get source_conflict_title => 'Sources not found';
 
   @override
-  String get source_conflict_message => '一部のソースに対応する拡張機能がありません。';
+  String get source_conflict_message =>
+      'These backup sources don\'t match an installed extension. Keep the original name (imported without a working source), or migrate to an installed extension so these series can be updated.';
 
   @override
-  String get source_conflict_keep => '元の名前を保持';
+  String get source_conflict_keep => 'Keep original name (no live source)';
 
   @override
-  String get import_summary_title => 'インポート準備完了';
+  String get import_summary_title => 'Ready to import';
 
   @override
   String import_summary_message(
@@ -2861,11 +2965,11 @@ class AppLocalizationsJa extends AppLocalizations {
     Object updatedSeries,
     Object newChapters,
   ) {
-    return '新規$newSeries作品、更新$updatedSeries作品、新規$newChapters話を追加します。';
+    return '$newSeries new series, $updatedSeries existing series will be updated, and $newChapters new chapters will be added. Nothing already in your library will be removed.';
   }
 
   @override
-  String get import_summary_confirm => 'インポート';
+  String get import_summary_confirm => 'Import';
 
   @override
   String import_result_message(
@@ -2873,49 +2977,51 @@ class AppLocalizationsJa extends AppLocalizations {
     Object updatedSeries,
     Object newChapters,
   ) {
-    return '新規$newSeries作品、更新$updatedSeries作品、$newChapters話を追加しました。';
+    return 'Imported $newSeries new series, updated $updatedSeries existing, added $newChapters new chapters.';
   }
 
   @override
-  String get roll_back => 'ロールバック';
+  String get roll_back => 'Roll back';
 
   @override
-  String get roll_back_confirm_message => '変更前のスナップショットにライブラリを復元します。';
+  String get roll_back_confirm_message =>
+      'This restores your library to the safety snapshot taken right before this change, undoing everything it just did.';
 
   @override
-  String get roll_back_done => '以前のスナップショットにロールバックしました。';
+  String get roll_back_done => 'Rolled back to the pre-change snapshot.';
 
   @override
-  String get restoring_backup => 'ライブラリを復元中…';
+  String get restoring_backup => 'Restoring your library…';
 
   @override
-  String get roll_back_last_change => '前回の変更をロールバック';
+  String get roll_back_last_change => 'Roll back last change';
 
   @override
   String roll_back_last_change_subtitle(Object date, Object description) {
-    return '$date のスナップショット — $description';
+    return 'Snapshot from $date — $description';
   }
 
   @override
   String roll_back_available_count(Object count) {
-    return 'ロールバック可能な変更: $count件';
+    return '$count recent changes available to roll back to';
   }
 
   @override
-  String get delete_source_title => 'ソースと作品を削除';
+  String get delete_source_title => 'Delete a source & its manga';
 
   @override
-  String get delete_source_subtitle => '選択したソースの作品、話、ダウンロード、履歴をすべて削除します。';
+  String get delete_source_subtitle =>
+      'Pick a source and remove every manga it has in your library, along with their chapters, downloads, history and tracking.';
 
   @override
-  String get delete_source_pick_title => '削除するソースを選択';
+  String get delete_source_pick_title => 'Pick a source to delete';
 
   @override
-  String get delete_source_empty => 'ライブラリにソースが見つかりません。';
+  String get delete_source_empty => 'No sources found in your library.';
 
   @override
   String delete_source_confirm_title(Object sourceName) {
-    return '$sourceNameを削除しますか？';
+    return 'Delete $sourceName?';
   }
 
   @override
@@ -2925,64 +3031,69 @@ class AppLocalizationsJa extends AppLocalizations {
     Object historyCount,
     Object updateCount,
   ) {
-    return '$mangaCount作品、$chapterCount話、$historyCount件の履歴が完全に削除されます。';
+    return 'This permanently deletes $mangaCount manga, $chapterCount chapters, $historyCount history entries and $updateCount update entries. Tracking links are kept. This cannot be undone except by rolling back.';
   }
 
   @override
-  String get delete_source_also_remove_extension => 'インストール済み拡張機能も削除';
+  String get delete_source_also_remove_extension =>
+      'Also remove the installed extension';
 
   @override
-  String get delete_source_keep_history => '読書履歴を保持';
+  String get delete_source_keep_history => 'Keep reading history';
 
   @override
-  String get delete_source_keep_downloads => 'ダウンロード記録を保持';
+  String get delete_source_keep_downloads => 'Keep download records';
 
   @override
-  String get delete_source_button => '削除';
+  String get delete_source_button => 'Delete';
 
   @override
   String delete_source_result_message(Object mangaCount, Object sourceName) {
-    return '$sourceNameから$mangaCount作品を削除しました。';
+    return 'Deleted $mangaCount manga from $sourceName.';
   }
 
   @override
-  String get merge_manga_title => '重複作品を統合';
+  String get merge_manga_title => 'Merge duplicate manga';
 
   @override
-  String get merge_manga_subtitle => '同じソース内の同名作品を統合します。';
+  String get merge_manga_subtitle =>
+      'Finds manga with matching titles under the same source (e.g. after merging duplicate sources) and folds them into one, without deleting anything you\'d want kept.';
 
   @override
-  String get merge_manga_none_found => '重複作品は見つかりませんでした。';
+  String get merge_manga_none_found => 'No likely duplicate manga found.';
 
   @override
-  String get merge_manga_pick_title => '重複の可能性がある作品';
+  String get merge_manga_pick_title => 'Possible duplicate manga';
 
   @override
-  String get merge_manga_choose_primary_title => 'どの作品に統合しますか？';
+  String get merge_manga_choose_primary_title =>
+      'Which one should the others merge into?';
 
   @override
-  String get merge_manga_choose_primary_message => '話、履歴、追跡情報が選択した作品に集約されます。';
+  String get merge_manga_choose_primary_message =>
+      'Chapters, history and tracking from the other entries will be folded into whichever one you pick — nothing is deleted.';
 
   @override
   String merge_manga_chapters_subtitle(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count 話',
+      other: '$count chapters',
+      one: '1 chapter',
     );
     return '$_temp0';
   }
 
   @override
-  String get merge_manga_button => '統合';
+  String get merge_manga_button => 'Merge';
 
   @override
   String merge_manga_result_message(Object count, Object mangaName) {
-    return '$count件の重複作品を$mangaNameに統合しました。';
+    return 'Merged $count duplicate manga into $mangaName.';
   }
 
   @override
-  String get merge_preview_title => '統合の確認';
+  String get merge_preview_title => 'Confirm merge';
 
   @override
   String merge_manga_preview_message(
@@ -2991,7 +3102,7 @@ class AppLocalizationsJa extends AppLocalizations {
     Object keptChapters,
     Object duplicateTracks,
   ) {
-    return '$totalChapters話見つかりました。$duplicateChapters件の重複を除外し、$keptChapters話を追加します。';
+    return '$totalChapters chapters found across the other entries. $duplicateChapters are duplicates and will be dropped (keeping whichever copy has reading progress); $keptChapters will be added. $duplicateTracks duplicate tracking link(s) will also be dropped.';
   }
 
   @override
@@ -3002,37 +3113,39 @@ class AppLocalizationsJa extends AppLocalizations {
       'A live readout of what the app is holding. For measuring on the device rather than guessing: watch it while scrolling the library or reading a chapter.';
 
   @override
-  String get beta => 'ベータ';
+  String get beta => 'Beta';
 
   @override
-  String get error_reports => 'エラーレポート';
+  String get error_reports => 'Error reports';
 
   @override
-  String get error_reports_subtitle => 'アプリで発生したエラーの確認と報告';
+  String get error_reports_subtitle =>
+      'Errors the app caught, and a way to report them';
 
   @override
-  String get error_reports_empty => 'エラーはありません。';
+  String get error_reports_empty =>
+      'Nothing has gone wrong. Errors the app catches are kept here so you can report them.';
 
   @override
-  String get error_reports_likely_cause => '考えられる原因';
+  String get error_reports_likely_cause => 'Likely cause';
 
   @override
-  String get error_reports_report => 'GitHubで報告';
+  String get error_reports_report => 'Report on GitHub';
 
   @override
-  String get error_reports_banner => 'エラーが発生しました';
+  String get error_reports_banner => 'Mangayomi ran into an error';
 
   @override
-  String get error_reports_banner_action => '表示';
+  String get error_reports_banner_action => 'See it';
 
   @override
-  String get error_reports_copy => 'コピー';
+  String get error_reports_copy => 'Copy';
 
   @override
-  String get error_reports_copied => 'クリップボードにコピーしました';
+  String get error_reports_copied => 'Copied to the clipboard';
 
   @override
-  String get error_reports_clear => 'クリア';
+  String get error_reports_clear => 'Clear';
 
   @override
   String get error_reports_extension_failure =>
@@ -3046,108 +3159,121 @@ class AppLocalizationsJa extends AppLocalizations {
       'This one is usually the source or the network rather than the app: a link that expired, a server that was down, or a connection that dropped. Worth reporting only if it keeps happening on a source that works elsewhere.';
 
   @override
-  String get share_unavailable_copied => '共有機能が利用できないためクリップボードにコピーしました。';
+  String get share_unavailable_copied =>
+      'Sharing isn\'t available on this platform, so it was copied to the clipboard instead.';
 
   @override
-  String get onboarding_title => 'Mangayomiへようこそ';
+  String get onboarding_title => 'Welcome to Mangayomi';
 
   @override
-  String get onboarding_libraries_body => '読みたいもの、観たいものを選択してください。';
+  String get onboarding_libraries_body =>
+      'Pick what you read and watch. The ones you leave out stay out of the navigation bar, and you can change this later under Appearance.';
 
   @override
-  String get onboarding_nav_title => 'ライブラリ';
+  String get onboarding_nav_title => 'Your libraries';
 
   @override
-  String get onboarding_nav_body => '個別のタブで表示するか、1つのライブラリタブにまとめるか選択できます。';
+  String get onboarding_nav_body =>
+      'Keep a tab for each of them, or put them together behind one Library tab you can switch inside.';
 
   @override
-  String get onboarding_nav_split => '個別のタブ';
+  String get onboarding_nav_split => 'A tab each';
 
   @override
-  String get onboarding_nav_merged => '1つのライブラリタブ';
+  String get onboarding_nav_merged => 'One Library tab';
 
   @override
-  String get onboarding_nav_inside => 'ライブラリをタップして切り替え';
+  String get onboarding_nav_inside => 'Tapping Library swaps the bar for these';
 
   @override
-  String get onboarding_next => '次へ';
+  String get onboarding_next => 'Next';
 
   @override
-  String get onboarding_restore => 'バックアップを復元';
+  String get onboarding_restore => 'Restore a backup';
 
   @override
-  String get onboarding_or_local => 'または手持ちのファイルを使用';
+  String get onboarding_or_local => 'Or use files you already have';
 
   @override
-  String get onboarding_local_folder => 'フォルダを追加';
+  String get onboarding_local_folder => 'Add a folder';
 
   @override
   String onboarding_local_existing(Object count) {
-    return '設定済みフォルダ: $count個';
+    return '$count folders already set up';
   }
 
   @override
-  String get onboarding_local_any_type => 'マンガ、アニメ、小説に対応しています。';
+  String get onboarding_local_any_type =>
+      'Manga, anime and novels all work. Each title goes to the right library based on what is inside it.';
 
   @override
-  String get onboarding_local_scanning => 'フォルダをスキャン中';
+  String get onboarding_local_scanning => 'Scanning the folder';
 
   @override
   String onboarding_local_found(Object count) {
-    return '$count作品見つかりました';
+    return '$count titles found';
   }
 
   @override
-  String get onboarding_local_remove => 'フォルダを削除';
+  String get onboarding_local_remove => 'Remove that folder';
 
   @override
-  String get onboarding_local_in_downloads => 'これはアプリのダウンロードフォルダです。';
+  String get onboarding_local_in_downloads =>
+      'That is the app\'s downloads folder. Adding it makes a second, local copy of a library the app already manages.';
 
   @override
-  String get onboarding_local_empty => '見つかりませんでした。親フォルダを選択してください。';
+  String get onboarding_local_empty =>
+      'Nothing found. Pick the folder that holds your manga folders, not one manga.';
 
   @override
-  String get onboarding_repo_failed => 'リポジトリを読み込めませんでした。';
+  String get onboarding_repo_failed =>
+      'Couldn\'t read that repository. Check the address and your connection.';
 
   @override
-  String get onboarding_repo_title => 'ソースを追加';
+  String get onboarding_repo_title => 'Add a source';
 
   @override
-  String get onboarding_body => 'リポジトリを追加して拡張機能をインストールしましょう。';
+  String get onboarding_body =>
+      'Mangayomi comes with no sources of its own. Add a repository and the extensions it holds become available to install and browse.';
 
   @override
-  String get onboarding_add => 'リポジトリを追加';
+  String get onboarding_add => 'Add repository';
 
   @override
-  String get onboarding_skip => '今はスキップ';
+  String get onboarding_skip => 'Skip for now';
 
   @override
-  String get onboarding_continue => '続ける';
+  String get onboarding_continue => 'Continue';
 
   @override
-  String get onboarding_later => '設定 > 閲覧から後で追加できます。';
+  String get onboarding_later =>
+      'You can add one later in Settings, under Browse.';
 
   @override
-  String get onboarding_replay => 'ウェルカム画面を表示';
+  String get onboarding_replay => 'Show the welcome screen';
 
   @override
-  String get onboarding_replay_subtitle => '初期設定画面を再度開きます。';
+  String get onboarding_replay_subtitle =>
+      'Opens the first-run screen again, the one a new install starts on.';
 
   @override
-  String get missing_source_check_title => '不足しているソースを確認';
+  String get missing_source_check_title => 'Check for missing sources';
 
   @override
-  String get missing_source_check_subtitle => '拡張機能が未インストールの作品を検出します。';
+  String get missing_source_check_subtitle =>
+      'Find library entries whose extension isn\'t installed - restoring a backup can leave entries pointing at a source you never installed on this device.';
 
   @override
-  String get missing_source_check_none_found => 'すべてのソースがインストールされています。';
+  String get missing_source_check_none_found =>
+      'Every library entry\'s source is installed.';
 
   @override
   String missing_source_check_result_title(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count件のソースが未インストール',
+      other: '$count sources missing',
+      one: '1 source missing',
     );
     return '$_temp0';
   }
@@ -3186,7 +3312,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get missing_source_check_result_message =>
-      'これらの作品のソースがインストールされていません。移行するか拡張機能をインストールしてください。';
+      'These library entries point at a source that isn\'t installed on this device. Tap one to migrate it to an installed source, install the matching extension, or use \"Delete a source & its manga\" to remove them.';
 
   @override
   String get related_titles => 'Related';

@@ -7,8 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `extract_resources_from_archive`, `extract_resources_with_content_from_bytes`, `extract_resources_with_content`, `find_chapter_name_from_toc`, `parse_epub_with_doc`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `attribute_value`, `bare_numeric_label`, `chimahon_epub_title`, `collect_navigation_entries`, `declared_encoding`, `decode_markup_entities`, `decode_text_resource`, `decode_utf16`, `element_content`, `epub_content_is_renderable`, `epub_paths_match`, `escape_html_attribute`, `extract_resources_from_archive`, `extract_resources_with_content_from_bytes`, `extract_resources_with_content`, `find_chapter_from_navigation`, `flatten_nav_points`, `is_epub_image_path`, `is_epub_reader_auxiliary_asset`, `mark_repeated_numeric_subsection_markers`, `mark_structural_navigation_entries`, `normalize_epub_path`, `opening_tag`, `parse_epub3_navigation`, `parse_epub3_structural_landmarks`, `parse_epub_with_doc`, `parse_navigation_links`, `parse_ncx_navigation`, `percent_decode_path`, `resolve_epub_reference`, `strip_markup`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `NavigationEntry`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<EpubNovel> parseEpubFromPath({
   required String epubPath,
@@ -36,18 +37,47 @@ Future<String> getChapterContent({
 );
 
 class EpubChapter {
+  /// Logical section name inherited from the nearest preceding EPUB TOC
+  /// entry. Raw spine fragments remain separate for reliable rendering.
   final String name;
   final String content;
   final String path;
+
+  /// Canonical path inside the EPUB archive. This is intentionally kept
+  /// alongside [path] so existing records remain readable while the reader
+  /// can resolve images, footnotes, and cross-chapter links correctly.
+  final String href;
+
+  /// Stable position in the original OPF spine.
+  final int spineIndex;
+
+  /// Whether this item participates in the book's linear reading order.
+  /// Chimahon numbers bookmark chapters over this filtered sequence.
+  final bool isLinear;
+
+  /// Whether this spine item should appear in the user-facing chapter list.
+  /// Non-navigation fragments are still kept for seamless reader paging.
+  final bool isNavigationEntry;
 
   const EpubChapter({
     required this.name,
     required this.content,
     required this.path,
+    required this.href,
+    required this.spineIndex,
+    required this.isLinear,
+    required this.isNavigationEntry,
   });
 
   @override
-  int get hashCode => name.hashCode ^ content.hashCode ^ path.hashCode;
+  int get hashCode =>
+      name.hashCode ^
+      content.hashCode ^
+      path.hashCode ^
+      href.hashCode ^
+      spineIndex.hashCode ^
+      isLinear.hashCode ^
+      isNavigationEntry.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -56,7 +86,11 @@ class EpubChapter {
           runtimeType == other.runtimeType &&
           name == other.name &&
           content == other.content &&
-          path == other.path;
+          path == other.path &&
+          href == other.href &&
+          spineIndex == other.spineIndex &&
+          isLinear == other.isLinear &&
+          isNavigationEntry == other.isNavigationEntry;
 }
 
 class EpubNovel {
@@ -64,6 +98,7 @@ class EpubNovel {
   final Uint8List? cover;
   final String? summary;
   final String? author;
+  final String? language;
   final String? artist;
   final List<EpubChapter> chapters;
   final List<EpubResource> images;
@@ -74,6 +109,7 @@ class EpubNovel {
     this.cover,
     this.summary,
     this.author,
+    this.language,
     this.artist,
     required this.chapters,
     required this.images,
@@ -86,6 +122,7 @@ class EpubNovel {
       cover.hashCode ^
       summary.hashCode ^
       author.hashCode ^
+      language.hashCode ^
       artist.hashCode ^
       chapters.hashCode ^
       images.hashCode ^
@@ -100,6 +137,7 @@ class EpubNovel {
           cover == other.cover &&
           summary == other.summary &&
           author == other.author &&
+          language == other.language &&
           artist == other.artist &&
           chapters == other.chapters &&
           images == other.images &&

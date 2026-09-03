@@ -42,7 +42,7 @@ final class AndroidProxyServerStateProvider
 }
 
 String _$androidProxyServerStateHash() =>
-    r'bcaa325e18791b26413844c2e0fc8d87e23bd194';
+    r'021cbd42e79942af0d23a2f80b579b33639c746d';
 
 abstract class _$AndroidProxyServerState extends $Notifier<String> {
   String build();
@@ -98,7 +98,7 @@ final class AutoStartExtensionServerOnLaunchStateProvider
 }
 
 String _$autoStartExtensionServerOnLaunchStateHash() =>
-    r'e7b8ab528a14305601daed723c3adc8ec0fb3562';
+    r'aa17f5809482af883136117eaf654dc23a303ab1';
 
 abstract class _$AutoStartExtensionServerOnLaunchState extends $Notifier<bool> {
   bool build();
@@ -274,7 +274,7 @@ final class ExtensionsRepoStateProvider
 }
 
 String _$extensionsRepoStateHash() =>
-    r'932f1bb08517957be271995b88fb67cf60b0d139';
+    r'd7b266d2f3872aa20b62bafcbdda868878ef7e89';
 
 final class ExtensionsRepoStateFamily extends $Family
     with
@@ -478,7 +478,7 @@ final class GetRepoInfosProvider
   }
 }
 
-String _$getRepoInfosHash() => r'f58b55f85f02f48102f475260d257676e82028c1';
+String _$getRepoInfosHash() => r'4c530ef356db88ee52ad84211dea0e6b3b16a777';
 
 final class GetRepoInfosFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Repo?>, String> {

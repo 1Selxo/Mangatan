@@ -10,6 +10,10 @@ import 'package:mangayomi/services/aniskip.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/track.dart';
 part 'anime_player_controller_provider.g.dart';
 
 final fullscreenProvider = StateProvider<bool>(() => false);
@@ -80,13 +84,36 @@ class AnimeStreamController extends _$AnimeStreamController
         : false;
     if (isWatch || save) {
       final ep = episode;
-      ep.isRead = isWatch;
-      ep.lastPageRead = (duration.inMilliseconds).toString();
-      chapterRepository.save(ep);
+      isar.writeTxnSync(() {
+        ep.isRead = isWatch;
+        ep.lastPageRead = (duration.inMilliseconds).toString();
+        if (totalDuration != null && totalDuration > Duration.zero) {
+          ep.duration = totalDuration.inMilliseconds.toString();
+        }
+        ep.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        isar.chapters.putSync(ep);
+      });
       if (isWatch) {
         episode.updateTrackChapterRead(ref);
       }
     }
+  }
+
+  /// Persists the terminal playback state before the player route is replaced.
+  ///
+  /// Some backends emit `completed` before their final position event. Using
+  /// the known total duration here makes completion deterministic and awaiting
+  /// the history write keeps route disposal from racing it.
+  Future<void> completeEpisode(
+    Duration totalDuration, {
+    int elapsedSeconds = 0,
+  }) async {
+    if (incognitoMode) return;
+    final completedPosition = totalDuration > Duration.zero
+        ? totalDuration
+        : Duration(milliseconds: int.tryParse(episode.lastPageRead ?? '') ?? 0);
+    setCurrentPosition(completedPosition, totalDuration, save: true);
+    await setHistoryUpdate(elapsedSeconds: elapsedSeconds);
   }
 
   // ---------------------------------------------------------------------------

@@ -15,6 +15,8 @@ class UChapDataPreload {
   int? index;
   GetChapterPagesModel? chapterUrlModel;
   int? pageIndex;
+  String? localArtifactPath;
+  Uint8List? cropImage;
   bool isTransitionPage;
   Chapter? nextChapter;
   String? mangaName;
@@ -33,10 +35,10 @@ class UChapDataPreload {
   double? loadedHeight;
   double? loadedWidth;
 
-  /// Cached decoded image for MinSubsamplingImage to avoid re-decoding on scroll
+  /// Cached decoded image for tiled rendering.
   Image? decodedImage;
 
-  /// Cached resolved local file path for SubsamplingScaleImageView to avoid resolving on scroll
+  /// Cached local file path for the subsampling image view.
   String? resolvedFilePath;
 
   UChapDataPreload(
@@ -48,6 +50,8 @@ class UChapDataPreload {
     this.index,
     this.chapterUrlModel,
     this.pageIndex, {
+    this.localArtifactPath,
+    this.cropImage,
     this.isTransitionPage = false,
     this.nextChapter,
     this.mangaName,
@@ -70,6 +74,7 @@ class UChapDataPreload {
        archiveImage = null,
        index = null,
        chapterUrlModel = null,
-       srcRect = null,
-       localImagePath = null;
+       localArtifactPath = null,
+       cropImage = null,
+       srcRect = null;
 }

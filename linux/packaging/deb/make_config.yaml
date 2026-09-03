@@ -1,4 +1,4 @@
-display_name: Mangayomi
+display_name: Mangatan
 
 package_name: mangayomi
 
@@ -15,17 +15,16 @@ installed_size: 109400
 dependencies:
   - libwebkit2gtk-4.1-0
   - libmpv2
-  - libjpeg8
-  - libpng16-16t64
-  - libavif16
+  - libsecret-1-0
+  - xdg-utils
 
 essential: false
 
 postinstall_scripts:
-  - echo "Installed Mangayomi successfully"
+  - echo "Installed Mangatan successfully"
   
 postuninstall_scripts:
-  - echo "Uninstalled Mangayomi successfully"
+  - echo "Uninstalled Mangatan successfully"
 icon: assets/app_icons/icon-red.png
 
 keywords:
@@ -39,3 +38,7 @@ categories:
   - AudioVideo
 
 startup_notify: true
+
+supported_mime_type:
+  - x-scheme-handler/mangayomi
+  - x-scheme-handler/app.chimahon.google.oauth

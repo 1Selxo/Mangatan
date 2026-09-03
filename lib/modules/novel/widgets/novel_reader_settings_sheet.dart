@@ -6,15 +6,24 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
 import 'package:mangayomi/modules/novel/utils/novel_reader_fonts.dart';
+import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 
 class ReaderSettingsTab extends ConsumerWidget {
-  const ReaderSettingsTab({super.key});
+  const ReaderSettingsTab({super.key, this.epubLayout});
+
+  /// Only supplied by the browser EPUB reader; web novels retain their normal
+  /// scroll view. The selected EPUB layout is persisted globally.
+  final ValueNotifier<EpubReadingLayout>? epubLayout;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final padding = ref.watch(novelReaderPaddingStateProvider);
+    final fontSize = ref.watch(novelFontSizeStateProvider);
     final lineHeight = ref.watch(novelReaderLineHeightStateProvider);
+    final paragraphSpacing = ref.watch(
+      novelReaderParagraphSpacingStateProvider,
+    );
     final textAlign = ref.watch(novelTextAlignStateProvider);
     final backgroundColor = ref.watch(novelReaderThemeStateProvider);
     final textColor = ref.watch(novelReaderTextColorStateProvider);
@@ -123,6 +132,134 @@ class ReaderSettingsTab extends ConsumerWidget {
 
           const SizedBox(height: 16),
           _SettingSection(
+            title: context.l10n.text_size,
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: context.l10n.text_size,
+                  onPressed: fontSize <= 4
+                      ? null
+                      : () => ref
+                            .read(novelFontSizeStateProvider.notifier)
+                            .set(fontSize - 1),
+                  icon: const Icon(Icons.text_decrease),
+                ),
+                Expanded(
+                  child: Slider(
+                    min: 4,
+                    max: 40,
+                    divisions: 36,
+                    value: fontSize.toDouble(),
+                    label: '$fontSize px',
+                    onChanged: (value) => ref
+                        .read(novelFontSizeStateProvider.notifier)
+                        .set(value.round()),
+                  ),
+                ),
+                SizedBox(
+                  width: 52,
+                  child: Text(
+                    '$fontSize px',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  tooltip: context.l10n.text_size,
+                  onPressed: fontSize >= 40
+                      ? null
+                      : () => ref
+                            .read(novelFontSizeStateProvider.notifier)
+                            .set(fontSize + 1),
+                  icon: const Icon(Icons.text_increase),
+                ),
+              ],
+            ),
+          ),
+
+          if (epubLayout != null) ...[
+            const SizedBox(height: 16),
+            _SettingSection(
+              title: 'EPUB layout',
+              child: ValueListenableBuilder<EpubReadingLayout>(
+                valueListenable: epubLayout!,
+                builder: (context, layout, _) {
+                  void setLayout({bool? vertical, bool? paged}) {
+                    final next = EpubReadingLayout.fromAxes(
+                      vertical: vertical ?? layout.isVerticalWriting,
+                      paged: paged ?? layout.isPaged,
+                    );
+                    epubLayout!.value = next;
+                    ref
+                        .read(novelEpubReadingLayoutStateProvider.notifier)
+                        .set(next.index);
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Writing direction',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.format_textdirection_l_to_r),
+                            label: Text('Horizontal'),
+                          ),
+                          ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.format_textdirection_r_to_l),
+                            label: Text('Vertical'),
+                          ),
+                        ],
+                        selected: {layout.isVerticalWriting},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) {
+                          if (selection.isNotEmpty) {
+                            setLayout(vertical: selection.first);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Flow',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.view_stream_outlined),
+                            label: Text('Continuous'),
+                          ),
+                          ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.menu_book_rounded),
+                            label: Text('Paged'),
+                          ),
+                        ],
+                        selected: {layout.isPaged},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) {
+                          if (selection.isNotEmpty) {
+                            setLayout(paged: selection.first);
+                          }
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 16),
+          _SettingSection(
             title: context.l10n.text_align,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -170,7 +307,7 @@ class ReaderSettingsTab extends ConsumerWidget {
           const SizedBox(height: 16),
 
           _SettingSection(
-            title: 'Padding',
+            title: 'Viewport padding',
             child: Column(
               children: [
                 Row(
@@ -209,9 +346,9 @@ class ReaderSettingsTab extends ConsumerWidget {
                         child: Slider(
                           value: padding.toDouble(),
                           min: 0,
-                          max: 50,
-                          divisions: 50,
-                          label: '$padding px',
+                          max: 25,
+                          divisions: 25,
+                          label: '$padding% of height',
                           onChanged: (value) {
                             ref
                                 .read(novelReaderPaddingStateProvider.notifier)
@@ -231,7 +368,7 @@ class ReaderSettingsTab extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '${padding}px',
+                        '$padding%',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -346,6 +483,60 @@ class ReaderSettingsTab extends ConsumerWidget {
               ],
             ),
           ),
+
+          const SizedBox(height: 16),
+
+          _SettingSection(
+            title: 'Paragraph spacing',
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.format_line_spacing_rounded,
+                    size: 22,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Slider(
+                    value: paragraphSpacing,
+                    min: 0,
+                    max: 2,
+                    divisions: 20,
+                    label: '${paragraphSpacing.toStringAsFixed(1)} em',
+                    onChanged: (value) {
+                      ref
+                          .read(
+                            novelReaderParagraphSpacingStateProvider.notifier,
+                          )
+                          .set(value);
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 58,
+                  child: Text(
+                    paragraphSpacing == 0
+                        ? '0'
+                        : '${paragraphSpacing.toStringAsFixed(1)} em',
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -357,11 +548,13 @@ class GeneralSettingsTab extends ConsumerWidget {
   final ValueNotifier<bool> autoScroll;
   final NovelReaderController readerController;
   final ValueNotifier<double> pageOffset;
+  final bool isEpubReader;
   const GeneralSettingsTab({
     required this.autoScrollPage,
     required this.autoScroll,
     required this.readerController,
     required this.pageOffset,
+    this.isEpubReader = false,
     super.key,
   });
 
@@ -418,22 +611,27 @@ class GeneralSettingsTab extends ConsumerWidget {
             },
           ),
           _SwitchListTileSetting(
-            title: context.l10n.remove_extra_paragraph_spacing,
-            value: ref.watch(novelRemoveExtraParagraphSpacingStateProvider),
-            onChanged: (value) {
-              ref
-                  .read(novelRemoveExtraParagraphSpacingStateProvider.notifier)
-                  .set(value);
-            },
-          ),
-
-          _SwitchListTileSetting(
             title: context.l10n.use_page_tap_zones,
             value: ref.watch(novelTapToScrollStateProvider),
             onChanged: (value) {
               ref.read(novelTapToScrollStateProvider.notifier).set(value);
             },
           ),
+          if (isEpubReader)
+            _SwitchListTileSetting(
+              title: 'Show return-to-saved-position button',
+              value: ref.watch(
+                novelShowReturnToSavedPositionButtonStateProvider,
+              ),
+              onChanged: (value) {
+                ref
+                    .read(
+                      novelShowReturnToSavedPositionButtonStateProvider
+                          .notifier,
+                    )
+                    .set(value);
+              },
+            ),
         ],
       ),
     );

@@ -3,36 +3,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/utils/downloaded_page_file.dart';
+import 'package:extended_image/extended_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/manga/reader/providers/reader_controller_provider.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
-import 'package:mangayomi/modules/manga/reader/providers/reader_controller_provider.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
-import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart'
-    as ssiv;
 import 'package:mangayomi/utils/extensions/others.dart';
 
 class ImageViewPaged extends ConsumerStatefulWidget {
   final UChapDataPreload data;
   final Function(UChapDataPreload data) onLongPressData;
-  final Widget? Function(ssiv.SubsamplingImageState state) loadStateChanged;
-  final bool zoomEnabled;
-  final bool panEnabled;
-  final void Function(int width, int height)? onImageLoaded;
-  final PageController? pageController;
-  final ssiv.SubsamplingScaleImageViewController? controller;
-  final bool isVisible;
-
+  final Widget? Function(ExtendedImageState state) loadStateChanged;
+  final Function(ExtendedImageGestureState state)? onDoubleTap;
+  final GestureConfig Function(ExtendedImageState state)?
+  initGestureConfigHandler;
+  final bool normalizeOcrPaintCoordinates;
+  final bool enableGestures;
   const ImageViewPaged({
     super.key,
     required this.data,
     required this.onLongPressData,
     required this.loadStateChanged,
-    this.zoomEnabled = true,
-    this.panEnabled = true,
-    this.onImageLoaded,
-    this.pageController,
-    this.controller,
-    this.isVisible = true,
+    this.onDoubleTap,
+    this.initGestureConfigHandler,
+    this.normalizeOcrPaintCoordinates = false,
+    this.enableGestures = true,
   });
 
   @override
@@ -40,287 +39,147 @@ class ImageViewPaged extends ConsumerStatefulWidget {
 }
 
 class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
-  Color? _autoBgColor;
+  final GlobalKey _imageKey = GlobalKey();
+  late ReaderOcrController _ocr = ReaderOcrController(
+    widget.data,
+    imageKey: _imageKey,
+  )..addListener(_repaint);
 
-  bool _hasLandscapeZoomed = false;
-
-  String? _resolvedFilePath;
-  bool _isAnimated = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller?.addListener(_onControllerChanged);
-    _resolvedFilePath = widget.data.resolvedFilePath;
-    _resolveFilePath();
-    _checkIfAnimated();
+  void _repaint() {
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _imageKey.currentContext?.findRenderObject()?.markNeedsPaint();
+    });
   }
 
   @override
   void didUpdateWidget(covariant ImageViewPaged oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.controller != oldWidget.controller) {
-      oldWidget.controller?.removeListener(_onControllerChanged);
-      widget.controller?.addListener(_onControllerChanged);
-    }
-    final bool dataChanged = widget.data != oldWidget.data;
-    final bool pathResolved = _resolvedFilePath != widget.data.resolvedFilePath;
-    if (dataChanged || pathResolved) {
-      _hasLandscapeZoomed = false;
-      _resolvedFilePath = widget.data.resolvedFilePath;
-      _resolveFilePath();
-      _checkIfAnimated();
-    }
-    if (widget.isVisible && !oldWidget.isVisible) {
-      _checkLandscapeZoom();
-    }
-  }
-
-  Future<void> _checkIfAnimated() async {
-    bool isAnimated = false;
-    final url = widget.data.pageUrl?.url.trim().toLowerCase() ?? '';
-    if (url.contains('.gif')) {
-      isAnimated = true;
-    } else if (widget.data.archiveImage != null &&
-        widget.data.archiveImage!.length > 5) {
-      if (isGifImage(widget.data.archiveImage!)) isAnimated = true;
-    } else if (widget.data.localImagePath != null) {
-      // Local image-folder page: sniff the real file's bytes directly rather
-      // than trusting its extension.
-      try {
-        final raf = await File(widget.data.localImagePath!).open();
-        try {
-          if (isGifImage(await raf.read(6))) isAnimated = true;
-        } finally {
-          await raf.close();
-        }
-      } catch (_) {}
-    } else if (widget.data.directory != null && widget.data.index != null) {
-      try {
-        // Look up whatever extension this page was actually saved under
-        // (findDownloadedPageFile), rather than assuming .jpg - still
-        // sniffing the real bytes here rather than trusting the extension,
-        // so this keeps working for pages downloaded before this fix that
-        // may still be labeled .jpg despite actually being a GIF.
-        final file = await findDownloadedPageFileAsync(
-          widget.data.directory!,
-          widget.data.index!,
-        );
-        if (file != null) {
-          final raf = await file.open();
-          try {
-            if (isGifImage(await raf.read(6))) isAnimated = true;
-          } finally {
-            await raf.close();
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (mounted && _isAnimated != isAnimated) {
-      setState(() {
-        _isAnimated = isAnimated;
-      });
-    }
-  }
-
-  Future<void> _resolveFilePath() async {
-    if (widget.data.resolvedFilePath != null) {
-      if (mounted) {
-        setState(() {
-          _resolvedFilePath = widget.data.resolvedFilePath;
-        });
-      }
-      return;
-    }
-    final path = await widget.data.getLocalFilePath;
-    if (path != null) {
-      widget.data.resolvedFilePath = path;
-      if (mounted) {
-        setState(() {
-          _resolvedFilePath = path;
-        });
-      }
+    if (!identical(oldWidget.data, widget.data)) {
+      _ocr
+        ..removeListener(_repaint)
+        ..dispose();
+      _ocr = ReaderOcrController(widget.data, imageKey: _imageKey)
+        ..addListener(_repaint);
     }
   }
 
   @override
   void dispose() {
-    widget.controller?.removeListener(_onControllerChanged);
+    _ocr
+      ..removeListener(_repaint)
+      ..dispose();
     super.dispose();
-  }
-
-  void _onControllerChanged() {
-    if (widget.isVisible) {
-      _checkLandscapeZoom();
-    }
-  }
-
-  void _checkLandscapeZoom() {
-    if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _performLandscapeZoom();
-    });
-  }
-
-  void _performLandscapeZoom() {
-    final controller = widget.controller;
-    if (controller == null ||
-        !controller.isReady ||
-        !widget.isVisible ||
-        !mounted) {
-      return;
-    }
-    if (_hasLandscapeZoomed) return;
-
-    final landscapeZoom = ref.read(landscapeZoomStateProvider);
-    if (!landscapeZoom) return;
-
-    final scaleType = ref.read(scaleTypeStateProvider);
-    if (scaleType != ScaleType.fitScreen) return;
-
-    final sWidth = controller.sWidth;
-    final sHeight = controller.sHeight;
-    if (sWidth <= sHeight) return;
-
-    final currentScale = controller.scale;
-    final minScale = controller.minScale;
-    if (minScale <= 0.0) return;
-    if ((currentScale - minScale).abs() > 0.01) return;
-
-    final viewHeight =
-        context.size?.height ?? MediaQuery.of(context).size.height;
-    final targetScale = viewHeight / sHeight;
-
-    final zoomStart = ref.read(zoomStartPositionStateProvider);
-    final readerMode = ref
-        .read(readerControllerProvider(chapter: widget.data.chapter!).notifier)
-        .getReaderMode();
-    final isRightToLeft = readerMode == ReaderMode.rtl;
-
-    Offset targetPoint;
-    if (zoomStart == 0) {
-      targetPoint = const Offset(0, 0);
-    } else if (zoomStart == 1) {
-      targetPoint = Offset(sWidth.toDouble(), 0);
-    } else if (zoomStart == 2) {
-      targetPoint = Offset(sWidth / 2, sHeight / 2);
-    } else {
-      targetPoint = isRightToLeft
-          ? Offset(sWidth.toDouble(), 0)
-          : const Offset(0, 0);
-    }
-
-    _hasLandscapeZoomed = true;
-    if (mounted) {
-      controller.animateScaleAndCenter(
-        targetScale,
-        targetPoint,
-        duration: const Duration(milliseconds: 500),
-      );
-    }
-  }
-
-  Duration _doubleTapAnimationDuration() {
-    final doubleTapAnimationValue = ref.read(
-      doubleTapAnimationSpeedStateProvider,
-    );
-    return switch (doubleTapAnimationValue) {
-      0 => const Duration(milliseconds: 10),
-      1 => const Duration(milliseconds: 800),
-      _ => const Duration(milliseconds: 200),
-    };
   }
 
   @override
   Widget build(BuildContext context) {
+    _ocr.updateTheme(Theme.of(context).colorScheme.primary);
     final scaleType = ref.watch(scaleTypeStateProvider);
     final image = widget.data.getImageProvider(ref, true);
     final (colorBlendMode, color) = chapterColorFIlterValues(context, ref);
-    final cropBorders = ref.watch(cropBordersStateProvider);
-    final dualPageRotateToFit = ref.watch(dualPageRotateToFitStateProvider);
-    final dualPageRotateToFitInvert = ref.watch(
-      dualPageRotateToFitInvertStateProvider,
-    );
+    final needsScaleOverride =
+        widget.enableGestures &&
+        (scaleType == ScaleType.fitWidth || scaleType == ScaleType.fitHeight);
+    final effectiveFit = needsScaleOverride
+        ? BoxFit.contain
+        : getBoxFit(scaleType);
 
-    // Determine background color
-    Color? pageBgColor = _autoBgColor;
-
-    // rotation calculation
-    int rotation = 0;
-    if (dualPageRotateToFit &&
-        widget.data.loadedWidth != null &&
-        widget.data.loadedHeight != null) {
-      if (widget.data.loadedWidth! > widget.data.loadedHeight!) {
-        rotation = dualPageRotateToFitInvert ? 270 : 90;
-      }
-    }
-
-    // Mappe le scaleType de Mangayomi vers le BoxFit
-    final effectiveFit = switch (scaleType) {
-      ScaleType.fitWidth => BoxFit.fitWidth,
-      ScaleType.fitHeight => BoxFit.fitHeight,
-      ScaleType.stretch => BoxFit.fill,
-      _ => BoxFit.contain,
-    };
-
-    if (_resolvedFilePath != widget.data.resolvedFilePath &&
-        widget.data.resolvedFilePath != null) {
-      _resolvedFilePath = widget.data.resolvedFilePath;
-    }
-
-    final bool isAnimated = _isAnimated;
-
-    final ssivScaleType = switch (scaleType) {
-      ScaleType.fitScreen => ssiv.ScaleType.centerInside,
-      ScaleType.stretch => ssiv.ScaleType.centerCrop,
-      ScaleType.fitWidth => ssiv.ScaleType.fitWidth,
-      ScaleType.fitHeight => ssiv.ScaleType.fitHeight,
-      ScaleType.originalSize => ssiv.ScaleType.originalSize,
-      ScaleType.smartFit => ssiv.ScaleType.smartFit,
-    };
-
-    Widget content;
-    if (isAnimated) {
-      content = Image(
-        image: image,
-        fit: effectiveFit,
-        color: color,
-        colorBlendMode: colorBlendMode,
-      );
+    GestureConfig Function(ExtendedImageState)? effectiveGestureHandler;
+    if (!widget.enableGestures) {
+      effectiveGestureHandler = null;
+    } else if (needsScaleOverride) {
+      effectiveGestureHandler = (ExtendedImageState state) {
+        final base = widget.initGestureConfigHandler?.call(state);
+        double initScale = base?.initialScale ?? 1.0;
+        InitialAlignment alignment =
+            base?.initialAlignment ?? InitialAlignment.center;
+        final info = state.extendedImageInfo;
+        if (info != null) {
+          final imgW = info.image.width.toDouble();
+          final imgH = info.image.height.toDouble();
+          final viewSize = MediaQuery.of(context).size;
+          final viewAspect = viewSize.width / viewSize.height;
+          final imgAspect = imgW / imgH;
+          if (scaleType == ScaleType.fitWidth && imgAspect < viewAspect) {
+            initScale = viewAspect / imgAspect;
+            alignment = InitialAlignment.topCenter;
+          } else if (scaleType == ScaleType.fitHeight &&
+              imgAspect > viewAspect) {
+            initScale = imgAspect / viewAspect;
+            alignment = InitialAlignment.centerLeft;
+          }
+        }
+        return GestureConfig(
+          minScale: base?.minScale ?? 0.8,
+          speed: base?.speed ?? 1,
+          initialScale: initScale,
+          initialAlignment: alignment,
+          inertialSpeed: base?.inertialSpeed ?? 200,
+          inPageView: base?.inPageView ?? true,
+          maxScale: base?.maxScale ?? 8,
+          animationMinScale: base?.animationMinScale,
+          animationMaxScale: base?.animationMaxScale ?? 8,
+          cacheGesture: base?.cacheGesture ?? true,
+          hitTestBehavior: base?.hitTestBehavior ?? HitTestBehavior.translucent,
+          reverseMousePointerScrollDirection:
+              base?.reverseMousePointerScrollDirection ?? true,
+        );
+      };
     } else {
-      content = ssiv.SubsamplingScaleImageView(
-        image: image,
-        resolvedFilePath: _resolvedFilePath,
-        preloadData: widget.data,
-        colorBlendMode: colorBlendMode,
-        color: color,
-        minimumScaleType: ssivScaleType,
-        filterQuality: FilterQuality.medium,
-        zoomEnabled: widget.zoomEnabled,
-        panEnabled: widget.panEnabled,
-        cropBorders: cropBorders,
-        srcRect: widget.data.srcRect,
-        onImageLoaded: widget.onImageLoaded,
-        loadStateChanged: widget.loadStateChanged,
-        pageController: widget.pageController,
-        rotation: rotation,
-        controller: widget.controller,
-        isVisible: widget.isVisible,
-        doubleTapZoomDuration: _doubleTapAnimationDuration(),
-        onReady: _checkLandscapeZoom,
-      );
+      effectiveGestureHandler = widget.initGestureConfigHandler;
     }
 
-    if (pageBgColor != null) {
-      content = Container(color: pageBgColor, child: content);
+    Rect? ocrHitTestImageRect(Rect paintedRect) {
+      if (!widget.normalizeOcrPaintCoordinates) return null;
+      final box = _imageKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return null;
+      return readerOcrHitTestImageRect(
+        paintedImageRect: paintedRect,
+        renderBoxSize: box.size,
+        normalizePaintCoordinates: true,
+      );
     }
 
     return applyReaderColorFilter(
       GestureDetector(
         onLongPress: () => widget.onLongPressData.call(widget.data),
-        child: content,
+        child: ExtendedImage(
+          key: _imageKey,
+          image: image,
+          colorBlendMode: colorBlendMode,
+          color: color,
+          fit: effectiveFit,
+          filterQuality: FilterQuality.medium,
+          mode: widget.enableGestures
+              ? ExtendedImageMode.gesture
+              : ExtendedImageMode.none,
+          handleLoadingProgress: true,
+          loadStateChanged: (state) {
+            if (state.extendedImageLoadState == LoadState.completed) {
+              // ExtendedImage invokes this callback while it is building.
+              // Starting OCR synchronously notifies this widget that loading
+              // began, which would call setState during that same build.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _ocr.load();
+              });
+            }
+            return widget.loadStateChanged(state);
+          },
+          initGestureConfigHandler: effectiveGestureHandler,
+          onDoubleTap: widget.enableGestures ? widget.onDoubleTap : null,
+          afterPaintImage: (canvas, rect, image, paint) {
+            _ocr.paint(
+              canvas,
+              rect,
+              image,
+              paint,
+              hitTestImageRect: ocrHitTestImageRect(rect),
+            );
+          },
+        ),
       ),
       ref,
     );

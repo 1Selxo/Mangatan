@@ -15,6 +15,8 @@ import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/error_toast.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
 
 class SourceRepositories extends ConsumerStatefulWidget {
   final ItemType itemType;
@@ -163,16 +165,20 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                           !repo.name!.endsWith('.json'))
                                       ? repo.name!
                                       : (repo.jsonUrl != null
-                                          ? (repo.jsonUrl!
-                                                  .replaceAll(
-                                                    RegExp(r'/[^/]+\.json$'),
-                                                    '',
-                                                  )
-                                                  .split('/')
-                                                  .where((s) => s.isNotEmpty)
-                                                  .lastOrNull ??
-                                              repo.jsonUrl!)
-                                          : "Invalid source - remove it"),
+                                            ? (repo.jsonUrl!
+                                                      .replaceAll(
+                                                        RegExp(
+                                                          r'/[^/]+\.json$',
+                                                        ),
+                                                        '',
+                                                      )
+                                                      .split('/')
+                                                      .where(
+                                                        (s) => s.isNotEmpty,
+                                                      )
+                                                      .lastOrNull ??
+                                                  repo.jsonUrl!)
+                                            : "Invalid source - remove it"),
                                   style: TextStyle(
                                     decoration: isHidden
                                         ? TextDecoration.lineThrough
@@ -283,7 +289,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
   /// #774: when a repo is removed, drop its *not-installed* sources so they
   /// don't linger as placeholders with a dead install button. Installed
   /// sources (non-empty [Source.sourceCode]) are kept so users don't lose them.
-  void _removeOrphanSources(Repo removedRepo) {
+  Future<void> _removeOrphanSources(Repo removedRepo) async {
     final repoUrl = removedRepo.jsonUrl;
     if (repoUrl == null) return;
     final orphanIds = sourceRepository
@@ -294,7 +300,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
         .map((s) => s.id!)
         .toList();
     if (orphanIds.isNotEmpty) {
-      sourceRepository.deleteAll(orphanIds);
+      await isar.writeTxn(() => isar.sources.deleteAll(orphanIds));
     }
   }
 
@@ -320,20 +326,19 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                     ),
                     const SizedBox(width: 15),
                     TextButton(
-                      onPressed: () {
+                      onPressed: () async {
                         final removedRepo = _entries[index];
                         final mangaRepos = ref
                             .read(extensionsRepoStateProvider(widget.itemType))
                             .toList();
                         mangaRepos.removeWhere((url) => url == removedRepo);
-                        ref
+                        await ref
                             .read(
                               extensionsRepoStateProvider(widget.itemType)
                                   .notifier,
                             )
                             .set(mangaRepos);
-                        _removeOrphanSources(removedRepo);
-                        ref.watch(extensionsRepoStateProvider(widget.itemType));
+                        await _removeOrphanSources(removedRepo);
                         if (context.mounted) {
                           Navigator.pop(context);
                         }
@@ -360,6 +365,8 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
           child: StatefulBuilder(
             builder: (context, setState) {
               final l10n = context.l10n;
+              final supportedRepoUrlHint = l10n.url_must_end_with_dot_json
+                  .replaceFirst('.json', '.json or .pb');
               return AlertDialog(
                 title: Text(l10n.add_extensions_repo),
                 content: TextFormField(
@@ -373,13 +380,15 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                   keyboardType: TextInputType.url,
                   onChanged: (value) => setState(() {}),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value.isEmpty) {
                       return l10n.url_cannot_be_empty;
                     }
+                    if (!value.endsWith('.json') && !value.endsWith('.pb')) {
+                      return supportedRepoUrlHint;
+                    }
                     try {
-                      final uri = Uri.parse(value.trim());
-                      if (!uri.isAbsolute ||
-                          (uri.scheme != 'http' && uri.scheme != 'https')) {
+                      final uri = Uri.parse(value);
+                      if (!uri.isAbsolute) {
                         return l10n.invalid_url_format;
                       }
                       final clean = value.trim().toLowerCase();
@@ -400,7 +409,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                   },
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   decoration: InputDecoration(
-                    hintText: l10n.url_must_end_with_dot_json_or_dot_pb,
+                    hintText: supportedRepoUrlHint,
                     filled: false,
                     contentPadding: const EdgeInsets.all(12),
                     enabledBorder: OutlineInputBorder(
@@ -432,12 +441,12 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                         builder: (context, setState) {
                           final text = controller.text.trim();
                           final clean = text.toLowerCase();
-                          final alreadyExists = _entries.any((r) {
-                            final rUrl = r.jsonUrl?.trim().toLowerCase();
-                            if (rUrl == null) return false;
-                            return rUrl == clean ||
-                                rUrl == '$clean/' ||
-                                '$rUrl/' == clean;
+                          final alreadyExists = _entries.any((repo) {
+                            final repoUrl = repo.jsonUrl?.trim().toLowerCase();
+                            if (repoUrl == null) return false;
+                            return repoUrl == clean ||
+                                repoUrl == '$clean/' ||
+                                '$repoUrl/' == clean;
                           });
                           final isValid =
                               text.isNotEmpty &&
@@ -464,13 +473,19 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                             .future,
                                       );
                                       if (repo == null) {
-                                        setState(() => isLoading = false);
+                                        if (context.mounted) {
+                                          setState(() => isLoading = false);
+                                        }
                                         botToast(l10n.unsupported_repo);
                                         return;
                                       }
-                                      final repoUrl = repo.jsonUrl?.trim().toLowerCase();
+                                      final repoUrl = repo.jsonUrl
+                                          ?.trim()
+                                          .toLowerCase();
                                       final isDuplicate = currentRepos.any((r) {
-                                        final rUrl = r.jsonUrl?.trim().toLowerCase();
+                                        final rUrl = r.jsonUrl
+                                            ?.trim()
+                                            .toLowerCase();
                                         return (rUrl != null &&
                                                 (rUrl == repoUrl ||
                                                     rUrl == clean ||
@@ -478,19 +493,32 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                                     '$rUrl/' == clean ||
                                                     (repoUrl != null &&
                                                         (rUrl == '$repoUrl/' ||
-                                                            '$rUrl/' == repoUrl)))) ||
+                                                            '$rUrl/' ==
+                                                                repoUrl)))) ||
                                             r == repo;
                                       });
                                       if (isDuplicate) {
-                                        setState(() => isLoading = false);
+                                        if (context.mounted) {
+                                          setState(() => isLoading = false);
+                                        }
                                         botToast(l10n.repo_already_exists);
                                         return;
                                       }
-                                      repoNotifier.set([...currentRepos, repo]);
+                                      await repoNotifier.set([
+                                        ...currentRepos,
+                                        repo,
+                                      ]);
                                       botToast(l10n.repo_added);
                                     } catch (e, s) {
-                                      setState(() => isLoading = false);
-                                      toastError(e, stack: s, source: 'sourceRepositories');
+                                      if (context.mounted) {
+                                        setState(() => isLoading = false);
+                                      }
+                                      toastError(
+                                        e,
+                                        stack: s,
+                                        source: 'sourceRepositories',
+                                      );
+                                      return;
                                     }
 
                                     if (context.mounted) {
@@ -498,7 +526,7 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                     }
                                   },
                             child: isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     height: 20,
                                     width: 20,
                                     child: CircularProgressIndicator(),
@@ -506,7 +534,9 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
                                 : Text(
                                     l10n.add,
                                     style: TextStyle(
-                                      color: !isValid
+                                      color:
+                                          controller.text.isEmpty ||
+                                              !controller.text.endsWith(".json")
                                           ? Theme.of(context).primaryColor
                                                 .withValues(alpha: 0.2)
                                           : null,

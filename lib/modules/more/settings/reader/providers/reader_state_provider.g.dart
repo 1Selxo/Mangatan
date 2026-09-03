@@ -9,6 +9,59 @@ part of 'reader_state_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(AutomaticBackgroundState)
+final automaticBackgroundStateProvider = AutomaticBackgroundStateProvider._();
+
+final class AutomaticBackgroundStateProvider
+    extends $NotifierProvider<AutomaticBackgroundState, bool> {
+  AutomaticBackgroundStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'automaticBackgroundStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$automaticBackgroundStateHash();
+
+  @$internal
+  @override
+  AutomaticBackgroundState create() => AutomaticBackgroundState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$automaticBackgroundStateHash() =>
+    r'adeef482a7630c03d0eee4eef7bf33aeff71d053';
+
+abstract class _$AutomaticBackgroundState extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(DefaultReadingModeState)
 final defaultReadingModeStateProvider = DefaultReadingModeStateProvider._();
 
@@ -42,7 +95,7 @@ final class DefaultReadingModeStateProvider
 }
 
 String _$defaultReadingModeStateHash() =>
-    r'e450969aaf4ca328bf835cc75a48fcd6eb025a5b';
+    r'fa4a07dd8132c847fbe93e72f21f37c338fe6923';
 
 abstract class _$DefaultReadingModeState extends $Notifier<ReaderMode> {
   ReaderMode build();
@@ -55,6 +108,114 @@ abstract class _$DefaultReadingModeState extends $Notifier<ReaderMode> {
             as $ClassProviderElement<
               AnyNotifier<ReaderMode, ReaderMode>,
               ReaderMode,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(DefaultReadingDirectionState)
+final defaultReadingDirectionStateProvider =
+    DefaultReadingDirectionStateProvider._();
+
+final class DefaultReadingDirectionStateProvider
+    extends $NotifierProvider<DefaultReadingDirectionState, ReadingDirection> {
+  DefaultReadingDirectionStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'defaultReadingDirectionStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$defaultReadingDirectionStateHash();
+
+  @$internal
+  @override
+  DefaultReadingDirectionState create() => DefaultReadingDirectionState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ReadingDirection value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ReadingDirection>(value),
+    );
+  }
+}
+
+String _$defaultReadingDirectionStateHash() =>
+    r'f80a55640b6cd19987a7247d193be621e61ef6ec';
+
+abstract class _$DefaultReadingDirectionState
+    extends $Notifier<ReadingDirection> {
+  ReadingDirection build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ReadingDirection, ReadingDirection>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ReadingDirection, ReadingDirection>,
+              ReadingDirection,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(DefaultPageModeState)
+final defaultPageModeStateProvider = DefaultPageModeStateProvider._();
+
+final class DefaultPageModeStateProvider
+    extends $NotifierProvider<DefaultPageModeState, PageMode> {
+  DefaultPageModeStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'defaultPageModeStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$defaultPageModeStateHash();
+
+  @$internal
+  @override
+  DefaultPageModeState create() => DefaultPageModeState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PageMode value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PageMode>(value),
+    );
+  }
+}
+
+String _$defaultPageModeStateHash() =>
+    r'7bea65041fbfc552a2b25a14ce77764d950cae70';
+
+abstract class _$DefaultPageModeState extends $Notifier<PageMode> {
+  PageMode build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<PageMode, PageMode>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<PageMode, PageMode>,
+              PageMode,
               Object?,
               Object?
             >;
@@ -413,7 +574,7 @@ final class UsePageTapZonesStateProvider
 }
 
 String _$usePageTapZonesStateHash() =>
-    r'819291e54970fbe0093c62407609a0b037a2a1bf';
+    r'18968e8a150aa54769325e1f500f4926c15100b2';
 
 abstract class _$UsePageTapZonesState extends $Notifier<bool> {
   bool build();
@@ -466,7 +627,7 @@ final class FullScreenReaderStateProvider
 }
 
 String _$fullScreenReaderStateHash() =>
-    r'2357c5e29f054b477bd508a9e293b3d4d4e52883';
+    r'98f6ee4e0ae95f34803709f46026c7d39031be89';
 
 abstract class _$FullScreenReaderState extends $Notifier<bool> {
   bool build();
@@ -519,7 +680,7 @@ final class NavigationOrderStateProvider
 }
 
 String _$navigationOrderStateHash() =>
-    r'7d18e3b34cad79446220ed47138d59892896b479';
+    r'a1142cab80120d9d94313adc7004bebbcf9979ee';
 
 abstract class _$NavigationOrderState extends $Notifier<List<String>> {
   List<String> build();
@@ -890,7 +1051,7 @@ final class NovelReaderPaddingStateProvider
 }
 
 String _$novelReaderPaddingStateHash() =>
-    r'b9017b6741fb725e05a414f3e528f514923538f0';
+    r'0f353ceeceddf7d1b63d08fceb5533f8832c7ae0';
 
 abstract class _$NovelReaderPaddingState extends $Notifier<int> {
   int build();
@@ -1071,55 +1232,54 @@ abstract class _$NovelShowScrollPercentageState extends $Notifier<bool> {
   }
 }
 
-@ProviderFor(NovelRemoveExtraParagraphSpacingState)
-final novelRemoveExtraParagraphSpacingStateProvider =
-    NovelRemoveExtraParagraphSpacingStateProvider._();
+@ProviderFor(NovelReaderParagraphSpacingState)
+final novelReaderParagraphSpacingStateProvider =
+    NovelReaderParagraphSpacingStateProvider._();
 
-final class NovelRemoveExtraParagraphSpacingStateProvider
-    extends $NotifierProvider<NovelRemoveExtraParagraphSpacingState, bool> {
-  NovelRemoveExtraParagraphSpacingStateProvider._()
+final class NovelReaderParagraphSpacingStateProvider
+    extends $NotifierProvider<NovelReaderParagraphSpacingState, double> {
+  NovelReaderParagraphSpacingStateProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'novelRemoveExtraParagraphSpacingStateProvider',
+        name: r'novelReaderParagraphSpacingStateProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() =>
-      _$novelRemoveExtraParagraphSpacingStateHash();
+  String debugGetCreateSourceHash() => _$novelReaderParagraphSpacingStateHash();
 
   @$internal
   @override
-  NovelRemoveExtraParagraphSpacingState create() =>
-      NovelRemoveExtraParagraphSpacingState();
+  NovelReaderParagraphSpacingState create() =>
+      NovelReaderParagraphSpacingState();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
+  Override overrideWithValue(double value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
+      providerOverride: $SyncValueProvider<double>(value),
     );
   }
 }
 
-String _$novelRemoveExtraParagraphSpacingStateHash() =>
-    r'ba3b09ecbf0d85907fbf23f88469b27aef2d4826';
+String _$novelReaderParagraphSpacingStateHash() =>
+    r'5d07da6c2b2932729cadbf87f7fbf311af50b440';
 
-abstract class _$NovelRemoveExtraParagraphSpacingState extends $Notifier<bool> {
-  bool build();
+abstract class _$NovelReaderParagraphSpacingState extends $Notifier<double> {
+  double build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<bool, bool>;
+    final ref = this.ref as $Ref<double, double>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
+              AnyNotifier<double, double>,
+              double,
               Object?,
               Object?
             >;
@@ -1173,6 +1333,117 @@ abstract class _$NovelTapToScrollState extends $Notifier<bool> {
             as $ClassProviderElement<
               AnyNotifier<bool, bool>,
               bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(NovelShowReturnToSavedPositionButtonState)
+final novelShowReturnToSavedPositionButtonStateProvider =
+    NovelShowReturnToSavedPositionButtonStateProvider._();
+
+final class NovelShowReturnToSavedPositionButtonStateProvider
+    extends $NotifierProvider<NovelShowReturnToSavedPositionButtonState, bool> {
+  NovelShowReturnToSavedPositionButtonStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'novelShowReturnToSavedPositionButtonStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() =>
+      _$novelShowReturnToSavedPositionButtonStateHash();
+
+  @$internal
+  @override
+  NovelShowReturnToSavedPositionButtonState create() =>
+      NovelShowReturnToSavedPositionButtonState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$novelShowReturnToSavedPositionButtonStateHash() =>
+    r'17c1f522066204e75bdf0a1233ad74763c729fd6';
+
+abstract class _$NovelShowReturnToSavedPositionButtonState
+    extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(NovelEpubReadingLayoutState)
+final novelEpubReadingLayoutStateProvider =
+    NovelEpubReadingLayoutStateProvider._();
+
+final class NovelEpubReadingLayoutStateProvider
+    extends $NotifierProvider<NovelEpubReadingLayoutState, int> {
+  NovelEpubReadingLayoutStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'novelEpubReadingLayoutStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$novelEpubReadingLayoutStateHash();
+
+  @$internal
+  @override
+  NovelEpubReadingLayoutState create() => NovelEpubReadingLayoutState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$novelEpubReadingLayoutStateHash() =>
+    r'4142fa5a0cd435e944072a5878f0496d0105b8f9';
+
+abstract class _$NovelEpubReadingLayoutState extends $Notifier<int> {
+  int build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<int, int>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<int, int>,
+              int,
               Object?,
               Object?
             >;

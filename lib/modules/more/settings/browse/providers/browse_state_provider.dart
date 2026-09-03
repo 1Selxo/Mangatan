@@ -1,41 +1,60 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http_interceptor/http_interceptor.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/repositories/settings_repository.dart';
+import 'package:mangayomi/services/extension_repository_catalog.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/services/http/m_client.dart';
-import 'package:mangayomi/services/extension_store_service.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:http_interceptor/http_interceptor.dart';
+import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/repositories/settings_repository.dart';
+import 'package:mangayomi/services/extension_store_service.dart';
 part 'browse_state_provider.g.dart';
 
 @riverpod
 class AndroidProxyServerState extends _$AndroidProxyServerState {
   @override
   String build() {
-    String proxyServer =
-        settingsRepository.currentOrNull?.androidProxyServer ??
-        "http://127.0.0.1:8080";
-    if (!proxyServer.startsWith("http")) {
-      proxyServer = "http://$proxyServer";
-    }
-    if ((proxyServer.contains("localhost") ||
-            RegExp(r'^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$')
-                .hasMatch(proxyServer.replaceAll("://", ":").split(":")[1])) &&
-        proxyServer.split(":").length < 3) {
-      proxyServer = "$proxyServer:8080";
-    }
-    return proxyServer;
+    // The embedded iOS bridge outlives any individual source provider.
+    ref.keepAlive();
+    final savedAddress = settingsRepository.currentOrNull?.androidProxyServer;
+    return normalizeMihonBridgeBaseUrl(
+      savedAddress == null || savedAddress.trim().isEmpty
+          ? "http://127.0.0.1:8080"
+          : savedAddress,
+    );
   }
 
+  String get currentValue => state;
+
   void set(String value) {
-    state = value;
-    settingsRepository.update((s) => s.androidProxyServer = value);
+    final proxyServer = normalizeMihonBridgeBaseUrl(value);
+    state = proxyServer;
+    settingsRepository.update(
+      (settings) => settings.androidProxyServer = proxyServer,
+    );
+  }
+
+  /// Changes the address used by the running app without overwriting the
+  /// user's external bridge fallback in the database.
+  void setRuntime(String value) {
+    state = normalizeMihonBridgeBaseUrl(value);
+  }
+
+  void restoreSaved() {
+    final savedAddress = settingsRepository.currentOrNull?.androidProxyServer;
+    state = normalizeMihonBridgeBaseUrl(
+      savedAddress == null || savedAddress.trim().isEmpty
+          ? "http://127.0.0.1:8080"
+          : savedAddress,
+    );
   }
 }
 
@@ -51,7 +70,7 @@ class AutoStartExtensionServerOnLaunchState
   void set(bool value) {
     state = value;
     settingsRepository.update(
-      (s) => s.autoStartExtensionServerOnLaunch = value,
+      (settings) => settings.autoStartExtensionServerOnLaunch = value,
     );
   }
 }
@@ -103,7 +122,8 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
   @override
   List<Repo> build(ItemType itemType) {
     final settings = settingsRepository.current;
-    final list = switch (itemType) {
+    final list =
+        switch (itemType) {
           ItemType.manga => settings.mangaExtensionsRepo,
           ItemType.anime => settings.animeExtensionsRepo,
           _ => settings.novelExtensionsRepo,
@@ -131,30 +151,38 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
     set(value);
   }
 
-  void set(List<Repo> value) {
-    final deduplicated = _deduplicate(value);
-    state = deduplicated;
-    settingsRepository.update((s) {
+  Future<void> set(List<Repo> value) async {
+    state = value;
+    await isar.writeTxn(() async {
+      final settings = await isar.settings.get(227);
+      if (settings == null) return;
       switch (itemType) {
         case ItemType.manga:
-          s.mangaExtensionsRepo = deduplicated;
+          settings.mangaExtensionsRepo = value;
           break;
         case ItemType.anime:
-          s.animeExtensionsRepo = deduplicated;
+          settings.animeExtensionsRepo = value;
           break;
-        default:
-          s.novelExtensionsRepo = deduplicated;
+        case ItemType.novel:
+          settings.novelExtensionsRepo = value;
+          break;
       }
+      settings.updatedAt = DateTime.now().millisecondsSinceEpoch;
+      await isar.settings.put(settings);
     });
+    unawaited(_refreshSources());
+  }
+
+  Future<void> _refreshSources() async {
     try {
-      final a = ref.refresh(
+      final refresh = ref.refresh(
         fetchItemSourcesListProvider(
           id: null,
           reFresh: false,
           itemType: itemType,
         ).future,
       );
-      Future.wait([a]);
+      await refresh;
     } catch (_) {}
   }
 }
@@ -189,8 +217,8 @@ class CheckForExtensionsUpdateState extends _$CheckForExtensionsUpdateState {
 Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
   final cleanUrl = jsonUrl.trim();
+  if (cleanUrl.isEmpty) return null;
 
-  // Normalize URLs that don't end with a file name (e.g. https://aidoku-community.github.io/sources)
   final urlsToTry = <String>[cleanUrl];
   if (!cleanUrl.endsWith('.json') && !cleanUrl.endsWith('.pb')) {
     final normalized = cleanUrl.endsWith('/')
@@ -204,17 +232,19 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
     ]);
   }
 
-  // 1. Try ExtensionStoreService (.pb, NetworkExtensionStore JSON, Aidoku JSON index, legacy JSON store)
+  // Upstream 0.9.2 stores, including Aidoku and protobuf indexes.
   for (final url in urlsToTry) {
     try {
       final result = await ExtensionStoreService.fetchStore(url, http);
       if (result != null &&
           (result.sources.isNotEmpty || result.name.isNotEmpty)) {
-        String repoName = result.name;
+        var repoName = result.name;
         if (repoName.isEmpty || repoName.endsWith('.json')) {
           final uri = Uri.parse(url);
           final segments = uri.pathSegments
-              .where((s) => s.isNotEmpty && !s.endsWith('.json'))
+              .where(
+                (segment) => segment.isNotEmpty && !segment.endsWith('.json'),
+              )
               .toList();
           repoName = segments.lastOrNull ?? uri.host;
         }
@@ -227,11 +257,36 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
     } catch (_) {}
   }
 
-  // 2. Fallback for custom / legacy JSON list format
+  // Mangatan's package-aware catalog parser remains available for its custom
+  // repository formats.
+  for (final url in urlsToTry) {
+    try {
+      final catalog = await loadExtensionRepositoryCatalog(Uri.parse(url), (
+        uri,
+      ) async {
+        final response = await http.get(uri);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw StateError(
+            'Extension repository returned HTTP ${response.statusCode}.',
+          );
+        }
+        return response.bodyBytes;
+      });
+      if (catalog.entries.isNotEmpty) {
+        return Repo(
+          name: catalog.name,
+          website: catalog.website ?? url,
+          jsonUrl: url,
+        );
+      }
+    } catch (_) {}
+  }
+
+  // Legacy JSON list format.
   for (final url in urlsToTry) {
     try {
       final res = await http.get(Uri.parse(url));
-      if (_checkValidUrl(res)) {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
         Map<String, dynamic> infos = {};
         final match = RegExp(r'^(.*)/[^/]+\.json$').firstMatch(url);
         if (match != null) {
@@ -265,23 +320,6 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   return null;
 }
 
-bool _checkValidUrl(Response res) {
-  try {
-    final decoded = jsonDecode(res.body);
-    if (decoded is List) {
-      final sourceList = decoded.map((e) => Source.fromJson(e));
-      if (sourceList.firstOrNull?.name != null) {
-        return true;
-      }
-    } else if (decoded is Map && decoded['sources'] is List) {
-      return true;
-    }
-  } catch (err) {
-    return false;
-  }
-  return false;
-}
-
 final isExtensionServerInstalledStreamProvider = StreamProvider<bool>((
   ref,
 ) async* {
@@ -289,13 +327,15 @@ final isExtensionServerInstalledStreamProvider = StreamProvider<bool>((
     yield true;
     return;
   }
-  await for (final settings in settingsRepository.watch()) {
-    final jrePath = settings.jrePath ?? '';
-    final serverPath = settings.extensionServerPath ?? '';
-    if (jrePath.isEmpty || serverPath.isEmpty) {
-      yield false;
-    } else {
-      yield File(jrePath).existsSync() && File(serverPath).existsSync();
-    }
+  await for (final settings in isar.settings.watchObject(
+    227,
+    fireImmediately: true,
+  )) {
+    final jrePath = settings?.jrePath ?? '';
+    final serverPath = settings?.extensionServerPath ?? '';
+    yield jrePath.isNotEmpty &&
+        serverPath.isNotEmpty &&
+        File(jrePath).existsSync() &&
+        File(serverPath).existsSync();
   }
 });

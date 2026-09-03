@@ -215,7 +215,7 @@ final class SortChapterStateProvider
   }
 }
 
-String _$sortChapterStateHash() => r'34d1527e0a27945ba95b28713dca697097864712';
+String _$sortChapterStateHash() => r'be078a16a3869daf834e827e5c28688d22635398';
 
 final class SortChapterStateFamily extends $Family
     with

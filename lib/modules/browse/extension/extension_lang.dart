@@ -8,6 +8,8 @@ import 'package:mangayomi/modules/browse/extension/widgets/extension_lang_list_t
 import 'package:mangayomi/utils/global_style.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
 
 class ExtensionsLang extends ConsumerWidget {
   final ItemType itemType;
@@ -50,7 +52,11 @@ class ExtensionsLang extends ConsumerWidget {
         stream: sourceRepository.watchByItemType(itemType),
         builder: (context, snapshot) {
           List<Source>? entries = snapshot.hasData ? snapshot.data : [];
-          final languages = entries!.map((e) => e.lang!).toSet().toList();
+          final languages = entries!
+              .map((source) => source.lang ?? '')
+              .where((lang) => lang.isNotEmpty)
+              .toSet()
+              .toList();
 
           languages.sort((a, b) => a.compareTo(b));
           return SuperListView.builder(
@@ -61,23 +67,24 @@ class ExtensionsLang extends ConsumerWidget {
               return ExtensionLangListTileWidget(
                 lang: lang,
                 onChanged: (val) {
-                  final now = DateTime.now().millisecondsSinceEpoch;
-                  final toUpdate = entries
-                      .where(
-                        (source) =>
-                            source.lang!.toLowerCase() == lang.toLowerCase(),
-                      )
-                      .map((source) => source..isActive = val..updatedAt = now)
-                      .toList();
-                  sourceRepository.putAll(toUpdate);
+                  isar.writeTxnSync(() {
+                    for (final source in entries) {
+                      if ((source.lang ?? '').toLowerCase() ==
+                          lang.toLowerCase()) {
+                        isar.sources.putSync(
+                          source
+                            ..isActive = val
+                            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
+                        );
+                      }
+                    }
+                  });
                 },
-                value: entries
-                    .where(
-                      (element) =>
-                          element.lang!.toLowerCase() == lang.toLowerCase() &&
-                          element.isActive!,
-                    )
-                    .isNotEmpty,
+                value: entries.any(
+                  (source) =>
+                      (source.lang ?? '').toLowerCase() == lang.toLowerCase() &&
+                      (source.isActive ?? false),
+                ),
               );
             },
           );

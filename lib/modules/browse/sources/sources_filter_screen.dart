@@ -4,11 +4,14 @@ import 'package:mangayomi/modules/widgets/custom_sliver_grouped_list_view.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/browse/widgets/source_extension_icon.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/utils/cached_network.dart';
 
 class SourcesFilterScreen extends ConsumerWidget {
   final ItemType itemType;
@@ -90,21 +93,11 @@ class SourcesFilterScreen extends ConsumerWidget {
                                 .withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(5),
                           ),
-                          child: element.iconUrl!.isEmpty
-                              ? const Icon(Icons.source_outlined)
-                              : cachedNetworkImage(
-                                  imageUrl: element.iconUrl!,
-                                  fit: BoxFit.contain,
-                                  width: 37,
-                                  height: 37,
-                                  errorWidget: const SizedBox(
-                                    width: 37,
-                                    height: 37,
-                                    child: Center(
-                                      child: Icon(Icons.source_outlined),
-                                    ),
-                                  ),
-                                ),
+                          child: SourceExtensionIcon(
+                            source: element,
+                            size: 37,
+                            fallbackIcon: Icons.source_outlined,
+                          ),
                         ),
                         onChanged: (bool? value) {
                           sourceRepository.save(element..isAdded = value);

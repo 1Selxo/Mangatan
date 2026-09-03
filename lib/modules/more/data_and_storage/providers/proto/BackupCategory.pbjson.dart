@@ -22,10 +22,12 @@ const BackupCategory$json = {
     {'1': 'order', '3': 2, '4': 1, '5': 3, '10': 'order'},
     {'1': 'id', '3': 3, '4': 1, '5': 3, '10': 'id'},
     {'1': 'flags', '3': 100, '4': 1, '5': 3, '10': 'flags'},
+    {'1': 'hidden', '3': 900, '4': 1, '5': 8, '10': 'hidden'},
   ],
 };
 
 /// Descriptor for `BackupCategory`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List backupCategoryDescriptor = $convert.base64Decode(
     'Cg5CYWNrdXBDYXRlZ29yeRISCgRuYW1lGAEgASgJUgRuYW1lEhQKBW9yZGVyGAIgASgDUgVvcm'
-    'RlchIOCgJpZBgDIAEoA1ICaWQSFAoFZmxhZ3MYZCABKANSBWZsYWdz');
+    'RlchIOCgJpZBgDIAEoA1ICaWQSFAoFZmxhZ3MYZCABKANSBWZsYWdzEhcKBmhpZGRlbhiEByAB'
+    'KAhSBmhpZGRlbg==');

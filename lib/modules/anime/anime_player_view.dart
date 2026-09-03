@@ -246,6 +246,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
         WidgetsBindingObserver {
   bool _routeExitInProgress = false;
   bool _videoTextureVisible = true;
+  bool _resumePlaybackAfterWindowsSuspend = false;
   ({double width, double height})? _linuxVideoViewport;
   ({int width, int height})? _linuxVideoOutputSize;
   bool _linuxVideoResizeScheduled = false;
@@ -1814,6 +1815,23 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (Platform.isWindows) {
+      if (shouldSuspendWindowsPlaybackSurface(state)) {
+        _resumePlaybackAfterWindowsSuspend =
+            _resumePlaybackAfterWindowsSuspend || _player.state.playing;
+        _setWindowsVideoSurfaceVisible(false);
+      } else if (shouldResumeWindowsPlaybackSurface(state)) {
+        _setWindowsVideoSurfaceVisible(true);
+        if (_resumePlaybackAfterWindowsSuspend) {
+          _resumePlaybackAfterWindowsSuspend = false;
+          unawaited(
+            WidgetsBinding.instance.endOfFrame.then((_) {
+              if (mounted && _videoTextureVisible) return _player.play();
+            }),
+          );
+        }
+      }
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _watchStopwatch.stop();
@@ -1821,6 +1839,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     } else if (state == AppLifecycleState.resumed) {
       _watchStopwatch.start();
     }
+  }
+
+  void _setWindowsVideoSurfaceVisible(bool visible) {
+    if (!mounted || _routeExitInProgress || _videoTextureVisible == visible) {
+      return;
+    }
+    setState(() => _videoTextureVisible = visible);
   }
 
   Future<void> _openMedia(VideoPrefs prefs, [Duration? position]) async {

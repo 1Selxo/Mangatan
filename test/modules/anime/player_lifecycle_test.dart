@@ -1,9 +1,42 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/anime/utils/player_lifecycle.dart';
 
 void main() {
+  group('Windows playback surface lifecycle', () {
+    test('retires the texture for hidden and suspended states', () {
+      expect(
+        shouldSuspendWindowsPlaybackSurface(AppLifecycleState.hidden),
+        isTrue,
+      );
+      expect(
+        shouldSuspendWindowsPlaybackSurface(AppLifecycleState.paused),
+        isTrue,
+      );
+      expect(
+        shouldSuspendWindowsPlaybackSurface(AppLifecycleState.detached),
+        isTrue,
+      );
+      expect(
+        shouldSuspendWindowsPlaybackSurface(AppLifecycleState.inactive),
+        isFalse,
+      );
+    });
+
+    test('recreates the texture only after resume', () {
+      expect(
+        shouldResumeWindowsPlaybackSurface(AppLifecycleState.resumed),
+        isTrue,
+      );
+      expect(
+        shouldResumeWindowsPlaybackSurface(AppLifecycleState.hidden),
+        isFalse,
+      );
+    });
+  });
+
   test('episode replacement preserves desktop fullscreen', () {
     expect(
       shouldExitDesktopFullscreenOnDispose(

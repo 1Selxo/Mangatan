@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart';
+
 /// Cancels every player listener before releasing the native player.
 ///
 /// `Player.dispose()` already stops playback. Starting `Player.stop()` and
@@ -32,6 +34,17 @@ Future<void> retirePlaybackSurface({
     await Future<void>.delayed(rasterDrainDelay);
   }
 }
+
+/// Windows can invalidate ANGLE/D3D textures while a window is minimized or
+/// the machine enters Modern Standby. Remove the video surface before that
+/// texture is presented again, while keeping the player session alive.
+bool shouldSuspendWindowsPlaybackSurface(AppLifecycleState state) =>
+    state == AppLifecycleState.hidden ||
+    state == AppLifecycleState.paused ||
+    state == AppLifecycleState.detached;
+
+bool shouldResumeWindowsPlaybackSurface(AppLifecycleState state) =>
+    state == AppLifecycleState.resumed;
 
 /// Whether disposing the outer player route should leave desktop fullscreen.
 ///

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 1.2.17+198 - 2026-09-02
+## 1.2.17+199 - 2026-09-03
 
 - Improved Linux video playback performance by sizing the native mpv texture
   to the visible physical viewport instead of rendering unnecessarily large
@@ -19,6 +19,17 @@
   mouse-selection dictionary lookup on Linux.
 - Repaired malformed MPEG-TS data from affected Mihon proxy streams before
   decoding, preventing recurring AAC playback errors on VidPlay episodes.
+- Made desktop player shortcuts independent of transient control focus,
+  restored Page Up/Down forwarding to mpv input mappings, and removed the
+  old focus-restoration path.
+- Prevented the Linux mpv renderer from blocking Flutter's raster thread while
+  waiting for an unreported presentation swap, fixing intermittent low-FPS
+  playback without changing decoder settings.
+- Retired the Windows video texture while minimized or suspended and recreated
+  it after resume, avoiding stale ANGLE/D3D surfaces that can hang or crash the
+  Intel graphics stack.
+- Added in-app installation and removal of a pinned, SHA-256-verified Windows
+  ScreenAI runtime, so local video OCR no longer requires installing Chrome.
 
 ## 1.2.16+196 - 2026-09-01
 

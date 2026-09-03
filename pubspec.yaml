@@ -2,7 +2,7 @@ name: mangayomi
 description: Free and open source manga reader and anime streaming
   cross-plateform app inspired by Tachiyomi and Aniyomi.
 publish_to: "none"
-version: 1.2.17+198
+version: 1.2.17+199
 
 environment:
   sdk: ^3.13.1
@@ -51,15 +51,18 @@ dependencies:
   encrypt: ^5.0.3
   media_kit:
     git:
-      url: https://github.com/Schnitzel5/media-kit.git
+      url: https://github.com/1Selxo/media-kit.git
+      ref: mangatan-linux-raster-v1
       path: media_kit
   media_kit_video:
     git:
-      url: https://github.com/Schnitzel5/media-kit.git
+      url: https://github.com/1Selxo/media-kit.git
+      ref: mangatan-linux-raster-v1
       path: media_kit_video
   media_kit_libs_video:
     git:
-      url: https://github.com/Schnitzel5/media-kit.git
+      url: https://github.com/1Selxo/media-kit.git
+      ref: mangatan-linux-raster-v1
       path: libs/universal/media_kit_libs_video
   crypto: ^3.0.7
   image: ^4.8.0

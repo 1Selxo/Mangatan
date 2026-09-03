@@ -18,7 +18,7 @@ privacy expectations.
 | --- | --- | --- |
 | **Automatic** (default) | Mixed — Google Lens first, then a platform-local fallback | Google Lens, and Mokuro-website (see below) |
 | **Apple Vision** | On-device (iOS and macOS) | None for inference; Mokuro-website may still fire |
-| **ScreenAI (local Chrome)** | On-device (Windows only) | None for inference; Mokuro-website may still fire (see below) |
+| **ScreenAI (managed or Chrome/Edge)** | On-device (Windows only) | Downloads the pinned runtime once; no network request for inference |
 | **Hayai OCR v2.1** | The user-configured Hayai server | Sends each AnimeText crop to that server |
 | **Google Lens** | Remote Google endpoint | Google Lens, and Mokuro-website (see below) |
 | **Mokuro only** | Local pre-generated data | None for inference; Mokuro-website may still fire (see below) |
@@ -33,13 +33,19 @@ choosing `Automatic` means page images may be sent to Google.
 Proof: `generatedOcrEngineOrder()` returns Google Lens before Apple Vision or
 ScreenAI for the automatic preference (`generated_ocr.dart`).
 
-### ScreenAI (local Chrome) — on-device, Windows only, no OCR upload
+### ScreenAI — on-device, Windows only, no OCR upload
 
-ScreenAI runs Chrome's/Edge's bundled `chrome_screen_ai.dll` locally through
-FFI; the page image is decoded and recognized on your machine and **no page
-image is uploaded for recognition**. If ScreenAI is unavailable or fails, this
-engine **rethrows the error instead of falling back to Google Lens** — so
-selecting it explicitly does not silently send your page to the cloud.
+ScreenAI runs `chrome_screen_ai.dll` locally through FFI; the page image is
+decoded and recognized on your machine and **no page image is uploaded for
+recognition**. Mangatan can download the approximately 72 MB Windows component
+from Chromium's CIPD service in **Dictionaries & audio**, or reuse a component
+already installed by Chrome or Edge. The managed download is pinned to an
+immutable package instance and checked against its published SHA-256 before it
+is installed. Chrome does not need to be installed or used as your browser.
+
+If ScreenAI is unavailable or fails, this engine **rethrows the error instead
+of falling back to Google Lens** — so selecting it explicitly does not silently
+send your page to the cloud.
 
 Proof: `ScreenAiOcrClient.recognize()` calls a native DLL via
 `_ScreenAiBridge` inside an isolate and makes no HTTP call
@@ -53,11 +59,9 @@ Requirements/limits, from the code:
 - **Windows only.** `ScreenAiOcrClient.isAvailable()` returns
   `Platform.isWindows && _ScreenAiBridge.isAvailable && _findComponentDirectory() != null`;
   `recognize()` throws `UnsupportedError` off Windows.
-- **No manual DLL install.** The component is located automatically by scanning
-  Chrome / Chrome SxS / Edge `User Data\screen_ai\<version>` for
-  `chrome_screen_ai.dll` + `manifest.json` (`_findComponentDirectory()`). If it
-  is missing you get "ScreenAI is not installed. Open Chrome once or select
-  Google Lens." — you do not copy any file by hand.
+- **No manual DLL install.** Mangatan first checks its managed component under
+  the application-support directory, then scans Chrome / Chrome SxS / Edge
+  `User Data\screen_ai\<version>` for an existing compatible component.
 
 ### Apple Vision — on-device on Apple platforms
 

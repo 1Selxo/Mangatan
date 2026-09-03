@@ -23,6 +23,7 @@ import 'package:mangayomi/services/mining/dictionary_update_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/ocr_processing_queue.dart';
+import 'package:mangayomi/services/mining/screen_ai_component_manager.dart';
 import 'package:mangayomi/services/mining/screen_ai_ocr.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as p;
@@ -125,6 +126,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   bool _additionalLeftClick = false;
   bool _overlayEnabled = true;
   bool _screenAiAvailable = false;
+  bool _screenAiManaged = false;
+  bool _screenAiBusy = false;
+  double? _screenAiProgress;
   bool _loading = true;
   bool _importing = false;
   bool _checkingDictionaryUpdates = false;
@@ -186,6 +190,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       MiningPreferences.getParallelOcrLimit(),
     ]);
     if (!mounted) return;
+    final managedScreenAi =
+        await ScreenAiComponentManager.installedComponentDirectory() != null;
+    if (!mounted) return;
     setState(() {
       _profiles = values[16] as List<DictionaryProfile>;
       _activeProfile = values[17] as DictionaryProfile;
@@ -206,6 +213,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _ankiAudioPreferences = values[10] as AnkiAudioPreferences;
       _ankiEndpoint = values[11] as Uri;
       _screenAiAvailable = values[12] as bool;
+      _screenAiManaged = managedScreenAi;
       _lookupTrigger = values[13] as DictionaryLookupTrigger;
       _additionalLeftClick = values[14] as bool;
       _dictionaryLanguage = values[15] as String;
@@ -217,6 +225,62 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     });
     if (widget.section == DictionarySettingsSection.anki && !_usesAnkiMobile) {
       unawaited(_refreshAnki(silent: true));
+    }
+  }
+
+  Future<void> _installScreenAi() async {
+    setState(() {
+      _screenAiBusy = true;
+      _screenAiProgress = 0;
+    });
+    try {
+      await ScreenAiComponentManager.install(
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(
+            () => _screenAiProgress = total > 0 ? received / total : null,
+          );
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _screenAiAvailable = true;
+        _screenAiManaged = true;
+      });
+      botToast('ScreenAI ${ScreenAiComponentManager.version} installed.');
+    } catch (error) {
+      if (mounted) botToast('ScreenAI installation failed: $error', second: 6);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _screenAiBusy = false;
+          _screenAiProgress = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _removeScreenAi() async {
+    setState(() => _screenAiBusy = true);
+    try {
+      await ScreenAiComponentManager.remove();
+      final available = await ScreenAiOcrClient.isAvailable();
+      if (!mounted) return;
+      setState(() {
+        _screenAiManaged = false;
+        _screenAiAvailable = available;
+      });
+      botToast('Mangatan-managed ScreenAI files removed.');
+    } catch (error) {
+      if (mounted) {
+        botToast(
+          'Could not remove ScreenAI while it is in use. Restart Mangatan '
+          'and try again. ($error)',
+          second: 6,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _screenAiBusy = false);
     }
   }
 
@@ -1735,10 +1799,37 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ),
                     title: const Text('ScreenAI OCR'),
                     subtitle: Text(
-                      _screenAiAvailable
-                          ? 'Local Chrome ScreenAI component detected. Runs on device.'
-                          : 'Local Chrome ScreenAI component was not detected.',
+                      _screenAiBusy
+                          ? _screenAiProgress == null
+                                ? 'Managing local ScreenAI files…'
+                                : 'Downloading ${(_screenAiProgress! * 100).clamp(0, 100).toStringAsFixed(0)}%'
+                          : _screenAiManaged
+                          ? 'Version ${ScreenAiComponentManager.version} is managed by Mangatan and runs on device.'
+                          : _screenAiAvailable
+                          ? 'Chrome/Edge ScreenAI component detected. Runs on device.'
+                          : 'Not installed. Download the 72 MB on-device OCR component, or use Automatic/Google Lens.',
                     ),
+                    trailing: _screenAiBusy
+                        ? SizedBox.square(
+                            dimension: 24,
+                            child: CircularProgressIndicator(
+                              value: _screenAiProgress,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : _screenAiManaged
+                        ? IconButton(
+                            tooltip: 'Remove managed ScreenAI files',
+                            onPressed: _removeScreenAi,
+                            icon: const Icon(Icons.delete_outline),
+                          )
+                        : _screenAiAvailable
+                        ? null
+                        : TextButton.icon(
+                            onPressed: _installScreenAi,
+                            icon: const Icon(Icons.download),
+                            label: const Text('Download'),
+                          ),
                   ),
                 const ListTile(
                   leading: Icon(Icons.translate),

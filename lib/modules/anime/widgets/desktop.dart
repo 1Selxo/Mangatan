@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
-import 'package:mangayomi/modules/anime/utils/player_focus.dart';
+import 'package:mangayomi/modules/anime/utils/player_keyboard_listener.dart';
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
@@ -71,9 +71,6 @@ class _DesktopControllerWidgetState
   final bottomButtonBarMargin = const EdgeInsets.only(left: 16.0, right: 8.0);
   final GlobalKey _subtitleOverlayKey = GlobalKey();
   final GlobalKey _seekBarKey = GlobalKey();
-  final FocusNode _playerFocusNode = FocusNode(
-    debugLabel: 'desktopPlayerShortcuts',
-  );
   double _subtitleBottomInset = 24;
   bool _subtitleAnchorUpdateScheduled = false;
 
@@ -135,17 +132,12 @@ class _DesktopControllerWidgetState
     subscriptions.clear();
     _timer?.cancel();
     _tapTimer?.cancel();
-    _playerFocusNode.dispose();
     super.dispose();
   }
 
   void _unmountHiddenControls() {
     if (visible) return;
 
-    // A focused control is about to leave the tree. Move focus to the
-    // persistent player node first; otherwise Flutter can fall back to the
-    // root focus scope and CallbackShortcuts will stop receiving hotkeys.
-    restorePlayerFocusBeforeUnmount(_playerFocusNode);
     setState(() => mount = false);
   }
 
@@ -243,14 +235,83 @@ class _DesktopControllerWidgetState
     widget.videoController.player.playOrPause();
   }
 
-  Map<ShortcutActivator, VoidCallback> _playerHotkeyCallbacks() {
-    final callbacks = <ShortcutActivator, VoidCallback>{};
-    for (final binding in _hotkeys) {
-      final activator = binding.activator;
-      if (activator == null) continue;
-      callbacks[activator] = () => _performHotkeyAction(binding.action);
+  bool _handleHardwareKey(KeyEvent event) {
+    if (!isPlayerShortcutPress(event) ||
+        ModalRoute.of(context)?.isCurrent == false ||
+        _textInputHasFocus()) {
+      return false;
     }
-    return callbacks;
+
+    final keyboard = HardwareKeyboard.instance;
+    for (final binding in _hotkeys) {
+      if (playerHotkeyMatches(
+        binding,
+        event,
+        controlPressed: keyboard.isControlPressed,
+        altPressed: keyboard.isAltPressed,
+        shiftPressed: keyboard.isShiftPressed,
+        metaPressed: keyboard.isMetaPressed,
+      )) {
+        _performHotkeyAction(binding.action);
+        return true;
+      }
+    }
+
+    if (keyboard.isControlPressed &&
+        !keyboard.isAltPressed &&
+        !keyboard.isShiftPressed &&
+        !keyboard.isMetaPressed) {
+      final scriptMessage = switch (event.logicalKey) {
+        LogicalKeyboardKey.digit0 => 'clear_anime',
+        LogicalKeyboardKey.digit1 => 'set_anime_a',
+        LogicalKeyboardKey.digit2 => 'set_anime_b',
+        LogicalKeyboardKey.digit3 => 'set_anime_c',
+        LogicalKeyboardKey.digit4 => 'set_anime_aa',
+        LogicalKeyboardKey.digit5 => 'set_anime_bb',
+        LogicalKeyboardKey.digit6 => 'set_anime_ca',
+        _ => null,
+      };
+      if (scriptMessage != null) {
+        unawaited(
+          (widget.videoController.player.platform as NativePlayer).command([
+            'script-message',
+            scriptMessage,
+          ]),
+        );
+        return true;
+      }
+    }
+
+    final mpvKey = mpvInputKeyForPlayerShortcut(event.logicalKey);
+    if (mpvKey != null &&
+        !keyboard.isControlPressed &&
+        !keyboard.isAltPressed &&
+        !keyboard.isShiftPressed &&
+        !keyboard.isMetaPressed) {
+      unawaited(
+        (widget.videoController.player.platform as NativePlayer).command([
+          'keypress',
+          mpvKey,
+        ]),
+      );
+      return true;
+    }
+    return false;
+  }
+
+  bool _textInputHasFocus() {
+    var context = FocusManager.instance.primaryFocus?.context;
+    if (context == null) return false;
+    if (context.widget is EditableText) return true;
+    var editable = false;
+    context.visitAncestorElements((element) {
+      if (element.widget is EditableText) {
+        editable = true;
+        return false;
+      }
+      return true;
+    });
+    return editable;
   }
 
   void _performHotkeyAction(PlayerHotkeyAction action) {
@@ -292,58 +353,13 @@ class _DesktopControllerWidgetState
   @override
   Widget build(BuildContext context) {
     _scheduleSubtitleAnchorUpdate();
-    return CallbackShortcuts(
-      bindings: {
-        ..._playerHotkeyCallbacks(),
-        const SingleActivator(LogicalKeyboardKey.digit0, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "clear_anime",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit1, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_a",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit2, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_b",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit3, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_c",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit4, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_aa",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit5, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_bb",
-          ]);
-        },
-        const SingleActivator(LogicalKeyboardKey.digit6, control: true): () {
-          (widget.videoController.player.platform as NativePlayer).command([
-            "script-message",
-            "set_anime_ca",
-          ]);
-        },
-      },
+    return PlayerHardwareKeyboardListener(
+      onKeyEvent: _handleHardwareKey,
       child: Stack(
         key: _subtitleOverlayKey,
         children: [
           Focus(
             autofocus: true,
-            focusNode: _playerFocusNode,
             child: Listener(
               onPointerSignal: modifyVolumeOnScroll
                   ? (e) {

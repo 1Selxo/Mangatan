@@ -61,7 +61,7 @@ String ocrEngineLabel(OcrEnginePreference engine) => switch (engine) {
     OcrHostPlatform.other => 'Automatic (Mokuro, Google Lens)',
   },
   OcrEnginePreference.appleVision => 'Apple Vision (on device)',
-  OcrEnginePreference.screenAi => 'ScreenAI (local Chrome)',
+  OcrEnginePreference.screenAi => 'ScreenAI (Chrome/Edge component)',
   OcrEnginePreference.hayai => 'Hayai OCR v2.1 (local server)',
   OcrEnginePreference.googleLens => 'Google Lens',
   OcrEnginePreference.mokuroOnly => 'Mokuro only',

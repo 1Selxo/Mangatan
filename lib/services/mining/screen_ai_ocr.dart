@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 import 'package:ffi/ffi.dart';
 import 'package:mangayomi/services/mining/ocr_image_tiling.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
+import 'package:mangayomi/services/mining/screen_ai_component_manager.dart';
 import 'package:path/path.dart' as p;
 
 class ScreenAiOcrResult {
@@ -66,17 +67,19 @@ class ScreenAiOcrClient {
   static Future<bool> isAvailable() async {
     return Platform.isWindows &&
         _ScreenAiBridge.isAvailable &&
-        _findComponentDirectory() != null;
+        await _findComponentDirectory() != null;
   }
 
   Future<ScreenAiOcrResult> recognize(Uint8List imageBytes) async {
     if (!Platform.isWindows) {
       throw UnsupportedError('ScreenAI OCR is currently available on Windows');
     }
-    final component = componentDirectory ?? _findComponentDirectory();
+    final component = componentDirectory ?? await _findComponentDirectory();
     if (component == null) {
       throw StateError(
-        'ScreenAI is not installed. Open Chrome once or select Google Lens.',
+        'ScreenAI is a Chromium component and is not installed. It does not '
+        'use your default browser; download it from Dictionary & audio '
+        'settings, or select Automatic or Google Lens.',
       );
     }
 
@@ -138,11 +141,13 @@ class ScreenAiOcrClient {
     final frame = await codec.getNextFrame();
     final width = frame.image.width;
     final height = frame.image.height;
-    final rgba = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final rgba = await frame.image.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
     frame.image.dispose();
     codec.dispose();
     if (rgba == null) throw StateError('Could not decode image for ScreenAI');
-    
+
     return _ImageDecodeResult(
       rgbaBytes: rgba.buffer.asUint8List(),
       width: width,
@@ -150,7 +155,10 @@ class ScreenAiOcrClient {
     );
   }
 
-  static Directory? _findComponentDirectory() {
+  static Future<Directory?> _findComponentDirectory() async {
+    final managed =
+        await ScreenAiComponentManager.installedComponentDirectory();
+    if (managed != null) return managed;
     final roots = <Directory>[
       _localAppDataDir(p.join('Google', 'Chrome', 'User Data', 'screen_ai')),
       _localAppDataDir(

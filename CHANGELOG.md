@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.2.18+200 - 2026-09-07
+
+- Rebased Mangatan onto Mangayomi 0.9.2 while preserving the iOS embedded
+  Mihon runtime, Aidoku support, Chimahon sync, mining, OCR, Yomitan,
+  EPUB/novel, desktop, and TV features.
+- Fixed post-rebase version ordering and made Windows, onboarding, scene
+  capture, and sync tests deterministic across supported environments.
+
 ## 1.2.17+199 - 2026-09-03
 
 - Improved Linux video playback performance by sizing the native mpv texture

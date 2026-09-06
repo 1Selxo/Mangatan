@@ -569,19 +569,19 @@ int compareVersions(String version1, String version2) {
 
   final v1Parts = clean1.split('.');
   final v2Parts = clean2.split('.');
-  final maxLength = v1Parts.length > v2Parts.length
+  final minLength = v1Parts.length < v2Parts.length
       ? v1Parts.length
       : v2Parts.length;
 
-  for (var i = 0; i < maxLength; i++) {
-    final v1Value = i < v1Parts.length ? _parseVersionPart(v1Parts[i]) : 0;
-    final v2Value = i < v2Parts.length ? _parseVersionPart(v2Parts[i]) : 0;
+  for (var i = 0; i < minLength; i++) {
+    final v1Value = _parseVersionPart(v1Parts[i]);
+    final v2Value = _parseVersionPart(v2Parts[i]);
 
     final comparison = v1Value.compareTo(v2Value);
     if (comparison != 0) return comparison;
   }
 
-  return 0;
+  return v1Parts.length.compareTo(v2Parts.length);
 }
 
 int _parseVersionPart(String part) {

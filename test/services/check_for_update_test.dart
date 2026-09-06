@@ -21,11 +21,11 @@ void main() {
     });
 
     test('different segment lengths', () {
-      expect(compareVersions('0.9', '0.9.0'), equals(0));
-      expect(compareVersions('0.9.0', '0.9'), equals(0));
+      expect(compareVersions('0.9', '0.9.0'), equals(-1));
+      expect(compareVersions('0.9.0', '0.9'), equals(1));
       expect(compareVersions('0.9.1', '0.9.1.1'), equals(-1));
       expect(compareVersions('0.9.1.1', '0.9.1'), equals(1));
-      expect(compareVersions('1', '1.0.0.0'), equals(0));
+      expect(compareVersions('1', '1.0.0.0'), equals(-1));
     });
 
     test('handles leading v or V prefix', () {

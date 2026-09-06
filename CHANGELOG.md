@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 1.2.18+201 - 2026-09-07
+## 1.2.18+202 - 2026-09-07
 
 - Rebased Mangatan onto Mangayomi 0.9.2 while preserving the iOS embedded
   Mihon runtime, Aidoku support, Chimahon sync, mining, OCR, Yomitan,

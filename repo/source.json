@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.17",
-      "versionDate": "2026-09-03T00:19:49Z",
+      "version": "1.2.18",
+      "versionDate": "2026-09-06T23:19:56Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.199-917845b-ios.ipa",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.18/Mangatan-v1.2.18-build.202-c2ad1d1-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 176982982,
+      "size": 179020028,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.18",
+          "date": "2026-09-06T23:19:56Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.18/Mangatan-v1.2.18-build.202-c2ad1d1-ios.ipa",
+          "size": 179020028
+        },
+        {
           "version": "1.2.17",
           "date": "2026-09-03T00:19:49Z",
-          "localizedDescription": "",
+          "localizedDescription": "\r\n1.2.17+199 \u2022 2026\u202209\u202203\r\n\r\n\u2022 Improved Linux video playback performance by sizing the native mpv texture\r\n  to the visible physical viewport instead of rendering unnecessarily large\r\n  source\u2022resolution frames.\r\n\u2022 Made multi\u2022dictionary imports use streaming ZIP inspection and the native\r\n  low\u2022memory path, continue after an individual archive fails, and preserve\r\n  dictionaries that imported successfully.\r\n\u2022 Added a Linux documents\u2022directory fallback when \"xdg\u2022user\u2022dir\" is missing\r\n  and clearer guidance when a D\u2022Bus file picker is unavailable.\r\n\u2022 Fixed first\u2022run content\u2022type and extension\u2022repository selection so manga,\r\n  anime, and novel repositories remain assigned to the intended sections.\r\n\u2022 Improved local EPUB performance by rendering one logical section at a time,\r\n  added an always\u2022accessible reader\u2022controls button, and enabled debounced\r\n  mouse\u2022selection dictionary lookup on Linux.\r\n\u2022 Repaired malformed MPEG\u2022TS data from affected Mihon proxy streams before\r\n  decoding, preventing recurring AAC playback errors on VidPlay episodes.\r\n\u2022 Made desktop player shortcuts independent of transient control focus,\r\n  restored Page Up/Down forwarding to mpv input mappings, and removed the\r\n  old focus\u2022restoration path.\r\n\u2022 Prevented the Linux mpv renderer from blocking Flutter's raster thread while\r\n  waiting for an unreported presentation swap, fixing intermittent low\u2022FPS\r\n  playback without changing decoder settings.\r\n\u2022 Retired the Windows video texture while minimized or suspended and recreated\r\n  it after resume, avoiding stale ANGLE/D3D surfaces that can hang or crash the\r\n  Intel graphics stack.\r\n\u2022 Added in\u2022app installation and removal of a pinned, SHA\u2022256\u2022verified Windows\r\n  ScreenAI runtime, so local video OCR no longer requires installing Chrome.",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.17/Mangatan-v1.2.17-build.199-917845b-ios.ipa",
           "size": 176982982
         },
@@ -297,6 +304,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.17"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.18 - 06 Sep",
+      "identifier": "release-1.2.18",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-09-06T23:19:56Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.18"
     }
   ]
 }

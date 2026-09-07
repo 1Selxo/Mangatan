@@ -26,7 +26,10 @@ class ChapterPageDownload extends ConsumerWidget {
   const ChapterPageDownload({super.key, required this.chapter});
 
   void _startDownload(bool? useWifi, int? downloadId, WidgetRef ref) async {
-    _cancelTasks(downloadId: downloadId);
+    if (isDownloadScheduled(chapter.id)) return;
+    await downloadRepository.enqueue(chapter);
+    if (!ref.context.mounted) return;
+    ref.invalidate(downloadChapterProvider(chapter: chapter, useWifi: useWifi));
     ref.read(downloadChapterProvider(chapter: chapter, useWifi: useWifi));
   }
 

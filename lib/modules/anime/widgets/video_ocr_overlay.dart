@@ -260,6 +260,10 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
                                   : 1,
                             ),
                           ),
+                          child: _VideoOcrText(
+                            block: item.block,
+                            selected: identical(_selection?.block, item.block),
+                          ),
                         ),
                       ),
                     ),
@@ -585,6 +589,13 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
                                     : 1,
                               ),
                             ),
+                            child: _VideoOcrText(
+                              block: item.block,
+                              selected: identical(
+                                _selection?.block,
+                                item.block,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -651,6 +662,45 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
                 ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+@visibleForTesting
+double videoOcrTextOpacity({required bool selected}) => selected ? 0.75 : 0.10;
+
+class _VideoOcrText extends StatelessWidget {
+  const _VideoOcrText({required this.block, required this.selected});
+
+  final OcrTextBlock block;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = block.text.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+    final opacity = videoOcrTextOpacity(selected: selected);
+    return IgnorePointer(
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: opacity),
+              fontWeight: FontWeight.w600,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withValues(alpha: opacity),
+                  blurRadius: 2,
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.2.19+203 - 2026-09-07
+
+- Fixed bulk episode downloads so "Next X" skips watched, downloaded, and
+  already queued episodes while filling the requested batch in reading order.
+- Made queue insertion atomic and non-destructive, restored failed downloads
+  as retryable entries, and prevented cancellation and worker startup failures
+  from leaving later downloads stuck.
+- Added preparation and network timeouts, reliable HLS finalization, and
+  automatic persistent Jimaku subtitle sidecars for offline anime playback.
+- Kept recognized video OCR text visible at 10% opacity so its lookup targets
+  remain discoverable, with stronger text feedback for the selected block.
+
 ## 1.2.18+202 - 2026-09-07
 
 - Rebased Mangatan onto Mangayomi 0.9.2 while preserving the iOS embedded

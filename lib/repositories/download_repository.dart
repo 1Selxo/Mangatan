@@ -19,10 +19,8 @@ class DownloadRepository {
 
   Download? getById(int id) => isar.downloads.getSync(id);
 
-  Stream<List<Download>> watchByChapterId(int? chapterId) => isar.downloads
-      .filter()
-      .idEqualTo(chapterId)
-      .watch(fireImmediately: true);
+  Stream<List<Download>> watchByChapterId(int? chapterId) =>
+      isar.downloads.filter().idEqualTo(chapterId).watch(fireImmediately: true);
 
   List<int> getDownloadedIdsAmong(List<int> chapterIds) => isar.downloads
       .where()
@@ -43,8 +41,10 @@ class DownloadRepository {
       .isDownloadEqualTo(true)
       .count();
 
-  Stream<List<Download>> watchDownloaded() =>
-      isar.downloads.where().isDownloadEqualTo(true).watch(fireImmediately: true);
+  Stream<List<Download>> watchDownloaded() => isar.downloads
+      .where()
+      .isDownloadEqualTo(true)
+      .watch(fireImmediately: true);
 
   Stream<List<Download>> watchPendingStarted() => isar.downloads
       .filter()
@@ -61,6 +61,34 @@ class DownloadRepository {
       .findAll();
 
   // No updatedAt stamping - Download has no such field.
+  /// Append atomically; repeated taps must not reset progress or other entries.
+  Future<void> enqueue(Chapter chapter) => dbWriteQueue.run(() {
+    isar.writeTxnSync(() {
+      final existing = isar.downloads.getSync(chapter.id!);
+      if (existing?.isDownload == true || existing?.isStartDownload == true) {
+        return;
+      }
+      final download =
+          existing ??
+          Download(
+            id: chapter.id,
+            total: 100,
+            succeeded: 0,
+            failed: 0,
+            isDownload: false,
+            isStartDownload: true,
+          );
+      download
+        ..succeeded = 0
+        ..failed = 0
+        ..isDownload = false
+        ..isStartDownload = true
+        ..chapter.value = chapter;
+      isar.downloads.putSync(download);
+      download.chapter.saveSync();
+    });
+  });
+
   Future<void> save(Download download) => dbWriteQueue.run(
     () => isar.writeTxnSync(() => isar.downloads.putSync(download)),
   );

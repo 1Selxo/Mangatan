@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'dart:io';
 import 'dart:async';
 import 'dart:isolate';
+
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/video.dart';
@@ -62,7 +63,7 @@ class M3u8Downloader {
     while (true) {
       try {
         attempts++;
-        return await operation();
+        return await operation().timeout(const Duration(seconds: 30));
       } catch (e) {
         if (attempts >= 3) {
           throw M3u8DownloaderException('Operation failed after 3 attempts', e);
@@ -187,20 +188,25 @@ class M3u8Downloader {
         onProgress(progress);
       },
       onComplete: () async {
-        // Merge the segments after downloading
-        await _mergeSegments(fileName, tempDir, onProgress);
+        try {
+          // Merge the segments after downloading
+          await _mergeSegments(fileName, tempDir, onProgress);
 
-        // Clean up the temporary directory
-        if (await Directory(tempDir).exists()) {
-          try {
-            await Directory(tempDir).delete(recursive: true);
-          } catch (e) {
-            _log('Warning: Failed to clean up temporary directory: $e');
+          // Clean up the temporary directory
+          if (await Directory(tempDir).exists()) {
+            try {
+              await Directory(tempDir).delete(recursive: true);
+            } catch (e) {
+              _log('Warning: Failed to clean up temporary directory: $e');
+            }
           }
-        }
 
-        if (!completer.isCompleted) {
-          completer.complete();
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+        } catch (error, stackTrace) {
+          if (!completer.isCompleted)
+            completer.completeError(error, stackTrace);
         }
       },
       onError: (error) {

@@ -6,9 +6,7 @@ import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/download_repository.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
-import 'package:mangayomi/models/download.dart';
 part 'state_providers.g.dart';
 
 @riverpod
@@ -367,15 +365,12 @@ class ChapterSetDownloadState extends _$ChapterSetDownloadState {
 
   Future<void> set() async {
     ref.read(isLongPressedStateProvider.notifier).update(false);
-    await downloadRepository.transaction(() {
-      for (var chapter in ref.watch(chaptersListStateProvider)) {
-        final entry = downloadRepository.getByChapterId(chapter.id);
-        if (entry == null || !entry.isDownload!) {
-          ref.watch(addDownloadToQueueProvider(chapter: chapter));
-        }
-      }
-    });
-
+    for (final chapter in ref.read(chaptersListStateProvider).toList()) {
+      await downloadRepository.enqueue(chapter);
+    }
+    if (!ref.mounted) return;
+    ref.invalidate(processDownloadsProvider());
+    ref.read(processDownloadsProvider());
     ref.read(chaptersListStateProvider.notifier).clear();
   }
 }
@@ -429,7 +424,9 @@ class ScanlatorsFilterState extends _$ScanlatorsFilterState {
       }
     }
     filterScanlatorList.add(value);
-    settingsRepository.save(settings..filterScanlatorList = filterScanlatorList);
+    settingsRepository.save(
+      settings..filterScanlatorList = filterScanlatorList,
+    );
     state = (_getScanlators(), _getFilterScanlator()!, filterScanlators);
   }
 

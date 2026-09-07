@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:mangayomi/services/download_manager/next_downloads.dart';
+
 import 'package:draggable_menu/draggable_menu.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +15,6 @@ import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -530,8 +531,10 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
     if (chaptersToDownload.isEmpty) return;
 
     for (final chapter in chaptersToDownload) {
-      await ref.read(addDownloadToQueueProvider(chapter: chapter).future);
+      await downloadRepository.enqueue(chapter);
     }
+    if (!mounted) return;
+    ref.invalidate(processDownloadsProvider());
     ref.read(processDownloadsProvider());
   }
 
@@ -763,110 +766,26 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                   ),
                                 ];
                               },
-                              onSelected: (value) {
+                              onSelected: (value) async {
                                 final chapters = widget.manga!
-                                    .getSortedFilteredChapters();
-                                if (value == 0 ||
-                                    value == 1 ||
-                                    value == 2 ||
-                                    value == 3) {
-                                  final lastChapterReadIndex = chapters
-                                      .lastIndexWhere(
-                                        (element) => element.isRead == true,
-                                      );
-                                  if (lastChapterReadIndex == -1 ||
-                                      chapters.length == 1) {
-                                    final chapter = chapters.first;
-                                    final entry = isar.downloads
-                                        .filter()
-                                        .idEqualTo(chapter.id)
-                                        .findFirstSync();
-                                    if (entry == null || !entry.isDownload!) {
-                                      ref.watch(
-                                        addDownloadToQueueProvider(
-                                          chapter: chapter,
-                                        ),
-                                      );
-                                      ref.watch(processDownloadsProvider());
-                                    }
-                                  } else {
-                                    final length = switch (value) {
-                                      0 => 1,
-                                      1 => 5,
-                                      2 => 10,
-                                      _ => 25,
-                                    };
-                                    for (var i = 1; i < length + 1; i++) {
-                                      if (chapters.length > 1 &&
-                                          chapters.elementAtOrNull(
-                                                lastChapterReadIndex + i,
-                                              ) !=
-                                              null) {
-                                        final chapter =
-                                            chapters[lastChapterReadIndex + i];
-                                        final entry = isar.downloads
-                                            .filter()
-                                            .idEqualTo(chapter.id)
-                                            .findFirstSync();
-                                        if (entry == null ||
-                                            !entry.isDownload!) {
-                                          ref.watch(
-                                            addDownloadToQueueProvider(
-                                              chapter: chapter,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    }
-                                    ref.watch(processDownloadsProvider());
-                                  }
-                                } else if (value == 4) {
-                                  final List<Chapter> unreadChapters = widget
-                                      .manga!
-                                      .getSortedFilteredChapters()
-                                      .where(
-                                        (element) => !(element.isRead ?? false),
+                                    .getFilteredChapters();
+                                final selected = value <= 3
+                                    ? selectNextDownloads(
+                                        chapters,
+                                        count: [1, 5, 10, 25][value],
+                                        downloads: downloadRepository.getAll(),
                                       )
-                                      .toList();
-                                  isar.chapters
-                                      .filter()
-                                      .idIsNotNull()
-                                      .mangaIdEqualTo(widget.manga!.id!)
-                                      .isReadEqualTo(false)
-                                      .findAllSync();
-                                  for (var chapter in unreadChapters) {
-                                    final entry = isar.downloads
-                                        .filter()
-                                        .idEqualTo(chapter.id)
-                                        .findFirstSync();
-                                    if (entry == null || !entry.isDownload!) {
-                                      ref.watch(
-                                        addDownloadToQueueProvider(
-                                          chapter: chapter,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                  ref.watch(processDownloadsProvider());
-                                } else if (value == 5) {
-                                  final List<Chapter> allChapters = widget
-                                      .manga!
-                                      .getSortedFilteredChapters();
-                                  for (var chapter in allChapters) {
-                                    final entry = isar.downloads
-                                        .filter()
-                                        .idEqualTo(chapter.id)
-                                        .findFirstSync();
-                                    if (entry == null || !entry.isDownload!) {
-                                      ref.watch(
-                                        addDownloadToQueueProvider(
-                                          chapter: chapter,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                  ref.watch(processDownloadsProvider());
-                                }
+                                    : chapters
+                                          .where(
+                                            (chapter) =>
+                                                value == 5 ||
+                                                chapter.isRead != true,
+                                          )
+                                          .toList();
+                                await _downloadChaptersWithDestination(
+                                  context,
+                                  selected,
+                                );
                               },
                             ),
                           ],
@@ -1386,22 +1305,12 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                       selectedLocalOverlayChapters.isEmpty)
                     BottomSelectButton(
                       icon: Icon(Icons.download_outlined, color: color),
-                      onPressed: () {
-                        for (var chapter in ref.watch(
-                          chaptersListStateProvider,
-                        )) {
-                          final entries = isar.downloads
-                              .filter()
-                              .idEqualTo(chapter.id)
-                              .findAllSync();
-                          if (entries.isEmpty || !entries.first.isDownload!) {
-                            ref.read(
-                              addDownloadToQueueProvider(chapter: chapter),
-                            );
-                          }
-                        }
-                        ref.watch(processDownloadsProvider());
-
+                      onPressed: () async {
+                        await _downloadChaptersWithDestination(
+                          context,
+                          ref.read(chaptersListStateProvider).toList(),
+                        );
+                        if (!mounted) return;
                         ref
                             .read(isLongPressedStateProvider.notifier)
                             .update(false);

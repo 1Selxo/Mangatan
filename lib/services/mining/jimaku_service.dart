@@ -88,6 +88,8 @@ class JimakuSubtitleService {
   static const _baseUrl = 'https://jimaku.cc/api';
   final http.Client _client;
 
+  void close() => _client.close();
+
   Future<List<JimakuEntry>> searchEntries({
     required String apiKey,
     required String query,
@@ -177,9 +179,8 @@ class JimakuSubtitleService {
     required String query,
     required bool anime,
   }) async {
-    final uri = Uri.parse(
-      '$_baseUrl/entries/search',
-    ).replace(queryParameters: {'anime': anime.toString(), 'query': query});
+    final uri = Uri.parse('$_baseUrl/entries/search')
+        .replace(queryParameters: {'anime': anime.toString(), 'query': query});
     final response = await _client.get(uri, headers: _headers(apiKey));
     _throwIfBad(response);
     return (jsonDecode(response.body) as List)
@@ -208,9 +209,8 @@ class _JimakuEpisodeNumbers {
 }
 
 JimakuMediaGuess? guessJimakuMedia(String value) {
-  final withoutExtension = _toJimakuFilename(
-    value,
-  ).replaceAll(_knownExtensionRegex, '');
+  final withoutExtension = _toJimakuFilename(value)
+      .replaceAll(_knownExtensionRegex, '');
   final season = _firstNumber(_seasonRegexes, withoutExtension);
   final episodeNumbers = _jimakuEpisodeNumbers(withoutExtension);
   final title = _cleanJimakuTitleCandidate(

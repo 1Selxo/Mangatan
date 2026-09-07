@@ -44,11 +44,7 @@ class _DownloadQueueScreenState extends ConsumerState<DownloadQueueScreen> {
             .toList();
         final queued = DownloadQueueOrder.sorted(
           resolved
-              .where(
-                (entry) =>
-                    !(entry.download.isDownload ?? false) &&
-                    (entry.download.isStartDownload ?? false),
-              )
+              .where((entry) => !(entry.download.isDownload ?? false))
               .map((entry) => entry.download)
               .toList(),
         );
@@ -83,7 +79,17 @@ class _DownloadQueueScreenState extends ConsumerState<DownloadQueueScreen> {
                 : CustomFloatingActionBtn(
                     isExtended: false,
                     label: l10n.download_queue,
-                    onPressed: () => ref.read(processDownloadsProvider()),
+                    onPressed: () async {
+                      for (final entry in queued) {
+                        final chapter = entry.chapter.value;
+                        if (chapter != null) {
+                          await downloadRepository.enqueue(chapter);
+                        }
+                      }
+                      if (!mounted) return;
+                      ref.invalidate(processDownloadsProvider());
+                      ref.read(processDownloadsProvider());
+                    },
                   ),
           ),
         );
@@ -203,7 +209,9 @@ class _DownloadQueueScreenState extends ConsumerState<DownloadQueueScreen> {
                       style: const TextStyle(fontSize: 16),
                     ),
                     Text(
-                      "${element.succeeded}/${element.total}",
+                      (element.failed ?? 0) > 0
+                          ? 'Failed — retry'
+                          : '${element.succeeded ?? 0}%',
                       style: const TextStyle(fontSize: 10),
                     ),
                   ],

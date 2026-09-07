@@ -1,4 +1,8 @@
 import 'dart:developer';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 import 'dart:io';
 import 'dart:async';
 import 'dart:isolate';
@@ -6,7 +10,6 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/video.dart';
-import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/http/rhttp/src/model/settings.dart';
 import 'package:mangayomi/services/download_manager/m3u8/models/download.dart';
@@ -41,7 +44,7 @@ class M3u8Downloader {
     required this.fileName,
     this.headers,
     required this.chapter,
-    this.concurrentDownloads = 1,
+    this.concurrentDownloads = 4,
     required this.subtitles,
     this.subDownloadDir,
   });
@@ -92,19 +95,26 @@ class M3u8Downloader {
   }
 
   Future<void> download(void Function(DownloadProgress) onProgress) async {
-    final tempName =
-        '.tmp_${chapter.name!.replaceForbiddenCharacters('_').trim()}_${chapter.id ?? chapter.url.hashCode}';
-    final tempDir = path.join(downloadDir, tempName);
-    await StorageProvider().createDirectorySafely(tempDir);
+    // Do not repeat the episode title: Windows directory enumeration can fail
+    // on the resulting long path even when segment writes succeeded.
+    final tempDir = path.join(
+      path.dirname(fileName),
+      m3u8TempDirectoryName('${chapter.id}:$m3u8Url'),
+    );
+    await Directory(tempDir).create(recursive: true);
 
     try {
       final (tsList, key, iv, mediaSequence) = await _getTsList();
 
+      if (tsList.isEmpty) {
+        throw M3u8DownloaderException('Playlist contains no media segments');
+      }
       final tsListToDownload = await _filterExistingSegments(tsList, tempDir);
       _log('Downloading ${tsListToDownload.length} segments...');
 
       await _downloadSegmentsWithProgress(
         tsListToDownload,
+        tsList.length,
         tempDir,
         key,
         iv,
@@ -155,13 +165,15 @@ class M3u8Downloader {
     List<TsInfo> tsList,
     String tempDir,
   ) async {
-    return tsList
-        .where((ts) => !File(path.join(tempDir, '${ts.name}.ts')).existsSync())
-        .toList();
+    return tsList.where((ts) {
+      final file = File(path.join(tempDir, '${ts.name}.ts'));
+      return !file.existsSync() || file.lengthSync() == 0;
+    }).toList();
   }
 
   Future<void> _downloadSegmentsWithProgress(
     List<TsInfo> segments,
+    int totalSegments,
     String tempDir,
     Uint8List? key,
     Uint8List? iv,
@@ -185,12 +197,19 @@ class M3u8Downloader {
       headers: headers,
       itemType: chapter.manga.value!.itemType,
       onProgress: (progress) {
-        onProgress(progress);
+        onProgress(
+          DownloadProgress(
+            totalSegments - segments.length + progress.completed,
+            totalSegments,
+            progress.itemType,
+            segment: progress.segment,
+          ),
+        );
       },
       onComplete: () async {
         try {
           // Merge the segments after downloading
-          await _mergeSegments(fileName, tempDir, onProgress);
+          await _mergeSegments(fileName, tempDir, totalSegments, onProgress);
 
           // Clean up the temporary directory
           if (await Directory(tempDir).exists()) {
@@ -222,11 +241,12 @@ class M3u8Downloader {
   Future<void> _mergeSegments(
     String outputFile,
     String tempDir,
+    int totalSegments,
     void Function(DownloadProgress) onProgress,
   ) async {
     _log('Merging segments...');
     try {
-      await _mergeTsToMp4(outputFile, tempDir);
+      await _mergeTsToMp4(outputFile, tempDir, totalSegments);
       onProgress.call(
         DownloadProgress(
           1,
@@ -241,34 +261,13 @@ class M3u8Downloader {
     }
   }
 
-  Future<void> _mergeTsToMp4(String fileName, String directory) async {
+  Future<void> _mergeTsToMp4(
+    String fileName,
+    String directory,
+    int total,
+  ) async {
     try {
-      // Sustained file I/O — run in a worker isolate so merging a long
-      // episode doesn't stall the UI thread after the download finishes.
-      await Isolate.run(() async {
-        final dir = Directory(directory);
-        final files = await dir
-            .list()
-            .where((entity) => entity.path.endsWith('.ts'))
-            .toList();
-
-        files.sort((a, b) {
-          final aIndex = int.parse(
-            a.path.substringAfter("TS_").substringBefore("."),
-          );
-          final bIndex = int.parse(
-            b.path.substringAfter("TS_").substringBefore("."),
-          );
-          return aIndex.compareTo(bIndex);
-        });
-
-        final outFile = File(fileName).openWrite();
-        for (var file in files) {
-          final inFile = File(file.path).openRead();
-          await outFile.addStream(inFile);
-        }
-        await outFile.close();
-      });
+      await Isolate.run(() => mergeM3u8Segments(fileName, directory, total));
     } catch (e) {
       throw M3u8DownloaderException('Failed to merge TS files', e);
     }
@@ -434,4 +433,36 @@ class M3u8DownloaderException implements Exception {
   @override
   String toString() =>
       'M3u8DownloaderException: $message${originalError != null ? ' ($originalError)' : ''}';
+}
+
+/// Short, source-specific name prevents long Windows paths and mixing variants.
+String m3u8TempDirectoryName(String url) =>
+    '.tmp_hls_${sha256.convert(utf8.encode(url)).toString().substring(0, 16)}';
+
+Future<void> mergeM3u8Segments(
+  String output,
+  String directory,
+  int total,
+) async {
+  if (total <= 0) throw StateError('No segments to merge');
+  final partial = File('$output.part');
+  final sink = partial.openWrite();
+  try {
+    try {
+      for (var index = 1; index <= total; index++) {
+        final file = File(path.join(directory, 'TS_$index.ts'));
+        if (!await file.exists() || await file.length() == 0) {
+          throw StateError('Missing or empty segment $index');
+        }
+        await sink.addStream(file.openRead());
+      }
+      await sink.flush();
+    } finally {
+      await sink.close();
+    }
+    await partial.rename(output);
+  } catch (_) {
+    if (await partial.exists()) await partial.delete();
+    rethrow;
+  }
 }

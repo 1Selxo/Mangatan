@@ -486,7 +486,7 @@ void _workerEntryPoint(SendPort mainPort) async {
             httpClient,
           );
         } else if (message.type == _TaskType.m3u8Download) {
-          await _processM3u8Download(
+          await processM3u8Download(
             message.params as M3u8DownloadParams,
             message.replyPort,
             httpClient,
@@ -662,7 +662,7 @@ Future<void> _downloadFile(
 }
 
 /// Process an M3U8 download
-Future<void> _processM3u8Download(
+Future<void> processM3u8Download(
   M3u8DownloadParams params,
   SendPort replyPort,
   Client client,
@@ -670,47 +670,31 @@ Future<void> _processM3u8Download(
   int completed = 0;
   final total = params.segments.length;
   final queue = Queue<TsInfo>.from(params.segments);
-  final List<Future<void>> activeTasks = [];
-
-  try {
-    while (queue.isNotEmpty || activeTasks.isNotEmpty) {
-      while (queue.isNotEmpty &&
-          activeTasks.length < params.concurrentDownloads) {
-        final segment = queue.removeFirst();
-        final task = _downloadSegment(segment, params, client)
-            .then((_) {
-              completed++;
-              replyPort.send(
-                DownloadProgress(
-                  segment: segment,
-                  completed,
-                  total,
-                  params.itemType,
-                ),
-              );
-            })
-            .catchError((error) {
-              replyPort.send(
-                DownloadPoolException(
-                  'Error downloading segment ${segment.name}',
-                  error,
-                ),
-              );
-              throw error;
-            });
-
-        activeTasks.add(task);
-      }
-
-      if (activeTasks.isNotEmpty) {
-        await Future.wait(activeTasks.toList(), eagerError: true);
-        activeTasks.clear();
+  Object? failure;
+  Future<void> worker() async {
+    while (queue.isNotEmpty && failure == null) {
+      final segment = queue.removeFirst();
+      try {
+        await _downloadSegment(segment, params, client);
+        completed++;
+        replyPort.send(
+          DownloadProgress(completed, total, params.itemType, segment: segment),
+        );
+      } catch (error) {
+        failure ??= error;
       }
     }
+  }
 
+  // Refill each slot immediately; a slow segment must not hold up a batch.
+  // Settle all writers before reporting failure or reusing this worker.
+  await Future.wait(
+    List.generate(params.concurrentDownloads.clamp(1, 8), (_) => worker()),
+  );
+  if (failure != null) {
+    replyPort.send(DownloadPoolException('M3U8 download failed', failure));
+  } else {
     replyPort.send(DownloadComplete());
-  } catch (e) {
-    replyPort.send(DownloadPoolException('M3U8 download failed', e));
   }
 }
 
@@ -720,65 +704,60 @@ Future<void> _downloadSegment(
   M3u8DownloadParams params,
   Client client,
 ) async {
+  final file = File(path.join(params.tempDir, '${ts.name}.ts'));
+  final partial = File('${file.path}.part');
   try {
-    final file = File(path.join(params.tempDir, '${ts.name}.ts'));
-
-    // Connection/response-headers timeout so a dropped connection can't hang
-    // the segment forever (see _downloadFile) — retry, then fail loudly.
-    StreamedResponse response = await _withRetry(() {
-      // A package:http Request is finalized by Client.send. Retrying the
-      // same instance fails before it reaches the server, so create a fresh
-      // request for every attempt.
-      final request = Request('GET', Uri.parse(ts.url));
-      request.headers.addAll(params.headers ?? {});
-      // HLS players request byte ranges for their media segments. Sending the
-      // equivalent open-ended range keeps source-side handling consistent with
-      // playback while still accepting either a 200 or 206 response below.
-      if (!request.headers.keys.any(
-        (name) => name.toLowerCase() == HttpHeaders.rangeHeader,
-      )) {
-        request.headers[HttpHeaders.rangeHeader] = 'bytes=0-';
+    await _withRetry(() async {
+      try {
+        final request = Request('GET', Uri.parse(ts.url));
+        request.headers.addAll(params.headers ?? {});
+        if (!request.headers.keys.any(
+          (name) => name.toLowerCase() == HttpHeaders.rangeHeader,
+        )) {
+          request.headers[HttpHeaders.rangeHeader] = 'bytes=0-';
+        }
+        final response = await client
+            .send(request)
+            .timeout(const Duration(seconds: 30));
+        if (response.statusCode != 200 && response.statusCode != 206) {
+          await response.stream.listen((_) {}).cancel();
+          throw DownloadPoolException(
+            'Failed to download segment: ${ts.name} (status ${response.statusCode})',
+          );
+        }
+        final sink = partial.openWrite();
+        try {
+          await sink.addStream(
+            response.stream.timeout(const Duration(seconds: 30)),
+          );
+          await sink.flush();
+        } finally {
+          await sink.close();
+        }
+        final length = await partial.length();
+        if (length == 0 ||
+            (response.contentLength != null &&
+                length != response.contentLength)) {
+          throw DownloadPoolException('Incomplete segment: ${ts.name}');
+        }
+        if (params.key != null) {
+          final bytes = await partial.readAsBytes();
+          final index = int.parse(ts.name.substringAfter('TS_'));
+          final decrypted = _aesDecrypt(
+            (params.mediaSequence ?? 0) + index - 1,
+            bytes,
+            params.key!,
+            iv: params.iv,
+          );
+          await partial.writeAsBytes(decrypted);
+        }
+        // Only complete, decrypted segments may be reused after a retry.
+        await partial.rename(file.path);
+      } catch (_) {
+        if (await partial.exists()) await partial.delete();
+        rethrow;
       }
-      return client.send(request).timeout(const Duration(seconds: 30));
     }, 3);
-
-    // Accept any 2xx (including 206 Partial Content) — see comment in
-    // _downloadFile.
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw DownloadPoolException(
-        'Failed to download segment: ${ts.name} (status ${response.statusCode})',
-      );
-    }
-
-    final sink = file.openWrite();
-    try {
-      // Idle timeout: a segment whose connection stalls (no bytes for 30s)
-      // fails and retries instead of hanging the whole download forever.
-      await for (var chunk in response.stream.timeout(
-        const Duration(seconds: 30),
-        onTimeout: (sink) => sink.addError(
-          TimeoutException('Segment stalled (no data for 30s)'),
-        ),
-      )) {
-        sink.add(chunk);
-      }
-    } finally {
-      await sink.flush();
-      await sink.close();
-    }
-
-    // Decrypt if necessary
-    if (params.key != null) {
-      final bytes = await file.readAsBytes();
-      final index = int.parse(ts.name.substringAfter("TS_"));
-      final decrypted = _aesDecrypt(
-        (params.mediaSequence ?? 1) + (index - 1),
-        bytes,
-        params.key!,
-        iv: params.iv,
-      );
-      await file.writeAsBytes(decrypted);
-    }
   } catch (e) {
     throw DownloadPoolException('Failed to process segment: ${ts.name}', e);
   }

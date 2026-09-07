@@ -65,42 +65,46 @@ void main() {
             paragraph.localToGlobal(Offset(0, paragraph.size.height)).dy -
                 paragraph.localToGlobal(Offset.zero).dy,
           );
-      expect(displayed.width, lessThanOrEqualTo(width - 20 + 0.01));
-      expect(displayed.height, lessThanOrEqualTo(188.01));
+      expect(displayed.width, lessThanOrEqualTo(width - 4 + 0.01));
+      expect(displayed.height, lessThanOrEqualTo(196.01));
       expect(
-        (displayed.width - (width - 20)).abs() < 0.1 ||
-            (displayed.height - 188).abs() < 0.1,
+        (displayed.width - (width - 4)).abs() < 0.1 ||
+            (displayed.height - 196).abs() < 0.1,
         isTrue,
       );
-      expect(paragraph.text.style!.color, Colors.white);
+      expect(paragraph.text.style!.color, Colors.white.withValues(alpha: 0.10));
+      expect(paragraph.text.style!.backgroundColor, isNull);
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('matched word has a contrasting highlight', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SizedBox(
-          width: 700,
-          height: 200,
-          child: VideoOcrText(
-            block: block,
-            selected: true,
-            selectionOffset: 4,
-            matchLength: 2,
-            onLookup: (_, _) {},
+  testWidgets(
+    'selected text preserves the original opacity without a solid highlight',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox(
+            width: 700,
+            height: 200,
+            child: VideoOcrText(
+              block: block,
+              selected: true,
+              selectionOffset: 4,
+              matchLength: 2,
+              onLookup: (_, _) {},
+            ),
           ),
         ),
-      ),
-    );
-    final paragraph = tester.renderObject<RenderParagraph>(
-      find.byType(RichText).last,
-    );
-    final spans = (paragraph.text as TextSpan).children!.cast<TextSpan>();
-    final highlighted = spans.singleWhere(
-      (span) => span.style?.backgroundColor == Colors.amber,
-    );
-    expect(highlighted.text, '航路');
-    expect(highlighted.style!.color, Colors.black);
-  });
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.byType(RichText).last,
+      );
+      final spans = (paragraph.text as TextSpan).children!.cast<TextSpan>();
+      expect(paragraph.text.style!.color, Colors.white.withValues(alpha: 0.75));
+      expect(
+        spans.every((span) => span.style?.backgroundColor == null),
+        isTrue,
+      );
+    },
+  );
 }

@@ -727,11 +727,7 @@ class VideoOcrText extends StatelessWidget {
     return Center(
       child: Container(
         constraints: const BoxConstraints.expand(),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(6),
-        ),
+        padding: const EdgeInsets.all(2),
         child: FittedBox(
           fit: BoxFit.contain,
           child: GestureDetector(
@@ -754,23 +750,25 @@ class VideoOcrText extends StatelessWidget {
               textDirection: TextDirection.ltr,
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: selected ? 0.75 : 0.10),
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(
+                        alpha: selected ? 0.75 : 0.10,
+                      ),
+                      blurRadius: 2,
+                    ),
+                  ],
                 ),
                 children: [
                   if (start == null)
                     TextSpan(text: text)
                   else ...[
                     TextSpan(text: text.substring(0, start)),
-                    TextSpan(
-                      text: text.substring(start, end),
-                      style: const TextStyle(
-                        color: Colors.black,
-                        backgroundColor: Colors.amber,
-                      ),
-                    ),
+                    TextSpan(text: text.substring(start, end)),
                     TextSpan(text: text.substring(end)),
                   ],
                 ],

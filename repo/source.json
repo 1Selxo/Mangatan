@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.19",
-      "versionDate": "2026-09-07T04:03:55Z",
+      "version": "1.2.20",
+      "versionDate": "2026-09-07T16:53:59Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.19/Mangatan-v1.2.19-build.203-bd5c994-ios.ipa",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.20/Mangatan-v1.2.20-build.204-8aebf1a-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 179029356,
+      "size": 179039686,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.20",
+          "date": "2026-09-07T16:53:59Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.20/Mangatan-v1.2.20-build.204-8aebf1a-ios.ipa",
+          "size": 179039686
+        },
+        {
           "version": "1.2.19",
           "date": "2026-09-07T04:03:55Z",
-          "localizedDescription": "",
+          "localizedDescription": "1.2.19+203 \u2022 2026\u202209\u202207\r\n\r\n\u2022 Fixed bulk episode downloads so \"Next X\" skips watched, downloaded, and\r\n  already queued episodes while filling the requested batch in reading order.\r\n\u2022 Made queue insertion atomic and non\u2022destructive, restored failed downloads\r\n  as retryable entries, and prevented cancellation and worker startup failures\r\n  from leaving later downloads stuck.\r\n\u2022 Added preparation and network timeouts, reliable HLS finalization, and\r\n  automatic persistent Jimaku subtitle sidecars for offline anime playback.\r\n\u2022 Kept recognized video OCR text visible at 10% opacity so its lookup targets\r\n  remain discoverable, with stronger text feedback for the selected block.\r\n",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.19/Mangatan-v1.2.19-build.203-bd5c994-ios.ipa",
           "size": 179029356
         },
@@ -333,6 +340,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.19"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.20 - 07 Sep",
+      "identifier": "release-1.2.20",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-09-07T16:53:59Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.20"
     }
   ]
 }

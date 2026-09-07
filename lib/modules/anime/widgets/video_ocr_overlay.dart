@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/generated_ocr.dart';
@@ -132,16 +133,14 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
     OcrTextBlock block,
     Rect rect,
     Offset position,
+    int textOffset,
   ) async {
     final renderBox = context.findRenderObject();
-    final localPosition = renderBox is RenderBox
-        ? renderBox.globalToLocal(position)
-        : position;
     final anchorOrigin = renderBox is RenderBox
         ? renderBox.localToGlobal(rect.topLeft)
         : rect.topLeft;
     final anchor = anchorOrigin & rect.size;
-    final selection = _videoOcrSelectionAtPosition(block, rect, localPosition);
+    final selection = _videoOcrSelectionAtOffset(block, textOffset);
     if (selection.text.isEmpty) return;
     _popup?.dismiss();
     setState(() => _selection = selection);
@@ -237,12 +236,6 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTapDown: (details) => _lookup(
-                          context,
-                          item.block,
-                          item.rect,
-                          details.globalPosition,
-                        ),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 100),
                           decoration: BoxDecoration(
@@ -260,8 +253,20 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay> {
                                   : 1,
                             ),
                           ),
-                          child: _VideoOcrText(
+                          child: VideoOcrText(
                             block: item.block,
+                            selectionOffset:
+                                identical(_selection?.block, item.block)
+                                ? _selection?.offset
+                                : null,
+                            matchLength: _selection?.matchLength ?? 0,
+                            onLookup: (offset, position) => _lookup(
+                              context,
+                              item.block,
+                              item.rect,
+                              position,
+                              offset,
+                            ),
                             selected: identical(_selection?.block, item.block),
                           ),
                         ),
@@ -455,16 +460,14 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
     OcrTextBlock block,
     Rect rect,
     Offset position,
+    int textOffset,
   ) async {
     final renderBox = context.findRenderObject();
-    final localPosition = renderBox is RenderBox
-        ? renderBox.globalToLocal(position)
-        : position;
     final anchorOrigin = renderBox is RenderBox
         ? renderBox.localToGlobal(rect.topLeft)
         : rect.topLeft;
     final anchor = anchorOrigin & rect.size;
-    final selection = _videoOcrSelectionAtPosition(block, rect, localPosition);
+    final selection = _videoOcrSelectionAtOffset(block, textOffset);
     if (selection.text.isEmpty) return;
     _popup?.dismiss();
     setState(() => _selection = selection);
@@ -564,12 +567,6 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
                         cursor: SystemMouseCursors.click,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTapDown: (details) => _lookup(
-                            context,
-                            item.block,
-                            item.rect,
-                            details.globalPosition,
-                          ),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 100),
                             decoration: BoxDecoration(
@@ -589,8 +586,20 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
                                     : 1,
                               ),
                             ),
-                            child: _VideoOcrText(
+                            child: VideoOcrText(
                               block: item.block,
+                              selectionOffset:
+                                  identical(_selection?.block, item.block)
+                                  ? _selection?.offset
+                                  : null,
+                              matchLength: _selection?.matchLength ?? 0,
+                              onLookup: (offset, position) => _lookup(
+                                context,
+                                item.block,
+                                item.rect,
+                                position,
+                                offset,
+                              ),
                               selected: identical(
                                 _selection?.block,
                                 item.block,
@@ -669,37 +678,103 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay> {
   }
 }
 
-@visibleForTesting
-double videoOcrTextOpacity({required bool selected}) => selected ? 0.75 : 0.10;
-
-class _VideoOcrText extends StatelessWidget {
-  const _VideoOcrText({required this.block, required this.selected});
+/// The displayed text and lookup hit targets share the same paragraph layout.
+class VideoOcrText extends StatelessWidget {
+  const VideoOcrText({
+    super.key,
+    required this.block,
+    required this.selected,
+    required this.onLookup,
+    this.selectionOffset,
+    this.matchLength = 0,
+  });
 
   final OcrTextBlock block;
   final bool selected;
+  final int? selectionOffset;
+  final int matchLength;
+  final void Function(int offset, Offset position) onLookup;
 
   @override
   Widget build(BuildContext context) {
-    final text = block.text.trim();
+    final lines = block.lines.where((line) => line.trim().isNotEmpty).toList();
+    final text = lines.join('\n');
     if (text.isEmpty) return const SizedBox.shrink();
-    final opacity = videoOcrTextOpacity(selected: selected);
-    return IgnorePointer(
-      child: Padding(
-        padding: const EdgeInsets.all(2),
+    // Inserted display line breaks are not part of the mining sentence.
+    final sentenceOffsets = <int>[];
+    var sentenceOffset = 0;
+    for (var line = 0; line < lines.length; line++) {
+      if (line > 0) sentenceOffsets.add(sentenceOffset);
+      for (var i = 0; i < lines[line].length; i++) {
+        sentenceOffsets.add(sentenceOffset++);
+      }
+    }
+    sentenceOffsets.add(sentenceOffset);
+    final paragraphKey = GlobalKey();
+    final start = selectionOffset == null
+        ? null
+        : sentenceOffsets.lastIndexOf(
+            selectionOffset!.clamp(0, sentenceOffset),
+          );
+    final end = start == null
+        ? 0
+        : sentenceOffsets.indexOf(
+            (selectionOffset! + (matchLength > 0 ? matchLength : 1)).clamp(
+              0,
+              sentenceOffset,
+            ),
+          );
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints.expand(),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(6),
+        ),
         child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: opacity),
-              fontWeight: FontWeight.w600,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: opacity),
-                  blurRadius: 2,
+          fit: BoxFit.contain,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: (details) {
+              final paragraph = paragraphKey.currentContext?.findRenderObject();
+              if (paragraph is! RenderParagraph) return;
+              final offset = paragraph
+                  .getPositionForOffset(
+                    paragraph.globalToLocal(details.globalPosition),
+                  )
+                  .offset;
+              onLookup(
+                sentenceOffsets[offset.clamp(0, text.length - 1)],
+                details.globalPosition,
+              );
+            },
+            child: RichText(
+              key: paragraphKey,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
+                children: [
+                  if (start == null)
+                    TextSpan(text: text)
+                  else ...[
+                    TextSpan(text: text.substring(0, start)),
+                    TextSpan(
+                      text: text.substring(start, end),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        backgroundColor: Colors.amber,
+                      ),
+                    ),
+                    TextSpan(text: text.substring(end)),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
@@ -780,19 +855,15 @@ class _VideoOcrSelection {
   );
 }
 
-_VideoOcrSelection _videoOcrSelectionAtPosition(
+_VideoOcrSelection _videoOcrSelectionAtOffset(
   OcrTextBlock block,
-  Rect rect,
-  Offset globalPosition,
+  int textOffset,
 ) {
   final text = block.sentence;
-  if (text.isEmpty || rect.isEmpty) {
+  if (text.isEmpty) {
     return _VideoOcrSelection(block: block, text: '', offset: 0);
   }
-  final ratio = block.vertical
-      ? ((globalPosition.dy - rect.top) / rect.height).clamp(0.0, 0.999)
-      : ((globalPosition.dx - rect.left) / rect.width).clamp(0.0, 0.999);
-  var offset = (ratio * text.length).floor().clamp(0, text.length - 1);
+  var offset = textOffset.clamp(0, text.length - 1);
   while (offset < text.length && _isLookupBoundary(text[offset])) {
     offset++;
   }

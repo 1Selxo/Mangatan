@@ -622,6 +622,10 @@ Future<void> restoreBackup(
   Map<String, bool> categoryDecisions = const {},
   Map<String, int> sourceDecisions = const {},
 }) async {
+  // This provider is awaited through ref.read(...future) by doRestore. Keep
+  // the nested operation alive until the database restore and state
+  // invalidation have both completed.
+  ref.keepAlive();
   final version = backup['version'];
   if (["1", "2"].any((e) => e == version)) {
     try {
@@ -963,6 +967,9 @@ ItemType _convertToItemTypeCategory(Map<String, dynamic> backup) {
 
 @riverpod
 Future<void> restoreKotatsuBackup(Ref ref, Archive archive) async {
+  // This provider is awaited through ref.read(...future) by doRestore. Keep
+  // the nested operation alive until the restore has finished using ref.
+  ref.keepAlive();
   try {
     for (var f in archive.files) {
       List<Category> cats = [];
@@ -1043,6 +1050,10 @@ Future<void> restoreTachiBkBackup(
   Map<String, bool> categoryDecisions = const {},
   Map<String, int> sourceDecisions = const {},
 }) async {
+  // doRestore awaits this nested auto-dispose provider through
+  // ref.read(...future). Without an explicit keep-alive, Riverpod can dispose
+  // it during the restore and invalidate Ref before the final import steps.
+  ref.keepAlive();
   final inputStream = InputFileStream(path);
   late final DecodedChimahonSync decoded;
   try {

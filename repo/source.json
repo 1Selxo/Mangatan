@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.20",
-      "versionDate": "2026-09-07T16:53:59Z",
+      "version": "1.2.21",
+      "versionDate": "2026-09-12T08:41:43Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.20/Mangatan-v1.2.20-build.204-8aebf1a-ios.ipa",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21-beta.1/Mangatan-v1.2.21-beta.1-build.205-6f6c54a-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 179039686,
+      "size": 179041650,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,16 @@
       ],
       "versions": [
         {
+          "version": "1.2.21",
+          "date": "2026-09-12T08:41:43Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21-beta.1/Mangatan-v1.2.21-beta.1-build.205-6f6c54a-ios.ipa",
+          "size": 179041650
+        },
+        {
           "version": "1.2.20",
           "date": "2026-09-07T16:53:59Z",
-          "localizedDescription": "",
+          "localizedDescription": "Anime download fixes\n\n\u2022 Fixed Windows merge failures caused by temporary paths containing long episode titles.\n\u2022 Increased HLS downloads from one to four concurrent segments, with available slots refilled immediately so a slow segment does not block the others.\n\u2022 Added retries for failed HTTP responses and interrupted segment transfers.\n\u2022 Prevented incomplete segments from being reused when retrying a download.\n\u2022 Isolated temporary files by episode and stream URL to prevent mixing segments from different fallback streams.\n\u2022 Made merging verify all expected segments and preserve the existing output if merging fails.\n\u2022 Corrected progress reporting when resuming downloaded segments.\n\u2022 Corrected the default AES\u2022128 sequence number for playlists without an explicit media sequence.\n\nValidation\n\n\u2022 All 16 focused download and embedded\u2022bridge regression tests passed. Local tests temporarily bypassed an unrelated Windows native\u2022image build hook, which was restored afterward.\n\u2022 Desktop release and iOS IPA builds completed successfully on GitHub Actions.\n\u2022 Actual Anichi download speed and reliability still require testing in the released app.\n\nVersion: **1.2.20+204**\r\n",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.20/Mangatan-v1.2.20-build.204-8aebf1a-ios.ipa",
           "size": 179039686
         },
@@ -351,6 +358,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.20"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.21-beta.1 - 12 Sep",
+      "identifier": "release-1.2.21-beta.1",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-09-12T08:41:43Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.21-beta.1"
     }
   ]
 }

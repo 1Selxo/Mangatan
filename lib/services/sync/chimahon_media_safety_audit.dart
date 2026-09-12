@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
@@ -35,6 +36,11 @@ class ChimahonMediaSafetyAudit {
     required void Function(String, Iterable<String>) fail,
     required void Function(String, Iterable<String>) observe,
   }) {
+    local = local.deepCopy()
+      ..backupAnime.clear()
+      ..backupAnime.addAll(
+        rebaseChimahonSeasonIds(local.backupAnime, remote.backupAnime),
+      );
     _auditDuplicateIdentities(
       label: 'remote',
       backup: remote,
@@ -143,6 +149,7 @@ class ChimahonMediaSafetyAudit {
           .map(mangaIdentity),
     );
 
+    final localSeasonParents = chimahonSeasonParents(local.backupAnime);
     final remoteLegacyAnimeBytes = {
       for (final anime in remote.backupAnime)
         if (_isLegacyAnimeTombstone(anime)) base64Encode(anime.writeToBuffer()),
@@ -151,6 +158,7 @@ class ChimahonMediaSafetyAudit {
       'local_anime_tombstone_deletion_clock_missing',
       local.backupAnime
           .where(_isLegacyAnimeTombstone)
+          .where((anime) => !localSeasonParents.containsKey(anime))
           .where(
             (anime) => !remoteLegacyAnimeBytes.contains(
               base64Encode(anime.writeToBuffer()),
@@ -196,14 +204,12 @@ class ChimahonMediaSafetyAudit {
     for (final manga in backup.backupManga) {
       final parentKey = mangaIdentity(manga);
       duplicateChapters.addAll(
-        _duplicateSurplus(
-          manga.chapters.map(_rawChapterIdentity),
-        ).map((key) => _join([parentKey, key])),
+        _duplicateSurplus(manga.chapters.map(_rawChapterIdentity))
+            .map((key) => _join([parentKey, key])),
       );
       duplicateMangaHistory.addAll(
-        _duplicateSurplus(
-          manga.history.map((history) => history.url),
-        ).map((key) => _join([parentKey, key])),
+        _duplicateSurplus(manga.history.map((history) => history.url))
+            .map((key) => _join([parentKey, key])),
       );
       duplicateMangaTracking.addAll(
         _duplicateSurplus(
@@ -229,14 +235,12 @@ class ChimahonMediaSafetyAudit {
     for (final anime in backup.backupAnime) {
       final parentKey = animeIdentity(anime);
       duplicateEpisodes.addAll(
-        _duplicateSurplus(
-          anime.episodes.map(_rawEpisodeIdentity),
-        ).map((key) => _join([parentKey, key])),
+        _duplicateSurplus(anime.episodes.map(_rawEpisodeIdentity))
+            .map((key) => _join([parentKey, key])),
       );
       duplicateAnimeHistory.addAll(
-        _duplicateSurplus(
-          anime.history.map((history) => history.url),
-        ).map((key) => _join([parentKey, key])),
+        _duplicateSurplus(anime.history.map((history) => history.url))
+            .map((key) => _join([parentKey, key])),
       );
       duplicateAnimeTracking.addAll(
         _duplicateSurplus(
@@ -1892,54 +1896,63 @@ class ChimahonMediaSafetyAudit {
         (value) => expected.updateStrategy = value,
         expected.clearUpdateStrategy,
       );
-      _copyOptionalInt64(
-        remote.hasSeasonFlags(),
-        remote.seasonFlags,
-        (value) => expected.seasonFlags = value,
-        expected.clearSeasonFlags,
-      );
-      _copyOptionalDouble(
-        remote.hasSeasonNumber(),
-        remote.seasonNumber,
-        (value) => expected.seasonNumber = value,
-        expected.clearSeasonNumber,
-      );
-      _copyOptionalInt64(
-        remote.hasSeasonSourceOrder(),
-        remote.seasonSourceOrder,
-        (value) => expected.seasonSourceOrder = value,
-        expected.clearSeasonSourceOrder,
-      );
-      _copyOptionalInt(
-        remote.hasFetchType(),
-        remote.fetchType,
-        (value) => expected.fetchType = value,
-        expected.clearFetchType,
-      );
+      if (!pair.localCanonical!.hasFetchType() ||
+          !pair.localCanonical!.hasId()) {
+        _copyOptionalInt64(
+          remote.hasSeasonFlags(),
+          remote.seasonFlags,
+          (value) => expected.seasonFlags = value,
+          expected.clearSeasonFlags,
+        );
+        _copyOptionalDouble(
+          remote.hasSeasonNumber(),
+          remote.seasonNumber,
+          (value) => expected.seasonNumber = value,
+          expected.clearSeasonNumber,
+        );
+        _copyOptionalInt64(
+          remote.hasSeasonSourceOrder(),
+          remote.seasonSourceOrder,
+          (value) => expected.seasonSourceOrder = value,
+          expected.clearSeasonSourceOrder,
+        );
+        _copyOptionalInt(
+          remote.hasFetchType(),
+          remote.fetchType,
+          (value) => expected.fetchType = value,
+          expected.clearFetchType,
+        );
+      }
       _copyOptionalInt(
         remote.hasViewerFlags(),
         remote.viewerFlags,
         (value) => expected.viewerFlags = value,
         expected.clearViewerFlags,
       );
-      _copyOptionalString(
-        remote.hasBackgroundUrl(),
-        remote.backgroundUrl,
-        (value) => expected.backgroundUrl = value,
-        expected.clearBackgroundUrl,
-      );
-      _copyOptionalInt64(
-        remote.hasParentId(),
-        remote.parentId,
-        (value) => expected.parentId = value,
-        expected.clearParentId,
-      );
-      _copyOptionalInt64(
-        remote.hasId(),
-        remote.id,
-        (value) => expected.id = value,
-        expected.clearId,
-      );
+      if (!pair.localCanonical!.hasFetchType() ||
+          !pair.localCanonical!.hasId()) {
+        _copyOptionalString(
+          remote.hasBackgroundUrl(),
+          remote.backgroundUrl,
+          (value) => expected.backgroundUrl = value,
+          expected.clearBackgroundUrl,
+        );
+        _copyOptionalInt64(
+          remote.hasParentId(),
+          remote.parentId,
+          (value) => expected.parentId = value,
+          expected.clearParentId,
+        );
+        _copyOptionalInt64(
+          remote.hasId(),
+          remote.id,
+          (value) => expected.id = value,
+          expected.clearId,
+        );
+      }
+    }
+    if (remote != null && pair.localCanonical != null) {
+      retainAnimeSeasonProjectionGaps(expected, pair.localCanonical!, remote);
     }
     return _animePortableProjection(expected);
   }
@@ -2101,6 +2114,7 @@ class ChimahonMediaSafetyAudit {
     required Iterable<BackupCategory> remoteCategories,
     required Iterable<BackupCategory> mergedCategories,
   }) =>
+      animeSeasonProjectionEquals(local, remote) &&
       local.source == remote.source &&
       local.url == remote.url &&
       local.title == remote.title &&

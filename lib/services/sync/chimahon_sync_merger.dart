@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
 import 'package:crypto/crypto.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
@@ -673,9 +674,10 @@ class ChimahonSyncMerger {
     }
 
     final remoteAnime = remote.toList(growable: false);
+    final rebasedSeasons = rebaseChimahonSeasonIds(local, remoteAnime);
     final localAnime = localProjectionRules
-        ? _rebaseLegacyLocalAnimeIdentity(local, remoteAnime)
-        : local;
+        ? _rebaseLegacyLocalAnimeIdentity(rebasedSeasons, remoteAnime)
+        : rebasedSeasons;
     final localCategoryMapper = _OrderedCategoryMembershipMapper(
       localCategories,
       mergedCategories,
@@ -757,7 +759,8 @@ class ChimahonSyncMerger {
         merged.version = _nextVersion(left.version, right.version);
       }
       if (localProjectionRules) {
-        _preserveRemoteOnlyAnimeFields(merged, right);
+        _preserveRemoteOnlyAnimeFields(merged, right, left);
+        retainAnimeSeasonProjectionGaps(merged, left, right);
       }
       _mergeAnimeFavorite(
         merged: merged,
@@ -941,9 +944,12 @@ class ChimahonSyncMerger {
     return result;
   }
 
-  /// Mangatan does not expose Chimahon's per-anime flags, hierarchy, or
-  /// season metadata, so a local metadata update must not clear them.
-  void _preserveRemoteOnlyAnimeFields(BackupAnime merged, BackupAnime remote) {
+  /// Preserve unsupported per-anime flags and hierarchy from legacy projections.
+  void _preserveRemoteOnlyAnimeFields(
+    BackupAnime merged,
+    BackupAnime remote,
+    BackupAnime local,
+  ) {
     merged.excludedScanlators
       ..clear()
       ..addAll(remote.excludedScanlators);
@@ -957,45 +963,49 @@ class ChimahonSyncMerger {
     } else {
       merged.clearUpdateStrategy();
     }
-    if (remote.hasSeasonFlags()) {
-      merged.seasonFlags = remote.seasonFlags;
-    } else {
-      merged.clearSeasonFlags();
-    }
-    if (remote.hasSeasonNumber()) {
-      merged.seasonNumber = remote.seasonNumber;
-    } else {
-      merged.clearSeasonNumber();
-    }
-    if (remote.hasSeasonSourceOrder()) {
-      merged.seasonSourceOrder = remote.seasonSourceOrder;
-    } else {
-      merged.clearSeasonSourceOrder();
-    }
-    if (remote.hasFetchType()) {
-      merged.fetchType = remote.fetchType;
-    } else {
-      merged.clearFetchType();
+    if (!local.hasFetchType() || !local.hasId()) {
+      if (remote.hasSeasonFlags()) {
+        merged.seasonFlags = remote.seasonFlags;
+      } else {
+        merged.clearSeasonFlags();
+      }
+      if (remote.hasSeasonNumber()) {
+        merged.seasonNumber = remote.seasonNumber;
+      } else {
+        merged.clearSeasonNumber();
+      }
+      if (remote.hasSeasonSourceOrder()) {
+        merged.seasonSourceOrder = remote.seasonSourceOrder;
+      } else {
+        merged.clearSeasonSourceOrder();
+      }
+      if (remote.hasFetchType()) {
+        merged.fetchType = remote.fetchType;
+      } else {
+        merged.clearFetchType();
+      }
     }
     if (remote.hasViewerFlags()) {
       merged.viewerFlags = remote.viewerFlags;
     } else {
       merged.clearViewerFlags();
     }
-    if (remote.hasBackgroundUrl()) {
-      merged.backgroundUrl = remote.backgroundUrl;
-    } else {
-      merged.clearBackgroundUrl();
-    }
-    if (remote.hasParentId()) {
-      merged.parentId = remote.parentId;
-    } else {
-      merged.clearParentId();
-    }
-    if (remote.hasId()) {
-      merged.id = remote.id;
-    } else {
-      merged.clearId();
+    if (!local.hasFetchType() || !local.hasId()) {
+      if (remote.hasBackgroundUrl()) {
+        merged.backgroundUrl = remote.backgroundUrl;
+      } else {
+        merged.clearBackgroundUrl();
+      }
+      if (remote.hasParentId()) {
+        merged.parentId = remote.parentId;
+      } else {
+        merged.clearParentId();
+      }
+      if (remote.hasId()) {
+        merged.id = remote.id;
+      } else {
+        merged.clearId();
+      }
     }
   }
 
@@ -1577,6 +1587,7 @@ class ChimahonSyncMerger {
       _trackingProjectionEquals(local.tracking, remote.tracking);
 
   bool _animeProjectionEquals(BackupAnime local, BackupAnime remote) =>
+      animeSeasonProjectionEquals(local, remote) &&
       local.source == remote.source &&
       local.url == remote.url &&
       local.title == remote.title &&

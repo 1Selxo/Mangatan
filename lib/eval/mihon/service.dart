@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:mangayomi/eval/javascript/http.dart';
@@ -17,15 +18,13 @@ import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/models/video.dart';
-import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/mihon_source_preferences.dart';
 
 import '../../models/manga.dart';
 import '../interface.dart';
 import 'models.dart';
-import 'dart:math';
-import 'package:http_interceptor/http_interceptor.dart';
+
 import 'package:mangayomi/models/settings.dart';
 
 class MihonExtensionService implements ExtensionService {
@@ -216,7 +215,16 @@ class MihonExtensionService implements ExtensionService {
     );
     hasError(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
-    final chapters = await getChapterList(url);
+    final detail = _animeOrManga(data);
+    if (source.itemType == ItemType.anime && detail.animeFetchType == 0) {
+      detail.seasons = await getSeasonList(data);
+    } else {
+      detail.chapters = await getChapterList(url);
+    }
+    return detail;
+  }
+
+  MManga _animeOrManga(Map<String, dynamic> data) {
     return MManga(
       name: data['title'],
       link: data['url'],
@@ -238,8 +246,35 @@ class MihonExtensionService implements ExtensionService {
         _ => Status.unknown,
       },
       imageUrl: _resolveBridgeMediaUrl(data['thumbnail_url'] as String?),
-      chapters: chapters,
+      animeFetchType: switch (data['fetch_type']) {
+        'Seasons' || 0 => 0,
+        'Episodes' || 1 => 1,
+        _ => null,
+      },
+      seasonNumber: (data['season_number'] as num?)?.toDouble(),
+      backgroundUrl: _resolveBridgeMediaUrl(data['background_url'] as String?),
+      chapters: [],
     );
+  }
+
+  Future<List<MManga>> getSeasonList(Map<String, dynamic> anime) async {
+    final res = await _postDalvik(
+      body: {
+        'method': 'getSeasonList',
+        'animeData': anime,
+        'preferences': mihonPreferencePayload(source, getSourcePreferences()),
+        'data': source.sourceCode,
+      },
+      headers: getCookie(),
+    );
+    hasError(res);
+    final data = jsonDecode(res.body);
+    if (data is! List) {
+      throw StateError(
+        'The extension server does not support seasons. Update the server and try again.',
+      );
+    }
+    return data.map((e) => _animeOrManga(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<MChapter>> getChapterList(String url) async {
@@ -266,6 +301,9 @@ class MihonExtensionService implements ExtensionService {
                 (e['date_upload'] as int?)?.toString() ??
                 DateTime.now().millisecondsSinceEpoch.toString(),
             scanlator: e['scanlator'],
+            isFiller: e['fillermark'] as bool?,
+            description: e['summary'] as String?,
+            thumbnailUrl: _resolveBridgeMediaUrl(e['preview_url'] as String?),
             chapterNumber: normalizeSourceChapterNumber(
               (e[source.itemType == ItemType.anime
                           ? 'episode_number'

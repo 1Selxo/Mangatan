@@ -1,3 +1,5 @@
+import 'package:mangayomi/modules/manga/detail/widgets/anime_season_list.dart';
+
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -251,17 +253,21 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                           ),
                           // Right: episodes (equal half).
                           Expanded(
-                            child: _EpisodesPanel(
-                              episodes: episodes,
-                              resumeId: resume?.id,
-                              loading: !hasLive && episodes.isEmpty,
-                              onExitLeft: () =>
-                                  _actionFocus[_lastAction].requestFocus(),
-                              onOpen: (c) => c.pushToReaderView(
-                                context,
-                                ignoreIsRead: true,
-                              ),
-                            ),
+                            child: manga.hasSeasons
+                                ? SingleChildScrollView(
+                                    child: AnimeSeasonList(anime: manga),
+                                  )
+                                : _EpisodesPanel(
+                                    episodes: episodes,
+                                    resumeId: resume?.id,
+                                    loading: !hasLive && episodes.isEmpty,
+                                    onExitLeft: () => _actionFocus[_lastAction]
+                                        .requestFocus(),
+                                    onOpen: (c) => c.pushToReaderView(
+                                      context,
+                                      ignoreIsRead: true,
+                                    ),
+                                  ),
                           ),
                         ],
                       ),

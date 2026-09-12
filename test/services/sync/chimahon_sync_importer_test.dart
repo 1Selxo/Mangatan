@@ -2,6 +2,10 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:mangayomi/services/anime_seasons.dart';
+import 'package:mangayomi/eval/model/m_manga.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
@@ -67,6 +71,131 @@ void main() {
       await databaseDirectory.delete(recursive: true);
     }
   });
+
+  test(
+    'season refresh reuses progress, detaches removals and rejects cycles',
+    () async {
+      final parent = Manga(
+        name: 'Series',
+        link: '/series',
+        source: 'Fixture',
+        sourceId: 7,
+        author: null,
+        artist: null,
+        genre: null,
+        imageUrl: null,
+        lang: 'en',
+        status: Status.ongoing,
+        description: null,
+        itemType: ItemType.anime,
+        animeFetchType: 0,
+        favorite: true,
+      );
+      database.writeTxnSync(() => database.mangas.putSync(parent));
+      final ids = await storeAnimeSeasons(database, parent, [
+        MManga(name: 'Season 1', link: '/season', seasonNumber: 1),
+      ]);
+      final season = database.mangas.getSync(ids.single)!;
+      database.writeTxnSync(() {
+        season.favorite = true;
+        database.mangas.putSync(season);
+        final chapter = Chapter(
+          name: 'Episode',
+          url: '/episode',
+          mangaId: season.id,
+          isRead: true,
+          lastPageRead: '123',
+        )..manga.value = season;
+        database.chapters.putSync(chapter);
+        chapter.manga.saveSync();
+      });
+      expect(
+        await storeAnimeSeasons(database, parent, [
+          MManga(name: 'Renamed season', link: '/season', seasonNumber: 1),
+        ]),
+        ids,
+      );
+      final refreshed = database.mangas.getSync(ids.single)!;
+      refreshed.chapters.loadSync();
+      expect(refreshed.favorite, true);
+      expect(refreshed.chapters.single.lastPageRead, '123');
+      await expectLater(
+        storeAnimeSeasons(database, refreshed, [
+          MManga(name: 'Cycle', link: '/series'),
+        ]),
+        throwsStateError,
+      );
+      await storeAnimeSeasons(database, parent, [
+        MManga(name: 'Season 2', link: '/second', seasonNumber: 2),
+      ]);
+      final detached = database.mangas.getSync(ids.single)!;
+      expect(detached.animeParentUrl, isNull);
+      detached.chapters.loadSync();
+      expect(detached.chapters.single.isRead, true);
+    },
+  );
+
+  test(
+    'unfavorited seasons restore with progress and export with their parent',
+    () {
+      final parent = BackupAnime(
+        source: Int64(77),
+        url: '/series',
+        title: 'Series',
+        id: Int64(600),
+        fetchType: 0,
+        favorite: true,
+      );
+      final season = BackupAnime(
+        source: Int64(77),
+        url: '/season',
+        title: 'Season 1',
+        id: Int64(900),
+        parentId: parent.id,
+        fetchType: 1,
+        favorite: false,
+        seasonNumber: 1,
+        seasonSourceOrder: Int64.ZERO,
+        episodes: [
+          BackupEpisode(
+            url: '/episode',
+            name: 'Episode 1',
+            seen: true,
+            lastSecondSeen: Int64(123),
+          ),
+        ],
+      );
+      final backup = BackupMihon(backupAnime: [season, parent]);
+      const importer = ChimahonSyncImporter();
+      importer.apply(database: database, backup: backup);
+      importer.apply(database: database, backup: backup);
+      final entries = database.mangas.where().findAllSync();
+      expect(entries, hasLength(2));
+      final child = entries.singleWhere((a) => a.link == '/season');
+      expect(child.favorite, false);
+      expect(child.animeParentUrl, '/series');
+      final chapters = database.chapters.where().findAllSync();
+      expect(chapters.single.isRead, true);
+      final exported = const MihonBackupExporter().export(
+        mangas: entries,
+        categories: [],
+        chapters: chapters,
+        histories: [],
+        sources: [],
+        epubBookProgress: [],
+      );
+      expect(exported.backupAnime, hasLength(2));
+      final exportedParent = exported.backupAnime.singleWhere(
+        (a) => a.url == '/series',
+      );
+      final exportedChild = exported.backupAnime.singleWhere(
+        (a) => a.url == '/season',
+      );
+      expect(exportedChild.parentId, exportedParent.id);
+      expect(exportedChild.episodes.single.lastSecondSeen, Int64(123));
+      expect(Manga.fromJson(child.toJson()).animeParentUrl, '/series');
+    },
+  );
 
   test(
     'upserts portable progress without deleting local-only desktop state',

@@ -83,6 +83,20 @@ class Manga {
   /// locally installed Mangatan source and can differ between devices.
   String? mihonSourceId;
 
+  /// Source URL of the parent series, scoped to this anime's source. Database
+  /// IDs from another device must never be stored as a local relationship.
+  String? animeParentUrl;
+
+  /// Anikku FetchType: 0 = seasons, 1 = episodes; null = legacy/unknown.
+  int? animeFetchType;
+  double? seasonNumber;
+  int? seasonSourceOrder;
+  int? seasonFlags;
+  String? backgroundUrl;
+
+  @ignore
+  bool get hasSeasons => itemType == ItemType.anime && animeFetchType == 0;
+
   @Backlink(to: "manga")
   final chapters = IsarLinks<Chapter>();
 
@@ -103,6 +117,12 @@ class Manga {
     required this.description,
     required this.sourceId,
     this.mihonSourceId,
+    this.animeParentUrl,
+    this.animeFetchType,
+    this.seasonNumber,
+    this.seasonSourceOrder,
+    this.seasonFlags,
+    this.backgroundUrl,
     this.isManga,
     this.itemType = ItemType.manga,
     this.dateAdded,
@@ -191,6 +211,12 @@ class Manga {
     updatedAt = json['updatedAt'];
     sourceId = json['sourceId'];
     mihonSourceId = json['mihonSourceId']?.toString();
+    animeParentUrl = json['animeParentUrl'];
+    animeFetchType = json['animeFetchType'];
+    seasonNumber = (json['seasonNumber'] as num?)?.toDouble();
+    seasonSourceOrder = json['seasonSourceOrder'];
+    seasonFlags = json['seasonFlags'];
+    backgroundUrl = json['backgroundUrl'];
   }
 
   Map<String, dynamic> toJson() => {
@@ -221,6 +247,12 @@ class Manga {
     'updatedAt': updatedAt ?? 0,
     'sourceId': sourceId,
     'mihonSourceId': mihonSourceId,
+    'animeParentUrl': animeParentUrl,
+    'animeFetchType': animeFetchType,
+    'seasonNumber': seasonNumber,
+    'seasonSourceOrder': seasonSourceOrder,
+    'seasonFlags': seasonFlags,
+    'backgroundUrl': backgroundUrl,
   };
 }
 

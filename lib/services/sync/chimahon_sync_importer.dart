@@ -1,3 +1,4 @@
+import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/models/category.dart';
@@ -211,6 +212,7 @@ class ChimahonSyncImporter {
   }) {
     final syncManga = authoritativeSelection?.manga ?? true;
     final syncAnime = authoritativeSelection?.anime ?? true;
+    final seasonParents = chimahonSeasonParents(backup.backupAnime);
     final syncNovels = authoritativeSelection?.novels ?? true;
     final localSources = database.sources.where().findAllSync();
     final localMangas = database.mangas.where().findAllSync();
@@ -542,7 +544,7 @@ class ChimahonSyncImporter {
               1,
         );
         final isFavorite = remote.hasFavorite() ? remote.favorite : true;
-        if (!isFavorite) {
+        if (!isFavorite && !seasonParents.containsKey(remote)) {
           if (local != null) {
             final retainedOverlay = localOverlayParentIds.contains(local.id);
             matchedAnimeIds.add(local.id!);
@@ -596,6 +598,9 @@ class ChimahonSyncImporter {
           database.mangas.putSync(local);
           titlesUpdated++;
         }
+        applyChimahonAnimeSeasons(local, remote, seasonParents[remote]);
+        local.favorite = isFavorite;
+        database.mangas.putSync(local);
         final chapterChanges = _upsertAnimeEpisodes(
           database: database,
           anime: local,

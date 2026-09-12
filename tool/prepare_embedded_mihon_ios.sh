@@ -46,7 +46,21 @@ download_and_verify() {
 
 echo "Downloading pinned M-Extension-Server $server_commit"
 server_jar="$work_dir/MExtensionServer-ios.jar"
-download_and_verify "$server_jar_url" "$server_jar_sha256" "$server_jar"
+if [[ -n "${MIHON_SERVER_JAR_FILE:-}" ]]; then
+  expected_commit=$(tr -d '\r\n' < "$script_dir/mihon_server_commit.txt")
+  if [[ "${MIHON_SERVER_COMMIT:-}" != "$expected_commit" ||
+        ! "${MIHON_SERVER_JAR_SHA256:-}" =~ ^[a-fA-F0-9]{64}$ ]]; then
+    echo "A source-built server requires its pinned commit and SHA-256." >&2
+    exit 1
+  fi
+  server_commit="$MIHON_SERVER_COMMIT"
+  server_jar_sha256="$MIHON_SERVER_JAR_SHA256"
+  echo "Using verified source-built M-Extension-Server $server_commit"
+  cp "$MIHON_SERVER_JAR_FILE" "$server_jar"
+  printf '%s  %s\n' "$server_jar_sha256" "$server_jar" | shasum -a 256 --check
+else
+  download_and_verify "$server_jar_url" "$server_jar_sha256" "$server_jar"
+fi
 if "$JAVA_HOME/bin/jar" tf "$server_jar" |
   grep -Eq '^(ch/qos/logback|org/cef|dev/datlag/kcef)/'; then
   echo "The iOS server JAR contains excluded desktop runtime classes." >&2

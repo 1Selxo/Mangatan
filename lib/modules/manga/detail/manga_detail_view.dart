@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:mangayomi/modules/manga/detail/widgets/anime_season_list.dart';
+
 import 'package:mangayomi/services/download_manager/next_downloads.dart';
 
 import 'package:draggable_menu/draggable_menu.dart';
@@ -2099,7 +2101,10 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                 ],
               ),
             ),
-            if (chapterLength == 0)
+            if (widget.manga!.hasSeasons ||
+                widget.manga!.animeParentUrl != null)
+              AnimeSeasonList(anime: widget.manga!),
+            if (chapterLength == 0 && !widget.manga!.hasSeasons)
               Container(
                 width: context.width(1),
                 height: context.height(1),

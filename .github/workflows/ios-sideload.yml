@@ -11,8 +11,57 @@ permissions:
   contents: write
 
 jobs:
+  build-mihon:
+    name: Build pinned season-capable Mihon bridge
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.pin.outputs.commit }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read bridge source pin
+        id: pin
+        shell: bash
+        run: |
+          commit=$(tr -d '\r\n' < tool/mihon_server_commit.txt)
+          [[ "$commit" =~ ^[a-f0-9]{40}$ ]]
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Check out pinned bridge
+        uses: actions/checkout@v4
+        with:
+          repository: 1Selxo/M-Extension-Server
+          ref: ${{ steps.pin.outputs.commit }}
+          path: bridge-source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Build and test embedded bridge
+        working-directory: bridge-source
+        run: |
+          ./AndroidCompat/getAndroid.sh
+          ./gradlew :server:test :server:shadowJar -PiosRuntime=true --no-daemon --max-workers=2
+      - name: Package branch runtime
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          jars=(bridge-source/server/build/MExtensionServer-*.jar)
+          test "${#jars[@]}" -eq 1
+          mkdir bridge-runtime
+          cp "${jars[0]}" bridge-runtime/MExtensionServer-ios.jar
+          sha256=$(sha256sum bridge-runtime/MExtensionServer-ios.jar | cut -d ' ' -f 1)
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinned-mihon-runtime
+          path: bridge-runtime/MExtensionServer-ios.jar
+          if-no-files-found: error
+          retention-days: 14
+
   build-ios:
     name: iOS IPA
+    needs: build-mihon
     runs-on: macos-26
     steps:
       - name: Check out source and submodules
@@ -70,7 +119,17 @@ jobs:
       - name: Verify native dictionary source
         run: test -f third_party/hoshidicts/CMakeLists.txt
 
+      - name: Download pinned bridge build
+        uses: actions/download-artifact@v4
+        with:
+          name: pinned-mihon-runtime
+          path: ${{ runner.temp }}/mihon-runtime
+
       - name: Prepare on-device Mihon bridge
+        env:
+          MIHON_SERVER_JAR_FILE: ${{ runner.temp }}/mihon-runtime/MExtensionServer-ios.jar
+          MIHON_SERVER_JAR_SHA256: ${{ needs.build-mihon.outputs.sha256 }}
+          MIHON_SERVER_COMMIT: ${{ needs.build-mihon.outputs.commit }}
         run: |
           tool/prepare_embedded_mihon_ios.sh
           runtime="ios/Frameworks/OpenJDKRuntime.framework/OpenJDKRuntime"

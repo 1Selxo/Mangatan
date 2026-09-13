@@ -5,6 +5,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
 
 class DownloadRepository {
@@ -86,6 +87,30 @@ class DownloadRepository {
         ..chapter.value = chapter;
       isar.downloads.putSync(download);
       download.chapter.saveSync();
+      // Chapter IDs follow source insertion order, often newest first. Persist
+      // arrival order in the same transaction so queue readers cannot reverse
+      // a "Next X" batch by sorting its database IDs.
+      final settings = isar.settings.getSync(227) ?? Settings();
+      final order = [...?settings.downloadQueueOrder];
+      // Existing queues from older builds have no saved order. Keep them ahead
+      // of newly added episodes instead of promoting the new batch over them.
+      for (final pending
+          in isar.downloads
+              .filter()
+              .isDownloadEqualTo(false)
+              .isStartDownloadEqualTo(true)
+              .findAllSync()) {
+        if (pending.id != chapter.id &&
+            pending.id != null &&
+            !order.contains(pending.id))
+          order.add(pending.id!);
+      }
+      if (!order.contains(chapter.id!)) {
+        order.add(chapter.id!);
+        settings.downloadQueueOrder = order;
+        settings.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        isar.settings.putSync(settings);
+      }
     });
   });
 

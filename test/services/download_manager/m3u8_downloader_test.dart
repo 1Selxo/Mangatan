@@ -11,6 +11,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/services/download_manager/m3u8/m3u8_downloader.dart';
 
 void main() {
+  List<int> tsPacket(int seed) => List<int>.generate(
+    188,
+    (index) => index == 0 ? 0x47 : (seed + index) & 0xff,
+  );
+  List<int> tsSegment(int seed) => [
+    ...tsPacket(seed),
+    ...tsPacket(seed + 1),
+    ...tsPacket(seed + 2),
+    ...tsPacket(seed + 3),
+  ];
+
   test('temporary paths stay short and distinguish stream variants', () {
     final url = 'https://example.com/${List.filled(300, 'episode').join()}';
     expect(m3u8TempDirectoryName(url).length, lessThan(32));
@@ -24,18 +35,21 @@ void main() {
   test('merge uses playlist order and ignores leftover files', () async {
     final dir = await Directory.systemTemp.createTemp('hls_test');
     addTearDown(() => dir.delete(recursive: true));
-    await File('${dir.path}/TS_2.ts').writeAsBytes([2]);
-    await File('${dir.path}/TS_1.ts').writeAsBytes([1]);
+    await File('${dir.path}/TS_2.ts').writeAsBytes(tsSegment(2));
+    await File('${dir.path}/TS_1.ts').writeAsBytes(tsSegment(1));
     await File('${dir.path}/TS_3.ts').writeAsBytes([99]);
     final output = '${dir.path}/video.mp4';
     await mergeM3u8Segments(output, dir.path, 2);
-    expect(await File(output).readAsBytes(), [1, 2]);
+    expect(await File(output).readAsBytes(), [
+      ...tsSegment(1),
+      ...tsSegment(2),
+    ]);
   });
 
   test('failed merge preserves output and removes partial output', () async {
     final dir = await Directory.systemTemp.createTemp('hls_test');
     addTearDown(() => dir.delete(recursive: true));
-    await File('${dir.path}/TS_1.ts').writeAsBytes([1]);
+    await File('${dir.path}/TS_1.ts').writeAsBytes(tsSegment(1));
     final output = '${dir.path}/video.mp4';
     await File(output).writeAsBytes([42]);
     await expectLater(mergeM3u8Segments(output, dir.path, 2), throwsStateError);
@@ -61,9 +75,9 @@ void main() {
           }(), 200);
         }
         return http.StreamedResponse(
-          Stream.value([1, 2, 3]),
+          Stream.value(tsSegment(1)),
           200,
-          contentLength: 3,
+          contentLength: tsSegment(1).length,
         );
       });
       addTearDown(client.close);
@@ -82,7 +96,7 @@ void main() {
         client,
       );
       expect(attempts, 3);
-      expect(await File('${dir.path}/TS_1.ts').readAsBytes(), [1, 2, 3]);
+      expect(await File('${dir.path}/TS_1.ts').readAsBytes(), tsSegment(1));
       expect(await File('${dir.path}/TS_1.ts.part').exists(), isFalse);
     },
   );
@@ -97,7 +111,7 @@ void main() {
     final client = MockClient.streaming((request, _) async {
       if (request.url.path == '/1.ts') await releaseFirst.future;
       if (request.url.path == '/3.ts') thirdStarted.complete();
-      return http.StreamedResponse(Stream.value([1]), 200);
+      return http.StreamedResponse(Stream.value(tsSegment(1)), 200);
     });
     addTearDown(client.close);
     final download = processM3u8Download(
@@ -123,6 +137,57 @@ void main() {
       releaseFirst.complete();
       await download;
     }
+  });
+
+  test('strips a PNG prefix and partial packet from an HLS segment', () {
+    final png = [0x89, 0x50, 0x4e, 0x47, ...List<int>.filled(66, 0)];
+    final partialPacket = List<int>.filled(182, 0x2a);
+    final stream = tsSegment(7);
+
+    expect(
+      normalizeMpegTsSegment([...png, ...partialPacket, ...stream]),
+      stream,
+    );
+  });
+
+  test('rejects an image response masquerading as an HLS segment', () {
+    final png = [0x89, 0x50, 0x4e, 0x47, ...List<int>.filled(2048, 0)];
+
+    expect(
+      () => normalizeMpegTsSegment(png),
+      throwsA(isA<DownloadPoolException>()),
+    );
+  });
+
+  test(
+    'final video validation rejects false-success image downloads',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('video_validation');
+      addTearDown(() => dir.delete(recursive: true));
+      final file = File('${dir.path}/episode.mp4');
+      await file.writeAsBytes([
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        ...List<int>.filled(64 * 1024, 0),
+      ]);
+
+      await expectLater(
+        validateDownloadedVideoFile(file),
+        throwsA(isA<DownloadPoolException>()),
+      );
+    },
+  );
+
+  test('final video validation rejects missing output', () async {
+    final dir = await Directory.systemTemp.createTemp('video_validation');
+    addTearDown(() => dir.delete(recursive: true));
+
+    await expectLater(
+      validateDownloadedVideoFile(File('${dir.path}/missing.mp4')),
+      throwsA(isA<DownloadPoolException>()),
+    );
   });
 
   test('resolves ordinary playlist references relative to the playlist', () {

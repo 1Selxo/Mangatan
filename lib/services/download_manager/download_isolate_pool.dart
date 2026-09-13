@@ -691,6 +691,14 @@ Future<void> downloadFile(
           await sink.close();
           offset = validator != null ? await file.length() : 0;
         }
+        try {
+          await validateDownloadedVideoFile(file);
+        } catch (_) {
+          if (await file.exists()) await file.delete();
+          offset = 0;
+          validator = null;
+          rethrow;
+        }
       }, 3);
     }
   } catch (e) {
@@ -791,6 +799,16 @@ Future<void> _downloadSegment(
           );
           await partial.writeAsBytes(decrypted);
         }
+        final contentType =
+            response.headers[HttpHeaders.contentTypeHeader] ?? '';
+        if (isLikelyMpegTs(ts.url, contentType) ||
+            contentType.toLowerCase().startsWith('image/') ||
+            contentType.toLowerCase().contains('text/html')) {
+          final normalized = normalizeMpegTsSegment(
+            await partial.readAsBytes(),
+          );
+          await partial.writeAsBytes(normalized, flush: true);
+        }
         // Only complete, decrypted segments may be reused after a retry.
         await partial.rename(file.path);
       } catch (_) {
@@ -800,6 +818,91 @@ Future<void> _downloadSegment(
     }, 3);
   } catch (e) {
     throw DownloadPoolException('Failed to process segment: ${ts.name}', e);
+  }
+}
+
+const _mpegTsPacketSize = 188;
+const _minimumMpegTsSyncRun = 4;
+const _maxMpegTsPrefix = 8 * 1024;
+
+bool isLikelyMpegTs(String url, String contentType) {
+  final urlPath = Uri.tryParse(url)?.path.toLowerCase() ?? url.toLowerCase();
+  return urlPath.endsWith('.ts') || contentType.toLowerCase().contains('mp2t');
+}
+
+bool hasErrorMediaPrefix(List<int> bytes) {
+  bool startsWith(List<int> signature) =>
+      bytes.length >= signature.length &&
+      List.generate(
+        signature.length,
+        (index) => bytes[index] == signature[index],
+      ).every((matches) => matches);
+  final textPrefix = String.fromCharCodes(bytes.take(256)).trimLeft();
+  return startsWith([0x89, 0x50, 0x4e, 0x47]) ||
+      startsWith([0xff, 0xd8, 0xff]) ||
+      startsWith([0x47, 0x49, 0x46, 0x38]) ||
+      RegExp(r'^(<!doctype|<html)', caseSensitive: false).hasMatch(textPrefix);
+}
+
+/// Removes CDN error-image/junk prefixes and returns a stable MPEG-TS grid.
+/// Throws for image/HTML/error bodies so they are retried instead of merged.
+Uint8List normalizeMpegTsSegment(List<int> bytes) {
+  if (bytes.length < _mpegTsPacketSize * _minimumMpegTsSyncRun) {
+    throw DownloadPoolException('Transport stream segment is too small');
+  }
+  final lastCandidate =
+      (bytes.length - (_mpegTsPacketSize * _minimumMpegTsSyncRun)).clamp(
+        0,
+        _maxMpegTsPrefix,
+      );
+  int start = -1;
+  for (var candidate = 0; candidate <= lastCandidate; candidate++) {
+    var aligned = true;
+    for (var packet = 0; packet < _minimumMpegTsSyncRun; packet++) {
+      if (bytes[candidate + packet * _mpegTsPacketSize] != 0x47) {
+        aligned = false;
+        break;
+      }
+    }
+    if (aligned) {
+      start = candidate;
+      break;
+    }
+  }
+  if (start < 0) {
+    throw DownloadPoolException('Response is not an MPEG-TS segment');
+  }
+  final completeLength =
+      ((bytes.length - start) ~/ _mpegTsPacketSize) * _mpegTsPacketSize;
+  if (completeLength < _mpegTsPacketSize * _minimumMpegTsSyncRun) {
+    throw DownloadPoolException('Transport stream segment is incomplete');
+  }
+  if (start == 0 && completeLength == bytes.length && bytes is Uint8List) {
+    return bytes;
+  }
+  return Uint8List.fromList(bytes.sublist(start, start + completeLength));
+}
+
+/// Rejects the common false-success responses before an anime download is
+/// recorded as complete. Unknown large containers remain supported.
+Future<void> validateDownloadedVideoFile(File file) async {
+  if (!await file.exists()) {
+    throw DownloadPoolException('Downloaded video file is missing');
+  }
+  if (await file.length() < 64 * 1024) {
+    throw DownloadPoolException('Downloaded video file is too small');
+  }
+  final handle = await file.open();
+  late final Uint8List prefix;
+  try {
+    prefix = await handle.read(8 * 1024);
+  } finally {
+    await handle.close();
+  }
+  if (hasErrorMediaPrefix(prefix)) {
+    throw DownloadPoolException(
+      'Downloaded video contains an image or HTTP error response',
+    );
   }
 }
 

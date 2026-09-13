@@ -28,6 +28,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/services/download_manager/download_queue_order.dart';
+import 'package:mangayomi/services/download_manager/download_isolate_pool.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/services/download_manager/downloaded_manga_artifact.dart';
 import 'package:mangayomi/services/get_video_list.dart';
@@ -239,6 +240,11 @@ Future<void> downloadChapter(
 
     Future<void> finalizeDownload() async {
       if (_downloadCancelled(chapter)) return;
+      if (itemType == ItemType.anime) {
+        await validateDownloadedVideoFile(
+          File(p.join(mangaMainDirectory.path, "$chapterName.mp4")),
+        );
+      }
       if (itemType == ItemType.manga) {
         await processConvert();
         await persistMokuroSidecar();
@@ -280,7 +286,10 @@ Future<void> downloadChapter(
       // Re-downloading a chapter that is already on disk reads it locally, and
       // local pages carry no url. Storing those placeholders would leave the
       // chapter unreadable from its source once the download is deleted.
-      if (pageUrls.every((pageUrl) => pageUrl.url.isEmpty)) return;
+      if (itemType != ItemType.anime &&
+          pageUrls.every((pageUrl) => pageUrl.url.isEmpty)) {
+        return;
+      }
       List<ChapterPageurls>? chapterPageUrls = [];
       for (var chapterPageUrl
           in settingsRepository.current.chapterPageUrlsList ?? []) {
@@ -288,10 +297,24 @@ Future<void> downloadChapter(
           chapterPageUrls.add(chapterPageUrl);
         }
       }
-      final chapterPageHeaders = pageUrls
+      final persistentPageUrls = itemType == ItemType.anime
+          ? pageUrls.where((pageUrl) {
+              final uri = Uri.tryParse(pageUrl.url);
+              return uri == null ||
+                  !((uri.host == '127.0.0.1' || uri.host == 'localhost') &&
+                      uri.path.startsWith('/video/'));
+            }).toList()
+          : pageUrls;
+      if (persistentPageUrls.isEmpty) {
+        settingsRepository.update(
+          (s) => s.chapterPageUrlsList = chapterPageUrls,
+        );
+        return;
+      }
+      final chapterPageHeaders = persistentPageUrls
           .map((e) => e.headers == null ? null : jsonEncode(e.headers))
           .toList();
-      final urls = pageUrls.map((e) => e.url).toList();
+      final urls = persistentPageUrls.map((e) => e.url).toList();
       chapterPageUrls.add(
         ChapterPageurls()
           ..chapterId = chapter.id
@@ -454,9 +477,18 @@ Future<void> downloadChapter(
             chapter,
           ).exists() &&
           saveAsCbz;
-      bool mp4FileExist = await File(
+      final animeFile = File(
         p.join(mangaMainDirectory.path, "$chapterName.mp4"),
-      ).exists();
+      );
+      bool mp4FileExist = await animeFile.exists();
+      if (mp4FileExist && itemType == ItemType.anime) {
+        try {
+          await validateDownloadedVideoFile(animeFile);
+        } catch (_) {
+          await animeFile.delete();
+          mp4FileExist = false;
+        }
+      }
       bool htmlFileExist = await File(
         p.join(mangaMainDirectory.path, "$chapterName.html"),
       ).exists();
@@ -601,6 +633,9 @@ Future<void> downloadChapter(
       if (lastError != null) {
         Error.throwWithStackTrace(lastError, lastStackTrace!);
       }
+      // An offline episode must never retain an ephemeral bridge URL from an
+      // earlier attempt; only the verified local artifact is durable.
+      savePageUrls();
       await finalizeDownload();
     }
     if (callback != null) {

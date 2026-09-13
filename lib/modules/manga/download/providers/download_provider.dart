@@ -153,7 +153,6 @@ Future<void> downloadChapter(
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
     };
     bool hasM3U8File = false;
-    bool nonM3U8File = false;
     List<Video> m3u8Videos = [];
 
     Future<void> processConvert() async {
@@ -330,37 +329,35 @@ Future<void> downloadChapter(
                   _isM3u8Url(element.url) || _isM3u8Url(element.originalUrl),
             )
             .toList();
-        final directVideoUrls = value.$1
+        final videosUrls = value.$1
             .where(
               (element) =>
                   // Jellyfin and some bridge proxies use extensionless
                   // stream endpoints, so the URL scheme is the reliable
                   // direct-download signal here.
-                  !_isM3u8Url(element.url) &&
-                  !_isM3u8Url(element.originalUrl) &&
-                  _isHttpUrl(element.url),
+                  _isHttpUrl(element.url) || m3u8Urls.contains(element),
             )
             .toList();
-        nonM3U8File = directVideoUrls.isNotEmpty;
-        hasM3U8File = nonM3U8File ? false : m3u8Urls.isNotEmpty;
-        final videosUrls = nonM3U8File ? directVideoUrls : m3u8Urls;
         if (videosUrls.isNotEmpty) {
+          // Select across formats in source order, just like playback. A direct
+          // link must not override the user's preferred HLS server (or vice versa).
+          final selected = preferredVideoStream(
+            videosUrls,
+            await MiningPreferences.getVideoStreamPreference(manga.id),
+          );
+          hasM3U8File = m3u8Urls.contains(selected);
           if (hasM3U8File) {
-            final selected = preferredVideoStream(
-              videosUrls,
-              await MiningPreferences.getVideoStreamPreference(manga.id),
-            );
             // Match the player's saved stream preference, then try the
             // remaining source URLs if that stream has expired.
             m3u8Videos = [
               selected,
-              ...videosUrls.where((video) => video.url != selected.url),
+              ...m3u8Urls.where((video) => video.url != selected.url),
             ];
             subtitles = selected.subtitles;
           } else {
-            pageUrls = [PageUrl(videosUrls.first.url)];
-            subtitles = videosUrls.first.subtitles;
-            videoHeader.addAll(videosUrls.first.headers ?? {});
+            pageUrls = [PageUrl(selected.url)];
+            subtitles = selected.subtitles;
+            videoHeader.addAll(selected.headers ?? {});
           }
           isOk = true;
         } else {
@@ -428,15 +425,9 @@ Future<void> downloadChapter(
       return;
     }
 
-    // A failed HLS attempt can leave partial segments that look complete on a
-    // later retry. Remove them before parsing a fresh playlist.
-    if (hasM3U8File &&
-        !(isar.downloads.getSync(chapter.id!)?.isDownload ?? false)) {
-      await _clearM3u8FallbackArtifacts(
-        chapterDirectory: chapterDirectory,
-        outputFile: File(p.join(mangaMainDirectory!.path, "$chapterName.mp4")),
-      );
-    }
+    // HLS publishes a .ts file only after its transfer and decryption finish.
+    // Keep those completed segments on retry; incomplete writes use .part.
+    // Each stream URL has its own cache directory, so variants stay separate.
 
     if (pageUrls.isNotEmpty) {
       // A stalled or failed attempt can leave a partial single-file download

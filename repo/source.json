@@ -15,14 +15,14 @@
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
       "version": "1.2.21",
-      "versionDate": "2026-09-12T08:41:43Z",
-      "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21-beta.1/Mangatan-v1.2.21-beta.1-build.205-6f6c54a-ios.ipa",
+      "versionDate": "2026-09-13T01:31:27Z",
+      "versionDescription": "Changes since v1.2.20\n\n\u2022 Downloads now honor the saved playback server and quality preference for both direct video and HLS streams.\n\u2022 Fixed \u201cNext X\u201d download queue order so episodes start in ascending reading/watch order instead of database ID order.\n\u2022 HLS retries retain completed segments instead of downloading them again.\n\u2022 Direct video retries resume interrupted transfers when the server supports validated range requests, and safely restart when it ignores them.\n\u2022 Added a delay between failed transfer attempts and checks to prevent incomplete videos being marked complete.\n\u2022 Improved video OCR text fitting and character hit testing while preserving the translucent overlay appearance.\n\u2022 Added an experimental dedicated Linux video rendering thread to address stuttering.\n\u2022 Fixed backup restore provider lifetime handling.\n\u2022 Added a PowerShell helper for Windows builds.\n\nValidation\n\n19 targeted download tests passed. Linux playback smoothness and real\u2022world download throughput still depend on the source/server and device; no performance improvement is claimed as measured.\n\nVersion: 1.2.21, build 207. Windows, macOS, Linux, and iOS packages will be attached as the release workflows finish.\n",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21/Mangatan-v1.2.21-build.207-1342be3-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 179041650,
+      "size": 179028905,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -31,10 +31,10 @@
       "versions": [
         {
           "version": "1.2.21",
-          "date": "2026-09-12T08:41:43Z",
-          "localizedDescription": "",
-          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21-beta.1/Mangatan-v1.2.21-beta.1-build.205-6f6c54a-ios.ipa",
-          "size": 179041650
+          "date": "2026-09-13T01:31:27Z",
+          "localizedDescription": "Changes since v1.2.20\n\n\u2022 Downloads now honor the saved playback server and quality preference for both direct video and HLS streams.\n\u2022 Fixed \u201cNext X\u201d download queue order so episodes start in ascending reading/watch order instead of database ID order.\n\u2022 HLS retries retain completed segments instead of downloading them again.\n\u2022 Direct video retries resume interrupted transfers when the server supports validated range requests, and safely restart when it ignores them.\n\u2022 Added a delay between failed transfer attempts and checks to prevent incomplete videos being marked complete.\n\u2022 Improved video OCR text fitting and character hit testing while preserving the translucent overlay appearance.\n\u2022 Added an experimental dedicated Linux video rendering thread to address stuttering.\n\u2022 Fixed backup restore provider lifetime handling.\n\u2022 Added a PowerShell helper for Windows builds.\n\nValidation\n\n19 targeted download tests passed. Linux playback smoothness and real\u2022world download throughput still depend on the source/server and device; no performance improvement is claimed as measured.\n\nVersion: 1.2.21, build 207. Windows, macOS, Linux, and iOS packages will be attached as the release workflows finish.\n",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21/Mangatan-v1.2.21-build.207-1342be3-ios.ipa",
+          "size": 179028905
         },
         {
           "version": "1.2.20",
@@ -369,6 +369,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.21-beta.1"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.21 - 13 Sep",
+      "identifier": "release-1.2.21",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-09-13T01:31:27Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.21"
     }
   ]
 }

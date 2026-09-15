@@ -161,11 +161,25 @@ jobs:
         with:
           targets: aarch64-apple-ios,x86_64-apple-ios
 
+      - name: Setup Java toolchain
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.31.6"
+
       - name: Install flutter_rust_bridge_codegen
         run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Prepare on-device Mihon bridge
+        run: tool/prepare_embedded_mihon_ios.sh
 
       - name: Build debug iOS
         run: flutter build ios --debug --no-codesign

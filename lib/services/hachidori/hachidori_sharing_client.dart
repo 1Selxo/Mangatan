@@ -21,15 +21,19 @@ abstract interface class HachidoriWebSocket {
   Future<void> close([int? code, String? reason]);
 }
 
-typedef HachidoriWebSocketConnector =
-    Future<HachidoriWebSocket> Function(Uri address, {required String origin});
+typedef HachidoriWebSocketConnector = Future<HachidoriWebSocket> Function(
+  Uri address, {
+  required String origin,
+});
 
 abstract interface class HachidoriReconnectHandle {
   void cancel();
 }
 
-typedef HachidoriReconnectScheduler =
-    HachidoriReconnectHandle Function(Duration delay, void Function() callback);
+typedef HachidoriReconnectScheduler = HachidoriReconnectHandle Function(
+  Duration delay,
+  void Function() callback,
+);
 
 class HachidoriSharingClient extends ChangeNotifier
     implements HachidoriLinkClient {
@@ -64,7 +68,7 @@ class HachidoriSharingClient extends ChangeNotifier
   int? _dictionaryGeneration;
   HachidoriReconnectHandle? _reconnectHandle;
   int _reconnectAttempt = 0;
-  bool _connectInFlight = false;
+  final Set<int> _connectingGenerations = <int>{};
   bool _disposed = false;
 
   HachidoriClientState get state => _state;
@@ -323,13 +327,13 @@ class HachidoriSharingClient extends ChangeNotifier
   }
 
   Future<void> _connect(HachidoriLinkAddress address, int generation) async {
-    if (_connectInFlight ||
+    if (_connectingGenerations.contains(generation) ||
         _disposed ||
         generation != _generation ||
         !_state.linked) {
       return;
     }
-    _connectInFlight = true;
+    _connectingGenerations.add(generation);
     try {
       final socket = await _connector(address.parsedUri, origin: origin);
       await socket.ready;
@@ -362,7 +366,7 @@ class HachidoriSharingClient extends ChangeNotifier
       );
       _scheduleReconnect(generation);
     } finally {
-      if (generation == _generation) _connectInFlight = false;
+      _connectingGenerations.remove(generation);
     }
   }
 
@@ -554,7 +558,9 @@ class HachidoriSharingClient extends ChangeNotifier
       );
     }
     final address = _state.address;
-    if (address != null && _socket == null && !_connectInFlight) {
+    if (address != null &&
+        _socket == null &&
+        !_connectingGenerations.contains(generation)) {
       _cancelReconnect();
       _setState(
         HachidoriClientState(

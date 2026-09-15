@@ -162,7 +162,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   @override
   void initState() {
     super.initState();
+    DictionaryReadFacade.instance.addListener(_onDictionaryLibraryChanged);
     _load();
+  }
+
+  void _onDictionaryLibraryChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    DictionaryReadFacade.instance.removeListener(_onDictionaryLibraryChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {

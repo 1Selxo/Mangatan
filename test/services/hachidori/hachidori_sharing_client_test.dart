@@ -378,6 +378,42 @@ void main() {
     });
 
     test(
+      'relink connects the new host while the old connector is pending',
+      () async {
+        final connector = _DelayedFirstConnector();
+        final client = HachidoriSharingClient(
+          connector: connector.call,
+          clientName: 'Mangatan',
+          clientVersion: '1.2.22',
+        );
+
+        client.link('old.test');
+        await pumpEventQueue();
+        expect(connector.addresses.single.host, 'old.test');
+
+        client.link('new.test');
+        await pumpEventQueue();
+
+        expect(connector.addresses.map((address) => address.host), [
+          'old.test',
+          'new.test',
+        ]);
+        final newSocket = connector.sockets.single;
+        newSocket.receive(_hello(snapshot: const {}));
+        await pumpEventQueue();
+        expect(client.state.ready, isTrue);
+        expect(client.state.address?.parsedUri.host, 'new.test');
+
+        connector.completeFirst();
+        await pumpEventQueue();
+        expect(connector.firstSocket.closed, isTrue);
+        expect(client.state.ready, isTrue);
+        expect(client.state.address?.parsedUri.host, 'new.test');
+        client.dispose();
+      },
+    );
+
+    test(
       'relink rejects old work and ignores obsolete socket replies',
       () async {
         final connector = _FakeConnector();
@@ -916,6 +952,23 @@ class _FakeConnector {
     sockets.add(socket);
     return socket;
   }
+}
+
+class _DelayedFirstConnector {
+  final List<Uri> addresses = [];
+  final List<_FakeSocket> sockets = [];
+  final Completer<HachidoriWebSocket> _first = Completer<HachidoriWebSocket>();
+  final _FakeSocket firstSocket = _FakeSocket();
+
+  Future<HachidoriWebSocket> call(Uri address, {required String origin}) {
+    addresses.add(address);
+    if (addresses.length == 1) return _first.future;
+    final socket = _FakeSocket();
+    sockets.add(socket);
+    return Future.value(socket);
+  }
+
+  void completeFirst() => _first.complete(firstSocket);
 }
 
 class _FakeReconnectScheduler {

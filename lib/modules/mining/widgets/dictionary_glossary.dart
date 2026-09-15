@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/dictionary/dictionary_read_facade.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 
 class DictionaryGlossary extends StatefulWidget {
@@ -54,7 +54,7 @@ class _DictionaryGlossaryState extends State<DictionaryGlossary> {
     if (paths.isEmpty) return;
     final loaded = <String, String>{};
     for (final path in paths) {
-      final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
+      final bytes = await DictionaryReadFacade.instance.getMediaFile(
         dictName: widget.dictionaryName,
         mediaPath: path,
         profile: widget.profile,

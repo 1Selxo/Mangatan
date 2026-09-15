@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
 import 'package:mangayomi/modules/mining/widgets/hoshi_dictionary_popup.dart';
-import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/dictionary/dictionary_read_facade.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
 import 'package:mangayomi/services/mining/anki_connect_service.dart';
 import 'package:mangayomi/services/mining/anki_mobile_service.dart';
@@ -279,7 +279,7 @@ class _DictionaryPopupHostController {
     }
     final results =
         compatiblePrefetch?.results ??
-        HoshidictsLookupBackend.instance.lookup(
+        DictionaryReadFacade.instance.lookup(
           text,
           maxResults: hoshiPopupMaxResults,
           scanLength: hoshiPopupScanLength,
@@ -915,7 +915,7 @@ class DictionaryLookupPopup extends StatelessWidget {
     final results = query.isEmpty
         ? Future<List<HoshiLookupResult>>.value(const [])
         : profileFuture.then(
-            (resolvedProfile) => HoshidictsLookupBackend.instance.lookup(
+            (resolvedProfile) => DictionaryReadFacade.instance.lookup(
               query,
               maxResults: hoshiPopupMaxResults,
               scanLength: hoshiPopupScanLength,
@@ -1140,13 +1140,13 @@ class _DictionaryLookupResultsViewState
     }
     final values = await Future.wait<dynamic>([
       widget.initialResults ??
-          HoshidictsLookupBackend.instance.lookup(
+          DictionaryReadFacade.instance.lookup(
             lookupText,
             maxResults: widget.maxResults,
             scanLength: widget.scanLength,
             profile: profile,
           ),
-      HoshidictsLookupBackend.instance
+      DictionaryReadFacade.instance
           .getStyles(profile: profile)
           .catchError((_) => <HoshiDictionaryStyle>[]),
     ]);

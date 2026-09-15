@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
+import 'package:mangayomi/modules/more/settings/dictionary/hachidori_link_section.dart';
+import 'package:mangayomi/services/dictionary/dictionary_read_facade.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/widgets/edit_text_dialog.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_history_sheet.dart';
@@ -1256,6 +1258,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 const _DictionarySettingsGroupMarker(
                   _DictionarySettingsGroup.dictionaries,
                 ),
+                HachidoriDictionaryLibraryPanel(
+                  controller: DictionaryReadFacade.instance,
+                  localControls: const SizedBox.shrink(),
+                ),
+                if (!DictionaryReadFacade.instance.remoteEnabled) ...[
                 const Divider(height: 24),
                 const _SectionHeader('Dictionaries'),
                 SwitchListTile(
@@ -1424,6 +1431,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       );
                     },
                   ),
+                ],
                 const _DictionarySettingsGroupMarker(
                   _DictionarySettingsGroup.popup,
                 ),

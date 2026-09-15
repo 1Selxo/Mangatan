@@ -201,6 +201,27 @@ void main() {
       client.dispose();
     });
 
+    test('rejects deeply nested frames before decoding', () async {
+      final connector = _FakeConnector();
+      final scheduler = _FakeReconnectScheduler();
+      final client = HachidoriSharingClient(
+        connector: connector.call,
+        reconnectScheduler: scheduler.call,
+        clientName: 'Mangatan',
+        clientVersion: '1.2.22',
+      );
+      client.link('127.0.0.1');
+      await pumpEventQueue();
+      final socket = connector.sockets.single;
+
+      socket.receiveRaw('${'[' * 65}null${']' * 65}');
+      await pumpEventQueue();
+
+      expect(socket.closed, isTrue);
+      expect(client.state.ready, isFalse);
+      client.dispose();
+    });
+
     test(
       'protocol mismatch, malformed JSON, and unknown frames fail closed',
       () async {
@@ -376,6 +397,86 @@ void main() {
       await expectLater(second, throwsA(isA<HachidoriConnectionException>()));
       client.dispose();
     });
+
+    test('remote request failures do not close a healthy socket', () async {
+      final connector = _FakeConnector();
+      final client = HachidoriSharingClient(
+        connector: connector.call,
+        clientName: 'Mangatan',
+        clientVersion: '1.2.22',
+      );
+      client.link('host.test');
+      await pumpEventQueue();
+      final socket = connector.sockets.single;
+      socket.receive(_hello(snapshot: const {}));
+      await pumpEventQueue();
+
+      final failed = client.status();
+      await pumpEventQueue();
+      final failedRequest = _lastRequest(socket, 'hd_status');
+      socket.reply(failedRequest, {
+        'type': 'hd_status_result',
+        'requestId': failedRequest['id'],
+        'ok': false,
+        'error': 'The engine is updating.',
+        'errorCode': 'engine-mutating',
+      });
+
+      await expectLater(
+        failed,
+        throwsA(
+          isA<HachidoriRemoteException>()
+              .having((error) => error.code, 'code', 'engine-mutating')
+              .having(
+                (error) => error.message,
+                'message',
+                'The engine is updating.',
+              ),
+        ),
+      );
+      expect(socket.closed, isFalse);
+      expect(client.state.ready, isTrue);
+
+      final next = client.status();
+      await pumpEventQueue();
+      final nextRequest = _lastRequest(socket, 'hd_status');
+      socket.reply(
+        nextRequest,
+        _statusResponse(requestId: nextRequest['id'] as int, generation: 3),
+      );
+      expect((await next).generation, 3);
+      client.dispose();
+    });
+
+    test(
+      'request send failure disconnects and schedules reconnection',
+      () async {
+        final connector = _FakeConnector();
+        final scheduler = _FakeReconnectScheduler();
+        final client = HachidoriSharingClient(
+          connector: connector.call,
+          reconnectScheduler: scheduler.call,
+          clientName: 'Mangatan',
+          clientVersion: '1.2.22',
+        );
+        client.link('host.test');
+        await pumpEventQueue();
+        final socket = connector.sockets.single;
+        socket.receive(_hello(snapshot: const {}));
+        await pumpEventQueue();
+        socket.sendError = StateError('write failed');
+
+        await expectLater(
+          client.status(),
+          throwsA(isA<HachidoriConnectionException>()),
+        );
+
+        expect(socket.closed, isTrue);
+        expect(client.state.ready, isFalse);
+        expect(scheduler.delays, const [Duration(milliseconds: 500)]);
+        client.dispose();
+      },
+    );
 
     test('a host that never replies does not leak a pending request', () async {
       final connector = _FakeConnector();
@@ -1044,6 +1145,7 @@ class _FakeSocket implements HachidoriWebSocket {
   final StreamController<Object?> _messages = StreamController<Object?>();
   final List<String> sent = [];
   bool closed = false;
+  Object? sendError;
 
   List<Object?> get decodedSent => sent.map(jsonDecode).toList();
 
@@ -1068,7 +1170,10 @@ class _FakeSocket implements HachidoriWebSocket {
   Future<void> get ready => Future.value();
 
   @override
-  void send(String text) => sent.add(text);
+  void send(String text) {
+    if (sendError case final error?) throw error;
+    sent.add(text);
+  }
 
   @override
   Future<void> close([int? code, String? reason]) async {

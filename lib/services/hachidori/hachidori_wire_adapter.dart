@@ -5,6 +5,9 @@ import 'package:mangayomi/services/hachidori/hachidori_models.dart';
 import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';
 
+const int _maxRemoteMediaEncodedBytes = 16 * 1024 * 1024;
+const int _maxRemoteMediaDecodedBytes = 12 * 1024 * 1024;
+
 List<HoshiLookupResult> adaptHachidoriLookupResults(Object? value) {
   final rows = _list(value, 'lookup results');
   return List<HoshiLookupResult>.unmodifiable(
@@ -188,11 +191,12 @@ List<HoshiDictionaryStyle> adaptHachidoriStyles(Object? value) =>
 Uint8List? adaptHachidoriMedia(Object? value) {
   if (value == null) return null;
   if (value is! String) _malformed('media data URL');
-  final match = RegExp(
-    r'^data:([a-z0-9.+-]+/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$',
-    caseSensitive: false,
-  ).firstMatch(value);
-  if (match == null) _malformed('media data URL');
+  const marker = ';base64,';
+  if (!value.startsWith('data:')) _malformed('media data URL');
+  final markerIndex = value.indexOf(marker, 5);
+  if (markerIndex < 0 || value.indexOf(marker, markerIndex + 1) >= 0) {
+    _malformed('media data URL');
+  }
   const mediaTypes = {
     'image/avif',
     'image/webp',
@@ -201,14 +205,20 @@ Uint8List? adaptHachidoriMedia(Object? value) {
     'image/gif',
     'image/svg+xml',
   };
-  final mediaType = match.group(1)!.toLowerCase();
-  final payload = match.group(2)!;
+  final mediaType = value.substring(5, markerIndex).toLowerCase();
+  final payload = value.substring(markerIndex + marker.length);
   if (!mediaTypes.contains(mediaType) || payload.length % 4 != 0) {
     _malformed('media data URL');
+  }
+  if (payload.length > _maxRemoteMediaEncodedBytes) {
+    throw const HachidoriProtocolException('remote media is too large');
   }
   try {
     final decoded = base64Decode(payload);
     if (decoded.isEmpty) _malformed('media data URL');
+    if (decoded.length > _maxRemoteMediaDecodedBytes) {
+      throw const HachidoriProtocolException('remote media is too large');
+    }
     return decoded;
   } on FormatException {
     _malformed('media data URL');

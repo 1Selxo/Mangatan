@@ -234,6 +234,14 @@ void main() {
       ]);
     });
 
+    test('rejects oversized media before decoding', () {
+      final oversized = 'A' * (16 * 1024 * 1024 + 4);
+      expect(
+        () => adaptHachidoriMedia('data:image/png;base64,$oversized'),
+        throwsA(isA<HachidoriProtocolException>()),
+      );
+    });
+
     test('rejects non-base64, unsupported MIME, and invalid base64 data', () {
       for (final value in [
         'data:image/png,raw',

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/hachidori_link_section.dart';
@@ -117,6 +119,32 @@ void main() {
       isNull,
     );
   });
+
+  testWidgets('ignores a probe failure after the address changes', (
+    tester,
+  ) async {
+    final probe = Completer<HachidoriProbeResult>();
+    final controller = _FakeLinkController()..pendingProbe = probe;
+    await tester.pumpWidget(
+      _app(
+        HachidoriDictionaryLibraryPanel(
+          controller: controller,
+          localControls: const SizedBox(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const ValueKey('hachidori-address-field'));
+    await tester.enterText(field, 'old.test');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.enterText(field, 'new.test');
+    probe.completeError(StateError('obsolete failure'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('obsolete failure'), findsNothing);
+  });
 }
 
 Widget _app(Widget child) => MaterialApp(
@@ -129,6 +157,7 @@ class _FakeLinkController extends ChangeNotifier
       const HachidoriLinkConfiguration.disabled();
   HachidoriClientState _state = const HachidoriClientState();
   String? probeError;
+  Completer<HachidoriProbeResult>? pendingProbe;
 
   @override
   HachidoriLinkConfiguration get configuration => _configuration;
@@ -145,6 +174,7 @@ class _FakeLinkController extends ChangeNotifier
   @override
   Future<HachidoriProbeResult> probe(String address) async {
     if (probeError case final String error) throw StateError(error);
+    if (pendingProbe case final pending?) return pending.future;
     return const HachidoriProbeResult(
       host: HachidoriHostIdentity(
         version: '1.0.0',

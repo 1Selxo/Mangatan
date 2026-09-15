@@ -116,7 +116,9 @@ class _HachidoriLinkSectionState extends State<HachidoriLinkSection> {
         _probedAddress = address;
       });
     } on Object catch (error) {
-      if (mounted) setState(() => _error = _describeError(error));
+      if (mounted && address == _addressController.text.trim()) {
+        setState(() => _error = _describeError(error));
+      }
     } finally {
       if (mounted) setState(() => _probing = false);
     }

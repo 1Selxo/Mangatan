@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/services/dictionary/dictionary_read_backend.dart';
@@ -94,6 +96,41 @@ void main() {
       facade.dispose();
     },
   );
+
+  test('serializes concurrent link and unlink mutations', () async {
+    final client = _FacadeClient();
+    final store = _ControlledConfigurationStore(
+      const HachidoriLinkConfiguration.disabled(),
+    );
+    final facade = DictionaryReadFacade.testing(
+      local: _FacadeBackend('local'),
+      configurationStore: store,
+      clientFactory: () async => client,
+    );
+    await facade.initialize();
+
+    final link = facade.link('new.test');
+    await pumpEventQueue();
+    expect(store.pendingWrites, hasLength(1));
+
+    final unlink = facade.unlink();
+    await pumpEventQueue();
+    expect(store.pendingWrites, hasLength(1));
+    expect(client.unlinkCalls, 0);
+
+    store.completeNextWrite();
+    await link;
+    await pumpEventQueue();
+    expect(store.pendingWrites, hasLength(1));
+    store.completeNextWrite();
+    await unlink;
+
+    expect(client.linkedAddresses, ['new.test']);
+    expect(client.unlinkCalls, 1);
+    expect(facade.remoteEnabled, isFalse);
+    expect(store.value.enabled, isFalse);
+    facade.dispose();
+  });
 }
 
 class _MemoryConfigurationStore implements HachidoriConfigurationStore {
@@ -109,6 +146,30 @@ class _MemoryConfigurationStore implements HachidoriConfigurationStore {
   Future<void> write(HachidoriLinkConfiguration configuration) async {
     value = configuration;
     writes.add(configuration);
+  }
+}
+
+class _ControlledConfigurationStore implements HachidoriConfigurationStore {
+  _ControlledConfigurationStore(this.value);
+
+  HachidoriLinkConfiguration value;
+  final List<({HachidoriLinkConfiguration value, Completer<void> completer})>
+  pendingWrites = [];
+
+  @override
+  Future<HachidoriLinkConfiguration> read() async => value;
+
+  @override
+  Future<void> write(HachidoriLinkConfiguration configuration) {
+    final completer = Completer<void>();
+    pendingWrites.add((value: configuration, completer: completer));
+    return completer.future;
+  }
+
+  void completeNextWrite() {
+    final pending = pendingWrites.removeAt(0);
+    value = pending.value;
+    pending.completer.complete();
   }
 }
 

@@ -323,8 +323,10 @@ class HachidoriSharingClient extends ChangeNotifier
           'The remote dictionary media changed after lookup.',
         );
       }
-      return _parseTypedResponse(
-        () => adaptHachidoriMedia(response.payload['dataUrl']),
+      return await Future.sync(
+        () => _parseTypedResponse(
+          () => adaptHachidoriMedia(response.payload['dataUrl']),
+        ),
       );
     } on HachidoriRemoteException catch (error) {
       if (error.message.toLowerCase().contains('generation')) {
@@ -360,7 +362,12 @@ class HachidoriSharingClient extends ChangeNotifier
         },
         onDone: () => _handleSocketDone(socket, generation),
       );
-      socket.send(_clientHello());
+      try {
+        socket.send(_clientHello());
+      } on Object catch (error) {
+        _disconnectSocket(socket, generation, _describe(error));
+        return;
+      }
     } catch (error) {
       if (_disposed || generation != _generation) return;
       _rejectWaiting(
@@ -421,10 +428,10 @@ class HachidoriSharingClient extends ChangeNotifier
             if (entry.value == null) {
               next.remove(entry.key);
             } else {
-              next[entry.key] = _freezeJson(entry.value);
+              next[entry.key] = entry.value;
             }
           }
-          final snapshot = Map<String, Object?>.unmodifiable(next);
+          final snapshot = _freezeMap(next);
           final dictionaries = _parseDictionaries(snapshot);
           _setState(
             HachidoriClientState(
@@ -564,6 +571,7 @@ class HachidoriSharingClient extends ChangeNotifier
       );
     } on Object catch (error, stackTrace) {
       _pending.remove(requestId)?.timeout.cancel();
+      _disconnectSocket(socket, requestGeneration, _describe(error));
       Error.throwWithStackTrace(
         HachidoriConnectionException(_describe(error)),
         stackTrace,
@@ -666,7 +674,6 @@ class HachidoriSharingClient extends ChangeNotifier
           payload['ok'] is! bool) {
         throw const HachidoriProtocolException('malformed sharing response');
       }
-      final generationValue = _responseGeneration(payload['generation']);
       if (payload['ok'] != true) {
         throw HachidoriRemoteException(
           payload['error']?.toString() ?? 'The Hachidori request failed.',
@@ -675,6 +682,7 @@ class HachidoriSharingClient extends ChangeNotifier
               : null,
         );
       }
+      final generationValue = _responseGeneration(payload['generation']);
       request.completer.complete(
         _TypedResponse(
           payload: Map<String, Object?>.unmodifiable(payload),
@@ -850,9 +858,11 @@ class _ByeFrame extends _HostFrame {
 }
 
 _HostFrame _parseHostFrame(Object? message) {
-  if (message is! String) {
+  const maxFrameCharacters = 20 * 1024 * 1024;
+  if (message is! String || message.length > maxFrameCharacters) {
     throw const FormatException('malformed sharing frame');
   }
+  _validateJsonDepth(message);
   final Object? decoded;
   try {
     decoded = jsonDecode(message);
@@ -951,21 +961,73 @@ int _responseCount(Object? value, String field) {
 }
 
 Map<String, Object?> _freezeMap(Map<String, Object?> value) =>
-    Map<String, Object?>.unmodifiable({
-      for (final entry in value.entries) entry.key: _freezeJson(entry.value),
-    });
+    _freezeJson(value, _JsonBudget()) as Map<String, Object?>;
 
-Object? _freezeJson(Object? value) {
+Object? _freezeJson(Object? value, _JsonBudget budget, [int depth = 0]) {
+  budget.consume(value, depth);
   if (value is Map) {
-    return _freezeMap(_stringMap(value, 'malformed sharing snapshot'));
+    final source = _stringMap(value, 'malformed sharing snapshot');
+    return Map<String, Object?>.unmodifiable({
+      for (final entry in source.entries)
+        entry.key: _freezeJson(entry.value, budget, depth + 1),
+    });
   }
   if (value is List) {
-    return List<Object?>.unmodifiable(value.map(_freezeJson));
+    return List<Object?>.unmodifiable(
+      value.map((item) => _freezeJson(item, budget, depth + 1)),
+    );
   }
   if (value == null || value is String || value is num || value is bool) {
     return value;
   }
   throw const FormatException('malformed sharing snapshot');
+}
+
+void _validateJsonDepth(String source) {
+  const maxDepth = 64;
+  var depth = 0;
+  var inString = false;
+  var escaped = false;
+  for (final codeUnit in source.codeUnits) {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (codeUnit == 0x5c) {
+        escaped = true;
+      } else if (codeUnit == 0x22) {
+        inString = false;
+      }
+      continue;
+    }
+    if (codeUnit == 0x22) {
+      inString = true;
+    } else if (codeUnit == 0x7b || codeUnit == 0x5b) {
+      if (++depth > maxDepth) {
+        throw const FormatException('sharing frame is too deeply nested');
+      }
+    } else if (codeUnit == 0x7d || codeUnit == 0x5d) {
+      depth--;
+    }
+  }
+}
+
+class _JsonBudget {
+  static const maxDepth = 64;
+  static const maxNodes = 100000;
+  static const maxStringCharacters = 16 * 1024 * 1024;
+
+  var nodes = 0;
+  var stringCharacters = 0;
+
+  void consume(Object? value, int depth) {
+    nodes++;
+    if (value is String) stringCharacters += value.length;
+    if (depth > maxDepth ||
+        nodes > maxNodes ||
+        stringCharacters > maxStringCharacters) {
+      throw const FormatException('sharing snapshot is too large');
+    }
+  }
 }
 
 List<HachidoriDictionaryInfo> _parseDictionaries(

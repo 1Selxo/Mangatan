@@ -52,6 +52,7 @@ class DictionaryReadFacade extends ChangeNotifier
   Future<void>? _initializing;
   bool _initialized = false;
   bool _disposed = false;
+  Future<void> _configurationMutation = Future.value();
 
   @override
   HachidoriLinkConfiguration get configuration => _configuration;
@@ -96,29 +97,30 @@ class DictionaryReadFacade extends ChangeNotifier
   }
 
   @override
-  Future<void> link(String address) async {
-    await initialize();
-    HachidoriLinkAddress.parse(address);
-    final normalized = address.trim();
-    final client = await _ensureClient();
-    client.link(normalized);
-    final configuration = HachidoriLinkConfiguration(
-      enabled: true,
-      address: normalized,
-    );
-    try {
-      await _configurationStore.write(configuration);
-    } on Object {
-      client.unlink();
-      rethrow;
-    }
-    _remote?.clearCaches();
-    _configuration = configuration;
-    if (!_disposed) notifyListeners();
-  }
+  Future<void> link(String address) =>
+      _serializeConfigurationMutation(() async {
+        await initialize();
+        HachidoriLinkAddress.parse(address);
+        final normalized = address.trim();
+        final client = await _ensureClient();
+        client.link(normalized);
+        final configuration = HachidoriLinkConfiguration(
+          enabled: true,
+          address: normalized,
+        );
+        try {
+          await _configurationStore.write(configuration);
+        } on Object {
+          client.unlink();
+          rethrow;
+        }
+        _remote?.clearCaches();
+        _configuration = configuration;
+        if (!_disposed) notifyListeners();
+      });
 
   @override
-  Future<void> unlink() async {
+  Future<void> unlink() => _serializeConfigurationMutation(() async {
     await initialize();
     final configuration = HachidoriLinkConfiguration(
       enabled: false,
@@ -129,6 +131,14 @@ class DictionaryReadFacade extends ChangeNotifier
     _remote?.clearCaches();
     _configuration = configuration;
     if (!_disposed) notifyListeners();
+  });
+
+  Future<void> _serializeConfigurationMutation(
+    Future<void> Function() mutation,
+  ) {
+    final result = _configurationMutation.then((_) => mutation());
+    _configurationMutation = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
   }
 
   Future<HachidoriLinkClient> _ensureClient() async {

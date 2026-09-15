@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/services/hachidori/hachidori_models.dart';
@@ -44,6 +43,7 @@ class HachidoriSharingClient extends ChangeNotifier
     HachidoriReconnectScheduler? reconnectScheduler,
     this.origin = hachidoriDefaultOrigin,
     this.connectWait = const Duration(seconds: 5),
+    this.requestWait = const Duration(seconds: 15),
   }) : _clientName = clientName,
        _clientVersion = clientVersion,
        _connector = connector ?? _connectIoWebSocket,
@@ -55,6 +55,7 @@ class HachidoriSharingClient extends ChangeNotifier
   final HachidoriReconnectScheduler _reconnectScheduler;
   final String origin;
   final Duration connectWait;
+  final Duration requestWait;
 
   HachidoriClientState _state = const HachidoriClientState();
   HachidoriWebSocket? _socket;
@@ -71,12 +72,15 @@ class HachidoriSharingClient extends ChangeNotifier
   final Set<int> _connectingGenerations = <int>{};
   bool _disposed = false;
 
+  @override
   HachidoriClientState get state => _state;
 
+  @override
   Stream<HachidoriLibraryEvent> get libraryEvents => _libraryEvents.stream;
 
   int? get dictionaryGeneration => _dictionaryGeneration;
 
+  @override
   void link(String address) {
     final parsed = HachidoriLinkAddress.parse(address);
     _cancelReconnect();
@@ -99,6 +103,7 @@ class HachidoriSharingClient extends ChangeNotifier
     unawaited(_connect(parsed, generation));
   }
 
+  @override
   void unlink() {
     _cancelReconnect();
     _reconnectAttempt = 0;
@@ -117,6 +122,7 @@ class HachidoriSharingClient extends ChangeNotifier
     _setState(const HachidoriClientState());
   }
 
+  @override
   Future<HachidoriProbeResult> probe(String address) async {
     final parsed = HachidoriLinkAddress.parse(address);
     HachidoriWebSocket? socket;
@@ -234,6 +240,7 @@ class HachidoriSharingClient extends ChangeNotifier
     });
   }
 
+  @override
   Future<List<HoshiLookupResult>> lookup(
     String text, {
     int maxResults = 10,
@@ -254,6 +261,7 @@ class HachidoriSharingClient extends ChangeNotifier
     });
   }
 
+  @override
   Future<List<HoshiLookupResult>> lookupDictionary(
     String text, {
     required String dictionary,
@@ -276,6 +284,7 @@ class HachidoriSharingClient extends ChangeNotifier
     });
   }
 
+  @override
   Future<List<HoshiLookupResult>> lookupKanji(String character) async {
     final response = await _request('hd_kanji', {'character': character});
     return _parseTypedResponse(
@@ -283,6 +292,7 @@ class HachidoriSharingClient extends ChangeNotifier
     );
   }
 
+  @override
   Future<List<HoshiDictionaryStyle>> styles() async {
     final response = await _request('hd_styles');
     return _parseTypedResponse(
@@ -290,6 +300,7 @@ class HachidoriSharingClient extends ChangeNotifier
     );
   }
 
+  @override
   Future<Uint8List?> media({
     required String dictionary,
     required String path,
@@ -520,11 +531,24 @@ class HachidoriSharingClient extends ChangeNotifier
     }
 
     final completer = Completer<_TypedResponse>();
-    _pending[requestId] = _PendingRequest(
+    late final _PendingRequest request;
+    final timeout = Timer(requestWait, () {
+      if (identical(_pending.remove(requestId), request) &&
+          !completer.isCompleted) {
+        completer.completeError(
+          const HachidoriConnectionException(
+            'The Hachidori request did not answer in time.',
+          ),
+        );
+      }
+    });
+    request = _PendingRequest(
       generation: requestGeneration,
       resultType: '${type}_result',
       completer: completer,
+      timeout: timeout,
     );
+    _pending[requestId] = request;
     try {
       socket.send(
         jsonEncode({
@@ -539,7 +563,7 @@ class HachidoriSharingClient extends ChangeNotifier
         }),
       );
     } on Object catch (error, stackTrace) {
-      _pending.remove(requestId);
+      _pending.remove(requestId)?.timeout.cancel();
       Error.throwWithStackTrace(
         HachidoriConnectionException(_describe(error)),
         stackTrace,
@@ -614,6 +638,7 @@ class HachidoriSharingClient extends ChangeNotifier
 
   void _rejectPendingAndWaiting(HachidoriException error) {
     for (final request in _pending.values) {
+      request.timeout.cancel();
       if (!request.completer.isCompleted) {
         request.completer.completeError(error);
       }
@@ -633,6 +658,7 @@ class HachidoriSharingClient extends ChangeNotifier
     final request = _pending[requestId];
     if (request == null || request.generation != generation) return;
     _pending.remove(requestId);
+    request.timeout.cancel();
     try {
       final payload = _stringMap(frame.response, 'malformed sharing response');
       if (payload['type'] != request.resultType ||
@@ -761,11 +787,13 @@ class _PendingRequest {
     required this.generation,
     required this.resultType,
     required this.completer,
+    required this.timeout,
   });
 
   final int generation;
   final String resultType;
   final Completer<_TypedResponse> completer;
+  final Timer timeout;
 }
 
 class _ReadyWaiter {

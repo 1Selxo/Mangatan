@@ -377,6 +377,42 @@ void main() {
       client.dispose();
     });
 
+    test('a host that never replies does not leak a pending request', () async {
+      final connector = _FakeConnector();
+      final client = HachidoriSharingClient(
+        connector: connector.call,
+        clientName: 'Mangatan',
+        clientVersion: '1.2.22',
+        requestWait: const Duration(milliseconds: 20),
+      );
+      client.link('host.test');
+      await pumpEventQueue();
+      final socket = connector.sockets.single;
+      socket.receive(_hello(snapshot: const {}));
+      await pumpEventQueue();
+
+      await expectLater(
+        client.status(),
+        throwsA(
+          isA<HachidoriConnectionException>().having(
+            (error) => error.message,
+            'message',
+            contains('did not answer in time'),
+          ),
+        ),
+      );
+
+      final next = client.status();
+      await pumpEventQueue();
+      final request = _lastRequest(socket, 'hd_status');
+      socket.reply(
+        request,
+        _statusResponse(requestId: request['id'] as int, generation: 3),
+      );
+      expect((await next).generation, 3);
+      client.dispose();
+    });
+
     test(
       'relink connects the new host while the old connector is pending',
       () async {

@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/services/hachidori/hachidori_protocol.dart';
 import 'package:mangayomi/src/rust/api/hoshidicts.dart';

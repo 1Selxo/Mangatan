@@ -152,9 +152,9 @@ void main() {
         expect(result.matched, '食');
         expect(result.term.expression, '食');
         expect(result.term.glossaries.single.dictName, 'KANJIDIC');
-        final glossary =
-            jsonDecode(result.term.glossaries.single.glossary)
-                as Map<String, dynamic>;
+        final glossary = jsonDecode(
+          result.term.glossaries.single.glossary,
+        ) as Map<String, dynamic>;
         expect(glossary['type'], yomitanKanjiContentType);
         expect(glossary['character'], '食');
         expect(glossary['dictionary'], 'KANJIDIC');

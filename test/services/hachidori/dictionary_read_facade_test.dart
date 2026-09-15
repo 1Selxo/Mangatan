@@ -97,6 +97,30 @@ void main() {
     },
   );
 
+  test(
+    'restores the prior enabled link when relink persistence fails',
+    () async {
+      final client = _FacadeClient();
+      final store = _FailingConfigurationStore(
+        const HachidoriLinkConfiguration(enabled: true, address: 'old.test'),
+      );
+      final facade = DictionaryReadFacade.testing(
+        local: _FacadeBackend('local'),
+        configurationStore: store,
+        clientFactory: () async => client,
+      );
+      await facade.initialize();
+
+      await expectLater(facade.link('new.test'), throwsStateError);
+
+      expect(client.linkedAddresses, ['old.test', 'new.test', 'old.test']);
+      expect(client.unlinkCalls, 0);
+      expect(facade.remoteEnabled, isTrue);
+      expect((await facade.lookup('word')).single.matched, 'remote');
+      facade.dispose();
+    },
+  );
+
   test('serializes concurrent link and unlink mutations', () async {
     final client = _FacadeClient();
     final store = _ControlledConfigurationStore(
@@ -146,6 +170,20 @@ class _MemoryConfigurationStore implements HachidoriConfigurationStore {
   Future<void> write(HachidoriLinkConfiguration configuration) async {
     value = configuration;
     writes.add(configuration);
+  }
+}
+
+class _FailingConfigurationStore implements HachidoriConfigurationStore {
+  _FailingConfigurationStore(this.value);
+
+  final HachidoriLinkConfiguration value;
+
+  @override
+  Future<HachidoriLinkConfiguration> read() async => value;
+
+  @override
+  Future<void> write(HachidoriLinkConfiguration configuration) async {
+    throw StateError('write failed');
   }
 }
 

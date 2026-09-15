@@ -103,6 +103,7 @@ class DictionaryReadFacade extends ChangeNotifier
         HachidoriLinkAddress.parse(address);
         final normalized = address.trim();
         final client = await _ensureClient();
+        final previousConfiguration = _configuration;
         client.link(normalized);
         final configuration = HachidoriLinkConfiguration(
           enabled: true,
@@ -111,7 +112,11 @@ class DictionaryReadFacade extends ChangeNotifier
         try {
           await _configurationStore.write(configuration);
         } on Object {
-          client.unlink();
+          if (previousConfiguration.enabled) {
+            client.link(previousConfiguration.address);
+          } else {
+            client.unlink();
+          }
           rethrow;
         }
         _remote?.clearCaches();

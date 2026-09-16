@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.21",
-      "versionDate": "2026-09-12T08:41:43Z",
+      "version": "1.2.22",
+      "versionDate": "2026-09-13T12:58:18Z",
       "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21-beta.1/Mangatan-v1.2.21-beta.1-build.205-6f6c54a-ios.ipa",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.22/Mangatan-v1.2.22-build.209-63d747f-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 179041650,
+      "size": 179041178,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,11 +30,18 @@
       ],
       "versions": [
         {
-          "version": "1.2.21",
-          "date": "2026-09-12T08:41:43Z",
+          "version": "1.2.22",
+          "date": "2026-09-13T12:58:18Z",
           "localizedDescription": "",
-          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21-beta.1/Mangatan-v1.2.21-beta.1-build.205-6f6c54a-ios.ipa",
-          "size": 179041650
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.22/Mangatan-v1.2.22-build.209-63d747f-ios.ipa",
+          "size": 179041178
+        },
+        {
+          "version": "1.2.21",
+          "date": "2026-09-13T01:31:27Z",
+          "localizedDescription": "Changelog\n\nDownloads\n\u2022 Preserve the existing queue when adding more chapters or episodes.\n\u2022 Queue \u201cNext X episodes\u201d in ascending playback order and skip watched episodes.\n\u2022 Use the same saved server and quality preference as playback for direct and HLS streams.\n\u2022 Resume validated partial video downloads safely, reject incomplete responses, and retry stalled transfers with backoff.\n\u2022 Preserve completed HLS segments across retries and reduce progress\u2022update overhead.\n\nVideo and OCR\n\u2022 Make OCR text easier to discover and click, with displayed characters retaining a minimum 10% opacity when not selected.\n\u2022 Improve OCR text fitting and hit testing.\n\u2022 Use the dedicated Linux media render\u2022thread fork to reduce playback stutter.\n\nSources and compatibility\n\u2022 Rebuild the iOS app with M\u2022Extension\u2022Server v1.0.6.5.\n\u2022 Restore Anichi/MegaPlay streams by supporting encrypted source responses and preserving the selected server parameter.\n\u2022 Normalize malformed or repeated Anichi URLs that could produce \"anichi.tohttps\" failures.\n\u2022 Preserve extension\u2022provided subtitle tracks, including Anichi episode subtitles.\n\nOther fixes\n\u2022 Keep nested backup providers alive while restoring data.\n\u2022 Add a PowerShell helper for repeatable Windows builds.\n\niOS rebuild\n\u2022 The v1.2.21 IPA was refreshed as build 208 from commit \"140f9dd5\" with the updated embedded Mihon runtime. Existing Windows, macOS, and Linux assets are unchanged.",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.21/Mangatan-v1.2.21-build.208-140f9dd-ios.ipa",
+          "size": 179037263
         },
         {
           "version": "1.2.20",
@@ -369,6 +376,28 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.21-beta.1"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.21 - 13 Sep",
+      "identifier": "release-1.2.21",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-09-13T01:31:27Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.21"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.22 - 13 Sep",
+      "identifier": "release-1.2.22",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-09-13T12:58:18Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.22"
     }
   ]
 }

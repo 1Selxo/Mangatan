@@ -515,7 +515,7 @@ Future<void> _processFileDownload(
       while (queue.isNotEmpty &&
           activeTasks.length < params.concurrentDownloads) {
         final pageUrl = queue.removeFirst();
-        final task = _downloadFile(pageUrl, client, params.itemType, replyPort)
+        final task = downloadFile(pageUrl, client, params.itemType, replyPort)
             .then((_) {
               if (params.itemType != ItemType.anime) {
                 completed++;
@@ -555,7 +555,8 @@ Future<void> _processFileDownload(
 }
 
 /// Download an individual file
-Future<void> _downloadFile(
+@visibleForTesting
+Future<void> downloadFile(
   PageUrl pageUrl,
   Client client,
   ItemType itemType,
@@ -582,10 +583,21 @@ Future<void> _downloadFile(
       final targetFile = File(path.setExtension(pageUrl.fileName!, realExt));
       await targetFile.writeAsBytes(bytes);
     } else {
-      // Streaming for videos (saves RAM)
+      // Retain bytes between attempts only when the server supplies a validator.
+      // If it ignores Range/If-Range, restart instead of appending a full body.
+      var offset = 0;
+      String? validator;
       await _withRetry(() async {
         var request = Request('GET', Uri.parse(pageUrl.url));
         request.headers.addAll(pageUrl.headers ?? {});
+        if (offset > 0 && validator != null) {
+          request.headers.removeWhere(
+            (key, _) =>
+                key.toLowerCase() == 'range' || key.toLowerCase() == 'if-range',
+          );
+          request.headers['Range'] = 'bytes=$offset-';
+          request.headers['If-Range'] = validator!;
+        }
         // Connection/response-headers timeout. Without it, a wifi drop after
         // streaming has begun makes the stream idle-timeout fire, retry, and
         // then hang forever on this send with no network — the download stalls
@@ -599,13 +611,33 @@ Future<void> _downloadFile(
         // streaming request (e.g. AnimeGG). Rejecting 206 here caused 3
         // retries → silent stall.
         if (response.statusCode < 200 || response.statusCode >= 300) {
+          await response.stream.listen((_) {}).cancel();
           throw DownloadPoolException(
             'Failed to download file: ${pageUrl.fileName!} '
             '(status ${response.statusCode})',
           );
         }
-        int total = response.contentLength ?? 0;
-        int received = 0;
+        final range = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$')
+            .firstMatch(response.headers['content-range'] ?? '');
+        final append =
+            offset > 0 && validator != null && response.statusCode == 206;
+        if (response.statusCode == 206 &&
+            (range == null ||
+                int.parse(range.group(1)!) != (append ? offset : 0))) {
+          await response.stream.listen((_) {}).cancel();
+          offset = 0;
+          validator = null;
+          throw DownloadPoolException('Invalid video Content-Range');
+        }
+        if (!append) offset = 0;
+        final etag = response.headers['etag'];
+        validator = etag != null && !etag.startsWith('W/')
+            ? etag
+            : response.headers['last-modified'];
+        int total = range != null
+            ? int.parse(range.group(3)!)
+            : (response.contentLength ?? 0);
+        int received = offset;
         // Throttle progress. Emitting on every chunk floods the main isolate
         // with synchronous DB writes (setProgress) and freezes the whole UI
         // while a download runs — worst with large single files (anime .mp4).
@@ -615,7 +647,9 @@ Future<void> _downloadFile(
         final progressWatch = Stopwatch()..start();
 
         final file = File(pageUrl.fileName!);
-        final sink = file.openWrite();
+        final sink = file.openWrite(
+          mode: append ? FileMode.append : FileMode.write,
+        );
         try {
           // Idle timeout: if no bytes arrive for 30s the connection has
           // stalled, so fail (and retry) instead of hanging the whole
@@ -647,9 +681,23 @@ Future<void> _downloadFile(
               } catch (_) {}
             }
           }
+          if (received == 0 || (total > 0 && received != total)) {
+            throw DownloadPoolException(
+              'Incomplete video: received $received of $total bytes',
+            );
+          }
         } finally {
           await sink.flush();
           await sink.close();
+          offset = validator != null ? await file.length() : 0;
+        }
+        try {
+          await validateDownloadedVideoFile(file);
+        } catch (_) {
+          if (await file.exists()) await file.delete();
+          offset = 0;
+          validator = null;
+          rethrow;
         }
       }, 3);
     }
@@ -751,6 +799,16 @@ Future<void> _downloadSegment(
           );
           await partial.writeAsBytes(decrypted);
         }
+        final contentType =
+            response.headers[HttpHeaders.contentTypeHeader] ?? '';
+        if (isLikelyMpegTs(ts.url, contentType) ||
+            contentType.toLowerCase().startsWith('image/') ||
+            contentType.toLowerCase().contains('text/html')) {
+          final normalized = normalizeMpegTsSegment(
+            await partial.readAsBytes(),
+          );
+          await partial.writeAsBytes(normalized, flush: true);
+        }
         // Only complete, decrypted segments may be reused after a retry.
         await partial.rename(file.path);
       } catch (_) {
@@ -760,6 +818,91 @@ Future<void> _downloadSegment(
     }, 3);
   } catch (e) {
     throw DownloadPoolException('Failed to process segment: ${ts.name}', e);
+  }
+}
+
+const _mpegTsPacketSize = 188;
+const _minimumMpegTsSyncRun = 4;
+const _maxMpegTsPrefix = 8 * 1024;
+
+bool isLikelyMpegTs(String url, String contentType) {
+  final urlPath = Uri.tryParse(url)?.path.toLowerCase() ?? url.toLowerCase();
+  return urlPath.endsWith('.ts') || contentType.toLowerCase().contains('mp2t');
+}
+
+bool hasErrorMediaPrefix(List<int> bytes) {
+  bool startsWith(List<int> signature) =>
+      bytes.length >= signature.length &&
+      List.generate(
+        signature.length,
+        (index) => bytes[index] == signature[index],
+      ).every((matches) => matches);
+  final textPrefix = String.fromCharCodes(bytes.take(256)).trimLeft();
+  return startsWith([0x89, 0x50, 0x4e, 0x47]) ||
+      startsWith([0xff, 0xd8, 0xff]) ||
+      startsWith([0x47, 0x49, 0x46, 0x38]) ||
+      RegExp(r'^(<!doctype|<html)', caseSensitive: false).hasMatch(textPrefix);
+}
+
+/// Removes CDN error-image/junk prefixes and returns a stable MPEG-TS grid.
+/// Throws for image/HTML/error bodies so they are retried instead of merged.
+Uint8List normalizeMpegTsSegment(List<int> bytes) {
+  if (bytes.length < _mpegTsPacketSize * _minimumMpegTsSyncRun) {
+    throw DownloadPoolException('Transport stream segment is too small');
+  }
+  final lastCandidate =
+      (bytes.length - (_mpegTsPacketSize * _minimumMpegTsSyncRun)).clamp(
+        0,
+        _maxMpegTsPrefix,
+      );
+  int start = -1;
+  for (var candidate = 0; candidate <= lastCandidate; candidate++) {
+    var aligned = true;
+    for (var packet = 0; packet < _minimumMpegTsSyncRun; packet++) {
+      if (bytes[candidate + packet * _mpegTsPacketSize] != 0x47) {
+        aligned = false;
+        break;
+      }
+    }
+    if (aligned) {
+      start = candidate;
+      break;
+    }
+  }
+  if (start < 0) {
+    throw DownloadPoolException('Response is not an MPEG-TS segment');
+  }
+  final completeLength =
+      ((bytes.length - start) ~/ _mpegTsPacketSize) * _mpegTsPacketSize;
+  if (completeLength < _mpegTsPacketSize * _minimumMpegTsSyncRun) {
+    throw DownloadPoolException('Transport stream segment is incomplete');
+  }
+  if (start == 0 && completeLength == bytes.length && bytes is Uint8List) {
+    return bytes;
+  }
+  return Uint8List.fromList(bytes.sublist(start, start + completeLength));
+}
+
+/// Rejects the common false-success responses before an anime download is
+/// recorded as complete. Unknown large containers remain supported.
+Future<void> validateDownloadedVideoFile(File file) async {
+  if (!await file.exists()) {
+    throw DownloadPoolException('Downloaded video file is missing');
+  }
+  if (await file.length() < 64 * 1024) {
+    throw DownloadPoolException('Downloaded video file is too small');
+  }
+  final handle = await file.open();
+  late final Uint8List prefix;
+  try {
+    prefix = await handle.read(8 * 1024);
+  } finally {
+    await handle.close();
+  }
+  if (hasErrorMediaPrefix(prefix)) {
+    throw DownloadPoolException(
+      'Downloaded video contains an image or HTTP error response',
+    );
   }
 }
 
@@ -800,6 +943,7 @@ Future<T> _withRetry<T>(Future<T> Function() operation, int maxRetries) async {
           e,
         );
       }
+      await Future<void>.delayed(Duration(seconds: attempts));
     }
   }
 }

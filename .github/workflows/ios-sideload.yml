@@ -112,6 +112,7 @@ jobs:
             test/services/mining/anki_mobile_service_test.dart \
             test/services/mining/dictionary_profile_test.dart \
             test/services/mining/mining_preferences_profile_test.dart \
+            test/services/download_manager/m3u8_downloader_test.dart \
             test/services/m_extension_server_test.dart \
             test/modules/anime/player_lifecycle_test.dart \
             test/utils/app_font_fallback_test.dart

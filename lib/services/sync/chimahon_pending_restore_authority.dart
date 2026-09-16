@@ -860,15 +860,25 @@ class ChimahonPendingRestoreAuthority {
     required K Function(T value) keyOf,
     T Function(T actual, T selected)? normalize,
   }) {
-    final actualByKey = _lastByKey(actual, keyOf);
+    // A few Mihon/Chimahon exports contain duplicate child identities (for
+    // example, two chapter rows with the same URL but different display
+    // metadata). Match those rows one-to-one instead of collapsing them to
+    // the last value for a key. The latter made a valid restored payload fail
+    // the safety audit whenever duplicate rows differed.
+    final actualByKey = <K, List<T>>{};
+    for (final actualValue in actual) {
+      actualByKey.putIfAbsent(keyOf(actualValue), () => []).add(actualValue);
+    }
     for (final selectedValue in selected) {
-      final actualValue = actualByKey[keyOf(selectedValue)];
-      if (actualValue == null) return false;
-      final normalized =
-          normalize?.call(actualValue.deepCopy(), selectedValue) ?? actualValue;
-      if (!_sameKnownWithSelectedUnknown(normalized, selectedValue)) {
-        return false;
-      }
+      final candidates = actualByKey[keyOf(selectedValue)];
+      if (candidates == null) return false;
+      final match = candidates.indexWhere((candidate) {
+        final normalized =
+            normalize?.call(candidate.deepCopy(), selectedValue) ?? candidate;
+        return _sameKnownWithSelectedUnknown(normalized, selectedValue);
+      });
+      if (match < 0) return false;
+      candidates.removeAt(match);
     }
     return true;
   }

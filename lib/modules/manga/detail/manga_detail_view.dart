@@ -889,6 +889,9 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                     width: seasonOverview ? context.width(1) : context.width(0.5),
                     height: context.height(1),
                     child: SingleChildScrollView(
+                      physics: seasonOverview
+                          ? const AlwaysScrollableScrollPhysics()
+                          : null,
                       child: _bodyContainer(chapterLength: chapters.length),
                     ),
                   ),

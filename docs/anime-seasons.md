@@ -46,9 +46,9 @@ the local hierarchy. Unimplemented Android flags remain preserved on the wire.
 
 These rules use protobuf [field presence](https://protobuf.dev/programming-guides/field_presence/),
 particularly because an absent fetch type must not become the zero-valued
-"seasons" enum. Compatibility is tested against the Anikku schema and legacy
-Chimahon projections; a future Chimahon release still needs an on-device
-round-trip check once its upstream changes are available.
+"seasons" enum. Compatibility is tested against the Anikku schema and the
+current Chimahon season implementation; a physical-device round-trip check
+still remains for the embedded bridge.
 
 ## Building both branches
 
@@ -56,7 +56,8 @@ Both repositories use `feature/anikku-seasons`. The exact bridge revision is
 stored in `tool/mihon_server_commit.txt`. The iOS sideload workflow builds and
 tests that revision on Ubuntu, transfers its JAR with a SHA-256 check, then
 packages it using the existing lazy OpenJDK runtime. Build number: 209.
-This requires neither a production release nor a main-branch merge.
+No production release was created; the changes remain on the feature branch
+for review.
 
 For local iOS preparation, build that bridge with JDK 21 and
 `./gradlew :server:test :server:shadowJar -PiosRuntime=true`, then set

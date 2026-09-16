@@ -43,6 +43,7 @@ Future<dynamic> updateMangaDetail(
     final getManga = await ref.read(
       getDetailProvider(url: manga.link!, source: source).future,
     );
+    if (!ref.mounted) return;
 
     final genre =
         getManga.genre
@@ -91,10 +92,12 @@ Future<dynamic> updateMangaDetail(
         getManga.seasons!,
         sourceIsLocal: source.isLocal == true,
       );
+      if (!ref.mounted) return;
       // Library refreshes also update each season's episodes and smart interval.
       // Initial browsing only fetches a season when it is opened.
       if (!isInit) {
         for (final id in seasonIds) {
+          if (!ref.mounted) return;
           await ref.read(
             updateMangaDetailProvider(
               mangaId: id,
@@ -102,6 +105,7 @@ Future<dynamic> updateMangaDetail(
               showToast: showToast,
             ).future,
           );
+          if (!ref.mounted) return;
         }
         // A series has no episodes of its own. Use the earliest child cadence
         // so smart library updates continue checking an actively airing season.

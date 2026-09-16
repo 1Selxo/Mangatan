@@ -27,12 +27,10 @@ import 'package:mangayomi/modules/library/library_screen.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
-import 'package:mangayomi/modules/manga/detail/providers/export_metadata.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/tracker_search_widget.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/tracker_widget.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
-import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/modules/more/providers/algorithm_weights_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
@@ -82,16 +80,11 @@ import '../../../utils/constant.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:isar_community/isar.dart';
-import 'package:mangayomi/modules/manga/detail/tv/tv_anime_detail_view.dart';
-import 'package:mangayomi/modules/manga/detail/widgets/tracking_menu.dart';
-import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
-import 'package:mangayomi/modules/widgets/tv_menu.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/download_repository.dart';
 import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:mangayomi/repositories/track_repository.dart';
 import 'package:mangayomi/utils/manga_cover_actions.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
 
 class MangaDetailView extends ConsumerStatefulWidget {
   final Function(bool) isExtended;
@@ -393,86 +386,6 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
   late final ScrollController _scrollController;
   late final isLocalArchive = widget.manga!.isLocalArchive ?? false;
 
-  /// The detail overflow actions, shared by the popup menu off-TV and the
-  /// centred TV menu.
-  Future<void> _onDetailOverflow(int value) async {
-    final l10n = l10nLocalizations(context)!;
-    switch (value) {
-      case 0:
-        widget.checkForUpdate(true);
-        break;
-      case 1:
-        showCategorySelectionDialog(
-          context: context,
-          ref: ref,
-          itemType: widget.manga!.itemType,
-          singleManga: widget.manga!,
-        );
-        break;
-      case 2:
-        final source = getSource(
-          widget.manga!.lang!,
-          widget.manga!.source!,
-          widget.manga!.sourceId,
-          installedOnly: true,
-        );
-        if (source == null) return;
-        final url =
-            "${source.baseUrl}${widget.manga!.link!.getUrlWithoutDomain}";
-        final box = context.findRenderObject() as RenderBox?;
-        shareOrCopy(
-          ShareParams(
-            text: url,
-            sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
-          ),
-        );
-        break;
-      case 3:
-        context.push("/migrate", extra: widget.manga);
-        break;
-      case 4:
-        final source = getSource(
-          widget.manga!.lang!,
-          widget.manga!.source!,
-          widget.manga!.sourceId,
-          installedOnly: true,
-        );
-        if (source == null) return;
-        context.push('/extension_detail', extra: source);
-        break;
-      case 5:
-        try {
-          final result = await FilePicker.getDirectoryPath();
-          if (result != null) {
-            final headers = isLocalArchive
-                ? null
-                : ref.read(
-                    headersProvider(
-                      source: widget.manga!.source!,
-                      lang: widget.manga!.lang!,
-                      sourceId: widget.manga!.sourceId,
-                    ),
-                  );
-            await exportMangaMetadata(
-              manga: widget.manga!,
-              directory: Directory(result),
-              headers: headers,
-            );
-            botToast(l10n.exported);
-          }
-        } catch (e) {
-          botToast(l10n.failed_to_export_metadata(e));
-        }
-        break;
-      case 6:
-        context.push(
-          "/massMigration",
-          extra: (widget.manga!.itemType, widget.manga),
-        );
-        break;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     // Watch all sort/filter providers so the list rebuilds whenever
@@ -552,6 +465,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
         .and()
         .forItemTypeEqualTo(widget.manga!.itemType)
         .isNotEmptySync();
+    final seasonOverview = widget.manga!.hasSeasons;
     return Stack(
       children: [
         Consumer(
@@ -970,16 +884,16 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
           body: SafeArea(
             child: Row(
               children: [
-                if (context.isTablet)
+                if (context.isTablet || seasonOverview)
                   SizedBox(
-                    width: context.width(0.5),
+                    width: seasonOverview ? context.width(1) : context.width(0.5),
                     height: context.height(1),
                     child: SingleChildScrollView(
                       child: _bodyContainer(chapterLength: chapters.length),
                     ),
                   ),
                 Expanded(
-                  child: Scrollbar(
+                  child: seasonOverview ? const SizedBox.shrink() : Scrollbar(
                     interactive: true,
                     thickness: 12,
                     radius: const Radius.circular(10),

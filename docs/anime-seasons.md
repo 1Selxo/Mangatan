@@ -7,12 +7,16 @@ tracking. This also supports nested collections. Sources that return ordinary
 episode lists continue to use the existing detail screen.
 
 The detail screen lists seasons with watched counts and parent navigation.
-Source order, season number and alphabetical sorting use Anikku's flag bits;
-editing those bits preserves the other settings. Library refreshes fetch season
-episodes and use the earliest child update interval for their series. Refreshes
-reuse source URLs, retain progress and custom titles, and detach removed seasons
-without deleting their data. Filler markers, summaries and episode previews
-now cross the Mihon bridge. Background artwork is retained for backup and sync.
+Source order, season number, upload date, alphabetical, unseen count, last-seen
+and episode-fetch-date sorting use Anikku's flag bits. The matching downloaded,
+unseen, started, completed, bookmarked and filler filters update as episode
+state changes, while editing one setting preserves the other bits. Library
+refreshes fetch season episodes and use the earliest child update interval for
+their series. Refreshes reuse source URLs, recognize season numbers in names
+when a source omits them, retain progress and custom titles, and detach removed
+seasons without deleting their data. Filler markers, summaries and episode
+previews now cross the Mihon bridge. Background artwork is retained for backup
+and sync.
 
 ## Backup and sync
 

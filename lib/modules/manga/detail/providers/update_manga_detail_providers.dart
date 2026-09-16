@@ -85,7 +85,12 @@ Future<dynamic> updateMangaDetail(
       ..seasonNumber = getManga.seasonNumber ?? manga.seasonNumber
       ..backgroundUrl = getManga.backgroundUrl ?? manga.backgroundUrl;
     if (getManga.seasons != null) {
-      final seasonIds = await storeAnimeSeasons(isar, manga, getManga.seasons!);
+      final seasonIds = await storeAnimeSeasons(
+        isar,
+        manga,
+        getManga.seasons!,
+        sourceIsLocal: source.isLocal == true,
+      );
       // Library refreshes also update each season's episodes and smart interval.
       // Initial browsing only fetches a season when it is opened.
       if (!isInit) {

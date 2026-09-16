@@ -2,6 +2,154 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_manga.dart';
 import 'package:mangayomi/models/manga.dart';
 
+/// The season flag layout used by Anikku 0.2 and its Mihon/Chimahon backup
+/// schema. Keep these values in one place because the same bit field is also
+/// edited by the season list controls and transported through protobuf.
+abstract final class AnimeSeasonFlags {
+  static const sortDirectionMask = 0x00000001;
+  static const sortDescending = 0x00000000;
+  static const sortAscending = 0x00000001;
+
+  static const showDownloaded = 0x00000002;
+  static const showNotDownloaded = 0x00000004;
+  static const downloadedMask = 0x00000006;
+  static const showUnseen = 0x00000008;
+  static const showSeen = 0x00000010;
+  static const unseenMask = 0x00000018;
+  static const showStarted = 0x00000020;
+  static const showNotStarted = 0x00000040;
+  static const startedMask = 0x00000060;
+  static const showCompleted = 0x00000080;
+  static const showNotCompleted = 0x00000100;
+  static const completedMask = 0x00000180;
+  static const showBookmarked = 0x00000200;
+  static const showNotBookmarked = 0x00000400;
+  static const bookmarkedMask = 0x00000600;
+  static const showFillermarked = 0x00000800;
+  static const showNotFillermarked = 0x00001000;
+  static const fillermarkedMask = 0x00001800;
+  static const filtersMask =
+      downloadedMask |
+      unseenMask |
+      startedMask |
+      completedMask |
+      bookmarkedMask |
+      fillermarkedMask;
+
+  static const sortSource = 0x00000000;
+  static const sortSeasonNumber = 0x00002000;
+  static const sortUploadDate = 0x00004000;
+  static const sortAlphabetical = 0x00006000;
+  static const sortUnseen = 0x00008000;
+  static const sortLastSeen = 0x0000a000;
+  static const sortFetchDate = 0x0000c000;
+  static const sortMask = 0x0000e000;
+
+  static const gridDisplayModeMask = 0x00030000;
+  static const gridDisplaySizeMask = 0x003c0000;
+  static const overlayDownloadedMask = 0x00400000;
+  static const overlayUnseenMask = 0x00800000;
+  static const overlayLocalMask = 0x01000000;
+  static const overlayLanguageMask = 0x02000000;
+  static const overlayContinueMask = 0x04000000;
+  static const displayModeNumber = 0x08000000;
+  static const displayModeMask = 0x08000000;
+
+  /// Returns the Anikku sort portion while accepting the early low-bit
+  /// Chimahon projection, whose source-order value is also zero.
+  static int sortMode(int flags) {
+    final legacyMode = flags & sortMask;
+    if (legacyMode != sortSource) return legacyMode;
+    return sortSource;
+  }
+
+  static bool isAscending(int flags) =>
+      flags & sortDirectionMask == sortAscending;
+
+  static int withSort(int flags, int sort) =>
+      (flags & ~sortMask) | (sort & sortMask);
+
+  static int withFilter(int flags, int filter, int mask) =>
+      (flags & ~mask) | (filter & mask);
+}
+
+final _seasonNumberPattern = RegExp(r'([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?');
+final _seasonBasicPattern = RegExp(
+  r'(?:\bs\.|\bs|season)\s*([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?',
+  caseSensitive: false,
+);
+final _seasonTagPattern = RegExp(
+  r'^\s*(?:\[[^]]+\]\s*|\([^)]+\)\s*)+|\s*(?:\[[^]]+\]\s*|\([^)]+\)\s*)+$',
+);
+final _seasonUnwantedPattern = RegExp(
+  r'\b\d+p\b|\d+x\d+|Hi10|\(\d+\)',
+  caseSensitive: false,
+);
+final _seasonUnwantedWhitespace = RegExp(
+  r'\s(?=extra|special|omake)',
+  caseSensitive: false,
+);
+
+/// Port of Anikku's season recognition. Sources often omit `season_number`
+/// and put the information only in names such as "Series S02" or
+/// "Series 1 special". The decimal suffixes keep specials and split seasons
+/// ordered without inventing a new wire field.
+double recognizeAnimeSeasonNumber(
+  String animeTitle,
+  String seasonTitle,
+  double? sourceNumber,
+) {
+  if (sourceNumber != null &&
+      (sourceNumber == -2 || sourceNumber > -1) &&
+      !sourceNumber.isNaN) {
+    return sourceNumber;
+  }
+
+  var clean = seasonTitle.toLowerCase();
+  if (animeTitle.isNotEmpty) {
+    clean = clean.replaceAll(
+      RegExp(RegExp.escape(animeTitle.toLowerCase()), caseSensitive: false),
+      '',
+    );
+  }
+  clean = clean
+      .replaceAll(',', '.')
+      .replaceAll('-', '.')
+      .replaceAll(_seasonUnwantedWhitespace, '')
+      .replaceAll(_seasonTagPattern, '')
+      .trim();
+
+  final matches = _seasonNumberPattern.allMatches(clean).toList();
+  if (matches.isEmpty) return sourceNumber ?? -1;
+
+  RegExpMatch match = matches.first;
+  if (matches.length > 1) {
+    final withoutQuality = clean.replaceAll(_seasonUnwantedPattern, '');
+    final basic = _seasonBasicPattern.firstMatch(withoutQuality);
+    match = basic ?? _seasonNumberPattern.firstMatch(withoutQuality) ?? match;
+  }
+  return _seasonNumberFromMatch(match);
+}
+
+double _seasonNumberFromMatch(RegExpMatch match) {
+  final initial = double.parse(match.group(1)!);
+  final decimal = match.group(2);
+  final alpha = match.group(3);
+  if (decimal != null && decimal.isNotEmpty) {
+    return initial + double.parse(decimal);
+  }
+  if (alpha == null || alpha.isEmpty) return initial;
+  final normalized = alpha.toLowerCase().replaceFirst('.', '');
+  if (normalized.contains('extra')) return initial + .99;
+  if (normalized.contains('omake')) return initial + .98;
+  if (normalized.contains('special')) return initial + .97;
+  if (normalized.length == 1) {
+    final suffix = normalized.codeUnitAt(0) - 'a'.codeUnitAt(0) + 1;
+    if (suffix > 0 && suffix < 10) return initial + suffix / 10;
+  }
+  return initial;
+}
+
 bool sameAnimeSource(Manga left, Manga right) =>
     left.itemType == ItemType.anime &&
     right.itemType == ItemType.anime &&
@@ -39,10 +187,14 @@ List<Manga> animeSeasonLibraryClosure(Iterable<Manga> entries) {
 Future<List<int>> storeAnimeSeasons(
   Isar database,
   Manga parent,
-  List<MManga> seasons,
-) async {
-  if (seasons.isEmpty) {
+  List<MManga> seasons, {
+  bool sourceIsLocal = false,
+}) async {
+  if (seasons.isEmpty && !sourceIsLocal) {
     throw StateError('The source returned no seasons. Try refreshing again.');
+  }
+  if (parent.link == null || parent.link!.isEmpty) {
+    throw StateError('The parent anime has no source URL.');
   }
   final urls = <String>{};
   for (final season in seasons) {
@@ -52,6 +204,12 @@ Future<List<int>> storeAnimeSeasons(
       throw StateError('The source returned an invalid season relationship.');
     }
     urls.add(season.link!);
+  }
+  final uniqueSeasons = seasons.where((season) => season.link != null).toList();
+  final deduplicatedSeasons = <MManga>[];
+  final seenUrls = <String>{};
+  for (final season in uniqueSeasons) {
+    if (seenUrls.add(season.link!)) deduplicatedSeasons.add(season);
   }
   final result = <int>[];
   await database.writeTxn(() async {
@@ -78,7 +236,7 @@ Future<List<int>> storeAnimeSeasons(
       }
     }
     final seen = <String>{};
-    for (final (order, detail) in seasons.indexed) {
+    for (final (order, detail) in deduplicatedSeasons.indexed) {
       if (!seen.add(detail.link!)) continue;
       final matches = all.where((m) => m.link == detail.link).toList();
       if (matches.length > 1) {
@@ -104,7 +262,11 @@ Future<List<int>> storeAnimeSeasons(
       season
         ..animeParentUrl = parent.link
         ..animeFetchType = detail.animeFetchType ?? 1
-        ..seasonNumber = detail.seasonNumber ?? -1
+        ..seasonNumber = recognizeAnimeSeasonNumber(
+          parent.name ?? '',
+          detail.name ?? '',
+          detail.seasonNumber,
+        )
         ..seasonSourceOrder = order
         ..backgroundUrl = detail.backgroundUrl ?? season.backgroundUrl
         ..updateSourceTitle(detail.name)

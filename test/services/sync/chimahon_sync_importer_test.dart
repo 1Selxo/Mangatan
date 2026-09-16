@@ -35,6 +35,19 @@ import 'package:mangayomi/services/sync/mihon_backup_exporter.dart';
 import 'package:protobuf/protobuf.dart';
 
 void main() {
+  test('recognizes Anikku season names when the source omits a number', () {
+    expect(recognizeAnimeSeasonNumber('My Series', 'My Series S02', null), 2);
+    expect(
+      recognizeAnimeSeasonNumber('My Series', 'My Series 2 special', null),
+      closeTo(2.97, 0.0001),
+    );
+    expect(
+      recognizeAnimeSeasonNumber('My Series', 'My Series 2.5', null),
+      2.5,
+    );
+    expect(recognizeAnimeSeasonNumber('My Series', 'My Series S01', -2), -2);
+  });
+
   late Directory databaseDirectory;
   late Isar database;
 

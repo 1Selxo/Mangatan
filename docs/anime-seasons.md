@@ -55,7 +55,7 @@ round-trip check once its upstream changes are available.
 Both repositories use `feature/anikku-seasons`. The exact bridge revision is
 stored in `tool/mihon_server_commit.txt`. The iOS sideload workflow builds and
 tests that revision on Ubuntu, transfers its JAR with a SHA-256 check, then
-packages it using the existing lazy OpenJDK runtime. Build number: 206.
+packages it using the existing lazy OpenJDK runtime. Build number: 209.
 This requires neither a production release nor a main-branch merge.
 
 For local iOS preparation, build that bridge with JDK 21 and

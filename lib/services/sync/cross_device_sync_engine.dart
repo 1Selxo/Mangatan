@@ -24,8 +24,9 @@ typedef SyncMediaSelectionUserSelectedProvider = bool Function();
 typedef SyncMediaSelectionGenerationProvider = int Function();
 typedef SyncMediaSelectionStateProvider =
     ChimahonMediaSyncSelectionState Function();
-typedef SyncPreUploadHook =
-    Future<void> Function(CrossDeviceSyncPreview preview);
+typedef SyncPreUploadHook = Future<void> Function(
+  CrossDeviceSyncPreview preview,
+);
 
 Set<String> _noUnrepresentableKeys() => const {};
 
@@ -105,6 +106,7 @@ class CrossDeviceSyncPreview {
     required RemoteSyncSnapshot? remoteSnapshot,
     required BackupMihon? decodedRemote,
     required BackupMihon proposedMerged,
+    required BackupMihon? ordinaryMerged,
     required Uint8List proposedBytes,
     required this.preferenceSafetyPolicy,
     required Set<String> unrepresentablePreferenceKeys,
@@ -123,6 +125,7 @@ class CrossDeviceSyncPreview {
            remoteSnapshot?.uploadRetainsAllRemoteByteBlobs ?? false,
        _decodedRemote = decodedRemote?.deepCopy(),
        _proposedMerged = proposedMerged.deepCopy(),
+       _ordinaryMerged = ordinaryMerged?.deepCopy(),
        _proposedBytes = Uint8List.fromList(proposedBytes),
        unrepresentablePreferenceKeys = Set<String>.unmodifiable(
          unrepresentablePreferenceKeys,
@@ -136,6 +139,7 @@ class CrossDeviceSyncPreview {
   final bool _remoteUploadRetainsAllRemoteByteBlobs;
   final BackupMihon? _decodedRemote;
   final BackupMihon _proposedMerged;
+  final BackupMihon? _ordinaryMerged;
   final Uint8List _proposedBytes;
 
   /// Key-origin evidence for preference value checks. It contains no values.
@@ -171,6 +175,11 @@ class CrossDeviceSyncPreview {
   BackupMihon? get decodedRemote => _decodedRemote?.deepCopy();
 
   BackupMihon get proposedMerged => _proposedMerged.deepCopy();
+
+  /// Present only for an explicit restore. The ordinary conflict transition
+  /// is audited separately from the restore, whose selected and untouched
+  /// records have already been proven against the decoded upload bytes.
+  BackupMihon? get ordinaryMerged => _ordinaryMerged?.deepCopy();
 
   Uint8List get proposedBytes => Uint8List.fromList(_proposedBytes);
 
@@ -297,6 +306,7 @@ class CrossDeviceSyncEngine {
       remoteSnapshot: prepared.remoteSnapshot,
       decodedRemote: prepared.remote,
       proposedMerged: prepared.merged,
+      ordinaryMerged: prepared.ordinaryMerged,
       proposedBytes: prepared.bytes,
       preferenceSafetyPolicy: prepared.preferenceSafetyPolicy,
       unrepresentablePreferenceKeys: prepared.unrepresentablePreferenceKeys,
@@ -866,6 +876,7 @@ class CrossDeviceSyncEngine {
         },
       );
     }
+    final ordinaryMerged = pendingLocal == null ? null : merged.deepCopy();
     if (pendingLocal != null) {
       merged = pendingRestoreAuthority.apply(
         pending: pendingLocal,
@@ -907,18 +918,38 @@ class CrossDeviceSyncEngine {
     metrics
       ?..protobufBytes = proposedProtobufBytes.length
       ..uploadBytes = bytes.length;
-    if (pendingLocal != null &&
-        !pendingRestoreAuthority.containsSelectedIntent(
-          uploaded: codec.decode(bytes).backup,
-          pending: pendingLocal,
-          localIntent: local,
-        )) {
-      // Do not upload, and especially do not clear the pending restore, if a
-      // future schema/merger change accidentally drops selected restore data.
-      throw StateError(
-        'The encoded Chimahon sync payload does not contain the selected '
-        'manual restore intent.',
+    if (pendingLocal != null) {
+      final uploaded = codec.decode(bytes).backup;
+      if (!pendingRestoreAuthority.containsSelectedIntent(
+        uploaded: uploaded,
+        pending: pendingLocal,
+        localIntent: local,
+      )) {
+        // Do not upload, and especially do not clear the pending restore, if a
+        // future schema/merger change accidentally drops selected restore data.
+        final failure =
+            pendingRestoreAuthority.selectedIntentFailure(
+              uploaded: uploaded,
+              pending: pendingLocal,
+              localIntent: local,
+            ) ??
+            'restore_selected_intent_mismatch';
+        throw StateError(
+          'The encoded Chimahon sync payload does not contain the selected '
+          'manual restore intent ($failure).',
+        );
+      }
+      final failure = pendingRestoreAuthority.transitionFailure(
+        uploaded: uploaded,
+        pending: pendingLocal,
+        localIntent: local,
+        ordinaryMerged: ordinaryMerged!,
+        remote: remote,
+        localTrackingDeletions: effectiveLocalTrackingDeletions,
       );
+      if (failure != null) {
+        throw StateError('Chimahon restore validation failed: $failure.');
+      }
     }
     return _PreparedSyncPayload(
       exported: exported,
@@ -943,6 +974,7 @@ class CrossDeviceSyncEngine {
       remote: remote,
       merged: merged,
       proposedProtobufBytes: proposedProtobufBytes,
+      ordinaryMerged: ordinaryMerged,
       bytes: bytes,
     );
   }
@@ -1181,6 +1213,7 @@ class _PreparedSyncPayload {
     required this.remoteProtobufBytes,
     required this.remote,
     required this.merged,
+    required this.ordinaryMerged,
     required this.proposedProtobufBytes,
     required this.bytes,
   });
@@ -1205,6 +1238,7 @@ class _PreparedSyncPayload {
   final Uint8List? remoteProtobufBytes;
   final BackupMihon? remote;
   final BackupMihon merged;
+  final BackupMihon? ordinaryMerged;
   final Uint8List proposedProtobufBytes;
   final Uint8List bytes;
 }

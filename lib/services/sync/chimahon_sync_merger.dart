@@ -25,6 +25,7 @@ import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_feed_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_media_child_projection_proof.dart';
 import 'package:mangayomi/services/sync/chimahon_media_parent_projection_proof.dart';
+import 'package:mangayomi/services/sync/chimahon_media_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_stats_row_merge.dart';
 import 'package:protobuf/protobuf.dart';
 
@@ -673,11 +674,19 @@ class ChimahonSyncMerger {
       return result;
     }
 
-    final remoteAnime = remote.toList(growable: false);
-    final rebasedSeasons = rebaseChimahonSeasonIds(local, remoteAnime);
-    final localAnime = localProjectionRules
-        ? _rebaseLegacyLocalAnimeIdentity(rebasedSeasons, remoteAnime)
-        : rebasedSeasons;
+    final remoteRows = remote.toList(growable: false);
+    final localRows = localProjectionRules
+        ? _rebaseLegacyLocalAnimeIdentity(local, remoteRows)
+        : local;
+    final namespace = ChimahonSeasonNamespace(localRows, remoteRows);
+    final localAnime = namespace.local;
+    final remoteAnime = namespace.remote;
+    BackupAnime withRelationshipId(BackupAnime anime) {
+      final result = anime.deepCopy();
+      namespace.assignId(result);
+      return result;
+    }
+
     final localCategoryMapper = _OrderedCategoryMembershipMapper(
       localCategories,
       mergedCategories,
@@ -699,7 +708,7 @@ class ChimahonSyncMerger {
       final right = remoteByKey[key];
       if (left == null) return right!.deepCopy();
       if (right == null) return left.deepCopy();
-      if (_canCopyExactAnime(left, right)) return right.deepCopy();
+      if (_canCopyExactAnime(left, right)) return withRelationshipId(right);
       var leftWins = _recordLeftWins(
         left.version,
         left.lastModifiedAt,
@@ -768,6 +777,7 @@ class ChimahonSyncMerger {
         right: right,
         latestWasLeft: leftWins,
       );
+      namespace.assignId(merged);
       return merged;
     }).toList();
   }
@@ -963,7 +973,7 @@ class ChimahonSyncMerger {
     } else {
       merged.clearUpdateStrategy();
     }
-    if (!local.hasFetchType() || !local.hasId()) {
+    if (!hasChimahonSeasonMetadata(local)) {
       if (remote.hasSeasonFlags()) {
         merged.seasonFlags = remote.seasonFlags;
       } else {
@@ -990,7 +1000,7 @@ class ChimahonSyncMerger {
     } else {
       merged.clearViewerFlags();
     }
-    if (!local.hasFetchType() || !local.hasId()) {
+    if (!hasChimahonSeasonMetadata(local)) {
       if (remote.hasBackgroundUrl()) {
         merged.backgroundUrl = remote.backgroundUrl;
       } else {
@@ -1798,9 +1808,7 @@ class ChimahonSyncMerger {
     return leftWinsTie;
   }
 
-  String _mangaKey(BackupManga manga) {
-    return '${manga.source}|${manga.url}|${_normalized(manga.title)}|${_mangaAuthorKey(manga)}';
-  }
+  String _mangaKey(BackupManga manga) => chimahonMangaIdentity(manga);
 
   String _mangaAuthorKey(BackupManga manga) =>
       manga.hasAuthor() ? _normalized(manga.author) : 'null';
@@ -1808,10 +1816,7 @@ class ChimahonSyncMerger {
   String _mangaSourceUrlKey(BackupManga manga) =>
       '${manga.source}|${manga.url}';
 
-  String _animeKey(BackupAnime anime) {
-    final author = anime.hasAuthor() ? _normalized(anime.author) : 'null';
-    return '${anime.source}|${anime.url}|${_normalized(anime.title)}|$author';
-  }
+  String _animeKey(BackupAnime anime) => chimahonAnimeIdentity(anime);
 
   String _animeSourceUrlKey(BackupAnime anime) =>
       '${anime.source}|${anime.url}';

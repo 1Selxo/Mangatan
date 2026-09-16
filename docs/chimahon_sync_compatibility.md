@@ -1,5 +1,8 @@
 # Chimahon sync compatibility
 
+The cross-client identity, season-default, restore-authority, and round-trip
+rules are documented in [the sync contract](chimahon_sync_contract.md).
+
 ## Transport and account setup
 
 Mangatan uses Chimahon's Google OAuth client ID, redirect URI, hidden Drive

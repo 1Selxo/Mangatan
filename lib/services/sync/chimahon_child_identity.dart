@@ -1,14 +1,20 @@
+import 'dart:typed_data';
+
 import 'package:fixnum/fixnum.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 
+/// Chapter and episode numbers are Kotlin Floats / protobuf float32 values.
+/// Quantize before using them in an identity, including numbers inferred from
+/// names; otherwise 1.1 changes identity after encoding and decoding a backup.
 double chimahonCanonicalChildNumber({
   required String name,
   required double? sourceNumber,
-}) =>
-    normalizeSourceChapterNumber(sourceNumber) ??
-    fallbackChapterNumberFromName(name);
+}) => Float32List.fromList([
+  normalizeSourceChapterNumber(sourceNumber) ??
+      fallbackChapterNumberFromName(name),
+]).single;
 
 String chimahonChapterIdentity(BackupChapter chapter) =>
     chimahonChapterIdentityValues(

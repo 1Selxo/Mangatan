@@ -13,6 +13,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTr
 import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_media_child_projection_proof.dart';
 import 'package:mangayomi/services/sync/chimahon_media_parent_projection_proof.dart';
+import 'package:mangayomi/services/sync/chimahon_media_identity.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/chimahon_unknown_field_safety.dart';
 import 'package:protobuf/protobuf.dart';
@@ -36,11 +37,16 @@ class ChimahonMediaSafetyAudit {
     required void Function(String, Iterable<String>) fail,
     required void Function(String, Iterable<String>) observe,
   }) {
+    final namespace = ChimahonSeasonNamespace(
+      local.backupAnime,
+      remote.backupAnime,
+    );
     local = local.deepCopy()
       ..backupAnime.clear()
-      ..backupAnime.addAll(
-        rebaseChimahonSeasonIds(local.backupAnime, remote.backupAnime),
-      );
+      ..backupAnime.addAll(namespace.local);
+    remote = remote.deepCopy()
+      ..backupAnime.clear()
+      ..backupAnime.addAll(namespace.remote);
     _auditDuplicateIdentities(
       label: 'remote',
       backup: remote,
@@ -1896,8 +1902,7 @@ class ChimahonMediaSafetyAudit {
         (value) => expected.updateStrategy = value,
         expected.clearUpdateStrategy,
       );
-      if (!pair.localCanonical!.hasFetchType() ||
-          !pair.localCanonical!.hasId()) {
+      if (!hasChimahonSeasonMetadata(pair.localCanonical!)) {
         _copyOptionalInt64(
           remote.hasSeasonFlags(),
           remote.seasonFlags,
@@ -1929,8 +1934,7 @@ class ChimahonMediaSafetyAudit {
         (value) => expected.viewerFlags = value,
         expected.clearViewerFlags,
       );
-      if (!pair.localCanonical!.hasFetchType() ||
-          !pair.localCanonical!.hasId()) {
+      if (!hasChimahonSeasonMetadata(pair.localCanonical!)) {
         _copyOptionalString(
           remote.hasBackgroundUrl(),
           remote.backgroundUrl,
@@ -2950,47 +2954,27 @@ class ChimahonMediaSafetyAudit {
     return duplicates;
   }
 
-  static String mangaIdentity(BackupManga manga) => _join([
-    manga.hasSource() ? manga.source.toString() : 'source-absent',
-    manga.url,
-    _normalized(manga.title),
-    manga.hasAuthor() ? 'present:${_normalized(manga.author)}' : 'absent',
-  ]);
+  static String mangaIdentity(BackupManga manga) =>
+      chimahonMangaIdentity(manga);
 
   static String mangaSourceUrlIdentity(BackupManga manga) => _join([
     manga.hasSource() ? manga.source.toString() : 'source-absent',
     manga.url,
   ]);
 
-  static String animeIdentity(BackupAnime anime) => _join([
-    anime.hasSource() ? anime.source.toString() : 'source-absent',
-    anime.url,
-    _normalized(anime.title),
-    anime.hasAuthor() ? 'present:${_normalized(anime.author)}' : 'absent',
-  ]);
+  static String animeIdentity(BackupAnime anime) =>
+      chimahonAnimeIdentity(anime);
 
   static String animeSourceUrlIdentity(BackupAnime anime) => _join([
     anime.hasSource() ? anime.source.toString() : 'source-absent',
     anime.url,
   ]);
 
-  static String chapterIdentity(BackupChapter chapter) => _join([
-    chapter.url,
-    chapter.name,
-    chimahonCanonicalChildNumber(
-      name: chapter.name,
-      sourceNumber: chapter.chapterNumber,
-    ).toString(),
-  ]);
+  static String chapterIdentity(BackupChapter chapter) =>
+      chimahonChapterIdentity(chapter);
 
-  static String episodeIdentity(BackupEpisode episode) => _join([
-    episode.url,
-    episode.name,
-    chimahonCanonicalChildNumber(
-      name: episode.name,
-      sourceNumber: episode.episodeNumber,
-    ).toString(),
-  ]);
+  static String episodeIdentity(BackupEpisode episode) =>
+      chimahonEpisodeIdentity(episode);
 
   static String _rawChapterIdentity(BackupChapter chapter) =>
       _join([chapter.url, chapter.name, chapter.chapterNumber.toString()]);

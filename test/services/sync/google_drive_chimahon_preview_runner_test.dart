@@ -18,155 +18,150 @@ import 'package:mangayomi/services/sync/google_drive_refresh_token_store.dart';
 void main() {
   const codec = ChimahonSyncCodec();
 
-  test(
-    'core uses exact account scope, stays write-free, and emits safe aggregates',
-    () async {
-      const permissionId = 'opaque-private-permission-id';
-      const revision = 'opaque-private-drive-revision';
-      final remote = BackupMihon();
-      final storage = _CountingStorage(
-        snapshot: RemoteSyncSnapshot(
-          bytes: codec.encode(
-            remote,
-            format: ChimahonSyncWireFormat.gzipProtobuf,
-          ),
-          revision: revision,
-          isCompleteRecovery: true,
+  test('core uses exact account scope, stays write-free, and emits safe aggregates', () async {
+    const permissionId = 'opaque-private-permission-id';
+    const revision = 'opaque-private-drive-revision';
+    final remote = BackupMihon();
+    final storage = _CountingStorage(
+      snapshot: RemoteSyncSnapshot(
+        bytes: codec.encode(
+          remote,
+          format: ChimahonSyncWireFormat.gzipProtobuf,
         ),
-      );
-      final primary = _CountingPrimaryStore();
-      final pending = _CountingPendingStore(
-        BackupMihon(
-          backupNovels: [
-            BackupNovel(id: 'pending-empty-metadata-id', title: ''),
-          ],
-        ),
-      );
-      String? receivedScope;
-      var projectionCalls = 0;
-      var storageCloseCount = 0;
-      bool? auditRemoteWinsTies;
-      final projection = GoogleDriveChimahonLocalProjection(
-        backup: BackupMihon(),
-        unrepresentablePreferenceKeys: const {'private-preference-key'},
-        trackingDeletionKeys: const {
-          (source: 42, url: '/private/series', syncId: 1),
-        },
-      );
-      final core = GoogleDriveChimahonReadOnlyPreviewCore(
-        oauthClientId: ChimahonGoogleOAuthConfig.current.clientId,
-        storage: storage,
-        currentUserPermissionId: () async => permissionId,
-        localProjection: () async {
-          projectionCalls++;
-          return projection;
-        },
-        sidecars: (scope) async {
-          receivedScope = scope;
-          return LayeredChimahonDeferredPayloadStore(
-            primary: primary,
-            pendingManualRestore: pending,
-          );
-        },
-        audit:
-            ({
-              BackupMihon? reference,
-              required BackupMihon remote,
-              required BackupMihon local,
-              required BackupMihon proposed,
-              required preferenceSafetyPolicy,
-              required localTrackingDeletions,
-              required bool remoteWinsTies,
-            }) {
-              auditRemoteWinsTies = remoteWinsTies;
-              return const ChimahonSyncSafetyAudit().audit(
-                reference: reference,
-                remote: remote,
-                local: local,
-                proposed: proposed,
-                preferenceSafetyPolicy: preferenceSafetyPolicy,
-                localTrackingDeletions: localTrackingDeletions,
-                remoteWinsTies: remoteWinsTies,
-              );
-            },
-        closeStorage: () => storageCloseCount++,
-      );
+        revision: revision,
+        isCompleteRecovery: true,
+      ),
+    );
+    final primary = _CountingPrimaryStore();
+    final pending = _CountingPendingStore(
+      BackupMihon(
+        backupNovels: [BackupNovel(id: 'pending-empty-metadata-id', title: '')],
+      ),
+    );
+    String? receivedScope;
+    var projectionCalls = 0;
+    var storageCloseCount = 0;
+    bool? auditRemoteWinsTies;
+    final projection = GoogleDriveChimahonLocalProjection(
+      backup: BackupMihon(),
+      unrepresentablePreferenceKeys: const {'private-preference-key'},
+      trackingDeletionKeys: const {
+        (source: 42, url: '/private/series', syncId: 1),
+      },
+    );
+    final core = GoogleDriveChimahonReadOnlyPreviewCore(
+      oauthClientId: ChimahonGoogleOAuthConfig.current.clientId,
+      storage: storage,
+      currentUserPermissionId: () async => permissionId,
+      localProjection: () async {
+        projectionCalls++;
+        return projection;
+      },
+      sidecars: (scope) async {
+        receivedScope = scope;
+        return LayeredChimahonDeferredPayloadStore(
+          primary: primary,
+          pendingManualRestore: pending,
+        );
+      },
+      audit:
+          ({
+            BackupMihon? reference,
+            required BackupMihon remote,
+            required BackupMihon local,
+            required BackupMihon proposed,
+            BackupMihon? localProjection,
+            required preferenceSafetyPolicy,
+            required localTrackingDeletions,
+            required bool remoteWinsTies,
+          }) {
+            auditRemoteWinsTies = remoteWinsTies;
+            return const ChimahonSyncSafetyAudit().audit(
+              reference: reference,
+              remote: remote,
+              local: local,
+              proposed: proposed,
+              localProjection: localProjection,
+              preferenceSafetyPolicy: preferenceSafetyPolicy,
+              localTrackingDeletions: localTrackingDeletions,
+              remoteWinsTies: remoteWinsTies,
+            );
+          },
+      closeStorage: () => storageCloseCount++,
+    );
 
-      final referenceBytes = codec.encode(
-        BackupMihon(),
-        format: ChimahonSyncWireFormat.gzipProtobuf,
-      );
-      final report = await core.run(referenceBackupBytes: referenceBytes);
-      core
-        ..close()
-        ..close();
+    final referenceBytes = codec.encode(
+      BackupMihon(),
+      format: ChimahonSyncWireFormat.gzipProtobuf,
+    );
+    final report = await core.run(referenceBackupBytes: referenceBytes);
+    core
+      ..close()
+      ..close();
 
-      expect(
-        receivedScope,
-        'google-drive|${ChimahonGoogleOAuthConfig.current.clientId}|'
-        '$permissionId',
-      );
-      expect(projectionCalls, 2);
-      expect(storage.downloadCount, 1);
-      expect(storage.uploadCount, 0);
-      expect(storageCloseCount, 1);
-      expect(primary.saveCount, 0);
-      expect(primary.preferenceSaveCount, 0);
-      expect(primary.sourcePreferenceSaveCount, 0);
-      expect(pending.clearCount, 0);
-      expect(auditRemoteWinsTies, isFalse);
-      expect(report.referencePresent, isTrue);
-      expect(report.remotePresent, isTrue);
-      expect(report.remoteRecoveryComplete, isTrue);
-      expect(report.pendingManualRestorePresent, isTrue);
-      expect(report.localStability.stable, isTrue);
-      expect(report.audit?.hardFailures, isEmpty);
-      expect(report.audit?.counts['local.novelRecords'], 1);
-      expect(report.audit?.counts['proposed.novelRecords'], 1);
-      expect(
-        report.audit?.observations.map((finding) => finding.code),
-        contains('local_only_novel_records'),
-      );
-      expect(report.safeForFirstUpload, isTrue);
-      expect(report.remoteToProposedDiff, isNotNull);
-      expect(report.remoteToProposedDiff?.equivalent, isFalse);
-      expect(
-        report.remoteToProposedDiff?.fieldDifferences,
-        contains('BackupMihon.backupNovels[]'),
-      );
-      expect(report.localFingerprint.counts['novels'], 1);
-      expect(report.exportedLocalFingerprint.counts['novels'], 0);
-      expect(report.localFingerprint.counts['mangaRecords'], 0);
-      expect(
-        report.localStability.hashes.values,
-        everyElement(matches(RegExp(r'^[0-9a-f]{64}$'))),
-      );
-      expect(
-        report
-            .localStability
-            .hashes['initialUnrepresentablePreferenceKeysSha256'],
-        report
-            .localStability
-            .hashes['finalUnrepresentablePreferenceKeysSha256'],
-      );
-      expect(
-        report.localStability.hashes['initialTrackingDeletionKeysSha256'],
-        report.localStability.hashes['finalTrackingDeletionKeysSha256'],
-      );
+    expect(
+      receivedScope,
+      'google-drive|${ChimahonGoogleOAuthConfig.current.clientId}|'
+      '$permissionId',
+    );
+    expect(projectionCalls, 2);
+    expect(storage.downloadCount, 1);
+    expect(storage.uploadCount, 0);
+    expect(storageCloseCount, 1);
+    expect(primary.saveCount, 0);
+    expect(primary.preferenceSaveCount, 0);
+    expect(primary.sourcePreferenceSaveCount, 0);
+    expect(pending.clearCount, 0);
+    expect(auditRemoteWinsTies, isFalse);
+    expect(report.referencePresent, isTrue);
+    expect(report.remotePresent, isTrue);
+    expect(report.remoteRecoveryComplete, isTrue);
+    expect(report.pendingManualRestorePresent, isTrue);
+    expect(report.localStability.stable, isTrue);
+    expect(report.audit?.hardFailures, isEmpty);
+    expect(report.audit?.counts['local.novelRecords'], 1);
+    expect(report.audit?.counts['proposed.novelRecords'], 1);
+    expect(
+      report.audit?.observations.map((finding) => finding.code),
+      contains('local_only_novel_records'),
+    );
+    expect(report.safeForFirstUpload, isTrue);
+    expect(report.remoteToProposedDiff, isNotNull);
+    expect(report.remoteToProposedDiff?.equivalent, isFalse);
+    expect(
+      report.remoteToProposedDiff?.fieldDifferences,
+      contains('BackupMihon.backupNovels[]'),
+    );
+    expect(report.localFingerprint.counts['novels'], 1);
+    expect(report.exportedLocalFingerprint.counts['novels'], 0);
+    expect(report.localFingerprint.counts['mangaRecords'], 0);
+    expect(
+      report.localStability.hashes.values,
+      everyElement(matches(RegExp(r'^[0-9a-f]{64}$'))),
+    );
+    expect(
+      report
+          .localStability
+          .hashes['initialUnrepresentablePreferenceKeysSha256'],
+      report.localStability.hashes['finalUnrepresentablePreferenceKeysSha256'],
+    );
+    expect(
+      report.localStability.hashes['initialTrackingDeletionKeysSha256'],
+      report.localStability.hashes['finalTrackingDeletionKeysSha256'],
+    );
 
-      final safeJson = jsonEncode(report.toSafeJson());
-      for (final secret in [
-        permissionId,
-        revision,
-        receivedScope!,
-        'private-preference-key',
-        '/private/series',
-        'pending-empty-metadata-id',
-      ]) {
-        expect(safeJson, isNot(contains(secret)));
-      }
-    },
-  );
+    final safeJson = jsonEncode(report.toSafeJson());
+    for (final secret in [
+      permissionId,
+      revision,
+      receivedScope!,
+      'private-preference-key',
+      '/private/series',
+      'pending-empty-metadata-id',
+    ]) {
+      expect(safeJson, isNot(contains(secret)));
+    }
+  });
 
   test(
     'missing remote returns a conservative report without auditing',
@@ -188,6 +183,7 @@ void main() {
               required BackupMihon remote,
               required BackupMihon local,
               required BackupMihon proposed,
+              BackupMihon? localProjection,
               required preferenceSafetyPolicy,
               required localTrackingDeletions,
               required remoteWinsTies,
@@ -240,6 +236,7 @@ void main() {
               required BackupMihon remote,
               required BackupMihon local,
               required BackupMihon proposed,
+              BackupMihon? localProjection,
               required preferenceSafetyPolicy,
               required localTrackingDeletions,
               required bool remoteWinsTies,
@@ -250,6 +247,7 @@ void main() {
                 remote: remote,
                 local: local,
                 proposed: proposed,
+                localProjection: localProjection,
                 preferenceSafetyPolicy: preferenceSafetyPolicy,
                 localTrackingDeletions: localTrackingDeletions,
                 remoteWinsTies: remoteWinsTies,
@@ -438,9 +436,10 @@ void main() {
         oauthCreated = true;
         return _FakeOAuthSession(clientId: 'unused', accessToken: 'unused');
       },
-      coreFactory:
-          ({required String accessToken, required String oauthClientId}) =>
-              throw StateError('Core must not be created.'),
+      coreFactory: ({
+        required String accessToken,
+        required String oauthClientId,
+      }) => throw StateError('Core must not be created.'),
     );
 
     await expectLater(
@@ -467,9 +466,10 @@ void main() {
     final runner = GoogleDriveChimahonPreviewRunner.withDependencies(
       tokenStore: _FakeTokenStore('private-refresh-token'),
       oauthFactory: () => oauth,
-      coreFactory:
-          ({required String accessToken, required String oauthClientId}) =>
-              throw StateError('Core must not be created.'),
+      coreFactory: ({
+        required String accessToken,
+        required String oauthClientId,
+      }) => throw StateError('Core must not be created.'),
     );
 
     await expectLater(

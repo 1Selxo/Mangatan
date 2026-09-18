@@ -26,6 +26,87 @@ const _merger = ChimahonSyncMerger();
 const _authority = ChimahonPendingRestoreAuthority();
 
 void main() {
+  for (final format in ChimahonSyncWireFormat.values) {
+    test(
+      '${format.name} sync preserves remote unknown-number identities',
+      () async {
+        final remote = BackupMihon(
+          backupManga: [
+            _manga(
+              '/book',
+              version: 9,
+              chapters: [
+                BackupChapter(
+                  url: '/unknown',
+                  name: 'Chapter 1.1',
+                  chapterNumber: -1,
+                  version: Int64(5),
+                  lastModifiedAt: Int64(100),
+                ),
+              ],
+            ),
+          ],
+          backupAnime: [
+            _anime('/anime', id: 40)
+              ..version = Int64(9)
+              ..episodes.add(
+                BackupEpisode(
+                  url: '/unknown',
+                  name: 'Episode 1.1',
+                  episodeNumber: -1,
+                  version: Int64(5),
+                  lastModifiedAt: Int64(100),
+                ),
+              ),
+          ],
+        );
+        final projection = remote.deepCopy();
+        final chapter = projection.backupManga.single.chapters.single;
+        chapter
+          ..version = Int64.ZERO
+          ..chapterNumber = chimahonCanonicalChildNumber(
+            name: chapter.name,
+            sourceNumber: -1,
+          );
+        final episode = projection.backupAnime.single.episodes.single;
+        episode
+          ..version = Int64.ZERO
+          ..episodeNumber = chimahonCanonicalChildNumber(
+            name: episode.name,
+            sourceNumber: -1,
+          );
+        final storage = _Storage(remote, format: format);
+        final original = storage.bytes;
+        final gate = ChimahonPreUploadSafetyGate(recoveryStore: _Recovery());
+        final preview = await CrossDeviceSyncEngine(
+          storage: storage,
+          exportLocal: () async => projection,
+          importMerged: (_) async {},
+        ).preview();
+        await gate.check(preview);
+        expect(preview.proposedBytes, original);
+
+        chapter
+          ..read = true
+          ..lastModifiedAt = Int64(200);
+        episode
+          ..seen = true
+          ..lastModifiedAt = Int64(200);
+        final edited = await CrossDeviceSyncEngine(
+          storage: storage,
+          exportLocal: () async => projection,
+          importMerged: (_) async {},
+        ).preview();
+        await gate.check(edited);
+        final uploaded = _codec.decode(edited.proposedBytes).backup;
+        expect(uploaded.backupManga.single.chapters.single.chapterNumber, -1);
+        expect(uploaded.backupManga.single.chapters.single.read, isTrue);
+        expect(uploaded.backupAnime.single.episodes.single.episodeNumber, -1);
+        expect(uploaded.backupAnime.single.episodes.single.seen, isTrue);
+      },
+    );
+  }
+
   test('fractional child identity is stable through protobuf and gzip', () {
     for (final format in ChimahonSyncWireFormat.values) {
       for (final number in [0.1, 1.1, 17.3, 16777217.0, -1.0]) {
@@ -501,10 +582,14 @@ BackupAnime _anime(String url, {required int id, int? parent, int fetch = 1}) =>
     );
 
 class _Storage implements CrossDeviceSyncStorage {
-  _Storage(BackupMihon remote) : bytes = _codec.encode(remote);
+  _Storage(
+    BackupMihon remote, {
+    ChimahonSyncWireFormat format = ChimahonSyncWireFormat.protobuf,
+  }) : bytes = _codec.encode(remote, format: format),
+       wireFormat = format;
   Uint8List bytes;
   @override
-  ChimahonSyncWireFormat get wireFormat => ChimahonSyncWireFormat.protobuf;
+  final ChimahonSyncWireFormat wireFormat;
   @override
   Future<RemoteSyncSnapshot?> download() async => RemoteSyncSnapshot(
     bytes: bytes,

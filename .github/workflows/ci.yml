@@ -12,6 +12,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  chimahon-sync:
+    name: Chimahon sync contracts (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Private state replays remain opt-in; deterministic wire, Isar, failure
+      # recovery, and season fixtures run on every PR without cloud credentials.
+      - name: Verify sync and season contracts
+        run: >-
+          flutter test --no-pub
+          test/services/sync
+          test/services/m_extension_server_test.dart
+          test/utils/season_identity_test.dart
+          test/eval/mihon/service_seasons_test.dart
+          test/modules/anime/anime_player_position_test.dart
+
   analyze:
     name: Analyze
     runs-on: ubuntu-latest

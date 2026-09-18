@@ -55,6 +55,18 @@ remain in force. Failed validation neither uploads nor clears pending intent.
 Restore diagnostics contain fixed collection-level codes, never user titles,
 URLs, or preference values.
 
+The transition proof also rejects collapsed category handles, loss of retained
+season fields during a legacy restore, novel-category duplication/unknown-field
+loss, and invented statistics. Statistics must use the exact per-counter maximum
+of the inputs, not merely a value greater than either input.
+
+Local commit persistence saves both projection baselines before publishing the
+remote baseline and consuming pending restore intent. A failed baseline write
+therefore leaves the selected backup and its original projection evidence ready
+for a retry. An upload with a lost acknowledgement likewise retains intent:
+the next attempt downloads current remote state and performs a new conditional
+merge, rather than assuming that the server did or did not accept the write.
+
 ## Regression verification
 
 `chimahon_sync_contract_test.dart` crosses merger, restore authority, codec,
@@ -63,6 +75,19 @@ numbers, nullable authors, category/season handle collisions, intentional
 resets, opaque Android rows, and deliberately corrupted encoded output.
 `chimahon_anime_seasons_test.dart` also checks ID permutations, legacy parents,
 orphan reservation, and convergence.
+
+Unknown chapter/episode numbers are normalized for matching, not blindly
+rewritten in an unchanged remote wire record. Actual duplicate aliases are still
+consolidated without losing progress. Database tests cover omitted Kotlin season
+defaults, fractional episodes, and explicit detachment of non-favorite seasons
+without deleting their cached playback progress.
+
+`chimahon_restore_transition_safety_test.dart` injects corrupt output into the
+two restore proofs. `chimahon_sync_recovery_test.dart` exercises rejected uploads,
+lost acknowledgements, import failures, and failures at each baseline-write
+boundary with both protobuf and gzip, then reopens the durable pending state and
+requires a successful, convergent retry. CI runs the deterministic sync/season
+suite on Windows and Linux; no private fixture or cloud credentials are needed.
 
 The opt-in `chimahon_state_replay_test.dart` reproduces private failed states
 without checking fixtures into source control. Configure:
@@ -96,3 +121,9 @@ and [retentive lenses](https://arxiv.org/abs/2001.02031): writing an unchanged
 lossy view back must not discard data outside that view. Here that is enforced
 by shared identities, explicit projection gaps, retained opaque data, and
 round-trip tests, not by treating every omitted field as a preservation rule.
+
+Failure injection also follows the distinction between a rejected write and an
+ambiguous result illustrated by
+[CockroachDB's transaction-recovery investigation](https://www.cockroachlabs.com/blog/demonic-nondeterminism/).
+The storage protocols differ, but the applicable invariant is the same: a
+missing acknowledgement is not proof that a write failed.

@@ -349,6 +349,17 @@ class ChimahonPendingRestoreAuthority {
         return 'restore_duplicate_anime_id';
       }
     }
+    // Rebinding to a collapsed namespace could otherwise make two different
+    // category memberships appear equal. Validate handles before rebasing.
+    for (final categories in [
+      uploaded.backupCategories,
+      uploaded.backupAnimeCategories,
+    ]) {
+      if (categories.map((row) => row.order).toSet().length !=
+          categories.length) {
+        return 'restore_duplicate_category_order';
+      }
+    }
     final actual = rebaseChimahonBackupReferences(uploaded, uploaded);
     final before = rebaseChimahonBackupReferences(ordinaryMerged, actual);
     final intent = rebaseChimahonBackupReferences(localIntent, actual);
@@ -476,6 +487,7 @@ class ChimahonPendingRestoreAuthority {
       selectedValid: (old, next, selected) {
         final cloud = remoteAnime[_animeKey(selected)];
         return _parentPromotionValid(next, selected, cloud) &&
+            _retainsLegacyAnimeSeasons(old, next, selected) &&
             children(
               old.episodes,
               next.episodes,
@@ -560,35 +572,28 @@ class ChimahonPendingRestoreAuthority {
       pending.backupNovelCategories,
       intent.backupNovelCategories,
     );
-    for (final category in before.backupNovelCategories) {
-      if (selectedNovelCategories.any(
-        (row) => _sameNovelCategoryIdentity(category, row),
-      )) {
-        continue;
-      }
-      if (!actual.backupNovelCategories.any(
-        (row) => _sameBytes(category, row),
-      )) {
-        return 'restore_unselected_novel_category_changed';
-      }
+    if (!_preservesNovelCategories(
+      before.backupNovelCategories,
+      actual.backupNovelCategories,
+      selectedNovelCategories,
+    )) {
+      return 'restore_unselected_novel_category_changed';
     }
-    if (!_statisticsRepresented<BackupMangaStats>(
-          pending: before.backupMangaStats,
-          uploaded: actual.backupMangaStats,
-          keyOf: ChimahonStatsRowMerge.mangaKey,
-          covers: (next, old) =>
-              next.charactersRead >= old.charactersRead &&
-              next.readingTime >= old.readingTime &&
-              _retainsUnknown(old, next),
+    if (!_preservesUnselected<BackupMangaStats, String>(
+          before.backupMangaStats,
+          actual.backupMangaStats,
+          pending.backupMangaStats,
+          ChimahonStatsRowMerge.mangaKey,
+          selectedValid: (old, next, selected) =>
+              _statisticsTransitionValid(old, next, selected),
         ) ||
-        !_statisticsRepresented<BackupAnkiStats>(
-          pending: before.backupAnkiStats,
-          uploaded: actual.backupAnkiStats,
-          keyOf: ChimahonStatsRowMerge.ankiKey,
-          covers: (next, old) =>
-              next.mangaCards >= old.mangaCards &&
-              next.novelCards >= old.novelCards &&
-              _retainsUnknown(old, next),
+        !_preservesUnselected<BackupAnkiStats, String>(
+          before.backupAnkiStats,
+          actual.backupAnkiStats,
+          pending.backupAnkiStats,
+          ChimahonStatsRowMerge.ankiKey,
+          selectedValid: (old, next, selected) =>
+              _statisticsTransitionValid(old, next, selected),
         )) {
       return 'restore_unselected_statistics_changed';
     }
@@ -604,6 +609,92 @@ class ChimahonPendingRestoreAuthority {
     return _sameBytes(before, actual)
         ? null
         : 'restore_unselected_collection_changed';
+  }
+
+  bool _retainsLegacyAnimeSeasons(
+    BackupAnime before,
+    BackupAnime after,
+    BackupAnime selected,
+  ) {
+    if (hasChimahonSeasonMetadata(selected)) return true;
+    final beforeHasSeasons = hasChimahonSeasonMetadata(before);
+    for (final tag in [500, 502, 503, 504, 505, 506, 507]) {
+      // A legacy restore cannot select a different relationship. Its explicit
+      // display values only fill fields the season-aware fallback lacks.
+      final owner =
+          beforeHasSeasons &&
+              (before.hasField(tag) || const {502, 503, 507}.contains(tag))
+          ? before
+          : selected;
+      if (after.hasField(tag) != owner.hasField(tag) ||
+          after.getField(tag) != owner.getField(tag)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _statisticsTransitionValid(
+    GeneratedMessage before,
+    GeneratedMessage after,
+    GeneratedMessage selected,
+  ) {
+    // Both root statistics messages put their two max-merged counters at 2/3.
+    // Merely checking non-regression would accept fabricated extra reading.
+    for (final tag in [2, 3]) {
+      final old = before.getField(tag) as Comparable;
+      final chosen = selected.getField(tag) as Comparable;
+      final expected = old.compareTo(chosen) >= 0 ? old : chosen;
+      if (after.getField(tag) != expected) return false;
+    }
+    final oldEnvelope = before.deepCopy()
+      ..clearField(2)
+      ..clearField(3)
+      ..unknownFields.clear();
+    final newEnvelope = after.deepCopy()
+      ..clearField(2)
+      ..clearField(3)
+      ..unknownFields.clear();
+    return _sameBytes(oldEnvelope, newEnvelope) &&
+        _retainsUnknown(selected, after);
+  }
+
+  bool _preservesNovelCategories(
+    List<BackupNovelCategory> before,
+    List<BackupNovelCategory> after,
+    List<BackupNovelCategory> selected,
+  ) {
+    final remaining = List.of(after);
+    final selections = List.of(selected);
+    for (final old in before) {
+      final chosenIndex = selections.indexWhere(
+        (row) => _sameNovelCategoryIdentity(old, row),
+      );
+      final chosen = chosenIndex < 0 ? null : selections.removeAt(chosenIndex);
+      final nextIndex = remaining.indexWhere(
+        (row) => _sameNovelCategoryIdentity(chosen ?? old, row),
+      );
+      if (nextIndex < 0) return false;
+      final next = remaining.removeAt(nextIndex);
+      if (!_retainsUnknown(old, next) ||
+          (chosen == null
+              ? !_sameBytes(old, next)
+              : !_sameKnownWithSelectedUnknown(next, chosen))) {
+        return false;
+      }
+    }
+    // Any additions must correspond one-to-one to a selected category, not an
+    // invented row or another copy of one already consumed above.
+    for (final chosen in selections) {
+      final index = remaining.indexWhere(
+        (row) => _sameNovelCategoryIdentity(chosen, row),
+      );
+      if (index < 0 ||
+          !_sameKnownWithSelectedUnknown(remaining.removeAt(index), chosen)) {
+        return false;
+      }
+    }
+    return remaining.isEmpty;
   }
 
   bool _preservesUnselected<T extends GeneratedMessage, K>(

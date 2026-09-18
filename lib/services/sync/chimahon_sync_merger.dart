@@ -495,7 +495,10 @@ class ChimahonSyncMerger {
     required bool leftWinsTie,
     required bool localProjectionRules,
   }) {
-    final remoteList = canonicalizeChimahonChapters(remote);
+    final remoteList = canonicalizeChimahonChapters(
+      remote,
+      normalizeNumbers: false,
+    );
     final canonicalLocal = canonicalizeChimahonChapters(local);
     final localList = localProjectionRules
         ? _rebaseLocalChapterIdentity(canonicalLocal, remoteList)
@@ -835,7 +838,10 @@ class ChimahonSyncMerger {
     required bool leftWinsTie,
     required bool localProjectionRules,
   }) {
-    final remoteList = canonicalizeChimahonEpisodes(remote);
+    final remoteList = canonicalizeChimahonEpisodes(
+      remote,
+      normalizeNumbers: false,
+    );
     final canonicalLocal = canonicalizeChimahonEpisodes(local);
     final localList = localProjectionRules
         ? _rebaseLocalEpisodeIdentity(canonicalLocal, remoteList)

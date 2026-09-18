@@ -554,6 +554,10 @@ class ChimahonSyncImporter {
                   ? <int>[]
                   : local.categories;
             _applyAnimeFavoriteVersion(local, remote);
+            // A season can remain in the source cache after leaving both its
+            // parent and the library. The tombstone fast path must still apply
+            // an explicit detach/default reset from a season-aware client.
+            applyChimahonAnimeSeasons(local, remote, null);
             database.mangas.putSync(local);
             _upsertTracking(
               database: database,

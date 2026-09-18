@@ -473,7 +473,6 @@ class CrossDeviceSyncEngine {
       localAfterCommit,
     );
     final persistStarted = metrics.elapsedMicroseconds;
-    await deferredPayloadStore?.save(prepared.merged);
     // If local state changed in flight, [merged] is now the real remote
     // baseline but the newer local settings have not reached it yet. Keep the
     // pre-commit projection as the local comparison baseline so the retry
@@ -501,6 +500,11 @@ class CrossDeviceSyncEngine {
         ?.saveLocalSourcePreferenceBaseline(
           sourcePreferenceBaselineAfterCommit,
         );
+    // Publish the remote baseline last. A layered store consumes the pending
+    // restore here, so clearing it before either projection baseline succeeds
+    // would lose the retry evidence after a local disk failure. The pending
+    // store's own baselines remain intact until this final acknowledgement.
+    await deferredPayloadStore?.save(prepared.merged);
     metrics.addElapsed(CrossDeviceSyncPhase.persistSidecars, persistStarted);
     return CrossDeviceSyncResult(
       hadRemoteData: prepared.remoteSnapshot != null,

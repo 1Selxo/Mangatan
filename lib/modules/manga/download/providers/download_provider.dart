@@ -37,6 +37,7 @@ import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/mining/mokuro_sidecar.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/download_manager/m3u8/m3u8_downloader.dart';
+import 'package:mangayomi/services/download_manager/video_list_retry.dart';
 import 'package:mangayomi/services/download_manager/m3u8/models/download.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/utils/downloaded_page_file.dart';
@@ -343,9 +344,11 @@ Future<void> downloadChapter(
           });
     } else if (itemType == ItemType.anime) {
       try {
-        final value = await ref
-            .read(getVideoListProvider(episode: chapter).future)
-            .timeout(const Duration(seconds: 45));
+        final videoListProvider = getVideoListProvider(episode: chapter);
+        final value = await resolveVideoListWithRetry(
+          resolve: () => ref.read(videoListProvider.future),
+          beforeRetry: () => ref.invalidate(videoListProvider),
+        );
         final m3u8Urls = value.$1
             .where(
               (element) =>

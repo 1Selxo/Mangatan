@@ -1154,7 +1154,7 @@ packages:
     description:
       path: media_kit
       ref: mangatan-linux-render-thread-v1
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "1.2.2"
@@ -1162,8 +1162,8 @@ packages:
     dependency: transitive
     description:
       path: "libs/android/media_kit_libs_android_video"
-      ref: ca042bdda33488c58287b97ba87dda55594aa46f
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "1.3.8"
@@ -1171,8 +1171,8 @@ packages:
     dependency: transitive
     description:
       path: "libs/ios/media_kit_libs_ios_video"
-      ref: ca042bdda33488c58287b97ba87dda55594aa46f
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "1.1.4"
@@ -1180,8 +1180,8 @@ packages:
     dependency: transitive
     description:
       path: "libs/linux/media_kit_libs_linux"
-      ref: ca042bdda33488c58287b97ba87dda55594aa46f
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "1.2.1"
@@ -1189,8 +1189,8 @@ packages:
     dependency: transitive
     description:
       path: "libs/macos/media_kit_libs_macos_video"
-      ref: ca042bdda33488c58287b97ba87dda55594aa46f
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "1.1.4"
@@ -1199,7 +1199,7 @@ packages:
     description:
       path: "libs/universal/media_kit_libs_video"
       ref: mangatan-linux-render-thread-v1
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "1.0.7"
@@ -1207,8 +1207,8 @@ packages:
     dependency: transitive
     description:
       path: "libs/windows/media_kit_libs_windows_video"
-      ref: ca042bdda33488c58287b97ba87dda55594aa46f
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "1.0.11"
@@ -1217,7 +1217,7 @@ packages:
     description:
       path: media_kit_video
       ref: mangatan-linux-render-thread-v1
-      resolved-ref: ca042bdda33488c58287b97ba87dda55594aa46f
+      resolved-ref: fdb1a7dd1bb988b2dccec566b8aa31d1af0624fe
       url: "https://github.com/1Selxo/media-kit.git"
     source: git
     version: "2.0.0"

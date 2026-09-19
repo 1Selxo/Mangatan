@@ -71,6 +71,9 @@ class M3u8Downloader {
         if (attempts >= 3) {
           throw M3u8DownloaderException('Operation failed after 3 attempts', e);
         }
+        // Match Anikku's retry pacing. Immediate retries tend to hit the same
+        // expired CDN edge or temporary rate limit and fail identically.
+        await Future<void>.delayed(Duration(seconds: 1 << attempts));
       }
     }
   }

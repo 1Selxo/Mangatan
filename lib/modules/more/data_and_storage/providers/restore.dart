@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
 import 'package:archive/archive_io.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:collection/collection.dart';
@@ -828,21 +829,39 @@ void _mergeMangayomiBackup({
 
   final oldToNewMangaId = <int, int>{};
   final newMangaIds = <int>{};
+  String restoreIdentity(Manga entry) {
+    final source = entry.itemType == ItemType.anime
+        ? entry.mihonSourceId?.toString() ?? '${entry.source}|${entry.lang}'
+        : '';
+    return '${entry.itemType.index}|$source|${entry.link}';
+  }
+
   if (manga != null) {
     final existingMangaByKey = {
       for (final m in mangaRepository.getAll())
-        if (m.link != null) '${m.itemType.index}|${m.link}': m,
+        if (m.link != null) restoreIdentity(m): m,
     };
     for (final tempManga in manga) {
       final oldId = tempManga.id;
-      final key = '${tempManga.itemType.index}|${tempManga.link}';
+      final key = restoreIdentity(tempManga);
       final existing = tempManga.link != null ? existingMangaByKey[key] : null;
       final remappedCategories = (tempManga.categories ?? [])
           .map((id) => oldToNewCategoryId[id])
           .whereType<int>()
           .toList();
       if (existing != null) {
-        existing.favorite = true;
+        if (existing.itemType == ItemType.anime) {
+          if (existing.animeFetchType == null) {
+            existing.animeParentUrl = tempManga.animeParentUrl;
+          }
+          existing.animeFetchType ??= tempManga.animeFetchType;
+          existing.seasonNumber ??= tempManga.seasonNumber;
+          existing.seasonSourceOrder ??= tempManga.seasonSourceOrder;
+          existing.seasonFlags ??= tempManga.seasonFlags;
+          existing.backgroundUrl ??= tempManga.backgroundUrl;
+        }
+        existing.favorite =
+            existing.favorite == true || tempManga.favorite == true;
         existing.categories = {
           ...?existing.categories,
           ...remappedCategories,
@@ -860,7 +879,7 @@ void _mergeMangayomiBackup({
             );
       tempManga.id = null;
       tempManga.categories = remappedCategories;
-      tempManga.favorite = true;
+      tempManga.favorite ??= true;
       if (boundSource != null) {
         tempManga.sourceId = boundSource.id;
         tempManga.source = boundSource.name;
@@ -1397,6 +1416,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
     }
   });
   if (shouldRestoreAnime) {
+    final seasonParents = chimahonSeasonParents(animeEntries);
     isar.writeTxnSync(() {
       for (var tempAnime in animeEntries) {
         final nativeSourceId = _protoInt(tempAnime.source);
@@ -1454,6 +1474,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
             _protoInt(tempAnime.lastModifiedAt),
           ),
         );
+        applyChimahonAnimeSeasons(anime, tempAnime, seasonParents[tempAnime]);
         isar.mangas.putSync(anime);
         final episodesByUrl = <String, Chapter>{};
         for (var tempEpisode in tempAnime.episodes) {

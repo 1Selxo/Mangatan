@@ -2,6 +2,10 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:mangayomi/services/anime_seasons.dart';
+import 'package:mangayomi/eval/model/m_manga.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
@@ -24,6 +28,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNo
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_importer.dart';
+import 'package:mangayomi/services/sync/chimahon_backup_semantic_diff.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/services/sync/chimahon_media_sync_selection.dart';
@@ -31,6 +36,16 @@ import 'package:mangayomi/services/sync/mihon_backup_exporter.dart';
 import 'package:protobuf/protobuf.dart';
 
 void main() {
+  test('recognizes Anikku season names when the source omits a number', () {
+    expect(recognizeAnimeSeasonNumber('My Series', 'My Series S02', null), 2);
+    expect(
+      recognizeAnimeSeasonNumber('My Series', 'My Series 2 special', null),
+      closeTo(2.97, 0.0001),
+    );
+    expect(recognizeAnimeSeasonNumber('My Series', 'My Series 2.5', null), 2.5);
+    expect(recognizeAnimeSeasonNumber('My Series', 'My Series S01', -2), -2);
+  });
+
   late Directory databaseDirectory;
   late Isar database;
 
@@ -65,6 +80,273 @@ void main() {
     await database.close(deleteFromDisk: true);
     if (await databaseDirectory.exists()) {
       await databaseDirectory.delete(recursive: true);
+    }
+  });
+
+  test(
+    'season refresh reuses progress, detaches removals and rejects cycles',
+    () async {
+      final parent = Manga(
+        name: 'Series',
+        link: '/series',
+        source: 'Fixture',
+        sourceId: 7,
+        author: null,
+        artist: null,
+        genre: null,
+        imageUrl: null,
+        lang: 'en',
+        status: Status.ongoing,
+        description: null,
+        itemType: ItemType.anime,
+        animeFetchType: 0,
+        favorite: true,
+      );
+      database.writeTxnSync(() => database.mangas.putSync(parent));
+      final ids = await storeAnimeSeasons(database, parent, [
+        MManga(name: 'Season 1', link: '/season', seasonNumber: 1),
+      ]);
+      final season = database.mangas.getSync(ids.single)!;
+      database.writeTxnSync(() {
+        season.favorite = true;
+        database.mangas.putSync(season);
+        final chapter = Chapter(
+          name: 'Episode',
+          url: '/episode',
+          mangaId: season.id,
+          isRead: true,
+          lastPageRead: '123',
+        )..manga.value = season;
+        database.chapters.putSync(chapter);
+        chapter.manga.saveSync();
+      });
+      expect(
+        await storeAnimeSeasons(database, parent, [
+          MManga(name: 'Renamed season', link: '/season', seasonNumber: 1),
+        ]),
+        ids,
+      );
+      final refreshed = database.mangas.getSync(ids.single)!;
+      refreshed.chapters.loadSync();
+      expect(refreshed.favorite, true);
+      expect(refreshed.chapters.single.lastPageRead, '123');
+      await expectLater(
+        storeAnimeSeasons(database, refreshed, [
+          MManga(name: 'Cycle', link: '/series'),
+        ]),
+        throwsStateError,
+      );
+      await storeAnimeSeasons(database, parent, [
+        MManga(name: 'Season 2', link: '/second', seasonNumber: 2),
+      ]);
+      final detached = database.mangas.getSync(ids.single)!;
+      expect(detached.animeParentUrl, isNull);
+      detached.chapters.loadSync();
+      expect(detached.chapters.single.isRead, true);
+    },
+  );
+
+  test(
+    'unfavorited seasons restore with progress and export with their parent',
+    () {
+      final parent = BackupAnime(
+        source: Int64(77),
+        url: '/series',
+        title: 'Series',
+        id: Int64(600),
+        fetchType: 0,
+        favorite: true,
+      );
+      final season = BackupAnime(
+        source: Int64(77),
+        url: '/season',
+        title: 'Season 1',
+        id: Int64(900),
+        parentId: parent.id,
+        fetchType: 1,
+        favorite: false,
+        seasonNumber: 1,
+        seasonSourceOrder: Int64.ZERO,
+        episodes: [
+          BackupEpisode(
+            url: '/episode',
+            name: 'Episode 1',
+            seen: true,
+            lastSecondSeen: Int64(123),
+          ),
+        ],
+      );
+      final backup = BackupMihon(backupAnime: [season, parent]);
+      const importer = ChimahonSyncImporter();
+      importer.apply(database: database, backup: backup);
+      importer.apply(database: database, backup: backup);
+      final entries = database.mangas.where().findAllSync();
+      expect(entries, hasLength(2));
+      final child = entries.singleWhere((a) => a.link == '/season');
+      expect(child.favorite, false);
+      expect(child.animeParentUrl, '/series');
+      final chapters = database.chapters.where().findAllSync();
+      expect(chapters.single.isRead, true);
+      final exported = const MihonBackupExporter().export(
+        mangas: entries,
+        categories: [],
+        chapters: chapters,
+        histories: [],
+        sources: [],
+        epubBookProgress: [],
+      );
+      expect(exported.backupAnime, hasLength(2));
+      final exportedParent = exported.backupAnime.singleWhere(
+        (a) => a.url == '/series',
+      );
+      final exportedChild = exported.backupAnime.singleWhere(
+        (a) => a.url == '/season',
+      );
+      expect(exportedChild.parentId, exportedParent.id);
+      expect(exportedChild.episodes.single.lastSecondSeen, Int64(123));
+      expect(Manga.fromJson(child.toJson()).animeParentUrl, '/series');
+    },
+  );
+
+  test(
+    'a detached non-favorite season loses its local parent but keeps progress',
+    () {
+      final parent = BackupAnime(
+        source: Int64(77),
+        url: '/series',
+        title: 'Series',
+        id: Int64(600),
+        fetchType: 0,
+        favorite: true,
+      );
+      final season = BackupAnime(
+        source: Int64(77),
+        url: '/season',
+        title: 'Season',
+        id: Int64(900),
+        parentId: parent.id,
+        favorite: false,
+        seasonFlags: Int64(32),
+        seasonNumber: 2,
+        backgroundUrl: '/old',
+        episodes: [
+          BackupEpisode(
+            url: '/episode',
+            name: 'Episode 1.1',
+            episodeNumber: 1.1,
+            seen: true,
+            lastSecondSeen: Int64(123),
+          ),
+        ],
+      );
+      final initial = BackupMihon(backupAnime: [parent, season]);
+      const importer = ChimahonSyncImporter();
+      importer.apply(database: database, backup: initial);
+      final childId = database.mangas
+          .where()
+          .findAllSync()
+          .singleWhere((row) => row.link == '/season')
+          .id;
+      final episodeId = database.chapters.where().findAllSync().single.id;
+      final detached = initial.deepCopy();
+      detached.backupAnime.last
+        ..clearParentId()
+        ..clearSeasonFlags()
+        ..clearSeasonNumber()
+        ..clearBackgroundUrl()
+        ..lastModifiedAt = Int64(200)
+        ..version = Int64(2);
+      for (var iteration = 0; iteration < 2; iteration++) {
+        importer.apply(database: database, backup: detached);
+        final child = database.mangas.getSync(childId!)!;
+        expect(child.animeParentUrl, isNull);
+        expect(child.animeFetchType, 1);
+        expect(child.seasonFlags, 0);
+        expect(child.seasonNumber, -1);
+        expect(child.backgroundUrl, isNull);
+        expect(child.favorite, isFalse);
+        final episode = database.chapters.getSync(episodeId!)!;
+        expect(episode.isRead, isTrue);
+        expect(episode.lastPageRead, '123');
+      }
+    },
+  );
+
+  test('Kotlin season defaults and fractional episodes survive repeated Isar wire round trips', () {
+    final reference = BackupMihon.fromBuffer(
+      BackupMihon(
+        backupNovelCategories: [
+          BackupNovelCategory(id: 'default', name: 'Default', order: Int64(-1)),
+        ],
+        backupAnimeSources: [
+          BackupSource(name: 'Fixture', sourceId: Int64(77)),
+        ],
+        backupAnime: [
+          BackupAnime(
+            source: Int64(77),
+            url: '/series',
+            title: 'Series',
+            id: Int64(600),
+            fetchType: 0,
+            favorite: true,
+            version: Int64(9),
+            lastModifiedAt: Int64(100),
+          ),
+          BackupAnime(
+            source: Int64(77),
+            url: '/season',
+            title: 'Season',
+            id: Int64(900),
+            parentId: Int64(600),
+            favorite: false,
+            version: Int64(9),
+            lastModifiedAt: Int64(100),
+            episodes: [
+              BackupEpisode(
+                url: '/episode',
+                name: 'Episode 1.1',
+                episodeNumber: 1.1,
+                seen: true,
+                version: Int64(5),
+                lastSecondSeen: Int64(123),
+              ),
+            ],
+          )..unknownFields.mergeVarintField(9999, Int64(42)),
+        ],
+      ).writeToBuffer(),
+    );
+    var wire = reference;
+    for (var iteration = 0; iteration < 3; iteration++) {
+      const ChimahonSyncImporter().apply(database: database, backup: wire);
+      final exported = const MihonBackupExporter().export(
+        mangas: database.mangas.where().findAllSync(),
+        categories: database.categorys.where().findAllSync(),
+        chapters: database.chapters.where().findAllSync(),
+        histories: database.historys.where().findAllSync(),
+        sources: database.sources.where().findAllSync(),
+        epubBookProgress: [],
+      );
+      wire = BackupMihon.fromBuffer(
+        const ChimahonSyncMerger()
+            .merge(
+              local: exported,
+              remote: wire,
+              remoteWinsProjectionTies: true,
+            )
+            .writeToBuffer(),
+      );
+      expect(
+        wire == reference,
+        isTrue,
+        reason: jsonEncode(
+          ChimahonBackupSemanticDiff.compare(
+            remote: reference,
+            proposed: wire,
+          ).toSafeJson(),
+        ),
+      );
+      expect(database.mangas.countSync(), 2);
+      expect(database.chapters.countSync(), 1);
     }
   });
 
@@ -952,103 +1234,100 @@ void main() {
     },
   );
 
-  test(
-    'remote tombstone import does not activate stale cached metadata on the next sync',
-    () {
-      late Manga cached;
-      database.writeTxnSync(() {
-        database.sources.putSync(_source());
-        cached = _manga(
-          name: 'Cached metadata',
-          sourceTitle: 'Cached metadata',
-          link: '/cached-tombstone',
-          sourceId: 42,
+  test('remote tombstone import does not activate stale cached metadata on the next sync', () {
+    late Manga cached;
+    database.writeTxnSync(() {
+      database.sources.putSync(_source());
+      cached = _manga(
+        name: 'Cached metadata',
+        sourceTitle: 'Cached metadata',
+        link: '/cached-tombstone',
+        sourceId: 42,
+        favorite: false,
+      )..updatedAt = 900;
+      database.mangas.putSync(cached);
+    });
+
+    final uploaded = BackupMihon(
+      backupSources: [
+        BackupSource(sourceId: Int64(9001), name: 'Remote source'),
+      ],
+      backupManga: [
+        BackupManga(
+          source: Int64(9001),
+          url: '/cached-tombstone',
+          title: 'Cached metadata',
+          artist: 'Local artist',
+          author: 'Local author',
+          description: 'Local description',
+          genre: const ['Local genre'],
+          status: 1,
+          thumbnailUrl: 'local-cover',
+          dateAdded: Int64.ZERO,
           favorite: false,
-        )..updatedAt = 900;
-        database.mangas.putSync(cached);
-      });
+          lastModifiedAt: Int64(800),
+          favoriteModifiedAt: Int64(800),
+          version: Int64(7),
+          initialized: true,
+        ),
+      ],
+    );
 
-      final uploaded = BackupMihon(
-        backupSources: [
-          BackupSource(sourceId: Int64(9001), name: 'Remote source'),
-        ],
-        backupManga: [
-          BackupManga(
-            source: Int64(9001),
-            url: '/cached-tombstone',
-            title: 'Cached metadata',
-            artist: 'Local artist',
-            author: 'Local author',
-            description: 'Local description',
-            genre: const ['Local genre'],
-            status: 1,
-            thumbnailUrl: 'local-cover',
-            dateAdded: Int64.ZERO,
-            favorite: false,
-            lastModifiedAt: Int64(800),
-            favoriteModifiedAt: Int64(800),
-            version: Int64(7),
-            initialized: true,
-          ),
-        ],
-      );
+    // Before the remote tombstone is imported, this cache row has no local
+    // favorite clock and is correctly absent from the sync projection.
+    expect(_exportProjection(database).backupManga, isEmpty);
 
-      // Before the remote tombstone is imported, this cache row has no local
-      // favorite clock and is correctly absent from the sync projection.
-      expect(_exportProjection(database).backupManga, isEmpty);
+    const ChimahonSyncImporter().apply(database: database, backup: uploaded);
+    final imported = database.mangas.getSync(cached.id!)!;
+    expect(imported.favorite, isFalse);
+    expect(imported.favoriteModifiedAt, 800);
+    expect(imported.updatedAt, 900);
 
-      const ChimahonSyncImporter().apply(database: database, backup: uploaded);
-      final imported = database.mangas.getSync(cached.id!)!;
-      expect(imported.favorite, isFalse);
-      expect(imported.favoriteModifiedAt, 800);
-      expect(imported.updatedAt, 900);
-
-      // Merely importing the just-uploaded tombstone makes the cached row
-      // exportable. Its pre-existing metadata clock must not manufacture a
-      // newer record/version when no local edit occurred after the upload.
-      final nextProposal = const ChimahonSyncMerger().merge(
-        local: _exportProjection(database),
-        remote: uploaded,
-      );
-      final uploadedManga = uploaded.backupManga.single;
-      final proposedManga = nextProposal.backupManga.single;
-      final changedFields = _semanticFieldDiffSummary(
-        uploadedManga,
-        proposedManga,
-      );
-      final changedValues = <String, String>{
-        'lastModifiedAt':
-            '${uploadedManga.lastModifiedAt} -> '
-            '${proposedManga.lastModifiedAt}',
-        'version': '${uploadedManga.version} -> ${proposedManga.version}',
-        'viewer':
-            '${uploadedManga.hasViewer()}/${uploadedManga.viewer} -> '
-            '${proposedManga.hasViewer()}/${proposedManga.viewer}',
-        'chapterFlags':
-            '${uploadedManga.hasChapterFlags()}/${uploadedManga.chapterFlags} '
-            '-> ${proposedManga.hasChapterFlags()}/'
-            '${proposedManga.chapterFlags}',
-        'updateStrategy':
-            '${uploadedManga.hasUpdateStrategy()}/'
-            '${uploadedManga.updateStrategy} -> '
-            '${proposedManga.hasUpdateStrategy()}/'
-            '${proposedManga.updateStrategy}',
-        'notes':
-            '${uploadedManga.hasNotes()}/${uploadedManga.notes.length} -> '
-            '${proposedManga.hasNotes()}/${proposedManga.notes.length}',
-      };
-      expect(
-        changedFields,
-        isEmpty,
-        reason:
-            'A no-edit post-import projection changed these protobuf fields: '
-            '$changedFields; values: $changedValues (encoded bytes: '
-            '${uploadedManga.writeToBuffer().length} -> '
-            '${proposedManga.writeToBuffer().length})',
-      );
-      expect(proposedManga, uploadedManga);
-    },
-  );
+    // Merely importing the just-uploaded tombstone makes the cached row
+    // exportable. Its pre-existing metadata clock must not manufacture a
+    // newer record/version when no local edit occurred after the upload.
+    final nextProposal = const ChimahonSyncMerger().merge(
+      local: _exportProjection(database),
+      remote: uploaded,
+    );
+    final uploadedManga = uploaded.backupManga.single;
+    final proposedManga = nextProposal.backupManga.single;
+    final changedFields = _semanticFieldDiffSummary(
+      uploadedManga,
+      proposedManga,
+    );
+    final changedValues = <String, String>{
+      'lastModifiedAt':
+          '${uploadedManga.lastModifiedAt} -> '
+          '${proposedManga.lastModifiedAt}',
+      'version': '${uploadedManga.version} -> ${proposedManga.version}',
+      'viewer':
+          '${uploadedManga.hasViewer()}/${uploadedManga.viewer} -> '
+          '${proposedManga.hasViewer()}/${proposedManga.viewer}',
+      'chapterFlags':
+          '${uploadedManga.hasChapterFlags()}/${uploadedManga.chapterFlags} '
+          '-> ${proposedManga.hasChapterFlags()}/'
+          '${proposedManga.chapterFlags}',
+      'updateStrategy':
+          '${uploadedManga.hasUpdateStrategy()}/'
+          '${uploadedManga.updateStrategy} -> '
+          '${proposedManga.hasUpdateStrategy()}/'
+          '${proposedManga.updateStrategy}',
+      'notes':
+          '${uploadedManga.hasNotes()}/${uploadedManga.notes.length} -> '
+          '${proposedManga.hasNotes()}/${proposedManga.notes.length}',
+    };
+    expect(
+      changedFields,
+      isEmpty,
+      reason:
+          'A no-edit post-import projection changed these protobuf fields: '
+          '$changedFields; values: $changedValues (encoded bytes: '
+          '${uploadedManga.writeToBuffer().length} -> '
+          '${proposedManga.writeToBuffer().length})',
+    );
+    expect(proposedManga, uploadedManga);
+  });
 
   test('same-title tombstone with a different URL cannot unfavorite', () {
     database.writeTxnSync(() {
@@ -1724,143 +2003,138 @@ void main() {
     expect(restoredUpdate.chapter.value?.id, survivor.id);
   });
 
-  test(
-    'authoritative download repairs aliases, removes stale rows, and is idempotent',
-    () async {
-      late Manga canonical;
-      late Manga duplicate;
-      late Manga stale;
-      late Manga retainedOverlay;
-      late Manga disabledAnime;
-      late Category localDefault;
-      database.writeTxnSync(() {
-        database.sources.putSync(_source());
-        localDefault = Category(
-          name: 'Default',
-          forItemType: ItemType.manga,
-          pos: 0,
-        );
-        database.categorys.putSync(localDefault);
-        canonical = _manga(
-          name: 'Remote title',
-          sourceTitle: 'Remote title',
-          link: '/remote',
-          sourceId: 42,
-          categories: [localDefault.id!],
-        )..mihonSourceId = '9001';
-        duplicate =
-            _manga(
-                name: 'Remote title',
-                sourceTitle: 'Remote title',
-                link: '/remote',
-                sourceId: null,
-                categories: [localDefault.id!],
-              )
-              ..source = 'Unknown'
-              ..mihonSourceId = '9001';
-        stale = _manga(
-          name: 'Stale',
-          sourceTitle: 'Stale',
-          link: '/stale',
-          sourceId: 42,
-        )..mihonSourceId = '9001';
-        retainedOverlay = _manga(
-          name: 'Local overlay',
-          sourceTitle: 'Local overlay',
-          link: '/overlay',
-          sourceId: 42,
-        )..mihonSourceId = '9001';
-        disabledAnime = _manga(
-          name: 'Local anime',
-          sourceTitle: 'Local anime',
-          link: '/anime',
-          sourceId: 42,
-          itemType: ItemType.anime,
-        )..mihonSourceId = '9001';
-        database.mangas.putAllSync([
-          canonical,
-          duplicate,
-          stale,
-          retainedOverlay,
-          disabledAnime,
-        ]);
-        final manual = _chapter(
-          retainedOverlay,
-          name: 'Manual',
-          url: '/manual',
-          archivePath: '/device/manual.cbz',
-        );
-        database.chapters.putSync(manual);
-        manual.manga.saveSync();
-      });
+  test('authoritative download repairs aliases, removes stale rows, and is idempotent', () async {
+    late Manga canonical;
+    late Manga duplicate;
+    late Manga stale;
+    late Manga retainedOverlay;
+    late Manga disabledAnime;
+    late Category localDefault;
+    database.writeTxnSync(() {
+      database.sources.putSync(_source());
+      localDefault = Category(
+        name: 'Default',
+        forItemType: ItemType.manga,
+        pos: 0,
+      );
+      database.categorys.putSync(localDefault);
+      canonical = _manga(
+        name: 'Remote title',
+        sourceTitle: 'Remote title',
+        link: '/remote',
+        sourceId: 42,
+        categories: [localDefault.id!],
+      )..mihonSourceId = '9001';
+      duplicate =
+          _manga(
+              name: 'Remote title',
+              sourceTitle: 'Remote title',
+              link: '/remote',
+              sourceId: null,
+              categories: [localDefault.id!],
+            )
+            ..source = 'Unknown'
+            ..mihonSourceId = '9001';
+      stale = _manga(
+        name: 'Stale',
+        sourceTitle: 'Stale',
+        link: '/stale',
+        sourceId: 42,
+      )..mihonSourceId = '9001';
+      retainedOverlay = _manga(
+        name: 'Local overlay',
+        sourceTitle: 'Local overlay',
+        link: '/overlay',
+        sourceId: 42,
+      )..mihonSourceId = '9001';
+      disabledAnime = _manga(
+        name: 'Local anime',
+        sourceTitle: 'Local anime',
+        link: '/anime',
+        sourceId: 42,
+        itemType: ItemType.anime,
+      )..mihonSourceId = '9001';
+      database.mangas.putAllSync([
+        canonical,
+        duplicate,
+        stale,
+        retainedOverlay,
+        disabledAnime,
+      ]);
+      final manual = _chapter(
+        retainedOverlay,
+        name: 'Manual',
+        url: '/manual',
+        archivePath: '/device/manual.cbz',
+      );
+      database.chapters.putSync(manual);
+      manual.manga.saveSync();
+    });
 
-      final remote = BackupMihon(
-        backupSources: [
-          BackupSource(sourceId: Int64(9001), name: 'Chimahon source'),
-        ],
-        backupManga: [
-          BackupManga(
-            source: Int64(9001),
-            url: '/remote',
-            title: 'Remote title',
-            author: 'Local author',
-            favorite: true,
-            lastModifiedAt: Int64(100),
-          ),
-        ],
-      );
-      const selection = ChimahonMediaSyncSelection(
-        manga: true,
-        anime: false,
-        novels: false,
-      );
+    final remote = BackupMihon(
+      backupSources: [
+        BackupSource(sourceId: Int64(9001), name: 'Chimahon source'),
+      ],
+      backupManga: [
+        BackupManga(
+          source: Int64(9001),
+          url: '/remote',
+          title: 'Remote title',
+          author: 'Local author',
+          favorite: true,
+          lastModifiedAt: Int64(100),
+        ),
+      ],
+    );
+    const selection = ChimahonMediaSyncSelection(
+      manga: true,
+      anime: false,
+      novels: false,
+    );
 
-      final first = const ChimahonSyncImporter().apply(
-        database: database,
-        backup: remote,
-        authoritativeSelection: selection,
-      );
-      final afterFirst = database.mangas.where().findAllSync();
-      final restored = afterFirst.singleWhere(
-        (manga) => manga.link == '/remote',
-      );
-      expect(restored.id, canonical.id);
-      expect(restored.mihonSourceId, '9001');
-      expect(restored.categories, isEmpty);
-      expect(afterFirst.any((manga) => manga.id == duplicate.id), isFalse);
-      expect(afterFirst.any((manga) => manga.id == stale.id), isFalse);
-      expect(
-        afterFirst
-            .singleWhere((manga) => manga.id == retainedOverlay.id)
-            .favorite,
-        isFalse,
-      );
-      expect(
-        afterFirst
-            .singleWhere((manga) => manga.id == retainedOverlay.id)
-            .categories,
-        isEmpty,
-      );
-      expect(afterFirst.any((manga) => manga.id == disabledAnime.id), isTrue);
-      expect(database.categorys.getSync(localDefault.id!), isNull);
-      expect(first.duplicatesRepaired, 1);
-      expect(first.titlesRemoved, 2);
-      expect(first.ambiguousRowsRetained, 1);
+    final first = const ChimahonSyncImporter().apply(
+      database: database,
+      backup: remote,
+      authoritativeSelection: selection,
+    );
+    final afterFirst = database.mangas.where().findAllSync();
+    final restored = afterFirst.singleWhere((manga) => manga.link == '/remote');
+    expect(restored.id, canonical.id);
+    expect(restored.mihonSourceId, '9001');
+    expect(restored.categories, isEmpty);
+    expect(afterFirst.any((manga) => manga.id == duplicate.id), isFalse);
+    expect(afterFirst.any((manga) => manga.id == stale.id), isFalse);
+    expect(
+      afterFirst
+          .singleWhere((manga) => manga.id == retainedOverlay.id)
+          .favorite,
+      isFalse,
+    );
+    expect(
+      afterFirst
+          .singleWhere((manga) => manga.id == retainedOverlay.id)
+          .categories,
+      isEmpty,
+    );
+    expect(afterFirst.any((manga) => manga.id == disabledAnime.id), isTrue);
+    expect(database.categorys.getSync(localDefault.id!), isNull);
+    expect(first.duplicatesRepaired, 1);
+    expect(first.titlesRemoved, 2);
+    expect(first.ambiguousRowsRetained, 1);
 
-      final stableIds = afterFirst.map((manga) => manga.id).toSet();
-      final second = const ChimahonSyncImporter().apply(
-        database: database,
-        backup: remote,
-        authoritativeSelection: selection,
-      );
-      expect(
-        database.mangas.where().findAllSync().map((manga) => manga.id).toSet(),
-        stableIds,
-      );
-      expect(second.titlesRemoved, 0);
-      expect(second.duplicatesRepaired, 0);
-    },
-  );
+    final stableIds = afterFirst.map((manga) => manga.id).toSet();
+    final second = const ChimahonSyncImporter().apply(
+      database: database,
+      backup: remote,
+      authoritativeSelection: selection,
+    );
+    expect(
+      database.mangas.where().findAllSync().map((manga) => manga.id).toSet(),
+      stableIds,
+    );
+    expect(second.titlesRemoved, 0);
+    expect(second.duplicatesRepaired, 0);
+  });
 }
 
 BackupMihon _exportProjection(Isar database) =>

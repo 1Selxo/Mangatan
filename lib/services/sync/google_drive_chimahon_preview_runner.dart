@@ -26,16 +26,16 @@ typedef GoogleDriveChimahonLocalProjectionProvider =
     Future<GoogleDriveChimahonLocalProjection> Function();
 typedef GoogleDriveChimahonPreviewSidecarFactory =
     Future<LayeredChimahonDeferredPayloadStore> Function(String scopeKey);
-typedef GoogleDriveChimahonPreviewAudit =
-    ChimahonSyncSafetyReport Function({
-      BackupMihon? reference,
-      required BackupMihon remote,
-      required BackupMihon local,
-      required BackupMihon proposed,
-      required ChimahonPreferenceSafetyPolicy preferenceSafetyPolicy,
-      required Set<ChimahonTrackingDeletionKey> localTrackingDeletions,
-      required bool remoteWinsTies,
-    });
+typedef GoogleDriveChimahonPreviewAudit = ChimahonSyncSafetyReport Function({
+  BackupMihon? reference,
+  required BackupMihon remote,
+  required BackupMihon local,
+  required BackupMihon proposed,
+  BackupMihon? localProjection,
+  required ChimahonPreferenceSafetyPolicy preferenceSafetyPolicy,
+  required Set<ChimahonTrackingDeletionKey> localTrackingDeletions,
+  required bool remoteWinsTies,
+});
 typedef GoogleDriveChimahonPreviewOAuthFactory =
     GoogleDriveChimahonPreviewOAuthSession Function();
 typedef GoogleDriveChimahonPreviewCoreFactory =
@@ -414,7 +414,8 @@ class GoogleDriveChimahonReadOnlyPreviewCore
             reference: reference,
             remote: remote,
             local: preview.effectiveLocalIntent,
-            proposed: preview.proposedMerged,
+            proposed: preview.ordinaryMerged ?? preview.proposedMerged,
+            localProjection: preview.exportedLocal,
             preferenceSafetyPolicy: preview.preferenceSafetyPolicy,
             localTrackingDeletions: preview.localTrackingDeletions,
             remoteWinsTies: !preview.pendingManualRestorePresent,

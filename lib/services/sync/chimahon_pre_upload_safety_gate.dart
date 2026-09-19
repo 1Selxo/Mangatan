@@ -5,22 +5,23 @@ import 'package:mangayomi/services/sync/chimahon_sync_safety_audit.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:mangayomi/services/sync/cross_device_sync_engine.dart';
 
-typedef ChimahonPreUploadAudit =
-    ChimahonSyncSafetyReport Function({
-      BackupMihon? reference,
-      required BackupMihon remote,
-      required BackupMihon local,
-      required BackupMihon proposed,
-      required ChimahonPreferenceSafetyPolicy preferenceSafetyPolicy,
-      required Set<ChimahonTrackingDeletionKey> localTrackingDeletions,
-      required bool remoteWinsTies,
-    });
+typedef ChimahonPreUploadAudit = ChimahonSyncSafetyReport Function({
+  BackupMihon? reference,
+  required BackupMihon remote,
+  required BackupMihon local,
+  required BackupMihon proposed,
+  BackupMihon? localProjection,
+  required ChimahonPreferenceSafetyPolicy preferenceSafetyPolicy,
+  required Set<ChimahonTrackingDeletionKey> localTrackingDeletions,
+  required bool remoteWinsTies,
+});
 
 ChimahonSyncSafetyReport _defaultAudit({
   BackupMihon? reference,
   required BackupMihon remote,
   required BackupMihon local,
   required BackupMihon proposed,
+  BackupMihon? localProjection,
   required ChimahonPreferenceSafetyPolicy preferenceSafetyPolicy,
   required Set<ChimahonTrackingDeletionKey> localTrackingDeletions,
   required bool remoteWinsTies,
@@ -29,6 +30,7 @@ ChimahonSyncSafetyReport _defaultAudit({
   remote: remote,
   local: local,
   proposed: proposed,
+  localProjection: localProjection,
   preferenceSafetyPolicy: preferenceSafetyPolicy,
   localTrackingDeletions: localTrackingDeletions,
   remoteWinsTies: remoteWinsTies,
@@ -39,10 +41,11 @@ ChimahonSyncSafetyReport _defaultAudit({
 ///
 /// Existing remote bytes are durably preserved first unless the transport
 /// proves its conditional upload retains every exact remote blob. The exact
-/// prepared remote/local/proposed transition is always audited. Remote
-/// creation has no prior state to recover, but is still audited against an
-/// empty remote so an encoder or merger regression cannot drop the first local
-/// payload.
+/// routine transition is audited here. For an explicit manual restore the
+/// engine additionally proves, against decoded upload bytes, that selected
+/// values and promoted clocks survive and unselected data is unchanged. This
+/// distinguishes an intentional reset from a destructive routine merge.
+/// Remote creation is still audited against an empty remote.
 class ChimahonPreUploadSafetyGate {
   const ChimahonPreUploadSafetyGate({
     required this.recoveryStore,
@@ -80,7 +83,8 @@ class ChimahonPreUploadSafetyGate {
         reference: null,
         remote: remote,
         local: preview.effectiveLocalIntent,
-        proposed: preview.proposedMerged,
+        proposed: preview.ordinaryMerged ?? preview.proposedMerged,
+        localProjection: preview.exportedLocal,
         preferenceSafetyPolicy: preview.preferenceSafetyPolicy,
         localTrackingDeletions: preview.localTrackingDeletions,
         remoteWinsTies: !preview.pendingManualRestorePresent,

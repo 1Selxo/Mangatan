@@ -1,4 +1,6 @@
 {
+  "seasons": "Seasons",
+  "season_number": "Season number",
   "@@locale": "en",
   "library": "Library",
   "updates": "Updates",

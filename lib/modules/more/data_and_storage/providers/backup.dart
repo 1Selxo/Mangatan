@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:mangayomi/services/anime_seasons.dart';
 import 'package:archive/archive_io.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
@@ -270,8 +271,8 @@ Future<String> writeMangayomiBackupZip({
   Map<String, dynamic> datas = {};
   datas.addAll({"version": "2"});
   if (list.contains(0)) {
-    final res = mangaRepository
-        .getFavoritesNonLocalArchive()
+    final res = animeSeasonLibraryClosure(mangaRepository.getAll())
+        .where((manga) => !(manga.isLocalArchive ?? false))
         .map((e) => e.toJson())
         .toList();
     datas.addAll({"manga": res});

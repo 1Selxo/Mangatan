@@ -17,96 +17,126 @@ const MangaSchema = CollectionSchema(
   name: r'Manga',
   id: -5643034226035087553,
   properties: {
-    r'artist': PropertySchema(id: 0, name: r'artist', type: IsarType.string),
-    r'author': PropertySchema(id: 1, name: r'author', type: IsarType.string),
+    r'animeFetchType': PropertySchema(
+      id: 0,
+      name: r'animeFetchType',
+      type: IsarType.long,
+    ),
+    r'animeParentUrl': PropertySchema(
+      id: 1,
+      name: r'animeParentUrl',
+      type: IsarType.string,
+    ),
+    r'artist': PropertySchema(id: 2, name: r'artist', type: IsarType.string),
+    r'author': PropertySchema(id: 3, name: r'author', type: IsarType.string),
+    r'backgroundUrl': PropertySchema(
+      id: 4,
+      name: r'backgroundUrl',
+      type: IsarType.string,
+    ),
     r'categories': PropertySchema(
-      id: 2,
+      id: 5,
       name: r'categories',
       type: IsarType.longList,
     ),
     r'customCoverFromTracker': PropertySchema(
-      id: 3,
+      id: 6,
       name: r'customCoverFromTracker',
       type: IsarType.string,
     ),
     r'customCoverImage': PropertySchema(
-      id: 4,
+      id: 7,
       name: r'customCoverImage',
       type: IsarType.byteList,
     ),
     r'dateAdded': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'dateAdded',
       type: IsarType.long,
     ),
     r'description': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'description',
       type: IsarType.string,
     ),
-    r'favorite': PropertySchema(id: 7, name: r'favorite', type: IsarType.bool),
+    r'favorite': PropertySchema(id: 10, name: r'favorite', type: IsarType.bool),
     r'favoriteModifiedAt': PropertySchema(
-      id: 8,
+      id: 11,
       name: r'favoriteModifiedAt',
       type: IsarType.long,
     ),
-    r'genre': PropertySchema(id: 9, name: r'genre', type: IsarType.stringList),
+    r'genre': PropertySchema(id: 12, name: r'genre', type: IsarType.stringList),
     r'hasLocalChapterOverlay': PropertySchema(
-      id: 10,
+      id: 13,
       name: r'hasLocalChapterOverlay',
       type: IsarType.bool,
     ),
     r'imageUrl': PropertySchema(
-      id: 11,
+      id: 14,
       name: r'imageUrl',
       type: IsarType.string,
     ),
     r'isLocalArchive': PropertySchema(
-      id: 12,
+      id: 15,
       name: r'isLocalArchive',
       type: IsarType.bool,
     ),
-    r'isManga': PropertySchema(id: 13, name: r'isManga', type: IsarType.bool),
+    r'isManga': PropertySchema(id: 16, name: r'isManga', type: IsarType.bool),
     r'itemType': PropertySchema(
-      id: 14,
+      id: 17,
       name: r'itemType',
       type: IsarType.byte,
       enumMap: _MangaitemTypeEnumValueMap,
     ),
-    r'lang': PropertySchema(id: 15, name: r'lang', type: IsarType.string),
-    r'lastRead': PropertySchema(id: 16, name: r'lastRead', type: IsarType.long),
+    r'lang': PropertySchema(id: 18, name: r'lang', type: IsarType.string),
+    r'lastRead': PropertySchema(id: 19, name: r'lastRead', type: IsarType.long),
     r'lastUpdate': PropertySchema(
-      id: 17,
+      id: 20,
       name: r'lastUpdate',
       type: IsarType.long,
     ),
-    r'link': PropertySchema(id: 18, name: r'link', type: IsarType.string),
+    r'link': PropertySchema(id: 21, name: r'link', type: IsarType.string),
     r'mihonSourceId': PropertySchema(
-      id: 19,
+      id: 22,
       name: r'mihonSourceId',
       type: IsarType.string,
     ),
-    r'name': PropertySchema(id: 20, name: r'name', type: IsarType.string),
+    r'name': PropertySchema(id: 23, name: r'name', type: IsarType.string),
+    r'seasonFlags': PropertySchema(
+      id: 24,
+      name: r'seasonFlags',
+      type: IsarType.long,
+    ),
+    r'seasonNumber': PropertySchema(
+      id: 25,
+      name: r'seasonNumber',
+      type: IsarType.double,
+    ),
+    r'seasonSourceOrder': PropertySchema(
+      id: 26,
+      name: r'seasonSourceOrder',
+      type: IsarType.long,
+    ),
     r'smartUpdateDays': PropertySchema(
-      id: 21,
+      id: 27,
       name: r'smartUpdateDays',
       type: IsarType.long,
     ),
-    r'source': PropertySchema(id: 22, name: r'source', type: IsarType.string),
-    r'sourceId': PropertySchema(id: 23, name: r'sourceId', type: IsarType.long),
+    r'source': PropertySchema(id: 28, name: r'source', type: IsarType.string),
+    r'sourceId': PropertySchema(id: 29, name: r'sourceId', type: IsarType.long),
     r'sourceTitle': PropertySchema(
-      id: 24,
+      id: 30,
       name: r'sourceTitle',
       type: IsarType.string,
     ),
     r'status': PropertySchema(
-      id: 25,
+      id: 31,
       name: r'status',
       type: IsarType.byte,
       enumMap: _MangastatusEnumValueMap,
     ),
     r'updatedAt': PropertySchema(
-      id: 26,
+      id: 32,
       name: r'updatedAt',
       type: IsarType.long,
     ),
@@ -187,6 +217,12 @@ int _mangaEstimateSize(
 ) {
   var bytesCount = offsets.last;
   {
+    final value = object.animeParentUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.artist;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -194,6 +230,12 @@ int _mangaEstimateSize(
   }
   {
     final value = object.author;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.backgroundUrl;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -285,33 +327,39 @@ void _mangaSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.artist);
-  writer.writeString(offsets[1], object.author);
-  writer.writeLongList(offsets[2], object.categories);
-  writer.writeString(offsets[3], object.customCoverFromTracker);
-  writer.writeByteList(offsets[4], object.customCoverImage);
-  writer.writeLong(offsets[5], object.dateAdded);
-  writer.writeString(offsets[6], object.description);
-  writer.writeBool(offsets[7], object.favorite);
-  writer.writeLong(offsets[8], object.favoriteModifiedAt);
-  writer.writeStringList(offsets[9], object.genre);
-  writer.writeBool(offsets[10], object.hasLocalChapterOverlay);
-  writer.writeString(offsets[11], object.imageUrl);
-  writer.writeBool(offsets[12], object.isLocalArchive);
-  writer.writeBool(offsets[13], object.isManga);
-  writer.writeByte(offsets[14], object.itemType.index);
-  writer.writeString(offsets[15], object.lang);
-  writer.writeLong(offsets[16], object.lastRead);
-  writer.writeLong(offsets[17], object.lastUpdate);
-  writer.writeString(offsets[18], object.link);
-  writer.writeString(offsets[19], object.mihonSourceId);
-  writer.writeString(offsets[20], object.name);
-  writer.writeLong(offsets[21], object.smartUpdateDays);
-  writer.writeString(offsets[22], object.source);
-  writer.writeLong(offsets[23], object.sourceId);
-  writer.writeString(offsets[24], object.sourceTitle);
-  writer.writeByte(offsets[25], object.status.index);
-  writer.writeLong(offsets[26], object.updatedAt);
+  writer.writeLong(offsets[0], object.animeFetchType);
+  writer.writeString(offsets[1], object.animeParentUrl);
+  writer.writeString(offsets[2], object.artist);
+  writer.writeString(offsets[3], object.author);
+  writer.writeString(offsets[4], object.backgroundUrl);
+  writer.writeLongList(offsets[5], object.categories);
+  writer.writeString(offsets[6], object.customCoverFromTracker);
+  writer.writeByteList(offsets[7], object.customCoverImage);
+  writer.writeLong(offsets[8], object.dateAdded);
+  writer.writeString(offsets[9], object.description);
+  writer.writeBool(offsets[10], object.favorite);
+  writer.writeLong(offsets[11], object.favoriteModifiedAt);
+  writer.writeStringList(offsets[12], object.genre);
+  writer.writeBool(offsets[13], object.hasLocalChapterOverlay);
+  writer.writeString(offsets[14], object.imageUrl);
+  writer.writeBool(offsets[15], object.isLocalArchive);
+  writer.writeBool(offsets[16], object.isManga);
+  writer.writeByte(offsets[17], object.itemType.index);
+  writer.writeString(offsets[18], object.lang);
+  writer.writeLong(offsets[19], object.lastRead);
+  writer.writeLong(offsets[20], object.lastUpdate);
+  writer.writeString(offsets[21], object.link);
+  writer.writeString(offsets[22], object.mihonSourceId);
+  writer.writeString(offsets[23], object.name);
+  writer.writeLong(offsets[24], object.seasonFlags);
+  writer.writeDouble(offsets[25], object.seasonNumber);
+  writer.writeLong(offsets[26], object.seasonSourceOrder);
+  writer.writeLong(offsets[27], object.smartUpdateDays);
+  writer.writeString(offsets[28], object.source);
+  writer.writeLong(offsets[29], object.sourceId);
+  writer.writeString(offsets[30], object.sourceTitle);
+  writer.writeByte(offsets[31], object.status.index);
+  writer.writeLong(offsets[32], object.updatedAt);
 }
 
 Manga _mangaDeserialize(
@@ -321,38 +369,44 @@ Manga _mangaDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Manga(
-    artist: reader.readStringOrNull(offsets[0]),
-    author: reader.readStringOrNull(offsets[1]),
-    categories: reader.readLongList(offsets[2]),
-    customCoverFromTracker: reader.readStringOrNull(offsets[3]),
-    customCoverImage: reader.readByteList(offsets[4]),
-    dateAdded: reader.readLongOrNull(offsets[5]),
-    description: reader.readStringOrNull(offsets[6]),
-    favorite: reader.readBoolOrNull(offsets[7]),
-    favoriteModifiedAt: reader.readLongOrNull(offsets[8]),
-    genre: reader.readStringList(offsets[9]),
-    hasLocalChapterOverlay: reader.readBoolOrNull(offsets[10]),
+    animeFetchType: reader.readLongOrNull(offsets[0]),
+    animeParentUrl: reader.readStringOrNull(offsets[1]),
+    artist: reader.readStringOrNull(offsets[2]),
+    author: reader.readStringOrNull(offsets[3]),
+    backgroundUrl: reader.readStringOrNull(offsets[4]),
+    categories: reader.readLongList(offsets[5]),
+    customCoverFromTracker: reader.readStringOrNull(offsets[6]),
+    customCoverImage: reader.readByteList(offsets[7]),
+    dateAdded: reader.readLongOrNull(offsets[8]),
+    description: reader.readStringOrNull(offsets[9]),
+    favorite: reader.readBoolOrNull(offsets[10]),
+    favoriteModifiedAt: reader.readLongOrNull(offsets[11]),
+    genre: reader.readStringList(offsets[12]),
+    hasLocalChapterOverlay: reader.readBoolOrNull(offsets[13]),
     id: id,
-    imageUrl: reader.readStringOrNull(offsets[11]),
-    isLocalArchive: reader.readBoolOrNull(offsets[12]),
-    isManga: reader.readBoolOrNull(offsets[13]),
+    imageUrl: reader.readStringOrNull(offsets[14]),
+    isLocalArchive: reader.readBoolOrNull(offsets[15]),
+    isManga: reader.readBoolOrNull(offsets[16]),
     itemType:
-        _MangaitemTypeValueEnumMap[reader.readByteOrNull(offsets[14])] ??
+        _MangaitemTypeValueEnumMap[reader.readByteOrNull(offsets[17])] ??
         ItemType.manga,
-    lang: reader.readStringOrNull(offsets[15]),
-    lastRead: reader.readLongOrNull(offsets[16]),
-    lastUpdate: reader.readLongOrNull(offsets[17]),
-    link: reader.readStringOrNull(offsets[18]),
-    mihonSourceId: reader.readStringOrNull(offsets[19]),
-    name: reader.readStringOrNull(offsets[20]),
-    smartUpdateDays: reader.readLongOrNull(offsets[21]),
-    source: reader.readStringOrNull(offsets[22]),
-    sourceId: reader.readLongOrNull(offsets[23]),
-    sourceTitle: reader.readStringOrNull(offsets[24]),
+    lang: reader.readStringOrNull(offsets[18]),
+    lastRead: reader.readLongOrNull(offsets[19]),
+    lastUpdate: reader.readLongOrNull(offsets[20]),
+    link: reader.readStringOrNull(offsets[21]),
+    mihonSourceId: reader.readStringOrNull(offsets[22]),
+    name: reader.readStringOrNull(offsets[23]),
+    seasonFlags: reader.readLongOrNull(offsets[24]),
+    seasonNumber: reader.readDoubleOrNull(offsets[25]),
+    seasonSourceOrder: reader.readLongOrNull(offsets[26]),
+    smartUpdateDays: reader.readLongOrNull(offsets[27]),
+    source: reader.readStringOrNull(offsets[28]),
+    sourceId: reader.readLongOrNull(offsets[29]),
+    sourceTitle: reader.readStringOrNull(offsets[30]),
     status:
-        _MangastatusValueEnumMap[reader.readByteOrNull(offsets[25])] ??
+        _MangastatusValueEnumMap[reader.readByteOrNull(offsets[31])] ??
         Status.ongoing,
-    updatedAt: reader.readLongOrNull(offsets[26]),
+    updatedAt: reader.readLongOrNull(offsets[32]),
   );
   return object;
 }
@@ -365,62 +419,74 @@ P _mangaDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 1:
       return (reader.readStringOrNull(offset)) as P;
     case 2:
-      return (reader.readLongList(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 3:
       return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readByteList(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readLongList(offset)) as P;
     case 6:
       return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readBoolOrNull(offset)) as P;
+      return (reader.readByteList(offset)) as P;
     case 8:
       return (reader.readLongOrNull(offset)) as P;
     case 9:
-      return (reader.readStringList(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 10:
       return (reader.readBoolOrNull(offset)) as P;
     case 11:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 12:
-      return (reader.readBoolOrNull(offset)) as P;
+      return (reader.readStringList(offset)) as P;
     case 13:
       return (reader.readBoolOrNull(offset)) as P;
     case 14:
+      return (reader.readStringOrNull(offset)) as P;
+    case 15:
+      return (reader.readBoolOrNull(offset)) as P;
+    case 16:
+      return (reader.readBoolOrNull(offset)) as P;
+    case 17:
       return (_MangaitemTypeValueEnumMap[reader.readByteOrNull(offset)] ??
               ItemType.manga)
           as P;
-    case 15:
-      return (reader.readStringOrNull(offset)) as P;
-    case 16:
-      return (reader.readLongOrNull(offset)) as P;
-    case 17:
-      return (reader.readLongOrNull(offset)) as P;
     case 18:
       return (reader.readStringOrNull(offset)) as P;
     case 19:
-      return (reader.readStringOrNull(offset)) as P;
-    case 20:
-      return (reader.readStringOrNull(offset)) as P;
-    case 21:
       return (reader.readLongOrNull(offset)) as P;
+    case 20:
+      return (reader.readLongOrNull(offset)) as P;
+    case 21:
+      return (reader.readStringOrNull(offset)) as P;
     case 22:
       return (reader.readStringOrNull(offset)) as P;
     case 23:
-      return (reader.readLongOrNull(offset)) as P;
-    case 24:
       return (reader.readStringOrNull(offset)) as P;
+    case 24:
+      return (reader.readLongOrNull(offset)) as P;
     case 25:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 26:
+      return (reader.readLongOrNull(offset)) as P;
+    case 27:
+      return (reader.readLongOrNull(offset)) as P;
+    case 28:
+      return (reader.readStringOrNull(offset)) as P;
+    case 29:
+      return (reader.readLongOrNull(offset)) as P;
+    case 30:
+      return (reader.readStringOrNull(offset)) as P;
+    case 31:
       return (_MangastatusValueEnumMap[reader.readByteOrNull(offset)] ??
               Status.ongoing)
           as P;
-    case 26:
+    case 32:
       return (reader.readLongOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -929,6 +995,243 @@ extension MangaQueryWhere on QueryBuilder<Manga, Manga, QWhereClause> {
 }
 
 extension MangaQueryFilter on QueryBuilder<Manga, Manga, QFilterCondition> {
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeFetchTypeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'animeFetchType'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeFetchTypeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'animeFetchType'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeFetchTypeEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'animeFetchType', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeFetchTypeGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'animeFetchType',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeFetchTypeLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'animeFetchType',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeFetchTypeBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'animeFetchType',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'animeParentUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'animeParentUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'animeParentUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'animeParentUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'animeParentUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'animeParentUrl',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'animeParentUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'animeParentUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'animeParentUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'animeParentUrl',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'animeParentUrl', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> animeParentUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'animeParentUrl', value: ''),
+      );
+    });
+  }
+
   QueryBuilder<Manga, Manga, QAfterFilterCondition> artistIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1249,6 +1552,168 @@ extension MangaQueryFilter on QueryBuilder<Manga, Manga, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'author', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'backgroundUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'backgroundUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'backgroundUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'backgroundUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'backgroundUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'backgroundUrl',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'backgroundUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'backgroundUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'backgroundUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'backgroundUrl',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'backgroundUrl', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> backgroundUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'backgroundUrl', value: ''),
       );
     });
   }
@@ -3401,6 +3866,245 @@ extension MangaQueryFilter on QueryBuilder<Manga, Manga, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonFlagsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'seasonFlags'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonFlagsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'seasonFlags'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonFlagsEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'seasonFlags', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonFlagsGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'seasonFlags',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonFlagsLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'seasonFlags',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonFlagsBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'seasonFlags',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonNumberIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'seasonNumber'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonNumberIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'seasonNumber'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonNumberEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'seasonNumber',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonNumberGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'seasonNumber',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonNumberLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'seasonNumber',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonNumberBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'seasonNumber',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonSourceOrderIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'seasonSourceOrder'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition>
+  seasonSourceOrderIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'seasonSourceOrder'),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonSourceOrderEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'seasonSourceOrder', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition>
+  seasonSourceOrderGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'seasonSourceOrder',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonSourceOrderLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'seasonSourceOrder',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> seasonSourceOrderBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'seasonSourceOrder',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<Manga, Manga, QAfterFilterCondition> smartUpdateDaysIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -4078,6 +4782,30 @@ extension MangaQueryLinks on QueryBuilder<Manga, Manga, QFilterCondition> {
 }
 
 extension MangaQuerySortBy on QueryBuilder<Manga, Manga, QSortBy> {
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortByAnimeFetchType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeFetchType', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortByAnimeFetchTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeFetchType', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortByAnimeParentUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeParentUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortByAnimeParentUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeParentUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<Manga, Manga, QAfterSortBy> sortByArtist() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'artist', Sort.asc);
@@ -4099,6 +4827,18 @@ extension MangaQuerySortBy on QueryBuilder<Manga, Manga, QSortBy> {
   QueryBuilder<Manga, Manga, QAfterSortBy> sortByAuthorDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'author', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortByBackgroundUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortByBackgroundUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundUrl', Sort.desc);
     });
   }
 
@@ -4294,6 +5034,42 @@ extension MangaQuerySortBy on QueryBuilder<Manga, Manga, QSortBy> {
     });
   }
 
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortBySeasonFlags() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonFlags', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortBySeasonFlagsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonFlags', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortBySeasonNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortBySeasonNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonNumber', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortBySeasonSourceOrder() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonSourceOrder', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> sortBySeasonSourceOrderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonSourceOrder', Sort.desc);
+    });
+  }
+
   QueryBuilder<Manga, Manga, QAfterSortBy> sortBySmartUpdateDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'smartUpdateDays', Sort.asc);
@@ -4368,6 +5144,30 @@ extension MangaQuerySortBy on QueryBuilder<Manga, Manga, QSortBy> {
 }
 
 extension MangaQuerySortThenBy on QueryBuilder<Manga, Manga, QSortThenBy> {
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenByAnimeFetchType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeFetchType', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenByAnimeFetchTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeFetchType', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenByAnimeParentUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeParentUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenByAnimeParentUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'animeParentUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<Manga, Manga, QAfterSortBy> thenByArtist() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'artist', Sort.asc);
@@ -4389,6 +5189,18 @@ extension MangaQuerySortThenBy on QueryBuilder<Manga, Manga, QSortThenBy> {
   QueryBuilder<Manga, Manga, QAfterSortBy> thenByAuthorDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'author', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenByBackgroundUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenByBackgroundUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundUrl', Sort.desc);
     });
   }
 
@@ -4596,6 +5408,42 @@ extension MangaQuerySortThenBy on QueryBuilder<Manga, Manga, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenBySeasonFlags() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonFlags', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenBySeasonFlagsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonFlags', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenBySeasonNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenBySeasonNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonNumber', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenBySeasonSourceOrder() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonSourceOrder', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QAfterSortBy> thenBySeasonSourceOrderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'seasonSourceOrder', Sort.desc);
+    });
+  }
+
   QueryBuilder<Manga, Manga, QAfterSortBy> thenBySmartUpdateDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'smartUpdateDays', Sort.asc);
@@ -4670,6 +5518,23 @@ extension MangaQuerySortThenBy on QueryBuilder<Manga, Manga, QSortThenBy> {
 }
 
 extension MangaQueryWhereDistinct on QueryBuilder<Manga, Manga, QDistinct> {
+  QueryBuilder<Manga, Manga, QDistinct> distinctByAnimeFetchType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'animeFetchType');
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QDistinct> distinctByAnimeParentUrl({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'animeParentUrl',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
   QueryBuilder<Manga, Manga, QDistinct> distinctByArtist({
     bool caseSensitive = true,
   }) {
@@ -4683,6 +5548,17 @@ extension MangaQueryWhereDistinct on QueryBuilder<Manga, Manga, QDistinct> {
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'author', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QDistinct> distinctByBackgroundUrl({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'backgroundUrl',
+        caseSensitive: caseSensitive,
+      );
     });
   }
 
@@ -4820,6 +5696,24 @@ extension MangaQueryWhereDistinct on QueryBuilder<Manga, Manga, QDistinct> {
     });
   }
 
+  QueryBuilder<Manga, Manga, QDistinct> distinctBySeasonFlags() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'seasonFlags');
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QDistinct> distinctBySeasonNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'seasonNumber');
+    });
+  }
+
+  QueryBuilder<Manga, Manga, QDistinct> distinctBySeasonSourceOrder() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'seasonSourceOrder');
+    });
+  }
+
   QueryBuilder<Manga, Manga, QDistinct> distinctBySmartUpdateDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'smartUpdateDays');
@@ -4868,6 +5762,18 @@ extension MangaQueryProperty on QueryBuilder<Manga, Manga, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Manga, int?, QQueryOperations> animeFetchTypeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'animeFetchType');
+    });
+  }
+
+  QueryBuilder<Manga, String?, QQueryOperations> animeParentUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'animeParentUrl');
+    });
+  }
+
   QueryBuilder<Manga, String?, QQueryOperations> artistProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'artist');
@@ -4877,6 +5783,12 @@ extension MangaQueryProperty on QueryBuilder<Manga, Manga, QQueryProperty> {
   QueryBuilder<Manga, String?, QQueryOperations> authorProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'author');
+    });
+  }
+
+  QueryBuilder<Manga, String?, QQueryOperations> backgroundUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'backgroundUrl');
     });
   }
 
@@ -4993,6 +5905,24 @@ extension MangaQueryProperty on QueryBuilder<Manga, Manga, QQueryProperty> {
   QueryBuilder<Manga, String?, QQueryOperations> nameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'name');
+    });
+  }
+
+  QueryBuilder<Manga, int?, QQueryOperations> seasonFlagsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'seasonFlags');
+    });
+  }
+
+  QueryBuilder<Manga, double?, QQueryOperations> seasonNumberProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'seasonNumber');
+    });
+  }
+
+  QueryBuilder<Manga, int?, QQueryOperations> seasonSourceOrderProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'seasonSourceOrder');
     });
   }
 

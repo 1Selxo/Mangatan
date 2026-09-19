@@ -126,6 +126,18 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @seasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Seasons'**
+  String get seasons;
+
+  /// No description provided for @season_number.
+  ///
+  /// In en, this message translates to:
+  /// **'Season number'**
+  String get season_number;
+
   /// No description provided for @library.
   ///
   /// In en, this message translates to:

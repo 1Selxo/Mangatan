@@ -21,6 +21,11 @@ class MManga {
 
   List<MChapter>? chapters;
 
+  List<MManga>? seasons;
+  int? animeFetchType;
+  double? seasonNumber;
+  String? backgroundUrl;
+
   MManga({
     this.author,
     this.artist,
@@ -31,11 +36,21 @@ class MManga {
     this.status = Status.unknown,
     this.description,
     this.chapters,
+    this.seasons,
+    this.animeFetchType,
+    this.seasonNumber,
+    this.backgroundUrl,
   });
 
   factory MManga.fromJson(Map<String, dynamic> json) {
     return MManga(
       name: json['name'],
+      animeFetchType: json['animeFetchType'],
+      seasonNumber: (json['seasonNumber'] as num?)?.toDouble(),
+      backgroundUrl: json['backgroundUrl'],
+      seasons: (json['seasons'] as List?)
+          ?.map((e) => MManga.fromJson(e))
+          .toList(),
       link: json['link'],
       imageUrl: json['imageUrl'],
       description: json['description'],
@@ -60,6 +75,10 @@ class MManga {
   Map<String, dynamic> toJson() {
     return {
       'name': name,
+      'animeFetchType': animeFetchType,
+      'seasonNumber': seasonNumber,
+      'backgroundUrl': backgroundUrl,
+      'seasons': seasons?.map((e) => e.toJson()).toList(),
       'link': link,
       'imageUrl': imageUrl,
       'description': description,
@@ -67,7 +86,7 @@ class MManga {
       'artist': artist,
       'status': status.toString().substringAfter("."),
       'genre': genre,
-      'chapters': chapters!.map((e) => e.toJson()).toList(),
+      'chapters': chapters?.map((e) => e.toJson()).toList(),
     };
   }
 }

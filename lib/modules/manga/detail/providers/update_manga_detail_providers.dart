@@ -12,6 +12,7 @@ import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/error_toast.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/main.dart';
+import 'package:mangayomi/services/anime_seasons.dart';
 part 'update_manga_detail_providers.g.dart';
 
 @riverpod
@@ -42,6 +43,7 @@ Future<dynamic> updateMangaDetail(
     final getManga = await ref.read(
       getDetailProvider(url: manga.link!, source: source).future,
     );
+    if (!ref.mounted) return;
 
     final genre =
         getManga.genre
@@ -78,6 +80,50 @@ Future<dynamic> updateMangaDetail(
       ..itemType = source.itemType
       ..lastUpdate = now
       ..updatedAt = now;
+
+    manga
+      ..animeFetchType = getManga.animeFetchType ?? manga.animeFetchType
+      ..seasonNumber = getManga.seasonNumber ?? manga.seasonNumber
+      ..backgroundUrl = getManga.backgroundUrl ?? manga.backgroundUrl;
+    if (getManga.seasons != null) {
+      final seasonIds = await storeAnimeSeasons(
+        isar,
+        manga,
+        getManga.seasons!,
+        sourceIsLocal: source.isLocal == true,
+      );
+      if (!ref.mounted) return;
+      // Library refreshes also update each season's episodes and smart interval.
+      // Initial browsing only fetches a season when it is opened.
+      if (!isInit) {
+        for (final id in seasonIds) {
+          if (!ref.mounted) return;
+          await ref.read(
+            updateMangaDetailProvider(
+              mangaId: id,
+              isInit: false,
+              showToast: showToast,
+            ).future,
+          );
+          if (!ref.mounted) return;
+        }
+        // A series has no episodes of its own. Use the earliest child cadence
+        // so smart library updates continue checking an actively airing season.
+        final intervals = seasonIds
+            .map((id) => mangaRepository.findById(id)?.smartUpdateDays)
+            .whereType<int>();
+        if (intervals.isNotEmpty) {
+          final current = mangaRepository.findById(manga.id!);
+          if (current != null) {
+            current.smartUpdateDays = intervals.reduce((a, b) => a < b ? a : b);
+            await mangaRepository.writeTransactionAsync(() async {
+              await mangaRepository.putAsync(current);
+            });
+          }
+        }
+      }
+      return;
+    }
 
     final chaps = getManga.chapters;
 

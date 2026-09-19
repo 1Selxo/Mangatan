@@ -7,11 +7,13 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart';
+import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
@@ -47,6 +49,8 @@ void main() {
           [
             MangaSchema,
             ChapterSchema,
+            DownloadSchema,
+            UpdateSchema,
             CategorySchema,
             HistorySchema,
             SourceSchema,
@@ -93,7 +97,7 @@ void main() {
                   'fixture-${indexed.$1}.epub',
               title: remote.title,
               author: remote.hasAuthor() ? remote.author : null,
-              lang: 'before-import',
+              lang: remote.hasLang() ? 'before-import' : null,
               chapterIndex: 0,
               progress: 0,
               characterCount: 0,

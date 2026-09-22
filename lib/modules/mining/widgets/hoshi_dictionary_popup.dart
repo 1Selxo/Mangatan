@@ -12,7 +12,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_glossary.dart';
-import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
+import 'package:mangayomi/services/dictionary/dictionary_read_facade.dart';
 import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:mangayomi/services/mining/anki_audio_service.dart';
 import 'package:mangayomi/services/mining/anki_card_builder.dart';
@@ -261,7 +261,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
   }
 
   Future<Map<String, String>> _loadStyles() async {
-    final styles = await HoshidictsLookupBackend.instance
+    final styles = await DictionaryReadFacade.instance
         .getStyles(profile: widget.profile)
         .catchError((_) => <HoshiDictionaryStyle>[]);
     return {for (final style in styles) style.dictName: style.styles};
@@ -282,7 +282,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     if (_usesStableCustomSchemes) return Future.value(const {});
     return hoshiPopupMediaDataUris(
       results,
-      (dictionary, path) => HoshidictsLookupBackend.instance.getMediaFile(
+      (dictionary, path) => DictionaryReadFacade.instance.getMediaFile(
         dictName: dictionary,
         mediaPath: path,
         profile: widget.profile,
@@ -305,7 +305,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       final results = query.isEmpty
           ? <HoshiLookupResult>[]
           : await (initialResults ??
-                HoshidictsLookupBackend.instance.lookup(
+                DictionaryReadFacade.instance.lookup(
                   query,
                   maxResults: hoshiPopupMaxResults,
                   scanLength: hoshiPopupScanLength,
@@ -376,7 +376,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     final generation = ++_lookupGeneration;
     final normalized = query.trim();
     _requestedQuery = normalized;
-    final results = await HoshidictsLookupBackend.instance.lookup(
+    final results = await DictionaryReadFacade.instance.lookup(
       normalized,
       maxResults: hoshiPopupMaxResults,
       scanLength: hoshiPopupScanLength,
@@ -393,7 +393,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
 
   Future<int> _lookupKanjiRedirect(String character) async {
     final generation = ++_lookupGeneration;
-    final results = await HoshidictsLookupBackend.instance.lookupKanji(
+    final results = await DictionaryReadFacade.instance.lookupKanji(
       character,
       profile: widget.profile,
     );
@@ -635,7 +635,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
       final path = item['path']?.toString() ?? '';
       final filename = item['filename']?.toString() ?? '';
       if (dictionary.isEmpty || path.isEmpty || filename.isEmpty) continue;
-      final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
+      final bytes = await DictionaryReadFacade.instance.getMediaFile(
         dictName: dictionary,
         mediaPath: path,
         profile: widget.profile,
@@ -719,7 +719,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         final dictionary = body['dictionary']?.toString() ?? '';
         final path = body['path']?.toString() ?? '';
         if (dictionary.isEmpty || path.isEmpty) return null;
-        final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
+        final bytes = await DictionaryReadFacade.instance.getMediaFile(
           dictName: dictionary,
           mediaPath: path,
           profile: widget.profile,
@@ -833,7 +833,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
     final dictionary = url.queryParameters['dictionary'];
     final path = url.queryParameters['path'];
     if (dictionary == null || path == null) return null;
-    final bytes = await HoshidictsLookupBackend.instance.getMediaFile(
+    final bytes = await DictionaryReadFacade.instance.getMediaFile(
       dictName: dictionary,
       mediaPath: path,
       profile: widget.profile,

@@ -72,6 +72,9 @@ class MDownloader {
             e,
           );
         }
+        // Give transient CDN and rate-limit failures time to recover instead
+        // of immediately repeating the same request.
+        await Future<void>.delayed(Duration(seconds: 1 << attempts));
       }
     }
   }

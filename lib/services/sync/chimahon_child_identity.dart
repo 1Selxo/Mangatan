@@ -1,14 +1,20 @@
+import 'dart:typed_data';
+
 import 'package:fixnum/fixnum.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupEpisode.pb.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
 
+/// Chapter and episode numbers are Kotlin Floats / protobuf float32 values.
+/// Quantize before using them in an identity, including numbers inferred from
+/// names; otherwise 1.1 changes identity after encoding and decoding a backup.
 double chimahonCanonicalChildNumber({
   required String name,
   required double? sourceNumber,
-}) =>
-    normalizeSourceChapterNumber(sourceNumber) ??
-    fallbackChapterNumberFromName(name);
+}) => Float32List.fromList([
+  normalizeSourceChapterNumber(sourceNumber) ??
+      fallbackChapterNumberFromName(name),
+]).single;
 
 String chimahonChapterIdentity(BackupChapter chapter) =>
     chimahonChapterIdentityValues(
@@ -40,13 +46,16 @@ String chimahonEpisodeIdentityValues({
 
 /// Normalizes Mihon's negative unknown-number sentinel and consolidates only
 /// rows that consequently become the exact same chapter identity.
+/// Remote wire records can retain their original sentinel while using the
+/// canonical identity for matching. Only actual alias collisions need repair.
 List<BackupChapter> canonicalizeChimahonChapters(
-  Iterable<BackupChapter> chapters,
-) {
+  Iterable<BackupChapter> chapters, {
+  bool normalizeNumbers = true,
+}) {
   final byIdentity = <String, BackupChapter>{};
   for (final chapter in chapters) {
     final canonical = chapter.deepCopy();
-    if (chapter.hasChapterNumber()) {
+    if (normalizeNumbers && chapter.hasChapterNumber()) {
       canonical.chapterNumber = chimahonCanonicalChildNumber(
         name: chapter.name,
         sourceNumber: chapter.chapterNumber,
@@ -63,12 +72,13 @@ List<BackupChapter> canonicalizeChimahonChapters(
 
 /// Episode equivalent of [canonicalizeChimahonChapters].
 List<BackupEpisode> canonicalizeChimahonEpisodes(
-  Iterable<BackupEpisode> episodes,
-) {
+  Iterable<BackupEpisode> episodes, {
+  bool normalizeNumbers = true,
+}) {
   final byIdentity = <String, BackupEpisode>{};
   for (final episode in episodes) {
     final canonical = episode.deepCopy();
-    if (episode.hasEpisodeNumber()) {
+    if (normalizeNumbers && episode.hasEpisodeNumber()) {
       canonical.episodeNumber = chimahonCanonicalChildNumber(
         name: episode.name,
         sourceNumber: episode.episodeNumber,

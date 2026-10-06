@@ -71,6 +71,9 @@ class M3u8Downloader {
         if (attempts >= 3) {
           throw M3u8DownloaderException('Operation failed after 3 attempts', e);
         }
+        // Match Anikku's retry pacing. Immediate retries tend to hit the same
+        // expired CDN edge or temporary rate limit and fail identically.
+        await Future<void>.delayed(Duration(seconds: 1 << attempts));
       }
     }
   }
@@ -165,10 +168,27 @@ class M3u8Downloader {
     List<TsInfo> tsList,
     String tempDir,
   ) async {
-    return tsList.where((ts) {
+    final missing = <TsInfo>[];
+    for (final ts in tsList) {
       final file = File(path.join(tempDir, '${ts.name}.ts'));
-      return !file.existsSync() || file.lengthSync() == 0;
-    }).toList();
+      if (!file.existsSync() || file.lengthSync() == 0) {
+        missing.add(ts);
+        continue;
+      }
+      try {
+        final original = await file.readAsBytes();
+        if (isLikelyMpegTs(ts.url, '') || hasErrorMediaPrefix(original)) {
+          final normalized = normalizeMpegTsSegment(original);
+          if (normalized.length != original.length) {
+            await file.writeAsBytes(normalized, flush: true);
+          }
+        }
+      } catch (_) {
+        await file.delete();
+        missing.add(ts);
+      }
+    }
+    return missing;
   }
 
   Future<void> _downloadSegmentsWithProgress(
@@ -224,8 +244,9 @@ class M3u8Downloader {
             completer.complete();
           }
         } catch (error, stackTrace) {
-          if (!completer.isCompleted)
+          if (!completer.isCompleted) {
             completer.completeError(error, stackTrace);
+          }
         }
       },
       onError: (error) {

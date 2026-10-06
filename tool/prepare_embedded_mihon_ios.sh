@@ -12,9 +12,9 @@ trap 'find "$work_dir" -depth -delete' EXIT
 # Keep the current Mihon/TachiyomiX bytecode and media-proxy repairs while
 # avoiding jdk.zipfs, which is intentionally absent from the small embedded
 # iOS JRE.
-server_commit="2c31d618f80914d7976269e32285122691fe3fda"
-server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v9/MExtensionServer-ios.jar"
-server_jar_sha256="e805705f0151eeaba35e4044c68aa8a08ab13b0974912c4a9904c8b70d9beaed"
+server_commit="b38a7b83acf5a8ea47512930c79ecd710f588c9a"
+server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v11/MExtensionServer-ios.jar"
+server_jar_sha256="d9b38ad454556545f8ab1f32e0d5c3bb8bb7f262560efe741ff82bc0e7452a3d"
 openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="f21681caae40e508647e7f18c9082f27fa9aa67ee7f1376725eae528fa2d38cb"
 openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/java_bundle-device.zip"
@@ -46,7 +46,21 @@ download_and_verify() {
 
 echo "Downloading pinned M-Extension-Server $server_commit"
 server_jar="$work_dir/MExtensionServer-ios.jar"
-download_and_verify "$server_jar_url" "$server_jar_sha256" "$server_jar"
+if [[ -n "${MIHON_SERVER_JAR_FILE:-}" ]]; then
+  expected_commit=$(tr -d '\r\n' < "$script_dir/mihon_server_commit.txt")
+  if [[ "${MIHON_SERVER_COMMIT:-}" != "$expected_commit" ||
+        ! "${MIHON_SERVER_JAR_SHA256:-}" =~ ^[a-fA-F0-9]{64}$ ]]; then
+    echo "A source-built server requires its pinned commit and SHA-256." >&2
+    exit 1
+  fi
+  server_commit="$MIHON_SERVER_COMMIT"
+  server_jar_sha256="$MIHON_SERVER_JAR_SHA256"
+  echo "Using verified source-built M-Extension-Server $server_commit"
+  cp "$MIHON_SERVER_JAR_FILE" "$server_jar"
+  printf '%s  %s\n' "$server_jar_sha256" "$server_jar" | shasum -a 256 --check
+else
+  download_and_verify "$server_jar_url" "$server_jar_sha256" "$server_jar"
+fi
 if "$JAVA_HOME/bin/jar" tf "$server_jar" |
   grep -Eq '^(ch/qos/logback|org/cef|dev/datlag/kcef)/'; then
   echo "The iOS server JAR contains excluded desktop runtime classes." >&2

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
 import 'package:archive/archive_io.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:collection/collection.dart';
@@ -622,6 +623,10 @@ Future<void> restoreBackup(
   Map<String, bool> categoryDecisions = const {},
   Map<String, int> sourceDecisions = const {},
 }) async {
+  // This provider is awaited through ref.read(...future) by doRestore. Keep
+  // the nested operation alive until the database restore and state
+  // invalidation have both completed.
+  ref.keepAlive();
   final version = backup['version'];
   if (["1", "2"].any((e) => e == version)) {
     try {
@@ -824,21 +829,39 @@ void _mergeMangayomiBackup({
 
   final oldToNewMangaId = <int, int>{};
   final newMangaIds = <int>{};
+  String restoreIdentity(Manga entry) {
+    final source = entry.itemType == ItemType.anime
+        ? entry.mihonSourceId?.toString() ?? '${entry.source}|${entry.lang}'
+        : '';
+    return '${entry.itemType.index}|$source|${entry.link}';
+  }
+
   if (manga != null) {
     final existingMangaByKey = {
       for (final m in mangaRepository.getAll())
-        if (m.link != null) '${m.itemType.index}|${m.link}': m,
+        if (m.link != null) restoreIdentity(m): m,
     };
     for (final tempManga in manga) {
       final oldId = tempManga.id;
-      final key = '${tempManga.itemType.index}|${tempManga.link}';
+      final key = restoreIdentity(tempManga);
       final existing = tempManga.link != null ? existingMangaByKey[key] : null;
       final remappedCategories = (tempManga.categories ?? [])
           .map((id) => oldToNewCategoryId[id])
           .whereType<int>()
           .toList();
       if (existing != null) {
-        existing.favorite = true;
+        if (existing.itemType == ItemType.anime) {
+          if (existing.animeFetchType == null) {
+            existing.animeParentUrl = tempManga.animeParentUrl;
+          }
+          existing.animeFetchType ??= tempManga.animeFetchType;
+          existing.seasonNumber ??= tempManga.seasonNumber;
+          existing.seasonSourceOrder ??= tempManga.seasonSourceOrder;
+          existing.seasonFlags ??= tempManga.seasonFlags;
+          existing.backgroundUrl ??= tempManga.backgroundUrl;
+        }
+        existing.favorite =
+            existing.favorite == true || tempManga.favorite == true;
         existing.categories = {
           ...?existing.categories,
           ...remappedCategories,
@@ -856,7 +879,7 @@ void _mergeMangayomiBackup({
             );
       tempManga.id = null;
       tempManga.categories = remappedCategories;
-      tempManga.favorite = true;
+      tempManga.favorite ??= true;
       if (boundSource != null) {
         tempManga.sourceId = boundSource.id;
         tempManga.source = boundSource.name;
@@ -963,6 +986,9 @@ ItemType _convertToItemTypeCategory(Map<String, dynamic> backup) {
 
 @riverpod
 Future<void> restoreKotatsuBackup(Ref ref, Archive archive) async {
+  // This provider is awaited through ref.read(...future) by doRestore. Keep
+  // the nested operation alive until the restore has finished using ref.
+  ref.keepAlive();
   try {
     for (var f in archive.files) {
       List<Category> cats = [];
@@ -1043,6 +1069,10 @@ Future<void> restoreTachiBkBackup(
   Map<String, bool> categoryDecisions = const {},
   Map<String, int> sourceDecisions = const {},
 }) async {
+  // doRestore awaits this nested auto-dispose provider through
+  // ref.read(...future). Without an explicit keep-alive, Riverpod can dispose
+  // it during the restore and invalidate Ref before the final import steps.
+  ref.keepAlive();
   final inputStream = InputFileStream(path);
   late final DecodedChimahonSync decoded;
   try {
@@ -1386,6 +1416,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
     }
   });
   if (shouldRestoreAnime) {
+    final seasonParents = chimahonSeasonParents(animeEntries);
     isar.writeTxnSync(() {
       for (var tempAnime in animeEntries) {
         final nativeSourceId = _protoInt(tempAnime.source);
@@ -1443,6 +1474,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
             _protoInt(tempAnime.lastModifiedAt),
           ),
         );
+        applyChimahonAnimeSeasons(anime, tempAnime, seasonParents[tempAnime]);
         isar.mangas.putSync(anime);
         final episodesByUrl = <String, Chapter>{};
         for (var tempEpisode in tempAnime.episodes) {

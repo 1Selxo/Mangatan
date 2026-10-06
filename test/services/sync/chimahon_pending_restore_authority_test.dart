@@ -2,6 +2,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupChapter.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_pending_restore_authority.dart';
@@ -120,4 +121,44 @@ void main() {
       );
     },
   );
+
+  test('matches duplicate child identities as separate selected rows', () {
+    final pending = BackupMihon(
+      backupManga: [
+        BackupManga(
+          source: Int64(1),
+          url: '/selected-manga',
+          title: 'Selected manga',
+          chapters: [
+            BackupChapter(
+              url: '/duplicate-chapter',
+              name: 'Chapter 1',
+              dateFetch: Int64(10),
+            ),
+            BackupChapter(
+              url: '/duplicate-chapter',
+              name: 'Chapter 1 (source copy)',
+              dateFetch: Int64(11),
+            ),
+          ],
+        ),
+      ],
+    );
+    final authority = ChimahonPendingRestoreAuthority();
+    final applied = authority.apply(
+      pending: pending,
+      localIntent: pending.deepCopy(),
+      remote: null,
+      merged: pending.deepCopy(),
+    );
+
+    expect(
+      authority.containsSelectedIntent(
+        uploaded: applied,
+        pending: pending,
+        localIntent: pending,
+      ),
+      isTrue,
+    );
+  });
 }

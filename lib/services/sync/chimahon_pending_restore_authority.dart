@@ -13,6 +13,11 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNo
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupStatistics.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupTracking.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_stats_row_merge.dart';
+import 'package:mangayomi/services/sync/chimahon_child_identity.dart';
+import 'package:mangayomi/services/sync/chimahon_media_identity.dart';
+import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
+import 'package:mangayomi/services/sync/chimahon_backup_references.dart';
+import 'package:mangayomi/services/sync/chimahon_unknown_field_safety.dart';
 import 'package:mangayomi/services/sync/chimahon_sync_merger.dart';
 import 'package:protobuf/protobuf.dart';
 
@@ -35,6 +40,13 @@ class ChimahonPendingRestoreAuthority {
     required BackupMihon merged,
     Set<ChimahonTrackingDeletionKey> localTrackingDeletions = const {},
   }) {
+    final namespace = ChimahonSeasonNamespace(
+      localIntent.backupAnime,
+      merged.backupAnime,
+    );
+    localIntent = localIntent.deepCopy()
+      ..backupAnime.clear()
+      ..backupAnime.addAll(namespace.local);
     final result = merged.deepCopy();
 
     _putSelectedUnknownFieldsLast(result, pending);
@@ -202,8 +214,26 @@ class ChimahonPendingRestoreAuthority {
     required BackupMihon uploaded,
     required BackupMihon pending,
     required BackupMihon localIntent,
+  }) =>
+      selectedIntentFailure(
+        uploaded: uploaded,
+        pending: pending,
+        localIntent: localIntent,
+      ) ==
+      null;
+
+  /// Privacy-safe diagnostic: only a fixed collection-level code, never URLs,
+  /// titles, preference values, or contents from the user's backup.
+  String? selectedIntentFailure({
+    required BackupMihon uploaded,
+    required BackupMihon pending,
+    required BackupMihon localIntent,
   }) {
-    if (!_unknownFieldsEndWith(uploaded, pending)) return false;
+    localIntent = rebaseChimahonBackupReferences(localIntent, uploaded);
+    uploaded = rebaseChimahonBackupReferences(uploaded, uploaded);
+    if (!_unknownFieldsEndWith(uploaded, pending)) {
+      return 'restore_selected_root_unknown_fields_lost';
+    }
 
     final uploadedManga = _lastByKey(uploaded.backupManga, _mangaKey);
     for (final selected in _selectedRows(
@@ -212,7 +242,9 @@ class ChimahonPendingRestoreAuthority {
       keyOf: _mangaKey,
     )) {
       final actual = uploadedManga[_mangaKey(selected)];
-      if (actual == null || !_containsManga(actual, selected)) return false;
+      if (actual == null || !_containsManga(actual, selected)) {
+        return 'restore_selected_manga_mismatch';
+      }
     }
 
     final uploadedAnime = _lastByKey(uploaded.backupAnime, _animeKey);
@@ -222,7 +254,9 @@ class ChimahonPendingRestoreAuthority {
       keyOf: _animeKey,
     )) {
       final actual = uploadedAnime[_animeKey(selected)];
-      if (actual == null || !_containsAnime(actual, selected)) return false;
+      if (actual == null || !_containsAnime(actual, selected)) {
+        return 'restore_selected_anime_mismatch';
+      }
     }
 
     final uploadedNovels = _lastByKey(uploaded.backupNovels, _novelKey);
@@ -232,7 +266,9 @@ class ChimahonPendingRestoreAuthority {
       keyOf: _novelKey,
     )) {
       final actual = uploadedNovels[_novelKey(selected)];
-      if (actual == null || !_containsNovel(actual, selected)) return false;
+      if (actual == null || !_containsNovel(actual, selected)) {
+        return 'restore_selected_novel_mismatch';
+      }
     }
 
     if (!_containsSelectedRows(
@@ -244,7 +280,7 @@ class ChimahonPendingRestoreAuthority {
       ),
       keyOf: _categoryKey,
     )) {
-      return false;
+      return 'restore_selected_manga_category_mismatch';
     }
     if (!_containsSelectedRows(
       uploaded: uploaded.backupAnimeCategories,
@@ -255,7 +291,7 @@ class ChimahonPendingRestoreAuthority {
       ),
       keyOf: _categoryKey,
     )) {
-      return false;
+      return 'restore_selected_anime_category_mismatch';
     }
     if (!_containsSelectedNovelCategories(
       uploaded.backupNovelCategories,
@@ -264,7 +300,7 @@ class ChimahonPendingRestoreAuthority {
         localIntent.backupNovelCategories,
       ),
     )) {
-      return false;
+      return 'restore_selected_novel_category_mismatch';
     }
     // Statistics are merged rather than passed through, so the upload cannot be
     // expected to contain the pending rows byte for byte. What must hold is that
@@ -277,7 +313,7 @@ class ChimahonPendingRestoreAuthority {
           uploadedRow.charactersRead >= pendingRow.charactersRead &&
           uploadedRow.readingTime >= pendingRow.readingTime,
     )) {
-      return false;
+      return 'restore_selected_manga_statistics_mismatch';
     }
     if (!_statisticsRepresented<BackupAnkiStats>(
       pending: pending.backupAnkiStats,
@@ -287,10 +323,444 @@ class ChimahonPendingRestoreAuthority {
           uploadedRow.mangaCards >= pendingRow.mangaCards &&
           uploadedRow.novelCards >= pendingRow.novelCards,
     )) {
-      return false;
+      return 'restore_selected_anki_statistics_mismatch';
     }
 
-    return _containsPendingPreferences(uploaded, pending, localIntent);
+    return _containsPendingPreferences(uploaded, pending, localIntent)
+        ? null
+        : 'restore_selected_preferences_mismatch';
+  }
+
+  /// The ordinary merge and the explicit restore are separate transitions.
+  /// After proving selected values, also prove that the restore changed only
+  /// those identities and advanced the clocks needed by Chimahon. This proof
+  /// has no dependency on [apply] and is checked against decoded upload bytes.
+  String? transitionFailure({
+    required BackupMihon uploaded,
+    required BackupMihon pending,
+    required BackupMihon localIntent,
+    required BackupMihon ordinaryMerged,
+    BackupMihon? remote,
+    Set<ChimahonTrackingDeletionKey> localTrackingDeletions = const {},
+  }) {
+    final animeIds = <Int64>{};
+    for (final anime in uploaded.backupAnime) {
+      if (anime.hasId() && anime.id > Int64.ZERO && !animeIds.add(anime.id)) {
+        return 'restore_duplicate_anime_id';
+      }
+    }
+    // Rebinding to a collapsed namespace could otherwise make two different
+    // category memberships appear equal. Validate handles before rebasing.
+    for (final categories in [
+      uploaded.backupCategories,
+      uploaded.backupAnimeCategories,
+    ]) {
+      if (categories.map((row) => row.order).toSet().length !=
+          categories.length) {
+        return 'restore_duplicate_category_order';
+      }
+    }
+    final actual = rebaseChimahonBackupReferences(uploaded, uploaded);
+    final before = rebaseChimahonBackupReferences(ordinaryMerged, actual);
+    final intent = rebaseChimahonBackupReferences(localIntent, actual);
+    final manga = _selectedRows(
+      pending: pending.backupManga,
+      current: intent.backupManga,
+      keyOf: _mangaKey,
+    );
+    final anime = _selectedRows(
+      pending: pending.backupAnime,
+      current: intent.backupAnime,
+      keyOf: _animeKey,
+    );
+    final novels = _selectedRows(
+      pending: pending.backupNovels,
+      current: intent.backupNovels,
+      keyOf: _novelKey,
+    );
+    final remoteManga = _lastByKey(
+      remote?.backupManga ?? <BackupManga>[],
+      _mangaKey,
+    );
+    final remoteAnime = _lastByKey(
+      remote?.backupAnime ?? <BackupAnime>[],
+      _animeKey,
+    );
+    final remoteNovels = _lastByKey(
+      remote?.backupNovels ?? <BackupNovel>[],
+      _novelKey,
+    );
+
+    bool children<T extends GeneratedMessage, K>(
+      List<T> old,
+      List<T> next,
+      List<T> selected,
+      K Function(T) keyOf, {
+      List<T>? competing,
+      int? clockTag,
+    }) {
+      if (clockTag != null) {
+        final nextByKey = _lastByKey(next, keyOf);
+        final cloudByKey = _lastByKey(competing ?? <T>[], keyOf);
+        for (final row in selected) {
+          final uploaded = nextByKey[keyOf(row)];
+          final cloud = cloudByKey[keyOf(row)];
+          final selectedClock = row.getField(clockTag) as Int64;
+          final expectedClock = cloud == null
+              ? selectedClock
+              : _promoteIfNeeded(
+                  selectedClock,
+                  cloud.getField(clockTag) as Int64,
+                );
+          if (uploaded == null ||
+              uploaded.getField(clockTag) != expectedClock) {
+            return false;
+          }
+        }
+      }
+      return _preservesUnselected(old, next, selected, keyOf);
+    }
+
+    bool trackers(
+      List<BackupTracking> old,
+      List<BackupTracking> next,
+      List<BackupTracking> selected,
+      int source,
+      String url,
+    ) => children(
+      old
+          .where(
+            (row) =>
+                !localTrackingDeletions.contains((
+                  source: source,
+                  url: url,
+                  syncId: row.syncId,
+                )) ||
+                selected.any((s) => s.syncId == row.syncId),
+          )
+          .toList(),
+      next,
+      selected,
+      (row) => row.syncId,
+    );
+
+    if (!_preservesUnselected(
+      before.backupManga,
+      actual.backupManga,
+      manga,
+      _mangaKey,
+      selectedValid: (old, next, selected) {
+        final cloud = remoteManga[_mangaKey(selected)];
+        return _parentPromotionValid(next, selected, cloud) &&
+            children(
+              old.chapters,
+              next.chapters,
+              selected.chapters,
+              _chapterKey,
+              competing: cloud?.chapters,
+              clockTag: 12,
+            ) &&
+            children(
+              old.history,
+              next.history,
+              selected.history,
+              (row) => row.url,
+              competing: cloud?.history,
+              clockTag: 2,
+            ) &&
+            trackers(
+              old.tracking,
+              next.tracking,
+              selected.tracking,
+              selected.source.toInt(),
+              selected.url,
+            );
+      },
+    )) {
+      return 'restore_unselected_manga_or_clocks_changed';
+    }
+    if (!_preservesUnselected(
+      before.backupAnime,
+      actual.backupAnime,
+      anime,
+      _animeKey,
+      selectedValid: (old, next, selected) {
+        final cloud = remoteAnime[_animeKey(selected)];
+        return _parentPromotionValid(next, selected, cloud) &&
+            _retainsLegacyAnimeSeasons(old, next, selected) &&
+            children(
+              old.episodes,
+              next.episodes,
+              selected.episodes,
+              _episodeKey,
+              competing: cloud?.episodes,
+              clockTag: 12,
+            ) &&
+            children(
+              old.history,
+              next.history,
+              selected.history,
+              (row) => row.url,
+              competing: cloud?.history,
+              clockTag: 2,
+            ) &&
+            trackers(
+              old.tracking,
+              next.tracking,
+              selected.tracking,
+              selected.source.toInt(),
+              selected.url,
+            );
+      },
+    )) {
+      return 'restore_unselected_anime_or_clocks_changed';
+    }
+    if (!_preservesUnselected(
+      before.backupNovels,
+      actual.backupNovels,
+      novels,
+      _novelKey,
+      selectedValid: (old, next, selected) {
+        final cloud = remoteNovels[_novelKey(selected)];
+        return next.lastModified ==
+                (cloud == null
+                    ? selected.lastModified
+                    : _promoteIfNeeded(
+                        selected.lastModified,
+                        cloud.lastModified,
+                      )) &&
+            children(
+              old.stats,
+              next.stats,
+              selected.stats,
+              (row) => row.dateKey,
+              competing: cloud?.stats,
+              clockTag: 8,
+            );
+      },
+    )) {
+      return 'restore_unselected_novel_or_clocks_changed';
+    }
+    for (final group in [
+      (
+        before.backupCategories,
+        actual.backupCategories,
+        pending.backupCategories,
+        intent.backupCategories,
+      ),
+      (
+        before.backupAnimeCategories,
+        actual.backupAnimeCategories,
+        pending.backupAnimeCategories,
+        intent.backupAnimeCategories,
+      ),
+    ]) {
+      if (!_preservesUnselected(
+        group.$1,
+        group.$2,
+        _selectedRows(
+          pending: group.$3,
+          current: group.$4,
+          keyOf: _categoryKey,
+        ),
+        _categoryKey,
+      )) {
+        return 'restore_unselected_category_changed';
+      }
+    }
+    final selectedNovelCategories = _selectedNovelCategories(
+      pending.backupNovelCategories,
+      intent.backupNovelCategories,
+    );
+    if (!_preservesNovelCategories(
+      before.backupNovelCategories,
+      actual.backupNovelCategories,
+      selectedNovelCategories,
+    )) {
+      return 'restore_unselected_novel_category_changed';
+    }
+    if (!_preservesUnselected<BackupMangaStats, String>(
+          before.backupMangaStats,
+          actual.backupMangaStats,
+          pending.backupMangaStats,
+          ChimahonStatsRowMerge.mangaKey,
+          selectedValid: (old, next, selected) =>
+              _statisticsTransitionValid(old, next, selected),
+        ) ||
+        !_preservesUnselected<BackupAnkiStats, String>(
+          before.backupAnkiStats,
+          actual.backupAnkiStats,
+          pending.backupAnkiStats,
+          ChimahonStatsRowMerge.ankiKey,
+          selectedValid: (old, next, selected) =>
+              _statisticsTransitionValid(old, next, selected),
+        )) {
+      return 'restore_unselected_statistics_changed';
+    }
+    if (!_retainsUnknown(before, actual)) return 'restore_unknown_fields_lost';
+    // All other collections, notably preferences and source stores, were
+    // already resolved and audited before the media restore overlay.
+    for (final backup in [before, actual]) {
+      for (final tag in [1, 2, 501, 502, 700, 701, 710, 711]) {
+        backup.clearField(tag);
+      }
+      backup.unknownFields.clear();
+    }
+    return _sameBytes(before, actual)
+        ? null
+        : 'restore_unselected_collection_changed';
+  }
+
+  bool _retainsLegacyAnimeSeasons(
+    BackupAnime before,
+    BackupAnime after,
+    BackupAnime selected,
+  ) {
+    if (hasChimahonSeasonMetadata(selected)) return true;
+    final beforeHasSeasons = hasChimahonSeasonMetadata(before);
+    for (final tag in [500, 502, 503, 504, 505, 506, 507]) {
+      // A legacy restore cannot select a different relationship. Its explicit
+      // display values only fill fields the season-aware fallback lacks.
+      final owner =
+          beforeHasSeasons &&
+              (before.hasField(tag) || const {502, 503, 507}.contains(tag))
+          ? before
+          : selected;
+      if (after.hasField(tag) != owner.hasField(tag) ||
+          after.getField(tag) != owner.getField(tag)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _statisticsTransitionValid(
+    GeneratedMessage before,
+    GeneratedMessage after,
+    GeneratedMessage selected,
+  ) {
+    // Both root statistics messages put their two max-merged counters at 2/3.
+    // Merely checking non-regression would accept fabricated extra reading.
+    for (final tag in [2, 3]) {
+      final old = before.getField(tag) as Comparable;
+      final chosen = selected.getField(tag) as Comparable;
+      final expected = old.compareTo(chosen) >= 0 ? old : chosen;
+      if (after.getField(tag) != expected) return false;
+    }
+    final oldEnvelope = before.deepCopy()
+      ..clearField(2)
+      ..clearField(3)
+      ..unknownFields.clear();
+    final newEnvelope = after.deepCopy()
+      ..clearField(2)
+      ..clearField(3)
+      ..unknownFields.clear();
+    return _sameBytes(oldEnvelope, newEnvelope) &&
+        _retainsUnknown(selected, after);
+  }
+
+  bool _preservesNovelCategories(
+    List<BackupNovelCategory> before,
+    List<BackupNovelCategory> after,
+    List<BackupNovelCategory> selected,
+  ) {
+    final remaining = List.of(after);
+    final selections = List.of(selected);
+    for (final old in before) {
+      final chosenIndex = selections.indexWhere(
+        (row) => _sameNovelCategoryIdentity(old, row),
+      );
+      final chosen = chosenIndex < 0 ? null : selections.removeAt(chosenIndex);
+      final nextIndex = remaining.indexWhere(
+        (row) => _sameNovelCategoryIdentity(chosen ?? old, row),
+      );
+      if (nextIndex < 0) return false;
+      final next = remaining.removeAt(nextIndex);
+      if (!_retainsUnknown(old, next) ||
+          (chosen == null
+              ? !_sameBytes(old, next)
+              : !_sameKnownWithSelectedUnknown(next, chosen))) {
+        return false;
+      }
+    }
+    // Any additions must correspond one-to-one to a selected category, not an
+    // invented row or another copy of one already consumed above.
+    for (final chosen in selections) {
+      final index = remaining.indexWhere(
+        (row) => _sameNovelCategoryIdentity(chosen, row),
+      );
+      if (index < 0 ||
+          !_sameKnownWithSelectedUnknown(remaining.removeAt(index), chosen)) {
+        return false;
+      }
+    }
+    return remaining.isEmpty;
+  }
+
+  bool _preservesUnselected<T extends GeneratedMessage, K>(
+    List<T> before,
+    List<T> after,
+    List<T> selected,
+    K Function(T) keyOf, {
+    bool Function(T before, T after, T selected)? selectedValid,
+  }) {
+    final selectedByKey = _lastByKey(selected, keyOf);
+    final afterByKey = _lastByKey(after, keyOf);
+    final allowed = {...before.map(keyOf), ...selectedByKey.keys};
+    if (after.length != afterByKey.length ||
+        afterByKey.keys.any((key) => !allowed.contains(key))) {
+      return false;
+    }
+    for (final old in before) {
+      final next = afterByKey[keyOf(old)];
+      if (next == null) return false;
+      final chosen = selectedByKey[keyOf(old)];
+      if (chosen == null) {
+        if (!_sameBytes(old, next)) return false;
+      } else if (!_retainsUnknown(old, next) ||
+          !(selectedValid?.call(old, next, chosen) ?? true)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _retainsUnknown(GeneratedMessage before, GeneratedMessage after) =>
+      ChimahonUnknownFieldSafety.missingOrReorderedTags(
+        baseline: before,
+        target: after,
+      ).isEmpty;
+
+  bool _parentPromotionValid(
+    GeneratedMessage actual,
+    GeneratedMessage selected,
+    GeneratedMessage? remote,
+  ) {
+    // Manga and anime share the three clock tags in Chimahon's wire schema.
+    if (actual.getField(109) !=
+        (remote == null
+            ? selected.getField(109)
+            : _promoteIfNeeded(
+                selected.getField(109) as Int64,
+                remote.getField(109) as Int64,
+              ))) {
+      return false;
+    }
+    final hasFavoriteClock =
+        selected.hasField(107) || (remote?.hasField(107) ?? false);
+    final favoriteClock = remote == null || !hasFavoriteClock
+        ? selected.getField(107) as Int64
+        : _promoteIfNeeded(
+            selected.getField(107) as Int64,
+            remote.getField(107) as Int64,
+          );
+    var modified = selected.getField(106) as Int64;
+    if (remote != null && hasFavoriteClock && favoriteClock > modified) {
+      modified = favoriteClock;
+    }
+    return actual.hasField(107) == hasFavoriteClock &&
+        actual.getField(107) == favoriteClock &&
+        actual.getField(106) == modified;
   }
 
   /// True when every pending statistics row has an uploaded counterpart on the
@@ -396,6 +866,9 @@ class ChimahonPendingRestoreAuthority {
     Set<ChimahonTrackingDeletionKey> localTrackingDeletions,
   ) {
     final result = _selectedOverFallback(selected, fallback);
+    if (!hasChimahonSeasonMetadata(selected)) {
+      retainAnimeSeasonProjectionGaps(result, fallback, selected);
+    }
     final competingEpisodes = _lastByKey(
       competing?.episodes ?? const <BackupEpisode>[],
       _episodeKey,
@@ -615,6 +1088,14 @@ class ChimahonPendingRestoreAuthority {
       ..tracking.clear()
       ..unknownFields.clear();
     _copyAnimePromotionFields(actualRoot, selected);
+    if (!hasChimahonSeasonMetadata(selected)) {
+      for (final tag in [500, 502, 503, 504, 505, 506, 507]) {
+        actualRoot.clearField(tag);
+        if (selected.hasField(tag)) {
+          actualRoot.setField(tag, selected.getField(tag));
+        }
+      }
+    }
     if (selected.hasFavoriteModifiedAt()) {
       actualRoot.favoriteModifiedAt = selected.favoriteModifiedAt;
     } else {
@@ -860,15 +1341,25 @@ class ChimahonPendingRestoreAuthority {
     required K Function(T value) keyOf,
     T Function(T actual, T selected)? normalize,
   }) {
-    final actualByKey = _lastByKey(actual, keyOf);
+    // A few Mihon/Chimahon exports contain duplicate child identities (for
+    // example, two chapter rows with the same URL but different display
+    // metadata). Match those rows one-to-one instead of collapsing them to
+    // the last value for a key. The latter made a valid restored payload fail
+    // the safety audit whenever duplicate rows differed.
+    final actualByKey = <K, List<T>>{};
+    for (final actualValue in actual) {
+      actualByKey.putIfAbsent(keyOf(actualValue), () => []).add(actualValue);
+    }
     for (final selectedValue in selected) {
-      final actualValue = actualByKey[keyOf(selectedValue)];
-      if (actualValue == null) return false;
-      final normalized =
-          normalize?.call(actualValue.deepCopy(), selectedValue) ?? actualValue;
-      if (!_sameKnownWithSelectedUnknown(normalized, selectedValue)) {
-        return false;
-      }
+      final candidates = actualByKey[keyOf(selectedValue)];
+      if (candidates == null) return false;
+      final match = candidates.indexWhere((candidate) {
+        final normalized =
+            normalize?.call(candidate.deepCopy(), selectedValue) ?? candidate;
+        return _sameKnownWithSelectedUnknown(normalized, selectedValue);
+      });
+      if (match < 0) return false;
+      candidates.removeAt(match);
     }
     return true;
   }
@@ -1137,22 +1628,13 @@ class ChimahonPendingRestoreAuthority {
   // must not collapse while a pending restore is reapplied.
   String _categoryKey(BackupCategory category) => category.name;
 
-  String _mangaKey(BackupManga manga) {
-    final url = manga.url.trim();
-    if (url.isNotEmpty) return '${manga.source}|$url';
-    return '${manga.source}||${_normalized(manga.title)}|${_normalized(manga.author)}';
-  }
+  String _mangaKey(BackupManga manga) => chimahonMangaIdentity(manga);
 
-  String _animeKey(BackupAnime anime) =>
-      '${anime.source}|${anime.url}|${_normalized(anime.title)}|${_normalized(anime.author)}';
+  String _animeKey(BackupAnime anime) => chimahonAnimeIdentity(anime);
 
-  String _chapterKey(BackupChapter chapter) => chapter.url.isNotEmpty
-      ? chapter.url
-      : '${chapter.name}|${chapter.chapterNumber}';
+  String _chapterKey(BackupChapter chapter) => chimahonChapterIdentity(chapter);
 
-  String _episodeKey(BackupEpisode episode) => episode.url.isNotEmpty
-      ? episode.url
-      : '${episode.name}|${episode.episodeNumber}';
+  String _episodeKey(BackupEpisode episode) => chimahonEpisodeIdentity(episode);
 
   String _novelKey(BackupNovel novel) {
     final title = _normalized(novel.title);

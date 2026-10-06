@@ -1,3 +1,4 @@
+import 'package:mangayomi/services/anime_seasons.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/models/category.dart';
@@ -195,12 +196,18 @@ class MihonBackupExporter {
 
     final exportedAnime = <BackupAnime>[];
     final usedAnimeSources = <int, BackupSource>{};
-    for (final anime in localMangas.where(
-      (manga) =>
-          manga.itemType == ItemType.anime &&
-          ((manga.favorite ?? false) || manga.favoriteModifiedAt != null) &&
-          !(manga.isLocalArchive ?? false),
-    )) {
+    final portableAnime = animeSeasonLibraryClosure(localMangas)
+        .where(
+          (m) => m.itemType == ItemType.anime && !(m.isLocalArchive ?? false),
+        )
+        .toList();
+    for (final anime in portableAnime) {
+      final parents = portableAnime
+          .where(
+            (p) => p.link == anime.animeParentUrl && sameAnimeSource(p, anime),
+          )
+          .toList();
+      final parent = parents.length == 1 ? parents.single : null;
       final localSource = anime.sourceId == null
           ? null
           : sourceByLocalId[anime.sourceId!];
@@ -236,6 +243,17 @@ class MihonBackupExporter {
       );
       exportedAnime.add(
         BackupAnime(
+          id: anime.animeFetchType == null ? null : Int64(anime.id!),
+          parentId: parent?.id == null ? null : Int64(parent!.id!),
+          fetchType: anime.animeFetchType,
+          seasonNumber: anime.seasonNumber,
+          seasonSourceOrder: anime.seasonSourceOrder == null
+              ? null
+              : Int64(anime.seasonSourceOrder!),
+          seasonFlags: anime.seasonFlags == null
+              ? null
+              : Int64(anime.seasonFlags!),
+          backgroundUrl: anime.backgroundUrl,
           source: Int64(nativeId),
           url: anime.link ?? '',
           title: anime.name ?? '',

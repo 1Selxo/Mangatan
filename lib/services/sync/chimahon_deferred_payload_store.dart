@@ -607,7 +607,9 @@ class FileChimahonPendingManualRestoreStore
 /// Presents an account-scoped remote baseline alongside a one-shot manual
 /// restore. The two payloads deliberately remain separate: only the manual
 /// restore is local upload intent. It is consumed by [save], which the sync
-/// engine calls after its conditional remote upload succeeds.
+/// engine calls after its conditional remote upload and local projection
+/// baseline writes succeed. Saving this payload is the final acknowledgement,
+/// not the first step of local commit persistence.
 class LayeredChimahonDeferredPayloadStore
     implements
         ChimahonDeferredPayloadStore,

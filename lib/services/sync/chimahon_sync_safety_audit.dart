@@ -30,6 +30,7 @@ class ChimahonSyncSafetyAudit {
     required BackupMihon remote,
     required BackupMihon local,
     required BackupMihon proposed,
+    BackupMihon? localProjection,
     ChimahonPreferenceSafetyPolicy? preferenceSafetyPolicy,
     Set<ChimahonTrackingDeletionKey> localTrackingDeletions = const {},
     bool remoteWinsTies = false,
@@ -127,7 +128,10 @@ class ChimahonSyncSafetyAudit {
       }
     }
     _auditSourceResolution(inputs: inputs, fail: fail);
-    _auditLocalChapterProjection(local: local, fail: fail);
+    // A selected backup may contain Android-local rows which must survive as
+    // opaque wire data. Only fresh device exports are subject to the portable
+    // file-path restriction; effective intent also contains that backup.
+    _auditLocalChapterProjection(local: localProjection ?? local, fail: fail);
     _auditNovels(remote: remote, proposed: proposed, fail: fail);
     const ChimahonGenericCollectionSafetyAudit().audit(
       local: local,

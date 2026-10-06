@@ -14,21 +14,28 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.23",
-      "versionDate": "2026-09-20T06:21:12Z",
-      "versionDescription": "",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.23/Mangatan-v1.2.23-build.211-1f74d2e-ios.ipa",
+      "version": "1.2.24",
+      "versionDate": "2026-10-06T22:40:08Z",
+      "versionDescription": "Mangatan v1.2.24 (build 212) integrates Mangayomi v0.9.8 while preserving Mangatan's reader, player, OCR, subtitle mining, Anki, Chimahon sync, and lazy iOS Mihon runtime.\n\nChanges:\n\u2022 Fix local image\u2022folder manga opening with a null\u2022check error on Windows. Local pages retain their on\u2022disk paths and do not require remote source metadata.\n\u2022 Adopt disk\u2022backed chapter page caching and clear the cache on reader retry; reject stale Mihon proxy URLs.\n\u2022 Pin the complete Linux X11 EGL renderer fix: native display discovery, an isolated rendering context/thread, and deferred texture deletion. Keep the existing system libmpv integration.\n\u2022 Update compatible upstream dependencies, source handling, trackers, localizations, and shared helpers.\n\nValidation: static analysis reports zero errors. Bridge/local chapter, archive, download retry, Mihon compatibility, backup, queue, novel, and Chimahon regression checks passed after integration fixes. Physical X11 playback and iPhone startup remain unverified; ten LNReader tests require the native QuickJS DLL unavailable in the local test environment.\n\nGitHub Actions builds and attaches the Windows installer/ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA. Downloads appear as the build jobs complete.\n\nSource commit: 28e8cf77\r\n",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.24/Mangatan-v1.2.24-build.212-28e8cf7-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 179216763,
+      "size": 180110491,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_2_default.webp"
       ],
       "versions": [
+        {
+          "version": "1.2.24",
+          "date": "2026-10-06T22:40:08Z",
+          "localizedDescription": "Mangatan v1.2.24 (build 212) integrates Mangayomi v0.9.8 while preserving Mangatan's reader, player, OCR, subtitle mining, Anki, Chimahon sync, and lazy iOS Mihon runtime.\n\nChanges:\n\u2022 Fix local image\u2022folder manga opening with a null\u2022check error on Windows. Local pages retain their on\u2022disk paths and do not require remote source metadata.\n\u2022 Adopt disk\u2022backed chapter page caching and clear the cache on reader retry; reject stale Mihon proxy URLs.\n\u2022 Pin the complete Linux X11 EGL renderer fix: native display discovery, an isolated rendering context/thread, and deferred texture deletion. Keep the existing system libmpv integration.\n\u2022 Update compatible upstream dependencies, source handling, trackers, localizations, and shared helpers.\n\nValidation: static analysis reports zero errors. Bridge/local chapter, archive, download retry, Mihon compatibility, backup, queue, novel, and Chimahon regression checks passed after integration fixes. Physical X11 playback and iPhone startup remain unverified; ten LNReader tests require the native QuickJS DLL unavailable in the local test environment.\n\nGitHub Actions builds and attaches the Windows installer/ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA. Downloads appear as the build jobs complete.\n\nSource commit: 28e8cf77\r\n",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.24/Mangatan-v1.2.24-build.212-28e8cf7-ios.ipa",
+          "size": 180110491
+        },
         {
           "version": "1.2.23",
           "date": "2026-09-20T06:21:12Z",
@@ -416,6 +423,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.23"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.2.24 - 06 Oct",
+      "identifier": "release-1.2.24",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-10-06T22:40:08Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.24"
     }
   ]
 }

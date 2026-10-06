@@ -89,6 +89,21 @@ bool audioTrackLanguagesMatch(String? first, String? second) {
   return firstFamily.isNotEmpty && firstFamily == secondFamily;
 }
 
+String subtitleTrackLabel(SubtitleTrack? track) {
+  if (track == null || track.id == 'no') return 'None';
+  if (track.id == 'auto') return '';
+  final language = _languageName(track.language);
+  final title = track.title?.trim() ?? '';
+  final parts = <String>[];
+  if (language.isNotEmpty) parts.add('[$language]');
+  if (title.isNotEmpty && title.toLowerCase() != language.toLowerCase()) {
+    parts.add(parts.isEmpty ? title : '- $title');
+  }
+  if (parts.isNotEmpty) return parts.join(' ');
+  final channels = track.channels?.trim() ?? '';
+  return channels.isEmpty ? track.id : channels;
+}
+
 String _languageFamily(String? value) {
   final name = _languageName(value).toLowerCase().trim();
   if (name.isEmpty) return '';

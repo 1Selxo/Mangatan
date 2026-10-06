@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:mangayomi/eval/javascript/http.dart';
+import 'package:mangayomi/eval/http_response_extensions.dart';
 import 'package:mangayomi/eval/model/filter.dart';
 import 'package:mangayomi/eval/model/m_chapter.dart';
 import 'package:mangayomi/eval/model/m_manga.dart';
@@ -20,6 +21,7 @@ import 'package:mangayomi/utils/chapter_recognition.dart';
 import 'package:mangayomi/models/video.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/mihon_source_preferences.dart';
+import 'package:mangayomi/services/http/cf_proxy_store.dart';
 
 import '../../models/manga.dart';
 import '../interface.dart';
@@ -66,13 +68,30 @@ class MihonExtensionService implements ExtensionService {
   Future<http.Response> _postDalvik({
     Object? body,
     Map<String, String>? headers,
-  }) => postMihonBridge(
-    client,
-    mihonBridgeDalvikUri(androidProxyServer),
-    body: body,
-    headers: headers,
-    retryTransientFailures: _usesLoopbackBridge,
-  );
+  }) async {
+    final payload = body is Map
+        ? {...body, 'lang': source.lang, 'sourceId': source.id?.toString()}
+        : body;
+    Future<http.Response> send(Map<String, String>? requestHeaders) =>
+        postMihonBridge(
+          client,
+          mihonBridgeDalvikUri(androidProxyServer),
+          body: payload,
+          headers: requestHeaders,
+          retryTransientFailures: _usesLoopbackBridge,
+        );
+    var response = await send(headers);
+    if (_isCloudflareBlocked(response)) {
+      final proxyUrl = requestHeaders == null
+          ? CfProxyStore.url.trim()
+          : (requestHeaders!['cf-proxy-url'] ?? '').trim();
+      if (proxyUrl.isNotEmpty &&
+          await solveWithCfProxy(proxyUrl, source.baseUrl!)) {
+        response = await send(getCookie());
+      }
+    }
+    return response;
+  }
 
   @override
   Map<String, String> getHeaders() {
@@ -502,29 +521,70 @@ class MihonExtensionService implements ExtensionService {
   }
 
   Map<String, String> getCookie() {
-    if (requestHeaders != null) return requestHeaders!;
+    if (requestHeaders != null) {
+      return {...requestHeaders!, 'source-base-url': ?source.baseUrl};
+    }
 
     final userAgent = isar.settings.getSync(227)!.userAgent;
+    final cfProxyUrl = CfProxyStore.url.trim();
     return {
       ...MClient.getCookiesPref(source.baseUrl!),
       'user-agent': ?userAgent,
+      // Which source of the extension this call is for. The id sent alongside
+      // it is a Dart hashCode of the original one (see ExtensionStoreService),
+      // which the server cannot reproduce on the JVM, so an extension holding
+      // several sources would otherwise always resolve to the same one.
+      'source-base-url': ?source.baseUrl,
+      // Lets an extension server that supports it solve the challenge itself,
+      // which is better placed than the retry below: it owns the request and
+      // its cookie jar. Servers that don't support it ignore the header.
+      if (cfProxyUrl.isNotEmpty) 'cf-proxy-url': cfProxyUrl,
     };
+  }
+
+  /// Extension requests run outside MClient, so bridge errors need their own
+  /// Cloudflare proxy retry.
+  bool _isCloudflareBlocked(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> &&
+          decoded['error'] != null &&
+          decoded['code'] == 403;
+    } catch (_) {
+      // Not JSON: hasError() reports the malformed-response case itself.
+      return false;
+    }
   }
 }
 
 void hasError(http.Response response) {
+  Map<String, dynamic>? decoded;
   try {
-    final errorMessage = jsonDecode(response.body)['error'];
-    final code = jsonDecode(response.body)['code'];
-    if (errorMessage != null && code != null) {
-      if ((code as int) == 403) {
-        throw "errorMessage: Failed to bypass Cloudflare.\n\n\nYou can try to bypass it manually in the webview \n\n\nstatusCode: 403";
-      }
-      throw "errorMessage: $errorMessage \n\n\nstatusCode: $code";
+    final parsed = jsonDecode(response.body);
+    if (parsed is Map<String, dynamic>) decoded = parsed;
+  } catch (_) {
+    // Not valid JSON - the Android extension bridge (the device/emulator
+    // configured in Settings > Browse > Extension Server) returned something
+    // other than the expected response, most likely because it crashed, was
+    // unreachable, or dropped the connection mid-response. Say so clearly
+    // instead of letting the caller's own jsonDecode() on the same empty/
+    // malformed body fail moments later with a bare "Unexpected end of
+    // input" that gives no indication of the actual cause.
+    if (response.body.trim().isEmpty) {
+      throw "The Android extension bridge server returned an empty response "
+          "(HTTP ${response.statusCode}). Check that the device/emulator set "
+          "in Settings > Browse > Extension Server is running and reachable.";
     }
-  } catch (e) {
-    if (e.toString().startsWith('errorMessage:')) {
-      throw e.toString().replaceFirst('errorMessage: ', '');
+    throw "The Android extension bridge server returned an unexpected "
+        "response (HTTP ${response.statusCode}): ${response.body}";
+  }
+
+  final errorMessage = decoded?['error'];
+  final code = decoded?['code'];
+  if (errorMessage != null && code != null) {
+    if (code == 403) {
+      throw "Failed to bypass Cloudflare.\n\n\nYou can try to bypass it manually in the webview \n\n\nstatusCode: 403";
     }
+    throw "$errorMessage \n\n\nstatusCode: $code";
   }
 }

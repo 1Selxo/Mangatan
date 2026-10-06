@@ -42,7 +42,7 @@ final class SubtitleSettingsStateProvider
 }
 
 String _$subtitleSettingsStateHash() =>
-    r'5198e55717807ba80a0495d9813d074f48d0297b';
+    r'75b3da2c8c57e00cf128d063dad5f054ca9e7b96';
 
 abstract class _$SubtitleSettingsState
     extends $Notifier<PlayerSubtitleSettings> {

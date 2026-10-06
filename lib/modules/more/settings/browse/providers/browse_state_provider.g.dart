@@ -224,6 +224,60 @@ abstract class _$ShowNSFWState extends $Notifier<bool> {
   }
 }
 
+@ProviderFor(ShowNavDoubleTapTooltipState)
+final showNavDoubleTapTooltipStateProvider =
+    ShowNavDoubleTapTooltipStateProvider._();
+
+final class ShowNavDoubleTapTooltipStateProvider
+    extends $NotifierProvider<ShowNavDoubleTapTooltipState, bool> {
+  ShowNavDoubleTapTooltipStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'showNavDoubleTapTooltipStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$showNavDoubleTapTooltipStateHash();
+
+  @$internal
+  @override
+  ShowNavDoubleTapTooltipState create() => ShowNavDoubleTapTooltipState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$showNavDoubleTapTooltipStateHash() =>
+    r'e0c10c8c89933775a5a7e29d68ccb044eda11a90';
+
+abstract class _$ShowNavDoubleTapTooltipState extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(ExtensionsRepoState)
 final extensionsRepoStateProvider = ExtensionsRepoStateFamily._();
 
@@ -274,7 +328,7 @@ final class ExtensionsRepoStateProvider
 }
 
 String _$extensionsRepoStateHash() =>
-    r'd7b266d2f3872aa20b62bafcbdda868878ef7e89';
+    r'9af5212d996cc4471a1bb3d61f279b891f33587c';
 
 final class ExtensionsRepoStateFamily extends $Family
     with
@@ -478,7 +532,7 @@ final class GetRepoInfosProvider
   }
 }
 
-String _$getRepoInfosHash() => r'4c530ef356db88ee52ad84211dea0e6b3b16a777';
+String _$getRepoInfosHash() => r'a04ee6ee4676729569dea6ad6812670eb336d6a6';
 
 final class GetRepoInfosFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Repo?>, String> {

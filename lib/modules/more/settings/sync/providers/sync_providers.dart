@@ -438,20 +438,34 @@ class Synching extends _$Synching {
     ActionType action,
     int? isarId,
     Object data,
-    bool writeTxn,
-  ) {
+    bool writeTxn, {
+    int? clientId,
+  }) {
     if (!state.syncOn) return;
-    changedPartRepository.add(action, isarId, data, writeTxn);
+    changedPartRepository.add(
+      action,
+      isarId,
+      data,
+      writeTxn,
+      clientId: clientId,
+    );
   }
 
   Future<void> addChangedPartAsync(
     ActionType action,
     int? isarId,
     Object data,
-    bool writeTxn,
-  ) async {
+    bool writeTxn, {
+    int? clientId,
+  }) async {
     if (!state.syncOn) return;
-    await changedPartRepository.addAsync(action, isarId, data, writeTxn);
+    await changedPartRepository.addAsync(
+      action,
+      isarId,
+      data,
+      writeTxn,
+      clientId: clientId,
+    );
   }
 
   Future<void> clearChangedParts(List<ActionType> actions, bool txn) =>

@@ -69,6 +69,7 @@ import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_s
 import 'package:mangayomi/modules/more/settings/ocr/ocr_settings_screen.dart';
 import 'package:mangayomi/modules/more/settings/player/player_subtitle_screen.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
+import 'package:mangayomi/modules/more/settings/reader/novel_reader_screen.dart';
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
 import 'package:mangayomi/modules/more/settings/security/security_screen.dart';
 import 'package:mangayomi/services/crash_route_observer.dart';
@@ -325,12 +326,25 @@ class RouterNotifier extends ChangeNotifier {
       name: "migrate",
       builder: (manga) => MigrationScreen(manga: manga),
     ),
-    _genericRoute<(ItemType, Manga?)>(
+    _genericRoute(name: 'novelReaderMode', child: const NovelReaderScreen()),
+    _genericRoute<dynamic>(
       name: "massMigration",
-      builder: (data) => MassMigrationSourceSelectionScreen(
-        itemType: data.$1,
-        prioritizedManga: data.$2,
-      ),
+      builder: (data) {
+        if (data is (ItemType, Manga?, List<Manga>?)) {
+          return MassMigrationSourceSelectionScreen(
+            itemType: data.$1,
+            prioritizedManga: data.$2,
+            selectedMangas: data.$3,
+          );
+        }
+        if (data is (ItemType, Manga?)) {
+          return MassMigrationSourceSelectionScreen(
+            itemType: data.$1,
+            prioritizedManga: data.$2,
+          );
+        }
+        return MassMigrationSourceSelectionScreen(itemType: data as ItemType);
+      },
     ),
     _genericRoute<(Manga, TrackSearch)>(
       name: "migrate/tracker",

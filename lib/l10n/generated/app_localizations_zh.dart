@@ -10,12 +10,6 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get seasons => 'Seasons';
-
-  @override
-  String get season_number => 'Season number';
-
-  @override
   String get library => '书架';
 
   @override
@@ -479,9 +473,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statistics => '统计';
 
   @override
-  String get library_statistics => 'Library statistics';
-
-  @override
   String get settings => '设置';
 
   @override
@@ -507,6 +498,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get name => '名称';
+
+  @override
+  String label_value(Object label, Object value) {
+    return '$label：$value';
+  }
+
+  @override
+  String get url => 'URL';
 
   @override
   String get category_name_required => '*必填';
@@ -542,18 +541,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appearance_subtitle => '主题，日期和时间格式';
-
-  @override
-  String get animation_speed => 'Animation speed';
-
-  @override
-  String get animation_speed_description =>
-      'Lower values play animations faster.';
-
-  @override
-  String animation_duration_percentage(int percentage) {
-    return '$percentage% duration';
-  }
 
   @override
   String get theme => '主题';
@@ -613,34 +600,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reading_mode_right_to_left => '从右到左';
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get reading_mode_vertical_continuous => '垂直连续';
 
   @override
   String get reading_mode_webtoon => '网络漫画';
-
-  @override
-  String get default_page_mode => 'Default page mode';
-
-  @override
-  String get page_mode_single => 'Single page';
-
-  @override
-  String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => '双击动画速度';
@@ -703,6 +666,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get version => '版本';
 
   @override
+  String beta_version(Object version) {
+    return '测试版 ($version)';
+  }
+
+  @override
   String get check_for_update => '检查更新';
 
   @override
@@ -756,6 +724,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unknown => '未知';
 
   @override
+  String get empty_placeholder => '空';
+
+  @override
+  String get error => '错误';
+
+  @override
+  String error_with_message(Object error) {
+    return '错误：$error';
+  }
+
+  @override
+  String get no_pages_available => '错误：无可用页面';
+
+  @override
   String get set_categories => '设置类别';
 
   @override
@@ -784,6 +766,90 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get source_title => '来源标题';
+
+  @override
+  String get create_extension => '创建扩展';
+
+  @override
+  String get developer_mode => '开发者模式';
+
+  @override
+  String get developer_mode_subtitle => '显示扩展开发者工具（创建扩展、编辑代码）';
+
+  @override
+  String get choose_extension_language => '选择扩展语言';
+
+  @override
+  String get lang => '语言';
+
+  @override
+  String get base_url => '基础 URL';
+
+  @override
+  String get api_url_optional => 'API URL（可选）';
+
+  @override
+  String get icon_url => '图标 URL';
+
+  @override
+  String get source_icon_url => '图源图标 URL';
+
+  @override
+  String get notes => '备注';
+
+  @override
+  String get extension_name_example => '例如：myAnime';
+
+  @override
+  String get language_code_example => '例如：zh';
+
+  @override
+  String get base_url_example => '例如：https://example.com';
+
+  @override
+  String get api_url_example => '例如：https://api.example.com';
+
+  @override
+  String get extension_notes_example => '例如：此扩展需要登录';
+
+  @override
+  String get type => '类型';
+
+  @override
+  String get target => '目标';
+
+  @override
+  String get source_type_single => '单一';
+
+  @override
+  String get source_type_multi => '多源';
+
+  @override
+  String get source_type_torrent => '种子 (Torrent)';
+
+  @override
+  String get source_language_dart => 'Dart';
+
+  @override
+  String get source_language_javascript => 'JavaScript';
+
+  @override
+  String get source_language_lnreader_compiled_js => 'LNReader 编译 JS';
+
+  @override
+  String get source_created_successfully => '图源创建成功';
+
+  @override
+  String get source_already_exists => '图源已存在';
+
+  @override
+  String get error_when_creating_source => '创建图源时出错';
+
+  @override
+  String get cookies_deleted => 'Cookie 已删除！';
+
+  @override
+  String get delete_all_cookies => '删除所有 Cookie';
 
   @override
   String get chapter_number => '章节号';
@@ -964,9 +1030,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get syncing => '正在同步';
 
   @override
-  String get sync_password => '密码（至少8个字符）';
-
-  @override
   String get sync_logged => '登录成功';
 
   @override
@@ -974,19 +1037,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '通过自托管服务器在多个设备上同步您的进度。查看我们的 Discord 服务器，了解更多信息！';
 
   @override
-  String get last_sync_manga => '上次同步漫画：';
+  String get last_sync => '上次同步时间：';
 
   @override
-  String get last_sync_history => '上次同步阅读记录：';
-
-  @override
-  String get last_sync_update => '上次同步更新：';
+  String get sync_login_browser => '使用浏览器登录';
 
   @override
   String get sync_server => '同步服务器地址';
-
-  @override
-  String get sync_login_invalid_creds => '无效的电子邮件或密码';
 
   @override
   String get sync_starting => '开始同步…';
@@ -999,6 +1056,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sync_restore_in_progress => '已跳过同步 — 正在恢复中';
+
+  @override
+  String sync_progress_percent(Object percent) {
+    return '正在同步… $percent%';
+  }
+
+  @override
+  String get sync_progress_indeterminate => '正在同步…';
 
   @override
   String get sync_button_sync => '同步进度';
@@ -1033,9 +1098,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sync_section_general => '通用';
-
-  @override
-  String get sync_section_data_types => '同步内容';
 
   @override
   String get sync_on => '启用同步';
@@ -1175,6 +1237,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String uninstall_extension(Object ext) {
     return '卸载 $ext 扩展？';
   }
+
+  @override
+  String double_tap_search_hint(Object type) {
+    return '双击以搜索全部 $type';
+  }
+
+  @override
+  String get show_nav_double_tap_tooltip => '显示双击搜索提示';
+
+  @override
+  String get show_nav_double_tap_tooltip_subtitle =>
+      '在漫画/动画/小说导航栏上显示提示，说明双击可打开全局搜索。';
+
+  @override
+  String already_in_library(Object source, Object title) {
+    return '\"$title\" 已通过 $source 添加到您的书架中。';
+  }
+
+  @override
+  String get add_anyway => '仍然添加';
 
   @override
   String get langauage => '语言';
@@ -1658,6 +1740,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libass_not_disable_message => '在播放器设置中禁用 `use libass` 以便自定义字幕。';
 
   @override
+  String get override_ass_subtitles => '覆盖 ASS 字幕样式';
+
+  @override
+  String get override_ass_subtitles_info => '将自定义样式应用到 ASS/SSA 字幕';
+
+  @override
   String get torrent_stream => '种子流';
 
   @override
@@ -1752,9 +1840,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloads_are_limited_to_wifi => '下载仅限于WiFi';
 
   @override
-  String get recommendations => '推荐';
-
-  @override
   String get recommendations_similar => '相似';
 
   @override
@@ -1818,7 +1903,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get url_cannot_be_empty => 'URL不能为空';
 
   @override
-  String get url_must_end_with_dot_json => 'URL must end with .json';
+  String get url_must_end_with_dot_json_or_dot_pb => 'URL必须以.json结尾';
 
   @override
   String get repo_url => '库URL';
@@ -1839,7 +1924,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get repo_added => '库已添加';
 
   @override
-  String get repo_already_exists => 'Repository already exists!';
+  String get repo_already_exists => '软件源仓库已存在！';
 
   @override
   String get add_repo => '添加库';
@@ -1929,15 +2014,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get rpc_show_cover_image => '在 Discord 中显示当前封面图片';
-
-  @override
-  String get sync_enable_histories => '同步历史记录数据';
-
-  @override
-  String get sync_enable_updates => '同步更新数据';
-
-  @override
-  String get sync_enable_settings => '同步设置';
 
   @override
   String get enable_mpv => '启用 mpv 着色器/脚本';
@@ -2051,6 +2127,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subtitle_speed => '速度';
 
   @override
+  String get tracks => '轨道';
+
+  @override
+  String get playback_speed => '播放速度';
+
+  @override
+  String get shaders => '着色器';
+
+  @override
+  String get video_fit => '画面适配';
+
+  @override
   String get calendar => '日历';
 
   @override
@@ -2086,6 +2174,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sequels => '续集';
 
   @override
+  String get recommendations => '推荐';
+
+  @override
   String get recommendations_similarity => '相似度：';
 
   @override
@@ -2099,6 +2190,68 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get rescan_local_folder => '立即重新扫描所有本地文件夹';
+
+  @override
+  String get default_download_destination => '默认下载位置';
+
+  @override
+  String get ask_download_destination => '每次下载前询问位置';
+
+  @override
+  String get ask_download_destination_desc => '每次开始下载时选择本地文件夹。';
+
+  @override
+  String get select_download_destination => '选择下载位置';
+
+  @override
+  String get clear_local_library => '清空本地书库';
+
+  @override
+  String get clear_local_library_desc => '从书库中移除本地文件夹和压缩包条目。';
+
+  @override
+  String get clear_local_library_msg => '这将从书库中移除本地条目，不会删除磁盘上的文件。';
+
+  @override
+  String get custom => '自定义';
+
+  @override
+  String get no_local_folder_available_for_downloads => '没有可用于下载的本地文件夹';
+
+  @override
+  String failed_to_create_cbz(Object error) {
+    return '创建 CBZ 失败：$error';
+  }
+
+  @override
+  String error_reading_cover_image(Object error) {
+    return '读取封面出错：$error';
+  }
+
+  @override
+  String error_reading_metadata(Object error) {
+    return '读取元数据出错：$error';
+  }
+
+  @override
+  String error_saving_chapter_episode_to_library(Object error) {
+    return '保存到书库时出错：$error';
+  }
+
+  @override
+  String error_reading_chapter_cover_image(Object error) {
+    return '读取章节封面出错：$error';
+  }
+
+  @override
+  String error_reading_archive_cover_image(Object error) {
+    return '读取归档封面出错：$error';
+  }
+
+  @override
+  String error_getting_local_library(Object error) {
+    return '获取本地书库时出错：$error';
+  }
 
   @override
   String get export_metadata => '导出元数据';
@@ -2187,6 +2340,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get authenticating => '正在验证...';
+
+  @override
+  String get lock => 'Lock';
 
   @override
   String get unlock => '解锁';
@@ -2392,13 +2548,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extension_server_files_linked => '扩展服务器文件已链接。';
 
   @override
-  String extension_server_directory_is_package_managed(
-    Object fallbackDirectory,
-  ) {
-    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
-  }
-
-  @override
   String get select_extension_server_jar => '选择扩展服务器 JAR';
 
   @override
@@ -2416,6 +2565,30 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get not_configured => '未配置';
+
+  @override
+  String get zero_interpreter => 'Zero 解释器';
+
+  @override
+  String get zero_interpreter_description => '自动或手动控制 Zero 解释器服务。';
+
+  @override
+  String get start_server_on_launch => '启动时开启服务';
+
+  @override
+  String get runtime_status => '运行状态';
+
+  @override
+  String get running => '运行中';
+
+  @override
+  String get stopped => '已停止';
+
+  @override
+  String get start => '启动';
+
+  @override
+  String get stop => '停止';
 
   @override
   String get webview => 'WebView';
@@ -2484,6 +2657,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dual_page_rotate_to_fit_invert => '反转旋转方向';
+
+  @override
+  String get double_page_single_first_page => '首页单页显示';
+
+  @override
+  String get double_page_single_first_page_subtitle => '在双页模式下单页显示第一页（封面）';
+
+  @override
+  String get double_page_auto => '自动双页';
+
+  @override
+  String get double_page_auto_subtitle => '横屏时自动切换到双页模式';
 
   @override
   String get landscape_zoom => '横屏自动缩放';
@@ -2568,60 +2753,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get error_no_pages_available => '错误：无可用页面';
 
   @override
-  String get subtitle_position => 'Subtitle position';
-
-  @override
-  String get dictionary_lookup => 'Dictionary';
-
-  @override
-  String get dictionary_settings => 'Dictionary settings';
-
-  @override
-  String get dictionary_search_label => 'Search';
-
-  @override
-  String get dictionary_search_hint => 'Word, reading, or phrase';
-
-  @override
-  String get clear_search => 'Clear search';
-
-  @override
-  String dictionary_count(int count) {
-    return '$count dictionaries';
-  }
-
-  @override
-  String dictionary_anki_deck(String name) {
-    return 'Anki deck: $name';
-  }
-
-  @override
-  String get dictionary_load_failed => 'Dictionary data could not be loaded';
-
-  @override
-  String get no_dictionaries_title => 'No dictionaries installed';
-
-  @override
-  String get no_dictionaries_description =>
-      'Import a Yomitan dictionary to start looking up words.';
-
-  @override
-  String get manage_dictionaries => 'Set up dictionaries';
-
-  @override
-  String get dictionary_empty_title => 'Look up a word or phrase';
-
-  @override
-  String get dictionary_empty_description =>
-      'Search a term, expression, sentence, or block of text.';
-
-  @override
-  String get previous_lookup => 'Previous lookup';
-
-  @override
-  String get next_lookup => 'Next lookup';
-
-  @override
   String get app_ui_scale => '界面缩放';
 
   @override
@@ -2654,197 +2785,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get source => '来源';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label：$value';
-  }
-
-  @override
-  String get url => 'URL';
-
-  @override
-  String beta_version(Object version) {
-    return '测试版 ($version)';
-  }
-
-  @override
-  String get empty_placeholder => '空';
-
-  @override
-  String get error => '错误';
-
-  @override
-  String error_with_message(Object error) {
-    return '错误：$error';
-  }
-
-  @override
-  String get no_pages_available => '错误：无可用页面';
-
-  @override
-  String get create_extension => '创建扩展';
-
-  @override
-  String get choose_extension_language => '选择扩展语言';
-
-  @override
-  String get lang => '语言';
-
-  @override
-  String get base_url => '基础 URL';
-
-  @override
-  String get api_url_optional => 'API URL（可选）';
-
-  @override
-  String get icon_url => '图标 URL';
-
-  @override
-  String get source_icon_url => '图源图标 URL';
-
-  @override
-  String get notes => '备注';
-
-  @override
-  String get extension_name_example => '例如：myAnime';
-
-  @override
-  String get language_code_example => '例如：zh';
-
-  @override
-  String get base_url_example => '例如：https://example.com';
-
-  @override
-  String get api_url_example => '例如：https://api.example.com';
-
-  @override
-  String get extension_notes_example => '例如：此扩展需要登录';
-
-  @override
-  String get type => '类型';
-
-  @override
-  String get target => '目标';
-
-  @override
-  String get source_type_single => '单一';
-
-  @override
-  String get source_type_multi => '多源';
-
-  @override
-  String get source_type_torrent => '种子 (Torrent)';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'LNReader 编译 JS';
-
-  @override
-  String get source_created_successfully => '图源创建成功';
-
-  @override
-  String get source_already_exists => '图源已存在';
-
-  @override
-  String get error_when_creating_source => '创建图源时出错';
-
-  @override
-  String get cookies_deleted => 'Cookie 已删除！';
-
-  @override
-  String get delete_all_cookies => '删除所有 Cookie';
-
-  @override
-  String get url_must_end_with_dot_json_or_dot_pb => 'URL必须以.json结尾';
-
-  @override
-  String get default_download_destination => '默认下载位置';
-
-  @override
-  String get ask_download_destination => '每次下载前询问位置';
-
-  @override
-  String get ask_download_destination_desc => '每次开始下载时选择本地文件夹。';
-
-  @override
-  String get select_download_destination => '选择下载位置';
-
-  @override
-  String get clear_local_library => '清空本地书库';
-
-  @override
-  String get clear_local_library_desc => '从书库中移除本地文件夹和压缩包条目。';
-
-  @override
-  String get clear_local_library_msg => '这将从书库中移除本地条目，不会删除磁盘上的文件。';
-
-  @override
-  String get custom => '自定义';
-
-  @override
-  String get no_local_folder_available_for_downloads => '没有可用于下载的本地文件夹';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return '创建 CBZ 失败：$error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return '读取封面出错：$error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return '读取元数据出错：$error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return '保存到书库时出错：$error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return '读取章节封面出错：$error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return '读取归档封面出错：$error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return '获取本地书库时出错：$error';
-  }
-
-  @override
-  String get zero_interpreter => 'Zero 解释器';
-
-  @override
-  String get zero_interpreter_description => '自动或手动控制 Zero 解释器服务。';
-
-  @override
-  String get runtime_status => '运行状态';
-
-  @override
-  String get running => '运行中';
-
-  @override
-  String get stopped => '已停止';
-
-  @override
-  String get start => '启动';
-
-  @override
-  String get stop => '停止';
 
   @override
   String get something_went_wrong => '出错了';
@@ -3060,11 +3000,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get memory_overlay => 'Show memory usage';
+  String get memory_overlay => '显示内存占用';
 
   @override
-  String get memory_overlay_subtitle =>
-      'A live readout of what the app is holding. For measuring on the device rather than guessing: watch it while scrolling the library or reading a chapter.';
+  String get memory_overlay_subtitle => '实时显示应用占用的内存。可在滚动书架或阅读章节时实时观察设备上的内存变化。';
 
   @override
   String get beta => 'Beta';
@@ -3101,14 +3040,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get error_reports_extension_failure =>
-      'This came from an extension, not from Mangayomi. Extensions are written and maintained by whoever runs the repository you installed this source from, so a fix has to go there. The source name and what you were opening are the useful details to give them.';
+      '此错误来自扩展插件，而非 Mangayomi 本身。扩展由插件仓库的维护者编写和维护，因此需要在插件仓库中修复。请向他们提供插件名称和当时正在打开的内容。';
 
   @override
-  String get error_reports_already_reported => 'Already reported';
+  String get error_reports_already_reported => '已报告';
 
   @override
   String get error_reports_expected_failure =>
-      'This one is usually the source or the network rather than the app: a link that expired, a server that was down, or a connection that dropped. Worth reporting only if it keeps happening on a source that works elsewhere.';
+      '这通常是来源网站或网络问题，而非应用本身的问题（如链接已失效、服务器宕机或网络连接中断）。仅当在其他地方正常工作的来源上持续出现此问题时才有必要报告。';
 
   @override
   String get share_unavailable_copied => '此平台不支持分享，已复制到剪贴板。';
@@ -3219,64 +3158,276 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String global_search_no_sources(String itemType) {
-    return 'No $itemType sources are installed.';
+    return '未安装任何 $itemType 来源。';
   }
 
   @override
-  String get global_search_no_sources_hint =>
-      'Add a repository under Browse, then install an extension for it.';
+  String get global_search_no_sources_hint => '请在“浏览”中添加仓库并安装相应的扩展插件。';
 
   @override
   String global_search_only_pinned(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count sources',
-      one: '1 source',
+      other: '$count 个来源',
     );
-    return 'You have $_temp0 for this, but only pinned ones are searched.';
+    return '您有 $_temp0，但仅会搜索已固定的来源。';
   }
 
   @override
-  String get global_search_only_pinned_hint =>
-      'Pin one, or turn off \"Only include pinned sources\" in Browse settings.';
+  String get global_search_only_pinned_hint => '请固定某个来源，或在浏览设置中关闭“仅包含固定的来源”。';
 
   @override
-  String get global_search_all_nsfw =>
-      'Every source you have for this is marked NSFW, and those are hidden.';
+  String get global_search_all_nsfw => '该分类下的所有来源均被标记为 NSFW 并已被隐藏。';
 
   @override
-  String get global_search_all_nsfw_hint =>
-      'Turn on NSFW sources in Browse settings to search them.';
+  String get global_search_all_nsfw_hint => '请在浏览设置中开启 NSFW 来源后再进行搜索。';
 
   @override
   String get missing_source_check_result_message =>
       '这些条目关联的图源未安装。点击可进行迁移或安装对应扩展。';
 
   @override
-  String get related_titles => 'Related';
+  String get related_titles => '相关作品';
 
   @override
-  String get related_none => 'Nothing related was found for this title.';
+  String get related_none => '未找到该作品的相关作品。';
 
   @override
-  String get relation_adaptation => 'Adaptation';
+  String get relation_adaptation => '改编';
 
   @override
-  String get relation_sequel => 'Sequel';
+  String get relation_sequel => '续作';
 
   @override
-  String get relation_prequel => 'Prequel';
+  String get relation_prequel => '前传';
 
   @override
-  String get relation_parent => 'Parent story';
+  String get relation_parent => '原作/主线';
 
   @override
-  String get relation_side_story => 'Side story';
+  String get relation_side_story => '外传';
 
   @override
-  String get relation_spin_off => 'Spin-off';
+  String get relation_spin_off => '衍生作';
 
   @override
-  String get relation_alternative => 'Alternative version';
+  String get relation_alternative => '平行/替代版本';
+
+  @override
+  String get auto_library_update => '书架自动更新';
+
+  @override
+  String get auto_library_update_subtitle => '在应用启动时检查书架中所有作品的最新章节。';
+
+  @override
+  String get auto_library_update_never => '从不';
+
+  @override
+  String get auto_library_update_12_hours => '每 12 小时';
+
+  @override
+  String get auto_library_update_daily => '每天';
+
+  @override
+  String get auto_library_update_2_days => '每 2 天';
+
+  @override
+  String get auto_library_update_weekly => '每周';
+
+  @override
+  String get auto_library_update_wifi_only => '仅限 Wi-Fi';
+
+  @override
+  String get auto_library_update_wifi_only_subtitle => '使用移动数据时跳过计划更新。';
+
+  @override
+  String get padding => '内边距';
+
+  @override
+  String get page_mode => '翻页模式';
+
+  @override
+  String get single_page => '单页';
+
+  @override
+  String get double_page => '双页';
+
+  @override
+  String get speed => '速度';
+
+  @override
+  String get theme_dark => '暗色';
+
+  @override
+  String get theme_light => '浅色';
+
+  @override
+  String get theme_black => '纯黑';
+
+  @override
+  String get theme_sepia => '复古';
+
+  @override
+  String get decrease => '减少';
+
+  @override
+  String get increase => '增加';
+
+  @override
+  String get chapter_swipe_actions => '章节滑动操作';
+
+  @override
+  String get chapter_swipe_start => '向右滑动';
+
+  @override
+  String get chapter_swipe_end => '向左滑动';
+
+  @override
+  String get chapter_swipe_toggle_bookmark => '切换书签';
+
+  @override
+  String get chapter_swipe_toggle_read => '切换已读状态';
+
+  @override
+  String get chapter_swipe_download => '下载';
+
+  @override
+  String get chapter_swipe_disabled => '已禁用';
+
+  @override
+  String get seasons => 'Seasons';
+
+  @override
+  String get season_number => 'Season number';
+
+  @override
+  String get library_statistics => 'Library statistics';
+
+  @override
+  String get url_must_end_with_dot_json => 'URL must end with .json';
+
+  @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
+  String get subtitle_position => 'Subtitle position';
+
+  @override
+  String get dictionary_lookup => 'Dictionary';
+
+  @override
+  String get dictionary_settings => 'Dictionary settings';
+
+  @override
+  String get dictionary_search_label => 'Search';
+
+  @override
+  String get dictionary_search_hint => 'Word, reading, or phrase';
+
+  @override
+  String get clear_search => 'Clear search';
+
+  @override
+  String dictionary_count(int count) {
+    return '$count dictionaries';
+  }
+
+  @override
+  String dictionary_anki_deck(String name) {
+    return 'Anki deck: $name';
+  }
+
+  @override
+  String get dictionary_load_failed => 'Dictionary data could not be loaded';
+
+  @override
+  String get no_dictionaries_title => 'No dictionaries installed';
+
+  @override
+  String get no_dictionaries_description =>
+      'Import a Yomitan dictionary to start looking up words.';
+
+  @override
+  String get manage_dictionaries => 'Set up dictionaries';
+
+  @override
+  String get dictionary_empty_title => 'Look up a word or phrase';
+
+  @override
+  String get dictionary_empty_description =>
+      'Search a term, expression, sentence, or block of text.';
+
+  @override
+  String get previous_lookup => 'Previous lookup';
+
+  @override
+  String get next_lookup => 'Next lookup';
+
+  @override
+  String get sync_password => '密码（至少8个字符）';
+
+  @override
+  String get last_sync_manga => '上次同步漫画：';
+
+  @override
+  String get last_sync_history => '上次同步阅读记录：';
+
+  @override
+  String get last_sync_update => '上次同步更新：';
+
+  @override
+  String get sync_login_invalid_creds => '无效的电子邮件或密码';
+
+  @override
+  String get sync_section_data_types => '同步内容';
+
+  @override
+  String get sync_enable_histories => '同步历史记录数据';
+
+  @override
+  String get sync_enable_updates => '同步更新数据';
+
+  @override
+  String get sync_enable_settings => '同步设置';
 }

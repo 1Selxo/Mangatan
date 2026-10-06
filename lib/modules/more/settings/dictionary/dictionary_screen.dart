@@ -292,7 +292,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         allowMultiple: true,
       );
       final paths =
-          result?.files.map((file) => file.path).nonNulls.toList() ?? [];
+          result?.map((file) => file.path).nonNulls.toList() ?? [];
       await _importDictionaryPaths(paths);
     } catch (error) {
       if (!mounted) return;

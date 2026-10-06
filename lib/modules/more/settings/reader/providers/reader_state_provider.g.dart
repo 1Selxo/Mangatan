@@ -2455,6 +2455,113 @@ abstract class _$DualPageRotateToFitInvertState extends $Notifier<bool> {
   }
 }
 
+@ProviderFor(DoublePageSingleFirstPageState)
+final doublePageSingleFirstPageStateProvider =
+    DoublePageSingleFirstPageStateProvider._();
+
+final class DoublePageSingleFirstPageStateProvider
+    extends $NotifierProvider<DoublePageSingleFirstPageState, bool> {
+  DoublePageSingleFirstPageStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'doublePageSingleFirstPageStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$doublePageSingleFirstPageStateHash();
+
+  @$internal
+  @override
+  DoublePageSingleFirstPageState create() => DoublePageSingleFirstPageState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$doublePageSingleFirstPageStateHash() =>
+    r'a5dd791ed8050e465b7f30130c42ce059c2fccf6';
+
+abstract class _$DoublePageSingleFirstPageState extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(DoublePageAutoState)
+final doublePageAutoStateProvider = DoublePageAutoStateProvider._();
+
+final class DoublePageAutoStateProvider
+    extends $NotifierProvider<DoublePageAutoState, bool> {
+  DoublePageAutoStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'doublePageAutoStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$doublePageAutoStateHash();
+
+  @$internal
+  @override
+  DoublePageAutoState create() => DoublePageAutoState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$doublePageAutoStateHash() =>
+    r'74c5e1fe37a11529b640356cb1899efa3c89c5f4';
+
+abstract class _$DoublePageAutoState extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(LandscapeZoomState)
 final landscapeZoomStateProvider = LandscapeZoomStateProvider._();
 
@@ -3089,6 +3196,117 @@ abstract class _$ReaderHideThresholdState extends $Notifier<int> {
             as $ClassProviderElement<
               AnyNotifier<int, int>,
               int,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(ChapterSwipeStartActionState)
+final chapterSwipeStartActionStateProvider =
+    ChapterSwipeStartActionStateProvider._();
+
+final class ChapterSwipeStartActionStateProvider
+    extends
+        $NotifierProvider<ChapterSwipeStartActionState, ChapterSwipeAction> {
+  ChapterSwipeStartActionStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chapterSwipeStartActionStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chapterSwipeStartActionStateHash();
+
+  @$internal
+  @override
+  ChapterSwipeStartActionState create() => ChapterSwipeStartActionState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChapterSwipeAction value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChapterSwipeAction>(value),
+    );
+  }
+}
+
+String _$chapterSwipeStartActionStateHash() =>
+    r'cdfdfa8c5a41cbfcca7c4b0168ac059ba61f27ad';
+
+abstract class _$ChapterSwipeStartActionState
+    extends $Notifier<ChapterSwipeAction> {
+  ChapterSwipeAction build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ChapterSwipeAction, ChapterSwipeAction>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ChapterSwipeAction, ChapterSwipeAction>,
+              ChapterSwipeAction,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(ChapterSwipeEndActionState)
+final chapterSwipeEndActionStateProvider =
+    ChapterSwipeEndActionStateProvider._();
+
+final class ChapterSwipeEndActionStateProvider
+    extends $NotifierProvider<ChapterSwipeEndActionState, ChapterSwipeAction> {
+  ChapterSwipeEndActionStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chapterSwipeEndActionStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chapterSwipeEndActionStateHash();
+
+  @$internal
+  @override
+  ChapterSwipeEndActionState create() => ChapterSwipeEndActionState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChapterSwipeAction value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChapterSwipeAction>(value),
+    );
+  }
+}
+
+String _$chapterSwipeEndActionStateHash() =>
+    r'43addead95db6cd05d4384ea7bad72bc9fa72c31';
+
+abstract class _$ChapterSwipeEndActionState
+    extends $Notifier<ChapterSwipeAction> {
+  ChapterSwipeAction build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ChapterSwipeAction, ChapterSwipeAction>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ChapterSwipeAction, ChapterSwipeAction>,
+              ChapterSwipeAction,
               Object?,
               Object?
             >;

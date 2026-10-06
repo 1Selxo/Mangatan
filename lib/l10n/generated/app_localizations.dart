@@ -15,6 +15,7 @@ import 'app_localizations_hi.dart';
 import 'app_localizations_id.dart';
 import 'app_localizations_it.dart';
 import 'app_localizations_ja.dart';
+import 'app_localizations_ko.dart';
 import 'app_localizations_pt.dart';
 import 'app_localizations_ru.dart';
 import 'app_localizations_th.dart';
@@ -118,6 +119,7 @@ abstract class AppLocalizations {
     Locale('id'),
     Locale('it'),
     Locale('ja'),
+    Locale('ko'),
     Locale('pt'),
     Locale('pt', 'BR'),
     Locale('ru'),
@@ -125,18 +127,6 @@ abstract class AppLocalizations {
     Locale('tr'),
     Locale('zh'),
   ];
-
-  /// No description provided for @seasons.
-  ///
-  /// In en, this message translates to:
-  /// **'Seasons'**
-  String get seasons;
-
-  /// No description provided for @season_number.
-  ///
-  /// In en, this message translates to:
-  /// **'Season number'**
-  String get season_number;
 
   /// No description provided for @library.
   ///
@@ -189,7 +179,7 @@ abstract class AppLocalizations {
   /// No description provided for @ignore_filters.
   ///
   /// In en, this message translates to:
-  /// **'Ignore filters'**
+  /// **'Ignore Filters'**
   String get ignore_filters;
 
   /// No description provided for @downloaded.
@@ -482,7 +472,7 @@ abstract class AppLocalizations {
   /// No description provided for @last_used.
   ///
   /// In en, this message translates to:
-  /// **'Last used'**
+  /// **'Last Used'**
   String get last_used;
 
   /// No description provided for @pinned.
@@ -728,13 +718,13 @@ abstract class AppLocalizations {
   /// No description provided for @mass_migration_failed_items.
   ///
   /// In en, this message translates to:
-  /// **'Failed items'**
+  /// **'Failed Items'**
   String get mass_migration_failed_items;
 
   /// No description provided for @mass_migration_exit.
   ///
   /// In en, this message translates to:
-  /// **'Exit mass migration'**
+  /// **'Exit Mass Migration'**
   String get mass_migration_exit;
 
   /// No description provided for @mass_migration_no_destination_match.
@@ -899,12 +889,6 @@ abstract class AppLocalizations {
   /// **'Statistics'**
   String get statistics;
 
-  /// No description provided for @library_statistics.
-  ///
-  /// In en, this message translates to:
-  /// **'Library statistics'**
-  String get library_statistics;
-
   /// No description provided for @settings.
   ///
   /// In en, this message translates to:
@@ -958,6 +942,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Name'**
   String get name;
+
+  /// No description provided for @label_value.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value}'**
+  String label_value(Object label, Object value);
+
+  /// No description provided for @url.
+  ///
+  /// In en, this message translates to:
+  /// **'URL'**
+  String get url;
 
   /// No description provided for @category_name_required.
   ///
@@ -1024,24 +1020,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Theme, date & time format'**
   String get appearance_subtitle;
-
-  /// No description provided for @animation_speed.
-  ///
-  /// In en, this message translates to:
-  /// **'Animation speed'**
-  String get animation_speed;
-
-  /// No description provided for @animation_speed_description.
-  ///
-  /// In en, this message translates to:
-  /// **'Lower values play animations faster.'**
-  String get animation_speed_description;
-
-  /// No description provided for @animation_duration_percentage.
-  ///
-  /// In en, this message translates to:
-  /// **'{percentage}% duration'**
-  String animation_duration_percentage(int percentage);
 
   /// No description provided for @theme.
   ///
@@ -1157,30 +1135,6 @@ abstract class AppLocalizations {
   /// **'Right to Left'**
   String get reading_mode_right_to_left;
 
-  /// No description provided for @reading_direction.
-  ///
-  /// In en, this message translates to:
-  /// **'Reading direction'**
-  String get reading_direction;
-
-  /// No description provided for @reading_mode_horizontal_paged.
-  ///
-  /// In en, this message translates to:
-  /// **'Horizontal paged'**
-  String get reading_mode_horizontal_paged;
-
-  /// No description provided for @reading_mode_vertical_paged.
-  ///
-  /// In en, this message translates to:
-  /// **'Vertical paged'**
-  String get reading_mode_vertical_paged;
-
-  /// No description provided for @reading_mode_horizontal_continuous.
-  ///
-  /// In en, this message translates to:
-  /// **'Horizontal continuous'**
-  String get reading_mode_horizontal_continuous;
-
   /// No description provided for @reading_mode_vertical_continuous.
   ///
   /// In en, this message translates to:
@@ -1192,30 +1146,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Webtoon'**
   String get reading_mode_webtoon;
-
-  /// No description provided for @default_page_mode.
-  ///
-  /// In en, this message translates to:
-  /// **'Default page mode'**
-  String get default_page_mode;
-
-  /// No description provided for @page_mode_single.
-  ///
-  /// In en, this message translates to:
-  /// **'Single page'**
-  String get page_mode_single;
-
-  /// No description provided for @page_mode_double.
-  ///
-  /// In en, this message translates to:
-  /// **'Double page'**
-  String get page_mode_double;
-
-  /// No description provided for @page_mode_double_cover.
-  ///
-  /// In en, this message translates to:
-  /// **'Double page with cover offset'**
-  String get page_mode_double_cover;
 
   /// No description provided for @double_tap_animation_speed.
   ///
@@ -1337,6 +1267,12 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get version;
 
+  /// No description provided for @beta_version.
+  ///
+  /// In en, this message translates to:
+  /// **'Beta ({version})'**
+  String beta_version(Object version);
+
   /// No description provided for @check_for_update.
   ///
   /// In en, this message translates to:
@@ -1439,6 +1375,30 @@ abstract class AppLocalizations {
   /// **'Unknown'**
   String get unknown;
 
+  /// No description provided for @empty_placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'EMPTY\nMPTY\nMTY\nMT\n\n'**
+  String get empty_placeholder;
+
+  /// No description provided for @error.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get error;
+
+  /// No description provided for @error_with_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String error_with_message(Object error);
+
+  /// No description provided for @no_pages_available.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: no pages available'**
+  String get no_pages_available;
+
   /// No description provided for @set_categories.
   ///
   /// In en, this message translates to:
@@ -1498,6 +1458,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Source title'**
   String get source_title;
+
+  /// No description provided for @create_extension.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Extension'**
+  String get create_extension;
+
+  /// No description provided for @developer_mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer mode'**
+  String get developer_mode;
+
+  /// No description provided for @developer_mode_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show extension developer tools (create extension, edit code)'**
+  String get developer_mode_subtitle;
+
+  /// No description provided for @choose_extension_language.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose extension language'**
+  String get choose_extension_language;
+
+  /// No description provided for @lang.
+  ///
+  /// In en, this message translates to:
+  /// **'Lang'**
+  String get lang;
+
+  /// No description provided for @base_url.
+  ///
+  /// In en, this message translates to:
+  /// **'BaseUrl'**
+  String get base_url;
+
+  /// No description provided for @api_url_optional.
+  ///
+  /// In en, this message translates to:
+  /// **'ApiUrl (optional)'**
+  String get api_url_optional;
+
+  /// No description provided for @icon_url.
+  ///
+  /// In en, this message translates to:
+  /// **'iconUrl'**
+  String get icon_url;
+
+  /// No description provided for @source_icon_url.
+  ///
+  /// In en, this message translates to:
+  /// **'Source icon url'**
+  String get source_icon_url;
+
+  /// No description provided for @notes.
+  ///
+  /// In en, this message translates to:
+  /// **'notes'**
+  String get notes;
+
+  /// No description provided for @extension_name_example.
+  ///
+  /// In en, this message translates to:
+  /// **'ex: myAnime'**
+  String get extension_name_example;
+
+  /// No description provided for @language_code_example.
+  ///
+  /// In en, this message translates to:
+  /// **'ex: en'**
+  String get language_code_example;
+
+  /// No description provided for @base_url_example.
+  ///
+  /// In en, this message translates to:
+  /// **'ex: https://example.com'**
+  String get base_url_example;
+
+  /// No description provided for @api_url_example.
+  ///
+  /// In en, this message translates to:
+  /// **'ex: https://api.example.com'**
+  String get api_url_example;
+
+  /// No description provided for @extension_notes_example.
+  ///
+  /// In en, this message translates to:
+  /// **'ex: this extension requires login'**
+  String get extension_notes_example;
+
+  /// No description provided for @type.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get type;
+
+  /// No description provided for @target.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get target;
+
+  /// No description provided for @source_type_single.
+  ///
+  /// In en, this message translates to:
+  /// **'single'**
+  String get source_type_single;
+
+  /// No description provided for @source_type_multi.
+  ///
+  /// In en, this message translates to:
+  /// **'multi'**
+  String get source_type_multi;
+
+  /// No description provided for @source_type_torrent.
+  ///
+  /// In en, this message translates to:
+  /// **'torrent'**
+  String get source_type_torrent;
+
+  /// No description provided for @source_language_dart.
+  ///
+  /// In en, this message translates to:
+  /// **'Dart'**
+  String get source_language_dart;
+
+  /// No description provided for @source_language_javascript.
+  ///
+  /// In en, this message translates to:
+  /// **'JavaScript'**
+  String get source_language_javascript;
+
+  /// No description provided for @source_language_lnreader_compiled_js.
+  ///
+  /// In en, this message translates to:
+  /// **'LNReader compiled JS'**
+  String get source_language_lnreader_compiled_js;
+
+  /// No description provided for @source_created_successfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Source created successfully'**
+  String get source_created_successfully;
+
+  /// No description provided for @source_already_exists.
+  ///
+  /// In en, this message translates to:
+  /// **'Source already exists'**
+  String get source_already_exists;
+
+  /// No description provided for @error_when_creating_source.
+  ///
+  /// In en, this message translates to:
+  /// **'Error when creating source'**
+  String get error_when_creating_source;
+
+  /// No description provided for @cookies_deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Cookies deleted!'**
+  String get cookies_deleted;
+
+  /// No description provided for @delete_all_cookies.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all cookies'**
+  String get delete_all_cookies;
 
   /// No description provided for @chapter_number.
   ///
@@ -1823,12 +1951,6 @@ abstract class AppLocalizations {
   /// **'Sync'**
   String get syncing;
 
-  /// No description provided for @sync_password.
-  ///
-  /// In en, this message translates to:
-  /// **'Password (at least 8 characters)'**
-  String get sync_password;
-
   /// No description provided for @sync_logged.
   ///
   /// In en, this message translates to:
@@ -1841,35 +1963,23 @@ abstract class AppLocalizations {
   /// **'Sync your progress across multiple devices via a self-hosted \nserver. Check out our discord server for more info!'**
   String get syncing_subtitle;
 
-  /// No description provided for @last_sync_manga.
+  /// No description provided for @last_sync.
   ///
   /// In en, this message translates to:
-  /// **'Last manga sync at: '**
-  String get last_sync_manga;
+  /// **'Last sync at: '**
+  String get last_sync;
 
-  /// No description provided for @last_sync_history.
+  /// No description provided for @sync_login_browser.
   ///
   /// In en, this message translates to:
-  /// **'Last history sync at: '**
-  String get last_sync_history;
-
-  /// No description provided for @last_sync_update.
-  ///
-  /// In en, this message translates to:
-  /// **'Last update sync at: '**
-  String get last_sync_update;
+  /// **'Log in with browser'**
+  String get sync_login_browser;
 
   /// No description provided for @sync_server.
   ///
   /// In en, this message translates to:
   /// **'Sync Server Address'**
   String get sync_server;
-
-  /// No description provided for @sync_login_invalid_creds.
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid email or password'**
-  String get sync_login_invalid_creds;
 
   /// No description provided for @sync_starting.
   ///
@@ -1895,6 +2005,18 @@ abstract class AppLocalizations {
   /// **'Sync skipped — restore in progress'**
   String get sync_restore_in_progress;
 
+  /// No description provided for @sync_progress_percent.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing… {percent}%'**
+  String sync_progress_percent(Object percent);
+
+  /// No description provided for @sync_progress_indeterminate.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing…'**
+  String get sync_progress_indeterminate;
+
   /// No description provided for @sync_button_sync.
   ///
   /// In en, this message translates to:
@@ -1910,7 +2032,7 @@ abstract class AppLocalizations {
   /// No description provided for @sync_button_upload_info.
   ///
   /// In en, this message translates to:
-  /// **'This operation will fully replace the remote data with local data!'**
+  /// **'This device\'s data will overwrite the server\'s for anything it also has. Nothing on the server gets deleted.'**
   String get sync_button_upload_info;
 
   /// No description provided for @sync_button_download.
@@ -1960,12 +2082,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'General'**
   String get sync_section_general;
-
-  /// No description provided for @sync_section_data_types.
-  ///
-  /// In en, this message translates to:
-  /// **'What to sync'**
-  String get sync_section_data_types;
 
   /// No description provided for @sync_on.
   ///
@@ -2224,6 +2340,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Uninstall {ext} extension?'**
   String uninstall_extension(Object ext);
+
+  /// No description provided for @double_tap_search_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap to search all {type}'**
+  String double_tap_search_hint(Object type);
+
+  /// No description provided for @show_nav_double_tap_tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show double-tap search hint'**
+  String get show_nav_double_tap_tooltip;
+
+  /// No description provided for @show_nav_double_tap_tooltip_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a tooltip on the Manga/Anime/Novel nav destinations explaining that double-tapping opens Global Search.'**
+  String get show_nav_double_tap_tooltip_subtitle;
+
+  /// No description provided for @already_in_library.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{title}\" is already in your library via {source}.'**
+  String already_in_library(Object source, Object title);
+
+  /// No description provided for @add_anyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Anyway'**
+  String get add_anyway;
 
   /// No description provided for @langauage.
   ///
@@ -3167,6 +3313,18 @@ abstract class AppLocalizations {
   /// **'Disable `use libass` in player settings to be able to customize the subtitles.'**
   String get libass_not_disable_message;
 
+  /// No description provided for @override_ass_subtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Override ASS subtitles'**
+  String get override_ass_subtitles;
+
+  /// No description provided for @override_ass_subtitles_info.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply custom styling to ASS/SSA subtitles'**
+  String get override_ass_subtitles_info;
+
   /// No description provided for @torrent_stream.
   ///
   /// In en, this message translates to:
@@ -3212,7 +3370,7 @@ abstract class AppLocalizations {
   /// No description provided for @use_native_http_client.
   ///
   /// In en, this message translates to:
-  /// **'Use native HTTP client'**
+  /// **'Use native http client'**
   String get use_native_http_client;
 
   /// No description provided for @use_native_http_client_info.
@@ -3328,12 +3486,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Downloads are limited to Wi-Fi only'**
   String get downloads_are_limited_to_wifi;
-
-  /// No description provided for @recommendations.
-  ///
-  /// In en, this message translates to:
-  /// **'Recommendations'**
-  String get recommendations;
 
   /// No description provided for @recommendations_similar.
   ///
@@ -3461,11 +3613,11 @@ abstract class AppLocalizations {
   /// **'URL cannot be empty'**
   String get url_cannot_be_empty;
 
-  /// No description provided for @url_must_end_with_dot_json.
+  /// No description provided for @url_must_end_with_dot_json_or_dot_pb.
   ///
   /// In en, this message translates to:
-  /// **'URL must end with .json'**
-  String get url_must_end_with_dot_json;
+  /// **'URL must end with .json / .pb'**
+  String get url_must_end_with_dot_json_or_dot_pb;
 
   /// No description provided for @repo_url.
   ///
@@ -3683,24 +3835,6 @@ abstract class AppLocalizations {
   /// **'Show current cover image in Discord'**
   String get rpc_show_cover_image;
 
-  /// No description provided for @sync_enable_histories.
-  ///
-  /// In en, this message translates to:
-  /// **'Sync history data'**
-  String get sync_enable_histories;
-
-  /// No description provided for @sync_enable_updates.
-  ///
-  /// In en, this message translates to:
-  /// **'Sync update data'**
-  String get sync_enable_updates;
-
-  /// No description provided for @sync_enable_settings.
-  ///
-  /// In en, this message translates to:
-  /// **'Sync settings'**
-  String get sync_enable_settings;
-
   /// No description provided for @enable_mpv.
   ///
   /// In en, this message translates to:
@@ -3917,6 +4051,30 @@ abstract class AppLocalizations {
   /// **'Speed'**
   String get subtitle_speed;
 
+  /// No description provided for @tracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks'**
+  String get tracks;
+
+  /// No description provided for @playback_speed.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback speed'**
+  String get playback_speed;
+
+  /// No description provided for @shaders.
+  ///
+  /// In en, this message translates to:
+  /// **'Shaders'**
+  String get shaders;
+
+  /// No description provided for @video_fit.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit'**
+  String get video_fit;
+
   /// No description provided for @calendar.
   ///
   /// In en, this message translates to:
@@ -3977,6 +4135,12 @@ abstract class AppLocalizations {
   /// **'Sequels'**
   String get sequels;
 
+  /// No description provided for @recommendations.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendations'**
+  String get recommendations;
+
   /// No description provided for @recommendations_similarity.
   ///
   /// In en, this message translates to:
@@ -4006,6 +4170,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rescan all local folders now'**
   String get rescan_local_folder;
+
+  /// No description provided for @default_download_destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Default download destination'**
+  String get default_download_destination;
+
+  /// No description provided for @ask_download_destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for download destination'**
+  String get ask_download_destination;
+
+  /// No description provided for @ask_download_destination_desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a local folder each time a download starts.'**
+  String get ask_download_destination_desc;
+
+  /// No description provided for @select_download_destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Select download destination'**
+  String get select_download_destination;
+
+  /// No description provided for @clear_local_library.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear local library'**
+  String get clear_local_library;
+
+  /// No description provided for @clear_local_library_desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove local folder and archive entries from the library.'**
+  String get clear_local_library_desc;
+
+  /// No description provided for @clear_local_library_msg.
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove local folder and archive entries from your library. It will not delete files from disk.'**
+  String get clear_local_library_msg;
+
+  /// No description provided for @custom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get custom;
+
+  /// No description provided for @no_local_folder_available_for_downloads.
+  ///
+  /// In en, this message translates to:
+  /// **'No local folder is available for downloads'**
+  String get no_local_folder_available_for_downloads;
+
+  /// No description provided for @failed_to_create_cbz.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create CBZ: {error}'**
+  String failed_to_create_cbz(Object error);
+
+  /// No description provided for @error_reading_cover_image.
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading cover image: {error}'**
+  String error_reading_cover_image(Object error);
+
+  /// No description provided for @error_reading_metadata.
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading metadata: {error}'**
+  String error_reading_metadata(Object error);
+
+  /// No description provided for @error_saving_chapter_episode_to_library.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving chapter/episode to library: {error}'**
+  String error_saving_chapter_episode_to_library(Object error);
+
+  /// No description provided for @error_reading_chapter_cover_image.
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading chapter cover image: {error}'**
+  String error_reading_chapter_cover_image(Object error);
+
+  /// No description provided for @error_reading_archive_cover_image.
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading archive cover image: {error}'**
+  String error_reading_archive_cover_image(Object error);
+
+  /// No description provided for @error_getting_local_library.
+  ///
+  /// In en, this message translates to:
+  /// **'Error getting local library: {error}'**
+  String error_getting_local_library(Object error);
 
   /// No description provided for @export_metadata.
   ///
@@ -4156,6 +4416,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Authenticating...'**
   String get authenticating;
+
+  /// No description provided for @lock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get lock;
 
   /// No description provided for @unlock.
   ///
@@ -4541,14 +4807,6 @@ abstract class AppLocalizations {
   /// **'Extension server files were linked.'**
   String get extension_server_files_linked;
 
-  /// No description provided for @extension_server_directory_is_package_managed.
-  ///
-  /// In en, this message translates to:
-  /// **'The extension server folder is managed by your package manager. Installing into {fallbackDirectory} instead.'**
-  String extension_server_directory_is_package_managed(
-    Object fallbackDirectory,
-  );
-
   /// No description provided for @select_extension_server_jar.
   ///
   /// In en, this message translates to:
@@ -4584,6 +4842,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not configured'**
   String get not_configured;
+
+  /// No description provided for @zero_interpreter.
+  ///
+  /// In en, this message translates to:
+  /// **'Zero interpreter'**
+  String get zero_interpreter;
+
+  /// No description provided for @zero_interpreter_description.
+  ///
+  /// In en, this message translates to:
+  /// **'The server starts automatically on launch. You can also control it manually.'**
+  String get zero_interpreter_description;
+
+  /// No description provided for @start_server_on_launch.
+  ///
+  /// In en, this message translates to:
+  /// **'Start server on launch'**
+  String get start_server_on_launch;
+
+  /// No description provided for @runtime_status.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime status'**
+  String get runtime_status;
+
+  /// No description provided for @running.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get running;
+
+  /// No description provided for @stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get stopped;
+
+  /// No description provided for @start.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get start;
+
+  /// No description provided for @stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stop;
 
   /// No description provided for @webview.
   ///
@@ -4716,6 +5022,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invert rotation direction'**
   String get dual_page_rotate_to_fit_invert;
+
+  /// No description provided for @double_page_single_first_page.
+  ///
+  /// In en, this message translates to:
+  /// **'Single first page'**
+  String get double_page_single_first_page;
+
+  /// No description provided for @double_page_single_first_page_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Display the first page alone in double page mode'**
+  String get double_page_single_first_page_subtitle;
+
+  /// No description provided for @double_page_auto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic double page'**
+  String get double_page_auto;
+
+  /// No description provided for @double_page_auto_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to double page mode automatically in landscape'**
+  String get double_page_auto_subtitle;
 
   /// No description provided for @landscape_zoom.
   ///
@@ -4873,102 +5203,6 @@ abstract class AppLocalizations {
   /// **'Error: no pages available'**
   String get error_no_pages_available;
 
-  /// No description provided for @subtitle_position.
-  ///
-  /// In en, this message translates to:
-  /// **'Subtitle position'**
-  String get subtitle_position;
-
-  /// No description provided for @dictionary_lookup.
-  ///
-  /// In en, this message translates to:
-  /// **'Dictionary'**
-  String get dictionary_lookup;
-
-  /// No description provided for @dictionary_settings.
-  ///
-  /// In en, this message translates to:
-  /// **'Dictionary settings'**
-  String get dictionary_settings;
-
-  /// No description provided for @dictionary_search_label.
-  ///
-  /// In en, this message translates to:
-  /// **'Search'**
-  String get dictionary_search_label;
-
-  /// No description provided for @dictionary_search_hint.
-  ///
-  /// In en, this message translates to:
-  /// **'Word, reading, or phrase'**
-  String get dictionary_search_hint;
-
-  /// No description provided for @clear_search.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear search'**
-  String get clear_search;
-
-  /// No description provided for @dictionary_count.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} dictionaries'**
-  String dictionary_count(int count);
-
-  /// No description provided for @dictionary_anki_deck.
-  ///
-  /// In en, this message translates to:
-  /// **'Anki deck: {name}'**
-  String dictionary_anki_deck(String name);
-
-  /// No description provided for @dictionary_load_failed.
-  ///
-  /// In en, this message translates to:
-  /// **'Dictionary data could not be loaded'**
-  String get dictionary_load_failed;
-
-  /// No description provided for @no_dictionaries_title.
-  ///
-  /// In en, this message translates to:
-  /// **'No dictionaries installed'**
-  String get no_dictionaries_title;
-
-  /// No description provided for @no_dictionaries_description.
-  ///
-  /// In en, this message translates to:
-  /// **'Import a Yomitan dictionary to start looking up words.'**
-  String get no_dictionaries_description;
-
-  /// No description provided for @manage_dictionaries.
-  ///
-  /// In en, this message translates to:
-  /// **'Set up dictionaries'**
-  String get manage_dictionaries;
-
-  /// No description provided for @dictionary_empty_title.
-  ///
-  /// In en, this message translates to:
-  /// **'Look up a word or phrase'**
-  String get dictionary_empty_title;
-
-  /// No description provided for @dictionary_empty_description.
-  ///
-  /// In en, this message translates to:
-  /// **'Search a term, expression, sentence, or block of text.'**
-  String get dictionary_empty_description;
-
-  /// No description provided for @previous_lookup.
-  ///
-  /// In en, this message translates to:
-  /// **'Previous lookup'**
-  String get previous_lookup;
-
-  /// No description provided for @next_lookup.
-  ///
-  /// In en, this message translates to:
-  /// **'Next lookup'**
-  String get next_lookup;
-
   /// No description provided for @app_ui_scale.
   ///
   /// In en, this message translates to:
@@ -5034,348 +5268,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Source'**
   String get source;
-
-  /// No description provided for @label_value.
-  ///
-  /// In en, this message translates to:
-  /// **'{label}: {value}'**
-  String label_value(Object label, Object value);
-
-  /// No description provided for @url.
-  ///
-  /// In en, this message translates to:
-  /// **'URL'**
-  String get url;
-
-  /// No description provided for @beta_version.
-  ///
-  /// In en, this message translates to:
-  /// **'Beta ({version})'**
-  String beta_version(Object version);
-
-  /// No description provided for @empty_placeholder.
-  ///
-  /// In en, this message translates to:
-  /// **'EMPTY\nMPTY\nMTY\nMT\n\n'**
-  String get empty_placeholder;
-
-  /// No description provided for @error.
-  ///
-  /// In en, this message translates to:
-  /// **'Error'**
-  String get error;
-
-  /// No description provided for @error_with_message.
-  ///
-  /// In en, this message translates to:
-  /// **'Error: {error}'**
-  String error_with_message(Object error);
-
-  /// No description provided for @no_pages_available.
-  ///
-  /// In en, this message translates to:
-  /// **'Error: no pages available'**
-  String get no_pages_available;
-
-  /// No description provided for @create_extension.
-  ///
-  /// In en, this message translates to:
-  /// **'Create Extension'**
-  String get create_extension;
-
-  /// No description provided for @choose_extension_language.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose extension language'**
-  String get choose_extension_language;
-
-  /// No description provided for @lang.
-  ///
-  /// In en, this message translates to:
-  /// **'Lang'**
-  String get lang;
-
-  /// No description provided for @base_url.
-  ///
-  /// In en, this message translates to:
-  /// **'BaseUrl'**
-  String get base_url;
-
-  /// No description provided for @api_url_optional.
-  ///
-  /// In en, this message translates to:
-  /// **'ApiUrl (optional)'**
-  String get api_url_optional;
-
-  /// No description provided for @icon_url.
-  ///
-  /// In en, this message translates to:
-  /// **'iconUrl'**
-  String get icon_url;
-
-  /// No description provided for @source_icon_url.
-  ///
-  /// In en, this message translates to:
-  /// **'Source icon url'**
-  String get source_icon_url;
-
-  /// No description provided for @notes.
-  ///
-  /// In en, this message translates to:
-  /// **'notes'**
-  String get notes;
-
-  /// No description provided for @extension_name_example.
-  ///
-  /// In en, this message translates to:
-  /// **'ex: myAnime'**
-  String get extension_name_example;
-
-  /// No description provided for @language_code_example.
-  ///
-  /// In en, this message translates to:
-  /// **'ex: en'**
-  String get language_code_example;
-
-  /// No description provided for @base_url_example.
-  ///
-  /// In en, this message translates to:
-  /// **'ex: https://example.com'**
-  String get base_url_example;
-
-  /// No description provided for @api_url_example.
-  ///
-  /// In en, this message translates to:
-  /// **'ex: https://api.example.com'**
-  String get api_url_example;
-
-  /// No description provided for @extension_notes_example.
-  ///
-  /// In en, this message translates to:
-  /// **'ex: this extension requires login'**
-  String get extension_notes_example;
-
-  /// No description provided for @type.
-  ///
-  /// In en, this message translates to:
-  /// **'Type'**
-  String get type;
-
-  /// No description provided for @target.
-  ///
-  /// In en, this message translates to:
-  /// **'Target'**
-  String get target;
-
-  /// No description provided for @source_type_single.
-  ///
-  /// In en, this message translates to:
-  /// **'single'**
-  String get source_type_single;
-
-  /// No description provided for @source_type_multi.
-  ///
-  /// In en, this message translates to:
-  /// **'multi'**
-  String get source_type_multi;
-
-  /// No description provided for @source_type_torrent.
-  ///
-  /// In en, this message translates to:
-  /// **'torrent'**
-  String get source_type_torrent;
-
-  /// No description provided for @source_language_dart.
-  ///
-  /// In en, this message translates to:
-  /// **'Dart'**
-  String get source_language_dart;
-
-  /// No description provided for @source_language_javascript.
-  ///
-  /// In en, this message translates to:
-  /// **'JavaScript'**
-  String get source_language_javascript;
-
-  /// No description provided for @source_language_lnreader_compiled_js.
-  ///
-  /// In en, this message translates to:
-  /// **'LNReader compiled JS'**
-  String get source_language_lnreader_compiled_js;
-
-  /// No description provided for @source_created_successfully.
-  ///
-  /// In en, this message translates to:
-  /// **'Source created successfully'**
-  String get source_created_successfully;
-
-  /// No description provided for @source_already_exists.
-  ///
-  /// In en, this message translates to:
-  /// **'Source already exists'**
-  String get source_already_exists;
-
-  /// No description provided for @error_when_creating_source.
-  ///
-  /// In en, this message translates to:
-  /// **'Error when creating source'**
-  String get error_when_creating_source;
-
-  /// No description provided for @cookies_deleted.
-  ///
-  /// In en, this message translates to:
-  /// **'Cookies deleted!'**
-  String get cookies_deleted;
-
-  /// No description provided for @delete_all_cookies.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete all cookies'**
-  String get delete_all_cookies;
-
-  /// No description provided for @url_must_end_with_dot_json_or_dot_pb.
-  ///
-  /// In en, this message translates to:
-  /// **'URL must end with .json / .pb'**
-  String get url_must_end_with_dot_json_or_dot_pb;
-
-  /// No description provided for @default_download_destination.
-  ///
-  /// In en, this message translates to:
-  /// **'Default download destination'**
-  String get default_download_destination;
-
-  /// No description provided for @ask_download_destination.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask for download destination'**
-  String get ask_download_destination;
-
-  /// No description provided for @ask_download_destination_desc.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose a local folder each time a download starts.'**
-  String get ask_download_destination_desc;
-
-  /// No description provided for @select_download_destination.
-  ///
-  /// In en, this message translates to:
-  /// **'Select download destination'**
-  String get select_download_destination;
-
-  /// No description provided for @clear_local_library.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear local library'**
-  String get clear_local_library;
-
-  /// No description provided for @clear_local_library_desc.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove local folder and archive entries from the library.'**
-  String get clear_local_library_desc;
-
-  /// No description provided for @clear_local_library_msg.
-  ///
-  /// In en, this message translates to:
-  /// **'This will remove local folder and archive entries from your library. It will not delete files from disk.'**
-  String get clear_local_library_msg;
-
-  /// No description provided for @custom.
-  ///
-  /// In en, this message translates to:
-  /// **'Custom'**
-  String get custom;
-
-  /// No description provided for @no_local_folder_available_for_downloads.
-  ///
-  /// In en, this message translates to:
-  /// **'No local folder is available for downloads'**
-  String get no_local_folder_available_for_downloads;
-
-  /// No description provided for @failed_to_create_cbz.
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to create CBZ: {error}'**
-  String failed_to_create_cbz(Object error);
-
-  /// No description provided for @error_reading_cover_image.
-  ///
-  /// In en, this message translates to:
-  /// **'Error reading cover image: {error}'**
-  String error_reading_cover_image(Object error);
-
-  /// No description provided for @error_reading_metadata.
-  ///
-  /// In en, this message translates to:
-  /// **'Error reading metadata: {error}'**
-  String error_reading_metadata(Object error);
-
-  /// No description provided for @error_saving_chapter_episode_to_library.
-  ///
-  /// In en, this message translates to:
-  /// **'Error saving chapter/episode to library: {error}'**
-  String error_saving_chapter_episode_to_library(Object error);
-
-  /// No description provided for @error_reading_chapter_cover_image.
-  ///
-  /// In en, this message translates to:
-  /// **'Error reading chapter cover image: {error}'**
-  String error_reading_chapter_cover_image(Object error);
-
-  /// No description provided for @error_reading_archive_cover_image.
-  ///
-  /// In en, this message translates to:
-  /// **'Error reading archive cover image: {error}'**
-  String error_reading_archive_cover_image(Object error);
-
-  /// No description provided for @error_getting_local_library.
-  ///
-  /// In en, this message translates to:
-  /// **'Error getting local library: {error}'**
-  String error_getting_local_library(Object error);
-
-  /// No description provided for @zero_interpreter.
-  ///
-  /// In en, this message translates to:
-  /// **'Zero interpreter'**
-  String get zero_interpreter;
-
-  /// No description provided for @zero_interpreter_description.
-  ///
-  /// In en, this message translates to:
-  /// **'The server starts automatically on launch. You can also control it manually.'**
-  String get zero_interpreter_description;
-
-  /// No description provided for @runtime_status.
-  ///
-  /// In en, this message translates to:
-  /// **'Runtime status'**
-  String get runtime_status;
-
-  /// No description provided for @running.
-  ///
-  /// In en, this message translates to:
-  /// **'Running'**
-  String get running;
-
-  /// No description provided for @stopped.
-  ///
-  /// In en, this message translates to:
-  /// **'Stopped'**
-  String get stopped;
-
-  /// No description provided for @start.
-  ///
-  /// In en, this message translates to:
-  /// **'Start'**
-  String get start;
-
-  /// No description provided for @stop.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop'**
-  String get stop;
 
   /// No description provided for @something_went_wrong.
   ///
@@ -6096,6 +5988,416 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Alternative version'**
   String get relation_alternative;
+
+  /// No description provided for @auto_library_update.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic library updates'**
+  String get auto_library_update;
+
+  /// No description provided for @auto_library_update_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check every entry in your library for new chapters when the app starts.'**
+  String get auto_library_update_subtitle;
+
+  /// No description provided for @auto_library_update_never.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get auto_library_update_never;
+
+  /// No description provided for @auto_library_update_12_hours.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 12 hours'**
+  String get auto_library_update_12_hours;
+
+  /// No description provided for @auto_library_update_daily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get auto_library_update_daily;
+
+  /// No description provided for @auto_library_update_2_days.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 2 days'**
+  String get auto_library_update_2_days;
+
+  /// No description provided for @auto_library_update_weekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get auto_library_update_weekly;
+
+  /// No description provided for @auto_library_update_wifi_only.
+  ///
+  /// In en, this message translates to:
+  /// **'Only on Wi-Fi'**
+  String get auto_library_update_wifi_only;
+
+  /// No description provided for @auto_library_update_wifi_only_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip the scheduled update while on mobile data.'**
+  String get auto_library_update_wifi_only_subtitle;
+
+  /// No description provided for @padding.
+  ///
+  /// In en, this message translates to:
+  /// **'Padding'**
+  String get padding;
+
+  /// No description provided for @page_mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Page mode'**
+  String get page_mode;
+
+  /// No description provided for @single_page.
+  ///
+  /// In en, this message translates to:
+  /// **'Single page'**
+  String get single_page;
+
+  /// No description provided for @double_page.
+  ///
+  /// In en, this message translates to:
+  /// **'Double page'**
+  String get double_page;
+
+  /// No description provided for @speed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get speed;
+
+  /// No description provided for @theme_dark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get theme_dark;
+
+  /// No description provided for @theme_light.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get theme_light;
+
+  /// No description provided for @theme_black.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get theme_black;
+
+  /// No description provided for @theme_sepia.
+  ///
+  /// In en, this message translates to:
+  /// **'Sepia'**
+  String get theme_sepia;
+
+  /// No description provided for @decrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease'**
+  String get decrease;
+
+  /// No description provided for @increase.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase'**
+  String get increase;
+
+  /// No description provided for @chapter_swipe_actions.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter swipe actions'**
+  String get chapter_swipe_actions;
+
+  /// No description provided for @chapter_swipe_start.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe right'**
+  String get chapter_swipe_start;
+
+  /// No description provided for @chapter_swipe_end.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe left'**
+  String get chapter_swipe_end;
+
+  /// No description provided for @chapter_swipe_toggle_bookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle bookmark'**
+  String get chapter_swipe_toggle_bookmark;
+
+  /// No description provided for @chapter_swipe_toggle_read.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle read'**
+  String get chapter_swipe_toggle_read;
+
+  /// No description provided for @chapter_swipe_download.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get chapter_swipe_download;
+
+  /// No description provided for @chapter_swipe_disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get chapter_swipe_disabled;
+
+  /// No description provided for @seasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Seasons'**
+  String get seasons;
+
+  /// No description provided for @season_number.
+  ///
+  /// In en, this message translates to:
+  /// **'Season number'**
+  String get season_number;
+
+  /// No description provided for @library_statistics.
+  ///
+  /// In en, this message translates to:
+  /// **'Library statistics'**
+  String get library_statistics;
+
+  /// No description provided for @url_must_end_with_dot_json.
+  ///
+  /// In en, this message translates to:
+  /// **'URL must end with .json'**
+  String get url_must_end_with_dot_json;
+
+  /// No description provided for @extension_server_directory_is_package_managed.
+  ///
+  /// In en, this message translates to:
+  /// **'The extension server folder is managed by your package manager. Installing into {fallbackDirectory} instead.'**
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  );
+
+  /// No description provided for @animation_speed.
+  ///
+  /// In en, this message translates to:
+  /// **'Animation speed'**
+  String get animation_speed;
+
+  /// No description provided for @animation_speed_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower values play animations faster.'**
+  String get animation_speed_description;
+
+  /// No description provided for @animation_duration_percentage.
+  ///
+  /// In en, this message translates to:
+  /// **'{percentage}% duration'**
+  String animation_duration_percentage(int percentage);
+
+  /// No description provided for @reading_direction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading direction'**
+  String get reading_direction;
+
+  /// No description provided for @reading_mode_horizontal_paged.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal paged'**
+  String get reading_mode_horizontal_paged;
+
+  /// No description provided for @reading_mode_vertical_paged.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical paged'**
+  String get reading_mode_vertical_paged;
+
+  /// No description provided for @reading_mode_horizontal_continuous.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal continuous'**
+  String get reading_mode_horizontal_continuous;
+
+  /// No description provided for @default_page_mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Default page mode'**
+  String get default_page_mode;
+
+  /// No description provided for @page_mode_single.
+  ///
+  /// In en, this message translates to:
+  /// **'Single page'**
+  String get page_mode_single;
+
+  /// No description provided for @page_mode_double.
+  ///
+  /// In en, this message translates to:
+  /// **'Double page'**
+  String get page_mode_double;
+
+  /// No description provided for @page_mode_double_cover.
+  ///
+  /// In en, this message translates to:
+  /// **'Double page with cover offset'**
+  String get page_mode_double_cover;
+
+  /// No description provided for @subtitle_position.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle position'**
+  String get subtitle_position;
+
+  /// No description provided for @dictionary_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary'**
+  String get dictionary_lookup;
+
+  /// No description provided for @dictionary_settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary settings'**
+  String get dictionary_settings;
+
+  /// No description provided for @dictionary_search_label.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get dictionary_search_label;
+
+  /// No description provided for @dictionary_search_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Word, reading, or phrase'**
+  String get dictionary_search_hint;
+
+  /// No description provided for @clear_search.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clear_search;
+
+  /// No description provided for @dictionary_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} dictionaries'**
+  String dictionary_count(int count);
+
+  /// No description provided for @dictionary_anki_deck.
+  ///
+  /// In en, this message translates to:
+  /// **'Anki deck: {name}'**
+  String dictionary_anki_deck(String name);
+
+  /// No description provided for @dictionary_load_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary data could not be loaded'**
+  String get dictionary_load_failed;
+
+  /// No description provided for @no_dictionaries_title.
+  ///
+  /// In en, this message translates to:
+  /// **'No dictionaries installed'**
+  String get no_dictionaries_title;
+
+  /// No description provided for @no_dictionaries_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a Yomitan dictionary to start looking up words.'**
+  String get no_dictionaries_description;
+
+  /// No description provided for @manage_dictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up dictionaries'**
+  String get manage_dictionaries;
+
+  /// No description provided for @dictionary_empty_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Look up a word or phrase'**
+  String get dictionary_empty_title;
+
+  /// No description provided for @dictionary_empty_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Search a term, expression, sentence, or block of text.'**
+  String get dictionary_empty_description;
+
+  /// No description provided for @previous_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous lookup'**
+  String get previous_lookup;
+
+  /// No description provided for @next_lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'Next lookup'**
+  String get next_lookup;
+
+  /// No description provided for @sync_password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password (at least 8 characters)'**
+  String get sync_password;
+
+  /// No description provided for @last_sync_manga.
+  ///
+  /// In en, this message translates to:
+  /// **'Last manga sync at: '**
+  String get last_sync_manga;
+
+  /// No description provided for @last_sync_history.
+  ///
+  /// In en, this message translates to:
+  /// **'Last history sync at: '**
+  String get last_sync_history;
+
+  /// No description provided for @last_sync_update.
+  ///
+  /// In en, this message translates to:
+  /// **'Last update sync at: '**
+  String get last_sync_update;
+
+  /// No description provided for @sync_login_invalid_creds.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid email or password'**
+  String get sync_login_invalid_creds;
+
+  /// No description provided for @sync_section_data_types.
+  ///
+  /// In en, this message translates to:
+  /// **'What to sync'**
+  String get sync_section_data_types;
+
+  /// No description provided for @sync_enable_histories.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync history data'**
+  String get sync_enable_histories;
+
+  /// No description provided for @sync_enable_updates.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync update data'**
+  String get sync_enable_updates;
+
+  /// No description provided for @sync_enable_settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync settings'**
+  String get sync_enable_settings;
 }
 
 class _AppLocalizationsDelegate
@@ -6119,6 +6421,7 @@ class _AppLocalizationsDelegate
     'id',
     'it',
     'ja',
+    'ko',
     'pt',
     'ru',
     'th',
@@ -6173,6 +6476,8 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
       return AppLocalizationsIt();
     case 'ja':
       return AppLocalizationsJa();
+    case 'ko':
+      return AppLocalizationsKo();
     case 'pt':
       return AppLocalizationsPt();
     case 'ru':

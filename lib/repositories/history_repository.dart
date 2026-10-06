@@ -20,7 +20,44 @@ class HistoryRepository {
   History? findFirstByMangaId(int? mangaId) =>
       isar.historys.filter().mangaIdEqualTo(mangaId).findFirstSync();
 
+  History? findByChapterId(int? chapterId) =>
+      isar.historys.filter().chapterIdEqualTo(chapterId).findFirstSync();
+
+  History? getLatestHistory([ItemType? itemType]) {
+    if (itemType == null) {
+      return isar.historys
+          .filter()
+          .chapterIdIsNotNull()
+          .sortByDateDesc()
+          .findFirstSync();
+    }
+    return isar.historys
+        .filter()
+        .chapterIdIsNotNull()
+        .and()
+        .group(
+          (q) => q
+              .itemTypeEqualTo(itemType)
+              .or()
+              .chapter((q) => q.manga((q) => q.itemTypeEqualTo(itemType))),
+        )
+        .sortByDateDesc()
+        .findFirstSync();
+  }
+
   List<History> getAll() => isar.historys.filter().idIsNotNull().findAllSync();
+
+  List<History> getChangedSince(int since) => isar.historys
+      .filter()
+      .updatedAtGreaterThan(since, include: true)
+      .findAllSync();
+
+  History? getByClientId(int clientId) => isar.historys
+      .filter()
+      .clientIdEqualTo(clientId)
+      .or()
+      .idEqualTo(clientId)
+      .findFirstSync();
 
   // Async twin, for callers already inside an async writeTxn/writeTransactionAsync
   // — Isar rejects a sync findAllSync() call from inside an async transaction.
@@ -91,10 +128,17 @@ class HistoryRepository {
 
   Future<void> delete(WidgetRef ref, int id) => dbWriteQueue.run(() {
     isar.writeTxnSync(() {
+      final clientId = isar.historys.getSync(id)?.clientId;
       isar.historys.deleteSync(id);
       ref
           .read(synchingProvider(syncId: 1).notifier)
-          .addChangedPart(ActionType.removeHistory, id, "{}", false);
+          .addChangedPart(
+            ActionType.removeHistory,
+            id,
+            "{}",
+            false,
+            clientId: clientId,
+          );
     });
   });
 
@@ -105,7 +149,8 @@ class HistoryRepository {
 
   void putSync(History history) => isar.historys.putSync(history);
 
-  void putAllSync(List<History> histories) => isar.historys.putAllSync(histories);
+  void putAllSync(List<History> histories) =>
+      isar.historys.putAllSync(histories);
 
   void clearSync() => isar.historys.clearSync();
 

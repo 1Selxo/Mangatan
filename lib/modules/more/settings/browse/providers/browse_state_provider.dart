@@ -75,6 +75,22 @@ class AutoStartExtensionServerOnLaunchState
   }
 }
 
+final developerModeStateProvider = NotifierProvider<DeveloperModeState, bool>(
+  DeveloperModeState.new,
+);
+
+class DeveloperModeState extends Notifier<bool> {
+  @override
+  bool build() {
+    return settingsRepository.currentOrNull?.developerMode ?? false;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.developerMode = value);
+  }
+}
+
 @riverpod
 class OnlyIncludePinnedSourceState extends _$OnlyIncludePinnedSourceState {
   @override
@@ -98,6 +114,19 @@ class ShowNSFWState extends _$ShowNSFWState {
   void set(bool value) {
     state = value;
     settingsRepository.update((s) => s.showNSFW = value);
+  }
+}
+
+@riverpod
+class ShowNavDoubleTapTooltipState extends _$ShowNavDoubleTapTooltipState {
+  @override
+  bool build() {
+    return settingsRepository.current.showNavDoubleTapTooltip ?? true;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.showNavDoubleTapTooltip = value);
   }
 }
 
@@ -148,7 +177,7 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
       }
       return e;
     }).toList();
-    set(value);
+    unawaited(set(value));
   }
 
   Future<void> set(List<Repo> value) async {
@@ -178,7 +207,7 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
       final refresh = ref.refresh(
         fetchItemSourcesListProvider(
           id: null,
-          reFresh: false,
+          reFresh: true,
           itemType: itemType,
         ).future,
       );
@@ -305,12 +334,10 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
         final repo = Repo.fromJson(infos);
         if (repo.name == null ||
             repo.name!.isEmpty ||
-            repo.name!.endsWith('.json')) {
-          final uri = Uri.parse(url);
-          final segments = uri.pathSegments
-              .where((s) => s.isNotEmpty && !s.endsWith('.json'))
-              .toList();
-          repo.name = segments.lastOrNull ?? uri.host;
+            repo.name!.endsWith('.json') ||
+            repo.name == '.dist' ||
+            repo.name == 'dist') {
+          repo.name = _inferRepoName(Uri.parse(url));
         }
         return repo;
       }
@@ -318,6 +345,19 @@ Future<Repo?> getRepoInfos(Ref ref, {required String jsonUrl}) async {
   }
 
   return null;
+}
+
+String _inferRepoName(Uri uri) {
+  if (uri.host == 'raw.githubusercontent.com' && uri.pathSegments.length >= 2) {
+    return uri.pathSegments[1];
+  }
+  final segments = uri.pathSegments.where(
+    (segment) =>
+        segment.isNotEmpty &&
+        !segment.endsWith('.json') &&
+        !const {'.dist', 'dist', 'build', '.build'}.contains(segment),
+  );
+  return segments.lastOrNull ?? uri.host;
 }
 
 final isExtensionServerInstalledStreamProvider = StreamProvider<bool>((

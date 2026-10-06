@@ -623,7 +623,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     return null;
   }
 
-  Future<void> _loadFromProvider() async {
+  Future<void> _loadFromProvider({bool evictCache = false}) async {
     _cancelImageStream();
 
     if (mounted) {
@@ -632,6 +632,13 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
         _loadingProgress = null;
         _isInitialized = false;
       });
+    }
+
+    if (evictCache) {
+      final provider = widget.image;
+      try {
+        await provider.evict();
+      } catch (_) {}
     }
 
     if (widget.resolvedFilePath != null) {
@@ -778,7 +785,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
   SubsamplingImageState _makeImageState() => SubsamplingImageState(
     loadState: _loadState,
     loadingProgress: _loadingProgress,
-    reLoadCallback: _loadFromProvider,
+    reLoadCallback: () => _loadFromProvider(evictCache: true),
   );
 
   // ── Internal Controller ───────────────────────────────────────────────────────
@@ -1538,7 +1545,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
             ),
             LoadState.failed => Center(
               child: GestureDetector(
-                onTap: _loadFromProvider,
+                onTap: () => _loadFromProvider(evictCache: true),
                 child: const Icon(
                   Icons.broken_image_outlined,
                   color: Colors.grey,

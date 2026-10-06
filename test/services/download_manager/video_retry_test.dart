@@ -10,6 +10,11 @@ import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/services/download_manager/download_isolate_pool.dart';
 
 void main() {
+  // Exercise transport retries with a media-sized payload: Mangatan rejects
+  // tiny/error responses before declaring a video download complete.
+  final video = List<int>.generate(64 * 1024, (index) => index & 0xff);
+  video.setRange(0, 12, [0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109]);
+  const interruptedAt = 4096;
   for (final honorsRange in [true, false]) {
     test('interrupted video retry, honors range: $honorsRange', () async {
       final dir = await Directory.systemTemp.createTemp('video_retry');
@@ -22,23 +27,27 @@ void main() {
         if (attempts == 1) {
           return http.StreamedResponse(
             () async* {
-              yield [1, 2];
+              yield video.sublist(0, interruptedAt);
               throw http.ClientException('connection interrupted');
             }(),
             200,
-            contentLength: 4,
+            contentLength: video.length,
             headers: {'etag': '"video-v1"'},
           );
         }
-        expect(request.headers['range'], 'bytes=2-');
+        expect(request.headers['range'], 'bytes=$interruptedAt-');
         expect(request.headers['if-range'], '"video-v1"');
         return http.StreamedResponse(
-          Stream.value(honorsRange ? [3, 4] : [1, 2, 3, 4]),
+          Stream.value(honorsRange ? video.sublist(interruptedAt) : video),
           honorsRange ? 206 : 200,
-          contentLength: honorsRange ? 2 : 4,
+          contentLength: honorsRange
+              ? video.length - interruptedAt
+              : video.length,
           headers: {
             'etag': '"video-v1"',
-            if (honorsRange) 'content-range': 'bytes 2-3/4',
+            if (honorsRange)
+              'content-range':
+                  'bytes $interruptedAt-${video.length - 1}/${video.length}',
           },
         );
       });
@@ -51,7 +60,7 @@ void main() {
         port.sendPort,
       );
       expect(attempts, 2);
-      expect(await file.readAsBytes(), [1, 2, 3, 4]);
+      expect(await file.readAsBytes(), video);
     });
   }
 
@@ -64,9 +73,9 @@ void main() {
     final client = MockClient.streaming((request, _) async {
       attempts++;
       return http.StreamedResponse(
-        Stream.value(attempts == 1 ? [1] : [1, 2]),
+        Stream.value(attempts == 1 ? video.sublist(0, interruptedAt) : video),
         200,
-        contentLength: 2,
+        contentLength: video.length,
       );
     });
     addTearDown(client.close);
@@ -78,6 +87,6 @@ void main() {
       port.sendPort,
     );
     expect(attempts, 2);
-    expect(await file.readAsBytes(), [1, 2]);
+    expect(await file.readAsBytes(), video);
   });
 }

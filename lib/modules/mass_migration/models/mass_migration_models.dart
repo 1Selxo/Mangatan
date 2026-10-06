@@ -94,6 +94,7 @@ class MassMigrationResolvedItem {
 List<MassMigrationSourceGroup> buildMassMigrationSourceGroups({
   required ItemType itemType,
   Manga? prioritizedManga,
+  List<Manga>? selectedMangas,
 }) {
   final libraryItems = isar.mangas
       .filter()

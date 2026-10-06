@@ -90,7 +90,7 @@ class _OcrSettingsScreenState extends State<OcrSettingsScreen> {
       type: FileType.custom,
       allowedExtensions: const ['tflite'],
     );
-    final selected = result?.files.single.path;
+    final selected = result?.single.path;
     if (selected == null) return;
     try {
       await AnimeTextDetectionService.instance.importModel(File(selected));

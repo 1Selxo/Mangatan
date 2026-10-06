@@ -58,7 +58,7 @@ final class TrackStateProvider extends $NotifierProvider<TrackState, Track> {
   }
 }
 
-String _$trackStateHash() => r'c3e386652db112f64ce5605afeb5e7a49afbc397';
+String _$trackStateHash() => r'6ccbb16e1e167c37a44883ed4944313401dddac4';
 
 final class TrackStateFamily extends $Family
     with

@@ -56,7 +56,7 @@ void main() {
     final pubspec = source('pubspec.yaml');
 
     expect(pubspec, contains('app_links: ^7.2.0'));
-    expect(pubspec, contains('flutter_secure_storage: ^11.0.0'));
+    expect(pubspec, contains('flutter_secure_storage: ^11.1.1'));
   });
 
   test('Windows secure-storage resource identity is present and stable', () {

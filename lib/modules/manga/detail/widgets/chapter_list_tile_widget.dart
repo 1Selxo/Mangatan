@@ -22,7 +22,10 @@ import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/download/download_page_widget.dart';
+import 'package:mangayomi/modules/manga/download/providers/download_provider.dart';
+import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
+import 'package:mangayomi/repositories/download_repository.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:mangayomi/utils/cached_network.dart';
@@ -48,6 +51,18 @@ class ChapterListTileWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = l10nLocalizations(context)!;
     final isLongPressed = ref.watch(isLongPressedStateProvider);
+    final swipeStartAction = ref.watch(chapterSwipeStartActionStateProvider);
+    final swipeEndAction = ref.watch(chapterSwipeEndActionStateProvider);
+    final dismissDirection =
+        isLongPressed ||
+            (swipeStartAction == ChapterSwipeAction.disabled &&
+                swipeEndAction == ChapterSwipeAction.disabled)
+        ? DismissDirection.none
+        : swipeStartAction == ChapterSwipeAction.disabled
+        ? DismissDirection.endToStart
+        : swipeEndAction == ChapterSwipeAction.disabled
+        ? DismissDirection.startToEnd
+        : DismissDirection.horizontal;
     final isEpubShortcut = isEpubNavigationChapter(chapter);
     final epubCharacterStart = epubChapterCharacterStart(chapter);
     final displayTitle = displayMode == SortChapter.chapterNumberDisplay
@@ -58,43 +73,23 @@ class ChapterListTileWidget extends ConsumerWidget {
         : chapter.name!;
     return Dismissible(
       key: ValueKey('chapter_swipe_${chapter.id}'),
-      direction: isLongPressed
-          ? DismissDirection.none
-          : DismissDirection.horizontal,
+      direction: dismissDirection,
       confirmDismiss: (direction) async {
-        if (direction == DismissDirection.startToEnd) {
-          // Swipe right → toggle bookmark
-          final chap = chapter;
-          chap.isBookmarked = !chap.isBookmarked!;
-          chapterRepository.save(chap);
-        } else if (direction == DismissDirection.endToStart) {
-          // Swipe left → toggle read
-          final chap = chapter;
-          chap.isRead = !chap.isRead!;
-          if (!chap.isRead!) {
-            chap.lastPageRead = "1";
-          }
-          chapterRepository.save(chap);
-        }
+        final action = direction == DismissDirection.startToEnd
+            ? swipeStartAction
+            : swipeEndAction;
+        await _performSwipeAction(action, context, ref);
         return false; // Don't dismiss, snap back
       },
-      background: Container(
-        color: context.primaryColor,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Icon(
-          chapter.isBookmarked! ? Icons.bookmark_remove : Icons.bookmark_add,
-          color: Colors.white,
-        ),
+      background: _buildSwipeBackground(
+        swipeStartAction,
+        context,
+        Alignment.centerLeft,
       ),
-      secondaryBackground: Container(
-        color: chapter.isRead! ? Colors.grey : Colors.green,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Icon(
-          chapter.isRead! ? Icons.visibility_off : Icons.done_all,
-          color: Colors.white,
-        ),
+      secondaryBackground: _buildSwipeBackground(
+        swipeEndAction,
+        context,
+        Alignment.centerRight,
       ),
       child: Material(
         color: chapterList.contains(chapter)
@@ -391,6 +386,83 @@ class ChapterListTileWidget extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _performSwipeAction(
+    ChapterSwipeAction action,
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    switch (action) {
+      case ChapterSwipeAction.toggleBookmark:
+        final chap = chapter;
+        chap.isBookmarked = !chap.isBookmarked!;
+        chapterRepository.save(chap);
+        break;
+      case ChapterSwipeAction.toggleRead:
+        final chap = chapter;
+        chap.isRead = !chap.isRead!;
+        if (!chap.isRead!) {
+          chap.lastPageRead = "1";
+        }
+        chapterRepository.save(chap);
+        break;
+      case ChapterSwipeAction.download:
+        final download = downloadRepository.getByChapterId(chapter.id);
+        if (download != null && download.isDownload == true) {
+          await chapter.deleteDownloadedFiles();
+        } else {
+          if (!isDownloadScheduled(chapter.id)) {
+            await downloadRepository.enqueue(chapter);
+            if (ref.context.mounted) {
+              ref.invalidate(downloadChapterProvider(chapter: chapter));
+              ref.read(downloadChapterProvider(chapter: chapter));
+            }
+          }
+        }
+        break;
+      case ChapterSwipeAction.disabled:
+        break;
+    }
+  }
+
+  Widget _buildSwipeBackground(
+    ChapterSwipeAction action,
+    BuildContext context,
+    Alignment alignment,
+  ) {
+    if (action == ChapterSwipeAction.disabled) {
+      return const SizedBox.shrink();
+    }
+    Color color;
+    IconData icon;
+    switch (action) {
+      case ChapterSwipeAction.toggleBookmark:
+        color = context.primaryColor;
+        icon = chapter.isBookmarked!
+            ? Icons.bookmark_remove
+            : Icons.bookmark_add;
+        break;
+      case ChapterSwipeAction.toggleRead:
+        color = chapter.isRead! ? Colors.grey : Colors.green;
+        icon = chapter.isRead! ? Icons.remove_done_sharp : Icons.done_all;
+        break;
+      case ChapterSwipeAction.download:
+        final download = downloadRepository.getByChapterId(chapter.id);
+        final isDownloaded = download != null && download.isDownload == true;
+        color = isDownloaded ? Colors.red : context.primaryColor;
+        icon = isDownloaded ? Icons.delete_outline : Icons.download;
+        break;
+      case ChapterSwipeAction.disabled:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      color: color,
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Icon(icon, color: Colors.white),
     );
   }
 

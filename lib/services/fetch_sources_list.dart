@@ -847,42 +847,5 @@ Future<MihonExtensionDescriptor> fetchMihonExtensionDescriptor(
 }
 
 String _convertLang(dynamic e) {
-  final lang = e['lang'];
-  if (lang is String) {
-    switch (lang) {
-      case "‎العربية":
-        return "ar";
-      case "中文, 汉语, 漢語":
-        return "zh";
-      case "English":
-        return "en";
-      case "Français":
-        return "fr";
-      case "Bahasa Indonesia":
-        return "id";
-      case "日本語":
-        return "ja";
-      case "조선말, 한국어":
-        return "ko";
-      case "Polski":
-        return "pl";
-      case "Português":
-        return "pt";
-      case "Русский":
-        return "ru";
-      case "Español":
-        return "es";
-      case "ไทย":
-        return "th";
-      case "Türkçe":
-        return "tr";
-      case "Українська":
-        return "uk";
-      case "Tiếng Việt":
-        return "vi";
-      default:
-        return "all";
-    }
-  }
-  return "all";
+  return ExtensionStoreService.convertLnreaderLang(e);
 }

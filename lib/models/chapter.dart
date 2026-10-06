@@ -7,6 +7,9 @@ part 'chapter.g.dart';
 class Chapter {
   Id? id;
 
+  @Index()
+  int? clientId;
+
   @Index(composite: [CompositeIndex('isRead')])
   int? mangaId;
 
@@ -50,6 +53,7 @@ class Chapter {
 
   Chapter({
     this.id = Isar.autoIncrement,
+    this.clientId,
     required this.mangaId,
     required this.name,
     this.url = '',
@@ -70,6 +74,7 @@ class Chapter {
 
   Chapter.fromJson(Map<String, dynamic> json) {
     archivePath = json['archivePath'];
+    clientId = json['clientId'];
     dateUpload = json['dateUpload'];
     id = json['id'];
     isBookmarked = json['isBookmarked'];
@@ -90,6 +95,7 @@ class Chapter {
 
   Map<String, dynamic> toJson() => {
     'archivePath': archivePath,
+    'clientId': clientId,
     'dateUpload': dateUpload,
     'id': id,
     'isBookmarked': isBookmarked,

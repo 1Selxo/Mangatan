@@ -5,7 +5,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:win32/win32.dart';
 
-import './protocol.dart';
+import 'protocol.dart';
 
 final _hive = HKEY_CURRENT_USER;
 

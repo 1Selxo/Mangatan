@@ -143,6 +143,52 @@ void main() {
     },
   );
 
+  test('opens local folder pages by path without source metadata', () async {
+    final folder = Directory(p.join(downloadsDirectory.path, 'local chapter'));
+    await folder.create();
+    final first = File(p.join(folder.path, '2.jpg'));
+    final second = File(p.join(folder.path, '10.jpg'));
+    await first.writeAsBytes([1]);
+    await second.writeAsBytes([2]);
+    final manga = Manga(
+      id: 1,
+      name: 'Local title',
+      isLocalArchive: true,
+      source: null,
+      author: '',
+      artist: '',
+      genre: const [],
+      imageUrl: null,
+      lang: null,
+      link: folder.path,
+      status: Status.ongoing,
+      description: '',
+      sourceId: null,
+    );
+    final chapter = Chapter(
+      id: 1,
+      mangaId: 1,
+      name: 'Chapter 1',
+      archivePath: folder.path,
+    )..manga.value = manga;
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final pages = await container.read(
+      getChapterPagesProvider(chapter: chapter).future,
+    );
+
+    expect(pages.pageUrls.map((page) => page.url), ['', '']);
+    expect(pages.isLocaleList, [true, true]);
+    expect(pages.archiveImages, [null, null]);
+    expect(pages.localImagePaths, [first.path, second.path]);
+    expect(pages.uChapDataPreload.map((page) => page.localImagePath), [
+      first.path,
+      second.path,
+    ]);
+    expect(pages.uChapDataPreload.first.localArtifactPath, folder.path);
+  });
+
   test('opens a downloaded CBZ without resolving its source', () async {
     final manga = Manga(
       id: 1,
@@ -178,9 +224,8 @@ void main() {
     final archive = Archive()
       ..add(ArchiveFile.bytes('001.jpg', [1]))
       ..add(ArchiveFile.bytes('002.jpg', [2]));
-    await File(
-      p.join(mangaDirectory.path, 'Chapter 1.cbz'),
-    ).writeAsBytes(ZipEncoder().encode(archive));
+    await File(p.join(mangaDirectory.path, 'Chapter 1.cbz'))
+        .writeAsBytes(ZipEncoder().encode(archive));
 
     final container = ProviderContainer();
     addTearDown(container.dispose);

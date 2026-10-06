@@ -128,7 +128,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       type: FileType.custom,
       allowedExtensions: const ['apk'],
     );
-    final path = selection?.files.single.path;
+    final path = selection?.single.path;
     if (path == null || !mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -214,9 +214,8 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
                 if (!isExtensionTab && isDesktop && tabType != ItemType.novel)
                   IconButton(
                     tooltip: context.l10n.import,
-                    focusColor: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.4),
+                    focusColor: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.4),
                     onPressed: _isImportingApk ? null : _importMihonApk,
                     icon: _isImportingApk
                         ? const SizedBox.square(
@@ -445,7 +444,13 @@ final extensionUpdateCountProvider = StreamProvider.family<int, ItemType>((
         (list) => list
             .where(
               (element) =>
-                  compareVersions(element.version!, element.versionLast!) < 0,
+                  (element.isAdded ?? false) &&
+                  !(element.isObsolete ?? false) &&
+                  compareVersions(
+                        element.version ?? '',
+                        element.versionLast ?? '',
+                      ) <
+                      0,
             )
             .length,
       );

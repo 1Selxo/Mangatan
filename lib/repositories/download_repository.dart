@@ -54,6 +54,12 @@ class DownloadRepository {
       .isStartDownloadEqualTo(true)
       .watch(fireImmediately: true);
 
+  Stream<List<Download>> watchPending() => isar.downloads
+      .filter()
+      .idIsNotNull()
+      .isDownloadEqualTo(false)
+      .watch(fireImmediately: true);
+
   Future<List<Download>> getPendingStarted() => isar.downloads
       .filter()
       .idIsNotNull()

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:json_view/json_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -87,6 +88,10 @@ class _CodeEditorPageState extends ConsumerState<CodeEditorPage> {
   final _logsNotifier = ValueNotifier<List<(LoggerLevel, String, DateTime)>>(
     [],
   );
+  // Aliases the app-wide Logger's controller - not owned by this widget, so
+  // it must never be closed here (that would break logging for the rest of
+  // the app once this screen closes).
+  // ignore: close_sinks
   late final _logStreamController = Logger.logStreamController;
   late final StreamSubscription _logSubscription;
   final _scrollController = ScrollController();
@@ -312,7 +317,7 @@ class _CodeEditorPageState extends ConsumerState<CodeEditorPage> {
                                 ],
                               );
                             },
-                        sperator: Container(
+                        leadingDivider: Container(
                           width: 1,
                           color: context.dynamicThemeColor.withValues(
                             alpha: 0.3,

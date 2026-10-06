@@ -112,7 +112,13 @@ Future<_MigrationSnapshot> _captureMigrationSnapshot({
       isar.historys.deleteSync(history.id!);
       ref
           .read(synchingProvider(syncId: 1).notifier)
-          .addChangedPart(ActionType.removeHistory, history.id, '{}', false);
+          .addChangedPart(
+            ActionType.removeHistory,
+            history.id,
+            '{}',
+            false,
+            clientId: history.clientId,
+          );
     }
     for (final chapter in existingChapters) {
       // The parent keeps its stable Isar ID during migration, so local file
@@ -127,7 +133,13 @@ Future<_MigrationSnapshot> _captureMigrationSnapshot({
       isar.chapters.deleteSync(chapter.id!);
       ref
           .read(synchingProvider(syncId: 1).notifier)
-          .addChangedPart(ActionType.removeChapter, chapter.id, '{}', false);
+          .addChangedPart(
+            ActionType.removeChapter,
+            chapter.id,
+            '{}',
+            false,
+            clientId: chapter.clientId,
+          );
     }
   });
 

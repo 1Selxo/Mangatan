@@ -215,7 +215,9 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
               onTap: () async {
                 final result =
                     await LocalDirectoryAccess.pickDirectory() ??
-                    await FilePicker.getDirectoryPath();
+                    await FilePicker.getDirectoryPath(
+                      linuxOptions: const LinuxOptions(lockParentWindow: true),
+                    );
                 if (result != null) {
                   ref.read(downloadLocationStateProvider.notifier).set(result);
                 }

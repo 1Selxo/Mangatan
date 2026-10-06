@@ -24,6 +24,7 @@ import 'package:path/path.dart' as path;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../providers/storage_provider.dart';
+
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 
@@ -495,6 +496,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
     final selectedDirectory = await FilePicker.getDirectoryPath(
       dialogTitle: l10n.select_extension_server_folder,
       initialDirectory: initialDirectory,
+      linuxOptions: const LinuxOptions(lockParentWindow: true),
     );
     if (!mounted || selectedDirectory == null || selectedDirectory.isEmpty) {
       return;
@@ -924,7 +926,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
       type: FileType.custom,
       allowedExtensions: const ['jar'],
     );
-    final file = result?.files.singleOrNull;
+    final file = result?.singleOrNull;
     final filePath = file?.path;
     if (filePath == null || filePath.isEmpty) {
       return null;

@@ -1,11 +1,10 @@
 import 'dart:io';
 
 import 'package:mangayomi/eval/model/m_bridge.dart';
-import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
-import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
+import 'package:mangayomi/utils/localized_message.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'storage_usage.g.dart';
 
@@ -29,6 +28,12 @@ class TotalChapterCacheSizeState extends _$TotalChapterCacheSizeState {
       if (dir.existsSync()) {
         await dir.delete(recursive: true);
       }
+      final chapterCacheDir = await _storage.getCacheDirectory(
+        'chapter_disk_cache',
+      );
+      if (chapterCacheDir.existsSync()) {
+        await chapterCacheDir.delete(recursive: true);
+      }
       msg = "0.00 B";
     } catch (_) {}
     try {
@@ -36,17 +41,19 @@ class TotalChapterCacheSizeState extends _$TotalChapterCacheSizeState {
     } catch (_) {}
     if (msg != null && showToast) {
       state = msg;
-      botToast(
-        navigatorKey.currentContext?.l10n.cache_cleared ?? "Cache cleared",
-      );
+      botToast(localizedMessage((l10n) => l10n.cache_cleared));
     }
   }
 
   Future<int> _getTotalDiskSpace() async {
     try {
-      return await _getdirectorySize(
+      final imageCacheSize = await _getdirectorySize(
         await _storage.getCacheDirectory('cacheimagemanga'),
       );
+      final chapterCacheSize = await _getdirectorySize(
+        await _storage.getCacheDirectory('chapter_disk_cache'),
+      );
+      return imageCacheSize + chapterCacheSize;
     } catch (_) {}
     return 0;
   }

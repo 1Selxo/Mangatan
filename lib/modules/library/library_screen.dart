@@ -1,8 +1,10 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -600,6 +602,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               },
             ),
             BottomSelectButton(
+              icon: Icon(Icons.swap_horiz_rounded, color: color),
+              onPressed: () {
+                final List<Manga> bulkMangas = mangaIds
+                    .map((id) => mangaRepository.getById(id))
+                    .whereType<Manga>()
+                    .toList();
+                ref.read(isLongPressedStateProvider.notifier).update(false);
+                ref.read(mangasListStateProvider.notifier).clear();
+                context.push(
+                  '/massMigration',
+                  extra: (widget.itemType, null, bulkMangas),
+                );
+              },
+            ),
+            BottomSelectButton(
               icon: Icon(Icons.delete_outline_outlined, color: color),
               onPressed: () => showDeleteMangaDialog(
                 context: context,
@@ -776,9 +793,10 @@ void addTorrent(BuildContext context, {Manga? manga}) {
                                         Text(
                                           "import .torrent file",
                                           style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall!.color,
+                                            color: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall!
+                                                .color,
                                             fontSize: 10,
                                           ),
                                         ),
@@ -799,9 +817,8 @@ void addTorrent(BuildContext context, {Manga? manga}) {
                                   child: Container(
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(20),
-                                      color: Theme.of(
-                                        context,
-                                      ).scaffoldBackgroundColor,
+                                      color: Theme.of(context)
+                                          .scaffoldBackgroundColor,
                                     ),
                                     height: 50,
                                     width: 50,

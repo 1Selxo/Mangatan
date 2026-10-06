@@ -21,6 +21,9 @@ class DiscordRPC {
   /// Temp var
   bool rpcShowReadingWatchingProgress = false;
 
+  int _nextReaderSession = 0;
+  int? _activeReaderSession;
+
   /// Instance of the current RPC activity
   final RpcActivity activity = RpcActivity(
     assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangatan"),
@@ -74,6 +77,20 @@ class DiscordRPC {
       state: "-----",
       assets: const RPCAssets(largeImage: "app-icon", largeText: "Mangatan"),
     );
+  }
+
+  /// Marks a reader as the current owner of chapter presence updates.
+  int beginReaderSession() {
+    final session = ++_nextReaderSession;
+    _activeReaderSession = session;
+    return session;
+  }
+
+  /// Returns to idle only if no newer reader has replaced this one.
+  Future<void> endReaderSession(int session) async {
+    if (_activeReaderSession != session) return;
+    _activeReaderSession = null;
+    await showIdleText();
   }
 
   Future<void> showChapterDetails(WidgetRef ref, Chapter chapter) async {

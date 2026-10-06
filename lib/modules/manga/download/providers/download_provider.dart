@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui';
@@ -14,7 +13,6 @@ import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/repositories/download_repository.dart';
-import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -283,51 +281,6 @@ Future<void> downloadChapter(
     }
 
     await setProgress(DownloadProgress(0, 0, itemType));
-    void savePageUrls() {
-      // Re-downloading a chapter that is already on disk reads it locally, and
-      // local pages carry no url. Storing those placeholders would leave the
-      // chapter unreadable from its source once the download is deleted.
-      if (itemType != ItemType.anime &&
-          pageUrls.every((pageUrl) => pageUrl.url.isEmpty)) {
-        return;
-      }
-      List<ChapterPageurls>? chapterPageUrls = [];
-      for (var chapterPageUrl
-          in settingsRepository.current.chapterPageUrlsList ?? []) {
-        if (chapterPageUrl.chapterId != chapter.id) {
-          chapterPageUrls.add(chapterPageUrl);
-        }
-      }
-      final persistentPageUrls = itemType == ItemType.anime
-          ? pageUrls.where((pageUrl) {
-              final uri = Uri.tryParse(pageUrl.url);
-              return uri == null ||
-                  !((uri.host == '127.0.0.1' || uri.host == 'localhost') &&
-                      uri.path.startsWith('/video/'));
-            }).toList()
-          : pageUrls;
-      if (persistentPageUrls.isEmpty) {
-        settingsRepository.update(
-          (s) => s.chapterPageUrlsList = chapterPageUrls,
-        );
-        return;
-      }
-      final chapterPageHeaders = persistentPageUrls
-          .map((e) => e.headers == null ? null : jsonEncode(e.headers))
-          .toList();
-      final urls = persistentPageUrls.map((e) => e.url).toList();
-      chapterPageUrls.add(
-        ChapterPageurls()
-          ..chapterId = chapter.id
-          ..urls = urls
-          ..chapterUrl = chapter.url
-          ..headers = chapterPageHeaders.first != null
-              ? chapterPageHeaders.map((e) => e.toString()).toList()
-              : null,
-      );
-      settingsRepository.update((s) => s.chapterPageUrlsList = chapterPageUrls);
-    }
-
     if (itemType == ItemType.manga) {
       ref
           .read(getChapterPagesProvider(chapter: chapter).future)
@@ -562,10 +515,8 @@ Future<void> downloadChapter(
       }
 
       if (pages.isEmpty && pageUrls.isNotEmpty) {
-        savePageUrls();
         await finalizeDownload();
       } else {
-        savePageUrls();
         await MDownloader(
           chapter: chapter,
           pageUrls: pages,
@@ -638,7 +589,6 @@ Future<void> downloadChapter(
       }
       // An offline episode must never retain an ephemeral bridge URL from an
       // earlier attempt; only the verified local artifact is durable.
-      savePageUrls();
       await finalizeDownload();
     }
     if (callback != null) {

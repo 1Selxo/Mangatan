@@ -693,6 +693,32 @@ class DualPageRotateToFitInvertState extends _$DualPageRotateToFitInvertState {
 }
 
 @riverpod
+class DoublePageSingleFirstPageState extends _$DoublePageSingleFirstPageState {
+  @override
+  bool build() {
+    return settingsRepository.current.doublePageSingleFirstPage ?? false;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.doublePageSingleFirstPage = value);
+  }
+}
+
+@riverpod
+class DoublePageAutoState extends _$DoublePageAutoState {
+  @override
+  bool build() {
+    return settingsRepository.current.doublePageAuto ?? false;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.doublePageAuto = value);
+  }
+}
+
+@riverpod
 class LandscapeZoomState extends _$LandscapeZoomState {
   @override
   bool build() {
@@ -847,5 +873,39 @@ class ReaderHideThresholdState extends _$ReaderHideThresholdState {
   void set(int value) {
     state = value;
     settingsRepository.update((s) => s.readerHideThreshold = value);
+  }
+}
+
+@riverpod
+class ChapterSwipeStartActionState extends _$ChapterSwipeStartActionState {
+  @override
+  ChapterSwipeAction build() {
+    final idx = settingsRepository.current.chapterSwipeStartAction ?? 0;
+    if (idx >= 0 && idx < ChapterSwipeAction.values.length) {
+      return ChapterSwipeAction.values[idx];
+    }
+    return ChapterSwipeAction.toggleBookmark;
+  }
+
+  void set(ChapterSwipeAction value) {
+    state = value;
+    settingsRepository.update((s) => s.chapterSwipeStartAction = value.index);
+  }
+}
+
+@riverpod
+class ChapterSwipeEndActionState extends _$ChapterSwipeEndActionState {
+  @override
+  ChapterSwipeAction build() {
+    final idx = settingsRepository.current.chapterSwipeEndAction ?? 1;
+    if (idx >= 0 && idx < ChapterSwipeAction.values.length) {
+      return ChapterSwipeAction.values[idx];
+    }
+    return ChapterSwipeAction.toggleRead;
+  }
+
+  void set(ChapterSwipeAction value) {
+    state = value;
+    settingsRepository.update((s) => s.chapterSwipeEndAction = value.index);
   }
 }

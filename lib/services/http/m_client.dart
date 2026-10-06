@@ -113,21 +113,39 @@ class MClient {
   // domain "example.com" a source actually scrapes, leaving Cloudflare
   // looking "unresolved" even right after a successful manual bypass.
   static bool _hostsMatch(String a, String b) {
-    return a == b || a.endsWith('.$b') || b.endsWith('.$a');
+    return a == b || a.endsWith('.$b') || b.endsWith('.$a') || a.contains(b);
   }
 
   static Map<String, String> getCookiesPref(String url) {
     final cookiesList = settingsRepository.currentOrNull?.cookiesList ?? [];
     if (cookiesList.isEmpty) return {};
     final host = Uri.parse(url).host;
-    final cookies = cookiesList
-        .firstWhere(
-          (element) => _hostsMatch(host, element.host!),
-          orElse: () => MCookie(cookie: ""),
-        )
-        .cookie!;
-    if (cookies.isEmpty) return {};
-    return {HttpHeaders.cookieHeader: cookies};
+    final matching = cookiesList.where(
+      (element) =>
+          element.host != null &&
+          element.cookie != null &&
+          element.cookie!.isNotEmpty &&
+          _hostsMatch(host, element.host!),
+    );
+    if (matching.isEmpty) return {};
+    final cookieMap = <String, String>{};
+    for (final entry in matching) {
+      for (final pair in entry.cookie!.split(';')) {
+        final trimmed = pair.trim();
+        if (trimmed.isEmpty) continue;
+        final parts = trimmed.split('=');
+        if (parts.length >= 2) {
+          final key = parts[0].trim();
+          final val = parts.sublist(1).join('=').trim();
+          cookieMap[key] = val;
+        }
+      }
+    }
+    if (cookieMap.isEmpty) return {};
+    final combined = cookieMap.entries
+        .map((e) => '${e.key}=${e.value}')
+        .join('; ');
+    return {HttpHeaders.cookieHeader: combined};
   }
 
   static Future<void> setCookie(
@@ -321,7 +339,7 @@ class ResolveCloudFlareChallenge extends RetryPolicy {
     // resolver below is disabled.
     final proxyUrl = CfProxyStore.url.trim();
     if (proxyUrl.isNotEmpty) {
-      return _solveWithCfProxy(proxyUrl, url);
+      return solveWithCfProxy(proxyUrl, url);
     }
 
     // Fall back to the bundled webview resolver (not available on Linux).
@@ -352,7 +370,7 @@ class ResolveCloudFlareChallenge extends RetryPolicy {
 /// On success it stores the returned `cf_clearance` cookies + user-agent via
 /// [MClient.setCookie] (exactly like the webview resolver does), so the retried
 /// request carries them, and returns `true` to trigger the retry.
-Future<bool> _solveWithCfProxy(String proxyUrl, String targetUrl) async {
+Future<bool> solveWithCfProxy(String proxyUrl, String targetUrl) async {
   try {
     final res = await http
         .post(
@@ -448,7 +466,7 @@ Future<void> stopwebviewServer() async {
 void _handleResolveCf(HttpRequest request) async {
   int time = 0;
   bool timeOut = false;
-  bool isCloudFlare = true;
+  bool solved = false;
   try {
     final body = await utf8.decoder.bind(request).join();
     final data = jsonDecode(body) as Map<String, dynamic>;
@@ -462,37 +480,47 @@ void _handleResolveCf(HttpRequest request) async {
       return;
     }
 
+    final webUri = flutter_inappwebview.WebUri(url);
+
+    // Whether the challenge actually passed is determined by Cloudflare's
+    // own cf_clearance cookie, which it only sets once the challenge is
+    // solved. The previous check (a string search for '#challenge-success-
+    // text' in document.head.innerHTML) is unreliable: Cloudflare's
+    // challenge template references that id in a <style> block in <head>
+    // from the very first load, pass or fail, so the search was true
+    // immediately and the resolver silently ran out the clock without ever
+    // saving cookies.
+    Future<bool> hasClearanceCookie(
+      flutter_inappwebview.InAppWebViewController? controller,
+    ) async {
+      try {
+        final cookies = await flutter_inappwebview.CookieManager.instance(
+          webViewEnvironment: webViewEnvironment,
+        ).getCookies(url: webUri, webViewController: controller);
+        return cookies.any((c) => c.name == 'cf_clearance');
+      } catch (_) {
+        return false;
+      }
+    }
+
     flutter_inappwebview.HeadlessInAppWebView? headlessWebView;
     headlessWebView = flutter_inappwebview.HeadlessInAppWebView(
       webViewEnvironment: webViewEnvironment,
-      initialUrlRequest: flutter_inappwebview.URLRequest(
-        url: flutter_inappwebview.WebUri(url),
-      ),
+      initialUrlRequest: flutter_inappwebview.URLRequest(url: webUri),
       onLoadStop: (controller, url) async {
-        try {
-          isCloudFlare = await controller.platform.evaluateJavascript(
-            source:
-                "document.head.innerHTML.includes('#challenge-success-text')",
-          );
-        } catch (_) {
-          isCloudFlare = false;
-        }
+        solved = await hasClearanceCookie(controller);
 
         await Future.doWhile(() async {
-          if (!timeOut && isCloudFlare) {
-            try {
-              isCloudFlare = await controller.platform.evaluateJavascript(
-                source: "document.head.innerHTML.includes('#challenge-success-text')",
-              );
-            } catch (_) {
-              isCloudFlare = false;
-            }
+          if (!timeOut && !solved) {
+            solved = await hasClearanceCookie(controller);
           }
-          if (isCloudFlare) await Future.delayed(Duration(milliseconds: 300));
-
-          return isCloudFlare;
+          if (!solved) {
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
+          return !solved && !timeOut;
         });
-        if (!timeOut) {
+
+        if (solved) {
           final ua =
               await controller.evaluateJavascript(
                 source: "navigator.userAgent",
@@ -507,7 +535,7 @@ void _handleResolveCf(HttpRequest request) async {
 
     await Future.doWhile(() async {
       timeOut = time == 15;
-      if (!isCloudFlare || timeOut) {
+      if (solved || timeOut) {
         return false;
       }
       await Future.delayed(const Duration(seconds: 1));
@@ -520,7 +548,7 @@ void _handleResolveCf(HttpRequest request) async {
 
     request.response
       ..headers.contentType = ContentType.json
-      ..write(jsonEncode({'result': isCloudFlare}))
+      ..write(jsonEncode({'result': solved}))
       ..close();
   } catch (e) {
     request.response

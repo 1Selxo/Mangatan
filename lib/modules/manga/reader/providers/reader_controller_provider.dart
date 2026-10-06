@@ -192,15 +192,7 @@ class ReaderController extends _$ReaderController
         : 0;
   }
 
-  int getPageLength(List incognitoPageLength) {
-    if (incognitoMode) return incognitoPageLength.length;
-    final urls = getIsarSetting().chapterPageUrlsList!
-        .where((element) => element.chapterId == chapter.id)
-        .firstOrNull
-        ?.urls;
-    if (urls == null || urls.isEmpty) return incognitoPageLength.length;
-    return urls.length;
-  }
+  int getPageLength(List pages) => pages.length;
 
   int? _lastSavedIndex;
   void setPageIndex(

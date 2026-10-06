@@ -86,6 +86,7 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:window_manager/window_manager.dart' show windowManager;
 
 import 'widgets/search_subtitles.dart';
+
 import 'package:flutter/gestures.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
@@ -2529,13 +2530,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           GestureDetector(
             onTap: () async {
               try {
-                FilePickerResult? result = await FilePicker.pickFiles(
+                final result = await FilePicker.pickFiles(
                   allowMultiple: false,
                 );
 
                 if (result != null && context.mounted) {
                   await _setSubtitleTrack(
-                    SubtitleTrack.uri(result.files.first.path!),
+                    SubtitleTrack.uri(result.first.path!),
                   );
                 }
                 if (!context.mounted) return;
@@ -2551,13 +2552,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           GestureDetector(
             onTap: () async {
               try {
-                final subtitle =
-                    await subtitlesSearchraggableMenu(
-                          context,
-                          chapter: widget.episode,
-                          isLocal: widget.isLocal,
-                        )
-                        as ImdbSubtitle?;
+                final subtitle = await subtitlesSearchraggableMenu(
+                  context,
+                  chapter: widget.episode,
+                  isLocal: widget.isLocal,
+                ) as ImdbSubtitle?;
                 if (subtitle != null && context.mounted) {
                   await _setSubtitleTrack(
                     SubtitleTrack.uri(
@@ -3220,9 +3219,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                           TextSpan(
                             style: TextStyle(
                               background: Paint()
-                                ..color = Theme.of(
-                                  context,
-                                ).scaffoldBackgroundColor
+                                ..color = Theme.of(context)
+                                    .scaffoldBackgroundColor
                                 ..strokeWidth = 30.0
                                 ..strokeJoin = StrokeJoin.round
                                 ..style = PaintingStyle.stroke,
@@ -3479,72 +3477,65 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                       ),
                       Row(
                         children: [
-                          button(
-                            context.l10n.set_as_cover,
-                            Icons.image_outlined,
-                            () async {
-                              final imageBytes = await _player.screenshot(
-                                format: "image/png",
-                                includeLibassSubtitles: _includeSubtitles,
-                              );
-                              if (context.mounted) {
-                                final res = await showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
-                                      content: Text(
-                                        context.l10n.use_this_as_cover_art,
+                          button(context.l10n.set_as_cover, Icons.image_outlined, () async {
+                            final imageBytes = await _player.screenshot(
+                              format: "image/png",
+                              includeLibassSubtitles: _includeSubtitles,
+                            );
+                            if (context.mounted) {
+                              final res = await showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return AlertDialog(
+                                    content: Text(
+                                      context.l10n.use_this_as_cover_art,
+                                    ),
+                                    actions: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                            },
+                                            child: Text(context.l10n.cancel),
+                                          ),
+                                          const SizedBox(width: 15),
+                                          TextButton(
+                                            onPressed: () {
+                                              final manga =
+                                                  episode.manga.value!;
+                                              isar.writeTxnSync(() {
+                                                isar.mangas.putSync(
+                                                  manga
+                                                    ..updatedAt = DateTime.now()
+                                                        .millisecondsSinceEpoch
+                                                    ..customCoverImage =
+                                                        imageBytes
+                                                            ?.getCoverImage,
+                                                );
+                                              });
+                                              if (context.mounted) {
+                                                Navigator.pop(context, "ok");
+                                              }
+                                            },
+                                            child: Text(context.l10n.ok),
+                                          ),
+                                        ],
                                       ),
-                                      actions: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.end,
-                                          children: [
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.pop(context);
-                                              },
-                                              child: Text(context.l10n.cancel),
-                                            ),
-                                            const SizedBox(width: 15),
-                                            TextButton(
-                                              onPressed: () {
-                                                final manga =
-                                                    episode.manga.value!;
-                                                isar.writeTxnSync(() {
-                                                  isar.mangas.putSync(
-                                                    manga
-                                                      ..updatedAt = DateTime.now()
-                                                          .millisecondsSinceEpoch
-                                                      ..customCoverImage =
-                                                          imageBytes
-                                                              ?.getCoverImage,
-                                                  );
-                                                });
-                                                if (context.mounted) {
-                                                  Navigator.pop(context, "ok");
-                                                }
-                                              },
-                                              child: Text(context.l10n.ok),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                                if (res != null &&
-                                    res == "ok" &&
-                                    context.mounted) {
-                                  Navigator.pop(context);
-                                  botToast(
-                                    context.l10n.cover_updated,
-                                    second: 3,
+                                    ],
                                   );
-                                }
+                                },
+                              );
+                              if (res != null &&
+                                  res == "ok" &&
+                                  context.mounted) {
+                                Navigator.pop(context);
+                                botToast(context.l10n.cover_updated, second: 3);
                               }
-                            },
-                          ),
+                            }
+                          }),
                           button(
                             context.l10n.share,
                             Icons.share_outlined,

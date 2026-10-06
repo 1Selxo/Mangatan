@@ -46,13 +46,13 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
   }
 
   Future<void> _updateSource(Source source) {
-    return ref.read(
-      fetchItemSourcesListProvider(
-        id: source.id,
-        reFresh: true,
-        itemType: source.itemType,
-      ).future,
+    final provider = fetchItemSourcesListProvider(
+      id: source.id,
+      reFresh: true,
+      itemType: source.itemType,
     );
+    ref.invalidate(provider);
+    return ref.read(provider.future);
   }
 
   @override

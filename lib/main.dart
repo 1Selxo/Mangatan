@@ -38,6 +38,7 @@ import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
+import 'package:mangayomi/services/library_updater.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
 import 'package:mangayomi/services/sync/google_drive_app_diagnostic.dart';
@@ -56,6 +57,7 @@ import 'package:mangayomi/utils/discord_rpc.dart';
 import 'package:mangayomi/services/crash_native.dart';
 import 'package:mangayomi/services/crash_report.dart';
 import 'package:mangayomi/utils/log/logger.dart';
+import 'package:mangayomi/utils/client_id.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/url_protocol/api.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_provider.dart';
@@ -171,17 +173,6 @@ void main(List<String> args) async {
         );
       }
     }
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-      final availableVersion = await WebViewEnvironment.getAvailableVersion();
-      if (availableVersion != null) {
-        final document = await getApplicationDocumentsDirectory();
-        webViewEnvironment = await WebViewEnvironment.create(
-          settings: WebViewEnvironmentSettings(
-            userDataFolder: p.join(document.path, 'flutter_inappwebview'),
-          ),
-        );
-      }
-    }
     final storage = StorageProvider();
     // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
     // prompt at launch. The database lives in scoped app storage, so the app
@@ -284,6 +275,10 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   unawaited(getIsolateService.start());
   unawaited(ffiImageDecoder.start());
   await AppLogger.init();
+  // Backfills clientId on rows saved before that field existed. Runs on every
+  // launch rather than gating on a version check - once caught up it's just
+  // six empty indexed lookups, so there's no real cost to checking again.
+  unawaited(backfillMissingClientIds());
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   if (isApple || Platform.isAndroid) {
     await Hive.initFlutter(isApple ? "databases" : "");
@@ -307,6 +302,22 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   }
   await storage.deleteBtDirectory();
   await webviewServer();
+  // Deferred until after runApp() creates the window: on Windows,
+  // WebViewEnvironment.create() needs COM initialized on a thread with an
+  // active message pump, which doesn't exist yet during main()'s pre-launch
+  // setup. Running it here (post-first-frame territory) avoids the
+  // "CoInitialize has not been called" PlatformException.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+    final availableVersion = await WebViewEnvironment.getAvailableVersion();
+    if (availableVersion != null) {
+      final document = await getApplicationDocumentsDirectory();
+      webViewEnvironment = await WebViewEnvironment.create(
+        settings: WebViewEnvironmentSettings(
+          userDataFolder: p.join(document.path, 'flutter_inappwebview'),
+        ),
+      );
+    }
+  }
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -359,6 +370,14 @@ class _MyAppState extends ConsumerState<MyApp>
         if (!mounted) return;
         _checkTrackerRefresh();
         unawaited(ref.read(scanLocalLibraryProvider.future));
+      });
+    });
+
+    // Defer the scheduled library refresh while launch is still busy.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 5), () {
+        if (!mounted) return;
+        unawaited(autoUpdateLibraryIfDue(ref));
       });
     });
 
@@ -419,6 +438,12 @@ class _MyAppState extends ConsumerState<MyApp>
       if (lockEnabled) {
         ref.read(appUnlockedStateProvider.notifier).lock();
       }
+    } else if (state == AppLifecycleState.resumed) {
+      // Launch is the other trigger for the scheduled refresh, so without this
+      // a session that stays open for days - a desktop one, typically - would
+      // never run one. The interval check makes this a no-op the rest of the
+      // time.
+      unawaited(autoUpdateLibraryIfDue(ref));
     }
   }
 
@@ -553,8 +578,17 @@ class _MyAppState extends ConsumerState<MyApp>
     super.dispose();
   }
 
+  // Linux emits `resize`/`move` while the window is being resized or moved;
+  // Windows and macOS emit `resized`/`moved` once it settles. Handle both, or
+  // the geometry is never saved on Linux and the window size is not remembered.
+  @override
+  void onWindowResize() => WindowGeometry.save();
+
   @override
   void onWindowResized() => WindowGeometry.save();
+
+  @override
+  void onWindowMove() => WindowGeometry.save();
 
   @override
   void onWindowMoved() => WindowGeometry.save();

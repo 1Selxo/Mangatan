@@ -7,6 +7,9 @@ part 'manga.g.dart';
 class Manga {
   Id? id;
 
+  @Index()
+  int? clientId;
+
   String? name;
 
   /// Title reported by the source before any local display-title override.
@@ -102,6 +105,7 @@ class Manga {
 
   Manga({
     this.id = Isar.autoIncrement,
+    this.clientId,
     required this.source,
     required this.author,
     required this.artist,
@@ -186,6 +190,7 @@ class Manga {
     author = json['author'];
     artist = json['artist'];
     categories = json['categories']?.cast<int>();
+    clientId = json['clientId'];
     customCoverImage = json['customCoverImage']?.cast<int>();
     dateAdded = json['dateAdded'];
     description = json['description'];
@@ -223,6 +228,7 @@ class Manga {
     'author': author,
     'artist': artist,
     'categories': categories,
+    'clientId': clientId,
     'customCoverImage': customCoverImage,
     'dateAdded': dateAdded,
     'description': description,

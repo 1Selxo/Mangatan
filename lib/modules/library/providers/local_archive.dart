@@ -44,7 +44,7 @@ Future importArchivesFromFile(
     );
     if (result == null) return;
 
-    final filePaths = result.files
+    final filePaths = result
         .map((file) => file.path)
         .whereType<String>()
         .toList();

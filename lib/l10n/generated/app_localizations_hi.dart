@@ -10,12 +10,6 @@ class AppLocalizationsHi extends AppLocalizations {
   AppLocalizationsHi([String locale = 'hi']) : super(locale);
 
   @override
-  String get seasons => 'Seasons';
-
-  @override
-  String get season_number => 'Season number';
-
-  @override
   String get library => 'पुस्तकालय';
 
   @override
@@ -494,9 +488,6 @@ class AppLocalizationsHi extends AppLocalizations {
   String get statistics => 'सांख्यिकी';
 
   @override
-  String get library_statistics => 'Library statistics';
-
-  @override
   String get settings => 'सेटिंग';
 
   @override
@@ -523,6 +514,14 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get name => 'नाम';
+
+  @override
+  String label_value(Object label, Object value) {
+    return '$label: $value';
+  }
+
+  @override
+  String get url => 'यूआरएल';
 
   @override
   String get category_name_required => '*आवश्यक';
@@ -558,18 +557,6 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get appearance_subtitle => 'थीम, तारीख और समय प्रारूप';
-
-  @override
-  String get animation_speed => 'Animation speed';
-
-  @override
-  String get animation_speed_description =>
-      'Lower values play animations faster.';
-
-  @override
-  String animation_duration_percentage(int percentage) {
-    return '$percentage% duration';
-  }
 
   @override
   String get theme => 'थीम';
@@ -629,34 +616,10 @@ class AppLocalizationsHi extends AppLocalizations {
   String get reading_mode_right_to_left => 'दाएँ से बाएँ';
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get reading_mode_vertical_continuous => 'लंबवत निरंतर';
 
   @override
   String get reading_mode_webtoon => 'वेबटून';
-
-  @override
-  String get default_page_mode => 'Default page mode';
-
-  @override
-  String get page_mode_single => 'Single page';
-
-  @override
-  String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get double_tap_animation_speed => 'डबल टैप एनिमेशन गति';
@@ -720,6 +683,11 @@ class AppLocalizationsHi extends AppLocalizations {
   String get version => 'संस्करण';
 
   @override
+  String beta_version(Object version) {
+    return 'बीटा ($version)';
+  }
+
+  @override
   String get check_for_update => 'अपडेट के लिए जांचें';
 
   @override
@@ -773,6 +741,20 @@ class AppLocalizationsHi extends AppLocalizations {
   String get unknown => 'अज्ञात';
 
   @override
+  String get empty_placeholder => 'खाली';
+
+  @override
+  String get error => 'त्रुटि';
+
+  @override
+  String error_with_message(Object error) {
+    return 'त्रुटि: $error';
+  }
+
+  @override
+  String get no_pages_available => 'त्रुटि: कोई पृष्ठ उपलब्ध नहीं है';
+
+  @override
   String get set_categories => 'श्रेणियाँ सेट करें';
 
   @override
@@ -803,6 +785,92 @@ class AppLocalizationsHi extends AppLocalizations {
   String get source_title => 'स्रोत शीर्षक';
 
   @override
+  String get create_extension => 'एक्सटेंशन बनाएं';
+
+  @override
+  String get developer_mode => 'डेवलपर मोड';
+
+  @override
+  String get developer_mode_subtitle =>
+      'एक्सटेंशन डेवलपर उपकरण दिखाएं (एक्सटेंशन बनाएं, कोड संपादित करें)';
+
+  @override
+  String get choose_extension_language => 'एक्सटेंशन की भाषा चुनें';
+
+  @override
+  String get lang => 'भाषा';
+
+  @override
+  String get base_url => 'आधार यूआरएल';
+
+  @override
+  String get api_url_optional => 'एपीआई यूआरएल (वैकल्पिक)';
+
+  @override
+  String get icon_url => 'आइकन यूआरएल';
+
+  @override
+  String get source_icon_url => 'स्रोत आइकन यूआरएल';
+
+  @override
+  String get notes => 'नोट्स';
+
+  @override
+  String get extension_name_example => 'उदा: myAnime';
+
+  @override
+  String get language_code_example => 'उदा: hi';
+
+  @override
+  String get base_url_example => 'उदा: https://example.com';
+
+  @override
+  String get api_url_example => 'उदा: https://api.example.com';
+
+  @override
+  String get extension_notes_example =>
+      'उदा: इस एक्सटेंशन के लिए लॉगिन आवश्यक है';
+
+  @override
+  String get type => 'प्रकार';
+
+  @override
+  String get target => 'लक्ष्य';
+
+  @override
+  String get source_type_single => 'एकल';
+
+  @override
+  String get source_type_multi => 'बहु';
+
+  @override
+  String get source_type_torrent => 'टोरेंट';
+
+  @override
+  String get source_language_dart => 'Dart';
+
+  @override
+  String get source_language_javascript => 'JavaScript';
+
+  @override
+  String get source_language_lnreader_compiled_js => 'LNReader संकलित JS';
+
+  @override
+  String get source_created_successfully => 'स्रोत सफलतापूर्वक बनाया गया';
+
+  @override
+  String get source_already_exists => 'स्रोत पहले से मौजूद है';
+
+  @override
+  String get error_when_creating_source => 'स्रोत बनाते समय त्रुटि';
+
+  @override
+  String get cookies_deleted => 'कुकीज़ हटा दी गईं!';
+
+  @override
+  String get delete_all_cookies => 'सभी कुकीज़ हटाएं';
+
+  @override
   String get chapter_number => 'अध्याय संख्या';
 
   @override
@@ -818,7 +886,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String missing_chapters(Object count) {
-    return 'Missing $count chapters';
+    return '$count अध्याय अनुपलब्ध';
   }
 
   @override
@@ -982,9 +1050,6 @@ class AppLocalizationsHi extends AppLocalizations {
   String get syncing => 'समन्वयित हो रहा है';
 
   @override
-  String get sync_password => 'पासवर्ड (कम से कम 8 अक्षर)';
-
-  @override
   String get sync_logged => 'लॉगिन सफल';
 
   @override
@@ -992,19 +1057,13 @@ class AppLocalizationsHi extends AppLocalizations {
       'स्व-होस्ट किए गए सर्वर के माध्यम से कई उपकरणों पर अपनी प्रगति सिंक करें। अधिक जानकारी के लिए हमारे Discord सर्वर पर जाएँ!';
 
   @override
-  String get last_sync_manga => 'अंतिम मंगा सिंक: ';
+  String get last_sync => 'अंतिम सिंक समय: ';
 
   @override
-  String get last_sync_history => 'अंतिम इतिहास सिंक: ';
-
-  @override
-  String get last_sync_update => 'अंतिम अपडेट सिंक: ';
+  String get sync_login_browser => 'ब्राउज़र से लॉग इन करें';
 
   @override
   String get sync_server => 'सिंक सर्वर का पता';
-
-  @override
-  String get sync_login_invalid_creds => 'अमान्य ईमेल या पासवर्ड';
 
   @override
   String get sync_starting => 'सिंक शुरू हो रहा है...';
@@ -1016,7 +1075,16 @@ class AppLocalizationsHi extends AppLocalizations {
   String get sync_failed => 'सिंक विफल';
 
   @override
-  String get sync_restore_in_progress => 'Sync skipped — restore in progress';
+  String get sync_restore_in_progress =>
+      'सिंक छोड़ दिया गया — पुनर्स्थापना जारी है';
+
+  @override
+  String sync_progress_percent(Object percent) {
+    return 'सिंक हो रहा है… $percent%';
+  }
+
+  @override
+  String get sync_progress_indeterminate => 'सिंक हो रहा है…';
 
   @override
   String get sync_button_sync => 'प्रगति सिंक करें';
@@ -1033,28 +1101,26 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get sync_button_download_info =>
-      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
+      'यह ऑपरेशन लोकल डेटा को पूरी तरह से रिमोट डेटा से बदल देगा!';
 
   @override
-  String get sync_status_not_configured => 'Not connected';
+  String get sync_status_not_configured => 'कनेक्ट नहीं है';
 
   @override
-  String get sync_status_checking => 'Checking connection...';
+  String get sync_status_checking => 'कनेक्शन की जाँच की जा रही है...';
 
   @override
-  String get sync_status_connected => 'Connected';
+  String get sync_status_connected => 'कनेक्टेड';
 
   @override
-  String get sync_status_unauthorized => 'Session expired, please log in again';
+  String get sync_status_unauthorized =>
+      'सत्र समाप्त हो गया, कृपया पुनः लॉगिन करें';
 
   @override
-  String get sync_status_unreachable => 'Can\'t reach server';
+  String get sync_status_unreachable => 'सर्वर तक पहुंच संभव नहीं है';
 
   @override
-  String get sync_section_general => 'General';
-
-  @override
-  String get sync_section_data_types => 'What to sync';
+  String get sync_section_general => 'सामान्य';
 
   @override
   String get sync_on => 'सिंक सक्षम करें';
@@ -1125,7 +1191,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String missing_episodes(Object count) {
-    return 'Missing $count episodes';
+    return '$count एपिसोड अनुपलब्ध';
   }
 
   @override
@@ -1197,6 +1263,26 @@ class AppLocalizationsHi extends AppLocalizations {
   String uninstall_extension(Object ext) {
     return '$ext एक्सटेंशन हटाएँ?';
   }
+
+  @override
+  String double_tap_search_hint(Object type) {
+    return 'सभी $type खोजने के लिए दो बार टैप करें';
+  }
+
+  @override
+  String get show_nav_double_tap_tooltip => 'डबल-टैप खोज संकेत दिखाएं';
+
+  @override
+  String get show_nav_double_tap_tooltip_subtitle =>
+      'मंगा/एनीमे/उपन्यास नेविगेशन पर एक टूलटिप दिखाएं जिसमें बताया गया हो कि डबल-टैप करने से ग्लोबल खोज खुलती है।';
+
+  @override
+  String already_in_library(Object source, Object title) {
+    return '\"$title\" पहले से ही $source के माध्यम से आपकी लाइब्रेरी में है।';
+  }
+
+  @override
+  String get add_anyway => 'फिर भी जोड़ें';
 
   @override
   String get langauage => 'भाषा';
@@ -1332,37 +1418,37 @@ class AppLocalizationsHi extends AppLocalizations {
   String get restore_backup => 'बैकअप पुनर्स्थापित करें';
 
   @override
-  String get encrypt_backups => 'Encrypt backups';
+  String get encrypt_backups => 'बैकअप एन्क्रिप्ट करें';
 
   @override
   String get encrypt_backups_info =>
-      'Password-protect backup files using AES encryption';
+      'AES एन्क्रिप्शन के साथ पासवर्ड से बैकअप सुरक्षित करें';
 
   @override
-  String get no_secure_storage => 'No secure storage found';
+  String get no_secure_storage => 'कोई सुरक्षित स्टोरेज नहीं मिला';
 
   @override
   String get no_keyring_warning =>
-      'This system doesn\'t have a keyring service available (e.g. gnome-keyring or kwallet on Linux), so the password can\'t be stored securely.\n\nStore it unencrypted in the local app database instead? Anyone with access to this device\'s app data would be able to read it.';
+      'सिस्टम में कोई कीरिंग सेवा उपलब्ध नहीं है, इसलिए पासवर्ड सुरक्षित रूप से संग्रहीत नहीं किया जा सकता।';
 
   @override
-  String get enter_backup_password => 'Enter backup password';
+  String get enter_backup_password => 'बैकअप पासवर्ड दर्ज करें';
 
   @override
-  String get incorrect_password_try_again => 'Incorrect password, try again.';
+  String get incorrect_password_try_again => 'गलत पासवर्ड, पुनः प्रयास करें।';
 
   @override
-  String get set_backup_password => 'Set backup password';
+  String get set_backup_password => 'बैकअप पासवर्ड सेट करें';
 
   @override
-  String get confirm_password => 'Confirm password';
+  String get confirm_password => 'पासवर्ड की पुष्टि करें';
 
   @override
-  String get passwords_do_not_match => 'Passwords do not match';
+  String get passwords_do_not_match => 'पासवर्ड मेल नहीं खाते';
 
   @override
   String get password_required_to_restore =>
-      'A password is required to restore this backup.';
+      'इस बैकअप को पुनर्स्थापित करने के लिए पासवर्ड आवश्यक है।';
 
   @override
   String get restore_backup_subtitle =>
@@ -1417,41 +1503,43 @@ class AppLocalizationsHi extends AppLocalizations {
       'बैकअप पुनर्स्थापित करने से सभी मौजूदा डेटा अधिलेखित हो जाएगा।\n\nपुनर्स्थापना जारी रखें?';
 
   @override
-  String get restore_sync_question_title => 'Sync this restore?';
+  String get restore_sync_question_title => 'इस पुनर्स्थापना को सिंक करें?';
 
   @override
   String get restore_sync_question_message =>
-      'This device is connected to a sync server. Upload this restored data to it now? If not, sync will be turned off so the server\'s old data doesn\'t overwrite what you just restored.';
+      'यह उपकरण सिंक सर्वर से जुड़ा है। क्या पुनर्स्थापित डेटा अभी अपलोड करना चाहते हैं?';
 
   @override
-  String get restore_sync_question_confirm => 'Yes, sync';
+  String get restore_sync_question_confirm => 'हाँ, सिंक करें';
 
   @override
-  String get restore_sync_question_deny => 'No, disable sync';
+  String get restore_sync_question_deny => 'नहीं, सिंक अक्षम करें';
 
   @override
   String get sync_disabled_after_restore =>
-      'Sync is disabled. You can turn it on again in Settings.';
+      'सिंक अक्षम कर दिया गया है। आप सेटिंग्स में इसे फिर से सक्षम कर सकते हैं।';
 
   @override
   String get restore_sync_disabled_question_title =>
-      'Sync is currently disabled';
+      'सिंक वर्तमान में अक्षम है';
 
   @override
   String get restore_sync_disabled_question_message =>
-      'Sync is turned off. Turn it back on and upload this restored data to your server?';
+      'सिंक बंद है। क्या इसे पुनः सक्षम करके सर्वर पर अपलोड करना चाहते हैं?';
 
   @override
-  String get restore_sync_question_reenable => 'Yes, re-enable and sync';
+  String get restore_sync_question_reenable => 'हाँ, पुनः सक्षम और सिंक करें';
 
   @override
-  String get restore_sync_question_keep_disabled => 'Keep it disabled';
+  String get restore_sync_question_keep_disabled => 'अक्षम रखें';
 
   @override
-  String get restore_sync_uploading => 'Syncing restored data to server…';
+  String get restore_sync_uploading =>
+      'पुनर्स्थापित डेटा सर्वर पर सिंक हो रहा है…';
 
   @override
-  String get restore_sync_upload_success => 'Restored data synced to server';
+  String get restore_sync_upload_success =>
+      'डेटा सर्वर पर सफलतापूर्वक सिंक हो गया';
 
   @override
   String get services => 'सेवाएँ';
@@ -1499,7 +1587,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get mark_duplicate_chapters_read =>
-      'Mark duplicate chapter numbers as read';
+      'डुप्लिकेट अध्याय संख्याओं को पढ़ा गया के रूप में चिह्नित करें';
 
   @override
   String get default_skip_intro_length => 'डिफ़ॉल्ट परिचय छोड़ने की अवधि';
@@ -1700,6 +1788,13 @@ class AppLocalizationsHi extends AppLocalizations {
       'उपशीर्षकों को अनुकूलित करने में सक्षम होने के लिए प्लेयर सेटिंग्स में `libass उपयोग करें` को अक्षम करें।';
 
   @override
+  String get override_ass_subtitles => 'ASS उपशीर्षक ओवरराइड करें';
+
+  @override
+  String get override_ass_subtitles_info =>
+      'ASS/SSA उपशीर्षक पर कस्टम स्टाइलिंग लागू करें';
+
+  @override
   String get torrent_stream => 'टॉरेंट स्ट्रीम';
 
   @override
@@ -1798,9 +1893,6 @@ class AppLocalizationsHi extends AppLocalizations {
   String get downloads_are_limited_to_wifi => 'डाउनलोड केवल Wi-Fi तक सीमित हैं';
 
   @override
-  String get recommendations => 'सिफ़ारिशें';
-
-  @override
   String get recommendations_similar => 'समान';
 
   @override
@@ -1867,7 +1959,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get url_cannot_be_empty => 'URL खाली नहीं हो सकता';
 
   @override
-  String get url_must_end_with_dot_json => 'URL .json के साथ समाप्त होना चाहिए';
+  String get url_must_end_with_dot_json_or_dot_pb =>
+      'URL .json / .pb के साथ समाप्त होना चाहिए';
 
   @override
   String get repo_url => 'रेपो URL';
@@ -1889,7 +1982,7 @@ class AppLocalizationsHi extends AppLocalizations {
   String get repo_added => 'स्रोत रिपोजिटरी जोड़ी गई!';
 
   @override
-  String get repo_already_exists => 'Repository already exists!';
+  String get repo_already_exists => 'रिपॉजिटरी पहले से मौजूद है!';
 
   @override
   String get add_repo => 'रिपोजिटरी जोड़ें?';
@@ -1986,15 +2079,6 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get rpc_show_cover_image => 'Discord में वर्तमान कवर छवि दिखाएं';
-
-  @override
-  String get sync_enable_histories => 'इतिहास डेटा सिंक करें';
-
-  @override
-  String get sync_enable_updates => 'अपडेट डेटा सिंक करें';
-
-  @override
-  String get sync_enable_settings => 'सेटिंग्स सिंक करें';
 
   @override
   String get enable_mpv => 'mpv शेडर्स / स्क्रिप्ट सक्षम करें';
@@ -2112,6 +2196,18 @@ class AppLocalizationsHi extends AppLocalizations {
   String get subtitle_speed => 'गति';
 
   @override
+  String get tracks => 'ट्रैक';
+
+  @override
+  String get playback_speed => 'प्लेबैक गति';
+
+  @override
+  String get shaders => 'शेडर्स';
+
+  @override
+  String get video_fit => 'फ़िट';
+
+  @override
   String get calendar => 'कैलेंडर';
 
   @override
@@ -2149,6 +2245,9 @@ class AppLocalizationsHi extends AppLocalizations {
   String get sequels => 'सीक्वल';
 
   @override
+  String get recommendations => 'सिफ़ारिशें';
+
+  @override
   String get recommendations_similarity => 'समानता:';
 
   @override
@@ -2164,6 +2263,72 @@ class AppLocalizationsHi extends AppLocalizations {
   String get rescan_local_folder => 'सभी स्थानीय फ़ोल्डर अभी फिर से स्कैन करें';
 
   @override
+  String get default_download_destination => 'डिफ़ॉल्ट डाउनलोड स्थान';
+
+  @override
+  String get ask_download_destination => 'डाउनलोड स्थान पूछें';
+
+  @override
+  String get ask_download_destination_desc =>
+      'प्रत्येक डाउनलोड से पहले फ़ोल्डर चुनें।';
+
+  @override
+  String get select_download_destination => 'डाउनलोड स्थान चुनें';
+
+  @override
+  String get clear_local_library => 'स्थानीय लाइब्रेरी साफ़ करें';
+
+  @override
+  String get clear_local_library_desc =>
+      'लाइब्रेरी से स्थानीय फ़ोल्डर और संग्रह हटाएं।';
+
+  @override
+  String get clear_local_library_msg =>
+      'यह आपकी लाइब्रेरी से स्थानीय प्रविष्टियों को हटा देगा (फ़ाइलें डिस्क से नहीं हटेंगी)।';
+
+  @override
+  String get custom => 'कस्टम';
+
+  @override
+  String get no_local_folder_available_for_downloads =>
+      'डाउनलोड के लिए कोई स्थानीय फ़ोल्डर उपलब्ध नहीं है';
+
+  @override
+  String failed_to_create_cbz(Object error) {
+    return 'CBZ बनाने में विफल: $error';
+  }
+
+  @override
+  String error_reading_cover_image(Object error) {
+    return 'कवर छवि पढ़ने में त्रुटि: $error';
+  }
+
+  @override
+  String error_reading_metadata(Object error) {
+    return 'मेटाडेटा पढ़ने में त्रुटि: $error';
+  }
+
+  @override
+  String error_saving_chapter_episode_to_library(Object error) {
+    return 'लाइब्रेरी में सहेजने में त्रुटि: $error';
+  }
+
+  @override
+  String error_reading_chapter_cover_image(Object error) {
+    return 'अध्याय कवर छवि पढ़ने में त्रुटि: $error';
+  }
+
+  @override
+  String error_reading_archive_cover_image(Object error) {
+    return 'संग्रह कवर छवि पढ़ने में त्रुटि: $error';
+  }
+
+  @override
+  String error_getting_local_library(Object error) {
+    return 'स्थानीय लाइब्रेरी प्राप्त करने में त्रुटि: $error';
+  }
+
+  @override
   String get export_metadata => 'मेटाडेटा निर्यात करें';
 
   @override
@@ -2171,25 +2336,25 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String failed_to_export_metadata(Object error) {
-    return 'Failed to export metadata: $error';
+    return 'मेटाडेटा निर्यात करने में विफल: $error';
   }
 
   @override
   String unrecognized_chapter_numbers(Object count) {
-    return '$count chapter(s) couldn\'t be auto-numbered and may be out of order or missing from the reader.';
+    return '$count अध्यायों को स्वतः क्रमांकित नहीं किया जा सका।';
   }
 
   @override
   String get cloudflare_resolution_webview_server_start_failed =>
-      'Couldn\'t start Cloudflare Resolution Webview Server.';
+      'क्लाउडफ्लेयर रिज़ॉल्यूशन सर्वर प्रारंभ नहीं हो सका।';
 
   @override
   String tracker_token_expired(Object tracker) {
-    return '$tracker Token expired';
+    return '$tracker टोकन समाप्त हो गया';
   }
 
   @override
-  String get video_list_empty => 'Video list is empty';
+  String get video_list_empty => 'वीडियो सूची खाली है';
 
   @override
   String playback_speed_multiplier(Object value) {
@@ -2198,7 +2363,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String could_not_launch_url(Object url) {
-    return 'Could not launch $url';
+    return '$url को खोला नहीं जा सका';
   }
 
   @override
@@ -2252,6 +2417,9 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get authenticating => 'प्रमाणीकरण चल रहा है...';
+
+  @override
+  String get lock => 'Lock';
 
   @override
   String get unlock => 'अनलॉक करें';
@@ -2467,13 +2635,6 @@ class AppLocalizationsHi extends AppLocalizations {
       'एक्सटेंशन सर्वर की फ़ाइलें लिंक कर दी गई हैं।';
 
   @override
-  String extension_server_directory_is_package_managed(
-    Object fallbackDirectory,
-  ) {
-    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
-  }
-
-  @override
   String get select_extension_server_jar => 'एक्सटेंशन सर्वर JAR चुनें';
 
   @override
@@ -2496,48 +2657,73 @@ class AppLocalizationsHi extends AppLocalizations {
   String get not_configured => 'कॉन्फ़िगर नहीं किया गया';
 
   @override
+  String get zero_interpreter => 'Zero दुभाषिया';
+
+  @override
+  String get zero_interpreter_description =>
+      'Zero दुभाषिया सर्वर को स्वतः या मैन्युअल नियंत्रित करें।';
+
+  @override
+  String get start_server_on_launch => 'लॉन्च पर सर्वर प्रारंभ करें';
+
+  @override
+  String get runtime_status => 'रनटाइम स्थिति';
+
+  @override
+  String get running => 'चल रहा है';
+
+  @override
+  String get stopped => 'रुका हुआ';
+
+  @override
+  String get start => 'प्रारंभ';
+
+  @override
+  String get stop => 'रोकें';
+
+  @override
   String get webview => 'Webview';
 
   @override
-  String get tts => 'Text-to-Speech';
+  String get tts => 'पाठ-से-बोली';
 
   @override
-  String get tts_speed => 'Speed';
+  String get tts_speed => 'गति';
 
   @override
-  String get tts_pitch => 'Pitch';
+  String get tts_pitch => 'पिच';
 
   @override
-  String get tts_language => 'Language';
+  String get tts_language => 'भाषा';
 
   @override
-  String get tts_voice => 'Voice';
+  String get tts_voice => 'आवाज';
 
   @override
-  String get tts_stop => 'Stop';
+  String get tts_stop => 'रोकें';
 
   @override
-  String get tts_play => 'Play';
+  String get tts_play => 'चलाएं';
 
   @override
-  String get tts_pause => 'Pause';
+  String get tts_pause => 'रोकें';
 
   @override
-  String get tts_previous => 'Previous paragraph';
+  String get tts_previous => 'पिछला अनुच्छेद';
 
   @override
-  String get tts_next => 'Next paragraph';
+  String get tts_next => 'अगला अनुच्छेद';
 
   @override
   String tts_paragraph_progress(Object current, Object total) {
-    return 'Paragraph $current of $total';
+    return 'अनुच्छेद $current का $total';
   }
 
   @override
-  String get tts_settings => 'TTS Settings';
+  String get tts_settings => 'TTS सेटिंग्स';
 
   @override
-  String get tts_default => 'Default';
+  String get tts_default => 'डिफ़ॉल्ट';
 
   @override
   String get webtoon_disable_zoom_out => 'वेबटून ज़ूम आउट अक्षम करें';
@@ -2564,6 +2750,20 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get dual_page_rotate_to_fit_invert => 'घूर्णन की दिशा उलटें';
+
+  @override
+  String get double_page_single_first_page => 'पहला पृष्ठ एकल';
+
+  @override
+  String get double_page_single_first_page_subtitle =>
+      'दोहरे पृष्ठ मोड में पहले पृष्ठ को अकेले प्रदर्शित करें';
+
+  @override
+  String get double_page_auto => 'स्वचालित दोहरा पृष्ठ';
+
+  @override
+  String get double_page_auto_subtitle =>
+      'लैंडस्केप में स्वचालित रूप से दोहरे पृष्ठ मोड पर स्विच करें';
 
   @override
   String get landscape_zoom => 'स्वचालित लैंडस्केप ज़ूम';
@@ -2649,6 +2849,639 @@ class AppLocalizationsHi extends AppLocalizations {
   String get error_no_pages_available => 'त्रुटि: कोई पन्ने उपलब्ध नहीं हैं';
 
   @override
+  String get app_ui_scale => 'इंटरफ़ेस स्केल';
+
+  @override
+  String get app_ui_scale_subtitle =>
+      'इंटरफ़ेस को अपने स्क्रीन और देखने की दूरी के अनुसार बड़ा या छोटा बनाएं।';
+
+  @override
+  String get allow_concurrent_downloads => 'समवर्ती डाउनलोड की अनुमति दें';
+
+  @override
+  String get allow_concurrent_downloads_subtitle =>
+      'विभिन्न स्रोतों से एक साथ डाउनलोड करें। एक एकल स्रोत अभी भी एक समय में एक अध्याय डाउनलोड करता है ताकि इसे अभिभूत न किया जाए। हर जगह एक-एक करके डाउनलोड करने के लिए बंद करें।';
+
+  @override
+  String get download_delay => 'डाउनलोड में देरी';
+
+  @override
+  String get download_delay_subtitle =>
+      'बंद। स्रोतों के लिए अधिक सौम्य होने के लिए अध्यायों के बीच यादृच्छिक जिटर के साथ प्रतीक्षा जोड़ें।';
+
+  @override
+  String get save_search => 'खोज सहेजें';
+
+  @override
+  String get saved_searches => 'सहेजी गई खोजें';
+
+  @override
+  String get enter_search_to_save_first => 'पहले खोज दर्ज करें';
+
+  @override
+  String get no_saved_searches =>
+      'इस स्रोत के लिए अभी तक कोई सहेजी गई खोज नहीं है।\nएक खोज चलाएं, फिर \"खोज सहेजें\" चुनें।';
+
+  @override
+  String get source => 'स्रोत';
+
+  @override
+  String get something_went_wrong => 'कुछ गलत हो गया';
+
+  @override
+  String get startup_failed => 'Mangayomi प्रारंभ नहीं हो सका';
+
+  @override
+  String sources_with_no_results(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count स्रोत जिनमें कोई परिणाम नहीं है',
+      one: '1 स्रोत जिसमें कोई परिणाम नहीं है',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get import_mode_title => 'इसे कैसे आयात किया जाना चाहिए?';
+
+  @override
+  String get import_mode_message =>
+      'इस बैकअप को वर्तमान लाइब्रेरी में मर्ज करें या पूरी लाइब्रेरी बदलें।';
+
+  @override
+  String get import_mode_keep_existing => 'मर्ज करें';
+
+  @override
+  String get import_mode_keep_existing_subtitle =>
+      'नई श्रृंखला जोड़ता है और मौजूदा को अपडेट करता है।';
+
+  @override
+  String get import_mode_replace => 'बदलें';
+
+  @override
+  String get import_mode_replace_subtitle =>
+      'वर्तमान लाइब्रेरी को हटाकर बैकअप से बदलता है।';
+
+  @override
+  String get replace_summary_title => 'लाइब्रेरी बदलने के लिए तैयार';
+
+  @override
+  String replace_summary_message(Object currentCount, Object backupCount) {
+    return 'यह वर्तमान $currentCount श्रृंखलाओं को हटाकर $backupCount श्रृंखलाओं से बदल देगा।';
+  }
+
+  @override
+  String get replace_summary_confirm => 'बदलें';
+
+  @override
+  String replace_result_message(Object count) {
+    return 'लाइब्रेरी को बैकअप से $count श्रृंखलाओं से बदल दिया गया।';
+  }
+
+  @override
+  String get category_conflict_title => 'मौजूदा श्रेणियां मिलीं';
+
+  @override
+  String get category_conflict_message =>
+      'बैकअप में ऐसी श्रेणियां हैं जो पहले से मौजूद हैं।';
+
+  @override
+  String get category_conflict_keep => 'रखें — मौजूदा श्रेणी में मर्ज करें';
+
+  @override
+  String get category_conflict_delete => 'हटाएं — बिना श्रेणी छोड़ें';
+
+  @override
+  String get source_conflict_title => 'स्रोत नहीं मिले';
+
+  @override
+  String get source_conflict_message =>
+      'कुछ स्रोत स्थापित एक्सटेंशन से मेल नहीं खाते।';
+
+  @override
+  String get source_conflict_keep => 'मूल नाम रखें';
+
+  @override
+  String get import_summary_title => 'आयात करने के लिए तैयार';
+
+  @override
+  String import_summary_message(
+    Object newSeries,
+    Object updatedSeries,
+    Object newChapters,
+  ) {
+    return '$newSeries नई श्रृंखलाएं, $updatedSeries अपडेटेड, और $newChapters नए अध्याय।';
+  }
+
+  @override
+  String get import_summary_confirm => 'आयात करें';
+
+  @override
+  String import_result_message(
+    Object newSeries,
+    Object updatedSeries,
+    Object newChapters,
+  ) {
+    return '$newSeries नई श्रृंखलाएं आयात की गईं, $updatedSeries अपडेटेड, $newChapters अध्याय जोड़े गए।';
+  }
+
+  @override
+  String get roll_back => 'रोलबैक करें';
+
+  @override
+  String get roll_back_confirm_message =>
+      'यह लाइब्रेरी को इस बदलाव से ठीक पहले के स्नैपशॉट पर पुनर्स्थापित करता है।';
+
+  @override
+  String get roll_back_done => 'पिछले स्नैपशॉट पर रोलबैक कर दिया गया।';
+
+  @override
+  String get restoring_backup => 'लाइब्रेरी पुनर्स्थापित हो रही है…';
+
+  @override
+  String get roll_back_last_change => 'अंतिम परिवर्तन वापस लें';
+
+  @override
+  String roll_back_last_change_subtitle(Object date, Object description) {
+    return '$date का स्नैपशॉट — $description';
+  }
+
+  @override
+  String roll_back_available_count(Object count) {
+    return 'रोलबैक के लिए $count हालिया परिवर्तन उपलब्ध हैं';
+  }
+
+  @override
+  String get delete_source_title => 'स्रोत और उसकी मंगा हटाएं';
+
+  @override
+  String get delete_source_subtitle =>
+      'स्रोत और उससे जुड़ी सभी मंगा, अध्याय, डाउनलोड और इतिहास हटाएं।';
+
+  @override
+  String get delete_source_pick_title => 'हटाने के लिए स्रोत चुनें';
+
+  @override
+  String get delete_source_empty => 'लाइब्रेरी में कोई स्रोत नहीं मिला।';
+
+  @override
+  String delete_source_confirm_title(Object sourceName) {
+    return '$sourceName हटाएं?';
+  }
+
+  @override
+  String delete_source_confirm_message(
+    Object mangaCount,
+    Object chapterCount,
+    Object historyCount,
+    Object updateCount,
+  ) {
+    return 'यह स्थायी रूप से $mangaCount मंगा, $chapterCount अध्याय और $historyCount इतिहास प्रविष्टियां हटा देगा।';
+  }
+
+  @override
+  String get delete_source_also_remove_extension =>
+      'स्थापित एक्सटेंशन भी हटाएं';
+
+  @override
+  String get delete_source_keep_history => 'पठन इतिहास रखें';
+
+  @override
+  String get delete_source_keep_downloads => 'डाउनलोड रिकॉर्ड रखें';
+
+  @override
+  String get delete_source_button => 'हटाएं';
+
+  @override
+  String delete_source_result_message(Object mangaCount, Object sourceName) {
+    return '$sourceName से $mangaCount मंगा हटा दी गईं।';
+  }
+
+  @override
+  String get merge_manga_title => 'डुप्लिकेट मंगा मर्ज करें';
+
+  @override
+  String get merge_manga_subtitle =>
+      'समान शीर्षक वाली मंगा को एक में संयोजित करता है।';
+
+  @override
+  String get merge_manga_none_found => 'कोई डुप्लिकेट मंगा नहीं मिली।';
+
+  @override
+  String get merge_manga_pick_title => 'संभावित डुप्लिकेट मंगा';
+
+  @override
+  String get merge_manga_choose_primary_title =>
+      'दूसरों को किसमें मर्ज किया जाना चाहिए?';
+
+  @override
+  String get merge_manga_choose_primary_message =>
+      'अध्याय, इतिहास और ट्रैकिंग चुनी गई प्रविष्टि में शामिल हो जाएंगे।';
+
+  @override
+  String merge_manga_chapters_subtitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count अध्याय',
+      one: '1 अध्याय',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merge_manga_button => 'मर्ज करें';
+
+  @override
+  String merge_manga_result_message(Object count, Object mangaName) {
+    return '$count डुप्लिकेट मंगा को $mangaName में मर्ज कर दिया गया।';
+  }
+
+  @override
+  String get merge_preview_title => 'मर्ज की पुष्टि करें';
+
+  @override
+  String merge_manga_preview_message(
+    Object totalChapters,
+    Object duplicateChapters,
+    Object keptChapters,
+    Object duplicateTracks,
+  ) {
+    return 'कुल $totalChapters अध्याय मिले। $duplicateChapters डुप्लिकेट छोड़ दिए जाएंगे, $keptChapters जोड़े जाएंगे।';
+  }
+
+  @override
+  String get memory_overlay => 'मेमोरी उपयोग दिखाएं';
+
+  @override
+  String get memory_overlay_subtitle =>
+      'ऐप द्वारा उपयोग की जा रही मेमोरी का लाइव विवरण। उपकरण पर सटीक माप के लिए: लाइब्रेरी स्क्रॉल करते समय या अध्याय पढ़ते समय देखें।';
+
+  @override
+  String get beta => 'बीटा';
+
+  @override
+  String get error_reports => 'त्रुटि रिपोर्ट';
+
+  @override
+  String get error_reports_subtitle =>
+      'ऐप द्वारा पकड़ी गई त्रुटियां और रिपोर्ट करने का तरीका';
+
+  @override
+  String get error_reports_empty => 'कोई त्रुटि नहीं है।';
+
+  @override
+  String get error_reports_likely_cause => 'संभावित कारण';
+
+  @override
+  String get error_reports_report => 'GitHub पर रिपोर्ट करें';
+
+  @override
+  String get error_reports_banner => 'Mangayomi में त्रुटि आई';
+
+  @override
+  String get error_reports_banner_action => 'देखें';
+
+  @override
+  String get error_reports_copy => 'कॉपी करें';
+
+  @override
+  String get error_reports_copied => 'क्लिपबोर्ड पर कॉपी किया गया';
+
+  @override
+  String get error_reports_clear => 'साफ़ करें';
+
+  @override
+  String get error_reports_extension_failure =>
+      'यह त्रुटि किसी एक्सटेंशन से आई है, Mangayomi से नहीं। एक्सटेंशन उस रिपॉजिटरी के प्रबंधकों द्वारा लिखे और बनाए रखे जाते हैं जहाँ से आपने यह स्रोत स्थापित किया है, इसलिए सुधार वहीं होना चाहिए।';
+
+  @override
+  String get error_reports_already_reported =>
+      'पहले ही रिपोर्ट किया जा चुका है';
+
+  @override
+  String get error_reports_expected_failure =>
+      'यह आमतौर पर ऐप के बजाय स्रोत या नेटवर्क के कारण होता है: समाप्त हो चुका लिंक, डाउन सर्वर या टूटा हुआ कनेक्शन।';
+
+  @override
+  String get share_unavailable_copied =>
+      'साझाकरण उपलब्ध नहीं है, क्लिपबोर्ड पर कॉपी किया गया।';
+
+  @override
+  String get onboarding_title => 'Mangayomi में आपका स्वागत है';
+
+  @override
+  String get onboarding_libraries_body =>
+      'चुनें कि आप क्या पढ़ना और देखना चाहते हैं।';
+
+  @override
+  String get onboarding_nav_title => 'आपकी लाइब्रेरी';
+
+  @override
+  String get onboarding_nav_body =>
+      'प्रत्येक के लिए अलग टैब रखें या एक लाइब्रेरी टैब में संयोजित करें।';
+
+  @override
+  String get onboarding_nav_split => 'अलग-अलग टैब';
+
+  @override
+  String get onboarding_nav_merged => 'एक लाइब्रेरी टैब';
+
+  @override
+  String get onboarding_nav_inside =>
+      'लाइब्रेरी टैप करने पर ये टैब बदल जाते हैं';
+
+  @override
+  String get onboarding_next => 'अगला';
+
+  @override
+  String get onboarding_restore => 'बैकअप पुनर्स्थापित करें';
+
+  @override
+  String get onboarding_or_local => 'या मौजूदा फ़ाइलों का उपयोग करें';
+
+  @override
+  String get onboarding_local_folder => 'फ़ोल्डर जोड़ें';
+
+  @override
+  String onboarding_local_existing(Object count) {
+    return '$count फ़ोल्डर पहले से सेट हैं';
+  }
+
+  @override
+  String get onboarding_local_any_type => 'मंगा, एनीमे और उपन्यास समर्थित हैं।';
+
+  @override
+  String get onboarding_local_scanning => 'फ़ोल्डर स्कैन किया जा रहा है';
+
+  @override
+  String onboarding_local_found(Object count) {
+    return '$count शीर्षक मिले';
+  }
+
+  @override
+  String get onboarding_local_remove => 'फ़ोल्डर हटाएं';
+
+  @override
+  String get onboarding_local_in_downloads => 'यह ऐप का डाउनलोड फ़ोल्डर है।';
+
+  @override
+  String get onboarding_local_empty => 'कुछ नहीं मिला। मुख्य फ़ोल्डर चुनें।';
+
+  @override
+  String get onboarding_repo_failed => 'रिपॉजिटरी पढ़ने में असमर्थ।';
+
+  @override
+  String get onboarding_repo_title => 'स्रोत जोड़ें';
+
+  @override
+  String get onboarding_body =>
+      'एक्सटेंशन स्थापित करने के लिए रिपॉजिटरी जोड़ें।';
+
+  @override
+  String get onboarding_add => 'रिपॉजिटरी जोड़ें';
+
+  @override
+  String get onboarding_skip => 'अभी छोड़ें';
+
+  @override
+  String get onboarding_continue => 'जारी रखें';
+
+  @override
+  String get onboarding_later =>
+      'आप इसे बाद में सेटिंग्स > ब्राउज़ में जोड़ सकते हैं।';
+
+  @override
+  String get onboarding_replay => 'स्वागत स्क्रीन दिखाएं';
+
+  @override
+  String get onboarding_replay_subtitle =>
+      'प्रारंभिक सेटअप स्क्रीन पुनः खोलें।';
+
+  @override
+  String get missing_source_check_title => 'अनुपलब्ध स्रोतों की जाँच करें';
+
+  @override
+  String get missing_source_check_subtitle =>
+      'ऐसी प्रविष्टियाँ खोजें जिनका एक्सटेंशन स्थापित नहीं है।';
+
+  @override
+  String get missing_source_check_none_found => 'सभी स्रोत स्थापित हैं।';
+
+  @override
+  String missing_source_check_result_title(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count स्रोत अनुपलब्ध',
+      one: '1 स्रोत अनुपलब्ध',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String global_search_no_sources(String itemType) {
+    return 'कोई $itemType स्रोत स्थापित नहीं है।';
+  }
+
+  @override
+  String get global_search_no_sources_hint =>
+      'ब्राउज़ के तहत एक रिपॉजिटरी जोड़ें, फिर इसके लिए एक एक्सटेंशन स्थापित करें।';
+
+  @override
+  String global_search_only_pinned(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count स्रोत',
+      one: '1 स्रोत',
+    );
+    return 'आपके पास इसके लिए $_temp0 हैं, लेकिन केवल पिन किए गए स्रोतों में खोज की जाती है।';
+  }
+
+  @override
+  String get global_search_only_pinned_hint =>
+      'किसी एक को पिन करें, या ब्राउज़ सेटिंग्स में \"केवल पिन किए गए स्रोतों को शामिल करें\" बंद करें।';
+
+  @override
+  String get global_search_all_nsfw =>
+      'इसके लिए आपके सभी स्रोत NSFW चिह्नित हैं और छिपे हुए हैं।';
+
+  @override
+  String get global_search_all_nsfw_hint =>
+      'उन्हें खोजने के लिए ब्राउज़ सेटिंग्स में NSFW स्रोत चालू करें।';
+
+  @override
+  String get missing_source_check_result_message =>
+      'ये प्रविष्टियां ऐसे स्रोत की ओर इशारा करती हैं जो स्थापित नहीं है। माइग्रेट करने के लिए टैप करें या एक्सटेंशन स्थापित करें।';
+
+  @override
+  String get related_titles => 'संबंधित';
+
+  @override
+  String get related_none => 'इस शीर्षक के लिए कोई संबंधित सामग्री नहीं मिली।';
+
+  @override
+  String get relation_adaptation => 'रूपांतरण';
+
+  @override
+  String get relation_sequel => 'सीक्वल';
+
+  @override
+  String get relation_prequel => 'प्रीक्वल';
+
+  @override
+  String get relation_parent => 'मूल कहानी';
+
+  @override
+  String get relation_side_story => 'साइड स्टोरी';
+
+  @override
+  String get relation_spin_off => 'स्पिन-ऑफ';
+
+  @override
+  String get relation_alternative => 'वैकल्पिक संस्करण';
+
+  @override
+  String get auto_library_update => 'स्वचालित लाइब्रेरी अपडेट';
+
+  @override
+  String get auto_library_update_subtitle =>
+      'ऐप शुरू होने पर नए अध्यायों के लिए अपनी लाइब्रेरी की प्रत्येक प्रविष्टि की जांच करें।';
+
+  @override
+  String get auto_library_update_never => 'कभी नहीं';
+
+  @override
+  String get auto_library_update_12_hours => 'प्रत्येक 12 घंटे में';
+
+  @override
+  String get auto_library_update_daily => 'दैनिक';
+
+  @override
+  String get auto_library_update_2_days => 'प्रत्येक 2 दिन में';
+
+  @override
+  String get auto_library_update_weekly => 'साप्ताहिक';
+
+  @override
+  String get auto_library_update_wifi_only => 'केवल वाई-फ़ाई पर';
+
+  @override
+  String get auto_library_update_wifi_only_subtitle =>
+      'मोबाइल डेटा पर होने पर निर्धारित अपडेट छोड़ें।';
+
+  @override
+  String get padding => 'पैडिंग';
+
+  @override
+  String get page_mode => 'पृष्ठ मोड';
+
+  @override
+  String get single_page => 'एकल पृष्ठ';
+
+  @override
+  String get double_page => 'दोहरा पृष्ठ';
+
+  @override
+  String get speed => 'गति';
+
+  @override
+  String get theme_dark => 'गहरा';
+
+  @override
+  String get theme_light => 'हल्का';
+
+  @override
+  String get theme_black => 'काला';
+
+  @override
+  String get theme_sepia => 'सेपिया';
+
+  @override
+  String get decrease => 'घटाएं';
+
+  @override
+  String get increase => 'बढ़ाएं';
+
+  @override
+  String get chapter_swipe_actions => 'अध्याय स्वाइप क्रियाएं';
+
+  @override
+  String get chapter_swipe_start => 'दाएं स्वाइप करें';
+
+  @override
+  String get chapter_swipe_end => 'बाएं स्वाइप करें';
+
+  @override
+  String get chapter_swipe_toggle_bookmark => 'बुकमार्क टॉगल करें';
+
+  @override
+  String get chapter_swipe_toggle_read => 'पढ़ा गया टॉगल करें';
+
+  @override
+  String get chapter_swipe_download => 'डाउनलोड करें';
+
+  @override
+  String get chapter_swipe_disabled => 'अक्षम';
+
+  @override
+  String get seasons => 'Seasons';
+
+  @override
+  String get season_number => 'Season number';
+
+  @override
+  String get library_statistics => 'Library statistics';
+
+  @override
+  String get url_must_end_with_dot_json => 'URL .json के साथ समाप्त होना चाहिए';
+
+  @override
+  String extension_server_directory_is_package_managed(
+    Object fallbackDirectory,
+  ) {
+    return 'The extension server folder is managed by your package manager. Installing into $fallbackDirectory instead.';
+  }
+
+  @override
+  String get animation_speed => 'Animation speed';
+
+  @override
+  String get animation_speed_description =>
+      'Lower values play animations faster.';
+
+  @override
+  String animation_duration_percentage(int percentage) {
+    return '$percentage% duration';
+  }
+
+  @override
+  String get reading_direction => 'Reading direction';
+
+  @override
+  String get reading_mode_horizontal_paged => 'Horizontal paged';
+
+  @override
+  String get reading_mode_vertical_paged => 'Vertical paged';
+
+  @override
+  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
+
+  @override
+  String get default_page_mode => 'Default page mode';
+
+  @override
+  String get page_mode_single => 'Single page';
+
+  @override
+  String get page_mode_double => 'Double page';
+
+  @override
+  String get page_mode_double_cover => 'Double page with cover offset';
+
+  @override
   String get subtitle_position => 'Subtitle position';
 
   @override
@@ -2703,698 +3536,29 @@ class AppLocalizationsHi extends AppLocalizations {
   String get next_lookup => 'Next lookup';
 
   @override
-  String get app_ui_scale => 'Interface scale';
+  String get sync_password => 'पासवर्ड (कम से कम 8 अक्षर)';
 
   @override
-  String get app_ui_scale_subtitle =>
-      'Make the interface larger or smaller to suit your screen and viewing distance.';
+  String get last_sync_manga => 'अंतिम मंगा सिंक: ';
 
   @override
-  String get allow_concurrent_downloads => 'Allow concurrent downloads';
+  String get last_sync_history => 'अंतिम इतिहास सिंक: ';
 
   @override
-  String get allow_concurrent_downloads_subtitle =>
-      'Download from different sources at the same time. A single source still downloads one chapter at a time so it isn\'t overloaded. Turn off to download one at a time everywhere.';
+  String get last_sync_update => 'अंतिम अपडेट सिंक: ';
 
   @override
-  String get download_delay => 'Download delay';
+  String get sync_login_invalid_creds => 'अमान्य ईमेल या पासवर्ड';
 
   @override
-  String get download_delay_subtitle =>
-      'Off. Add a wait with random jitter between chapters to be gentler on sources.';
+  String get sync_section_data_types => 'क्या सिंक करना है';
 
   @override
-  String get save_search => 'Save search';
+  String get sync_enable_histories => 'इतिहास डेटा सिंक करें';
 
   @override
-  String get saved_searches => 'Saved searches';
+  String get sync_enable_updates => 'अपडेट डेटा सिंक करें';
 
   @override
-  String get enter_search_to_save_first => 'Enter a search to save first';
-
-  @override
-  String get no_saved_searches =>
-      'No saved searches for this source yet.\nRun a search, then pick \"Save search\".';
-
-  @override
-  String get source => 'Source';
-
-  @override
-  String label_value(Object label, Object value) {
-    return '$label: $value';
-  }
-
-  @override
-  String get url => 'URL';
-
-  @override
-  String beta_version(Object version) {
-    return 'Beta ($version)';
-  }
-
-  @override
-  String get empty_placeholder => 'EMPTY\nMPTY\nMTY\nMT\n\n';
-
-  @override
-  String get error => 'Error';
-
-  @override
-  String error_with_message(Object error) {
-    return 'Error: $error';
-  }
-
-  @override
-  String get no_pages_available => 'Error: no pages available';
-
-  @override
-  String get create_extension => 'Create Extension';
-
-  @override
-  String get choose_extension_language => 'Choose extension language';
-
-  @override
-  String get lang => 'Lang';
-
-  @override
-  String get base_url => 'BaseUrl';
-
-  @override
-  String get api_url_optional => 'ApiUrl (optional)';
-
-  @override
-  String get icon_url => 'iconUrl';
-
-  @override
-  String get source_icon_url => 'Source icon url';
-
-  @override
-  String get notes => 'notes';
-
-  @override
-  String get extension_name_example => 'ex: myAnime';
-
-  @override
-  String get language_code_example => 'ex: en';
-
-  @override
-  String get base_url_example => 'ex: https://example.com';
-
-  @override
-  String get api_url_example => 'ex: https://api.example.com';
-
-  @override
-  String get extension_notes_example => 'ex: this extension requires login';
-
-  @override
-  String get type => 'Type';
-
-  @override
-  String get target => 'Target';
-
-  @override
-  String get source_type_single => 'single';
-
-  @override
-  String get source_type_multi => 'multi';
-
-  @override
-  String get source_type_torrent => 'torrent';
-
-  @override
-  String get source_language_dart => 'Dart';
-
-  @override
-  String get source_language_javascript => 'JavaScript';
-
-  @override
-  String get source_language_lnreader_compiled_js => 'LNReader compiled JS';
-
-  @override
-  String get source_created_successfully => 'Source created successfully';
-
-  @override
-  String get source_already_exists => 'Source already exists';
-
-  @override
-  String get error_when_creating_source => 'Error when creating source';
-
-  @override
-  String get cookies_deleted => 'Cookies deleted!';
-
-  @override
-  String get delete_all_cookies => 'Delete all cookies';
-
-  @override
-  String get url_must_end_with_dot_json_or_dot_pb =>
-      'URL must end with .json / .pb';
-
-  @override
-  String get default_download_destination => 'Default download destination';
-
-  @override
-  String get ask_download_destination => 'Ask for download destination';
-
-  @override
-  String get ask_download_destination_desc =>
-      'Choose a local folder each time a download starts.';
-
-  @override
-  String get select_download_destination => 'Select download destination';
-
-  @override
-  String get clear_local_library => 'Clear local library';
-
-  @override
-  String get clear_local_library_desc =>
-      'Remove local folder and archive entries from the library.';
-
-  @override
-  String get clear_local_library_msg =>
-      'This will remove local folder and archive entries from your library. It will not delete files from disk.';
-
-  @override
-  String get custom => 'Custom';
-
-  @override
-  String get no_local_folder_available_for_downloads =>
-      'No local folder is available for downloads';
-
-  @override
-  String failed_to_create_cbz(Object error) {
-    return 'Failed to create CBZ: $error';
-  }
-
-  @override
-  String error_reading_cover_image(Object error) {
-    return 'Error reading cover image: $error';
-  }
-
-  @override
-  String error_reading_metadata(Object error) {
-    return 'Error reading metadata: $error';
-  }
-
-  @override
-  String error_saving_chapter_episode_to_library(Object error) {
-    return 'Error saving chapter/episode to library: $error';
-  }
-
-  @override
-  String error_reading_chapter_cover_image(Object error) {
-    return 'Error reading chapter cover image: $error';
-  }
-
-  @override
-  String error_reading_archive_cover_image(Object error) {
-    return 'Error reading archive cover image: $error';
-  }
-
-  @override
-  String error_getting_local_library(Object error) {
-    return 'Error getting local library: $error';
-  }
-
-  @override
-  String get zero_interpreter => 'Zero interpreter';
-
-  @override
-  String get zero_interpreter_description =>
-      'The server starts automatically on launch. You can also control it manually.';
-
-  @override
-  String get runtime_status => 'Runtime status';
-
-  @override
-  String get running => 'Running';
-
-  @override
-  String get stopped => 'Stopped';
-
-  @override
-  String get start => 'Start';
-
-  @override
-  String get stop => 'Stop';
-
-  @override
-  String get something_went_wrong => 'Something went wrong';
-
-  @override
-  String get startup_failed => 'Mangayomi could not finish starting up';
-
-  @override
-  String sources_with_no_results(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count sources with no results',
-      one: '1 source with no results',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get import_mode_title => 'How should this be imported?';
-
-  @override
-  String get import_mode_message =>
-      'Choose whether to merge this backup into your current library, or replace your entire library with it.';
-
-  @override
-  String get import_mode_keep_existing => 'Merge';
-
-  @override
-  String get import_mode_keep_existing_subtitle =>
-      'Adds new series and updates matching ones. Nothing in your current library is removed.';
-
-  @override
-  String get import_mode_replace => 'Replace';
-
-  @override
-  String get import_mode_replace_subtitle =>
-      'Deletes your entire current library and replaces it with this backup.';
-
-  @override
-  String get replace_summary_title => 'Ready to replace your library';
-
-  @override
-  String replace_summary_message(Object currentCount, Object backupCount) {
-    return 'This deletes your entire current library ($currentCount series) and replaces it with $backupCount series from this backup. This can only be undone by rolling back.';
-  }
-
-  @override
-  String get replace_summary_confirm => 'Replace';
-
-  @override
-  String replace_result_message(Object count) {
-    return 'Replaced your library with $count series from this backup.';
-  }
-
-  @override
-  String get category_conflict_title => 'Existing categories found';
-
-  @override
-  String get category_conflict_message =>
-      'The backup has categories that already exist in your library. Keep to fold incoming series into the existing category, or delete to leave those series uncategorized instead.';
-
-  @override
-  String get category_conflict_keep => 'Keep — merge into existing category';
-
-  @override
-  String get category_conflict_delete => 'Delete — leave series uncategorized';
-
-  @override
-  String get source_conflict_title => 'Sources not found';
-
-  @override
-  String get source_conflict_message =>
-      'These backup sources don\'t match an installed extension. Keep the original name (imported without a working source), or migrate to an installed extension so these series can be updated.';
-
-  @override
-  String get source_conflict_keep => 'Keep original name (no live source)';
-
-  @override
-  String get import_summary_title => 'Ready to import';
-
-  @override
-  String import_summary_message(
-    Object newSeries,
-    Object updatedSeries,
-    Object newChapters,
-  ) {
-    return '$newSeries new series, $updatedSeries existing series will be updated, and $newChapters new chapters will be added. Nothing already in your library will be removed.';
-  }
-
-  @override
-  String get import_summary_confirm => 'Import';
-
-  @override
-  String import_result_message(
-    Object newSeries,
-    Object updatedSeries,
-    Object newChapters,
-  ) {
-    return 'Imported $newSeries new series, updated $updatedSeries existing, added $newChapters new chapters.';
-  }
-
-  @override
-  String get roll_back => 'Roll back';
-
-  @override
-  String get roll_back_confirm_message =>
-      'This restores your library to the safety snapshot taken right before this change, undoing everything it just did.';
-
-  @override
-  String get roll_back_done => 'Rolled back to the pre-change snapshot.';
-
-  @override
-  String get restoring_backup => 'Restoring your library…';
-
-  @override
-  String get roll_back_last_change => 'Roll back last change';
-
-  @override
-  String roll_back_last_change_subtitle(Object date, Object description) {
-    return 'Snapshot from $date — $description';
-  }
-
-  @override
-  String roll_back_available_count(Object count) {
-    return '$count recent changes available to roll back to';
-  }
-
-  @override
-  String get delete_source_title => 'Delete a source & its manga';
-
-  @override
-  String get delete_source_subtitle =>
-      'Pick a source and remove every manga it has in your library, along with their chapters, downloads, history and tracking.';
-
-  @override
-  String get delete_source_pick_title => 'Pick a source to delete';
-
-  @override
-  String get delete_source_empty => 'No sources found in your library.';
-
-  @override
-  String delete_source_confirm_title(Object sourceName) {
-    return 'Delete $sourceName?';
-  }
-
-  @override
-  String delete_source_confirm_message(
-    Object mangaCount,
-    Object chapterCount,
-    Object historyCount,
-    Object updateCount,
-  ) {
-    return 'This permanently deletes $mangaCount manga, $chapterCount chapters, $historyCount history entries and $updateCount update entries. Tracking links are kept. This cannot be undone except by rolling back.';
-  }
-
-  @override
-  String get delete_source_also_remove_extension =>
-      'Also remove the installed extension';
-
-  @override
-  String get delete_source_keep_history => 'Keep reading history';
-
-  @override
-  String get delete_source_keep_downloads => 'Keep download records';
-
-  @override
-  String get delete_source_button => 'Delete';
-
-  @override
-  String delete_source_result_message(Object mangaCount, Object sourceName) {
-    return 'Deleted $mangaCount manga from $sourceName.';
-  }
-
-  @override
-  String get merge_manga_title => 'Merge duplicate manga';
-
-  @override
-  String get merge_manga_subtitle =>
-      'Finds manga with matching titles under the same source (e.g. after merging duplicate sources) and folds them into one, without deleting anything you\'d want kept.';
-
-  @override
-  String get merge_manga_none_found => 'No likely duplicate manga found.';
-
-  @override
-  String get merge_manga_pick_title => 'Possible duplicate manga';
-
-  @override
-  String get merge_manga_choose_primary_title =>
-      'Which one should the others merge into?';
-
-  @override
-  String get merge_manga_choose_primary_message =>
-      'Chapters, history and tracking from the other entries will be folded into whichever one you pick — nothing is deleted.';
-
-  @override
-  String merge_manga_chapters_subtitle(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count chapters',
-      one: '1 chapter',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get merge_manga_button => 'Merge';
-
-  @override
-  String merge_manga_result_message(Object count, Object mangaName) {
-    return 'Merged $count duplicate manga into $mangaName.';
-  }
-
-  @override
-  String get merge_preview_title => 'Confirm merge';
-
-  @override
-  String merge_manga_preview_message(
-    Object totalChapters,
-    Object duplicateChapters,
-    Object keptChapters,
-    Object duplicateTracks,
-  ) {
-    return '$totalChapters chapters found across the other entries. $duplicateChapters are duplicates and will be dropped (keeping whichever copy has reading progress); $keptChapters will be added. $duplicateTracks duplicate tracking link(s) will also be dropped.';
-  }
-
-  @override
-  String get memory_overlay => 'Show memory usage';
-
-  @override
-  String get memory_overlay_subtitle =>
-      'A live readout of what the app is holding. For measuring on the device rather than guessing: watch it while scrolling the library or reading a chapter.';
-
-  @override
-  String get beta => 'Beta';
-
-  @override
-  String get error_reports => 'Error reports';
-
-  @override
-  String get error_reports_subtitle =>
-      'Errors the app caught, and a way to report them';
-
-  @override
-  String get error_reports_empty =>
-      'Nothing has gone wrong. Errors the app catches are kept here so you can report them.';
-
-  @override
-  String get error_reports_likely_cause => 'Likely cause';
-
-  @override
-  String get error_reports_report => 'Report on GitHub';
-
-  @override
-  String get error_reports_banner => 'Mangayomi ran into an error';
-
-  @override
-  String get error_reports_banner_action => 'See it';
-
-  @override
-  String get error_reports_copy => 'Copy';
-
-  @override
-  String get error_reports_copied => 'Copied to the clipboard';
-
-  @override
-  String get error_reports_clear => 'Clear';
-
-  @override
-  String get error_reports_extension_failure =>
-      'This came from an extension, not from Mangayomi. Extensions are written and maintained by whoever runs the repository you installed this source from, so a fix has to go there. The source name and what you were opening are the useful details to give them.';
-
-  @override
-  String get error_reports_already_reported => 'Already reported';
-
-  @override
-  String get error_reports_expected_failure =>
-      'This one is usually the source or the network rather than the app: a link that expired, a server that was down, or a connection that dropped. Worth reporting only if it keeps happening on a source that works elsewhere.';
-
-  @override
-  String get share_unavailable_copied =>
-      'Sharing isn\'t available on this platform, so it was copied to the clipboard instead.';
-
-  @override
-  String get onboarding_title => 'Welcome to Mangayomi';
-
-  @override
-  String get onboarding_libraries_body =>
-      'Pick what you read and watch. The ones you leave out stay out of the navigation bar, and you can change this later under Appearance.';
-
-  @override
-  String get onboarding_nav_title => 'Your libraries';
-
-  @override
-  String get onboarding_nav_body =>
-      'Keep a tab for each of them, or put them together behind one Library tab you can switch inside.';
-
-  @override
-  String get onboarding_nav_split => 'A tab each';
-
-  @override
-  String get onboarding_nav_merged => 'One Library tab';
-
-  @override
-  String get onboarding_nav_inside => 'Tapping Library swaps the bar for these';
-
-  @override
-  String get onboarding_next => 'Next';
-
-  @override
-  String get onboarding_restore => 'Restore a backup';
-
-  @override
-  String get onboarding_or_local => 'Or use files you already have';
-
-  @override
-  String get onboarding_local_folder => 'Add a folder';
-
-  @override
-  String onboarding_local_existing(Object count) {
-    return '$count folders already set up';
-  }
-
-  @override
-  String get onboarding_local_any_type =>
-      'Manga, anime and novels all work. Each title goes to the right library based on what is inside it.';
-
-  @override
-  String get onboarding_local_scanning => 'Scanning the folder';
-
-  @override
-  String onboarding_local_found(Object count) {
-    return '$count titles found';
-  }
-
-  @override
-  String get onboarding_local_remove => 'Remove that folder';
-
-  @override
-  String get onboarding_local_in_downloads =>
-      'That is the app\'s downloads folder. Adding it makes a second, local copy of a library the app already manages.';
-
-  @override
-  String get onboarding_local_empty =>
-      'Nothing found. Pick the folder that holds your manga folders, not one manga.';
-
-  @override
-  String get onboarding_repo_failed =>
-      'Couldn\'t read that repository. Check the address and your connection.';
-
-  @override
-  String get onboarding_repo_title => 'Add a source';
-
-  @override
-  String get onboarding_body =>
-      'Mangayomi comes with no sources of its own. Add a repository and the extensions it holds become available to install and browse.';
-
-  @override
-  String get onboarding_add => 'Add repository';
-
-  @override
-  String get onboarding_skip => 'Skip for now';
-
-  @override
-  String get onboarding_continue => 'Continue';
-
-  @override
-  String get onboarding_later =>
-      'You can add one later in Settings, under Browse.';
-
-  @override
-  String get onboarding_replay => 'Show the welcome screen';
-
-  @override
-  String get onboarding_replay_subtitle =>
-      'Opens the first-run screen again, the one a new install starts on.';
-
-  @override
-  String get missing_source_check_title => 'Check for missing sources';
-
-  @override
-  String get missing_source_check_subtitle =>
-      'Find library entries whose extension isn\'t installed - restoring a backup can leave entries pointing at a source you never installed on this device.';
-
-  @override
-  String get missing_source_check_none_found =>
-      'Every library entry\'s source is installed.';
-
-  @override
-  String missing_source_check_result_title(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count sources missing',
-      one: '1 source missing',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String global_search_no_sources(String itemType) {
-    return 'No $itemType sources are installed.';
-  }
-
-  @override
-  String get global_search_no_sources_hint =>
-      'Add a repository under Browse, then install an extension for it.';
-
-  @override
-  String global_search_only_pinned(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count sources',
-      one: '1 source',
-    );
-    return 'You have $_temp0 for this, but only pinned ones are searched.';
-  }
-
-  @override
-  String get global_search_only_pinned_hint =>
-      'Pin one, or turn off \"Only include pinned sources\" in Browse settings.';
-
-  @override
-  String get global_search_all_nsfw =>
-      'Every source you have for this is marked NSFW, and those are hidden.';
-
-  @override
-  String get global_search_all_nsfw_hint =>
-      'Turn on NSFW sources in Browse settings to search them.';
-
-  @override
-  String get missing_source_check_result_message =>
-      'These library entries point at a source that isn\'t installed on this device. Tap one to migrate it to an installed source, install the matching extension, or use \"Delete a source & its manga\" to remove them.';
-
-  @override
-  String get related_titles => 'Related';
-
-  @override
-  String get related_none => 'Nothing related was found for this title.';
-
-  @override
-  String get relation_adaptation => 'Adaptation';
-
-  @override
-  String get relation_sequel => 'Sequel';
-
-  @override
-  String get relation_prequel => 'Prequel';
-
-  @override
-  String get relation_parent => 'Parent story';
-
-  @override
-  String get relation_side_story => 'Side story';
-
-  @override
-  String get relation_spin_off => 'Spin-off';
-
-  @override
-  String get relation_alternative => 'Alternative version';
+  String get sync_enable_settings => 'सेटिंग्स सिंक करें';
 }

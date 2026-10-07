@@ -344,6 +344,7 @@ jobs:
           artifacts: "release-packages/*"
           artifactErrorsFailBuild: true
           allowUpdates: true
+          omitBodyDuringUpdate: true
           immutableCreate: true
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           tag: ${{ env.RELEASE_TAG }}

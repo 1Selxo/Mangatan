@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
-import 'package:mangayomi/eval/javascript/http.dart';
 import 'package:mangayomi/eval/http_response_extensions.dart';
 import 'package:mangayomi/eval/model/filter.dart';
 import 'package:mangayomi/eval/model/m_chapter.dart';
@@ -69,14 +68,13 @@ class MihonExtensionService implements ExtensionService {
     Object? body,
     Map<String, String>? headers,
   }) async {
-    final payload = body is Map
-        ? {...body, 'lang': source.lang, 'sourceId': source.id?.toString()}
-        : body;
+    // The pinned APKBridge DataBody rejects unknown top-level fields. Source
+    // selection travels in mihonPreferencePayload's bridge context instead.
     Future<http.Response> send(Map<String, String>? requestHeaders) =>
         postMihonBridge(
           client,
           mihonBridgeDalvikUri(androidProxyServer),
-          body: payload,
+          body: body,
           headers: requestHeaders,
           retryTransientFailures: _usesLoopbackBridge,
         );

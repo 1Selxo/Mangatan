@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'onboarding_state_provider.g.dart';
@@ -18,13 +19,23 @@ part 'onboarding_state_provider.g.dart';
 class OnboardingCompletedState extends _$OnboardingCompletedState {
   @override
   bool build() {
-    final settings = settingsRepository.current;
-    final completed = settings.onboardingCompleted;
+    final completed = settingsRepository.field(
+      (s) => s.onboardingCompletedProperty(),
+    );
     if (completed != null) return completed;
     if (kDebugMode) return true;
-    return (settings.mangaExtensionsRepo?.isNotEmpty ?? false) ||
-        (settings.animeExtensionsRepo?.isNotEmpty ?? false) ||
-        (settings.novelExtensionsRepo?.isNotEmpty ?? false);
+    return (settingsRepository
+                .field((s) => s.mangaExtensionsRepoProperty())
+                ?.isNotEmpty ??
+            false) ||
+        (settingsRepository
+                .field((s) => s.animeExtensionsRepoProperty())
+                ?.isNotEmpty ??
+            false) ||
+        (settingsRepository
+                .field((s) => s.novelExtensionsRepoProperty())
+                ?.isNotEmpty ??
+            false);
   }
 
   void complete() => _set(true);

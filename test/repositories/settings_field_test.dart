@@ -4,6 +4,7 @@
 //
 // With MANGATAN_PERF set it also prints how long each read takes on a
 // settings row with a large library's per-entry lists.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -116,7 +117,64 @@ final _fields = <String, (Object? Function(Settings), Object? Function())>{
     (s) => s.novelGridSize,
     () => settingsRepository.field((s) => s.novelGridSizeProperty()),
   ),
+  'onboardingCompleted': (
+    (s) => s.onboardingCompleted,
+    () => settingsRepository.field((s) => s.onboardingCompletedProperty()),
+  ),
+  'mangaExtensionsRepo': (
+    (s) => _json(s.mangaExtensionsRepo),
+    () =>
+        _json(settingsRepository.field((s) => s.mangaExtensionsRepoProperty())),
+  ),
+  'animeExtensionsRepo': (
+    (s) => _json(s.animeExtensionsRepo),
+    () =>
+        _json(settingsRepository.field((s) => s.animeExtensionsRepoProperty())),
+  ),
+  'novelExtensionsRepo': (
+    (s) => _json(s.novelExtensionsRepo),
+    () =>
+        _json(settingsRepository.field((s) => s.novelExtensionsRepoProperty())),
+  ),
 };
+
+/// Fields read with `currentOrNull?.<field>` before and with `fieldOrNull`
+/// now: per HTTP request (DNS settings, cookies) and for the bridge address.
+final _nullableFields =
+    <String, (Object? Function(Settings?), Object? Function())>{
+      'doHEnabled': (
+        (s) => s?.doHEnabled,
+        () => settingsRepository.fieldOrNull((s) => s.doHEnabledProperty()),
+      ),
+      'doHProviderId': (
+        (s) => s?.doHProviderId,
+        () => settingsRepository.fieldOrNull((s) => s.doHProviderIdProperty()),
+      ),
+      'cookiesList': (
+        (s) => _json(s?.cookiesList),
+        () => _json(
+          settingsRepository.fieldOrNull((s) => s.cookiesListProperty()),
+        ),
+      ),
+      'androidProxyServer': (
+        (s) => s?.androidProxyServer,
+        () => settingsRepository.fieldOrNull(
+          (s) => s.androidProxyServerProperty(),
+        ),
+      ),
+      'androidProxyServer (bridge base URL)': (
+        (s) => s?.androidProxyServer,
+        () => isar.settings
+            .where()
+            .idEqualTo(227)
+            .androidProxyServerProperty()
+            .findFirstSync(),
+      ),
+    };
+
+/// Embedded objects have no field-by-field `==`, so compare their JSON.
+String? _json(List<dynamic>? list) =>
+    list == null ? null : jsonEncode([for (final e in list) e.toJson()]);
 
 Object? _locale(L10nLocale? locale) =>
     locale == null ? null : (locale.languageCode, locale.countryCode);
@@ -127,8 +185,23 @@ bool _same(Object? a, Object? b) {
 }
 
 void _expectAllFieldsMatch() {
+  _expectNullableFieldsMatch();
   final current = settingsRepository.current;
   for (final MapEntry(key: name, value: (old, now)) in _fields.entries) {
+    final expected = old(current);
+    final actual = now();
+    expect(
+      _same(expected, actual),
+      isTrue,
+      reason: '$name: expected $expected, got $actual',
+    );
+  }
+}
+
+void _expectNullableFieldsMatch() {
+  final current = settingsRepository.currentOrNull;
+  for (final MapEntry(key: name, value: (old, now))
+      in _nullableFields.entries) {
     final expected = old(current);
     final actual = now();
     expect(
@@ -197,6 +270,20 @@ void main() {
           ..mangaGridSize = 4
           ..animeGridSize = null
           ..novelGridSize = 0
+          ..onboardingCompleted = false
+          ..mangaExtensionsRepo = [
+            Repo(name: 'Keiyoushi', jsonUrl: 'https://repo.example/i.json'),
+            Repo(name: 'é 漢字', website: '', hidden: true),
+          ]
+          ..animeExtensionsRepo = []
+          ..novelExtensionsRepo = null
+          ..doHEnabled = true
+          ..doHProviderId = null
+          ..cookiesList = [
+            MCookie(host: 'example.com', cookie: 'cf_clearance=ä; a=b'),
+            MCookie(host: null, cookie: ''),
+          ]
+          ..androidProxyServer = 'http://192.168.1.5:8080'
           ..chapterPageIndexList = [
             for (var i = 0; i < 2000; i++)
               ChapterPageIndex(chapterId: i, index: i % 7),
@@ -221,6 +308,48 @@ void main() {
     expect(
       settingsRepository.field((s) => s.themeIsDarkProperty()),
       !(Settings().themeIsDark!),
+    );
+  });
+
+  test('stored DNS settings and repositories read the same', () {
+    isar.writeTxnSync(
+      () => isar.settings.putSync(
+        Settings()
+          ..doHEnabled = false
+          ..doHProviderId = 3
+          ..cookiesList = []
+          ..androidProxyServer = ''
+          ..onboardingCompleted = null
+          ..mangaExtensionsRepo = null
+          ..animeExtensionsRepo = [Repo(jsonUrl: 'https://a.example/x.json')],
+      ),
+    );
+    _expectAllFieldsMatch();
+  });
+
+  test('a missing row reads null where currentOrNull did', () {
+    expect(settingsRepository.currentOrNull, isNull);
+    _expectNullableFieldsMatch();
+    for (final (_, now) in _nullableFields.values) {
+      expect(now(), isNull);
+    }
+  });
+
+  test('a closed database reads null where currentOrNull did', () async {
+    isar.writeTxnSync(() => isar.settings.putSync(Settings()));
+    final open = isar;
+    await open.close();
+    expect(settingsRepository.currentOrNull, isNull);
+    for (final (name, (_, now)) in [
+      for (final e in _nullableFields.entries)
+        if (!e.key.contains('bridge')) (e.key, e.value),
+    ]) {
+      expect(now(), isNull, reason: name);
+    }
+    isar = await Isar.open(
+      [SettingsSchema, SourceSchema],
+      directory: dir.path,
+      name: 'settings_field_${dir.path.hashCode}',
     );
   });
 
@@ -284,6 +413,24 @@ void main() {
       );
       // ignore: avoid_print
       print('BENCH settings read: current $whole ms, field $one ms');
+      // What one HTTP request reads: MClient.init's DNS settings, then the
+      // cookie lookup.
+      final requestOld = median(() {
+        final appSettings = settingsRepository.currentOrNull;
+        appSettings?.doHEnabled;
+        appSettings?.doHProviderId;
+        settingsRepository.currentOrNull?.cookiesList;
+      });
+      final requestNew = median(() {
+        settingsRepository.fieldOrNull((s) => s.doHEnabledProperty());
+        settingsRepository.fieldOrNull((s) => s.doHProviderIdProperty());
+        settingsRepository.fieldOrNull((s) => s.cookiesListProperty());
+      });
+      // ignore: avoid_print
+      print(
+        'BENCH per-request settings reads: whole row $requestOld ms, '
+        'fields $requestNew ms',
+      );
     },
   );
 }

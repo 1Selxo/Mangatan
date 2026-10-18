@@ -66,9 +66,11 @@ class MClient {
     rhttp.ClientSettings? settings,
     bool showCloudFlareError = true,
   }) {
-    final appSettings = settingsRepository.currentOrNull;
-    final useDoH = appSettings?.doHEnabled ?? false;
-    final doHProviderId = appSettings?.doHProviderId;
+    final useDoH =
+        settingsRepository.fieldOrNull((s) => s.doHEnabledProperty()) ?? false;
+    final doHProviderId = settingsRepository.fieldOrNull(
+      (s) => s.doHProviderIdProperty(),
+    );
 
     DnsSettings? dnsSettings;
 
@@ -120,7 +122,8 @@ class MClient {
   }
 
   static Map<String, String> getCookiesPref(String url) {
-    final cookiesList = settingsRepository.currentOrNull?.cookiesList ?? [];
+    final cookiesList =
+        settingsRepository.fieldOrNull((s) => s.cookiesListProperty()) ?? [];
     if (cookiesList.isEmpty) return {};
     final host = Uri.parse(url).host;
     final matching = cookiesList.where(

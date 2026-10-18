@@ -1,9 +1,10 @@
 # App startup performance (work in progress)
 
-Status: one optimization (S1) is implemented and covered by an equivalence
-test. Its effect on real startup has **not** been measured after the change
-yet: the profile build containing S1 was never run. Everything below the
-"Baseline" heading was measured on the code before S1.
+Status: two optimizations (S1, S2), both covered by equivalence tests. S1 is
+measured in profile builds (see "After S1"); S2 so far only by a
+micro-benchmark. The "Baseline" section was measured on the code before S1.
+The first-launch stall turned out to be a harness artifact (see "The
+first-launch stall").
 
 ## What is measured
 
@@ -124,6 +125,7 @@ samples at 1 ms):
 | Id | Change | Files | Status |
 |---|---|---|---|
 | S1 | Startup providers read their one settings field with an Isar property query (`SettingsRepository.field`) instead of deserializing the whole settings row | `settings_repository.dart`; providers in `library_source_badge_provider.dart`, `library_state_provider.dart` (grid size), `tv_mode_provider.dart`, `storage_usage.dart`, `downloaded_only_state_provider.dart`, `incognito_mode_state_provider.dart`, `animation_duration_scale_provider.dart`, `app_font_family.dart`, `app_ui_scale_state_provider.dart`, `blend_level_state_provider.dart`, `flex_scheme_color_state_provider.dart`, `pure_black_dark_mode_state_provider.dart`, `theme_mode_state_provider.dart`, `browse_state_provider.dart` (extension update check), `general_state_provider.dart` (DNS, user agent), `reader_state_provider.dart` (navigation order, hidden items, merged nav), `security_state_provider.dart`, `l10n_providers.dart` | Implemented, equivalence tested, measured |
+| S2 | The remaining whole-row settings reads on startup and per-request paths read single fields: `MClient.init` (DNS-over-HTTPS settings) and `MClient.getCookiesPref` (cookies) on every HTTP request, the extension-server address (`AndroidProxyServerState`, `MExtensionServerPlatform._baseUrl`), `OnboardingCompletedState` and `ExtensionsRepoState`. Reads that used `currentOrNull?.x` use the new `SettingsRepository.fieldOrNull` | `settings_repository.dart`, `m_client.dart`, `browse_state_provider.dart`, `onboarding_state_provider.dart`, `m_extension_server.dart` | Implemented, equivalence tested, micro-benchmarked |
 
 S1 keeps every read fresh (one query per `build()`, exactly when the old code
 read), so no read can see older data than before. Only `build()` methods were
@@ -143,6 +145,27 @@ page indexes and 500 entries in each chapter filter list, median of 40):
 about 25 startup providers this suggests roughly 25 ms less main-isolate work
 before the library frame at this library size; the profile-build figure is
 still to be measured.
+
+S2: `fieldOrNull` returns null where `currentOrNull?.<field>` did: a missing
+row, a null value, or a failing read (for example a closed database). The
+onboarding and repository reads use `field`, which fails like `current`.
+`_baseUrl` used `getSync` without a guard, so it uses an unguarded property
+query. Onboarding still reads the repository lists only when the flag is
+unset, in the same order. The DNS settings are now two queries instead of one
+row read; nothing between them yields to the event loop.
+
+Equivalence evidence for S2: `test/repositories/settings_field_test.dart`
+compares every converted field with the old expression on a fresh row, on
+rows with stored values, nulls, empty lists, embedded repositories and cookies
+(compared as JSON) and non-ASCII text, after a write, for a missing row, and
+with the database closed. Mutation checks: letting `fieldOrNull` throw
+instead of returning null, and making it always return null, each fail the
+test.
+
+Micro-benchmark (same settings row as above, JIT, median of 40): the settings
+reads of one HTTP request (`MClient.init` plus the cookie lookup) take 1.29 ms
+before and 0.04 ms after. That is about 1.25 ms of main-isolate time saved per
+request at this library size, for example per source in a global search.
 
 ## After S1
 
@@ -222,9 +245,8 @@ The longest remaining stall is the first build, as in warm launches.
 
 ## Still to do
 
-- Remaining settings reads on the startup path not converted yet:
-  `OnboardingCompletedState` (reads several fields), `AndroidProxyServerState`
-  (`currentOrNull`), `MExtensionServerPlatform._baseUrl`, `MClient.init`.
+- Measure S2 in a profile build: a request-heavy flow such as global search
+  across many sources, not only startup.
 
 ## Measured but deliberately not changed
 

@@ -24,7 +24,9 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
   String build() {
     // The embedded iOS bridge outlives any individual source provider.
     ref.keepAlive();
-    final savedAddress = settingsRepository.currentOrNull?.androidProxyServer;
+    final savedAddress = settingsRepository.fieldOrNull(
+      (s) => s.androidProxyServerProperty(),
+    );
     return normalizeMihonBridgeBaseUrl(
       savedAddress == null || savedAddress.trim().isEmpty
           ? "http://127.0.0.1:8080"
@@ -49,7 +51,9 @@ class AndroidProxyServerState extends _$AndroidProxyServerState {
   }
 
   void restoreSaved() {
-    final savedAddress = settingsRepository.currentOrNull?.androidProxyServer;
+    final savedAddress = settingsRepository.fieldOrNull(
+      (s) => s.androidProxyServerProperty(),
+    );
     state = normalizeMihonBridgeBaseUrl(
       savedAddress == null || savedAddress.trim().isEmpty
           ? "http://127.0.0.1:8080"
@@ -150,13 +154,14 @@ class ExtensionsRepoState extends _$ExtensionsRepoState {
 
   @override
   List<Repo> build(ItemType itemType) {
-    final settings = settingsRepository.current;
     final list =
-        switch (itemType) {
-          ItemType.manga => settings.mangaExtensionsRepo,
-          ItemType.anime => settings.animeExtensionsRepo,
-          _ => settings.novelExtensionsRepo,
-        } ??
+        settingsRepository.field(
+          (s) => switch (itemType) {
+            ItemType.manga => s.mangaExtensionsRepoProperty(),
+            ItemType.anime => s.animeExtensionsRepoProperty(),
+            _ => s.novelExtensionsRepoProperty(),
+          },
+        ) ??
         [];
     return _deduplicate(list);
   }

@@ -39,6 +39,22 @@ class SettingsRepository {
     return values.first;
   }
 
+  /// Reads one stored field of the settings row, with the same result as
+  /// `currentOrNull?.<field>`: null when the row is missing, when the value is
+  /// null, or when reading fails.
+  T? fieldOrNull<T>(
+    QueryBuilder<Settings, T?, QQueryOperations> Function(
+      QueryBuilder<Settings, Settings, QQueryProperty> settings,
+    )
+    property,
+  ) {
+    try {
+      return property(isar.settings.where().idEqualTo(227)).findFirstSync();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Settings?> get currentAsync => isar.settings.get(227);
 
   List<Settings> getAll() => isar.settings.filter().idIsNotNull().findAllSync();

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
+import 'package:isar_community/isar.dart';
 import 'package:m_extension_server/m_extension_server.dart';
 import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/eval/mihon/image_proxy.dart';
@@ -554,7 +555,11 @@ class MExtensionServerPlatform {
         if (value != null) return value;
       } catch (_) {}
     }
-    return isar.settings.getSync(227)?.androidProxyServer ??
+    return isar.settings
+            .where()
+            .idEqualTo(227)
+            .androidProxyServerProperty()
+            .findFirstSync() ??
         _unavailableBaseUrl;
   }
 

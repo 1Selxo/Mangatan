@@ -97,6 +97,11 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
   /// so the results are not interleaved with a dozen dead extensions.
   final Map<int, String> _nothingToShow = {};
 
+  /// Bumped whenever [_nothingToShow] changes. Only the group at the bottom
+  /// listens: a report used to rebuild the whole screen, every source row and
+  /// every result card in it, to change that one group.
+  final _nothingToShowRevision = ValueNotifier<int>(0);
+
   @override
   void initState() {
     super.initState();
@@ -108,7 +113,9 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
     if (id == null || _nothingToShow[id] == reason) return;
     // Reported from the child's build, so defer the parent rebuild a frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _nothingToShow[id] = reason);
+      if (!mounted) return;
+      _nothingToShow[id] = reason;
+      _nothingToShowRevision.value++;
     });
   }
 
@@ -179,7 +186,10 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
                       onNothingToShow: (reason) =>
                           _reportNothingToShow(source, reason),
                     ),
-                  _nothingToShowGroup(context),
+                  ValueListenableBuilder<int>(
+                    valueListenable: _nothingToShowRevision,
+                    builder: (context, _, _) => _nothingToShowGroup(context),
+                  ),
                 ],
               ),
             ),
@@ -316,6 +326,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
   @override
   void dispose() {
     _textEditingController.dispose();
+    _nothingToShowRevision.dispose();
     super.dispose();
   }
 }
@@ -500,6 +511,32 @@ class _MangaGlobalImageCardState extends ConsumerState<MangaGlobalImageCard>
     with AutomaticKeepAliveClientMixin<MangaGlobalImageCard> {
   bool _focused = false;
 
+  /// The library lookup for this card, made once and reused by every build.
+  ///
+  /// A new stream on each build made the StreamBuilder drop its watch and run
+  /// the query again, and every card rebuilds whenever the result list does.
+  /// The stream already reports every change, so reusing it shows the same
+  /// thing. It is replaced only when the lookup itself changes.
+  Stream<List<Manga>>? _favorites;
+  ItemType? _favoritesItemType;
+  String? _favoritesName;
+
+  Stream<List<Manga>> _favoritesStream() {
+    final itemType = widget.source.itemType;
+    final name = widget.manga.name;
+    if (_favorites == null ||
+        itemType != _favoritesItemType ||
+        name != _favoritesName) {
+      _favoritesItemType = itemType;
+      _favoritesName = name;
+      _favorites = mangaRepository.watchFavoritesByItemTypeAndName(
+        itemType,
+        name,
+      );
+    }
+    return _favorites!;
+  }
+
   void _open() {
     pushToMangaReaderDetail(
       ref: ref,
@@ -588,10 +625,7 @@ class _MangaGlobalImageCardState extends ConsumerState<MangaGlobalImageCard>
             onTap: _open,
             onLongPress: _quickAddToLibrary,
             child: StreamBuilder(
-              stream: mangaRepository.watchFavoritesByItemTypeAndName(
-                widget.source.itemType,
-                getMangaDetail.name,
-              ),
+              stream: _favoritesStream(),
               builder: (context, snapshot) {
                 final favorites = snapshot.data ?? const <Manga>[];
                 final sameSource = favorites.where(

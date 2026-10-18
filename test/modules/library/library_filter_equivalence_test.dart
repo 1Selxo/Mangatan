@@ -236,6 +236,65 @@ void main() {
     );
   });
 
+  test('scanlator filters read the same as from the whole settings row', () {
+    final original = isar.settings.getSync(227)!;
+    addTearDown(() => isar.writeTxnSync(() => isar.settings.putSync(original)));
+    final data = freshLibrary();
+
+    // The previous code: decode the whole row, then read the list.
+    int previousUnread(Manga manga) => manga.unreadChaptersCountWith(
+      isar.settings
+          .getSync(227)
+          ?.filterScanlatorList
+          ?.where((e) => e.mangaId == manga.id)
+          .firstOrNull
+          ?.scanlators,
+    );
+    Map<int?, List<String>?> previousHidden() {
+      final byManga = <int?, List<String>?>{};
+      for (final filter
+          in isar.settings.getSync(227)?.filterScanlatorList ??
+              const <FilterScanlator>[]) {
+        byManga.putIfAbsent(filter.mangaId, () => filter.scanlators);
+      }
+      return byManga;
+    }
+
+    void check(String reason) {
+      expect(hiddenScanlatorsByManga(), previousHidden(), reason: reason);
+      for (final manga in data) {
+        expect(
+          manga.unreadChaptersCount,
+          previousUnread(manga),
+          reason: '$reason ${manga.id}',
+        );
+      }
+    }
+
+    check('saved filters');
+    final variants = <String, List<FilterScanlator>?>{
+      'no list': null,
+      'empty list': [],
+      'nulls and non-ASCII': [
+        FilterScanlator(mangaId: null, scanlators: ['A']),
+        FilterScanlator(mangaId: data[0].id, scanlators: null),
+        FilterScanlator(mangaId: data[0].id, scanlators: ['B']),
+        FilterScanlator(mangaId: data[1].id, scanlators: ['B', 'Ä 翻訳']),
+        FilterScanlator(mangaId: data[2].id, scanlators: ['', 'A']),
+      ],
+    };
+    for (final MapEntry(:key, :value) in variants.entries) {
+      isar.writeTxnSync(
+        () => isar.settings.putSync(
+          isar.settings.getSync(227)!..filterScanlatorList = value,
+        ),
+      );
+      check(key);
+    }
+    isar.writeTxnSync(() => isar.settings.deleteSync(227));
+    check('no settings row');
+  });
+
   test('a tab lists the same entries as before and reuses its list', () {
     final all = freshLibrary();
     final settings = isar.settings.getSync(227)!;

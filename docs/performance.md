@@ -269,6 +269,7 @@ stream delivers them, so chapter links start unloaded.
 | L1 | Load an entry's chapters only when an active filter or the sort reads them | `library_filter_provider.dart` |
 | L2 | Count unread chapters for many entries with one settings read (`unreadChaptersCounter`) instead of one per entry | `manga_extensions.dart`, `library_filter_provider.dart`, `library_body.dart`, `tv_anime_home_view.dart` |
 | L3 | Build each category tab's entry list once per library snapshot and settings object, and reuse it for the tab and its badge | `library_filter_provider.dart`, `library_body.dart` |
+| L4 | Read only the scanlator filter list from the settings row (an Isar property query) where the unread count needs it, instead of decoding the whole row, which holds every entry's chapter settings | `manga_extensions.dart` |
 
 Equivalence evidence: `test/modules/library/library_filter_equivalence_test.dart`
 compares the filter with a verbatim copy of the previous implementation over
@@ -298,9 +299,27 @@ Median of 20 runs, milliseconds:
 | updates stream emission | 2.5 | 2.6 |
 
 Sorts and filters that read chapters still have to load them; what remains
-is the database read of each entry's chapter links. Tile badges are unchanged
-because each tile still reads the settings when it builds; sharing one read
-across tiles would change when a settings change reaches a tile.
+is the database read of each entry's chapter links. L1–L3 left the tile
+badges unchanged because each tile still reads the settings when it builds;
+sharing one read across tiles would change when a settings change reaches a
+tile.
+
+L4 keeps that read per tile and just makes it cheaper: each tile still
+queries the database when it builds, so it sees exactly the data it saw
+before, but only the scanlator filter list is decoded. A missing row or list
+still gives no filter. Median of 20 runs, two runs each:
+
+| Measure | Before L4 | After L4 |
+|---|---|---|
+| tile badges (unread and download counts, all entries) | 81.3, 83.2 | 52.8, 52.8 |
+| filter + sort, unread count (one read per sort) | 37.2, 37.5 | 37.4, 39.6 |
+
+Equivalence evidence for L4: the library equivalence test compares
+`unreadChaptersCount` and `hiddenScanlatorsByManga` for every entry against
+the previous full-row expressions on the saved filters, no list, an empty
+list, null entry ids and scanlator lists, repeated entries, non-ASCII names
+and a missing settings row. Making the new read return an empty list makes it
+fail.
 
 L3 caches by the identity of the library list and the settings object, both
 of which are replaced whenever either changes. In the moment between a

@@ -94,14 +94,20 @@ List<Chapter> sortChaptersForDisplay({
   return reverse ? list : list.reversed.toList();
 }
 
+/// `isar.settings.getSync(227)?.filterScanlatorList`, without decoding the
+/// rest of the settings row: null when the row or the list is missing.
+List<FilterScanlator>? _filterScanlatorList() => isar.settings
+    .where()
+    .idEqualTo(227)
+    .filterScanlatorListProperty()
+    .findFirstSync();
+
 /// The scanlators hidden for each entry, as [MangaExtensions.unreadChaptersCount]
 /// looks them up: the first filter saved for an entry wins. Reads the
 /// settings once, so counting many entries doesn't load them once per entry.
 Map<int?, List<String>?> hiddenScanlatorsByManga() {
   final byManga = <int?, List<String>?>{};
-  for (final filter
-      in isar.settings.getSync(227)?.filterScanlatorList ??
-          const <FilterScanlator>[]) {
+  for (final filter in _filterScanlatorList() ?? const <FilterScanlator>[]) {
     byManga.putIfAbsent(filter.mangaId, () => filter.scanlators);
   }
   return byManga;
@@ -114,9 +120,7 @@ extension MangaExtensions on Manga {
   /// actually sees rather than counting duplicate chapters from hidden
   /// scanlators (#796).
   int get unreadChaptersCount => unreadChaptersCountWith(
-    isar.settings
-        .getSync(227)
-        ?.filterScanlatorList
+    _filterScanlatorList()
         ?.where((e) => e.mangaId == id)
         .firstOrNull
         ?.scanlators,

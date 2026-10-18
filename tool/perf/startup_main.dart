@@ -43,6 +43,7 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/perf/benchmark_data_root.dart';
 import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/services/perf/startup_trace.dart';
+import 'package:mangayomi/utils/client_id.dart';
 import 'package:window_manager/window_manager.dart';
 
 const _entries = 500;
@@ -342,6 +343,11 @@ Future<void> _seed() async {
         ],
     );
   });
+  // Rows made by the app get their sync clientId at the next launch (see
+  // backfillMissingClientIds). Assign them here, as for a library that has
+  // been opened before; otherwise every fresh launch would measure the
+  // one-time backfill of 75,000 chapters instead of an ordinary launch.
+  await backfillMissingClientIds();
   await isar.close();
   // The window opens at the same size and place on every launch.
   final supportDir = Directory(

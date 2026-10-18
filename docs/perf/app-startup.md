@@ -54,6 +54,8 @@ filters for 100, reader and page modes for 300, 20,000 chapter page indexes
 (one is added per chapter read and never removed) and 30 cookies. Onboarding
 is completed; the window opens at 1200×800. Covers have no image URL, so
 cover decoding is not part of the measurement. No tracker is logged in.
+Every seeded row gets its sync `clientId` during seeding (see "The
+first-launch stall" below), as in a library the app has opened before.
 
 ### Commands
 
@@ -178,13 +180,48 @@ Fresh launches (new copy of the data folder each time), median (p90), ms:
 
 On a first launch on a data folder, a stall of about 445 ms between the first
 frame and `post_launch_done` dominates both variants. S1 does not touch it.
-It is the next startup candidate (see below).
+The next section explains it; it came from the harness seed.
+
+## The first-launch stall
+
+A CPU profile of a fresh launch (main isolate, `first_frame` to
+`post_launch_done`, 437 ms) put 304 of 331 samples in
+`backfillMissingClientIds`, called unawaited from `_postLaunchInit`. Inside it,
+`ChapterRepository.putSync` took 274 samples and `isar_put` 261. The seed
+created its rows without a `clientId`, and no app code assigns one when a row
+is created; the startup backfill does that on the next launch. Each copy of
+the seed folder therefore rewrote all 75,000 chapters in one synchronous
+write transaction on the main isolate.
+
+In the real app this happens once, on the first launch after an upgrade from
+a version without `clientId`. After that, each launch backfills only the rows
+created since the previous launch: a few, or as many as a large restore or
+update check added. It is real behavior, but not an ordinary launch.
+
+A bulk write is not meaningfully faster. In a JIT test with 75,000 chapters,
+one `putAllSync` per collection took 339–342 ms, against 343–353 ms for the
+current per-row `putSync` loop, so about 2%. The cost is Isar's native index
+maintenance, which both forms pay the same. Moving the backfill to another
+isolate would take it out of `dbWriteQueue`'s ordering. Neither was changed.
+
+The seed now calls `backfillMissingClientIds()` itself, so `--mode fresh`
+measures an ordinary launch on a data folder the OS has not cached. Fresh
+launches with S1 and the backfilled seed (15 runs, load average about 4),
+median (p90), ms:
+
+| Measure | old seed | backfilled seed |
+|---|---|---|
+| `first_frame` | 127.7 (183.0) | 116.5 (123.4) |
+| `post_launch_done` | 599.6 (681.0) | 130.9 (138.8) |
+| `library_frame` | 624.6 (678.0) | 151.6 (161.2) |
+| spawn to library frame | 977.0 (1031.1) | 428.3 (443.2) |
+| longest main-isolate stall | 447.5 (489.3) | 42.1 (49.3) |
+| dropped frames from `run_app` | 1 (2) | 0 (0) |
+
+The longest remaining stall is the first build, as in warm launches.
 
 ## Still to do
 
-- Find what the 445 ms first-launch stall in `post_launch` is (CPU profile in
-  `--mode fresh`), and whether it also happens on a real first launch or only
-  because the harness copies the seed folder.
 - Remaining settings reads on the startup path not converted yet:
   `OnboardingCompletedState` (reads several fields), `AndroidProxyServerState`
   (`currentOrNull`), `MExtensionServerPlatform._baseUrl`, `MClient.init`.
@@ -205,5 +242,7 @@ It is the next startup candidate (see below).
   that is existing behavior with side effects.
 - Spawn-to-`main` (engine and plugin startup, about 460 ms quiet) is outside
   Dart.
+- `backfillMissingClientIds` on the first launch after an upgrade (about
+  340 ms for 75,000 chapters): see "The first-launch stall".
 - True cold launches (empty OS file cache) were not measured: that needs
   `sudo purge`.

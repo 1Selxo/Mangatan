@@ -157,6 +157,113 @@ void main() {
     );
   });
 
+  test('accepts a remote novel winning an equal-clock routine tie', () {
+    final localNovel = _novel()..characterCount = 480;
+    final remoteNovel = _novel()
+      ..chapterIndex = 6
+      ..progress = 0.1;
+    final local = BackupMihon(backupNovels: [localNovel]);
+    final remote = BackupMihon(backupNovels: [remoteNovel]);
+    final proposed = const ChimahonSyncMerger().merge(
+      local: local,
+      remote: remote,
+      remoteWinsProjectionTies: true,
+    );
+
+    final routine = _run(
+      audit,
+      local: local,
+      remote: remote,
+      proposed: proposed,
+      remoteWinsTies: true,
+    );
+    final manualRestore = _run(
+      audit,
+      local: local,
+      remote: remote,
+      proposed: proposed,
+    );
+
+    expect(
+      routine.failures,
+      isNot(contains('local_novel_progress_regressed_in_proposed')),
+    );
+    expect(
+      manualRestore.failures,
+      contains('local_novel_progress_regressed_in_proposed'),
+    );
+  });
+
+  test('rejects an equal-clock tie which matches neither side', () {
+    final local = BackupMihon(backupNovels: [_novel()]);
+    final remote = BackupMihon(backupNovels: [_novel()..chapterIndex = 6]);
+    final proposed = BackupMihon(backupNovels: [_novel()..chapterIndex = 1]);
+
+    final result = _run(
+      audit,
+      local: local,
+      remote: remote,
+      proposed: proposed,
+      remoteWinsTies: true,
+    );
+
+    expect(
+      result.failures,
+      contains('local_novel_progress_regressed_in_proposed'),
+    );
+  });
+
+  test('accepts Chimahon spelling an uncategorized novel as no category', () {
+    // Mangatan exports an uncategorized novel with the synthetic default ID;
+    // after an authoritative download Chimahon's copy has an empty list.
+    final local = BackupMihon(
+      backupNovels: [
+        _novel(categoryIds: const ['default']),
+      ],
+    );
+    final remote = BackupMihon(backupNovels: [_novel()]);
+    final proposed = const ChimahonSyncMerger().merge(
+      local: local,
+      remote: remote,
+      remoteWinsProjectionTies: true,
+    );
+
+    final result = _run(
+      audit,
+      local: local,
+      remote: remote,
+      proposed: proposed,
+      remoteWinsTies: true,
+    );
+
+    expect(proposed.backupNovels.single.categoryIds, isEmpty);
+    expect(
+      result.failures,
+      isNot(contains('local_novel_category_membership_missing_from_proposed')),
+    );
+  });
+
+  test('still rejects a dropped concrete novel category', () {
+    final local = BackupMihon(
+      backupNovels: [
+        _novel(categoryIds: const ['reading']),
+      ],
+    );
+    final proposed = BackupMihon(backupNovels: [_novel()]);
+
+    final result = _run(
+      audit,
+      local: local,
+      remote: proposed,
+      proposed: proposed,
+    );
+
+    expect(
+      result.failures,
+      contains('local_novel_category_membership_missing_from_proposed'),
+    );
+  });
+
   test('accepts semantic novel category ID remapping by name', () {
     final localNovel = _novel(categoryIds: const ['local-category']);
     final local = BackupMihon(
@@ -417,6 +524,7 @@ _run(
   required BackupMihon local,
   required BackupMihon remote,
   required BackupMihon proposed,
+  bool remoteWinsTies = false,
 }) {
   final failures = <String, List<String>>{};
   final observations = <String, List<String>>{};
@@ -424,6 +532,7 @@ _run(
     local: local,
     remote: remote,
     proposed: proposed,
+    remoteWinsTies: remoteWinsTies,
     fail: (code, affected) {
       final values = affected.toList(growable: false);
       if (values.isNotEmpty) failures[code] = values;

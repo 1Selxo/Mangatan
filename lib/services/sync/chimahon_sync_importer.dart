@@ -251,9 +251,8 @@ class ChimahonSyncImporter {
         .nonNulls
         .toSet();
     const novelMaterializer = ChimahonNovelMaterializer();
-    final libraryNovels = chimahonEpubLibraryNovels(
-      backup,
-    ).toList(growable: false);
+    final libraryNovels = chimahonEpubLibraryNovels(backup)
+        .toList(growable: false);
     final staleCloudNovelParentIds = !syncNovels
         ? <int>{}
         : novelMaterializer.staleCloudNovelParentIds(
@@ -516,8 +515,10 @@ class ChimahonSyncImporter {
         );
       }
 
-      for (final remote
-          in syncAnime ? backup.backupAnime : const <BackupAnime>[]) {
+      final animeFold = _AnimeSourceUrlFold(
+        syncAnime ? backup.backupAnime : const <BackupAnime>[],
+      );
+      for (final remote in animeFold.ordered) {
         final nativeId = remote.source.toInt();
         final resolvedSource = resolvedAnimeSources.putIfAbsent(
           nativeId,
@@ -546,7 +547,32 @@ class ChimahonSyncImporter {
               )] ==
               1,
         );
-        final isFavorite = remote.hasFavorite() ? remote.favorite : true;
+        final foldKey = animeFold.keyOf(remote);
+        if (foldKey != null) {
+          local = animeFold.localRow(
+            foldKey,
+            () => _foldedAnimeRow(
+              candidates: _titleCandidates(
+                all: localMangas,
+                indexed: mangasByTypeAndUrl,
+                itemType: ItemType.anime,
+                url: remote.url,
+              ),
+              source: resolvedSource,
+              url: remote.url,
+            ),
+          );
+        }
+        final recordIsFavorite = remote.hasFavorite() ? remote.favorite : true;
+        if (foldKey != null &&
+            !recordIsFavorite &&
+            animeFold.hasFavorite(foldKey)) {
+          // Chimahon and Anikku restore every record of one source+URL onto
+          // a single row and keep it favorite if any record is. A sibling's
+          // removal record must not unfavorite the folded row.
+          continue;
+        }
+        final isFavorite = recordIsFavorite;
         if (!isFavorite && !seasonParents.containsKey(remote)) {
           if (local != null) {
             final retainedOverlay = localOverlayParentIds.contains(local.id);
@@ -605,6 +631,7 @@ class ChimahonSyncImporter {
           database.mangas.putSync(local);
           titlesUpdated++;
         }
+        if (foldKey != null) animeFold.setLocalRow(foldKey, local);
         applyChimahonAnimeSeasons(local, remote, seasonParents[remote]);
         local.favorite = isFavorite;
         database.mangas.putSync(local);
@@ -1780,6 +1807,35 @@ class ChimahonSyncImporter {
     return result;
   }
 
+  /// The stored row a folded anime source+URL group applies to: the library
+  /// row first, then the oldest. Other rows with that URL stay untouched.
+  Manga? _foldedAnimeRow({
+    required Iterable<Manga> candidates,
+    required ResolvedMihonBackupSource source,
+    required String url,
+  }) {
+    final rows =
+        candidates
+            .where(
+              (manga) =>
+                  manga.itemType == ItemType.anime &&
+                  !(manga.isLocalArchive ?? false) &&
+                  manga.link == url &&
+                  (manga.mihonSourceId == source.portableId ||
+                      (source.localId != null &&
+                          manga.mihonSourceId == null &&
+                          manga.sourceId == source.localId)),
+            )
+            .toList()
+          ..sort((left, right) {
+            final leftFavorite = left.favorite == true;
+            final rightFavorite = right.favorite == true;
+            if (leftFavorite != rightFavorite) return leftFavorite ? -1 : 1;
+            return (left.id ?? 0).compareTo(right.id ?? 0);
+          });
+    return rows.firstOrNull;
+  }
+
   Iterable<Manga> _titleCandidates({
     required List<Manga> all,
     required Map<({ItemType type, String url}), List<Manga>> indexed,
@@ -1788,4 +1844,67 @@ class ChimahonSyncImporter {
   }) => url.isEmpty
       ? all
       : indexed[(type: itemType, url: url)] ?? const <Manga>[];
+}
+
+/// Groups anime records that share a source and URL. Chimahon and Anikku look
+/// a row up by URL and source on restore, so such records are one entry there
+/// even when their title or author differ. Only groups with several records
+/// are folded; a lone record keeps the normal identity matching.
+class _AnimeSourceUrlFold {
+  _AnimeSourceUrlFold(Iterable<BackupAnime> records) {
+    final groups = <String, List<BackupAnime>>{};
+    final firstSeen = <String>[];
+    for (final record in records) {
+      final key = '${record.source}\u0000${record.url}';
+      if (!groups.containsKey(key)) firstSeen.add(key);
+      groups.putIfAbsent(key, () => []).add(record);
+    }
+    for (final key in firstSeen) {
+      final group = groups[key]!;
+      if (group.length < 2 || group.first.url.isEmpty) {
+        ordered.addAll(group);
+        continue;
+      }
+      _folded[key] = group.any(_isFavorite);
+      // The record deciding the favorite state is applied last, so its clock
+      // and categories win deterministically on every sync.
+      final deciding = group.reduce(
+        (best, next) => _decides(next, best) ? next : best,
+      );
+      ordered
+        ..addAll(group.where((record) => !identical(record, deciding)))
+        ..add(deciding);
+    }
+  }
+
+  final List<BackupAnime> ordered = [];
+  final Map<String, bool> _folded = {};
+  final Map<String, Manga?> _localRows = {};
+
+  String? keyOf(BackupAnime record) {
+    final key = '${record.source}\u0000${record.url}';
+    return _folded.containsKey(key) ? key : null;
+  }
+
+  bool hasFavorite(String key) => _folded[key] ?? false;
+
+  Manga? localRow(String key, Manga? Function() resolve) =>
+      _localRows.containsKey(key)
+      ? _localRows[key]
+      : (_localRows[key] = resolve());
+
+  void setLocalRow(String key, Manga row) => _localRows[key] = row;
+
+  static bool _isFavorite(BackupAnime record) =>
+      record.hasFavorite() ? record.favorite : true;
+
+  static bool _decides(BackupAnime candidate, BackupAnime current) {
+    if (_isFavorite(candidate) != _isFavorite(current)) {
+      return _isFavorite(candidate);
+    }
+    final candidateClock = candidate.favoriteModifiedAt.toInt();
+    final currentClock = current.favoriteModifiedAt.toInt();
+    if (candidateClock != currentClock) return candidateClock > currentClock;
+    return candidate.lastModifiedAt.toInt() > current.lastModifiedAt.toInt();
+  }
 }

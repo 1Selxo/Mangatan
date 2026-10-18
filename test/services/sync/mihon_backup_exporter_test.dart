@@ -562,6 +562,85 @@ void main() {
     expect(reverse.writeToBuffer(), forward.writeToBuffer());
   });
 
+  test('exports one parent per identity so its seasons keep their link', () {
+    final source = Source(
+      id: 221,
+      name: 'Anime source',
+      lang: 'en',
+      additionalParams: encodeMihonSourceMetadata(
+        sourceId: 221001,
+        packageName: 'pkg.anime.seasons',
+      ),
+    );
+    Manga anime(
+      int id, {
+      required String link,
+      String name = 'Series',
+      bool favorite = true,
+      int? favoriteModifiedAt,
+      int? fetchType = 0,
+      String? parentUrl,
+    }) => Manga(
+      id: id,
+      source: source.name,
+      sourceId: source.id,
+      author: 'Studio',
+      artist: null,
+      genre: const [],
+      imageUrl: null,
+      lang: 'en',
+      link: link,
+      name: name,
+      status: Status.ongoing,
+      description: null,
+      favorite: favorite,
+      favoriteModifiedAt: favoriteModifiedAt,
+      itemType: ItemType.anime,
+      animeFetchType: fetchType,
+      animeParentUrl: parentUrl,
+    );
+    // A cache row from browsing (no library state), the library row, a later
+    // removed duplicate, and one of the series' seasons.
+    final cache = anime(5, link: '/series', favorite: false);
+    final library = anime(7, link: '/series');
+    final removed = anime(
+      9,
+      link: '/series',
+      favorite: false,
+      favoriteModifiedAt: 1700000000,
+    );
+    final season = anime(
+      8,
+      link: '/season-1',
+      name: 'Season 1',
+      favorite: false,
+      fetchType: 1,
+      parentUrl: '/series',
+    );
+
+    for (final order in [
+      [cache, library, removed, season],
+      [season, removed, library, cache],
+    ]) {
+      final exported = const MihonBackupExporter().export(
+        mangas: order,
+        categories: const [],
+        chapters: const [],
+        histories: const [],
+        sources: [source],
+        epubBookProgress: const [],
+      );
+      final parents = exported.backupAnime.where((a) => a.url == '/series');
+      expect(parents, hasLength(1));
+      expect(parents.single.id, Int64(library.id!));
+      expect(parents.single.favorite, isTrue);
+      final exportedSeason = exported.backupAnime.singleWhere(
+        (a) => a.url == '/season-1',
+      );
+      expect(exportedSeason.parentId, Int64(library.id!));
+    }
+  });
+
   test('uses stored source chapter number instead of reparsing its name', () {
     final source = Source(
       id: 103,

@@ -274,6 +274,12 @@ Future<void> pushToMangaReaderDetail({
 }) async {
   int? mangaId = (await mangaRepository.findLocalArchiveByName(getManga?.name))
       ?.id;
+  // A library entry is already a stored row. Re-resolving it by title would
+  // open another row with the same name, such as a different series' season
+  // that is also called "Season 1" on the same source.
+  if (mangaId == null && archiveId == null && mangaM?.id != null) {
+    mangaId = (await mangaRepository.findByIdAsync(mangaM!.id!))?.id;
+  }
 
   if (mangaId == null) {
     if (archiveId == null) {
@@ -371,12 +377,23 @@ Future<int> resolveBrowsedMangaId(
             ? q.sourceEqualTo(manga.source)
             : q.sourceEqualTo(manga.source).or().sourceIdEqualTo(sourceId),
       );
-  final empty = await sameEntry().isEmpty();
-  if (empty) {
-    await mangaRepository.save(manga);
+  // The title alone is not an identity: Jellyfin names every season
+  // "Season 1", "Season 2", and so on. A stored row with a different source
+  // URL is a different entry, while a row without a URL still matches by
+  // title as before.
+  final link = manga.link?.trim() ?? '';
+  bool sameLink(Manga stored) {
+    final storedLink = stored.link?.trim() ?? '';
+    return link.isEmpty || storedLink.isEmpty || storedLink == link;
   }
 
-  final foundMangas = await sameEntry().findAll();
+  final foundMangas = (await sameEntry().findAll()).where(sameLink).toList()
+    ..sort((left, right) {
+      final leftExact = link.isNotEmpty && left.link?.trim() == link;
+      final rightExact = link.isNotEmpty && right.link?.trim() == link;
+      if (leftExact != rightExact) return leftExact ? -1 : 1;
+      return (left.id ?? 0).compareTo(right.id ?? 0);
+    });
   Manga? matchedManga;
   for (final foundManga in foundMangas) {
     if (foundManga.sourceId == null || foundManga.sourceId == sourceId) {

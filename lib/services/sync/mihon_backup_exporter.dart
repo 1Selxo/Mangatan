@@ -196,11 +196,12 @@ class MihonBackupExporter {
 
     final exportedAnime = <BackupAnime>[];
     final usedAnimeSources = <int, BackupSource>{};
-    final portableAnime = animeSeasonLibraryClosure(localMangas)
-        .where(
-          (m) => m.itemType == ItemType.anime && !(m.isLocalArchive ?? false),
-        )
-        .toList();
+    final portableAnime = _oneRowPerAnimeIdentity(
+      animeSeasonLibraryClosure(localMangas).where(
+        (m) => m.itemType == ItemType.anime && !(m.isLocalArchive ?? false),
+      ),
+      sourceByLocalId,
+    );
     for (final anime in portableAnime) {
       final parents = portableAnime
           .where(
@@ -437,6 +438,45 @@ class MihonBackupExporter {
     final projected = byUrl.values.toList()
       ..sort((left, right) => left.url.compareTo(right.url));
     return List.unmodifiable(projected);
+  }
+
+  /// Browsing a source can leave a cache row beside the library row with the
+  /// same Chimahon identity. The merger keeps only the last record per
+  /// identity and a parent's seasons need one parent per URL, so send one row.
+  /// The order matches the importer's choice: library row first, then the
+  /// explicit tombstone, then the lowest ID.
+  List<Manga> _oneRowPerAnimeIdentity(
+    Iterable<Manga> entries,
+    Map<int, Source> sourceByLocalId,
+  ) {
+    int rank(Manga anime) => anime.favorite == true
+        ? 0
+        : anime.favoriteModifiedAt != null
+        ? 1
+        : 2;
+    final kept = <String, Manga>{};
+    final order = <String>[];
+    for (final anime in entries) {
+      final nativeId = _nativeSourceId(
+        anime.sourceId == null ? null : sourceByLocalId[anime.sourceId!],
+        fallback: anime.mihonSourceId,
+      );
+      final key = [
+        nativeId ?? 'local:${anime.id}',
+        anime.link ?? '',
+        (anime.name ?? '').trim().toLowerCase(),
+        anime.author?.trim().toLowerCase(),
+      ].join('\u0000');
+      final current = kept[key];
+      if (current == null) order.add(key);
+      if (current == null ||
+          rank(anime) < rank(current) ||
+          (rank(anime) == rank(current) &&
+              (anime.id ?? 0) < (current.id ?? 0))) {
+        kept[key] = anime;
+      }
+    }
+    return [for (final key in order) kept[key]!];
   }
 
   int? _nativeSourceId(Source? source, {String? fallback}) {

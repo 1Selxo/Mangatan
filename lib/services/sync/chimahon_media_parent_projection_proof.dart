@@ -5,10 +5,12 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMa
 /// Proofs for rebasing Mangatan's lossy media-parent projections onto an
 /// existing Chimahon wire identity.
 ///
-/// A shared source and URL are not an identity in Chimahon: title and author
-/// also participate. Callers must therefore establish that both the local and
-/// remote source+URL groups contain exactly one row before asking for a
-/// rebase. The nullable result makes an unproved identity mismatch fail closed
+/// A shared source and URL are not a wire identity in Chimahon: title and
+/// author also participate. Manga rebases only proven Mangatan projection
+/// artifacts; anime also pairs one-to-one metadata drift (see
+/// [tryRebaseLocalAnimeIdentity]). Callers must therefore establish that both
+/// the local and remote source+URL groups contain exactly one row before
+/// asking for a rebase. The nullable result makes an unproved identity mismatch fail closed
 /// in both the merger and its pre-upload audit.
 abstract final class ChimahonMediaParentProjectionProof {
   /// Returns a local manga projection carrying [remote]'s canonical identity
@@ -64,7 +66,23 @@ abstract final class ChimahonMediaParentProjectionProof {
     return rebased;
   }
 
-  /// Anime counterpart to [tryRebaseLocalMangaIdentity].
+  /// Returns a local anime projection carrying [remote]'s canonical identity
+  /// whenever the source+URL groups pair one-to-one.
+  ///
+  /// Unlike manga, any title or author difference is accepted. Chimahon keeps
+  /// exactly one database row per anime source+URL (browse and restore both
+  /// look the row up by URL and source first), and its restorer never adopts
+  /// a synced title or a null author for an existing row. A one-to-one drift
+  /// is therefore the same entry with device-local metadata. Leaving it split
+  /// makes Mangatan's importer create a second library entry, while Chimahon
+  /// folds both records onto its one row. Keeping Chimahon's spelling is the
+  /// only stable choice: a Mangatan spelling would split again every sync.
+  ///
+  /// Known risk: a source that reuses a URL for a different show pairs with
+  /// the old record and shows its title until the next metadata refresh.
+  /// Chimahon itself collapses that case onto one row, so it cannot be
+  /// represented more faithfully. Groups with more than one row on either
+  /// side are never paired.
   static BackupAnime? tryRebaseLocalAnimeIdentity({
     required BackupAnime localProjection,
     required BackupAnime remote,
@@ -83,20 +101,6 @@ abstract final class ChimahonMediaParentProjectionProof {
         _animeIdentityEqual(localProjection, remote)) {
       return null;
     }
-
-    final isTombstoneProjection = _isMatchingAnimeTombstoneProjection(
-      localProjection,
-      remote,
-    );
-    final isSparseAuthorProjection =
-        localProjection.title == remote.title &&
-        _isAbsentEmptyAuthorPair(
-          localHasAuthor: localProjection.hasAuthor(),
-          localAuthor: localProjection.author,
-          remoteHasAuthor: remote.hasAuthor(),
-          remoteAuthor: remote.author,
-        );
-    if (!isTombstoneProjection && !isSparseAuthorProjection) return null;
 
     final rebased = localProjection.deepCopy()..title = remote.title;
     _copyAnimeAuthorIdentity(rebased, remote);
@@ -139,18 +143,6 @@ abstract final class ChimahonMediaParentProjectionProof {
       local.title == remote.customTitle &&
       _authorIdentity(local.hasAuthor(), local.author) ==
           _authorIdentity(remote.hasAuthor(), remote.author);
-
-  static bool _isMatchingAnimeTombstoneProjection(
-    BackupAnime local,
-    BackupAnime remote,
-  ) =>
-      local.hasFavorite() &&
-      !local.favorite &&
-      remote.hasFavorite() &&
-      !remote.favorite &&
-      local.hasFavoriteModifiedAt() &&
-      remote.hasFavoriteModifiedAt() &&
-      local.favoriteModifiedAt == remote.favoriteModifiedAt;
 
   static bool _mangaIdentityEqual(BackupManga left, BackupManga right) =>
       left.source == right.source &&

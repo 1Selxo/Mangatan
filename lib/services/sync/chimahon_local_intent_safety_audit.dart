@@ -2,11 +2,14 @@ import 'dart:convert';
 
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_stat_safety.dart';
 import 'package:mangayomi/services/sync/chimahon_unknown_field_safety.dart';
 import 'package:mangayomi/utils/chimahon_novel_identity.dart';
 
-typedef ChimahonSafetyIdentitySink =
-    void Function(String code, Iterable<String> affected);
+typedef ChimahonSafetyIdentitySink = void Function(
+  String code,
+  Iterable<String> affected,
+);
 
 /// Audits the effective local side of a Chimahon merge.
 ///
@@ -25,8 +28,15 @@ class ChimahonLocalIntentSafetyAudit {
     required BackupMihon proposed,
     required ChimahonSafetyIdentitySink fail,
     required ChimahonSafetyIdentitySink observe,
+    bool remoteWinsTies = false,
   }) {
-    _auditNovels(local: local, remote: remote, proposed: proposed, fail: fail);
+    _auditNovels(
+      local: local,
+      remote: remote,
+      proposed: proposed,
+      remoteWinsTies: remoteWinsTies,
+      fail: fail,
+    );
     _observeNovelDifferences(local: local, remote: remote, observe: observe);
   }
 
@@ -34,6 +44,7 @@ class ChimahonLocalIntentSafetyAudit {
     required BackupMihon local,
     required BackupMihon remote,
     required BackupMihon proposed,
+    required bool remoteWinsTies,
     required ChimahonSafetyIdentitySink fail,
   }) {
     fail(
@@ -53,7 +64,7 @@ class ChimahonLocalIntentSafetyAudit {
     final changedLocalOnlyMetadata = <String>[];
     final novelUnknownFields = <String>[];
     final novelStatUnknownFields = <String>[];
-    final remoteNovelKeys = _novelSnapshots(remote.backupNovels).keys.toSet();
+    final remoteByKey = _novelSnapshots(remote.backupNovels);
     final proposedNovelRows = {
       for (final novel in proposed.backupNovels)
         if (_novelStableId(novel) case final String identity) identity: novel,
@@ -70,10 +81,18 @@ class ChimahonLocalIntentSafetyAudit {
         missingNovels.add(entry.key);
         continue;
       }
-      if (_novelProgressRegressed(baseline.progress, candidate.progress)) {
+      final remotePeer = remoteByKey[entry.key];
+      if (_novelProgressRegressed(baseline.progress, candidate.progress) &&
+          !(remoteWinsTies &&
+              remotePeer != null &&
+              _remoteWonProgressTie(
+                baseline: baseline.progress,
+                remote: remotePeer.progress,
+                candidate: candidate.progress,
+              ))) {
         regressedProgress.add(entry.key);
       }
-      if (!remoteNovelKeys.contains(entry.key) &&
+      if (remotePeer == null &&
           !_localOnlyNovelMetadataPreserved(
             baseline.progress,
             candidate.progress,
@@ -85,7 +104,7 @@ class ChimahonLocalIntentSafetyAudit {
         final candidateStat = candidate.stats[statEntry.key];
         if (candidateStat == null) {
           missingStats.add(identity);
-        } else if (_novelStatRegressed(statEntry.value, candidateStat)) {
+        } else if (chimahonNovelStatRegressed(statEntry.value, candidateStat)) {
           regressedStats.add(identity);
         }
       }
@@ -96,9 +115,15 @@ class ChimahonLocalIntentSafetyAudit {
             candidate.categoryIds.any(
               (value) => value != _uncategorizedNovelCategoryId,
             );
+        // Mangatan spells "no category" as the synthetic default ID; Chimahon
+        // may spell it as an empty list, which the merger keeps verbatim.
+        final defaultIsSpelledAsNoCategory =
+            categoryId == _uncategorizedNovelCategoryId &&
+            candidate.categoryIds.isEmpty;
         if (!candidate.categoryIds.contains(mappedId) &&
             !candidate.categoryIds.contains(categoryId) &&
-            !defaultWasReplacedByConcreteCategory) {
+            !defaultWasReplacedByConcreteCategory &&
+            !defaultIsSpelledAsNoCategory) {
           missingMemberships.add(_join([entry.key, categoryId]));
         }
       }
@@ -311,23 +336,19 @@ class ChimahonLocalIntentSafetyAudit {
         candidate.characterCount != baseline.characterCount;
   }
 
-  bool _novelStatRegressed(
-    BackupNovelStat baseline,
-    BackupNovelStat candidate,
-  ) {
-    if (candidate.lastStatisticModified < baseline.lastStatisticModified) {
-      return true;
-    }
-    if (candidate.lastStatisticModified > baseline.lastStatisticModified) {
-      return false;
-    }
-    return candidate.charactersRead != baseline.charactersRead ||
-        candidate.readingTime != baseline.readingTime ||
-        candidate.minReadingSpeed != baseline.minReadingSpeed ||
-        candidate.altMinReadingSpeed != baseline.altMinReadingSpeed ||
-        candidate.lastReadingSpeed != baseline.lastReadingSpeed ||
-        candidate.maxReadingSpeed != baseline.maxReadingSpeed;
-  }
+  /// Routine sync compares a lossy database projection with the exact remote
+  /// bytes, so the merger lets the remote row win an equal clock. That is not
+  /// a regression provided the proposed row is exactly the remote row.
+  bool _remoteWonProgressTie({
+    required BackupNovel baseline,
+    required BackupNovel remote,
+    required BackupNovel candidate,
+  }) =>
+      remote.lastModified == baseline.lastModified &&
+      candidate.lastModified == remote.lastModified &&
+      candidate.chapterIndex == remote.chapterIndex &&
+      candidate.progress == remote.progress &&
+      candidate.characterCount == remote.characterCount;
 
   bool _localOnlyNovelMetadataPreserved(
     BackupNovel baseline,

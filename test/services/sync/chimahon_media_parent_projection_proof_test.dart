@@ -104,16 +104,51 @@ void main() {
       expect(rebased.hasAuthor(), isFalse);
     });
 
-    test('different non-empty authors fail closed', () {
+    // Deliberate change: anime now pairs any one-to-one title or author drift
+    // and keeps Chimahon's spelling (the remote), including a null author.
+    test('one-to-one title or author drift adopts the remote identity', () {
+      final rebased =
+          ChimahonMediaParentProjectionProof.tryRebaseLocalAnimeIdentity(
+            localProjection: anime(author: 'Studio list')
+              ..title = 'Local title'
+              ..description = 'Local description',
+            remote: anime(),
+            localSourceUrlIsUnique: true,
+            remoteSourceUrlIsUnique: true,
+          )!;
+      expect(rebased.title, 'T');
+      expect(rebased.hasAuthor(), isFalse);
+      expect(rebased.description, 'Local description');
+
       expect(
         ChimahonMediaParentProjectionProof.tryRebaseLocalAnimeIdentity(
           localProjection: anime(author: 'One'),
           remote: anime(author: 'Two'),
           localSourceUrlIsUnique: true,
           remoteSourceUrlIsUnique: true,
-        ),
-        isNull,
+        )?.author,
+        'Two',
       );
+    });
+
+    test('ambiguous groups, versioned rows and other URLs never pair', () {
+      BackupAnime? rebase({
+        bool localUnique = true,
+        bool remoteUnique = true,
+        BackupAnime? local,
+        BackupAnime? remote,
+      }) => ChimahonMediaParentProjectionProof.tryRebaseLocalAnimeIdentity(
+        localProjection: local ?? anime(author: 'One'),
+        remote: remote ?? anime(author: 'Two'),
+        localSourceUrlIsUnique: localUnique,
+        remoteSourceUrlIsUnique: remoteUnique,
+      );
+
+      expect(rebase(localUnique: false), isNull);
+      expect(rebase(remoteUnique: false), isNull);
+      expect(rebase(local: anime(author: 'One')..version = Int64(3)), isNull);
+      expect(rebase(remote: anime(author: 'Two')..url = '/other'), isNull);
+      expect(rebase(remote: anime(author: 'Two')..source = Int64(8)), isNull);
     });
   });
 }

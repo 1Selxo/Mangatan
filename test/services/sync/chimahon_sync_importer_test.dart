@@ -1366,6 +1366,178 @@ void main() {
     expect(titles.single.favoriteModifiedAt, 200);
   });
 
+  test('one-to-one anime author drift stays one library entry', () {
+    // Chimahon kept its own row without an author; Mangatan has the studio
+    // list. The merger pairs them, so repeated syncs never add a second row.
+    database.writeTxnSync(() {
+      database.sources.putSync(_source());
+      database.mangas.putSync(
+        _manga(
+          name: 'Series',
+          sourceTitle: 'Series',
+          link: '/series',
+          sourceId: 42,
+          itemType: ItemType.anime,
+        )..mihonSourceId = '9001',
+      );
+    });
+    final remote = BackupMihon(
+      backupAnimeSources: [
+        BackupSource(sourceId: Int64(9001), name: 'Remote source'),
+      ],
+      backupAnime: [
+        BackupAnime(
+          source: Int64(9001),
+          url: '/series',
+          title: 'Series',
+          lastModifiedAt: Int64(100),
+          version: Int64(2),
+        ),
+      ],
+    );
+
+    for (var iteration = 0; iteration < 2; iteration++) {
+      final local = const MihonBackupExporter().export(
+        mangas: database.mangas.where().findAllSync(),
+        categories: const [],
+        chapters: const [],
+        histories: const [],
+        sources: database.sources.where().findAllSync(),
+        epubBookProgress: const [],
+      );
+      final merged = const ChimahonSyncMerger().merge(
+        local: local,
+        remote: remote,
+        remoteWinsProjectionTies: true,
+      );
+      expect(merged.backupAnime, hasLength(1));
+      expect(merged.backupAnime.single.hasAuthor(), isFalse);
+      const ChimahonSyncImporter().apply(database: database, backup: merged);
+      final rows = database.mangas
+          .where()
+          .findAllSync()
+          .where((row) => row.itemType == ItemType.anime)
+          .toList();
+      expect(rows, hasLength(1));
+      expect(rows.single.author, 'Local author');
+    }
+  });
+
+  group('anime records sharing a source URL fold like Chimahon', () {
+    BackupAnime record({
+      String? author,
+      bool favorite = true,
+      int clock = 100,
+    }) {
+      final value = BackupAnime(
+        source: Int64(9001),
+        url: '/series',
+        title: 'Series',
+        favorite: favorite,
+        favoriteModifiedAt: Int64(clock),
+        lastModifiedAt: Int64(clock),
+        version: Int64(2),
+      );
+      if (author != null) value.author = author;
+      return value;
+    }
+
+    BackupMihon payload(List<BackupAnime> records) => BackupMihon(
+      backupAnimeSources: [
+        BackupSource(sourceId: Int64(9001), name: 'Remote source'),
+      ],
+      backupAnime: records,
+    );
+
+    List<Manga> animeRows() => database.mangas
+        .where()
+        .findAllSync()
+        .where((row) => row.itemType == ItemType.anime)
+        .toList();
+
+    test('a dormant duplicate row is never revived by its own record', () {
+      late Manga library;
+      late Manga dormant;
+      database.writeTxnSync(() {
+        database.sources.putSync(_source());
+        library = _manga(
+          name: 'Series',
+          sourceTitle: 'Series',
+          link: '/series',
+          sourceId: 42,
+          itemType: ItemType.anime,
+        )..mihonSourceId = '9001';
+        database.mangas.putSync(library);
+        dormant = _manga(
+          name: 'Series',
+          sourceTitle: 'Series',
+          link: '/series',
+          sourceId: 42,
+          favorite: false,
+          itemType: ItemType.anime,
+        )..mihonSourceId = '9001';
+        dormant.author = null;
+        database.mangas.putSync(dormant);
+      });
+
+      // Chimahon's own row has no author and is in its library; the
+      // Mangatan spelling is an older removal record.
+      const ChimahonSyncImporter().apply(
+        database: database,
+        backup: payload([
+          record(author: 'Local author', favorite: false, clock: 100),
+          record(clock: 200),
+        ]),
+      );
+
+      expect(animeRows(), hasLength(2));
+      expect(database.mangas.getSync(library.id!)!.favorite, isTrue);
+      expect(database.mangas.getSync(dormant.id!)!.favorite, isFalse);
+    });
+
+    test('two library records without a local row create one row', () {
+      database.writeTxnSync(() {
+        database.sources.putSync(_source());
+      });
+      for (var iteration = 0; iteration < 2; iteration++) {
+        const ChimahonSyncImporter().apply(
+          database: database,
+          backup: payload([
+            record(author: 'Studio', clock: 100),
+            record(clock: 200),
+          ]),
+        );
+        expect(animeRows(), hasLength(1));
+        expect(animeRows().single.favorite, isTrue);
+      }
+    });
+
+    test('a removal applies when every record of the group is removed', () {
+      database.writeTxnSync(() {
+        database.sources.putSync(_source());
+        database.mangas.putSync(
+          _manga(
+            name: 'Series',
+            sourceTitle: 'Series',
+            link: '/series',
+            sourceId: 42,
+            itemType: ItemType.anime,
+          )..mihonSourceId = '9001',
+        );
+      });
+      const ChimahonSyncImporter().apply(
+        database: database,
+        backup: payload([
+          record(author: 'Local author', favorite: false, clock: 300),
+          record(favorite: false, clock: 200),
+        ]),
+      );
+
+      expect(animeRows(), hasLength(1));
+      expect(animeRows().single.favorite, isFalse);
+    });
+  });
+
   test('imports distinct Chimahon manga and chapters which share URLs', () {
     database.writeTxnSync(() {
       database.sources.putSync(_source());

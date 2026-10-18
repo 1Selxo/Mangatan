@@ -659,7 +659,9 @@ void main() {
     },
   );
 
-  test('does not rebase newer source metadata by source URL alone', () {
+  // Deliberate change: manga still keeps a source metadata refresh as a new
+  // wire identity, but one-to-one anime drift pairs onto Chimahon's spelling.
+  test('rebases one-to-one anime drift but not manga metadata by URL', () {
     final merged = merger.merge(
       local: BackupMihon(
         backupManga: [
@@ -712,11 +714,10 @@ void main() {
       merged.backupManga.map((manga) => manga.title),
       containsAll(['Previous manga title', 'Refreshed manga title']),
     );
-    expect(merged.backupAnime, hasLength(2));
-    expect(
-      merged.backupAnime.map((anime) => anime.title),
-      containsAll(['Previous anime title', 'Refreshed anime title']),
-    );
+    final anime = merged.backupAnime.single;
+    expect(anime.title, 'Previous anime title');
+    expect(anime.author, 'Previous anime author');
+    expect(anime.url, '/shared-anime');
   });
 
   test('does not rebase newer chapter or episode identity edits by URL', () {

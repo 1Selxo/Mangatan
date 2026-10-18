@@ -21,6 +21,7 @@ Manga _manga(
   ItemType itemType = ItemType.manga,
   bool localArchive = false,
   bool overlay = false,
+  bool? favorite,
 }) => Manga(
   id: id,
   source: 'Source',
@@ -38,6 +39,7 @@ Manga _manga(
   itemType: itemType,
   isLocalArchive: localArchive,
   hasLocalChapterOverlay: overlay,
+  favorite: favorite,
 );
 
 Manga? _find(
@@ -87,6 +89,21 @@ void main() {
 
   test('duplicates that both hold local data stay ambiguous', () {
     expect(_find([_manga(1, overlay: true), _manga(2, overlay: true)]), isNull);
+  });
+
+  test('a browsing cache row never hides the library row', () {
+    final cache = _manga(1);
+    final library = _manga(2, favorite: true);
+    expect(_find([cache, library]), same(library));
+    expect(_find([library, cache]), same(library));
+  });
+
+  test('duplicates without local data never make the importer add a row', () {
+    final older = _manga(3, favorite: true);
+    final newer = _manga(9, favorite: true);
+    final uninstalled = _manga(1, favorite: true, sourceId: 8);
+    expect(_find([newer, uninstalled, older]), same(older));
+    expect(_find([_manga(4), _manga(2)])?.id, 2);
   });
 
   test('a pre-Mihon-identity row matches through the installed source', () {

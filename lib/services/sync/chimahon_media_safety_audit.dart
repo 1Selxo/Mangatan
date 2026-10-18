@@ -802,6 +802,11 @@ class ChimahonMediaSafetyAudit {
     final changedTrackingUnknownFields = <String>[];
     final missingMemberships = <String>[];
     final favoriteFailures = <_FavoriteFailure, List<String>>{};
+    // Mirrors _auditLocalTombstoneClocks: an unfavorited season of a local
+    // library series is hierarchy cache, not a deletion, so it has no clock.
+    final localSeasonParents = allowLegacyLocalRebase
+        ? chimahonSeasonParents(baseline.backupAnime)
+        : const <BackupAnime, BackupAnime>{};
 
     for (final baselineAnime in baseline.backupAnime) {
       final key = animeIdentity(baselineAnime);
@@ -862,6 +867,9 @@ class ChimahonMediaSafetyAudit {
         baseline: _FavoriteSnapshot.anime(baselineAnime),
         expected: expectedParentProjection?.favorite,
         proposed: _FavoriteSnapshot.anime(merged),
+        clocklessTombstoneIsSeasonCache: localSeasonParents.containsKey(
+          baselineAnime,
+        ),
       );
       for (final finding in favoriteFindings) {
         favoriteFailures.putIfAbsent(finding, () => []).add(key);
@@ -2667,9 +2675,12 @@ class ChimahonMediaSafetyAudit {
     required _FavoriteSnapshot baseline,
     required _FavoriteSnapshot? expected,
     required _FavoriteSnapshot proposed,
+    bool clocklessTombstoneIsSeasonCache = false,
   }) {
     final failures = <_FavoriteFailure>{};
-    if (baseline.isTombstone && !baseline.hasPositiveClock) {
+    if (baseline.isTombstone &&
+        !baseline.hasPositiveClock &&
+        !clocklessTombstoneIsSeasonCache) {
       final preservedLegacyTombstone =
           proposed.hasFavoriteField == baseline.hasFavoriteField &&
           proposed.favorite == baseline.favorite &&

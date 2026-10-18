@@ -754,32 +754,42 @@ void main() {
     );
   });
 
-  test('same source URL cannot hide an unproven local anime identity', () {
+  // One-to-one anime metadata drift is now a proven pairing (Chimahon keeps one
+  // row per anime source+URL), but the pair must still preserve newer local
+  // data. Ambiguous groups stay unproven; see the next test.
+  test('one-to-one anime drift pairs but cannot hide newer local data', () {
     final remoteAnime = BackupAnime(
       source: Int64(2),
       url: '/shared',
       title: 'Remote title',
       author: 'Remote author',
+      description: 'Remote description',
       lastModifiedAt: Int64(200),
       version: Int64(5),
     );
-    final localAnime = BackupAnime(
+    BackupAnime localAnime(int modifiedAt) => BackupAnime(
       source: Int64(2),
       url: '/shared',
       title: 'Local title',
       author: 'Local author',
-      lastModifiedAt: Int64(100),
+      description: 'Local description',
+      lastModifiedAt: Int64(modifiedAt),
       version: Int64.ZERO,
     );
 
-    expect(
-      failures(
-        remote: BackupMihon(backupAnime: [remoteAnime]),
-        local: BackupMihon(backupAnime: [localAnime]),
-        proposed: BackupMihon(backupAnime: [remoteAnime]),
-      ),
-      contains('local_anime_missing_from_proposed'),
+    final olderLocal = failures(
+      remote: BackupMihon(backupAnime: [remoteAnime]),
+      local: BackupMihon(backupAnime: [localAnime(100)]),
+      proposed: BackupMihon(backupAnime: [remoteAnime]),
     );
+    expect(olderLocal, isEmpty);
+
+    final newerLocal = failures(
+      remote: BackupMihon(backupAnime: [remoteAnime]),
+      local: BackupMihon(backupAnime: [localAnime(300)]),
+      proposed: BackupMihon(backupAnime: [remoteAnime]),
+    );
+    expect(newerLocal, isNotEmpty);
   });
 
   test('duplicate competing source URLs cannot authorize parent rebasing', () {

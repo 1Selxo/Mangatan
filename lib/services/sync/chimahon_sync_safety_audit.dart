@@ -5,6 +5,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCh
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupManga.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupNovel.pb.dart';
+import 'package:mangayomi/services/sync/chimahon_novel_stat_safety.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_generic_collection_safety_audit.dart';
 import 'package:mangayomi/services/sync/chimahon_local_chapter_policy.dart';
@@ -144,6 +145,7 @@ class ChimahonSyncSafetyAudit {
       local: local,
       remote: remote,
       proposed: proposed,
+      remoteWinsTies: remoteWinsTies,
       fail: fail,
       observe: observe,
     );
@@ -483,7 +485,7 @@ class ChimahonSyncSafetyAudit {
         final candidateStat = candidate.stats[statEntry.key];
         if (candidateStat == null) {
           missingStats.add(statKey);
-        } else if (_novelStatRegressed(statEntry.value, candidateStat)) {
+        } else if (chimahonNovelStatRegressed(statEntry.value, candidateStat)) {
           regressedStats.add(statKey);
         }
       }
@@ -683,24 +685,6 @@ class ChimahonSyncSafetyAudit {
     return proposed.chapterIndex != remote.chapterIndex ||
         proposed.progress != remote.progress ||
         proposed.characterCount != remote.characterCount;
-  }
-
-  static bool _novelStatRegressed(
-    BackupNovelStat remote,
-    BackupNovelStat proposed,
-  ) {
-    if (proposed.lastStatisticModified < remote.lastStatisticModified) {
-      return true;
-    }
-    if (proposed.lastStatisticModified > remote.lastStatisticModified) {
-      return false;
-    }
-    return proposed.charactersRead != remote.charactersRead ||
-        proposed.readingTime != remote.readingTime ||
-        proposed.minReadingSpeed != remote.minReadingSpeed ||
-        proposed.altMinReadingSpeed != remote.altMinReadingSpeed ||
-        proposed.lastReadingSpeed != remote.lastReadingSpeed ||
-        proposed.maxReadingSpeed != remote.maxReadingSpeed;
   }
 
   static bool _isClockedTombstone(BackupManga manga) =>

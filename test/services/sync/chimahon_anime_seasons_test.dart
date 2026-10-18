@@ -153,6 +153,51 @@ void main() {
     expect(failures, isEmpty);
   });
 
+  test('a never-favorited local season accepts Chimahon\'s clocked state', () {
+    // Mangatan exports an unfavorited season of a library series without a
+    // favorite clock; Chimahon later stamps the same unfavorited season.
+    Set<String> audit({required bool isSeason}) {
+      final localSeason = isSeason
+          ? anime('/season', 2, parent: 1, fetchType: 1)
+          : (anime('/standalone', 2)..favorite = false);
+      localSeason.lastModifiedAt = Int64(100);
+      final remoteSeason = localSeason.deepCopy()
+        ..favoriteModifiedAt = Int64(200)
+        ..lastModifiedAt = Int64(200)
+        ..version = Int64(2);
+      final local = BackupMihon(
+        backupAnime: [anime('/series', 1), localSeason],
+      );
+      final remote = BackupMihon(
+        backupAnime: [anime('/series', 1), remoteSeason],
+      );
+      final merged = const ChimahonSyncMerger().merge(
+        local: local,
+        remote: remote,
+        remoteWinsProjectionTies: true,
+      );
+      final failures = <String>{};
+      const ChimahonMediaSafetyAudit().audit(
+        local: local,
+        remote: remote,
+        proposed: merged,
+        remoteWinsTies: true,
+        fail: (code, rows) {
+          if (rows.isNotEmpty) failures.add(code);
+        },
+        observe: (_, _) {},
+      );
+      return failures;
+    }
+
+    expect(audit(isSeason: true), isEmpty);
+    // A clockless removal of a standalone title is still refused.
+    expect(
+      audit(isSeason: false),
+      contains('local_anime_tombstone_deletion_clock_missing'),
+    );
+  });
+
   test(
     'opaque orphan and duplicate remote handles never attach to new local rows',
     () {

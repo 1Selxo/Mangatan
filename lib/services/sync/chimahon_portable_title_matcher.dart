@@ -88,12 +88,26 @@ class ChimahonPortableTitleMatcher {
         .where((manga) => manga.hasLocalChapterOverlay ?? false)
         .toList(growable: false);
     if (withLocalData.length == 1) return withLocalData.single;
-    if (withLocalData.length > 1 || source.localId == null) return null;
-    final installed = candidates
-        .where((manga) => manga.sourceId == source.localId)
-        .toList(growable: false);
-    return installed.length == 1 ? installed.single : null;
+    if (withLocalData.length > 1) return null;
+    // Without device-local files the rows are interchangeable source cache, so
+    // pick one deterministically. Returning null would add yet another
+    // duplicate on every sync. Prefer the library row, which is the one the
+    // exporter sends, over a row left behind by browsing the source.
+    final ranked = candidates.toList()
+      ..sort((left, right) {
+        final byFavorite = _rank(left.favorite == true, right.favorite == true);
+        if (byFavorite != 0) return byFavorite;
+        final byInstalled = _rank(
+          source.localId != null && left.sourceId == source.localId,
+          source.localId != null && right.sourceId == source.localId,
+        );
+        if (byInstalled != 0) return byInstalled;
+        return (left.id ?? 0).compareTo(right.id ?? 0);
+      });
+    return ranked.first;
   }
+
+  int _rank(bool left, bool right) => left == right ? 0 : (left ? -1 : 1);
 
   String _normalize(String? value) => value?.trim().toLowerCase() ?? '';
 }

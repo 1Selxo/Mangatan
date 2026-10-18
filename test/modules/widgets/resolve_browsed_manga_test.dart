@@ -31,12 +31,17 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  Manga browsed(String source, int? sourceId) => Manga(
-    name: 'Re:Zero',
+  Manga browsed(
+    String source,
+    int? sourceId, {
+    String name = 'Re:Zero',
+    String? link = 'https://example.test/series',
+  }) => Manga(
+    name: name,
     source: source,
     sourceId: sourceId,
     lang: 'all',
-    link: 'https://example.test/series',
+    link: link,
     imageUrl: '',
     genre: const [],
     author: '',
@@ -75,5 +80,44 @@ void main() {
 
     expect(second, isNot(first));
     expect(await isar.mangas.count(), 2);
+  });
+
+  test('same-named seasons of different series stay separate', () async {
+    // Jellyfin titles every season "Season 1"; only the URL tells them apart.
+    final honzuki = await resolveBrowsedMangaId(
+      browsed('Jellyfin', 7, name: 'Season 1', link: '/honzuki#season'),
+      'all',
+      7,
+    );
+    final frieren = await resolveBrowsedMangaId(
+      browsed('Jellyfin', 7, name: 'Season 1', link: '/frieren#season'),
+      'all',
+      7,
+    );
+    final frierenAgain = await resolveBrowsedMangaId(
+      browsed('Jellyfin', 7, name: 'Season 1', link: '/frieren#season'),
+      'all',
+      7,
+    );
+
+    expect(frieren, isNot(honzuki));
+    expect(frierenAgain, frieren);
+    expect(await isar.mangas.count(), 2);
+  });
+
+  test('a stored row without a URL is still reused by title', () async {
+    final legacy = await resolveBrowsedMangaId(
+      browsed('Source', 7, link: null),
+      'all',
+      7,
+    );
+    final browsedAgain = await resolveBrowsedMangaId(
+      browsed('Source', 7),
+      'all',
+      7,
+    );
+
+    expect(browsedAgain, legacy);
+    expect(await isar.mangas.count(), 1);
   });
 }

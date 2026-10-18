@@ -205,52 +205,70 @@ Future<void> fetchSourcesList({
     final languageStates = await _savedExtensionLanguageStates(itemType);
     final deviceLocales = PlatformDispatcher.instance.locales;
     final updateGroups = <String, List<Source>>{};
-    for (var source in sourceList) {
-      final existingSource = await sourceRepository.findByIdAsync(source.id!);
-      if (existingSource == null) {
-        final isActive = extensionLanguageEnabledForNewSource(
+    // Read every stored source in one query and save this refresh's changes
+    // in one transaction instead of one of each per source. A source written
+    // earlier in the loop is read back from `pending`, as it would have been
+    // from the database, and pending writes are saved even if the loop
+    // throws, like the writes made before the throw used to be.
+    final knownIds = [
+      for (final source in sourceList)
+        if (source.id != null) source.id!,
+    ];
+    final storedById = <int, Source?>{};
+    final stored = await isar.sources.getAll(knownIds);
+    for (var i = 0; i < knownIds.length; i++) {
+      storedById[knownIds[i]] = stored[i];
+    }
+    final pending = <int, Source>{};
+    try {
+      for (var source in sourceList) {
+        final id = source.id!;
+        final existingSource = pending[id] ?? storedById[id];
+        if (existingSource == null) {
+          final isActive = extensionLanguageEnabledForNewSource(
+            source.lang,
+            savedLanguageStates: languageStates,
+            deviceLocales: deviceLocales,
+          );
+          pending[id] = _newSource(source, repo, itemType, isActive: isActive)
+            ..updatedAt = DateTime.now().millisecondsSinceEpoch;
+          continue;
+        }
+        final metadataChanged = applyExtensionCatalogMetadata(
+          existingSource,
+          source,
+          repo: repo,
+        );
+        final isActive = extensionLanguageEnabledForCatalogSource(
           source.lang,
+          isInstalled: existingSource.isAdded ?? false,
+          currentValue: existingSource.isActive,
           savedLanguageStates: languageStates,
           deviceLocales: deviceLocales,
         );
-        await _addNewSource(source, repo, itemType, isActive: isActive);
-        continue;
+        final activationChanged = existingSource.isActive != isActive;
+        if (activationChanged) existingSource.isActive = isActive;
+        if (metadataChanged || activationChanged) {
+          _markPending(pending, existingSource);
+        }
+        final shouldUpdate =
+            (existingSource.isAdded ?? false) &&
+            compareVersions(existingSource.version!, source.version!) < 0;
+        if (!shouldUpdate) continue;
+        if (autoUpdateExtensions) {
+          final groupKey = source.sourceCodeLanguage == SourceCodeLanguage.mihon
+              ? mihonExtensionGroupKey(source)
+              : source.id.toString();
+          updateGroups.putIfAbsent(groupKey, () => []).add(source);
+        } else {
+          _markPending(pending, existingSource..versionLast = source.version);
+        }
       }
-      final metadataChanged = applyExtensionCatalogMetadata(
-        existingSource,
-        source,
-        repo: repo,
-      );
-      final isActive = extensionLanguageEnabledForCatalogSource(
-        source.lang,
-        isInstalled: existingSource.isAdded ?? false,
-        currentValue: existingSource.isActive,
-        savedLanguageStates: languageStates,
-        deviceLocales: deviceLocales,
-      );
-      final activationChanged = existingSource.isActive != isActive;
-      if (activationChanged) existingSource.isActive = isActive;
-      if (metadataChanged || activationChanged) {
+    } finally {
+      if (pending.isNotEmpty) {
+        final writes = pending.values.toList();
         await dbWriteQueue.run(
-          () => isar.writeTxn(() async {
-            isar.sources.put(
-              existingSource..updatedAt = DateTime.now().millisecondsSinceEpoch,
-            );
-          }),
-        );
-      }
-      final shouldUpdate =
-          (existingSource.isAdded ?? false) &&
-          compareVersions(existingSource.version!, source.version!) < 0;
-      if (!shouldUpdate) continue;
-      if (autoUpdateExtensions) {
-        final groupKey = source.sourceCodeLanguage == SourceCodeLanguage.mihon
-            ? mihonExtensionGroupKey(source)
-            : source.id.toString();
-        updateGroups.putIfAbsent(groupKey, () => []).add(source);
-      } else {
-        await sourceRepository.save(
-          existingSource..versionLast = source.version,
+          () => isar.writeTxn(() => isar.sources.putAll(writes)),
         );
       }
     }
@@ -274,10 +292,24 @@ Future<void> fetchSourcesList({
           .putIfAbsent(mihonExtensionGroupKey(source), () => [])
           .add(source);
     }
+    // Read every group's stored state at once. Installing a group changes
+    // the database, so after an install the remaining groups are read again
+    // one at a time, as before.
+    final mihonIds = [
+      for (final group in mihonGroups.values)
+        for (final source in group) source.id!,
+    ];
+    var prefetched = <int, Source?>{};
+    final mihonStored = await isar.sources.getAll(mihonIds);
+    for (var i = 0; i < mihonIds.length; i++) {
+      prefetched[mihonIds[i]] = mihonStored[i];
+    }
     for (final group in mihonGroups.values) {
-      final installedStates = await Future.wait(
-        group.map((source) => isar.sources.get(source.id!)),
-      );
+      final installedStates = prefetched.isEmpty
+          ? await Future.wait(
+              group.map((source) => isar.sources.get(source.id!)),
+            )
+          : [for (final source in group) prefetched[source.id!]];
       final hasInstalledSource = installedStates.any(
         (source) => source?.isAdded ?? false,
       );
@@ -285,6 +317,7 @@ Future<void> fetchSourcesList({
         (source) => !(source?.isAdded ?? false),
       );
       if (hasInstalledSource && hasMissingSibling) {
+        prefetched = {};
         await _updateSources(group, androidProxyServer, repo, itemType);
       }
     }
@@ -507,39 +540,43 @@ Future<void> installMihonApkSources({
   );
 }
 
-Future<void> _addNewSource(
+Source _newSource(
   Source source,
   Repo? repo,
   ItemType itemType, {
   required bool isActive,
-}) async {
-  final newSource = Source()
-    ..sourceCodeUrl = source.sourceCodeUrl
-    ..id = source.id
-    ..sourceCode = source.sourceCode
-    ..apiUrl = source.apiUrl
-    ..baseUrl = source.baseUrl
-    ..dateFormat = source.dateFormat
-    ..dateFormatLocale = source.dateFormatLocale
-    ..hasCloudflare = source.hasCloudflare
-    ..iconUrl = source.iconUrl
-    ..typeSource = source.typeSource
-    ..lang = source.lang
-    ..isNsfw = source.isNsfw
-    ..isActive = isActive
-    ..name = source.name
-    ..version = source.version
-    ..versionLast = source.version
-    ..itemType = itemType
-    ..sourceCodeLanguage = source.sourceCodeLanguage
-    ..isFullData = source.isFullData ?? false
-    ..appMinVerReq = source.appMinVerReq
-    ..additionalParams = source.additionalParams
-    ..isObsolete = false
-    ..notes = source.notes
-    ..repo = repo
+}) => Source()
+  ..sourceCodeUrl = source.sourceCodeUrl
+  ..id = source.id
+  ..sourceCode = source.sourceCode
+  ..apiUrl = source.apiUrl
+  ..baseUrl = source.baseUrl
+  ..dateFormat = source.dateFormat
+  ..dateFormatLocale = source.dateFormatLocale
+  ..hasCloudflare = source.hasCloudflare
+  ..iconUrl = source.iconUrl
+  ..typeSource = source.typeSource
+  ..lang = source.lang
+  ..isNsfw = source.isNsfw
+  ..isActive = isActive
+  ..name = source.name
+  ..version = source.version
+  ..versionLast = source.version
+  ..itemType = itemType
+  ..sourceCodeLanguage = source.sourceCodeLanguage
+  ..isFullData = source.isFullData ?? false
+  ..appMinVerReq = source.appMinVerReq
+  ..additionalParams = source.additionalParams
+  ..isObsolete = false
+  ..notes = source.notes
+  ..repo = repo;
+
+/// Queues [source] for the refresh's single write, stamped with the time it
+/// would have been written on its own. A later write of the same source
+/// replaces the earlier one but keeps its place in the write order.
+void _markPending(Map<int, Source> pending, Source source) {
+  pending[source.id!] = source
     ..updatedAt = DateTime.now().millisecondsSinceEpoch;
-  await sourceRepository.save(newSource);
 }
 
 Future<Map<String, bool>> _savedExtensionLanguageStates(

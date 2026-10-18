@@ -318,6 +318,53 @@ which 259 ms network and 29 ms processing; the longest main-isolate stall is
 out. The refresh rewrites every stored chapter because their `updatedAt`
 changes, which is part of the current behavior and was kept.
 
+## Extension repository refresh
+
+Opening the extensions screen, adding a repository and the extension update
+check all run `fetchSourcesList`, which stores every source the repository
+lists. It used to read each source with its own database call and write
+each new or changed source in its own transaction, which for a repository
+the size of Keiyoushi's means thousands of transactions.
+
+`test/perf/extension_repo_benchmark_test.dart` serves a Keiyoushi-sized
+`index.min.json` (1,300 extensions, 2,154 manga sources) from a local
+server and measures three refreshes on a real Isar database:
+
+```sh
+MANGATAN_PERF=1 flutter test test/perf/extension_repo_benchmark_test.dart
+```
+
+| Id | Change | File |
+|---|---|---|
+| E1 | Read every stored source in one query, collect the refresh's writes and save them in one transaction; also read the installed-sibling check in one query, re-reading one group at a time after any install as before | `fetch_sources_list.dart` |
+
+Equivalence evidence: `test/services/fetch_sources_list_refresh_test.dart`
+runs four refreshes (first fetch, updates offered with auto-update off and
+moved base URLs, the same again, and one that throws part way because an
+installed source has no version) and compares every stored source after each
+step with a golden file produced by the previous implementation. The steps
+cover a source id listed twice, language activation, metadata changes,
+pending updates, the install-siblings path, and the writes made before a
+throw, which are still saved. Discarding those writes makes the test fail.
+
+Median of 10 runs, milliseconds. These runs overlapped other benchmarks, so
+the absolute numbers are noisier than elsewhere in this document; a quieter
+6-run pass is in brackets.
+
+| Refresh | Before | After | Longest stall, before → after |
+|---|---|---|---|
+| first fetch, every source new | 10,516 (8,889) | 61 (43) | 88 → 19 ms (45 → 16) |
+| nothing changed | 576 (423) | 86 (47) | 15 → 24 ms (13 → 14) |
+| 100 installed extensions with updates | 2,048 (670) | 79 (53) | 39 → 22 ms (12 → 13) |
+
+The obsolete-source check that runs after each refresh takes 7–14 ms and was
+already a single query and transaction.
+
+What changes besides speed: the sources now appear in the database in one
+write instead of one by one, so a screen watching them updates once at the
+end instead of thousands of times during the refresh. Each source's
+`updatedAt` is still stamped at the moment it would have been written.
+
 ## Open findings
 
 - Every chapter open loads its page list twice.

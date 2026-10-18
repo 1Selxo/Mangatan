@@ -565,6 +565,11 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   @override
   void initState() {
     super.initState();
+    // Before anything that can fail, so the controller dispose() needs is
+    // always there: this is the whole point of not leaving it lazy.
+    _readerController = ref.read(
+      novelReaderControllerProvider(chapter: chapter).notifier,
+    );
     unawaited(_initStatsTracker());
     HardwareKeyboard.instance.addHandler(_handleHiddenEpubEscape);
     unawaited(ReaderLookupTriggerState.initialize());

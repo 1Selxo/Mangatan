@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +88,24 @@ void main() {
       seenInDispose,
       1,
       reason: 'dispose still gets the real value, not a fallback',
+    );
+  });
+
+  test('the novel reader assigns its controller in initState', () {
+    // The rebase onto v0.9.2 kept the uninitialised `late final` declaration
+    // but dropped this assignment, so every novel failed to open with a
+    // LateInitializationError. The probes above cannot see that.
+    final source = File('lib/modules/novel/novel_reader_view.dart')
+        .readAsStringSync();
+    final initState = RegExp(r'void initState\(\) \{([\s\S]*?)\n  \}')
+        .firstMatch(source);
+    expect(initState, isNotNull);
+    expect(
+      initState!.group(1),
+      contains(
+        '_readerController = ref.read(\n'
+        '      novelReaderControllerProvider(chapter: chapter).notifier,',
+      ),
     );
   });
 }

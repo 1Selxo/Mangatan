@@ -1803,7 +1803,8 @@ class ChimahonMediaSafetyAudit {
     final selected = winner == _MediaWinner.local
         ? pair.localCanonical!
         : pair.remote!;
-    final expected = selected.deepCopy();
+    // Child lists are cleared by the projection below, so don't copy them.
+    final expected = _copyWithoutFields(selected, _mangaChildFields);
     if (!expected.hasCustomTitle()) {
       if (pair.localCanonical?.hasCustomTitle() ?? false) {
         expected.customTitle = pair.localCanonical!.customTitle;
@@ -1859,11 +1860,14 @@ class ChimahonMediaSafetyAudit {
         expected.clearMemo,
       );
     }
-    return _mangaPortableProjection(expected);
+    return _clearMangaProjectionFields(expected);
   }
 
-  BackupManga _mangaPortableProjection(BackupManga value) {
-    final result = value.deepCopy()
+  BackupManga _mangaPortableProjection(BackupManga value) =>
+      _clearMangaProjectionFields(_copyWithoutFields(value, _mangaChildFields));
+
+  BackupManga _clearMangaProjectionFields(BackupManga value) {
+    final result = value
       ..chapters.clear()
       ..categories.clear()
       ..tracking.clear()
@@ -1893,7 +1897,8 @@ class ChimahonMediaSafetyAudit {
     final selected = winner == _MediaWinner.local
         ? pair.localCanonical!
         : pair.remote!;
-    final expected = selected.deepCopy();
+    // Child lists are cleared by the projection below, so don't copy them.
+    final expected = _copyWithoutFields(selected, _animeChildFields);
     final remote = pair.remote;
     if (remote != null && pair.localCanonical != null) {
       expected.excludedScanlators
@@ -1967,11 +1972,14 @@ class ChimahonMediaSafetyAudit {
     if (remote != null && pair.localCanonical != null) {
       retainAnimeSeasonProjectionGaps(expected, pair.localCanonical!, remote);
     }
-    return _animePortableProjection(expected);
+    return _clearAnimeProjectionFields(expected);
   }
 
-  BackupAnime _animePortableProjection(BackupAnime value) {
-    final result = value.deepCopy()
+  BackupAnime _animePortableProjection(BackupAnime value) =>
+      _clearAnimeProjectionFields(_copyWithoutFields(value, _animeChildFields));
+
+  BackupAnime _clearAnimeProjectionFields(BackupAnime value) {
+    final result = value
       ..episodes.clear()
       ..categories.clear()
       ..tracking.clear()
@@ -2026,7 +2034,11 @@ class ChimahonMediaSafetyAudit {
         expected.clearMemo,
       );
     }
-    return _chapterPortableProjection(expected);
+    // [expected] is already a private copy; clear it in place.
+    return expected
+      ..clearLastModifiedAt()
+      ..clearVersion()
+      ..unknownFields.clear();
   }
 
   BackupChapter _chapterPortableProjection(BackupChapter value) =>
@@ -2034,6 +2046,60 @@ class ChimahonMediaSafetyAudit {
         ..clearLastModifiedAt()
         ..clearVersion()
         ..unknownFields.clear();
+
+  static const _mangaChildFields = {
+    'chapters',
+    'categories',
+    'tracking',
+    'history',
+  };
+  static const _animeChildFields = {
+    'episodes',
+    'categories',
+    'tracking',
+    'history',
+  };
+
+  /// Same as `value.deepCopy()` followed by clearing [excludedFields] and the
+  /// unknown fields, without first copying the excluded (large, repeated)
+  /// child lists. Every other field is copied as `deepCopy` copies it, so the
+  /// serialized result is identical.
+  T _copyWithoutFields<T extends GeneratedMessage>(
+    T value,
+    Set<String> excludedFields,
+  ) {
+    final result = value.createEmptyInstance() as T;
+    for (final field in value.info_.byIndex) {
+      if (excludedFields.contains(field.name)) continue;
+      final tag = field.tagNumber;
+      if (field.isMapField) {
+        final source = value.getField(tag) as PbMap;
+        final target = result.getField(tag) as PbMap;
+        for (final entry in source.entries) {
+          final entryValue = entry.value;
+          target[entry.key] = entryValue is GeneratedMessage
+              ? entryValue.deepCopy()
+              : entryValue;
+        }
+      } else if (field.isRepeated) {
+        final source = value.getField(tag) as List;
+        if (source.isEmpty) continue;
+        final target = result.getField(tag) as List;
+        for (final element in source) {
+          target.add(
+            element is GeneratedMessage ? element.deepCopy() : element,
+          );
+        }
+      } else if (value.hasField(tag)) {
+        final fieldValue = value.getField(tag);
+        result.setField(
+          tag,
+          fieldValue is GeneratedMessage ? fieldValue.deepCopy() : fieldValue,
+        );
+      }
+    }
+    return result;
+  }
 
   bool _matchesAnyEpisodePortableProjection({
     required BackupEpisode proposed,
@@ -2079,7 +2145,11 @@ class ChimahonMediaSafetyAudit {
         );
       }
     }
-    return _episodePortableProjection(expected);
+    // [expected] is already a private copy; clear it in place.
+    return expected
+      ..clearLastModifiedAt()
+      ..clearVersion()
+      ..unknownFields.clear();
   }
 
   BackupEpisode _episodePortableProjection(BackupEpisode value) =>
@@ -2359,6 +2429,14 @@ class ChimahonMediaSafetyAudit {
     required GeneratedMessage winner,
     required GeneratedMessage? loser,
   }) {
+    // Without any unknown fields on either side or in the proposal, no tag can
+    // be missing and both envelopes encode to zero bytes, so the full check
+    // below would return true. Most records carry no unknown fields.
+    if (winner.unknownFields.isEmpty &&
+        (loser == null || loser.unknownFields.isEmpty) &&
+        proposed.unknownFields.isEmpty) {
+      return true;
+    }
     if (ChimahonUnknownFieldSafety.missingOrReorderedTags(
       baseline: winner,
       target: proposed,

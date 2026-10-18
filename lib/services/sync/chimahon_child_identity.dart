@@ -11,10 +11,17 @@ import 'package:mangayomi/utils/chapter_recognition.dart';
 double chimahonCanonicalChildNumber({
   required String name,
   required double? sourceNumber,
-}) => Float32List.fromList([
-  normalizeSourceChapterNumber(sourceNumber) ??
-      fallbackChapterNumberFromName(name),
-]).single;
+}) {
+  // Storing into a float32 element rounds exactly like
+  // `Float32List.fromList([value]).single`, without allocating a list for
+  // every chapter identity.
+  _float32Scratch[0] =
+      normalizeSourceChapterNumber(sourceNumber) ??
+      fallbackChapterNumberFromName(name);
+  return _float32Scratch[0];
+}
+
+final _float32Scratch = Float32List(1);
 
 String chimahonChapterIdentity(BackupChapter chapter) =>
     chimahonChapterIdentityValues(

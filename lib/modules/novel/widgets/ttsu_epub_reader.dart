@@ -15,6 +15,7 @@ import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
 import 'package:mangayomi/services/epub_reader_asset_server.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
@@ -319,6 +320,11 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   DictionaryLookupPrefetch? _prefetchedLookup;
   DictionaryLookupTrigger _lookupTrigger = DictionaryLookupTrigger.leftClick;
   bool _additionalLeftClick = false;
+  bool _lookupOnHover = false;
+  Timer? _hoverDismissTimer;
+  bool _hoveringPopup = false;
+  Offset? _pendingPointer;
+  bool _pointerForwarding = false;
 
   String? get _chapterHref {
     if (isEpubNavigationChapter(widget.chapter)) return null;
@@ -343,6 +349,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     ReaderLookupTriggerState.additionalLeftClick.addListener(
       _handleLookupPreferencesChanged,
     );
+    ReaderOcrState.lookupOnHover.addListener(_handleLookupPreferencesChanged);
     unawaited(_prepareBundle());
   }
 
@@ -350,12 +357,16 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     final trigger = ReaderLookupTriggerState.trigger.value;
     final additionalLeftClick =
         ReaderLookupTriggerState.additionalLeftClick.value;
+    final lookupOnHover = isDesktop && ReaderOcrState.lookupOnHover.value;
     if (trigger == _lookupTrigger &&
-        additionalLeftClick == _additionalLeftClick) {
+        additionalLeftClick == _additionalLeftClick &&
+        lookupOnHover == _lookupOnHover) {
       return;
     }
     _lookupTrigger = trigger;
     _additionalLeftClick = additionalLeftClick;
+    _lookupOnHover = lookupOnHover;
+    _cancelHoverDismiss();
     if (_bundle != null && !_isPreparing) {
       unawaited(_reloadAtCurrentPosition());
     }
@@ -400,9 +411,13 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
 
     _EpubRenderBundle? bundle;
     try {
-      await ReaderLookupTriggerState.initialize();
+      await Future.wait([
+        ReaderLookupTriggerState.initialize(),
+        ReaderOcrState.initialize(),
+      ]);
       _lookupTrigger = ReaderLookupTriggerState.trigger.value;
       _additionalLeftClick = ReaderLookupTriggerState.additionalLeftClick.value;
+      _lookupOnHover = isDesktop && ReaderOcrState.lookupOnHover.value;
       bundle = await _EpubRenderBundle.create(
         book: widget.book,
         chapterHref: _chapterHref,
@@ -491,6 +506,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     layout: widget.layout,
     lookupTrigger: _lookupTrigger,
     additionalLeftClick: isDesktop && _additionalLeftClick,
+    lookupOnHover: _lookupOnHover,
     chapterHref: _chapterHref,
     resourceUrlFor: resourceUrlFor ?? _bundle?.relativeUrlFor,
   );
@@ -503,6 +519,10 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     ReaderLookupTriggerState.additionalLeftClick.removeListener(
       _handleLookupPreferencesChanged,
     );
+    ReaderOcrState.lookupOnHover.removeListener(
+      _handleLookupPreferencesChanged,
+    );
+    _hoverDismissTimer?.cancel();
     final controller = _webView;
     if (controller != null) widget.controller.detach(controller);
     final bundle = _bundle;
@@ -623,9 +643,18 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     controller.addJavaScriptHandler(
       handlerName: 'readerDismissDictionary',
       callback: (_) {
+        _cancelHoverDismiss();
         _dictionaryGeneration++;
         return DictionaryLookupPopup.dismissActive();
       },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'readerHoverMiss',
+      callback: (_) => _scheduleHoverDismiss(),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'readerHoverHit',
+      callback: (_) => _cancelHoverDismiss(),
     );
     controller.addJavaScriptHandler(
       handlerName: 'readerLink',
@@ -636,6 +665,80 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     );
   }
 
+  /// Forwards Flutter's mouse position to the page, keeping at most one
+  /// evaluation in flight so fast movement collapses to the latest point.
+  void _forwardPointer(Offset position) {
+    _pendingPointer = position;
+    if (_pointerForwarding) return;
+    unawaited(_drainPointer());
+  }
+
+  Future<void> _drainPointer() async {
+    _pointerForwarding = true;
+    try {
+      while (mounted && _pendingPointer != null) {
+        final position = _pendingPointer!;
+        _pendingPointer = null;
+        final webView = _webView;
+        if (webView == null || !_isReady) break;
+        await webView.evaluateJavascript(
+          source:
+              'window.mangatanReader?.pointerAt?.(${position.dx}, ${position.dy});',
+        );
+      }
+    } catch (_) {
+      // A reload can replace the page mid-call; the next move retries.
+    } finally {
+      _pointerForwarding = false;
+    }
+  }
+
+  void _handlePointerExit() {
+    _pendingPointer = null;
+    if (!_lookupOnHover) return;
+    unawaited(
+      _webView?.evaluateJavascript(
+        source: 'window.mangatanReader?.pointerLeft?.();',
+      ),
+    );
+  }
+
+  void _handlePopupHover(bool hovered, {bool recheck = true}) {
+    _hoveringPopup = hovered;
+    if (hovered) _cancelHoverDismiss();
+    unawaited(
+      _webView?.evaluateJavascript(
+        source: 'window.mangatanReader?.setPopupHovered?.($hovered, $recheck);',
+      ),
+    );
+  }
+
+  /// A popup can close under the pointer without reporting hover exit.
+  void _resetPopupHover() {
+    if (_hoveringPopup) _handlePopupHover(false, recheck: false);
+  }
+
+  void _cancelHoverDismiss() {
+    _hoverDismissTimer?.cancel();
+    _hoverDismissTimer = null;
+  }
+
+  void _scheduleHoverDismiss() {
+    if (!_lookupOnHover) return;
+    _hoverDismissTimer?.cancel();
+    _hoverDismissTimer = Timer(const Duration(milliseconds: 250), () {
+      _hoverDismissTimer = null;
+      if (!mounted || _hoveringPopup) return;
+      _dictionaryGeneration++;
+      DictionaryLookupPopup.dismissActive();
+      unawaited(
+        _webView?.evaluateJavascript(
+          source: 'window.mangatanReader?.clearLookup();',
+        ),
+      );
+    });
+  }
+
   Map<dynamic, dynamic>? _firstMap(List<dynamic> arguments) {
     final first = arguments.firstOrNull;
     return first is Map ? first : null;
@@ -644,6 +747,8 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
   Future<void> _showDictionary(Map<dynamic, dynamic> data) async {
     final text = data['text']?.toString().trim() ?? '';
     if (text.isEmpty || !mounted) return;
+    final hover = data['hover'] == true;
+    if (hover) _cancelHoverDismiss();
     final lookupToken = data['lookupToken'] == null
         ? null
         : _javascriptNumber(data['lookupToken']).toInt();
@@ -675,6 +780,8 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       placement: widget.layout.isVerticalWriting
           ? DictionaryPopupPlacement.leftOrRight
           : DictionaryPopupPlacement.aboveOrBelow,
+      dismissOnOutsideTap: !hover,
+      onHoverChanged: hover ? _handlePopupHover : null,
       miningContext: _dictionaryMiningContext(
         sentence?.isNotEmpty == true ? sentence! : text,
       ),
@@ -694,6 +801,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       },
     );
     if (handle == null) {
+      _resetPopupHover();
       if (generation == _dictionaryGeneration) {
         await _webView?.evaluateJavascript(
           source: 'window.mangatanReader?.clearLookup($lookupTokenLiteral);',
@@ -703,7 +811,9 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     }
     unawaited(
       handle.dismissed.then((_) async {
-        if (!mounted || generation != _dictionaryGeneration) return;
+        if (!mounted) return;
+        _resetPopupHover();
+        if (generation != _dictionaryGeneration) return;
         await _webView?.evaluateJavascript(
           source: 'window.mangatanReader?.clearLookup($lookupTokenLiteral);',
         );
@@ -865,70 +975,79 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
       children: [
         ColoredBox(
           color: _color(widget.backgroundColor, const Color(0xFF292832)),
-          child: SizedBox.expand(
-            key: _webViewKey,
-            child: InAppWebView(
-              key: ValueKey(documentUri.toString()),
-              webViewEnvironment: webViewEnvironment,
-              initialUrlRequest: URLRequest(
-                url: WebUri(documentUri.toString()),
-              ),
-              initialSettings: InAppWebViewSettings(
-                transparentBackground: true,
-                underPageBackgroundColor: _color(
-                  widget.backgroundColor,
-                  const Color(0xFF292832),
+          child: MouseRegion(
+            opaque: false,
+            onHover: isDesktop
+                ? (event) => _forwardPointer(event.localPosition)
+                : null,
+            onExit: isDesktop ? (_) => _handlePointerExit() : null,
+            child: SizedBox.expand(
+              key: _webViewKey,
+              child: InAppWebView(
+                key: ValueKey(documentUri.toString()),
+                webViewEnvironment: webViewEnvironment,
+                initialUrlRequest: URLRequest(
+                  url: WebUri(documentUri.toString()),
                 ),
-                supportZoom: false,
-                horizontalScrollBarEnabled: false,
-                verticalScrollBarEnabled: !widget.layout.usesHorizontalScroll,
-                disableHorizontalScroll: !widget.layout.usesHorizontalScroll,
-                disableVerticalScroll: widget.layout.usesHorizontalScroll,
-                isInspectable: kDebugMode,
-                allowFileAccessFromFileURLs: !Platform.isWindows,
-                allowUniversalAccessFromFileURLs: false,
-              ),
-              onWebViewCreated: (controller) {
-                _webView = controller;
-                widget.controller.attach(controller);
-                _registerHandlers(controller);
-              },
-              onLoadStop: (controller, _) {
-                unawaited(_verifyLoadedDocument(controller, documentIdentity));
-              },
-              onReceivedError: (_, request, error) {
-                if (request.isForMainFrame != false &&
-                    documentIdentity == _documentIdentity) {
-                  _fail(_generation, 'WebView error: ${error.description}');
-                }
-              },
-              onReceivedHttpError: (_, request, response) {
-                if (request.isForMainFrame != false &&
-                    documentIdentity == _documentIdentity) {
-                  _fail(
-                    _generation,
-                    'WebView HTTP error ${response.statusCode ?? ''}: ${response.reasonPhrase ?? ''}',
+                initialSettings: InAppWebViewSettings(
+                  transparentBackground: true,
+                  underPageBackgroundColor: _color(
+                    widget.backgroundColor,
+                    const Color(0xFF292832),
+                  ),
+                  supportZoom: false,
+                  horizontalScrollBarEnabled: false,
+                  verticalScrollBarEnabled: !widget.layout.usesHorizontalScroll,
+                  disableHorizontalScroll: !widget.layout.usesHorizontalScroll,
+                  disableVerticalScroll: widget.layout.usesHorizontalScroll,
+                  isInspectable: kDebugMode,
+                  allowFileAccessFromFileURLs: !Platform.isWindows,
+                  allowUniversalAccessFromFileURLs: false,
+                ),
+                onWebViewCreated: (controller) {
+                  _webView = controller;
+                  widget.controller.attach(controller);
+                  _registerHandlers(controller);
+                },
+                onLoadStop: (controller, _) {
+                  unawaited(
+                    _verifyLoadedDocument(controller, documentIdentity),
                   );
-                }
-              },
-              shouldOverrideUrlLoading: (_, navigationAction) async {
-                final url = navigationAction.request.url;
-                if (url == null) return NavigationActionPolicy.CANCEL;
-                final uri = Uri.tryParse(url.toString());
-                if (uri != null && _sameReaderDocument(uri, documentUri)) {
-                  // WebView2 describes a cancelled initial navigation as a
-                  // stopped connection. Permit only this generated chapter
-                  // document; EPUB links still use the JS bridge.
-                  return NavigationActionPolicy.ALLOW;
-                }
-                if (uri != null &&
-                    (uri.scheme == 'http' || uri.scheme == 'https')) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-                // EPUB links are handled by the DOM bridge. Never let a link
-                // replace the controlled reader document with a blank page.
-                return NavigationActionPolicy.CANCEL;
-              },
+                },
+                onReceivedError: (_, request, error) {
+                  if (request.isForMainFrame != false &&
+                      documentIdentity == _documentIdentity) {
+                    _fail(_generation, 'WebView error: ${error.description}');
+                  }
+                },
+                onReceivedHttpError: (_, request, response) {
+                  if (request.isForMainFrame != false &&
+                      documentIdentity == _documentIdentity) {
+                    _fail(
+                      _generation,
+                      'WebView HTTP error ${response.statusCode ?? ''}: ${response.reasonPhrase ?? ''}',
+                    );
+                  }
+                },
+                shouldOverrideUrlLoading: (_, navigationAction) async {
+                  final url = navigationAction.request.url;
+                  if (url == null) return NavigationActionPolicy.CANCEL;
+                  final uri = Uri.tryParse(url.toString());
+                  if (uri != null && _sameReaderDocument(uri, documentUri)) {
+                    // WebView2 describes a cancelled initial navigation as a
+                    // stopped connection. Permit only this generated chapter
+                    // document; EPUB links still use the JS bridge.
+                    return NavigationActionPolicy.ALLOW;
+                  }
+                  if (uri != null &&
+                      (uri.scheme == 'http' || uri.scheme == 'https')) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                  // EPUB links are handled by the DOM bridge. Never let a link
+                  // replace the controlled reader document with a blank page.
+                  return NavigationActionPolicy.CANCEL;
+                },
+              ),
             ),
           ),
         ),
@@ -1153,6 +1272,7 @@ String buildTtsuEpubDocument({
   EpubReadingLayout layout = EpubReadingLayout.horizontalContinuous,
   DictionaryLookupTrigger lookupTrigger = DictionaryLookupTrigger.leftClick,
   bool additionalLeftClick = false,
+  bool lookupOnHover = false,
   String? chapterHref,
   String? Function(EpubResource resource)? resourceUrlFor,
 }) {
@@ -1195,6 +1315,7 @@ String buildTtsuEpubDocument({
   final verticalWriting = layout.isVerticalWriting;
   final lookupTriggerValue = jsonEncode(lookupTrigger.name);
   final additionalLeftClickValue = additionalLeftClick ? 'true' : 'false';
+  final lookupOnHoverValue = lookupOnHover ? 'true' : 'false';
   final pageGap = (padding * 2).toStringAsFixed(1);
 
   return '''<!doctype html>
@@ -1435,6 +1556,7 @@ String buildTtsuEpubDocument({
       const continuousVertical = verticalWriting && !pageMode;
       const lookupTrigger = $lookupTriggerValue;
       const additionalLeftClick = $additionalLeftClickValue;
+      const lookupOnHover = $lookupOnHoverValue;
       const leftClickLookupEnabled = (event) =>
         lookupTrigger === 'leftClick' ||
         (additionalLeftClick &&
@@ -1454,6 +1576,8 @@ String buildTtsuEpubDocument({
       let shiftLookupActive = false;
       let middleLookupActive = false;
       let lastHeldLookupKey = null;
+      let hoverMissReported = false;
+      let popupHovered = false;
       let nextTextNodeId = 0;
       const textNodeIds = new WeakMap();
       let measuredPageMax = null;
@@ -2139,6 +2263,8 @@ String buildTtsuEpubDocument({
         if (expectedToken != null && activeLookup?.token !== Number(expectedToken)) return false;
         lookupHighlight = false;
         activeLookup = null;
+        // A dismissed hover popup must reopen when its word is hovered again.
+        if (lookupOnHover) lastHeldLookupKey = null;
         window.getSelection()?.removeAllRanges();
         CSS.highlights?.get('hoshi-selection')?.clear();
         CSS.highlights?.delete('hoshi-selection');
@@ -2146,11 +2272,12 @@ String buildTtsuEpubDocument({
         return true;
       };
       const clearSelection = () => clearLookup();
-      const triggerLookupAt = (x, y, hit = null) => {
+      const triggerLookupAt = (x, y, hit = null, hover = false) => {
         if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
         hideAction();
         const lookup = lookupAt(x, y, hit);
         if (!lookup) { clearLookup(); return false; }
+        if (hover) lookup.hover = true;
         call('readerDictionary', lookup);
         return true;
       };
@@ -2167,6 +2294,70 @@ String buildTtsuEpubDocument({
         call('readerDismissDictionary');
         clearLookup();
       };
+      const hitKey = (hit) => {
+        let nodeId = textNodeIds.get(hit.node);
+        if (nodeId == null) {
+          nodeId = ++nextTextNodeId;
+          textNodeIds.set(hit.node, nodeId);
+        }
+        return nodeId + ':' + hit.offset;
+      };
+      // Hover lookups follow the pointer. Flutter owns the dismissal delay so
+      // the pointer can cross the gap into the popup without closing it.
+      const triggerHoverLookupAt = (x, y) => {
+        const hit = Number.isFinite(x) && Number.isFinite(y)
+          ? characterAt(x, y)
+          : null;
+        if (!hit) {
+          if (!hoverMissReported) {
+            hoverMissReported = true;
+            call('readerHoverMiss');
+          }
+          return false;
+        }
+        const recovered = hoverMissReported;
+        hoverMissReported = false;
+        const key = hitKey(hit);
+        if (key === lastHeldLookupKey) {
+          if (recovered) call('readerHoverHit');
+          return true;
+        }
+        lastHeldLookupKey = key;
+        return triggerLookupAt(x, y, hit, true);
+      };
+      const handlePointerAt = (x, y, shiftKey = false) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        lastPointerX = x; lastPointerY = y;
+        // The Flutter popup covers the page; the web view may still see the
+        // pointer underneath it.
+        if (popupHovered) return;
+        clearTimeout(prefetchTimer);
+        prefetchTimer = setTimeout(() => prefetchAt(x, y), 70);
+        if (lookupOnHover) {
+          triggerHoverLookupAt(x, y);
+          return;
+        }
+        const shiftScan = lookupTrigger === 'shift' &&
+          (shiftKey || shiftLookupActive);
+        const middleScan = lookupTrigger === 'middleClick' && middleLookupActive;
+        if (shiftScan || middleScan) {
+          triggerHeldLookupAt(x, y);
+        }
+      };
+      // macOS WKWebView only delivers mouse moves after it becomes first
+      // responder, so Flutter forwards its own hover positions here.
+      const pointerAt = (x, y) => handlePointerAt(Number(x), Number(y));
+      const pointerLeft = () => {
+        if (!lookupOnHover || popupHovered) return;
+        hoverMissReported = false;
+        triggerHoverLookupAt(NaN, NaN);
+      };
+      const setPopupHovered = (hovered, recheck = true) => {
+        popupHovered = Boolean(hovered);
+        if (popupHovered || !lookupOnHover || !recheck) return;
+        hoverMissReported = false;
+        triggerHoverLookupAt(lastPointerX, lastPointerY);
+      };
       const triggerHeldLookupAt = (x, y) => {
         if (!Number.isFinite(x) || !Number.isFinite(y)) {
           lastHeldLookupKey = null;
@@ -2181,12 +2372,7 @@ String buildTtsuEpubDocument({
           call('readerDismissDictionary');
           return false;
         }
-        let nodeId = textNodeIds.get(hit.node);
-        if (nodeId == null) {
-          nodeId = ++nextTextNodeId;
-          textNodeIds.set(hit.node, nodeId);
-        }
-        const key = nodeId + ':' + hit.offset;
+        const key = hitKey(hit);
         if (key === lastHeldLookupKey) return true;
         lastHeldLookupKey = key;
         const triggered = triggerLookupAt(x, y, hit);
@@ -2194,7 +2380,7 @@ String buildTtsuEpubDocument({
         return triggered;
       };
       const setShiftLookupActive = (active) => {
-        if (lookupTrigger !== 'shift') return false;
+        if (lookupTrigger !== 'shift' || lookupOnHover) return false;
         const wasActive = shiftLookupActive;
         shiftLookupActive = Boolean(active);
         if (!shiftLookupActive) { lastHeldLookupKey = null; return true; }
@@ -2220,6 +2406,9 @@ String buildTtsuEpubDocument({
         clearLookup,
         clearSelection,
         setShiftLookupActive,
+        pointerAt,
+        pointerLeft,
+        setPopupHovered,
         isReady: () => ready,
       };
 
@@ -2237,16 +2426,7 @@ String buildTtsuEpubDocument({
       action.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); if (selected) call('readerDictionary', selected); });
       document.addEventListener('pointermove', (event) => {
         if (event.pointerType && event.pointerType !== 'mouse') return;
-        const x = event.clientX; const y = event.clientY;
-        lastPointerX = x; lastPointerY = y;
-        clearTimeout(prefetchTimer);
-        prefetchTimer = setTimeout(() => prefetchAt(x, y), 70);
-        const shiftScan = lookupTrigger === 'shift' &&
-          (event.shiftKey || shiftLookupActive);
-        const middleScan = lookupTrigger === 'middleClick' && middleLookupActive;
-        if (shiftScan || middleScan) {
-          triggerHeldLookupAt(x, y);
-        }
+        handlePointerAt(event.clientX, event.clientY, event.shiftKey);
       }, { passive: true });
       document.addEventListener('pointerdown', (event) => {
         if (event.button === 3) {
@@ -2296,7 +2476,14 @@ String buildTtsuEpubDocument({
         const link = event.target.closest?.('a[href]');
         if (link) { event.preventDefault(); clearLookup(); const href = link.getAttribute('href') || ''; if (href.startsWith('#')) jumpToFragment(href); else call('readerLink', href); return; }
         const hadActiveLookup = activeLookup != null;
-        if (leftClickLookupEnabled(event)) {
+        if (lookupOnHover && (!event.pointerType || event.pointerType === 'mouse')) {
+          // Hovering already opened the word under the pointer; a click
+          // closes it or falls through to the reader's tap zones.
+          if (hadActiveLookup) {
+            dismissReaderDictionary();
+            return;
+          }
+        } else if (leftClickLookupEnabled(event)) {
           if (pointsAtActiveLookup(event.clientX, event.clientY)) {
             dismissReaderDictionary();
             return;

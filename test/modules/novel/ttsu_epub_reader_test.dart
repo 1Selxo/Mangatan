@@ -175,7 +175,9 @@ void main() {
       final lookupModeIndex = document.indexOf(
         'if (leftClickLookupEnabled(event))',
       );
-      final fallbackDismissalIndex = document.indexOf('if (hadActiveLookup)');
+      final fallbackDismissalIndex = document.lastIndexOf(
+        'if (hadActiveLookup)',
+      );
       expect(lookupModeIndex, greaterThanOrEqualTo(0));
       expect(
         lookupModeIndex,
@@ -351,6 +353,36 @@ void main() {
     expect(document, contains("event.shiftKey || shiftLookupActive"));
     expect(document, contains('triggerHeldLookupAt(x, y)'));
     expect(document, contains("call('readerDismissDictionary')"));
+  });
+
+  test('accepts Flutter pointer positions and hover lookups', () {
+    final document = buildTtsuEpubDocument(
+      html: '<p>辞書</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      lookupOnHover: true,
+    );
+
+    expect(document, contains('const lookupOnHover = true'));
+    expect(document, contains('pointerAt,'));
+    expect(document, contains('pointerLeft,'));
+    expect(document, contains('setPopupHovered,'));
+    expect(document, contains("call('readerHoverMiss')"));
+    expect(document, contains("call('readerHoverHit')"));
+    expect(document, contains('if (hover) lookup.hover = true;'));
+    // Shift is not a separate trigger while hover lookup is on.
+    expect(
+      document,
+      contains("if (lookupTrigger !== 'shift' || lookupOnHover)"),
+    );
   });
 
   test('does not allow EPUB markup to inject executable elements', () {

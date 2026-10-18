@@ -80,12 +80,10 @@ class _DownloadQueueScreenState extends ConsumerState<DownloadQueueScreen> {
                     isExtended: false,
                     label: l10n.download_queue,
                     onPressed: () async {
-                      for (final entry in queued) {
-                        final chapter = entry.chapter.value;
-                        if (chapter != null) {
-                          await downloadRepository.enqueue(chapter);
-                        }
-                      }
+                      await downloadRepository.enqueueAll([
+                        for (final entry in queued)
+                          if (entry.chapter.value != null) entry.chapter.value!,
+                      ]);
                       if (!mounted) return;
                       ref.invalidate(processDownloadsProvider());
                       ref.read(processDownloadsProvider());

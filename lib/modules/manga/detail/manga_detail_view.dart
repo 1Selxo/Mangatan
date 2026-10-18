@@ -456,9 +456,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
     }).toList();
     if (chaptersToDownload.isEmpty) return;
 
-    for (final chapter in chaptersToDownload) {
-      await downloadRepository.enqueue(chapter);
-    }
+    await downloadRepository.enqueueAll(chaptersToDownload);
     if (!mounted) return;
     ref.invalidate(processDownloadsProvider());
     ref.read(processDownloadsProvider());

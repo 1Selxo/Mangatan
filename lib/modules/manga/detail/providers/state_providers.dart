@@ -322,9 +322,9 @@ class ChapterSetDownloadState extends _$ChapterSetDownloadState {
 
   Future<void> set() async {
     ref.read(isLongPressedStateProvider.notifier).update(false);
-    for (final chapter in ref.read(chaptersListStateProvider).toList()) {
-      await downloadRepository.enqueue(chapter);
-    }
+    await downloadRepository.enqueueAll(
+      ref.read(chaptersListStateProvider).toList(),
+    );
     if (!ref.mounted) return;
     ref.invalidate(processDownloadsProvider());
     ref.read(processDownloadsProvider());

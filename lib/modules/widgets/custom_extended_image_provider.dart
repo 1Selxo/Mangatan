@@ -15,6 +15,7 @@ import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/utils/avif.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:path/path.dart';
 import 'package:extended_image_library/src/network/extended_network_image_provider.dart'
     as image_provider;
@@ -239,10 +240,13 @@ class CustomExtendedNetworkImageProvider
         StreamController<ImageChunkEvent>();
 
     return MultiFrameImageStreamCompleter(
-      codec: _loadAsync(
-        key as CustomExtendedNetworkImageProvider,
-        chunkEvents,
-        decode,
+      codec: PerfMetrics.trace(
+        PerfFlow.loadMedia,
+        () => _loadAsync(
+          key as CustomExtendedNetworkImageProvider,
+          chunkEvents,
+          decode,
+        ),
       ),
       scale: key.scale,
       chunkEvents: chunkEvents.stream,

@@ -121,8 +121,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final data = _checkedJson(res) as Map<String, dynamic>;
     final pages = MangaPages.fromJson(data, source.itemType);
     return MPages(
       list: pages.list
@@ -157,8 +156,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final data = _checkedJson(res) as Map<String, dynamic>;
     final pages = MangaPages.fromJson(data, source.itemType);
     return MPages(
       list: pages.list
@@ -194,8 +192,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final data = _checkedJson(res) as Map<String, dynamic>;
     final pages = MangaPages.fromJson(data, source.itemType);
     return MPages(
       list: pages.list
@@ -230,8 +227,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final data = _checkedJson(res) as Map<String, dynamic>;
     final detail = _animeOrManga(data);
     if (source.itemType == ItemType.anime && detail.animeFetchType == 0) {
       detail.seasons = await getSeasonList(data);
@@ -284,8 +280,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body);
+    final data = _checkedJson(res);
     if (data is! List) {
       throw StateError(
         'The extension server does not support seasons. Update the server and try again.',
@@ -307,8 +302,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body) as List;
+    final data = _checkedJson(res) as List;
     return data
         .map(
           (e) => MChapter(
@@ -354,8 +348,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    return jsonDecode(res.body) as String;
+    return _checkedJson(res) as String;
   }
 
   Future<String> getChapterWebViewUrl(Chapter chapter) async {
@@ -376,8 +369,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    return jsonDecode(res.body) as String;
+    return _checkedJson(res) as String;
   }
 
   @override
@@ -391,8 +383,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body) as List;
+    final data = _checkedJson(res) as List;
     return data
         .map(
           (e) => PageUrl(
@@ -426,8 +417,7 @@ class MihonExtensionService implements ExtensionService {
       },
       headers: getCookie(),
     );
-    hasError(res);
-    final data = jsonDecode(res.body) as List;
+    final data = _checkedJson(res) as List;
     return data.map((e) {
       final tempHeaders =
           e['headers']?['namesAndValues\$okhttp'] as List<dynamic>?;
@@ -553,24 +543,53 @@ class MihonExtensionService implements ExtensionService {
   /// Extension requests run outside MClient, so bridge errors need their own
   /// Cloudflare proxy retry.
   bool _isCloudflareBlocked(http.Response response) {
-    try {
-      final decoded = jsonDecode(response.body);
-      return decoded is Map<String, dynamic> &&
-          decoded['error'] != null &&
-          decoded['code'] == 403;
-    } catch (_) {
-      // Not JSON: hasError() reports the malformed-response case itself.
-      return false;
-    }
+    final parsed = _parseJson(response);
+    // Not JSON: hasError() reports the malformed-response case itself.
+    if (!parsed.isValid) return false;
+    final decoded = parsed.value;
+    return decoded is Map<String, dynamic> &&
+        decoded['error'] != null &&
+        decoded['code'] == 403;
   }
+}
+
+/// A response body parsed as JSON, or a note that it is not valid JSON.
+final class _ParsedBody {
+  const _ParsedBody(this.value) : isValid = true;
+  const _ParsedBody.invalid() : value = null, isValid = false;
+
+  final Object? value;
+  final bool isValid;
+}
+
+/// Each response is checked for a Cloudflare block, checked for an error and
+/// then read, and its body can be large. Parse it once for all three. The
+/// parsed value is only ever read, never modified.
+final _parsedBodies = Expando<_ParsedBody>('mihonParsedBody');
+
+_ParsedBody _parseJson(http.Response response) =>
+    _parsedBodies[response] ??= () {
+      try {
+        return _ParsedBody(jsonDecode(mihonResponseBody(response)));
+      } catch (_) {
+        return const _ParsedBody.invalid();
+      }
+    }();
+
+/// [hasError] followed by the response's JSON value.
+Object? _checkedJson(http.Response response) {
+  hasError(response);
+  return _parseJson(response).value;
 }
 
 void hasError(http.Response response) {
   Map<String, dynamic>? decoded;
-  try {
-    final parsed = jsonDecode(response.body);
-    if (parsed is Map<String, dynamic>) decoded = parsed;
-  } catch (_) {
+  final parsed = _parseJson(response);
+  if (parsed.isValid) {
+    if (parsed.value is Map<String, dynamic>) {
+      decoded = parsed.value as Map<String, dynamic>;
+    }
+  } else {
     // Not valid JSON - the Android extension bridge (the device/emulator
     // configured in Settings > Browse > Extension Server) returned something
     // other than the expected response, most likely because it crashed, was

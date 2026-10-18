@@ -289,9 +289,11 @@ Future<dynamic> updateMangaDetail(
         }
 
         await chapterRepository.putAllAsync(orderedNew);
-        for (final chap in orderedNew) {
-          await chap.manga.save();
-        }
+        // Manga.chapters is the backlink of Chapter.manga, so linking the new
+        // chapters from the manga's side writes the same links as saving each
+        // chapter's link, in one database call instead of one per chapter.
+        // The chapters are new, so they have no earlier link to reset.
+        await manga.chapters.update(link: orderedNew);
 
         final updatesToInsert = <Update>[];
         for (final chap in orderedNew) {
@@ -309,9 +311,9 @@ Future<dynamic> updateMangaDetail(
 
         if (updatesToInsert.isNotEmpty) {
           await updateRepository.putAllAsync(updatesToInsert);
-          for (final upd in updatesToInsert) {
-            await upd.chapter.save();
-          }
+          await Future.wait([
+            for (final upd in updatesToInsert) upd.chapter.save(),
+          ]);
         }
       }
 

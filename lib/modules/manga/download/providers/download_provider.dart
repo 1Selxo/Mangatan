@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/services/download_manager/jimaku_download.dart';
 import 'package:mangayomi/services/mining/jimaku_service.dart';
 
@@ -346,8 +347,9 @@ Future<void> downloadChapter(
 
     await setProgress(DownloadProgress(0, 0, itemType));
     if (itemType == ItemType.manga) {
-      ref
-          .read(getChapterPagesProvider(chapter: chapter).future)
+      PerfMetrics.untraced(
+            () => ref.read(getChapterPagesProvider(chapter: chapter).future),
+          )
           .then((value) {
             if (value.pageUrls.isNotEmpty) {
               pageUrls = value.pageUrls;
@@ -363,7 +365,8 @@ Future<void> downloadChapter(
       try {
         final videoListProvider = getVideoListProvider(episode: chapter);
         final value = await resolveVideoListWithRetry(
-          resolve: () => ref.read(videoListProvider.future),
+          resolve: () =>
+              PerfMetrics.untraced(() => ref.read(videoListProvider.future)),
           beforeRetry: () => ref.invalidate(videoListProvider),
         );
         final m3u8Urls = value.$1

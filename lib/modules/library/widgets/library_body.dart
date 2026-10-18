@@ -12,7 +12,6 @@ import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/library_updater.dart';
-import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 
 /// Displays the library body content for a given category (or uncategorized).
 ///
@@ -83,14 +82,10 @@ class LibraryBody extends ConsumerWidget {
     );
     final mangaStream = allMangaStream.whenData((allMangas) {
       if (withoutCategories) {
-        return allMangas
-            .where((m) => m.categories == null || m.categories!.isEmpty)
-            .toList();
+        return libraryTabEntries(allMangas, settings, withoutCategories: true);
       }
       if (categoryId != null) {
-        return allMangas
-            .where((m) => m.categories?.contains(categoryId) ?? false)
-            .toList();
+        return libraryTabEntries(allMangas, settings, categoryId: categoryId);
       }
       return allMangas;
     });
@@ -123,7 +118,7 @@ class LibraryBody extends ConsumerWidget {
             ? sortType == 3
                   ? sortByUnreadCount(
                       entries,
-                      unreadCountOf: (manga) => manga.unreadChaptersCount,
+                      unreadCountOf: unreadChaptersCounter(),
                       descending: true,
                     )
                   : entries.reversed.toList()
@@ -215,9 +210,11 @@ class CategoryBadge extends ConsumerWidget {
 
     return mangas.when(
       data: (allMangas) {
-        final data = allMangas
-            .where((m) => m.categories?.contains(categoryId) ?? false)
-            .toList();
+        final data = libraryTabEntries(
+          allMangas,
+          settings,
+          categoryId: categoryId,
+        );
         final filtered = ref.watch(
           filteredLibraryMangaProvider(
             data: data,

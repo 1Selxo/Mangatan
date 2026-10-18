@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/modules/manga/detail/tv/tv_anime_detail_view.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/anime_season_list.dart';
@@ -334,8 +335,10 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
           title: widget.manga!.name ?? 'Manga',
           subtitle: chapter.name ?? 'Chapter',
           operation: (onProgress) async {
-            final result = await container.read(
-              getChapterPagesProvider(chapter: chapter).future,
+            final result = await PerfMetrics.untraced(
+              () => container.read(
+                getChapterPagesProvider(chapter: chapter).future,
+              ),
             );
             final pages = result.uChapDataPreload;
             if (pages.isEmpty) {

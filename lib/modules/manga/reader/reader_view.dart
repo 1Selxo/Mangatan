@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:photo_view/photo_view.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/modules/widgets/error_state.dart';
 import 'package:mangayomi/services/downloaded_chapter.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
@@ -1101,8 +1102,8 @@ class _MangaChapterPageGalleryState
         _isNextChapterPreloading = false;
         return;
       }
-      final value = await ref.read(
-        getChapterPagesProvider(chapter: nextChapter).future,
+      final value = await PerfMetrics.untraced(
+        () => ref.read(getChapterPagesProvider(chapter: nextChapter).future),
       );
       if (mounted) {
         _preloadNextChapter(value, chapter);

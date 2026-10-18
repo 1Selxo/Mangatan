@@ -4,6 +4,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/services/local_source_browser.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'search.g.dart';
@@ -15,7 +16,7 @@ Future<MPages?> search(
   required String query,
   required int page,
   required List<dynamic> filterList,
-}) async {
+}) => PerfMetrics.trace(PerfFlow.browseSource, label: 'search', () async {
   if (source.name == "local" && source.lang == "") {
     return buildLocalSourcePage(
       await loadLocalSourceNames(isar, itemType: source.itemType),
@@ -32,4 +33,4 @@ Future<MPages?> search(
     serviceType: 'search',
     proxyServer: proxyServer,
   );
-}
+});

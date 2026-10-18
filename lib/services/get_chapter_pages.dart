@@ -15,6 +15,7 @@ import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/downloaded_chapter.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'get_chapter_pages.g.dart';
 
@@ -39,12 +40,28 @@ class GetChapterPagesModel {
   });
 }
 
+/// [findDownloadedPageFileAsync] for pages 0 to [pageCount] - 1, in order.
+///
+/// A chapter that was never downloaded has no folder, and no page can be
+/// inside a folder that does not exist. Otherwise every page is looked up at
+/// once rather than one file system round trip at a time.
+Future<List<File?>> _findDownloadedPages(
+  Directory directory,
+  int pageCount,
+) async {
+  if (!await directory.exists()) return List<File?>.filled(pageCount, null);
+  return Future.wait([
+    for (var i = 0; i < pageCount; i++)
+      findDownloadedPageFileAsync(directory, i),
+  ]);
+}
+
 @riverpod
 Future<GetChapterPagesModel> getChapterPages(
   Ref ref, {
   required Chapter chapter,
   bool forceRefresh = false,
-}) async {
+}) => PerfMetrics.trace(PerfFlow.openChapter, () async {
   final keepAlive = ref.keepAlive();
   try {
     Directory? path;
@@ -137,10 +154,13 @@ Future<GetChapterPagesModel> getChapterPages(
         final pageCount = pageUrls.isNotEmpty
             ? pageUrls.length
             : downloaded!.pageCount;
+        final onDisk = pageCount == 0
+            ? const <File?>[]
+            : await _findDownloadedPages(path!, pageCount);
         for (var i = 0; i < pageCount; i++) {
           archiveImages.add(null);
           chapterModel.localImagePaths.add(null);
-          if (await findDownloadedPageFileAsync(path!, i) != null) {
+          if (onDisk[i] != null) {
             isLocaleList.add(true);
           } else {
             isLocaleList.add(false);
@@ -188,4 +208,4 @@ Future<GetChapterPagesModel> getChapterPages(
     keepAlive.close();
     rethrow;
   }
-}
+}, watchFrames: true);

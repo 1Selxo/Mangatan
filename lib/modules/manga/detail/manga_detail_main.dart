@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
-import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/detail/manga_details_view.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
@@ -13,7 +11,9 @@ import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/utils/source_lookup.dart';
+import 'package:mangayomi/utils/utils.dart';
 
 class MangaReaderDetail extends ConsumerStatefulWidget {
   final int mangaId;
@@ -40,7 +40,7 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
     _init();
   }
 
-  Future<void> _init() async {
+  Future<void> _init() => PerfMetrics.trace(PerfFlow.openEntry, () async {
     // Wait for the widget tree to settle before loading detail
     await WidgetsBinding.instance.endOfFrame;
     await ref.read(
@@ -51,7 +51,7 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
         _isLoading = false;
       });
     }
-  }
+  }, watchFrames: true);
 
   bool _isLoading = true;
   @override
@@ -67,12 +67,13 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
           // Language filters only hide Browse rows. Installed sources remain
           // available to refresh items already in the library.
           final detail = StreamBuilder(
-            stream: isar.sources
-                .filter()
-                .idIsNotNull()
-                .and()
-                .isAddedEqualTo(true)
-                .watch(fireImmediately: true),
+            // Only the rows that can match this entry, so a change does not
+            // load every installed extension.
+            stream: sourceLookupQuery(
+              currentManga.lang!,
+              currentManga.sourceId,
+              installedOnly: true,
+            ).watch(fireImmediately: true),
             builder: (context, snapshot) {
               final resolvedSource = snapshot.hasData
                   ? findSourceFromList(

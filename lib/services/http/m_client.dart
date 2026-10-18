@@ -22,6 +22,7 @@ import 'package:mangayomi/services/http/doh/doh_resolver.dart';
 import 'package:mangayomi/services/http/doh/doh_providers.dart';
 import 'package:mangayomi/services/http/doh/doh_custom_store.dart';
 import 'package:mangayomi/services/http/cf_proxy_store.dart';
+import 'package:mangayomi/services/perf/perf_http_client.dart';
 import 'package:mangayomi/utils/localized_message.dart';
 
 class MClient {
@@ -96,7 +97,9 @@ class MClient {
         : settings;
 
     return InterceptedClient.build(
-      client: httpClient(settings: clientSettings, reqcopyWith: reqcopyWith),
+      client: PerfHttpClient(
+        httpClient(settings: clientSettings, reqcopyWith: reqcopyWith),
+      ),
       retryPolicy: ResolveCloudFlareChallenge(showCloudFlareError),
       interceptors: [
         MCookieManager(reqcopyWith),

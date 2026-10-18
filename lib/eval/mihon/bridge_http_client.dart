@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 
 const mihonBridgeRetryDelays = [
   Duration(milliseconds: 250),
@@ -71,10 +72,12 @@ Future<http.Response> postMihonBridge(
   final preparedBody = _PreparedBridgeBody.from(uri, body);
   while (true) {
     try {
-      final response = await client.post(
-        uri,
-        body: preparedBody.body,
-        headers: _bridgeRequestHeaders(headers),
+      final response = await PerfMetrics.network(
+        () => client.post(
+          uri,
+          body: preparedBody.body,
+          headers: _bridgeRequestHeaders(headers),
+        ),
       );
       _publishExtensionToasts(response);
       _validateMihonBridgeResponse(response, uri);
@@ -102,6 +105,13 @@ Future<http.Response> postMihonBridge(
     }
   }
 }
+
+final _responseBodies = Expando<String>('mihonResponseBody');
+
+/// [http.Response.body] decodes the bytes again on every read. Bridge
+/// responses are read several times, so decode each one once.
+String mihonResponseBody(http.Response response) =>
+    _responseBodies[response] ??= response.body;
 
 const _extensionIdHeader = 'x-mangatan-extension-id';
 const _extensionToastsHeader = 'x-mangatan-toasts';
@@ -145,29 +155,33 @@ class _PreparedBridgeBody {
       return _PreparedBridgeBody(body: originalBody);
     }
 
-    final fullBody = originalBody is String
-        ? originalBody
-        : jsonEncode(payload);
     final apkData = payload['data'];
     if (apkData is! String || apkData.isEmpty) {
-      return _PreparedBridgeBody(body: fullBody);
+      return _PreparedBridgeBody(
+        body: originalBody is String ? originalBody : jsonEncode(payload),
+      );
     }
 
+    // The full body carries the whole APK. It is only sent when the server
+    // does not know the extension yet, so it is encoded only then.
+    String fullBody() =>
+        originalBody is String ? originalBody : jsonEncode(payload);
     final cacheKey = _extensionCacheKey(uri, apkData);
     final extensionId = _extensionIds[cacheKey];
     if (extensionId == null) {
+      final body = fullBody();
       return _PreparedBridgeBody(
-        body: fullBody,
-        fullBody: fullBody,
+        body: body,
+        fullBody: () => body,
         cacheKey: cacheKey,
       );
     }
 
-    payload
+    final small = Map<String, dynamic>.of(payload)
       ..remove('data')
       ..['extensionId'] = extensionId;
     return _PreparedBridgeBody(
-      body: jsonEncode(payload),
+      body: jsonEncode(small),
       fullBody: fullBody,
       cacheKey: cacheKey,
       usingExtensionId: true,
@@ -175,7 +189,7 @@ class _PreparedBridgeBody {
   }
 
   Object? body;
-  final Object? fullBody;
+  final String Function()? fullBody;
   final String? cacheKey;
   bool usingExtensionId;
 
@@ -199,7 +213,7 @@ class _PreparedBridgeBody {
       return false;
     }
     _extensionIds.remove(cacheKey);
-    body = fullBody;
+    body = fullBody!();
     usingExtensionId = false;
     return true;
   }
@@ -241,7 +255,10 @@ bool isTransientMihonBridgeGatewayError(Object error) {
 
 void _validateMihonBridgeResponse(http.Response response, Uri uri) {
   final contentType = response.headers['content-type']?.toLowerCase() ?? '';
-  final bodyStart = response.body.trimLeft().toLowerCase();
+  final bodyStart = _lowerCaseStart(
+    mihonResponseBody(response),
+    '<!doctype html'.length,
+  );
   final returnedHtml =
       contentType.contains('text/html') ||
       bodyStart.startsWith('<html') ||
@@ -283,6 +300,21 @@ void _validateMihonBridgeResponse(http.Response response, Uri uri) {
                 'APKBridge log and update both APKBridge and the Mihon extension.' : ' $serverError'}',
       statusCode: response.statusCode,
     );
+  }
+}
+
+/// The first [length] characters of `body.trimLeft().toLowerCase()`, without
+/// copying or lower-casing the rest of a possibly large body.
+String _lowerCaseStart(String body, int length) {
+  var end = body.length < 256 ? body.length : 256;
+  while (true) {
+    final trimmed = body.substring(0, end).trimLeft();
+    // Lower-casing never shortens text, so `length` characters of input are
+    // enough for `length` characters of output.
+    if (trimmed.length >= length || end == body.length) {
+      return trimmed.toLowerCase();
+    }
+    end = end * 2 < body.length ? end * 2 : body.length;
   }
 }
 

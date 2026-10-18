@@ -4,6 +4,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/services/local_source_browser.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/isolate_service.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'get_popular.g.dart';
@@ -13,7 +14,7 @@ Future<MPages?> getPopular(
   Ref ref, {
   required Source source,
   required int page,
-}) async {
+}) => PerfMetrics.trace(PerfFlow.browseSource, label: 'popular', () async {
   if (source.name == "local" && source.lang == "") {
     return buildLocalSourcePage(
       await loadLocalSourceNames(isar, itemType: source.itemType),
@@ -28,4 +29,4 @@ Future<MPages?> getPopular(
     serviceType: 'getPopular',
     proxyServer: proxyServer,
   );
-}
+});

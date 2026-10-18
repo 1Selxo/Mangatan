@@ -73,6 +73,7 @@ import 'package:mangayomi/modules/more/settings/reader/novel_reader_screen.dart'
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
 import 'package:mangayomi/modules/more/settings/security/security_screen.dart';
 import 'package:mangayomi/services/crash_route_observer.dart';
+import 'package:mangayomi/services/perf/perf_route_observer.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter/cupertino.dart';
 part 'router.g.dart';
@@ -92,6 +93,7 @@ GoRouter router(Ref ref) {
       BotToastNavigatorObserver(),
       CrashRouteObserver(),
       DictionaryPopupDismissNavigatorObserver(),
+      PerfRouteObserver(),
     ],
     initialLocation: initLocation,
     debugLogDiagnostics: kDebugMode,

@@ -94,19 +94,37 @@ List<Chapter> sortChaptersForDisplay({
   return reverse ? list : list.reversed.toList();
 }
 
+/// The scanlators hidden for each entry, as [MangaExtensions.unreadChaptersCount]
+/// looks them up: the first filter saved for an entry wins. Reads the
+/// settings once, so counting many entries doesn't load them once per entry.
+Map<int?, List<String>?> hiddenScanlatorsByManga() {
+  final byManga = <int?, List<String>?>{};
+  for (final filter
+      in isar.settings.getSync(227)?.filterScanlatorList ??
+          const <FilterScanlator>[]) {
+    byManga.putIfAbsent(filter.mangaId, () => filter.scanlators);
+  }
+  return byManga;
+}
+
 extension MangaExtensions on Manga {
   /// Number of unread chapters, excluding chapters from scanlators the user has
   /// filtered out for this manga. Mirrors the chapter list's scanlator filter,
   /// so the library "unread" badge and the unread sort reflect what the user
   /// actually sees rather than counting duplicate chapters from hidden
   /// scanlators (#796).
-  int get unreadChaptersCount {
-    final filter = isar.settings
+  int get unreadChaptersCount => unreadChaptersCountWith(
+    isar.settings
         .getSync(227)
         ?.filterScanlatorList
         ?.where((e) => e.mangaId == id)
         .firstOrNull
-        ?.scanlators;
+        ?.scanlators,
+  );
+
+  /// [unreadChaptersCount] with the hidden scanlators already looked up, for
+  /// passes over many entries. See [hiddenScanlatorsByManga].
+  int unreadChaptersCountWith(List<String>? filter) {
     if (filter == null || filter.isEmpty) {
       return chapters.where((c) => !(c.isRead ?? false)).length;
     }

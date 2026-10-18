@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:m_extension_server/m_extension_server.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -132,9 +133,11 @@ class MExtensionServerPlatform {
   Future<bool> _checkHealth(String baseUrl) async {
     if (baseUrl == _unavailableBaseUrl) return false;
     try {
-      final res = await http
-          .get(Uri.parse("$baseUrl/"))
-          .timeout(const Duration(seconds: 2));
+      final res = await PerfMetrics.network(
+        () => http
+            .get(Uri.parse("$baseUrl/"))
+            .timeout(const Duration(seconds: 2)),
+      );
       if (res.statusCode == 200) {
         return true;
       }
@@ -736,9 +739,9 @@ class MExtensionServerPlatform {
     Duration timeout = const Duration(seconds: 2),
   }) async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/capabilities'))
-          .timeout(timeout);
+      final response = await PerfMetrics.network(
+        () => http.get(Uri.parse('$baseUrl/capabilities')).timeout(timeout),
+      );
       if (response.statusCode != 200) return false;
       final capabilities = jsonDecode(response.body) as Map<String, dynamic>;
       return (capabilities['mangatanMihonBridge'] as num?)?.toInt() == 1 &&

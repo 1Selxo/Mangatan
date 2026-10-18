@@ -15,6 +15,7 @@ import 'package:mangayomi/services/torrent_server.dart';
 import 'package:mangayomi/services/youtube/youtube_service.dart';
 import 'package:mangayomi/utils/utils.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
+import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:path/path.dart' as p;
 
@@ -25,7 +26,7 @@ part 'get_video_list.g.dart';
 Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
   Ref ref, {
   required Chapter episode,
-}) async {
+}) => PerfMetrics.trace(PerfFlow.openEpisode, () async {
   (List<Video>, bool, List<String>, Directory?) result;
   final keepAlive = ref.keepAlive();
   try {
@@ -193,4 +194,4 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
     keepAlive.close();
     rethrow;
   }
-}
+}, watchFrames: true);

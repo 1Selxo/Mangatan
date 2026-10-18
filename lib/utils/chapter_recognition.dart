@@ -143,6 +143,27 @@ class ChapterRecognition {
   /// a genuine chapter 0, so callers can avoid treating every such chapter
   /// as a duplicate of every other one.
   (int, double?) rawSeasonAndNumber(String mangaTitle, String chapterName) {
+    // The answer depends only on the two strings, and chapter lists are
+    // parsed again on every sort, filter and rebuild, so remember it.
+    final byName = _parsed.putIfAbsent(mangaTitle, () => {});
+    final cached = byName[chapterName];
+    if (cached != null) return cached;
+    final parsed = _parseSeasonAndNumber(mangaTitle, chapterName);
+    if (_parsedCount >= _parsedLimit) {
+      _parsed.clear();
+      _parsedCount = 0;
+      _parsed[mangaTitle] = byName..clear();
+    }
+    byName[chapterName] = parsed;
+    _parsedCount++;
+    return parsed;
+  }
+
+  static final _parsed = <String, Map<String, (int, double?)>>{};
+  static int _parsedCount = 0;
+  static const _parsedLimit = 50000;
+
+  (int, double?) _parseSeasonAndNumber(String mangaTitle, String chapterName) {
     final name = chapterName
         .toLowerCase()
         .replaceAll(mangaTitle.toLowerCase(), '')

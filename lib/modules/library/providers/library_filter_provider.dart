@@ -1,6 +1,7 @@
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -30,6 +31,51 @@ List<T> sortByUnreadCount<T>(
     return descending ? bCount.compareTo(aCount) : aCount.compareTo(bCount);
   });
   return sorted;
+}
+
+/// [MangaExtensions.unreadChaptersCount] for many entries, reading the
+/// hidden-scanlator settings once instead of once per entry.
+int Function(Manga manga) unreadChaptersCounter() {
+  final hiddenScanlators = hiddenScanlatorsByManga();
+  return (manga) => manga.unreadChaptersCountWith(hiddenScanlators[manga.id]);
+}
+
+class _TabEntriesCache {
+  _TabEntriesCache(this.settings);
+  final Settings settings;
+  final byTab = <Object?, List<Manga>>{};
+}
+
+final _tabEntries = Expando<_TabEntriesCache>('libraryTabEntries');
+
+/// The entries of one library tab: those in [categoryId], or with
+/// [withoutCategories] those that have no category.
+///
+/// Returns the same list for the same library snapshot [all] and [settings].
+/// The filter provider below is keyed by its list, so a tab and its count
+/// badge reuse their filtered result when the library screen rebuilds
+/// without a change, for example when an entry is selected. A new snapshot
+/// or new settings start over, exactly as a new list did before.
+List<Manga> libraryTabEntries(
+  List<Manga> all,
+  Settings settings, {
+  int? categoryId,
+  bool withoutCategories = false,
+}) {
+  var cache = _tabEntries[all];
+  if (cache == null || !identical(cache.settings, settings)) {
+    cache = _tabEntries[all] = _TabEntriesCache(settings);
+  }
+  return cache.byTab.putIfAbsent(
+    withoutCategories ? #withoutCategories : categoryId,
+    () => withoutCategories
+        ? all
+              .where((m) => m.categories == null || m.categories!.isEmpty)
+              .toList()
+        : all
+              .where((m) => m.categories?.contains(categoryId) ?? false)
+              .toList(),
+  );
 }
 
 /// Pre-fetches all downloaded chapter IDs in a single Isar query.
@@ -80,7 +126,9 @@ List<Manga> filteredLibraryManga(
         .toList();
   } else {
     mangas = data.where((element) {
-      final chapters = userFacingChapters(element);
+      // Loaded only when a filter below reads them: loading every entry's
+      // chapters is most of the cost when no chapter filter is active.
+      late final chapters = userFacingChapters(element);
       // Filter by download — uses Set lookup instead of per-chapter Isar query
       if (downloadFilterType == 1 || downloadedOnly) {
         final hasDownloaded = chapters.any(
@@ -150,10 +198,11 @@ List<Manga> filteredLibraryManga(
   if (mangas.isNotEmpty) {
     if (sortType == 3) {
       final unreadCounts = <int, int>{};
+      final unreadCountOf = unreadChaptersCounter();
       for (final manga in mangas) {
         if (manga.id != null) {
           // Scanlator-aware unread count (respects the per-manga filter).
-          unreadCounts[manga.id!] = manga.unreadChaptersCount;
+          unreadCounts[manga.id!] = unreadCountOf(manga);
         }
       }
       mangas = sortByUnreadCount(

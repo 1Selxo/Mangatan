@@ -139,6 +139,22 @@ Novel statistics differ from the root manga/Anki statistics: they are nested
 under a stable novel identity and Chimahon merges them by date and modification
 clock, so they remain part of routine cross-device sync.
 
+## Known upstream issues
+
+These are bugs in Chimahon itself. Mangatan does not work around them, so
+both clients keep producing the same data and the fix can land upstream alone.
+
+- **Season details are not restored on Chimahon (or Anikku).** Chimahon applies
+  a sync through its backup restorer. `AnimeRestorer.restore` restores each
+  season row (an anime with `parentId`) with base data only. It never applies
+  the season's episodes, history, categories or tracking. Anikku's
+  `MangaRestorer.restore` has the same code, which came from Animiru. As a
+  result, watch progress, seen state, categories and tracking set on a season
+  in Mangatan reach the synced backup but never show up in Chimahon.
+  Chimahon-side changes still sync to Mangatan, and standalone entries sync
+  both ways. The fix is to call the details restore for each restored season,
+  as is done for the parent.
+
 ## Current verification boundary
 
 The macOS ARM64 debug app completed an authenticated Drive sync and subsequent

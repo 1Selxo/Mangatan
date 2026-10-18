@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'theme_mode_state_provider.g.dart';
@@ -8,7 +9,7 @@ part 'theme_mode_state_provider.g.dart';
 class ThemeModeState extends _$ThemeModeState {
   @override
   bool build() {
-    return settingsRepository.current.themeIsDark!;
+    return settingsRepository.field((s) => s.themeIsDarkProperty())!;
   }
 
   void setTheme(Brightness brightness) {
@@ -41,7 +42,8 @@ class ThemeModeState extends _$ThemeModeState {
 class FollowSystemThemeState extends _$FollowSystemThemeState {
   @override
   bool build() {
-    return settingsRepository.current.followSystemTheme ?? false;
+    return settingsRepository.field((s) => s.followSystemThemeProperty()) ??
+        false;
   }
 
   void set(bool value) {

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:mangayomi/utils/localized_message.dart';
@@ -79,7 +80,10 @@ class ClearChapterCacheOnAppLaunchState
     extends _$ClearChapterCacheOnAppLaunchState {
   @override
   bool build() {
-    return settingsRepository.current.clearChapterCacheOnAppLaunch ?? false;
+    return settingsRepository.field(
+          (s) => s.clearChapterCacheOnAppLaunchProperty(),
+        ) ??
+        false;
   }
 
   void set(bool value) {

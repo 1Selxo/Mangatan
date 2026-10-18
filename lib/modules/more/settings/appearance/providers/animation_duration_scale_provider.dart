@@ -1,4 +1,3 @@
-import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
@@ -34,7 +33,7 @@ class AnimationDurationScale extends _$AnimationDurationScale {
   @override
   double build() {
     return normalizeAnimationDurationScale(
-      isar.settings.getSync(227)!.animationDurationScale,
+      settingsRepository.field((s) => s.animationDurationScaleProperty()),
     );
   }
 

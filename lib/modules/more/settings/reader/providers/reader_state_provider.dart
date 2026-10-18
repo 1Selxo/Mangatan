@@ -186,7 +186,8 @@ class NavigationOrderState extends _$NavigationOrderState {
   @override
   List<String> build() {
     return _checkMissingItems(
-      settingsRepository.current.navigationOrder?.toList() ?? [],
+      settingsRepository.field((s) => s.navigationOrderProperty())?.toList() ??
+          [],
     );
   }
 
@@ -207,7 +208,8 @@ class NavigationOrderState extends _$NavigationOrderState {
 class HideItemsState extends _$HideItemsState {
   @override
   List<String> build() {
-    return settingsRepository.current.hideItems ?? ['/trackerLibrary'];
+    return settingsRepository.field((s) => s.hideItemsProperty()) ??
+        ['/trackerLibrary'];
   }
 
   void set(List<String> values) {
@@ -220,7 +222,8 @@ class HideItemsState extends _$HideItemsState {
 class MergeLibraryNavMobileState extends _$MergeLibraryNavMobileState {
   @override
   bool build() {
-    return settingsRepository.current.mergeLibraryNavMobile ?? false;
+    return settingsRepository.field((s) => s.mergeLibraryNavMobileProperty()) ??
+        false;
   }
 
   void set(bool value) {

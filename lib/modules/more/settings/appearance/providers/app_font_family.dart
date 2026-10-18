@@ -1,4 +1,5 @@
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'app_font_family.g.dart';
@@ -21,7 +22,9 @@ class AppFontFamily extends _$AppFontFamily {
 
   @override
   (String? raw, String? resolved) build() {
-    final fontFamily = settingsRepository.current.appFontFamily;
+    final fontFamily = settingsRepository.field(
+      (s) => s.appFontFamilyProperty(),
+    );
     return (fontFamily, _resolveFontFamily(fontFamily));
   }
 

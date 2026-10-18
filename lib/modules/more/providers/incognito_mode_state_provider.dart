@@ -1,3 +1,4 @@
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'incognito_mode_state_provider.g.dart';
@@ -6,7 +7,7 @@ part 'incognito_mode_state_provider.g.dart';
 class IncognitoModeState extends _$IncognitoModeState {
   @override
   bool build() {
-    return settingsRepository.current.incognitoMode ?? false;
+    return settingsRepository.field((s) => s.incognitoModeProperty()) ?? false;
   }
 
   void setIncognitoMode(bool value) {

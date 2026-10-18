@@ -1,5 +1,6 @@
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'flex_scheme_color_state_provider.g.dart';
@@ -14,7 +15,9 @@ part 'flex_scheme_color_state_provider.g.dart';
 class FlexSchemeColorState extends _$FlexSchemeColorState {
   @override
   (FlexSchemeColor color, int index) build() {
-    final index = settingsRepository.current.flexSchemeColorIndex!;
+    final index = settingsRepository.field(
+      (s) => s.flexSchemeColorIndexProperty(),
+    )!;
     final color = ref.read(themeModeStateProvider)
         ? ThemeAA.schemes[index].dark
         : ThemeAA.schemes[index].light;

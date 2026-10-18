@@ -16,6 +16,29 @@ class SettingsRepository {
     }
   }
 
+  /// Reads one stored field of the settings row, with the same result as
+  /// reading that field from [current].
+  ///
+  /// [current] deserializes the whole row, including per-entry lists that grow
+  /// with the library (chapter page indexes, chapter filters and sorts), which
+  /// many providers pay for at startup to read a single value. This reads only
+  /// the selected property. When the row is missing it throws exactly as
+  /// [current] does.
+  T field<T>(
+    QueryBuilder<Settings, T, QQueryOperations> Function(
+      QueryBuilder<Settings, Settings, QQueryProperty> settings,
+    )
+    property,
+  ) {
+    final values = property(isar.settings.where().idEqualTo(227)).findAllSync();
+    if (values.isEmpty) {
+      // No settings row: `current` fails with its usual null-check error.
+      current;
+      throw StateError('The settings row is missing.');
+    }
+    return values.first;
+  }
+
   Future<Settings?> get currentAsync => isar.settings.get(227);
 
   List<Settings> getAll() => isar.settings.filter().idIsNotNull().findAllSync();

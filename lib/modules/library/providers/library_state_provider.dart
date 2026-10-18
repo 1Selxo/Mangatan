@@ -65,11 +65,11 @@ class LibraryGridSizeState extends _$LibraryGridSizeState {
   int? build({required ItemType itemType}) {
     switch (itemType) {
       case ItemType.manga:
-        return settings.mangaGridSize;
+        return settingsRepository.field((s) => s.mangaGridSizeProperty());
       case ItemType.anime:
-        return settings.animeGridSize;
+        return settingsRepository.field((s) => s.animeGridSizeProperty());
       default:
-        return settings.novelGridSize;
+        return settingsRepository.field((s) => s.novelGridSizeProperty());
     }
   }
 

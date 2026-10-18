@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 
 /// Whether to show the source name as a badge on library covers. Off by default
@@ -9,7 +10,8 @@ final librarySourceBadgeProvider = NotifierProvider<LibrarySourceBadge, bool>(
 
 class LibrarySourceBadge extends Notifier<bool> {
   @override
-  bool build() => settingsRepository.current.showSourceBadge ?? false;
+  bool build() =>
+      settingsRepository.field((s) => s.showSourceBadgeProperty()) ?? false;
 
   void set(bool value) {
     state = value;

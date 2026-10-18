@@ -14,7 +14,7 @@ class L10nLocaleState extends _$L10nLocaleState {
   }
 
   L10nLocale _getLocale() {
-    return settingsRepository.current.locale ??
+    return settingsRepository.field((s) => s.localeProperty()) ??
         L10nLocale(languageCode: "en", countryCode: "");
   }
 

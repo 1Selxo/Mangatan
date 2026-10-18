@@ -1,3 +1,4 @@
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'security_state_provider.g.dart';
@@ -6,7 +7,7 @@ part 'security_state_provider.g.dart';
 class AppLockEnabledState extends _$AppLockEnabledState {
   @override
   bool build() {
-    return settingsRepository.current.appLockEnabled ?? false;
+    return settingsRepository.field((s) => s.appLockEnabledProperty()) ?? false;
   }
 
   void set(bool value) {
@@ -22,7 +23,8 @@ class AppUnlockedState extends _$AppUnlockedState {
   @override
   bool build() {
     // If app lock is not enabled, always unlocked
-    final lockEnabled = settingsRepository.current.appLockEnabled ?? false;
+    final lockEnabled =
+        settingsRepository.field((s) => s.appLockEnabledProperty()) ?? false;
     return !lockEnabled;
   }
 

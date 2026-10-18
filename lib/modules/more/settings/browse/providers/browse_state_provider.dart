@@ -235,7 +235,10 @@ class AutoUpdateExtensionsState extends _$AutoUpdateExtensionsState {
 class CheckForExtensionsUpdateState extends _$CheckForExtensionsUpdateState {
   @override
   bool build() {
-    return settingsRepository.current.checkForExtensionUpdates ?? true;
+    return settingsRepository.field(
+          (s) => s.checkForExtensionUpdatesProperty(),
+        ) ??
+        true;
   }
 
   void set(bool value) {

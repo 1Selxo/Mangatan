@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
@@ -15,7 +16,8 @@ final animeOnlyTvModeProvider = NotifierProvider<AnimeOnlyTvMode, bool>(
 
 class AnimeOnlyTvMode extends Notifier<bool> {
   @override
-  bool build() => settingsRepository.current.tvAnimeOnlyOverride ?? isTv;
+  bool build() =>
+      settingsRepository.field((s) => s.tvAnimeOnlyOverrideProperty()) ?? isTv;
 
   /// Explicitly turns the anime-only layout on/off and persists the choice.
   void set(bool value) {

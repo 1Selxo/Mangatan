@@ -1,3 +1,4 @@
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'app_ui_scale_state_provider.g.dart';
@@ -8,7 +9,7 @@ part 'app_ui_scale_state_provider.g.dart';
 class AppUiScaleState extends _$AppUiScaleState {
   @override
   double build() {
-    return settingsRepository.current.appUiScale ?? 1.0;
+    return settingsRepository.field((s) => s.appUiScaleProperty()) ?? 1.0;
   }
 
   void set(double value, {bool end = false}) {

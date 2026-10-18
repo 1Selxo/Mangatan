@@ -74,6 +74,7 @@ import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subs
 import 'package:mangayomi/modules/widgets/app_ui_scale.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/services/perf/startup_trace.dart';
 
 late Isar isar;
 DiscordRPC? discordRpc;
@@ -105,8 +106,10 @@ Uri? initialDesktopAppLinkFromArguments(
 
 void main(List<String> args) async {
   // Zone-level catch-all for anything that slips through both layers
+  StartupTrace.mark('main');
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    StartupTrace.mark('bindings');
     _registerBundledLibraryLicenses();
     if (Platform.isLinux && runWebViewTitleBarWidget(args)) return;
 
@@ -148,7 +151,9 @@ void main(List<String> args) async {
     };
 
     MediaKit.ensureInitialized();
+    StartupTrace.mark('media_kit');
     await RustLib.init();
+    StartupTrace.mark('rust');
     // Detect Android TV / leanback so the UI can branch on form factor.
     // No-op on other platforms. See #729.
     await initIsTv();
@@ -156,6 +161,7 @@ void main(List<String> args) async {
       await windowManager.ensureInitialized();
       await WindowGeometry.restore();
     }
+    StartupTrace.mark('window');
     if (Platform.isWindows || Platform.isLinux) {
       try {
         registerPersistentProtocolHandler("mangayomi");
@@ -186,6 +192,7 @@ void main(List<String> args) async {
       AppLogger.log('DB init failed: $e\n$st', logLevel: LogLevel.error);
       startupError = e;
     }
+    StartupTrace.mark('database');
     runApp(
       startupError != null
           ? _StartupErrorApp(error: startupError.toString())
@@ -200,6 +207,12 @@ void main(List<String> args) async {
             ),
     );
     _didMountApplication = true;
+    StartupTrace.mark('run_app');
+    unawaited(
+      WidgetsBinding.instance.waitUntilFirstFrameRasterized.then(
+        (_) => StartupTrace.mark('first_frame'),
+      ),
+    );
     if (startupError == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_postLaunchInit(storage));
@@ -269,6 +282,7 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   // These services spawn five isolates in total, and the extension workers
   // each open the database. Warming them before runApp can consume the iOS
   // launch-watchdog window without presenting a frame.
+  StartupTrace.mark('post_launch');
   unawaited(getIsolateService.start());
   unawaited(ffiImageDecoder.start());
   await AppLogger.init();
@@ -315,6 +329,7 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
       );
     }
   }
+  StartupTrace.mark('post_launch_done');
 }
 
 class MyApp extends ConsumerStatefulWidget {

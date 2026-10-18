@@ -20,6 +20,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
+import 'package:mangayomi/services/perf/benchmark_data_root.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -37,7 +38,10 @@ class StorageProvider {
   static const _legacyDirectoryName = 'Mangayomi';
 
   static final StorageProvider _instance = StorageProvider._internal();
-  StorageProvider._internal();
+  StorageProvider._internal() {
+    // Compiles to nothing outside a benchmark harness build.
+    applyBenchmarkDataRoot();
+  }
   factory StorageProvider() => _instance;
 
   /// `path_provider_linux` asks `xdg-user-dir` for Documents. Minimal window
@@ -379,7 +383,9 @@ class StorageProvider {
       if (settings == null) {
         // TV defaults to dark on first run (a fresh library). Only the
         // initial Settings row is seeded, so switching to light later sticks.
-        await isar.writeTxn(() async => isar.settings.put(Settings()..themeIsDark = isTv));
+        await isar.writeTxn(
+          () async => isar.settings.put(Settings()..themeIsDark = isTv),
+        );
       }
     } catch (_) {
       if (await requestPermission()) {
@@ -388,7 +394,9 @@ class StorageProvider {
           if (settings == null) {
             // TV defaults to dark on first run (a fresh library). Only the
             // initial Settings row is seeded, so switching to light later sticks.
-            await isar.writeTxn(() async => isar.settings.put(Settings()..themeIsDark = isTv));
+            await isar.writeTxn(
+              () async => isar.settings.put(Settings()..themeIsDark = isTv),
+            );
           }
         } catch (e) {
           if (kDebugMode) {

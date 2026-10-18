@@ -1,3 +1,4 @@
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'general_state_provider.g.dart';
@@ -6,7 +7,7 @@ part 'general_state_provider.g.dart';
 class CustomDnsState extends _$CustomDnsState {
   @override
   String build() {
-    return settingsRepository.current.customDns ?? "";
+    return settingsRepository.field((s) => s.customDnsProperty()) ?? "";
   }
 
   void set(String value) {
@@ -85,7 +86,7 @@ class RpcShowCoverImageState extends _$RpcShowCoverImageState {
 class UserAgentState extends _$UserAgentState {
   @override
   String build() {
-    return settingsRepository.current.userAgent!;
+    return settingsRepository.field((s) => s.userAgentProperty())!;
   }
 
   void set(String value) {

@@ -347,8 +347,14 @@ Future<void> restoreBackup(
           mangaRepository.putAllSync(manga);
           if (chapters != null) {
             isar.chapters.clearSync();
+            // Mangas don't change while chapters are restored, so each one
+            // is read once instead of once per chapter.
+            final mangaById = <int, Manga?>{};
             for (var chapter in chapters) {
-              final manga = isar.mangas.getSync(chapter.mangaId!);
+              final mangaId = chapter.mangaId!;
+              final manga = mangaById.containsKey(mangaId)
+                  ? mangaById[mangaId]
+                  : mangaById[mangaId] = isar.mangas.getSync(mangaId);
               if (manga != null) {
                 isar.chapters.putSync(chapter..manga.value = manga);
                 chapter.manga.saveSync();
@@ -386,14 +392,21 @@ Future<void> restoreBackup(
                   .idIsNotNull()
                   .findAllSync()
                   .toList();
+              // The first chapter (in id order) for each manga and name, which
+              // is the one a linear search of tempChapters finds first.
+              final firstChapterByMangaAndName = <(int?, String?), Chapter>{};
+              for (final chapter in tempChapters) {
+                firstChapterByMangaAndName.putIfAbsent((
+                  chapter.mangaId,
+                  chapter.name,
+                ), () => chapter);
+              }
               for (var update in updates) {
-                final matchingChapter = tempChapters
-                    .where(
-                      (chapter) =>
-                          chapter.mangaId == update.mangaId &&
-                          chapter.name == update.chapterName,
-                    )
-                    .firstOrNull;
+                final matchingChapter =
+                    firstChapterByMangaAndName[(
+                      update.mangaId,
+                      update.chapterName,
+                    )];
                 if (matchingChapter != null) {
                   isar.updates.putSync(update..chapter.value = matchingChapter);
                   update.chapter.saveSync();
@@ -557,6 +570,7 @@ void _mergeMangayomiBackup({
   final oldToNewChapterId = <int, int>{};
   if (chapters != null) {
     final existingUrlsByMangaId = <int, Set<String>>{};
+    final mangaRefs = <int, Manga?>{};
     for (final tempChapter in chapters) {
       final newMangaId = tempChapter.mangaId != null
           ? oldToNewMangaId[tempChapter.mangaId]
@@ -567,16 +581,16 @@ void _mergeMangayomiBackup({
       if (!newMangaIds.contains(newMangaId)) continue;
       final existingUrls = existingUrlsByMangaId.putIfAbsent(
         newMangaId,
-        () => chapterRepository
-            .getAllByMangaId(newMangaId)
-            .map((c) => c.url)
-            .whereType<String>()
-            .toSet(),
+        () => _chapterUrlsOfManga(newMangaId),
       );
       if (tempChapter.url != null && existingUrls.contains(tempChapter.url)) {
         continue;
       }
-      final mangaRef = mangaRepository.findById(newMangaId);
+      // Mangas don't change while chapters are merged, so each one is read
+      // once instead of once per chapter.
+      final mangaRef = mangaRefs.containsKey(newMangaId)
+          ? mangaRefs[newMangaId]
+          : mangaRefs[newMangaId] = mangaRepository.findById(newMangaId);
       if (mangaRef == null) continue;
       final oldId = tempChapter.id;
       tempChapter.id = null;
@@ -610,15 +624,17 @@ void _mergeMangayomiBackup({
   }
 
   if (updates != null) {
+    // No chapters are written below, so each manga's chapters are read once.
+    final firstChapterByName = <int, Map<String?, Chapter>>{};
     for (final tempUpdate in updates) {
       final newMangaId = tempUpdate.mangaId != null
           ? oldToNewMangaId[tempUpdate.mangaId]
           : null;
       if (newMangaId == null || !newMangaIds.contains(newMangaId)) continue;
-      final chapter = chapterRepository.findByMangaIdAndName(
+      final chapter = firstChapterByName.putIfAbsent(
         newMangaId,
-        tempUpdate.chapterName,
-      );
+        () => _firstChapterByName(newMangaId),
+      )[tempUpdate.chapterName];
       if (chapter == null) continue;
       tempUpdate.id = null;
       tempUpdate.mangaId = newMangaId;
@@ -626,6 +642,36 @@ void _mergeMangayomiBackup({
       tempUpdate.chapter.saveSync();
     }
   }
+}
+
+/// Every chapter of [mangaId], read through the manga index. The same rows
+/// as `chapterRepository.getAllByMangaId`, which scans the whole table.
+List<Chapter> _chaptersOfManga(int mangaId) =>
+    isar.chapters.where().mangaIdEqualToAnyIsRead(mangaId).findAllSync();
+
+/// The non-null chapter URLs of [mangaId], read through the manga index and
+/// without loading whole chapters. The same set as mapping
+/// `chapterRepository.getAllByMangaId`, which scans the whole table.
+Set<String> _chapterUrlsOfManga(int mangaId) => isar.chapters
+    .where()
+    .mangaIdEqualToAnyIsRead(mangaId)
+    .urlProperty()
+    .findAllSync()
+    .whereType<String>()
+    .toSet();
+
+/// For each chapter name of [mangaId], the chapter with the lowest id: the
+/// one `chapterRepository.findByMangaIdAndName` returns, since its filter
+/// query scans in id order.
+Map<String?, Chapter> _firstChapterByName(int mangaId) {
+  final byName = <String?, Chapter>{};
+  for (final chapter in _chaptersOfManga(mangaId)) {
+    final current = byName[chapter.name];
+    if (current == null || chapter.id! < current.id!) {
+      byName[chapter.name] = chapter;
+    }
+  }
+  return byName;
 }
 
 @riverpod

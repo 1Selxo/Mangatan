@@ -5,6 +5,8 @@
 // anything destructive.
 import 'package:archive/archive_io.dart';
 import 'package:collection/collection.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -12,7 +14,6 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/repositories/category_repository.dart';
-import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
 import 'package:protobuf/protobuf.dart';
@@ -130,11 +131,7 @@ TachiBkImportPreview? previewTachiBkImport(String path) {
     final existing = existingMangaByLink[m.url];
     if (existing != null) {
       updatedSeries++;
-      final existingUrls = chapterRepository
-          .getAllByMangaId(existing.id)
-          .map((c) => c.url)
-          .whereType<String>()
-          .toSet();
+      final existingUrls = _chapterUrlsOfManga(existing.id);
       newChapters += m.chapters
           .where((c) => !existingUrls.contains(c.url))
           .length;
@@ -176,11 +173,7 @@ TachiBkImportPreview? previewTachiBkImport(String path) {
       final existing = existingAnimeByLink[a.url];
       if (existing != null) {
         updatedSeries++;
-        final existingUrls = chapterRepository
-            .getAllByMangaId(existing.id)
-            .map((c) => c.url)
-            .whereType<String>()
-            .toSet();
+        final existingUrls = _chapterUrlsOfManga(existing.id);
         newChapters += a.episodes
             .where((c) => !existingUrls.contains(c.url))
             .length;
@@ -263,11 +256,7 @@ TachiBkImportPreview previewMangayomiBackup(Map<String, dynamic> backup) {
         : const <Chapter>[];
     if (existing != null) {
       updatedSeries++;
-      final existingUrls = chapterRepository
-          .getAllByMangaId(existing.id)
-          .map((c) => c.url)
-          .whereType<String>()
-          .toSet();
+      final existingUrls = _chapterUrlsOfManga(existing.id);
       newChapters += mangaChapters
           .where((c) => c.url != null && !existingUrls.contains(c.url))
           .length;
@@ -287,6 +276,17 @@ TachiBkImportPreview previewMangayomiBackup(Map<String, dynamic> backup) {
     newChapterCount: newChapters,
   );
 }
+
+/// The non-null chapter URLs of [mangaId], read through the manga index and
+/// without loading whole chapters. The same set as mapping
+/// `chapterRepository.getAllByMangaId`, which scans the whole table.
+Set<String> _chapterUrlsOfManga(int? mangaId) => isar.chapters
+    .where()
+    .mangaIdEqualToAnyIsRead(mangaId)
+    .urlProperty()
+    .findAllSync()
+    .whereType<String>()
+    .toSet();
 
 int currentFavoriteMangaCount() => mangaRepository.countFavorites();
 

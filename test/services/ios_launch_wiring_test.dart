@@ -40,7 +40,11 @@ void main() {
   });
 
   test('always finishes the Flutter application delegate launch', () {
-    final source = File('ios/Runner/AppDelegate.swift').readAsStringSync();
+    // Code only: a comment may name the call that was removed.
+    final source = File('ios/Runner/AppDelegate.swift')
+        .readAsLinesSync()
+        .where((line) => !line.trimLeft().startsWith('//'))
+        .join('\n');
 
     expect(source, isNot(contains('AppLinks.shared.getLink')));
     expect(source, isNot(contains('return true')));

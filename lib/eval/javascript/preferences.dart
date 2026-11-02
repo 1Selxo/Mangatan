@@ -1,6 +1,6 @@
 import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/modules/browse/extension/providers/extension_preferences_providers.dart';
+import 'package:mangayomi/services/extension_preferences_service.dart';
 
 class JsPreferences {
   late JavascriptRuntime runtime;
@@ -9,7 +9,7 @@ class JsPreferences {
 
   void init() {
     runtime.onMessage('get', (dynamic args) {
-      return getPreferenceValue(source!.id!, args[0]);
+      return getPreferenceValue(source!.id!, args[0], source: source);
     });
     runtime.onMessage('getString', (dynamic args) {
       return getSourcePreferenceStringValue(source!.id!, args[0], args[1]);

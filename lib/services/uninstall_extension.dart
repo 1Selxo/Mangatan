@@ -34,8 +34,11 @@ Future<UninstallExtensionResult> uninstallExtension(
       .findAllSync()
       .map((preference) => preference.id)
       .toList();
+  // Obsolete and local sources have nothing left to reinstall from.
+  bool removable(Source source) =>
+      (source.isObsolete ?? false) || (source.isLocal ?? false);
   final obsoleteIds = sources
-      .where((source) => source.isObsolete ?? false)
+      .where(removable)
       .map((source) => source.id)
       .nonNulls
       .toList();
@@ -43,7 +46,7 @@ Future<UninstallExtensionResult> uninstallExtension(
   isar.writeTxnSync(() {
     for (final source in sources) {
       if (source.id == null) continue;
-      if (source.isObsolete ?? false) {
+      if (removable(source)) {
         isar.sources.deleteSync(source.id!);
         recordObsoleteRemoval?.call(source.id!);
       } else {
@@ -54,6 +57,7 @@ Future<UninstallExtensionResult> uninstallExtension(
             ..isAdded = false
             ..isActive = locallyImported ? false : source.isActive
             ..isPinned = false
+            ..versionLast = source.version
             ..updatedAt = DateTime.now().millisecondsSinceEpoch,
         );
       }

@@ -56,10 +56,7 @@ class _MemoryEpubBlobStorage implements MangatanEpubBlobStorage {
   Future<MangatanRemoteEpubManifest?> downloadEpubManifest() async =>
       manifest == null
       ? null
-      : MangatanRemoteEpubManifest(
-          manifest: manifest!,
-          revision: revision,
-        );
+      : MangatanRemoteEpubManifest(manifest: manifest!, revision: revision);
 
   @override
   Future<bool> hasEpubBlob(String sha256) async => blobs.containsKey(sha256);

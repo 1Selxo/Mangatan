@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -64,16 +65,25 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
         data: (manga) {
           final currentManga = manga;
           if (currentManga == null) return const ProgressCenter();
+          final hasSourceInfo =
+              currentManga.lang != null && currentManga.source != null;
           // Language filters only hide Browse rows. Installed sources remain
           // available to refresh items already in the library.
+          // Only the rows that can match this entry, so a change does not
+          // load every installed extension.
+          final sources = hasSourceInfo
+              ? sourceLookupQuery(
+                  currentManga.lang!,
+                  currentManga.sourceId,
+                  installedOnly: true,
+                )
+              : null;
           final detail = StreamBuilder(
-            // Only the rows that can match this entry, so a change does not
-            // load every installed extension.
-            stream: sourceLookupQuery(
-              currentManga.lang!,
-              currentManga.sourceId,
-              installedOnly: true,
-            ).watch(fireImmediately: true),
+            // Read now as well, so the first frame does not show the source
+            // as missing.
+            initialData: sources?.findAllSync(),
+            stream:
+                sources?.watch(fireImmediately: true) ?? const Stream.empty(),
             builder: (context, snapshot) {
               final resolvedSource = snapshot.hasData
                   ? findSourceFromList(
@@ -129,7 +139,7 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
                         left: 0,
                         right: 0,
                         child: Padding(
-                          padding: EdgeInsets.only(top: 40),
+                          padding: EdgeInsets.only(top: ShioriSpace.s32),
                           child: Center(child: RefreshProgressIndicator()),
                         ),
                       ),

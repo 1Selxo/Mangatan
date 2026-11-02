@@ -29,7 +29,10 @@ import '../test_utils/isar_library.dart';
 /// Refreshing a repository stores the same sources, in the same state, as the
 /// implementation that read and wrote each source on its own. The golden file
 /// was produced by that implementation; regenerate it only for an intended
-/// behavior change, with UPDATE_GOLDEN=1.
+/// behavior change, with UPDATE_GOLDEN=1. It was regenerated once for
+/// Mangayomi v0.9.95, where installing updates moved out of this step into
+/// applyExtensionUpdates (run after every repository is read), and an
+/// installed source without a version no longer stops the refresh.
 const _golden = 'test/services/goldens/fetch_sources_list_refresh.txt';
 
 List<Map<String, Object?>> catalog({int bump = 0, int moved = 0}) {
@@ -118,13 +121,11 @@ void main() {
       body = utf8.encode(jsonEncode(index));
       Object? error;
       try {
-        await fetchSourcesList(
-          refresh: true,
-          androidProxyServer: '',
-          autoUpdateExtensions: false,
-          itemType: ItemType.manga,
+        final listed = await fetchRepoSources(
           repo: repo,
+          itemType: ItemType.manga,
         );
+        await recordRepoSources(listed, repo, ItemType.manga);
       } catch (e) {
         error = e.runtimeType.toString();
       }

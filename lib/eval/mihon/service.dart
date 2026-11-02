@@ -12,7 +12,6 @@ import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/eval/mihon/image_proxy.dart';
-import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/models/source.dart';
@@ -27,6 +26,21 @@ import '../interface.dart';
 import 'models.dart';
 
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/utils/constant.dart';
+import 'package:mangayomi/repositories/settings_repository.dart';
+
+/// Some Mihon sources return memo data without repeating the requested slug.
+/// The memo enriches that address; storing it alone loses the work on refresh.
+String resolveMihonDetailUrl(String requestedUrl, String? returnedUrl) {
+  const memoMarker = '|mangayomi-memo|';
+  final returned = returnedUrl?.trim() ?? '';
+  if (returned.isEmpty) return requestedUrl;
+  if (returned.startsWith(memoMarker)) {
+    final base = requestedUrl.split(memoMarker).first;
+    return base.isEmpty ? requestedUrl : '$base$returned';
+  }
+  return returned;
+}
 
 class MihonExtensionService implements ExtensionService {
   late String androidProxyServer;
@@ -64,10 +78,7 @@ class MihonExtensionService implements ExtensionService {
     return IOClient(httpClient);
   }
 
-  Future<http.Response> _postDalvik({
-    Object? body,
-    Map<String, String>? headers,
-  }) async {
+  Future<http.Response> _postDalvik({Object? body}) async {
     // The pinned APKBridge DataBody rejects unknown top-level fields. Source
     // selection travels in mihonPreferencePayload's bridge context instead.
     Future<http.Response> send(Map<String, String>? requestHeaders) =>
@@ -78,14 +89,34 @@ class MihonExtensionService implements ExtensionService {
           headers: requestHeaders,
           retryTransientFailures: _usesLoopbackBridge,
         );
-    var response = await send(headers);
-    if (_isCloudflareBlocked(response)) {
+    // The headers tell the server where this app's WebViews are, so the
+    // WebView host must be running before they are read.
+    if (!Platform.isLinux && cfPort == 0) {
+      await webviewServer();
+    }
+    var response = await send(getCookie());
+    if (_isForbiddenResponse(response)) {
       final proxyUrl = requestHeaders == null
           ? CfProxyStore.url.trim()
           : (requestHeaders!['cf-proxy-url'] ?? '').trim();
       if (proxyUrl.isNotEmpty &&
           await solveWithCfProxy(proxyUrl, source.baseUrl!)) {
         response = await send(getCookie());
+      } else if (!Platform.isLinux && cfPort > 0 && source.baseUrl != null) {
+        // No proxy configured: let this app's WebView solve the challenge,
+        // then retry with the cookies it stored.
+        try {
+          final resolveRes = await client.post(
+            Uri.parse('http://127.0.0.1:$cfPort/resolve_cf'),
+            body: jsonEncode({'url': source.baseUrl!}),
+          );
+          if (resolveRes.statusCode == 200) {
+            final data = jsonDecode(resolveRes.body) as Map<String, dynamic>;
+            if (data['result'] == true) {
+              response = await send(getCookie());
+            }
+          }
+        } catch (_) {}
       }
     }
     return response;
@@ -119,7 +150,6 @@ class MihonExtensionService implements ExtensionService {
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res) as Map<String, dynamic>;
     final pages = MangaPages.fromJson(data, source.itemType);
@@ -154,7 +184,6 @@ class MihonExtensionService implements ExtensionService {
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res) as Map<String, dynamic>;
     final pages = MangaPages.fromJson(data, source.itemType);
@@ -190,7 +219,6 @@ class MihonExtensionService implements ExtensionService {
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res) as Map<String, dynamic>;
     final pages = MangaPages.fromJson(data, source.itemType);
@@ -225,10 +253,10 @@ class MihonExtensionService implements ExtensionService {
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res) as Map<String, dynamic>;
-    final detail = _animeOrManga(data);
+    final detail = _animeOrManga(data)
+      ..link = resolveMihonDetailUrl(url, data['url'] as String?);
     if (source.itemType == ItemType.anime && detail.animeFetchType == 0) {
       detail.seasons = await getSeasonList(data);
     } else {
@@ -278,7 +306,6 @@ class MihonExtensionService implements ExtensionService {
         'preferences': mihonPreferencePayload(source, getSourcePreferences()),
         'data': source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res);
     if (data is! List) {
@@ -300,7 +327,6 @@ class MihonExtensionService implements ExtensionService {
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res) as List;
     return data
@@ -346,7 +372,6 @@ class MihonExtensionService implements ExtensionService {
         'preferences': mihonPreferencePayload(source, getSourcePreferences()),
         'data': source.sourceCode,
       },
-      headers: getCookie(),
     );
     return _checkedJson(res) as String;
   }
@@ -367,7 +392,6 @@ class MihonExtensionService implements ExtensionService {
         'preferences': mihonPreferencePayload(source, getSourcePreferences()),
         'data': source.sourceCode,
       },
-      headers: getCookie(),
     );
     return _checkedJson(res) as String;
   }
@@ -381,7 +405,6 @@ class MihonExtensionService implements ExtensionService {
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res) as List;
     return data
@@ -415,51 +438,78 @@ class MihonExtensionService implements ExtensionService {
         "preferences": mihonPreferencePayload(source, getSourcePreferences()),
         "data": source.sourceCode,
       },
-      headers: getCookie(),
     );
     final data = _checkedJson(res) as List;
-    return data.map((e) {
+    final videos = <Video>[];
+    for (final e in data) {
+      if (e is! Map) continue;
+      // Extension lib 16 can leave videoUrl empty and give only url, and a
+      // hoster's qualities may come without a quality label.
+      final videoUrl = e['videoUrl']?.toString().trim() ?? '';
+      final rawUrl = e['url']?.toString().trim() ?? '';
+      final effectiveUrl = (videoUrl.isNotEmpty && videoUrl != 'null')
+          ? videoUrl
+          : rawUrl;
+      if (effectiveUrl.isEmpty || effectiveUrl == 'null') continue;
+      final originalUrl = (rawUrl.isNotEmpty && rawUrl != 'null')
+          ? rawUrl
+          : effectiveUrl;
+      final rawQuality = e['quality']?.toString().trim() ?? '';
+      final rawTitle = e['videoTitle']?.toString().trim() ?? '';
+      final quality = rawQuality.isNotEmpty
+          ? rawQuality
+          : (rawTitle.isNotEmpty ? rawTitle : 'Default');
+
       final tempHeaders =
           e['headers']?['namesAndValues\$okhttp'] as List<dynamic>?;
       final Map<String, String> headers = {};
       if (tempHeaders != null) {
         for (var i = 0; i + 1 < tempHeaders.length; i += 2) {
-          headers[tempHeaders[i]] = tempHeaders[i + 1];
+          headers[tempHeaders[i].toString()] = tempHeaders[i + 1].toString();
         }
+      } else if (e['headers'] is Map) {
+        (e['headers'] as Map).forEach((k, v) {
+          if (k != null && v != null && k != 'namesAndValues\$okhttp') {
+            headers[k.toString()] = v.toString();
+          }
+        });
       }
-      return Video(
-        _resolveBridgeMediaUrl(e['videoUrl']?.toString()) ?? '',
-        e['quality'],
-        e['url'],
-        headers: headers,
-        audios:
-            (e['audioTracks'] as List?)
-                ?.map(
-                  (e) => Track(
-                    file: _resolveBridgeMediaUrl(
-                      (e['file'] ?? e['url'])?.toString(),
+      videos.add(
+        Video(
+          _resolveBridgeMediaUrl(effectiveUrl) ?? '',
+          quality,
+          originalUrl,
+          headers: headers,
+          audios:
+              (e['audioTracks'] as List?)
+                  ?.map(
+                    (e) => Track(
+                      file: _resolveBridgeMediaUrl(
+                        (e['file'] ?? e['url'])?.toString(),
+                      ),
+                      label: e['label']?.toString(),
+                      language: (e['language'] ?? e['lang'])?.toString(),
                     ),
-                    label: e['label']?.toString(),
-                    language: (e['language'] ?? e['lang'])?.toString(),
-                  ),
-                )
-                .toList() ??
-            [],
-        subtitles:
-            (e['subtitleTracks'] as List?)
-                ?.map(
-                  (e) => Track(
-                    file: _resolveBridgeMediaUrl(
-                      (e['file'] ?? e['url'])?.toString(),
+                  )
+                  .toList() ??
+              [],
+          subtitles:
+              (e['subtitleTracks'] as List?)
+                  ?.map(
+                    (e) => Track(
+                      file: _resolveBridgeMediaUrl(
+                        (e['file'] ?? e['url'])?.toString(),
+                      ),
+                      label: e['label']?.toString(),
+                      language: (e['language'] ?? e['lang'])?.toString(),
                     ),
-                    label: e['label']?.toString(),
-                    language: (e['language'] ?? e['lang'])?.toString(),
-                  ),
-                )
-                .toList() ??
-            [],
+                  )
+                  .toList() ??
+              [],
+        ),
       );
-    }).toList();
+    }
+    return videos;
   }
 
   @override
@@ -523,11 +573,18 @@ class MihonExtensionService implements ExtensionService {
       return {...requestHeaders!, 'source-base-url': ?source.baseUrl};
     }
 
-    final userAgent = isar.settings.getSync(227)!.userAgent;
+    // A browser User-Agent: extensions validate it, and an empty setting
+    // must not reach them.
+    final rawUa = settingsRepository
+        .field((s) => s.userAgentProperty())
+        ?.trim();
+    final userAgent = (rawUa != null && rawUa.isNotEmpty)
+        ? rawUa
+        : defaultUserAgent;
     final cfProxyUrl = CfProxyStore.url.trim();
     return {
       ...MClient.getCookiesPref(source.baseUrl!),
-      'user-agent': ?userAgent,
+      'user-agent': userAgent,
       // Which source of the extension this call is for. The id sent alongside
       // it is a Dart hashCode of the original one (see ExtensionStoreService),
       // which the server cannot reproduce on the JVM, so an extension holding
@@ -537,12 +594,19 @@ class MihonExtensionService implements ExtensionService {
       // which is better placed than the retry below: it owns the request and
       // its cookie jar. Servers that don't support it ignore the header.
       if (cfProxyUrl.isNotEmpty) 'cf-proxy-url': cfProxyUrl,
+      // Where the server reaches this app's WebViews, and the secret it must
+      // present: extension WebViews then run here as real WebViews.
+      if (!Platform.isLinux && cfPort > 0) ...{
+        'x-mangayomi-webview-port': cfPort.toString(),
+        'x-mangayomi-webview-token': webviewBridgeToken,
+      },
     };
   }
 
-  /// Extension requests run outside MClient, so bridge errors need their own
-  /// Cloudflare proxy retry.
-  bool _isCloudflareBlocked(http.Response response) {
+  /// Extension requests run outside MClient, so a bridge 403 gets its own
+  /// best-effort bypass retry. The bridge reports only the status, so a 403 is
+  /// never presented to the user as proof of a Cloudflare challenge.
+  bool _isForbiddenResponse(http.Response response) {
     final parsed = _parseJson(response);
     // Not JSON: hasError() reports the malformed-response case itself.
     if (!parsed.isValid) return false;
@@ -609,9 +673,6 @@ void hasError(http.Response response) {
   final errorMessage = decoded?['error'];
   final code = decoded?['code'];
   if (errorMessage != null && code != null) {
-    if (code == 403) {
-      throw "Failed to bypass Cloudflare.\n\n\nYou can try to bypass it manually in the webview \n\n\nstatusCode: 403";
-    }
     throw "$errorMessage \n\n\nstatusCode: $code";
   }
 }

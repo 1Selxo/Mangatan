@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   connectivity_plus
   desktop_drop
+  desktop_webview_window
   flutter_inappwebview_windows
   flutter_qjs
   flutter_secure_storage_windows
@@ -16,7 +17,6 @@ list(APPEND FLUTTER_PLUGIN_LIST
   media_kit_libs_windows_video
   media_kit_video
   permission_handler_windows
-  screen_brightness_windows
   screen_retriever_windows
   share_plus
   url_launcher_windows

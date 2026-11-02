@@ -18,7 +18,7 @@ Verify both hosts:
 - Run a preview against a freshly downloaded remote and the local comparison
   fixture. On macOS use `dart run tool/chimahon_drive_diagnostic.dart
   --operation=sync-preview --app=/absolute/path/to/Mangatan.app
-  --reference=/Users/rahulb/Downloads/app.chimahon_2026-07-17_22-11.tachibk`;
+  --reference=<path-to-chimahon-backup>.tachibk`;
   on Linux copy that fixture locally and use
   `--app=/absolute/path/to/mangayomi
   --reference=/path/to/copied/app.chimahon_2026-07-17_22-11.tachibk`. Prove the

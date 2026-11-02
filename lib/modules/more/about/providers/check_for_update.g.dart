@@ -8,6 +8,60 @@ part of 'check_for_update.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+
+@ProviderFor(CheckForAppUpdates)
+final checkForAppUpdatesProvider = CheckForAppUpdatesProvider._();
+
+final class CheckForAppUpdatesProvider
+    extends $NotifierProvider<CheckForAppUpdates, bool> {
+  CheckForAppUpdatesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'checkForAppUpdatesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$checkForAppUpdatesHash();
+
+  @$internal
+  @override
+  CheckForAppUpdates create() => CheckForAppUpdates();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$checkForAppUpdatesHash() =>
+    r'd68e6fbc8f2506e948b3386a65779dcd5e01767e';
+
+abstract class _$CheckForAppUpdates extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// Automatic update-check provider.
 ///
 /// Respects the user's [checkForAppUpdatesProvider] preference.  Returns
@@ -63,56 +117,3 @@ final class CheckForUpdateProvider
 }
 
 String _$checkForUpdateHash() => r'7134bb3c6ac01bc16fecf975195a5231d57c6148';
-
-@ProviderFor(CheckForAppUpdates)
-final checkForAppUpdatesProvider = CheckForAppUpdatesProvider._();
-
-final class CheckForAppUpdatesProvider
-    extends $NotifierProvider<CheckForAppUpdates, bool> {
-  CheckForAppUpdatesProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'checkForAppUpdatesProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$checkForAppUpdatesHash();
-
-  @$internal
-  @override
-  CheckForAppUpdates create() => CheckForAppUpdates();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
-    );
-  }
-}
-
-String _$checkForAppUpdatesHash() =>
-    r'c418d23abc3369d3a39b49ec4ee4d0862ffe146c';
-
-abstract class _$CheckForAppUpdates extends $Notifier<bool> {
-  bool build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<bool, bool>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}

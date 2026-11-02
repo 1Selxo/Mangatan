@@ -71,10 +71,6 @@ final _fields = <String, (Object? Function(Settings), Object? Function())>{
     (s) => s.flexSchemeColorIndex,
     () => settingsRepository.field((s) => s.flexSchemeColorIndexProperty()),
   ),
-  'appFontFamily': (
-    (s) => s.appFontFamily,
-    () => settingsRepository.field((s) => s.appFontFamilyProperty()),
-  ),
   'themeIsDark': (
     (s) => s.themeIsDark,
     () => settingsRepository.field((s) => s.themeIsDarkProperty()),
@@ -259,7 +255,6 @@ void main() {
           ..pureBlackDarkMode = false
           ..appUiScale = null
           ..flexSchemeColorIndex = 12
-          ..appFontFamily = ''
           ..themeIsDark = true
           ..followSystemTheme = null
           ..checkForExtensionUpdates = false

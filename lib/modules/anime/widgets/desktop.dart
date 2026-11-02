@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:mangayomi/utils/system_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +16,6 @@ import 'package:mangayomi/services/player_hotkeys.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/extensions/duration.dart';
-import 'package:window_manager/window_manager.dart';
 
 class DesktopControllerWidget extends ConsumerStatefulWidget {
   final Function(Duration?) tempDuration;
@@ -937,28 +937,4 @@ class _CustomMaterialDesktopFullscreenButtonState
       },
     );
   }
-}
-
-bool _restoreMaximizedAfterFullscreen = false;
-
-Future<bool> setFullScreen({bool? value}) async {
-  final current = await windowManager.isFullScreen();
-  final target = value ?? !current;
-  if (target == current) return current;
-
-  if (target) {
-    _restoreMaximizedAfterFullscreen = await windowManager.isMaximized();
-    if (_restoreMaximizedAfterFullscreen) {
-      await windowManager.unmaximize();
-      await Future<void>.delayed(const Duration(milliseconds: 16));
-    }
-    await windowManager.setFullScreen(true);
-  } else {
-    await windowManager.setFullScreen(false);
-    if (_restoreMaximizedAfterFullscreen) {
-      await windowManager.maximize();
-    }
-    _restoreMaximizedAfterFullscreen = false;
-  }
-  return target;
 }

@@ -2,20 +2,21 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_qjs/quickjs/ffi.dart';
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:mangayomi/services/external_browser.dart';
 import 'package:http_interceptor/http_interceptor.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
-import 'package:mangayomi/modules/more/settings/track/myanimelist/model.dart';
-import 'package:mangayomi/modules/more/settings/track/providers/track_providers.dart';
+import 'package:mangayomi/models/oauth.dart';
+import 'package:mangayomi/providers/track_providers.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 
 import 'base_tracker.dart';
 import 'tracker_account.dart';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 part 'simkl.g.dart';
 
 /// Which Simkl library a mangayomi library maps to.
@@ -65,11 +66,12 @@ class Simkl extends _$Simkl implements BaseTracker {
     final loginUrl = _authUrl();
 
     try {
-      final uri = await FlutterWebAuth2.authenticate(
-        url: "$loginUrl&redirect_uri=$_redirectUri",
+      final uri = await ExternalBrowser.openOAuth(
+        "$loginUrl&redirect_uri=$_redirectUri",
+        port: 43824,
         callbackUrlScheme: callbackUrlScheme,
       );
-      final code = Uri.parse(uri).queryParameters['code'];
+      final code = uri?.queryParameters['code'];
       if (code == null) return null;
 
       final oAuthData = await _getOAuth(code);
@@ -78,7 +80,8 @@ class Simkl extends _$Simkl implements BaseTracker {
       _saveOAuth(username, oAuth);
 
       return true;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'simkl');
       return false;
     }
   }

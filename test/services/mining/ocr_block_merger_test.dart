@@ -367,36 +367,33 @@ void main() {
       ]);
     });
 
-    test(
-      'staggered right-to-left order is deterministic under shuffled input',
-      () {
-        // The reading order must be a valid total ordering: independent of the
-        // order the blocks arrive in. Shuffle the maintainer's staggered fixture
-        // (plus an extra staggered bubble) many times and require an identical
-        // result every time.
-        List<OcrTextBlock> layout() => [
-          _sep('left', 0.05, 0.05, 0.25, 0.20),
-          _sep('mid', 0.35, 0.18, 0.55, 0.33),
-          _sep('right', 0.70, 0.30, 0.90, 0.45),
-        ];
+    test('staggered right-to-left order is deterministic under shuffled input', () {
+      // The reading order must be a valid total ordering: independent of the
+      // order the blocks arrive in. Shuffle the maintainer's staggered fixture
+      // (plus an extra staggered bubble) many times and require an identical
+      // result every time.
+      List<OcrTextBlock> layout() => [
+        _sep('left', 0.05, 0.05, 0.25, 0.20),
+        _sep('mid', 0.35, 0.18, 0.55, 0.33),
+        _sep('right', 0.70, 0.30, 0.90, 0.45),
+      ];
 
-        List<String> order(List<OcrTextBlock> blocks) => mergeOcrBlocks(
-          blocks,
-          language: 'ja',
-        ).map((block) => block.lines.single).toList();
+      List<String> order(List<OcrTextBlock> blocks) => mergeOcrBlocks(
+        blocks,
+        language: 'ja',
+      ).map((block) => block.lines.single).toList();
 
-        const expected = ['right', 'mid', 'left'];
-        expect(order(layout()), expected);
+      const expected = ['right', 'mid', 'left'];
+      expect(order(layout()), expected);
 
-        final random = Random(44);
-        for (var i = 0; i < 100; i++) {
-          expect(order(layout()..shuffle(random)), expected);
-        }
+      final random = Random(44);
+      for (var i = 0; i < 100; i++) {
+        expect(order(layout()..shuffle(random)), expected);
+      }
 
-        // Idempotent: re-sorting the produced order is a fixed point.
-        expect(order(mergeOcrBlocks(layout(), language: 'ja')), expected);
-      },
-    );
+      // Idempotent: re-sorting the produced order is a fixed point.
+      expect(order(mergeOcrBlocks(layout(), language: 'ja')), expected);
+    });
   });
 }
 

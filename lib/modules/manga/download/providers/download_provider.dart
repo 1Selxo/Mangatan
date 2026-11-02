@@ -23,7 +23,9 @@ import 'package:mangayomi/modules/manga/detail/providers/export_metadata.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/downloads/providers/downloads_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/general_state_provider.dart';
+import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
+import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/services/download_manager/download_queue_order.dart';
 import 'package:mangayomi/services/download_manager/download_isolate_pool.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
@@ -64,12 +66,23 @@ Future<void> downloadChapter(
   bool? useWifi,
   VoidCallback? callback,
 }) async {
-  if (!scheduleDownload(chapter.id!)) return;
   final keepAlive = ref.keepAlive();
-
-  // Show the chapter as queued straight away, before it waits for a slot, so
-  // the download icon reacts to the tap immediately even while it sits in the
-  // gate behind other downloads.
+  Future<void> progressWrites = Future.value();
+  // Enqueue under the same write queue as consolidation before claiming an ID.
+  // An old Updates/detail widget may still carry an ID merged during its click.
+  // Queued before it waits for a slot, so the download icon reacts to the tap
+  // straight away even while it sits in the gate behind other downloads.
+  try {
+    final current = await downloadRepository.enqueue(chapter);
+    if (current == null || !scheduleDownload(current.id!)) {
+      keepAlive.close();
+      return;
+    }
+    chapter = current;
+  } catch (_) {
+    keepAlive.close();
+    rethrow;
+  }
 
   // Every download path funnels through here, so acquiring the shared gate is
   // what makes the concurrency limit, per-source serialization (#645) and the
@@ -81,7 +94,6 @@ Future<void> downloadChapter(
         ? ref.read(concurrentDownloadsStateProvider)
         : 1;
     final delaySeconds = ref.read(downloadDelaySecondsStateProvider);
-    await downloadRepository.enqueue(chapter);
     if (downloadRepository.getById(chapter.id!)?.isDownload == true) return;
     await DownloadGate.instance.acquire(
       id: chapter.id!,
@@ -134,6 +146,9 @@ Future<void> downloadChapter(
       directory: mangaMainDirectory,
       headers: metadataHeaders,
       onlyIfMissing: true,
+      // A remote cover must not hold the download slot: it is fetched once
+      // the chapter is done, with a page standing in for it until then.
+      fetchCover: false,
     );
     List<Track>? subtitles;
     bool isOk = false;
@@ -158,15 +173,6 @@ Future<void> downloadChapter(
     Future<void> processConvert() async {
       if (!saveAsCbz) return;
       try {
-        final pageFiles = await chapterDirectory
-            .list()
-            .where(
-              (entity) =>
-                  entity is File && entity.path.toLowerCase().endsWith('.jpg'),
-            )
-            .map((entity) => entity.path)
-            .toList();
-
         // Extract chapter number from name (e.g., "Chapter 5" → "5")
         final chapterNumber = ChapterRecognition().resolveChapterNumber(
           chapter.manga.value!.name!,
@@ -191,12 +197,16 @@ Future<void> downloadChapter(
             chapterDirectory.path,
             mangaMainDirectory.path,
             chapterName,
-            pageFiles,
+            // The pending batch excludes cached pages; the archive needs all pages.
+            List.generate(
+              pageUrls.length,
+              (index) => p.join(chapterDirectory.path, padIndex(index)),
+            ),
             comicInfo: comicInfo,
           ).future,
         );
       } catch (error) {
-        botToast("Failed to create CBZ: $error");
+        botToast(localizedMessage((l10n) => l10n.failed_to_create_cbz(error)));
       }
     }
 
@@ -279,6 +289,7 @@ Future<void> downloadChapter(
         directory: mangaMainDirectory,
         imageFile: imageFiles.first,
         onlyIfMissing: true,
+        fromPage: true,
       );
     }
 
@@ -590,8 +601,12 @@ Future<void> downloadChapter(
           subtitles: subtitles,
           subDownloadDir: chapterDirectory.path,
         ).download((progress) {
-          if (!progress.isCompleted) setProgress(progress);
+          if (!progress.isCompleted) {
+            progressWrites = progressWrites.then((_) => setProgress(progress));
+          }
         });
+        // Worker callbacks are synchronous, but progress writes are not.
+        await progressWrites;
         await finalizeDownload();
       }
     } else if (itemType == ItemType.novel) {
@@ -633,8 +648,13 @@ Future<void> downloadChapter(
             fileName: p.join(mangaMainDirectory.path, "$chapterName.mp4"),
             chapter: chapter,
           ).download((progress) {
-            if (!progress.isCompleted) setProgress(progress);
+            if (!progress.isCompleted) {
+              progressWrites = progressWrites.then(
+                (_) => setProgress(progress),
+              );
+            }
           });
+          await progressWrites;
           lastError = null;
           break;
         } catch (error, stackTrace) {
@@ -661,15 +681,26 @@ Future<void> downloadChapter(
     if (callback != null) {
       callback();
     }
+    // Not awaited: the series' own cover may take its time, and the source's
+    // slot is released below whatever it does.
+    unawaited(
+      fetchMissingMangaCover(
+        manga: manga,
+        directory: mangaMainDirectory,
+        headers: metadataHeaders,
+      ),
+    );
     keepAlive.close();
   } catch (e) {
     // Surface the failure instead of swallowing it — a silent catch here is
     // exactly how "downloads just don't start" stays invisible.
     if (!isDownloadCancelled(chapter)) botToast("Download failed: $e");
+    await progressWrites.catchError((Object _) {});
     await markDownloadFailed(chapter);
     if (callback != null) callback();
     keepAlive.close();
   } finally {
+    await progressWrites.catchError((Object _) {});
     if (acquired) DownloadGate.instance.release(sourceKey);
     unscheduleDownload(chapter.id);
     keepAlive.close();
@@ -738,7 +769,14 @@ Future<void> processDownloads(Ref ref, {bool? useWifi}) async {
       ref.read(provider);
     }
   } catch (error) {
-    botToast('Could not start download queue: $error');
+    final context = navigatorKey.currentContext;
+    final l10n = context == null || !context.mounted
+        ? null
+        : l10nLocalizations(context);
+    botToast(
+      l10n?.download_queue_start_failed('$error') ??
+          'Could not start the download queue: $error',
+    );
   } finally {
     keepAlive.close();
   }

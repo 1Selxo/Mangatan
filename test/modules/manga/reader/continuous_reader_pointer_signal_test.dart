@@ -13,7 +13,7 @@ import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 

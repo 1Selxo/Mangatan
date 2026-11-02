@@ -1,0 +1,5 @@
+1 lib/providers/browse_state_provider.dart -> package:mangayomi/main.dart
+1 lib/providers/reader_state_provider.dart -> package:mangayomi/main.dart
+1 lib/providers/sync_providers.dart -> package:mangayomi/main.dart
+1 lib/providers/track_providers.dart -> package:mangayomi/main.dart
+1 lib/providers/track_providers.dart -> package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart

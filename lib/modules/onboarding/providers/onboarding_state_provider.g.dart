@@ -75,7 +75,7 @@ final class OnboardingCompletedStateProvider
 }
 
 String _$onboardingCompletedStateHash() =>
-    r'762854e31b6c411f43c26cc3ab7a42275cacd4dd';
+    r'15607c83fff043bc00e59c16867468d769655215';
 
 /// Whether the first-run screen has already been dismissed.
 ///
@@ -93,7 +93,7 @@ abstract class _$OnboardingCompletedState extends $Notifier<bool> {
   bool build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<bool, bool>;
     final element =
         ref.element
@@ -103,6 +103,6 @@ abstract class _$OnboardingCompletedState extends $Notifier<bool> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

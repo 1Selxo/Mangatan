@@ -8,6 +8,8 @@ import 'package:mangayomi/eval/model/m_chapter.dart';
 import 'package:mangayomi/eval/model/m_manga.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
+import 'package:mangayomi/models/download.dart';
+import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
@@ -33,7 +35,17 @@ void main() {
   setUp(() async {
     directory = Directory.systemTemp.createTempSync('update_detail_links');
     isar = await Isar.open(
-      [MangaSchema, ChapterSchema, UpdateSchema, SourceSchema, SettingsSchema],
+      [
+        MangaSchema,
+        ChapterSchema,
+        UpdateSchema,
+        SourceSchema,
+        SettingsSchema,
+        // A refresh merges duplicate chapters, moving their downloads and
+        // history.
+        DownloadSchema,
+        HistorySchema,
+      ],
       directory: directory.path,
       name: 'links_${directory.path.hashCode}',
     );

@@ -6,6 +6,7 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/custom_button.dart';
@@ -20,6 +21,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
+import 'package:mangayomi/models/tracker_library_cache.dart';
 import 'package:mangayomi/services/perf/benchmark_data_root.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:path_provider/path_provider.dart';
@@ -61,12 +63,7 @@ class StorageProvider {
 
   Future<bool> requestPermission() async {
     if (!Platform.isAndroid) return true;
-    Permission permission = Permission.manageExternalStorage;
-    if (await permission.isGranted) return true;
-    if (await permission.request().isGranted) {
-      return true;
-    }
-    return false;
+    return askPermission(Permission.manageExternalStorage);
   }
 
   Future<void> deleteBtDirectory() async {
@@ -160,11 +157,11 @@ class StorageProvider {
     return Directory(dbDir);
   }
 
-  Future<Directory?> getDirectory() async {
+  Future<Directory?> getDirectory({Settings? settings}) async {
     Directory? directory;
     String dPath = "";
     try {
-      final setting = settingsRepository.currentOrNull;
+      final setting = settings ?? settingsRepository.currentOrNull;
       dPath = setting?.downloadLocation ?? "";
     } catch (e) {
       if (kDebugMode) {
@@ -186,7 +183,10 @@ class StorageProvider {
     return directory;
   }
 
-  Future<Directory?> getMangaMainDirectory(Chapter chapter) async {
+  Future<Directory?> getMangaMainDirectory(
+    Chapter chapter, {
+    Settings? settings,
+  }) async {
     final manga = chapter.manga.value!;
     final itemType = chapter.manga.value!.itemType;
     final itemTypePath = itemType == ItemType.manga
@@ -194,7 +194,7 @@ class StorageProvider {
         : itemType == ItemType.anime
         ? "Anime"
         : "Novel";
-    final dir = await getDirectory();
+    final dir = await getDirectory(settings: settings);
     return Directory(
       path.join(
         dir!.path,
@@ -373,6 +373,7 @@ class StorageProvider {
         SourcePreferenceSchema,
         SourcePreferenceStringValueSchema,
         BackupPasswordFallbackSchema,
+        TrackerLibraryCacheSchema,
       ],
       directory: dir!.path,
       name: "mangayomiDb",
@@ -483,5 +484,20 @@ end""",
         debugPrint('[storage] Windowed reader migration skipped: $error');
       }
     }
+  }
+}
+
+/// Whether [permission] is granted, asking for it when it is not.
+///
+/// A device without the screen that grants it throws when asked: Google TV
+/// has none for all files access, and opening an episode crashed there
+/// (#1069). That is recorded and answers no, as a refusal does.
+Future<bool> askPermission(Permission permission) async {
+  try {
+    if (await permission.isGranted) return true;
+    return (await permission.request()).isGranted;
+  } catch (e, stack) {
+    recordError(e, stack: stack, source: 'permission ${permission.toString()}');
+    return false;
   }
 }

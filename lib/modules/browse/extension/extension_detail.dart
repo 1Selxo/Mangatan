@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http_interceptor/http_interceptor.dart';
+import 'package:mangayomi/services/external_browser.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
@@ -32,7 +33,6 @@ import 'package:mangayomi/services/reconcile_mihon_sources.dart';
 import 'package:mangayomi/services/uninstall_extension.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
 
@@ -289,7 +289,7 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
   }
 
   Future<void> _launchInBrowser(Uri url) async {
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    if (!await ExternalBrowser.open(url.toString())) {
       throw 'Could not launch $url';
     }
   }

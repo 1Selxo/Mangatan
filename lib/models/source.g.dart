@@ -7,7 +7,7 @@ part of 'source.dart';
 // **************************************************************************
 
 // coverage:ignore-file
-// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types, experimental_member_use
 
 extension GetSourceCollection on Isar {
   IsarCollection<Source> get sources => this.collection();
@@ -120,14 +120,21 @@ const SourceSchema = CollectionSchema(
       name: r'typeSource',
       type: IsarType.string,
     ),
-    r'updatedAt': PropertySchema(
+    r'updateRepo': PropertySchema(
       id: 31,
+      name: r'updateRepo',
+      type: IsarType.object,
+
+      target: r'Repo',
+    ),
+    r'updatedAt': PropertySchema(
+      id: 32,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'version': PropertySchema(id: 32, name: r'version', type: IsarType.string),
+    r'version': PropertySchema(id: 33, name: r'version', type: IsarType.string),
     r'versionLast': PropertySchema(
-      id: 33,
+      id: 34,
       name: r'versionLast',
       type: IsarType.string,
     ),
@@ -190,7 +197,7 @@ const SourceSchema = CollectionSchema(
   getId: _sourceGetId,
   getLinks: _sourceGetLinks,
   attach: _sourceAttach,
-  version: '3.3.2',
+  version: '3.4.1',
 );
 
 int _sourceEstimateSize(
@@ -303,6 +310,13 @@ int _sourceEstimateSize(
     }
   }
   {
+    final value = object.updateRepo;
+    if (value != null) {
+      bytesCount +=
+          3 + RepoSchema.estimateSize(value, allOffsets[Repo]!, allOffsets);
+    }
+  }
+  {
     final value = object.version;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -359,9 +373,15 @@ void _sourceSerialize(
   writer.writeString(offsets[28], object.sourceCodeUrl);
   writer.writeBool(offsets[29], object.supportLatest);
   writer.writeString(offsets[30], object.typeSource);
-  writer.writeLong(offsets[31], object.updatedAt);
-  writer.writeString(offsets[32], object.version);
-  writer.writeString(offsets[33], object.versionLast);
+  writer.writeObject<Repo>(
+    offsets[31],
+    allOffsets,
+    RepoSchema.serialize,
+    object.updateRepo,
+  );
+  writer.writeLong(offsets[32], object.updatedAt);
+  writer.writeString(offsets[33], object.version);
+  writer.writeString(offsets[34], object.versionLast);
 }
 
 Source _sourceDeserialize(
@@ -407,15 +427,20 @@ Source _sourceDeserialize(
     sourceCodeUrl: reader.readStringOrNull(offsets[28]),
     supportLatest: reader.readBoolOrNull(offsets[29]),
     typeSource: reader.readStringOrNull(offsets[30]),
-    updatedAt: reader.readLongOrNull(offsets[31]),
-    version: reader.readStringOrNull(offsets[32]),
-    versionLast: reader.readStringOrNull(offsets[33]),
+    updatedAt: reader.readLongOrNull(offsets[32]),
+    version: reader.readStringOrNull(offsets[33]),
+    versionLast: reader.readStringOrNull(offsets[34]),
   );
   object.sourceCodeLanguage =
       _SourcesourceCodeLanguageValueEnumMap[reader.readByteOrNull(
         offsets[27],
       )] ??
       SourceCodeLanguage.dart;
+  object.updateRepo = reader.readObjectOrNull<Repo>(
+    offsets[31],
+    RepoSchema.deserialize,
+    allOffsets,
+  );
   return object;
 }
 
@@ -480,11 +505,10 @@ P _sourceDeserializeProp<P>(
       return (reader.readStringOrNull(offset)) as P;
     case 25:
       return (reader.readObjectOrNull<Repo>(
-            offset,
-            RepoSchema.deserialize,
-            allOffsets,
-          ))
-          as P;
+        offset,
+        RepoSchema.deserialize,
+        allOffsets,
+      )) as P;
     case 26:
       return (reader.readStringOrNull(offset)) as P;
     case 27:
@@ -500,10 +524,16 @@ P _sourceDeserializeProp<P>(
     case 30:
       return (reader.readStringOrNull(offset)) as P;
     case 31:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readObjectOrNull<Repo>(
+        offset,
+        RepoSchema.deserialize,
+        allOffsets,
+      )) as P;
     case 32:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 33:
+      return (reader.readStringOrNull(offset)) as P;
+    case 34:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -4089,6 +4119,22 @@ extension SourceQueryFilter on QueryBuilder<Source, Source, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Source, Source, QAfterFilterCondition> updateRepoIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'updateRepo'),
+      );
+    });
+  }
+
+  QueryBuilder<Source, Source, QAfterFilterCondition> updateRepoIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'updateRepo'),
+      );
+    });
+  }
+
   QueryBuilder<Source, Source, QAfterFilterCondition> updatedAtIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -4495,6 +4541,14 @@ extension SourceQueryObject on QueryBuilder<Source, Source, QFilterCondition> {
   ) {
     return QueryBuilder.apply(this, (query) {
       return query.object(q, r'repo');
+    });
+  }
+
+  QueryBuilder<Source, Source, QAfterFilterCondition> updateRepo(
+    FilterQuery<Repo> q,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.object(q, r'updateRepo');
     });
   }
 }
@@ -5748,6 +5802,12 @@ extension SourceQueryProperty on QueryBuilder<Source, Source, QQueryProperty> {
   QueryBuilder<Source, String?, QQueryOperations> typeSourceProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'typeSource');
+    });
+  }
+
+  QueryBuilder<Source, Repo?, QQueryOperations> updateRepoProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'updateRepo');
     });
   }
 

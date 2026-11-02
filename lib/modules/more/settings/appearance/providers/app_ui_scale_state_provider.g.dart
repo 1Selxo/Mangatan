@@ -47,7 +47,7 @@ final class AppUiScaleStateProvider
   }
 }
 
-String _$appUiScaleStateHash() => r'814ffcfb4a1079396e76a46672dcb5e3cde10a3c';
+String _$appUiScaleStateHash() => r'd65dc16c2873d50c3a86620c0bd4da5a3ba9ad9f';
 
 /// User fine-tune for the TV interface scale. 1.0 is the normalized reference
 /// (see [AppUiScale]); higher renders the UI larger, lower smaller.
@@ -56,7 +56,7 @@ abstract class _$AppUiScaleState extends $Notifier<double> {
   double build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<double, double>;
     final element =
         ref.element
@@ -66,6 +66,6 @@ abstract class _$AppUiScaleState extends $Notifier<double> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

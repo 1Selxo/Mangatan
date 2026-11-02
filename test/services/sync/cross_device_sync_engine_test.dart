@@ -728,51 +728,48 @@ void main() {
     },
   );
 
-  test(
-    'source preference baseline keeps local edits without reviving opaque deletions',
-    () async {
-      const preferenceCodec = ChimahonPreferenceCodec();
-      BackupSourcePreferences group(String sourceKey, String value) =>
-          BackupSourcePreferences(
-            sourceKey: sourceKey,
-            prefs: [preferenceCodec.encode('setting', value)],
-          );
+  test('source preference baseline keeps local edits without reviving opaque deletions', () async {
+    const preferenceCodec = ChimahonPreferenceCodec();
+    BackupSourcePreferences group(String sourceKey, String value) =>
+        BackupSourcePreferences(
+          sourceKey: sourceKey,
+          prefs: [preferenceCodec.encode('setting', value)],
+        );
 
-      final installedBaseline = group('source_1', 'baseline');
-      final baseline = BackupMihon(
-        backupSourcePreferences: [
-          installedBaseline,
-          group('source_999', 'deleted remotely'),
-        ],
-      );
-      final deferredStore = _MemoryDeferredPayloadStore(baseline)
-        ..localSourcePreferenceBaseline = [installedBaseline.deepCopy()];
-      final storage = _MemoryStorage(
-        remote: codec.encode(
-          BackupMihon(backupSourcePreferences: [installedBaseline.deepCopy()]),
-        ),
-      );
+    final installedBaseline = group('source_1', 'baseline');
+    final baseline = BackupMihon(
+      backupSourcePreferences: [
+        installedBaseline,
+        group('source_999', 'deleted remotely'),
+      ],
+    );
+    final deferredStore = _MemoryDeferredPayloadStore(baseline)
+      ..localSourcePreferenceBaseline = [installedBaseline.deepCopy()];
+    final storage = _MemoryStorage(
+      remote: codec.encode(
+        BackupMihon(backupSourcePreferences: [installedBaseline.deepCopy()]),
+      ),
+    );
 
-      await CrossDeviceSyncEngine(
-        storage: storage,
-        deferredPayloadStore: deferredStore,
-        exportLocal: () async => BackupMihon(
-          backupSourcePreferences: [group('source_1', 'local edit')],
-        ),
-        importMerged: (_) async {},
-      ).uploadPreservingRemote();
+    await CrossDeviceSyncEngine(
+      storage: storage,
+      deferredPayloadStore: deferredStore,
+      exportLocal: () async => BackupMihon(
+        backupSourcePreferences: [group('source_1', 'local edit')],
+      ),
+      importMerged: (_) async {},
+    ).uploadPreservingRemote();
 
-      final uploaded = codec.decode(storage.uploaded!).backup;
-      expect(uploaded.backupSourcePreferences, hasLength(1));
-      expect(uploaded.backupSourcePreferences.single.sourceKey, 'source_1');
-      expect(
-        preferenceCodec
-            .decode(uploaded.backupSourcePreferences.single.prefs.single)
-            .value,
-        'local edit',
-      );
-    },
-  );
+    final uploaded = codec.decode(storage.uploaded!).backup;
+    expect(uploaded.backupSourcePreferences, hasLength(1));
+    expect(uploaded.backupSourcePreferences.single.sourceKey, 'source_1');
+    expect(
+      preferenceCodec
+          .decode(uploaded.backupSourcePreferences.single.prefs.single)
+          .value,
+      'local edit',
+    );
+  });
 
   test(
     'forced upload preserves current remote data without resurrecting baseline',
@@ -1012,466 +1009,457 @@ void main() {
     expect(deferredStore.pending, isNull);
   });
 
-  test(
-    'pending restore beats a newer cloud record without dropping cloud-only data',
-    () async {
-      final selectedChapter = BackupChapter(
-        url: '/selected/chapter-1',
-        name: 'Chapter 1',
-        read: false,
-        bookmark: false,
-        lastPageRead: Int64(2),
-        lastModifiedAt: Int64(100),
-        version: Int64(4),
-      )..unknownFields.mergeVarintField(5003, Int64(11));
-      final selectedNovelStat = BackupNovelStat(
-        dateKey: '2026-07-17',
-        charactersRead: 10,
-        readingTime: 1.0,
-        lastStatisticModified: Int64(100),
-      )..unknownFields.mergeVarintField(5005, Int64(11));
-      final selectedManga = BackupManga(
-        source: Int64(1),
-        url: '/selected',
-        title: 'Selected title',
-        author: 'Selected author',
-        description: 'Selected backup description',
-        favorite: true,
-        favoriteModifiedAt: Int64(100),
-        lastModifiedAt: Int64(100),
-        version: Int64(5),
-        categories: [Int64.ZERO],
-        chapters: [selectedChapter],
-        history: [
-          BackupHistory(
-            url: '/selected/chapter-1',
-            lastRead: Int64(1000),
-            readDuration: Int64(500),
-          ),
-        ],
-      )..unknownFields.mergeVarintField(5001, Int64(11));
-      final selectedNovel = BackupNovel(
-        id: 'selected-novel',
-        title: 'Selected novel',
-        author: 'Selected novelist',
-        chapterIndex: 1,
-        progress: 0.2,
-        characterCount: 20,
-        lastModified: Int64(100),
-        stats: [selectedNovelStat],
-      )..unknownFields.mergeVarintField(5004, Int64(11));
-      final pending = BackupMihon(
-        backupManga: [selectedManga],
-        backupCategories: [
-          BackupCategory(
-            name: 'Restored category',
-            order: Int64.ZERO,
-            id: Int64(1),
-          ),
-        ],
-        backupAnime: [
-          BackupAnime(
-            source: Int64(2),
-            url: '/selected-anime',
-            title: 'Selected anime',
-            author: 'Selected anime author',
-            description: 'Selected anime backup description',
-            categories: [Int64.ZERO],
-            lastModifiedAt: Int64(100),
-            version: Int64(5),
-          ),
-        ],
-        backupAnimeCategories: [
-          BackupCategory(
-            name: 'Restored anime category',
-            order: Int64.ZERO,
-            id: Int64(3),
-          ),
-        ],
-        backupNovels: [selectedNovel],
-        backupMangaStats: [
-          BackupMangaStats(
-            dateKey: '2026-07-17',
-            mangaId: Int64(1),
-            charactersRead: 10,
-            readingTime: Int64(1000),
-          ),
-        ],
-      )..unknownFields.mergeVarintField(5000, Int64(11));
-
-      // This is the database projection after the selected backup was restored
-      // and then edited locally, before its first successful cloud upload.
-      final postRestoreLocal = BackupMihon(
-        backupCategories: [
-          BackupCategory(
-            name: 'Restored category',
-            order: Int64.ZERO,
-            id: Int64(1),
-          ),
-        ],
-        backupManga: [
-          BackupManga(
-            source: Int64(1),
-            url: '/selected',
-            title: 'Selected title',
-            author: 'Selected author',
-            description: 'Post-restore local edit',
-            favorite: true,
-            favoriteModifiedAt: Int64(150),
-            lastModifiedAt: Int64(150),
-            categories: [Int64.ZERO],
-            chapters: [
-              BackupChapter(
-                url: '/selected/chapter-1',
-                name: 'Chapter 1',
-                read: true,
-                bookmark: true,
-                lastPageRead: Int64(8),
-                lastModifiedAt: Int64(150),
-              ),
-            ],
-            history: [
-              BackupHistory(
-                url: '/selected/chapter-1',
-                lastRead: Int64(1500),
-                readDuration: Int64(700),
-              ),
-            ],
-          ),
-        ],
-        backupAnimeCategories: [
-          BackupCategory(
-            name: 'Restored anime category',
-            order: Int64.ZERO,
-            id: Int64(3),
-          ),
-        ],
-        backupAnime: [
-          BackupAnime(
-            source: Int64(2),
-            url: '/selected-anime',
-            title: 'Selected anime',
-            author: 'Selected anime author',
-            description: 'Post-restore anime edit',
-            categories: [Int64.ZERO],
-            lastModifiedAt: Int64(150),
-          ),
-        ],
-        backupNovels: [
-          BackupNovel(
-            id: 'selected-novel',
-            title: 'Selected novel',
-            author: 'Selected novelist',
-            chapterIndex: 3,
-            progress: 0.75,
-            characterCount: 300,
-            lastModified: Int64(150),
-            stats: [
-              BackupNovelStat(
-                dateKey: '2026-07-17',
-                charactersRead: 15,
-                readingTime: 2.0,
-                lastStatisticModified: Int64(150),
-              ),
-            ],
-          ),
-        ],
-        backupMangaStats: [
-          BackupMangaStats(
-            dateKey: '2026-07-17',
-            mangaId: Int64(1),
-            charactersRead: 15,
-            readingTime: Int64(1500),
-          ),
-        ],
-      );
-
-      final cloudChapter = BackupChapter(
-        url: '/selected/chapter-1',
-        name: 'Chapter 1',
-        read: false,
-        bookmark: false,
-        lastPageRead: Int64(20),
-        lastModifiedAt: Int64(200),
-        version: Int64(8),
-      )..unknownFields.mergeVarintField(5003, Int64(99));
-      final cloudNovelStat = BackupNovelStat(
-        dateKey: '2026-07-17',
-        charactersRead: 99,
-        readingTime: 9.0,
-        lastStatisticModified: Int64(200),
-      )..unknownFields.mergeVarintField(5005, Int64(99));
-      final cloudManga = BackupManga(
-        source: Int64(1),
-        url: '/selected',
-        title: 'Selected title',
-        author: 'Selected author',
-        description: 'Newer cloud edit',
-        favorite: false,
-        favoriteModifiedAt: Int64(200),
-        lastModifiedAt: Int64(200),
-        version: Int64(10),
-        categories: [Int64(2)],
-        chapters: [
-          cloudChapter,
-          BackupChapter(
-            url: '/selected/cloud-only-chapter',
-            name: 'Cloud-only chapter',
-            version: Int64(3),
-          ),
-        ],
-        history: [
-          BackupHistory(
-            url: '/selected/chapter-1',
-            lastRead: Int64(2000),
-            readDuration: Int64(900),
-          ),
-        ],
-      )..unknownFields.mergeVarintField(5001, Int64(99));
-      final cloudNovel = BackupNovel(
-        id: 'cloud-selected-novel',
-        title: 'Selected novel',
-        author: 'Selected novelist',
-        chapterIndex: 9,
-        progress: 0.95,
-        characterCount: 999,
-        lastModified: Int64(200),
-        stats: [
-          cloudNovelStat,
-          BackupNovelStat(
-            dateKey: '2026-07-18',
-            charactersRead: 20,
-            readingTime: 3.0,
-            lastStatisticModified: Int64(180),
-          ),
-        ],
-      )..unknownFields.mergeVarintField(5004, Int64(99));
-      final remote = BackupMihon(
-        backupCategories: [
-          BackupCategory(
-            name: 'Restored category',
-            order: Int64(2),
-            id: Int64(1),
-          ),
-          BackupCategory(
-            name: 'Cloud-only category',
-            order: Int64.ZERO,
-            id: Int64(2),
-          ),
-        ],
-        backupManga: [
-          cloudManga,
-          BackupManga(
-            source: Int64(42),
-            url: '/cloud-only-title',
-            title: 'Cloud-only title',
-            version: Int64(7),
-            categories: [Int64.ZERO],
-          ),
-        ],
-        backupAnimeCategories: [
-          BackupCategory(
-            name: 'Restored anime category',
-            order: Int64(2),
-            id: Int64(3),
-          ),
-          BackupCategory(
-            name: 'Cloud-only anime category',
-            order: Int64.ZERO,
-            id: Int64(4),
-          ),
-        ],
-        backupAnime: [
-          BackupAnime(
-            source: Int64(2),
-            url: '/selected-anime',
-            title: 'Selected anime',
-            author: 'Selected anime author',
-            description: 'Newer cloud anime edit',
-            categories: [Int64(2)],
-            lastModifiedAt: Int64(200),
-            version: Int64(10),
-          ),
-          BackupAnime(
-            source: Int64(42),
-            url: '/cloud-only-anime',
-            title: 'Cloud-only anime',
-            categories: [Int64.ZERO],
-            version: Int64(7),
-          ),
-        ],
-        backupNovels: [
-          cloudNovel,
-          BackupNovel(
-            id: 'cloud-only-novel',
-            title: 'Cloud-only novel',
-            author: 'Cloud author',
-            lastModified: Int64(180),
-          ),
-        ],
-        backupMangaStats: [
-          BackupMangaStats(
-            dateKey: '2026-07-17',
-            mangaId: Int64(1),
-            charactersRead: 99,
-            readingTime: Int64(9000),
-          ),
-          BackupMangaStats(
-            dateKey: '2026-07-18',
-            mangaId: Int64(42),
-            charactersRead: 20,
-            readingTime: Int64(2000),
-          ),
-        ],
-      )..unknownFields.mergeVarintField(5000, Int64(99));
-
-      final deferredStore = _MemoryPendingPayloadStore(
-        baseline: BackupMihon(),
-        pending: pending,
-      );
-      final authority = _ProofRecordingAuthority();
-      final storage = _MemoryStorage(
-        remote: codec.encode(remote),
-        onUpload: () {
-          expect(authority.proofRan, isTrue);
-          expect(authority.proofResult, isTrue);
-          expect(deferredStore.pending, isNotNull);
-        },
-      );
-
-      await CrossDeviceSyncEngine(
-        storage: storage,
-        deferredPayloadStore: deferredStore,
-        pendingRestoreAuthority: authority,
-        exportLocal: () async => postRestoreLocal.deepCopy(),
-        importMerged: (_) async {},
-      ).uploadPreservingRemote();
-
-      final uploaded = codec.decode(storage.uploaded!).backup;
-      final uploadedManga = uploaded.backupManga.singleWhere(
-        (manga) => manga.url == '/selected',
-      );
-      final uploadedChapter = uploadedManga.chapters.singleWhere(
-        (chapter) => chapter.url == '/selected/chapter-1',
-      );
-      final uploadedHistory = uploadedManga.history.singleWhere(
-        (history) => history.url == '/selected/chapter-1',
-      );
-      expect(uploadedManga.description, 'Post-restore local edit');
-      expect(uploadedManga.favorite, isTrue);
-      expect(uploadedManga.favoriteModifiedAt, Int64(201));
-      expect(uploadedManga.lastModifiedAt, Int64(201));
-      expect(uploadedManga.version, Int64(11));
-      expect(uploadedChapter.read, isTrue);
-      expect(uploadedChapter.bookmark, isTrue);
-      expect(uploadedChapter.lastPageRead, Int64(8));
-      expect(uploadedChapter.version, Int64(9));
-      expect(uploadedHistory.lastRead, Int64(2001));
-      expect(uploadedHistory.readDuration, Int64(700));
-      expect(
-        uploadedManga.chapters.map((chapter) => chapter.url),
-        contains('/selected/cloud-only-chapter'),
-      );
-      expect(
-        uploaded.backupManga.map((manga) => manga.url),
-        contains('/cloud-only-title'),
-      );
-      final categoryOrders = {
-        for (final category in uploaded.backupCategories)
-          category.name: category.order,
-      };
-      expect(categoryOrders.values.toSet(), hasLength(categoryOrders.length));
-      expect(categoryOrders['Restored category'], Int64.ZERO);
-      expect(uploadedManga.categories, [Int64.ZERO]);
-      expect(
-        uploaded.backupManga
-            .singleWhere((manga) => manga.url == '/cloud-only-title')
-            .categories,
-        [categoryOrders['Cloud-only category']],
-      );
-
-      final uploadedAnime = uploaded.backupAnime.singleWhere(
-        (anime) => anime.url == '/selected-anime',
-      );
-      final animeCategoryOrders = {
-        for (final category in uploaded.backupAnimeCategories)
-          category.name: category.order,
-      };
-      expect(
-        animeCategoryOrders.values.toSet(),
-        hasLength(animeCategoryOrders.length),
-      );
-      expect(animeCategoryOrders['Restored anime category'], Int64.ZERO);
-      expect(uploadedAnime.description, 'Post-restore anime edit');
-      expect(uploadedAnime.version, Int64(11));
-      expect(uploadedAnime.categories, [Int64.ZERO]);
-      expect(
-        uploaded.backupAnime
-            .singleWhere((anime) => anime.url == '/cloud-only-anime')
-            .categories,
-        [animeCategoryOrders['Cloud-only anime category']],
-      );
-
-      final uploadedNovel = uploaded.backupNovels.singleWhere(
-        (novel) => novel.title == 'Selected novel',
-      );
-      final uploadedNovelStat = uploadedNovel.stats.singleWhere(
-        (stat) => stat.dateKey == '2026-07-17',
-      );
-      expect(uploadedNovel.chapterIndex, 3);
-      expect(uploadedNovel.progress, 0.75);
-      expect(uploadedNovel.characterCount, 300);
-      expect(uploadedNovel.lastModified, Int64(201));
-      expect(uploadedNovelStat.charactersRead, 15);
-      expect(uploadedNovelStat.readingTime, 2.0);
-      expect(uploadedNovelStat.lastStatisticModified, Int64(201));
-      expect(
-        uploadedNovel.stats.map((stat) => stat.dateKey),
-        contains('2026-07-18'),
-      );
-      expect(
-        uploaded.backupNovels.map((novel) => novel.title),
-        contains('Cloud-only novel'),
-      );
-
-      // The restored backup, the post-restore local edit, and the cloud record
-      // all describe the same day and title, so they collapse into one row
-      // holding the largest value seen for each field — Chimahon's merge rule.
-      // Keeping three rows would triple count that day's reading.
-      final selectedStat = uploaded.backupMangaStats.singleWhere(
-        (stat) => stat.dateKey == '2026-07-17' && stat.mangaId == Int64(1),
-      );
-      expect(selectedStat.charactersRead, 99);
-      expect(selectedStat.readingTime, Int64(9000));
-      expect(
-        uploaded.backupMangaStats.any(
-          (stat) => stat.dateKey == '2026-07-18' && stat.mangaId == Int64(42),
+  test('pending restore beats a newer cloud record without dropping cloud-only data', () async {
+    final selectedChapter = BackupChapter(
+      url: '/selected/chapter-1',
+      name: 'Chapter 1',
+      read: false,
+      bookmark: false,
+      lastPageRead: Int64(2),
+      lastModifiedAt: Int64(100),
+      version: Int64(4),
+    )..unknownFields.mergeVarintField(5003, Int64(11));
+    final selectedNovelStat = BackupNovelStat(
+      dateKey: '2026-07-17',
+      charactersRead: 10,
+      readingTime: 1.0,
+      lastStatisticModified: Int64(100),
+    )..unknownFields.mergeVarintField(5005, Int64(11));
+    final selectedManga = BackupManga(
+      source: Int64(1),
+      url: '/selected',
+      title: 'Selected title',
+      author: 'Selected author',
+      description: 'Selected backup description',
+      favorite: true,
+      favoriteModifiedAt: Int64(100),
+      lastModifiedAt: Int64(100),
+      version: Int64(5),
+      categories: [Int64.ZERO],
+      chapters: [selectedChapter],
+      history: [
+        BackupHistory(
+          url: '/selected/chapter-1',
+          lastRead: Int64(1000),
+          readDuration: Int64(500),
         ),
-        isTrue,
-      );
+      ],
+    )..unknownFields.mergeVarintField(5001, Int64(11));
+    final selectedNovel = BackupNovel(
+      id: 'selected-novel',
+      title: 'Selected novel',
+      author: 'Selected novelist',
+      chapterIndex: 1,
+      progress: 0.2,
+      characterCount: 20,
+      lastModified: Int64(100),
+      stats: [selectedNovelStat],
+    )..unknownFields.mergeVarintField(5004, Int64(11));
+    final pending = BackupMihon(
+      backupManga: [selectedManga],
+      backupCategories: [
+        BackupCategory(
+          name: 'Restored category',
+          order: Int64.ZERO,
+          id: Int64(1),
+        ),
+      ],
+      backupAnime: [
+        BackupAnime(
+          source: Int64(2),
+          url: '/selected-anime',
+          title: 'Selected anime',
+          author: 'Selected anime author',
+          description: 'Selected anime backup description',
+          categories: [Int64.ZERO],
+          lastModifiedAt: Int64(100),
+          version: Int64(5),
+        ),
+      ],
+      backupAnimeCategories: [
+        BackupCategory(
+          name: 'Restored anime category',
+          order: Int64.ZERO,
+          id: Int64(3),
+        ),
+      ],
+      backupNovels: [selectedNovel],
+      backupMangaStats: [
+        BackupMangaStats(
+          dateKey: '2026-07-17',
+          mangaId: Int64(1),
+          charactersRead: 10,
+          readingTime: Int64(1000),
+        ),
+      ],
+    )..unknownFields.mergeVarintField(5000, Int64(11));
 
-      expect(uploaded.unknownFields.getField(5000)!.varints.last, Int64(11));
-      expect(
-        uploadedManga.unknownFields.getField(5001)!.varints.last,
-        Int64(11),
-      );
-      expect(
-        uploadedChapter.unknownFields.getField(5003)!.varints.last,
-        Int64(11),
-      );
-      expect(
-        uploadedNovel.unknownFields.getField(5004)!.varints.last,
-        Int64(11),
-      );
-      expect(
-        uploadedNovelStat.unknownFields.getField(5005)!.varints.last,
-        Int64(11),
-      );
-      expect(authority.proofRan, isTrue);
-      expect(authority.proofResult, isTrue);
-      expect(deferredStore.pending, isNull);
-    },
-  );
+    // This is the database projection after the selected backup was restored
+    // and then edited locally, before its first successful cloud upload.
+    final postRestoreLocal = BackupMihon(
+      backupCategories: [
+        BackupCategory(
+          name: 'Restored category',
+          order: Int64.ZERO,
+          id: Int64(1),
+        ),
+      ],
+      backupManga: [
+        BackupManga(
+          source: Int64(1),
+          url: '/selected',
+          title: 'Selected title',
+          author: 'Selected author',
+          description: 'Post-restore local edit',
+          favorite: true,
+          favoriteModifiedAt: Int64(150),
+          lastModifiedAt: Int64(150),
+          categories: [Int64.ZERO],
+          chapters: [
+            BackupChapter(
+              url: '/selected/chapter-1',
+              name: 'Chapter 1',
+              read: true,
+              bookmark: true,
+              lastPageRead: Int64(8),
+              lastModifiedAt: Int64(150),
+            ),
+          ],
+          history: [
+            BackupHistory(
+              url: '/selected/chapter-1',
+              lastRead: Int64(1500),
+              readDuration: Int64(700),
+            ),
+          ],
+        ),
+      ],
+      backupAnimeCategories: [
+        BackupCategory(
+          name: 'Restored anime category',
+          order: Int64.ZERO,
+          id: Int64(3),
+        ),
+      ],
+      backupAnime: [
+        BackupAnime(
+          source: Int64(2),
+          url: '/selected-anime',
+          title: 'Selected anime',
+          author: 'Selected anime author',
+          description: 'Post-restore anime edit',
+          categories: [Int64.ZERO],
+          lastModifiedAt: Int64(150),
+        ),
+      ],
+      backupNovels: [
+        BackupNovel(
+          id: 'selected-novel',
+          title: 'Selected novel',
+          author: 'Selected novelist',
+          chapterIndex: 3,
+          progress: 0.75,
+          characterCount: 300,
+          lastModified: Int64(150),
+          stats: [
+            BackupNovelStat(
+              dateKey: '2026-07-17',
+              charactersRead: 15,
+              readingTime: 2.0,
+              lastStatisticModified: Int64(150),
+            ),
+          ],
+        ),
+      ],
+      backupMangaStats: [
+        BackupMangaStats(
+          dateKey: '2026-07-17',
+          mangaId: Int64(1),
+          charactersRead: 15,
+          readingTime: Int64(1500),
+        ),
+      ],
+    );
+
+    final cloudChapter = BackupChapter(
+      url: '/selected/chapter-1',
+      name: 'Chapter 1',
+      read: false,
+      bookmark: false,
+      lastPageRead: Int64(20),
+      lastModifiedAt: Int64(200),
+      version: Int64(8),
+    )..unknownFields.mergeVarintField(5003, Int64(99));
+    final cloudNovelStat = BackupNovelStat(
+      dateKey: '2026-07-17',
+      charactersRead: 99,
+      readingTime: 9.0,
+      lastStatisticModified: Int64(200),
+    )..unknownFields.mergeVarintField(5005, Int64(99));
+    final cloudManga = BackupManga(
+      source: Int64(1),
+      url: '/selected',
+      title: 'Selected title',
+      author: 'Selected author',
+      description: 'Newer cloud edit',
+      favorite: false,
+      favoriteModifiedAt: Int64(200),
+      lastModifiedAt: Int64(200),
+      version: Int64(10),
+      categories: [Int64(2)],
+      chapters: [
+        cloudChapter,
+        BackupChapter(
+          url: '/selected/cloud-only-chapter',
+          name: 'Cloud-only chapter',
+          version: Int64(3),
+        ),
+      ],
+      history: [
+        BackupHistory(
+          url: '/selected/chapter-1',
+          lastRead: Int64(2000),
+          readDuration: Int64(900),
+        ),
+      ],
+    )..unknownFields.mergeVarintField(5001, Int64(99));
+    final cloudNovel = BackupNovel(
+      id: 'cloud-selected-novel',
+      title: 'Selected novel',
+      author: 'Selected novelist',
+      chapterIndex: 9,
+      progress: 0.95,
+      characterCount: 999,
+      lastModified: Int64(200),
+      stats: [
+        cloudNovelStat,
+        BackupNovelStat(
+          dateKey: '2026-07-18',
+          charactersRead: 20,
+          readingTime: 3.0,
+          lastStatisticModified: Int64(180),
+        ),
+      ],
+    )..unknownFields.mergeVarintField(5004, Int64(99));
+    final remote = BackupMihon(
+      backupCategories: [
+        BackupCategory(
+          name: 'Restored category',
+          order: Int64(2),
+          id: Int64(1),
+        ),
+        BackupCategory(
+          name: 'Cloud-only category',
+          order: Int64.ZERO,
+          id: Int64(2),
+        ),
+      ],
+      backupManga: [
+        cloudManga,
+        BackupManga(
+          source: Int64(42),
+          url: '/cloud-only-title',
+          title: 'Cloud-only title',
+          version: Int64(7),
+          categories: [Int64.ZERO],
+        ),
+      ],
+      backupAnimeCategories: [
+        BackupCategory(
+          name: 'Restored anime category',
+          order: Int64(2),
+          id: Int64(3),
+        ),
+        BackupCategory(
+          name: 'Cloud-only anime category',
+          order: Int64.ZERO,
+          id: Int64(4),
+        ),
+      ],
+      backupAnime: [
+        BackupAnime(
+          source: Int64(2),
+          url: '/selected-anime',
+          title: 'Selected anime',
+          author: 'Selected anime author',
+          description: 'Newer cloud anime edit',
+          categories: [Int64(2)],
+          lastModifiedAt: Int64(200),
+          version: Int64(10),
+        ),
+        BackupAnime(
+          source: Int64(42),
+          url: '/cloud-only-anime',
+          title: 'Cloud-only anime',
+          categories: [Int64.ZERO],
+          version: Int64(7),
+        ),
+      ],
+      backupNovels: [
+        cloudNovel,
+        BackupNovel(
+          id: 'cloud-only-novel',
+          title: 'Cloud-only novel',
+          author: 'Cloud author',
+          lastModified: Int64(180),
+        ),
+      ],
+      backupMangaStats: [
+        BackupMangaStats(
+          dateKey: '2026-07-17',
+          mangaId: Int64(1),
+          charactersRead: 99,
+          readingTime: Int64(9000),
+        ),
+        BackupMangaStats(
+          dateKey: '2026-07-18',
+          mangaId: Int64(42),
+          charactersRead: 20,
+          readingTime: Int64(2000),
+        ),
+      ],
+    )..unknownFields.mergeVarintField(5000, Int64(99));
+
+    final deferredStore = _MemoryPendingPayloadStore(
+      baseline: BackupMihon(),
+      pending: pending,
+    );
+    final authority = _ProofRecordingAuthority();
+    final storage = _MemoryStorage(
+      remote: codec.encode(remote),
+      onUpload: () {
+        expect(authority.proofRan, isTrue);
+        expect(authority.proofResult, isTrue);
+        expect(deferredStore.pending, isNotNull);
+      },
+    );
+
+    await CrossDeviceSyncEngine(
+      storage: storage,
+      deferredPayloadStore: deferredStore,
+      pendingRestoreAuthority: authority,
+      exportLocal: () async => postRestoreLocal.deepCopy(),
+      importMerged: (_) async {},
+    ).uploadPreservingRemote();
+
+    final uploaded = codec.decode(storage.uploaded!).backup;
+    final uploadedManga = uploaded.backupManga.singleWhere(
+      (manga) => manga.url == '/selected',
+    );
+    final uploadedChapter = uploadedManga.chapters.singleWhere(
+      (chapter) => chapter.url == '/selected/chapter-1',
+    );
+    final uploadedHistory = uploadedManga.history.singleWhere(
+      (history) => history.url == '/selected/chapter-1',
+    );
+    expect(uploadedManga.description, 'Post-restore local edit');
+    expect(uploadedManga.favorite, isTrue);
+    expect(uploadedManga.favoriteModifiedAt, Int64(201));
+    expect(uploadedManga.lastModifiedAt, Int64(201));
+    expect(uploadedManga.version, Int64(11));
+    expect(uploadedChapter.read, isTrue);
+    expect(uploadedChapter.bookmark, isTrue);
+    expect(uploadedChapter.lastPageRead, Int64(8));
+    expect(uploadedChapter.version, Int64(9));
+    expect(uploadedHistory.lastRead, Int64(2001));
+    expect(uploadedHistory.readDuration, Int64(700));
+    expect(
+      uploadedManga.chapters.map((chapter) => chapter.url),
+      contains('/selected/cloud-only-chapter'),
+    );
+    expect(
+      uploaded.backupManga.map((manga) => manga.url),
+      contains('/cloud-only-title'),
+    );
+    final categoryOrders = {
+      for (final category in uploaded.backupCategories)
+        category.name: category.order,
+    };
+    expect(categoryOrders.values.toSet(), hasLength(categoryOrders.length));
+    expect(categoryOrders['Restored category'], Int64.ZERO);
+    expect(uploadedManga.categories, [Int64.ZERO]);
+    expect(
+      uploaded.backupManga
+          .singleWhere((manga) => manga.url == '/cloud-only-title')
+          .categories,
+      [categoryOrders['Cloud-only category']],
+    );
+
+    final uploadedAnime = uploaded.backupAnime.singleWhere(
+      (anime) => anime.url == '/selected-anime',
+    );
+    final animeCategoryOrders = {
+      for (final category in uploaded.backupAnimeCategories)
+        category.name: category.order,
+    };
+    expect(
+      animeCategoryOrders.values.toSet(),
+      hasLength(animeCategoryOrders.length),
+    );
+    expect(animeCategoryOrders['Restored anime category'], Int64.ZERO);
+    expect(uploadedAnime.description, 'Post-restore anime edit');
+    expect(uploadedAnime.version, Int64(11));
+    expect(uploadedAnime.categories, [Int64.ZERO]);
+    expect(
+      uploaded.backupAnime
+          .singleWhere((anime) => anime.url == '/cloud-only-anime')
+          .categories,
+      [animeCategoryOrders['Cloud-only anime category']],
+    );
+
+    final uploadedNovel = uploaded.backupNovels.singleWhere(
+      (novel) => novel.title == 'Selected novel',
+    );
+    final uploadedNovelStat = uploadedNovel.stats.singleWhere(
+      (stat) => stat.dateKey == '2026-07-17',
+    );
+    expect(uploadedNovel.chapterIndex, 3);
+    expect(uploadedNovel.progress, 0.75);
+    expect(uploadedNovel.characterCount, 300);
+    expect(uploadedNovel.lastModified, Int64(201));
+    expect(uploadedNovelStat.charactersRead, 15);
+    expect(uploadedNovelStat.readingTime, 2.0);
+    expect(uploadedNovelStat.lastStatisticModified, Int64(201));
+    expect(
+      uploadedNovel.stats.map((stat) => stat.dateKey),
+      contains('2026-07-18'),
+    );
+    expect(
+      uploaded.backupNovels.map((novel) => novel.title),
+      contains('Cloud-only novel'),
+    );
+
+    // The restored backup, the post-restore local edit, and the cloud record
+    // all describe the same day and title, so they collapse into one row
+    // holding the largest value seen for each field — Chimahon's merge rule.
+    // Keeping three rows would triple count that day's reading.
+    final selectedStat = uploaded.backupMangaStats.singleWhere(
+      (stat) => stat.dateKey == '2026-07-17' && stat.mangaId == Int64(1),
+    );
+    expect(selectedStat.charactersRead, 99);
+    expect(selectedStat.readingTime, Int64(9000));
+    expect(
+      uploaded.backupMangaStats.any(
+        (stat) => stat.dateKey == '2026-07-18' && stat.mangaId == Int64(42),
+      ),
+      isTrue,
+    );
+
+    expect(uploaded.unknownFields.getField(5000)!.varints.last, Int64(11));
+    expect(uploadedManga.unknownFields.getField(5001)!.varints.last, Int64(11));
+    expect(
+      uploadedChapter.unknownFields.getField(5003)!.varints.last,
+      Int64(11),
+    );
+    expect(uploadedNovel.unknownFields.getField(5004)!.varints.last, Int64(11));
+    expect(
+      uploadedNovelStat.unknownFields.getField(5005)!.varints.last,
+      Int64(11),
+    );
+    expect(authority.proofRan, isTrue);
+    expect(authority.proofResult, isTrue);
+    expect(deferredStore.pending, isNull);
+  });
 
   test(
     'a local edit during upload skips stale import and requests a retry',

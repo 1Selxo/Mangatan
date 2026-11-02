@@ -1,0 +1,1 @@
+1 lib/modules/reader_common/widgets/btn_chapter_list_dialog.dart -> package:mangayomi/modules/novel/novel_reader_progress.dart

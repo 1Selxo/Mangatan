@@ -86,9 +86,8 @@ void main() {
     final cbz = File(p.join(temporaryDirectory.path, 'Volume.cbz'));
     await cbz.writeAsBytes(const [1]);
     await mokuroSidecarFor(cbz).writeAsString('{invalid');
-    await File(
-      p.setExtension(cbz.path, '.json'),
-    ).writeAsString(_volumeJson('Fallback'));
+    await File(p.setExtension(cbz.path, '.json'))
+        .writeAsString(_volumeJson('Fallback'));
     final data = UChapDataPreload(
       Chapter(mangaId: 1, name: 'Volume'),
       temporaryDirectory,
@@ -111,9 +110,8 @@ void main() {
       'mangatan-mokuro-parser-',
     );
     addTearDown(() => temporaryDirectory.delete(recursive: true));
-    await File(
-      p.join(temporaryDirectory.path, 'Another Volume.mokuro'),
-    ).writeAsString(_volumeJson('Wrong chapter'));
+    await File(p.join(temporaryDirectory.path, 'Another Volume.mokuro'))
+        .writeAsString(_volumeJson('Wrong chapter'));
     final chapterDirectory = Directory(
       p.join(temporaryDirectory.path, 'This_Volume'),
     );

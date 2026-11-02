@@ -116,7 +116,12 @@ void main() {
 
   testWidgets('results, the no-results group and its order', (tester) async {
     await pumpScreen(tester);
-    await tester.pump(const Duration(milliseconds: 100));
+    // A frame per 10 ms, so each source finishes in a frame of its own. In
+    // one long pump they all finish together and are reported in rebuild
+    // order instead.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
     await tester.pump();
     await tester.pump();
 

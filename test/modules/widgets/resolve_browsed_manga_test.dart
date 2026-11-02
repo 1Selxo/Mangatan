@@ -5,7 +5,7 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/modules/widgets/manga_image_card_widget.dart';
+import 'package:mangayomi/modules/manga/widgets/manga_image_card_widget.dart';
 
 void main() {
   late Directory dir;

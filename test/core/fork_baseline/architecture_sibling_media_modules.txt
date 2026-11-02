@@ -1,0 +1,5 @@
+1 lib/modules/anime/anime_player_view.dart -> package:mangayomi/modules/library/providers/local_archive.dart
+1 lib/modules/anime/widgets/subtitle_setting_widget.dart -> package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart
+1 lib/modules/manga/detail/widgets/chapter_list_tile_widget.dart -> package:mangayomi/modules/novel/novel_reader_progress.dart
+1 lib/modules/manga/detail/widgets/chapter_list_tile_widget.dart -> package:mangayomi/modules/novel/novel_reader_view.dart
+1 lib/modules/manga/download/providers/download_provider.dart -> package:mangayomi/modules/anime/utils/video_stream_preference.dart

@@ -22,7 +22,7 @@ import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/manga/download/download_page_widget.dart';
 import 'package:mangayomi/modules/manga/download/providers/download_provider.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/download_repository.dart';
 import 'package:photo_view/photo_view.dart';

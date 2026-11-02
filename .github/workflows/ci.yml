@@ -1,15 +1,18 @@
 name: CI
 
-# Build/compile checks for pull requests and main branch for Android, Android TV, iOS, macOS, Windows & Linux in debug mode.
+# Analysis, tests, and build/compile checks for pull requests and main branch for Android, Android TV, iOS, macOS, Windows & Linux in debug mode.
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   chimahon-sync:
@@ -48,10 +51,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
@@ -65,35 +70,90 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Repository tests open a real Isar database and download its native
+      # core on first use; the C++ image decoder is built by hook/build.dart
+      # with the runner's clang. Neither needs the Rust toolchain.
+      - name: Run tests
+        run: flutter test
+
+  shiori:
+    name: Shiori design system
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          cache: true
+
+      # The package is analysed and tested on its own, so a component can't
+      # quietly start depending on the app.
+      - name: Analyze and test the package
+        working-directory: packages/shiori
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      # Every use case in the catalogue is opened once, and the web build
+      # proves it still compiles for the browser.
+      - name: Analyze, test and build the catalogue
+        working-directory: widgetbook
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build web
+
   build-android:
     name: Build (Android debug)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Setup Java toolchain
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.9.1
         with:
           distribution: temurin
           java-version: "17"
-
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "3.18.1"
-
-      - name: Setup ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Install flutter_rust_bridge_codegen
         run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
@@ -105,7 +165,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: Upload Android debug artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: Mangayomi-android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
@@ -115,30 +175,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Setup Java toolchain
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.9.1
         with:
           distribution: temurin
           java-version: "17"
-
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "3.18.1"
-
-      - name: Setup ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Install flutter_rust_bridge_codegen
         run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
@@ -161,7 +217,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: Upload Android TV debug artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: Mangayomi-android-tv-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
@@ -171,17 +227,20 @@ jobs:
     runs-on: macos-15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: stable
           targets: aarch64-apple-ios,x86_64-apple-ios
 
       - name: Install flutter_rust_bridge_codegen
@@ -197,7 +256,7 @@ jobs:
         run: flutter build ios --debug --no-codesign
 
       - name: Upload iOS debug artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: Mangayomi-ios-debug
           path: build/ios/iphoneos/Runner.app
@@ -207,16 +266,20 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Install flutter_rust_bridge_codegen
         run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
@@ -232,7 +295,7 @@ jobs:
           flutter build macos --debug --verbose
 
       - name: Upload macOS debug artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: Mangayomi-macos-debug
           path: build/macos/Build/Products/Debug/Mangayomi.app
@@ -242,16 +305,20 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Install flutter_rust_bridge_codegen
         run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
@@ -263,7 +330,7 @@ jobs:
         run: flutter build windows --debug
 
       - name: Upload Windows debug artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: Mangatan-windows-debug
           path: C:\m\build\windows\x64\runner\Debug\
@@ -273,7 +340,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Install system dependencies
         run: |
@@ -285,13 +354,15 @@ jobs:
             libpng-dev libavif-dev libsecret-1-dev
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Install flutter_rust_bridge_codegen
         run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
@@ -303,7 +374,7 @@ jobs:
         run: flutter build linux --debug --verbose
 
       - name: Upload Linux debug artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: Mangayomi-linux-debug
           path: build/linux/x64/debug/bundle/

@@ -1,97 +1,30 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ffi';
-import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
-import 'package:mangayomi/utils/avif.dart';
-import 'package:mangayomi/utils/downloaded_page_file.dart';
+import 'package:shiori/shiori.dart';
 
 import 'coordinate_transformer.dart';
+import 'page_pan_forwarding.dart';
+import 'row_pan.dart';
 import 'ffi_image_decoder.dart';
 import 'subsampling_image_painter.dart';
+import 'subsampling_image_resolver.dart';
+import 'subsampling_types.dart';
 import 'tiling_engine.dart';
 import '../../u_chap_data_preload.dart';
 
-// ─── Load State ───────────────────────────────────────────────────────────────
+import 'package:mangayomi/utils/error_toast.dart';
 
-/// Image loading state, identical to extended_image.
-enum LoadState {
-  /// The image is currently loading (downloading, resolving, etc.)
-  loading,
+import '../../utils/reader_motion.dart';
 
-  /// The image is fully loaded and ready to be displayed
-  completed,
+export 'subsampling_types.dart';
 
-  /// Loading failed
-  failed,
-}
-
-/// Represents the current state of the widget, passed to the [loadStateChanged] callback.
-/// Identical interface to ExtendedImageState from extended_image.
-class SubsamplingImageState {
-  const SubsamplingImageState({
-    required this.loadState,
-    this.loadingProgress,
-    required this._reLoadCallback,
-  });
-
-  /// Current loading state.
-  final LoadState loadState;
-
-  /// Loading progress (available during [LoadState.loading]).
-  /// Contains the bytes received and the expected total size.
-  final ImageChunkEvent? loadingProgress;
-
-  final VoidCallback _reLoadCallback;
-
-  /// Reloads the image from the start (useful after a failure).
-  void reLoadImage() => _reLoadCallback();
-}
-
-// ─── Enums ────────────────────────────────────────────────────────────────────
-
-/// Mode for fitting the initial minimum scale of the image.
-enum ScaleType {
-  /// Fits the entire image to be visible (default behavior)
-  centerInside,
-
-  /// Fits to fill the view, cropping the edges
-  centerCrop,
-
-  /// Fits to the width of the view
-  fitWidth,
-
-  /// Fits to the height of the view
-  fitHeight,
-
-  /// Displays the image at its original size (1:1 pixels)
-  originalSize,
-
-  /// fitWidth if portrait, fitHeight if landscape
-  smartFit,
-
-  /// Uses the manually provided [SubsamplingScaleImageView.minScale] value
-  custom,
-}
-
-/// Mode for limiting pan to the edges of the image.
-enum PanLimit {
-  /// The image cannot go entirely off-screen (default behavior)
-  inside,
-
-  /// The image can go entirely off-screen
-  outside,
-
-  /// The center of the image cannot go off-screen
-  center,
-}
+part 'subsampling_pan.dart';
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
@@ -103,8 +36,11 @@ class SubsamplingScaleImageViewController extends ChangeNotifier {
     _state = state;
   }
 
-  void _detach() {
-    _state = null;
+  /// Only [state]'s own detach counts: when a page moves to another slot,
+  /// its replacement attaches before the old view is disposed, and the old
+  /// view must not unhook it.
+  void _detach(_SubsamplingScaleImageViewState state) {
+    if (identical(_state, state)) _state = null;
   }
 
   // ── State Getters ──────────────────────────────────────────────────────────
@@ -158,7 +94,7 @@ class SubsamplingScaleImageViewController extends ChangeNotifier {
   void animateScaleAndCenter(
     double targetScale,
     ui.Offset sCenter, {
-    Duration duration = const Duration(milliseconds: 300),
+    Duration duration = ShioriMotion.enter,
   }) {
     _state?._animateScaleAndCenter(targetScale, sCenter, duration);
   }
@@ -167,63 +103,9 @@ class SubsamplingScaleImageViewController extends ChangeNotifier {
   void animateScaleAndTranslation(
     double targetScale,
     ui.Offset targetTranslate, {
-    Duration duration = const Duration(milliseconds: 300),
+    Duration duration = ShioriMotion.enter,
   }) {
     _state?._animateScaleAndTranslation(targetScale, targetTranslate, duration);
-  }
-
-  /// Checks if the image can be panned to the left.
-  bool canPanLeft() {
-    final s = _state;
-    if (s == null || !s._isInitialized) return false;
-    final left = max(0.0, -s._vTranslate.dx);
-    return left > 1.0;
-  }
-
-  /// Checks if the image can be panned to the right.
-  bool canPanRight() {
-    final s = _state;
-    if (s == null || !s._isInitialized) return false;
-    final transformer = CoordinateTransformer(
-      scale: s._scale,
-      vTranslate: s._vTranslate,
-      rotation: s.widget.rotation,
-      sWidth: s._sWidth,
-      sHeight: s._sHeight,
-    );
-    final double imageWidth = transformer.effectiveSWidth * s._scale;
-    final right = max(0.0, (imageWidth + s._vTranslate.dx) - s._viewSize.width);
-    return right > 1.0;
-  }
-
-  /// Pans the image to the left by one screen width.
-  void panLeft() {
-    final s = _state;
-    if (s == null || !s._isInitialized) return;
-    final currentCenter = center;
-    if (currentCenter == null) return;
-    final dx = s._viewSize.width / s._scale;
-    final targetCenter = ui.Offset(currentCenter.dx - dx, currentCenter.dy);
-    animateScaleAndCenter(
-      s._scale,
-      targetCenter,
-      duration: const Duration(milliseconds: 250),
-    );
-  }
-
-  /// Pans the image to the right by one screen width.
-  void panRight() {
-    final s = _state;
-    if (s == null || !s._isInitialized) return;
-    final currentCenter = center;
-    if (currentCenter == null) return;
-    final dx = s._viewSize.width / s._scale;
-    final targetCenter = ui.Offset(currentCenter.dx + dx, currentCenter.dy);
-    animateScaleAndCenter(
-      s._scale,
-      targetCenter,
-      duration: const Duration(milliseconds: 250),
-    );
   }
 
   // ── Coordinate Conversion ────────────────────────────────────────────────
@@ -298,7 +180,7 @@ class SubsamplingScaleImageView extends StatefulWidget {
   ///   if (state.loadState == LoadState.failed) {
   ///     return GestureDetector(
   ///       onTap: state.reLoadImage,
-  ///       child: const Icon(Icons.error),
+  ///       child: const Icon(Symbols.error_rounded, fill: 1),
   ///     );
   ///   }
   ///   if (state.loadState == LoadState.loading) {
@@ -412,7 +294,7 @@ class SubsamplingScaleImageView extends StatefulWidget {
     this.maxScale,
     this.minScale,
     this.doubleTapZoomScale,
-    this.doubleTapZoomDuration = const Duration(milliseconds: 300),
+    this.doubleTapZoomDuration = ShioriMotion.enter,
     this.color,
     this.colorBlendMode,
     this.filterQuality = FilterQuality.medium,
@@ -486,7 +368,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     _tilingEngine = TilingEngine();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: ShioriMotion.enter,
     );
     _animationController.addListener(() {
       if (_scaleAnimation != null && _translateAnimation != null) {
@@ -515,7 +397,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
   void dispose() {
     _resizeTimer?.cancel();
     _cancelImageStream();
-    widget.controller?._detach();
+    widget.controller?._detach(this);
     _animationController.dispose();
     _tilingEngine.dispose();
     super.dispose();
@@ -526,7 +408,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.controller != widget.controller) {
-      oldWidget.controller?._detach();
+      oldWidget.controller?._detach(this);
       widget.controller?._attach(this);
     }
 
@@ -590,39 +472,6 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     }
   }
 
-  String _md5Hash(String input) {
-    return md5.convert(utf8.encode(input)).toString();
-  }
-
-  Future<File?> _findCachedFile(String url, String? cacheFolderName) async {
-    try {
-      final hash = _md5Hash(url);
-      final foldersToCheck = [
-        ?cacheFolderName,
-        'cacheimagemanga',
-        'cacheimage',
-      ];
-
-      final dirs = <Directory>[];
-      try {
-        dirs.add(await getApplicationCacheDirectory());
-      } catch (_) {}
-      try {
-        dirs.add(await getTemporaryDirectory());
-      } catch (_) {}
-
-      for (final baseDir in dirs) {
-        for (final folder in foldersToCheck) {
-          final file = File('${baseDir.path}/$folder/$hash');
-          if (file.existsSync()) {
-            return file;
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
   Future<void> _loadFromProvider({bool evictCache = false}) async {
     _cancelImageStream();
 
@@ -648,58 +497,12 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     }
 
     final provider = widget.image;
-
-    // 1. Fast path: FileImage
-    if (provider is FileImage) {
-      _resolvedFilePath = provider.file.path;
+    final (fastPath, networkUrl, cacheFolderName) =
+        await tryResolveFastPathProvider(provider);
+    if (fastPath != null) {
+      _resolvedFilePath = fastPath;
       await _initImage();
       return;
-    }
-
-    // Duck-typing for ExtendedFileImageProvider (or any provider exposing a File)
-    try {
-      final dynamic dynProvider = provider;
-      if (dynProvider.file is File) {
-        _resolvedFilePath = dynProvider.file.path;
-        await _initImage();
-        return;
-      }
-    } catch (_) {}
-
-    // 2. Fast path: Memory-based providers (MemoryImage, ExtendedMemoryImageProvider, etc.)
-    try {
-      final dynamic dynProvider = provider;
-      if (dynProvider.bytes is Uint8List) {
-        final Uint8List bytes = dynProvider.bytes;
-        final cacheKey = provider.hashCode.abs();
-        final tempFile = await cacheImageBytesToTempFile(
-          tempDir: await getTemporaryDirectory(),
-          baseName: 'ssiv_cache_$cacheKey',
-          extension: detectImageExtension(bytes),
-          bytesProvider: () => bytes,
-        );
-        _resolvedFilePath = tempFile.path;
-        await _initImage();
-        return;
-      }
-    } catch (_) {}
-
-    // 3. Fast path: Network/Cached-based providers (CustomExtendedNetworkImageProvider)
-    String? networkUrl;
-    String? cacheFolderName;
-    try {
-      final dynamic dynProvider = provider;
-      networkUrl = dynProvider.url;
-      cacheFolderName = dynProvider.imageCacheFolderName;
-    } catch (_) {}
-
-    if (networkUrl != null) {
-      final cachedFile = await _findCachedFile(networkUrl, cacheFolderName);
-      if (cachedFile != null) {
-        _resolvedFilePath = cachedFile.path;
-        await _initImage();
-        return;
-      }
     }
 
     // 4. General path: resolution via ImageStream
@@ -738,7 +541,10 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
       // If it was a network provider, it probably wrote the image to disk during loading.
       // We re-check the cache before doing the heavy re-encoding fallback.
       if (networkUrl != null) {
-        final cachedFile = await _findCachedFile(networkUrl, cacheFolderName);
+        final cachedFile = await findCachedImageFile(
+          networkUrl,
+          cacheFolderName,
+        );
         if (cachedFile != null) {
           _resolvedFilePath = cachedFile.path;
           await _initImage();
@@ -747,20 +553,10 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
       }
 
       // Fallback: Encode the image to PNG to save it to disk
-      final cacheKey = provider.hashCode.abs();
-      final tempFile = await cacheImageBytesToTempFile(
-        tempDir: await getTemporaryDirectory(),
-        baseName: 'ssiv_cache_$cacheKey',
-        extension: '.png', // we control the encode below, so this is exact
-        bytesProvider: () async {
-          final byteData = await loadedImage.toByteData(
-            format: ui.ImageByteFormat.png,
-          );
-          if (byteData == null) {
-            throw Exception('Failed to convert image to PNG bytes');
-          }
-          return byteData.buffer.asUint8List();
-        },
+      // (we control the encode, so the .png extension is exact)
+      final tempFile = await encodeLoadedUiImageToTempFile(
+        loadedImage,
+        provider.hashCode.abs(),
       );
 
       _resolvedFilePath = tempFile.path;
@@ -929,33 +725,6 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
 
   // ── Initialization ──────────────────────────────────────────────────────────
 
-  Future<String?> _legacyIosAvifPng(String path) async {
-    if (!Platform.isIOS) return null;
-
-    final source = File(path);
-    final reader = await source.open();
-    late final Uint8List header;
-    try {
-      header = await reader.read(256);
-    } finally {
-      await reader.close();
-    }
-    if (!isAvifImage(header)) return null;
-
-    final stat = await source.stat();
-    final key = _md5Hash(
-      '$path:${stat.size}:${stat.modified.millisecondsSinceEpoch}',
-    );
-    // Decoding is deferred into bytesProvider so it only runs on a cache miss
-    final target = await cacheImageBytesToTempFile(
-      tempDir: await getTemporaryDirectory(),
-      baseName: 'ssiv_avif_$key',
-      extension: '.png', // decodeAvifToPng always returns PNG bytes
-      bytesProvider: () async => decodeAvifToPng(await source.readAsBytes()),
-    );
-    return target.path;
-  }
-
   Future<void> _initImage() async {
     var path = _resolvedFilePath;
     if (path == null) return;
@@ -969,7 +738,11 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
 
     if (outSize == null || outSize[0] == 0 || outSize[1] == 0) {
       try {
-        final convertedPath = await _legacyIosAvifPng(path);
+        // What the native decoder cannot read on this system, as a PNG
+        // decoded by Flutter.
+        final convertedPath =
+            await convertLegacyIosAvifToPng(path) ??
+            await convertLinuxJpegToPng(path);
         if (!mounted || _resolvedFilePath != path) return;
         if (convertedPath != null) {
           path = convertedPath;
@@ -980,11 +753,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
           );
         }
       } catch (e, st) {
-        if (kDebugMode) {
-          debugPrint(
-            'SubsamplingScaleImageView: Failed to decode AVIF: $e\n$st',
-          );
-        }
+        recordError(e, stack: st, source: 'reader image conversion');
       }
     }
 
@@ -1056,49 +825,17 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
 
   // ── Scale and Type Calculations ────────────────────────────────────────────
 
-  ScaleType get _effectiveScaleType {
-    if (widget.fit != null) {
-      switch (widget.fit!) {
-        case BoxFit.contain:
-          return ScaleType.centerInside;
-        case BoxFit.cover:
-          return ScaleType.centerCrop;
-        case BoxFit.fitWidth:
-          return ScaleType.fitWidth;
-        case BoxFit.fitHeight:
-          return ScaleType.fitHeight;
-        case BoxFit.none:
-          return ScaleType.originalSize;
-        case BoxFit.fill:
-          return ScaleType.centerCrop;
-        case BoxFit.scaleDown:
-          return ScaleType.centerInside;
-      }
-    }
-    return widget.minimumScaleType;
-  }
+  ScaleType get _effectiveScaleType =>
+      resolveEffectiveScaleType(widget.fit, widget.minimumScaleType);
 
-  double _calcMinScaleForType(double effWidth, double effHeight) {
-    final double scaleX = _viewSize.width / effWidth;
-    final double scaleY = _viewSize.height / effHeight;
-
-    switch (_effectiveScaleType) {
-      case ScaleType.centerInside:
-        return min(scaleX, scaleY);
-      case ScaleType.centerCrop:
-        return max(scaleX, scaleY);
-      case ScaleType.fitWidth:
-        return scaleX;
-      case ScaleType.fitHeight:
-        return scaleY;
-      case ScaleType.originalSize:
-        return 1.0;
-      case ScaleType.smartFit:
-        return effHeight > effWidth ? scaleX : scaleY;
-      case ScaleType.custom:
-        return widget.minScale ?? min(scaleX, scaleY);
-    }
-  }
+  double _calcMinScaleForType(double effWidth, double effHeight) =>
+      calculateMinScaleForType(
+        effWidth: effWidth,
+        effHeight: effHeight,
+        viewSize: _viewSize,
+        effectiveScaleType: _effectiveScaleType,
+        customMinScale: widget.minScale,
+      );
 
   double _getMinScale() {
     final transformer = CoordinateTransformer(
@@ -1121,46 +858,16 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
 
   // ── Pan clamping ─────────────────────────────────────────────────────────────
 
-  ui.Offset _clampTranslate(ui.Offset translate, double scale) {
-    final transformer = CoordinateTransformer(
-      scale: scale,
-      vTranslate: translate,
-      rotation: widget.rotation,
-      sWidth: _sWidth,
-      sHeight: _sHeight,
-    );
-
-    final double imageWidth = transformer.effectiveSWidth * scale;
-    final double imageHeight = transformer.effectiveSHeight * scale;
-
-    double tx = translate.dx;
-    double ty = translate.dy;
-
-    switch (widget.panLimit) {
-      case PanLimit.inside:
-        if (imageWidth <= _viewSize.width) {
-          tx = (_viewSize.width - imageWidth) / 2;
-        } else {
-          tx = max(_viewSize.width - imageWidth, min(0.0, tx));
-        }
-        if (imageHeight <= _viewSize.height) {
-          ty = (_viewSize.height - imageHeight) / 2;
-        } else {
-          ty = max(_viewSize.height - imageHeight, min(0.0, ty));
-        }
-        break;
-      case PanLimit.outside:
-        break;
-      case PanLimit.center:
-        tx = max(tx, _viewSize.width / 2 - imageWidth);
-        ty = max(ty, _viewSize.height / 2 - imageHeight);
-        tx = min(tx, _viewSize.width / 2);
-        ty = min(ty, _viewSize.height / 2);
-        break;
-    }
-
-    return ui.Offset(tx, ty);
-  }
+  ui.Offset _clampTranslate(ui.Offset translate, double scale) =>
+      clampPanTranslation(
+        translate: translate,
+        scale: scale,
+        rotation: widget.rotation,
+        sWidth: _sWidth,
+        sHeight: _sHeight,
+        viewSize: _viewSize,
+        panLimit: widget.panLimit,
+      );
 
   // ── Tile loading ─────────────────────────────────────────────────────────────
 
@@ -1366,11 +1073,14 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
         if (widget.pageController != null &&
             widget.pageController!.hasClients &&
             _scale <= _getMinScale() * 1.01) {
-          final double excessX = proposedTranslate.dx - clampedTranslate.dx;
-          if (excessX != 0) {
-            final pos = widget.pageController!.position;
+          final pos = widget.pageController!.position;
+          final double delta = pageScrollDeltaForPan(
+            pos.axisDirection,
+            proposedTranslate - clampedTranslate,
+          );
+          if (delta != 0) {
             pos.jumpTo(
-              (pos.pixels - excessX).clamp(
+              (pos.pixels + delta).clamp(
                 pos.minScrollExtent,
                 pos.maxScrollExtent,
               ),
@@ -1400,7 +1110,7 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
       final velocity = details.velocity.pixelsPerSecond;
       if (velocity.distance > 400) {
         final targetTranslate = _clampTranslate(
-          _vTranslate + velocity * 0.2,
+          _vTranslate + velocity * ReaderMotion.flingTravel,
           _scale,
         );
         if ((targetTranslate - _vTranslate).distance > 10) {
@@ -1409,7 +1119,8 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
             _scale,
             _vTranslate,
             targetTranslate,
-            const Duration(seconds: 1),
+            ReaderMotion.flingDuration,
+            curve: Curves.decelerate,
           );
         }
       }
@@ -1421,12 +1132,29 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     if (widget.pageController != null &&
         widget.pageController!.hasClients &&
         _scale <= _getMinScale() * 1.01) {
+      final position = widget.pageController!.position;
       final double currentPageValue = widget.pageController!.page ?? 0.0;
-      final int targetPage = currentPageValue.round();
+      final int targetPage = settlePage(
+        currentPageValue,
+        position.axisDirection,
+        details.velocity.pixelsPerSecond,
+      );
+      // Settled in the time the release speed takes, so the page carries on
+      // at the finger's pace rather than speeding up or braking.
+      final extent = position.viewportDimension;
+      final duration = ReaderMotion.settle(
+        distance: (targetPage - currentPageValue) * extent,
+        extent: extent,
+        velocity: pageScrollDeltaForPan(
+          position.axisDirection,
+          details.velocity.pixelsPerSecond,
+        ),
+      );
+      if (duration == Duration.zero) return;
       widget.pageController!.animateToPage(
         targetPage,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
+        duration: duration,
+        curve: ReaderMotion.quinticOut,
       );
     }
   }
@@ -1465,14 +1193,14 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     _scaleAnimation = Tween<double>(begin: _scale, end: targetScale).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: Curves.easeInOutCubic,
+        curve: Curves.easeInOutQuad,
       ),
     );
     _translateAnimation =
         Tween<ui.Offset>(begin: _vTranslate, end: targetTranslate).animate(
           CurvedAnimation(
             parent: _animationController,
-            curve: Curves.easeInOutCubic,
+            curve: Curves.easeInOutQuad,
           ),
         );
     _animationController.duration = widget.doubleTapZoomDuration;
@@ -1546,9 +1274,9 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
             LoadState.failed => Center(
               child: GestureDetector(
                 onTap: () => _loadFromProvider(evictCache: true),
-                child: const Icon(
-                  Icons.broken_image_outlined,
-                  color: Colors.grey,
+                child: Icon(
+                  Symbols.broken_image_rounded,
+                  color: context.shiori.color.fgMuted,
                   size: 48,
                 ),
               ),

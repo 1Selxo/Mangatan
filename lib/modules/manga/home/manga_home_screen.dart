@@ -28,7 +28,7 @@ import 'package:mangayomi/modules/library/widgets/search_text_form_field.dart';
 import 'package:mangayomi/modules/manga/home/widget/mangas_card_selector.dart';
 import 'package:mangayomi/modules/widgets/cover_grid_skeleton.dart';
 import 'package:mangayomi/modules/widgets/gridview_widget.dart';
-import 'package:mangayomi/modules/widgets/manga_image_card_widget.dart';
+import 'package:mangayomi/modules/manga/widgets/manga_image_card_widget.dart';
 import 'package:mangayomi/utils/global_style.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:marquee/marquee.dart';

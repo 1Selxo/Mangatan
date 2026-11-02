@@ -15,12 +15,13 @@ import 'package:path/path.dart' as p; // For manipulating file system paths
 import 'package:bot_toast/bot_toast.dart'; // For Exceptions
 import 'package:mangayomi/models/manga.dart'; // Has Manga model and ItemType enum
 import 'package:mangayomi/models/chapter.dart'; // Has Chapter model with archivePath
-import 'package:mangayomi/providers/storage_provider.dart'; // Provides storage directory selection
+// Provides storage directory selection
 import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/services/local_folders.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart'; // Annotations for code generation
 part 'file_scanner.g.dart';
 
@@ -86,12 +87,19 @@ class LocalFoldersState extends _$LocalFoldersState {
 /// ```
 @riverpod
 Future<void> scanLocalLibrary(Ref ref) async {
-  // Get /local directory
-  final localDir = await getLocalLibrary();
-  await _scanDirectory(ref, localDir);
-  final customDirs = ref.read(localFoldersStateProvider);
-  for (final dir in customDirs) {
-    await _scanDirectory(ref, Directory(dir));
+  // Callers often await/ignore .future without listening, which would dispose
+  // this auto-dispose provider mid-scan and break every ref use below.
+  final keepAlive = ref.keepAlive();
+  try {
+    // Get /local directory
+    final localDir = await getLocalLibrary();
+    await _scanDirectory(ref, localDir);
+    final customDirs = ref.read(localFoldersStateProvider);
+    for (final dir in customDirs) {
+      await _scanDirectory(ref, Directory(dir));
+    }
+  } finally {
+    keepAlive.close();
   }
 }
 
@@ -480,21 +488,6 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
     );
   }
 }
-
-/// Returns the `/local` directory inside the app's default storage.
-Future<Directory?> getLocalLibrary() async {
-  try {
-    final dir = await StorageProvider().getDefaultDirectory();
-    return dir == null ? null : Directory(p.join(dir.path, 'local'));
-  } catch (e) {
-    BotToast.showText(text: "Error getting local library: $e");
-    return null;
-  }
-}
-
-/// Fork-local chapters store an absolute archive path, so no virtual-folder
-/// translation is needed when opening them.
-Future<String> resolveLocalArchivePath(String archivePath) async => archivePath;
 
 /// Returns if file is a json
 bool _isJson(String path) {

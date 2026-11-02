@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:isar_community/isar.dart';
-import 'package:mangayomi/main.dart';
+import 'package:mangayomi/services/category_service.dart';
+import 'package:mangayomi/repositories/db.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
 
 class CategoryRepository {
+  Category? findById(int id) => isar.categorys.getSync(id);
+
   Stream<List<Category>> watchAll() =>
       isar.categorys.where().watch(fireImmediately: true);
 
@@ -73,33 +76,45 @@ class CategoryRepository {
   );
 
   // Uncategorizes every manga that had this category, then deletes it.
+  /// Deletes [category], takes it off the entries of its media type, and
+  /// closes the gap it leaves in that type's category order.
   Future<void> remove(Category category) => dbWriteQueue.run(
     () => isar.writeTxn(() async {
+      final itemType = category.forItemType;
       final items = await isar.mangas
           .filter()
           .categoriesElementEqualTo(category.id!)
+          .and()
+          .itemTypeEqualTo(itemType)
           .findAll();
-      final updatedItems = items.map((manga) {
-        final cats = List<int>.from(manga.categories ?? []);
-        cats.remove(category.id!);
-        manga.categories = cats;
-        return manga;
-      }).toList();
-      await isar.mangas.putAll(updatedItems);
+      for (final item in items) {
+        CategoryService.removeMembership(item, category.id!);
+      }
+      await isar.mangas.putAll(items);
       await isar.categorys.delete(category.id!);
+      await isar.categorys.putAll(
+        CategoryService.normalizePositions(
+          await isar.categorys.filter().forItemTypeEqualTo(itemType).findAll(),
+        ),
+      );
     }),
   );
 
+  /// Adds [category] after the last category of its media type.
   Future<void> create(Category category) => dbWriteQueue.run(() {
     isar.writeTxnSync(() {
-      isar.categorys.putSync(category..pos = category.id);
-      final nulls = isar.categorys.filter().posIsNull().findAllSync();
-      for (final c in nulls) {
-        c.pos = c.id;
-      }
-      if (nulls.isNotEmpty) {
-        isar.categorys.putAllSync(nulls);
-      }
+      final siblings = CategoryService.ordered(
+        isar.categorys
+            .filter()
+            .forItemTypeEqualTo(category.forItemType)
+            .findAllSync(),
+      );
+      isar.categorys.putSync(
+        category
+          ..pos = siblings.isEmpty ? 0 : (siblings.last.pos ?? 0) + 1
+          ..hide ??= false
+          ..shouldUpdate ??= true,
+      );
     });
   });
 
@@ -111,6 +126,8 @@ class CategoryRepository {
   Future<bool> deleteAsync(int id) => isar.categorys.delete(id);
 
   int putSync(Category category) => isar.categorys.putSync(category);
+
+  void deleteSync(int id) => isar.categorys.deleteSync(id);
 
   void putAllSync(List<Category> categories) =>
       isar.categorys.putAllSync(categories);

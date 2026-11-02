@@ -6,14 +6,12 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/reader_page_states.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
-import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/reader_interactive_region.dart';
 
 class MinSubsamplingImage extends ConsumerStatefulWidget {
   final UChapDataPreload data;
@@ -163,7 +161,8 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
     if (path != null) {
       widget.data.resolvedFilePath = path;
     }
-    if (path != null && widget.cropBorders) {
+    // A slice of a page is decoded on its own, from the file.
+    if (path != null && (widget.cropBorders || widget.data.srcRect != null)) {
       await _loadFromPath(path);
     } else {
       final provider = widget.data.getImageProvider(ref, true);
@@ -177,7 +176,7 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
           if (cachedPath != null) {
             widget.data.resolvedFilePath = cachedPath;
           }
-          if (widget.cropBorders) {
+          if (widget.cropBorders || widget.data.srcRect != null) {
             if (cachedPath != null) {
               await _loadFromPath(cachedPath);
               return;
@@ -229,11 +228,17 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
     if (!mounted) return;
 
     try {
-      final dims = await ffiImageDecoder.getImageDimensionsAsync(
-        path,
-        cropBorders: widget.cropBorders,
-        cancelToken: this,
-      );
+      // A slice is a region of the whole image, so its borders are not
+      // cropped: cropping needs the whole image to find them.
+      final region = widget.data.srcRect;
+      final cropBorders = widget.cropBorders && region == null;
+      final dims = region != null
+          ? [region.width.round(), region.height.round()]
+          : await ffiImageDecoder.getImageDimensionsAsync(
+              path,
+              cropBorders: cropBorders,
+              cancelToken: this,
+            );
 
       if (dims == null || dims.length < 2) {
         // If operation was cancelled by a quick toggle, return quietly without error
@@ -242,6 +247,8 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
 
       final int croppedWidth = dims[0];
       final int croppedHeight = dims[1];
+      final int left = region?.left.round() ?? 0;
+      final int top = region?.top.round() ?? 0;
 
       if (!mounted) return;
 
@@ -273,12 +280,12 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
       final result = await ffiImageDecoder.decodeRegionAsync(
         DecodeParams(
           filePath: path,
-          left: 0,
-          top: 0,
-          right: croppedWidth,
-          bottom: croppedHeight,
+          left: left,
+          top: top,
+          right: left + croppedWidth,
+          bottom: top + croppedHeight,
           sampleSize: sampleSize,
-          cropBorders: widget.cropBorders,
+          cropBorders: cropBorders,
         ),
         cancelToken: this,
       );
@@ -404,48 +411,20 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
         color: getBackgroundColor(backgroundColor),
         height: placeholderHeight,
         width: placeholderWidth,
-        child: CircularProgressIndicatorAnimateRotate(progress: progress),
+        child: ReaderPageLoading(progress: progress),
       );
     }
 
     if (_hasError || _uiImage == null) {
-      final l10n = l10nLocalizations(context)!;
       return Container(
         color: getBackgroundColor(backgroundColor),
         height: placeholderHeight,
         width: placeholderWidth,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              l10n.image_loading_error,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ReaderInteractiveRegion(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 20,
-                    ),
-                  ),
-                  onPressed: () {
-                    widget.failedToLoadImage(false);
-                    _loadImage(refresh: true, evictCache: true);
-                  },
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: Text(l10n.retry),
-                ),
-              ),
-            ),
-          ],
+        child: ReaderPageError(
+          onRetry: () {
+            widget.failedToLoadImage(false);
+            _loadImage(refresh: true, evictCache: true);
+          },
         ),
       );
     }

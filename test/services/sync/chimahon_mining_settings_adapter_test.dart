@@ -489,9 +489,9 @@ void main() {
     final exported = await const ChimahonMiningSettingsAdapter().export(
       dictionaryStorage: _DictionaryStorageStub(),
     );
-    final roundTripped = ChimahonSettingsPayload.fromBackup(
-      exported,
-    ).languageProfiles.single;
+    final roundTripped = ChimahonSettingsPayload.fromBackup(exported)
+        .languageProfiles
+        .single;
     expect(roundTripped.ankiFieldMap, AnkiMarker.lapisDefaultFieldMap);
   });
 

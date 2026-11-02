@@ -5,10 +5,11 @@ import 'package:mangayomi/repositories/download_repository.dart';
 
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/video.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
-import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
+import 'package:mangayomi/services/local_folders.dart';
+import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/downloaded_chapter.dart';
+import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/torrent_server.dart';
@@ -20,6 +21,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/source.dart';
+
+import 'package:mangayomi/utils/error_toast.dart';
 part 'get_video_list.g.dart';
 
 @riverpod
@@ -35,7 +38,8 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
     // Otherwise a fresh install with no all-files access would hit a permission
     // error just for streaming an episode — the dir was being created on every
     // play even though useMpvConfig defaults to false. See #740.
-    final useMpvConfig = ref.read(useMpvConfigStateProvider);
+    final useMpvConfig =
+        settingsRepository.currentOrNull?.useMpvConfig ?? false;
     final mpvDirectory = useMpvConfig
         ? await storageProvider.getMpvDirectory()
         : null;
@@ -141,7 +145,8 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
           serviceType: 'getVideoList',
           proxyServer: proxyServer,
         );
-      } catch (e) {
+      } catch (e, stackTrace) {
+        recordError(e, stack: stackTrace, source: 'get_video_list');
         list = [Video(episode.url!, episode.name!, episode.url!)];
       }
 
@@ -172,19 +177,35 @@ Future<(List<Video>, bool, List<String>, Directory?)> getVideoList(
       return (torrentList, false, infoHashes, mpvDirectory);
     }
 
-    List<Video> list = await getIsolateService.get<List<Video>>(
-      url: episode.url!,
-      source: source,
-      serviceType: 'getVideoList',
-      proxyServer: proxyServer,
-    );
-    List<Video> videos = [];
-
-    for (var video in list) {
-      if (!videos.any((element) => element.quality == video.quality)) {
+    // Some sources probe several hosts and keep the ones that succeed. Wait
+    // for that aggregate result before asking the user to solve one failed
+    // host's Cloudflare challenge.
+    final cloudflareAlerts = CloudflareAlertScope();
+    final videos = await cloudflareAlerts.run(() async {
+      final list = await getIsolateService.get<List<Video>>(
+        url: episode.url!,
+        source: source,
+        serviceType: 'getVideoList',
+        proxyServer: proxyServer,
+      );
+      final videos = <Video>[];
+      final qualityCounts = <String, int>{};
+      for (final video in list) {
+        if (video.url.isEmpty) continue;
+        if (videos.any(
+          (element) =>
+              element.url == video.url && element.quality == video.quality,
+        )) {
+          continue;
+        }
+        final baseQuality = video.quality.isEmpty ? 'Default' : video.quality;
+        final count = (qualityCounts[baseQuality] ?? 0) + 1;
+        qualityCounts[baseQuality] = count;
+        video.quality = count > 1 ? '$baseQuality ($count)' : baseQuality;
         videos.add(video);
       }
-    }
+      return videos;
+    }, hasUsableResult: (videos) => videos.isNotEmpty);
 
     result = (videos, false, infoHashes, mpvDirectory);
 

@@ -84,7 +84,7 @@ abstract class _$CurrentIndex extends $Notifier<int> {
   int build(Chapter chapter);
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<int, int>;
     final element =
         ref.element
@@ -94,7 +94,7 @@ abstract class _$CurrentIndex extends $Notifier<int> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, () => build(_$args));
+    return element.handleCreate(ref, () => build(_$args));
   }
 }
 
@@ -147,7 +147,7 @@ final class ReaderControllerProvider
   }
 }
 
-String _$readerControllerHash() => r'696a7f25b6d6aaaeeb9e8517ae79af57fe484171';
+String _$readerControllerHash() => r'97fe2e7fedbedd10ee5ac235b4cec86bf70d6046';
 
 final class ReaderControllerFamily extends $Family
     with
@@ -181,7 +181,7 @@ abstract class _$ReaderController extends $Notifier<KeepAliveLink> {
   KeepAliveLink build({required Chapter chapter});
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<KeepAliveLink, KeepAliveLink>;
     final element =
         ref.element
@@ -191,6 +191,6 @@ abstract class _$ReaderController extends $Notifier<KeepAliveLink> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, () => build(chapter: _$args));
+    return element.handleCreate(ref, () => build(chapter: _$args));
   }
 }

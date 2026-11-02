@@ -51,10 +51,10 @@ void main() {
       'lib/services/m_extension_server.dart',
     );
     final mainScreenSource = _readNormalized(
-      'lib/modules/main_view/main_screen.dart',
+      'lib/modules/main_view/controllers/main_screen_lifecycle_mixin.dart',
     );
     final browseStateSource = _readNormalized(
-      'lib/modules/more/settings/browse/providers/browse_state_provider.dart',
+      'lib/providers/browse_state_provider.dart',
     );
     final nativeSource = _readNormalized('ios/Runner/MihonEmbeddedBridge.mm');
     final appDelegateSource = _readNormalized('ios/Runner/AppDelegate.swift');
@@ -171,7 +171,7 @@ void main() {
       reason: 'a dead saved loopback address must never be returned as ready',
     );
     final imageProviderSource = _readNormalized(
-      'lib/modules/widgets/custom_extended_image_provider.dart',
+      'lib/services/http/custom_extended_image_provider.dart',
     );
     expect(
       imageProviderSource,

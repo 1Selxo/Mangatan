@@ -1,6 +1,7 @@
 // ignore_for_file: depend_on_referenced_packages
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
@@ -11,7 +12,7 @@ import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:volume_controller/volume_controller.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import 'package:mangayomi/services/screen_brightness.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/extensions/duration.dart';
@@ -52,7 +53,6 @@ class _MobileControllerWidgetState
   );
   final ValueNotifier<double> _brightnessValue = ValueNotifier(0.0);
   final ValueNotifier<bool> _brightnessIndicator = ValueNotifier(false);
-  StreamSubscription<double>? _brightnessSubscription;
   Timer? _brightnessTimer;
 
   final ValueNotifier<double> _volumeValue = ValueNotifier(0.0);
@@ -140,15 +140,10 @@ class _MobileControllerWidgetState
     _volumeIndicator.dispose();
     _brightnessValue.dispose();
     _brightnessIndicator.dispose();
-    _brightnessSubscription?.cancel();
     _volumeController.removeListener();
 
-    // package:screen_brightness
-    Future.microtask(() async {
-      try {
-        await ScreenBrightness.instance.resetApplicationScreenBrightness();
-      } catch (_) {}
-    });
+    // Gives the screen's brightness back to the system.
+    unawaited(ScreenBrightness.reset());
     super.dispose();
   }
 
@@ -253,15 +248,8 @@ class _MobileControllerWidgetState
 
     Future.microtask(() async {
       try {
-        _brightnessValue.value = await ScreenBrightness.instance.application;
-        _brightnessSubscription = ScreenBrightness
-            .instance
-            .onApplicationScreenBrightnessChanged
-            .listen((value) {
-              if (mounted) {
-                _brightnessValue.value = value;
-              }
-            });
+        final brightness = await ScreenBrightness.current();
+        if (mounted && brightness != null) _brightnessValue.value = brightness;
       } catch (_) {}
     });
   }
@@ -283,10 +271,8 @@ class _MobileControllerWidgetState
   }
 
   Future<void> setBrightness(double value) async {
-    // package:screen_brightness
-    try {
-      await ScreenBrightness.instance.setApplicationScreenBrightness(value);
-    } catch (_) {}
+    await ScreenBrightness.set(value);
+    _brightnessValue.value = value;
     _brightnessIndicator.value = true;
     _brightnessTimer?.cancel();
     _brightnessTimer = Timer(const Duration(milliseconds: 200), () {

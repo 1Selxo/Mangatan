@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:shiori/shiori.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/tracker_library/tracker_library_card.dart';
@@ -9,6 +9,7 @@ import 'package:mangayomi/modules/tracker_library/tracker_library_section.dart';
 import 'package:mangayomi/modules/widgets/error_state.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/repositories/track_repository.dart';
+import 'package:mangayomi/repositories/tracker_library_cache_repository.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 class TrackerSectionScreen extends StatefulWidget {
@@ -42,9 +43,15 @@ class _TrackerSectionScreenState extends State<TrackerSectionScreen> {
             setState(() {
               _trackIndex = {
                 for (final t in tracks)
-                  if (t.mediaId != null) t.mediaId!: t,
+                  // Media ids are each tracker's own: the same number on
+                  // another tracker is another series.
+                  if (t.mediaId != null && t.syncId == widget.section.syncId)
+                    t.mediaId!: t,
               };
             });
+            // Read from the device: a change to an entry moves it between
+            // shelves at once.
+            if (!widget.section.cache) _fetchData();
           }
         });
   }
@@ -77,7 +84,7 @@ class _TrackerSectionScreenState extends State<TrackerSectionScreen> {
             _isLoading
                 ? const SizedBox(
                     height: 60,
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: ShioriSkeleton.line(width: 160)),
                   )
                 : Builder(
                     builder: (context) {
@@ -111,7 +118,11 @@ class _TrackerSectionScreenState extends State<TrackerSectionScreen> {
                       }
                       return SizedBox(
                         height: 60,
-                        child: Center(child: Text(l10n.no_result)),
+                        child: ShioriEmptyState(
+                          icon: Symbols.search_off_rounded,
+                          title: l10n.no_result,
+                          compact: true,
+                        ),
                       );
                     },
                   ),
@@ -122,14 +133,15 @@ class _TrackerSectionScreenState extends State<TrackerSectionScreen> {
   }
 
   Future<void> _fetchData() async {
-    final box = await Hive.openBox("tracker_library");
     final key =
         "${widget.section.syncId}-${widget.section.itemType.name}-${widget.section.name}";
-    if (_checkCache(box, key)) return;
+    if (await _checkCache(key)) return;
     try {
       _errorMessage = "";
       _tracks = await widget.section.func() ?? [];
-      box.put(key, _tracks);
+      if (widget.section.cache) {
+        await trackerLibraryCacheRepository.put(key, _tracks);
+      }
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -143,17 +155,14 @@ class _TrackerSectionScreenState extends State<TrackerSectionScreen> {
     }
   }
 
-  bool _checkCache(Box<dynamic> box, String key) {
-    if (!widget.section.isSearch && box.containsKey(key)) {
-      final temp = box.get(key);
-      if (temp is List<TrackSearch>) {
-        _errorMessage = "";
-        _tracks = temp;
-        if (mounted) setState(() => _isLoading = false);
-        return true;
-      }
-    }
-    return false;
+  Future<bool> _checkCache(String key) async {
+    if (widget.section.isSearch || !widget.section.cache) return false;
+    final cached = await trackerLibraryCacheRepository.get(key);
+    if (cached == null) return false;
+    _errorMessage = "";
+    _tracks = cached;
+    if (mounted) setState(() => _isLoading = false);
+    return true;
   }
 }
 

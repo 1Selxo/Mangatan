@@ -6,6 +6,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/browse/source_repositories.dart';
+import 'package:shiori/shiori.dart';
 
 void main() {
   Future<void> openAddDialog(WidgetTester tester) async {
@@ -27,10 +28,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  TextButton addButton(WidgetTester tester) => tester.widget<TextButton>(
+  ShioriButton addButton(WidgetTester tester) => tester.widget<ShioriButton>(
     find.descendant(
-      of: find.byType(AlertDialog),
-      matching: find.widgetWithText(TextButton, 'Add'),
+      of: find.byType(ShioriDialog),
+      matching: find.widgetWithText(ShioriButton, 'Add'),
     ),
   );
 

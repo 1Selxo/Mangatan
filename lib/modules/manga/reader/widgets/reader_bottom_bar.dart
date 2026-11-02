@@ -10,7 +10,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_value_indicator_shape.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';

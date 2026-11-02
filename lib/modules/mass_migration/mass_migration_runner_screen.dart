@@ -6,10 +6,14 @@ import 'package:mangayomi/eval/model/m_manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/mass_migration/models/mass_migration_models.dart';
 import 'package:mangayomi/modules/mass_migration/services/mass_migration_service.dart';
+import 'package:mangayomi/modules/mass_migration/widgets/mass_migration_applying_phase.dart';
+import 'package:mangayomi/modules/mass_migration/widgets/mass_migration_matching_phase.dart';
+import 'package:mangayomi/modules/mass_migration/widgets/mass_migration_resolved_item_card.dart';
+import 'package:mangayomi/modules/mass_migration/widgets/mass_migration_summary_phase.dart';
 import 'package:mangayomi/modules/mass_migration/widgets/mass_migration_widgets.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/get_detail.dart';
-import 'package:mangayomi/utils/language.dart';
+import 'package:shiori/shiori.dart';
 
 enum _MassMigrationPhase { matching, review, applying, summary }
 
@@ -51,96 +55,33 @@ class _MassMigrationRunnerScreenState
     return Scaffold(
       appBar: AppBar(title: Text(l10n.mass_migration_title)),
       body: switch (_phase) {
-        _MassMigrationPhase.matching => _buildMatchingPhase(context),
+        _MassMigrationPhase.matching => MassMigrationMatchingPhase(
+          sourceGroup: widget.sourceGroup,
+          destinationSource: widget.destinationSource,
+          currentIndex: _currentIndex,
+          resolvedItems: _resolvedItems,
+          isWaitingForNextItem: _isWaitingForNextItem,
+        ),
         _MassMigrationPhase.review => _buildReviewPhase(context),
-        _MassMigrationPhase.applying => _buildApplyingPhase(context),
-        _MassMigrationPhase.summary => _buildSummaryPhase(context),
+        _MassMigrationPhase.applying => MassMigrationApplyingPhase(
+          destinationSource: widget.destinationSource,
+          sourceGroup: widget.sourceGroup,
+          selectedItems: _resolvedItems
+              .where((item) => item.shouldMigrate)
+              .toList(),
+          currentIndex: _currentIndex,
+          isWaitingForNextItem: _isWaitingForNextItem,
+        ),
+        _MassMigrationPhase.summary => MassMigrationSummaryPhase(
+          sourceGroup: widget.sourceGroup,
+          destinationSource: widget.destinationSource,
+          resolvedItems: _resolvedItems,
+          migratedCount: _migratedCount,
+          skippedCount: _skippedCount,
+          failedItems: _failedItems,
+          onExit: _exitMassMigrationFlow,
+        ),
       },
-    );
-  }
-
-  Widget _buildMatchingPhase(BuildContext context) {
-    final l10n = context.l10n;
-    final total = widget.sourceGroup.items.length;
-    final currentItem = widget.sourceGroup.items[_currentIndex];
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              MassMigrationSourceIcon(source: widget.destinationSource),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  l10n.mass_migration_finding_matches(
-                    widget.destinationSource.name ?? '',
-                    completeLanguageName(widget.destinationSource.lang ?? ''),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LinearProgressIndicator(value: (_currentIndex + 1) / total),
-          const SizedBox(height: 8),
-          Text(l10n.mass_migration_processing_item(_currentIndex + 1, total)),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  MassMigrationCover(
-                    libraryItem: currentItem,
-                    source: widget.sourceGroup.source,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          currentItem.name ?? l10n.mass_migration_unknown_title,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          [
-                            widget.sourceGroup.sourceName,
-                            l10n.mass_migration_chapter_count(
-                              currentItem.chapters.length,
-                            ),
-                          ].join(' • '),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_isWaitingForNextItem) ...[
-            const SizedBox(height: 12),
-            Text(l10n.mass_migration_waiting_next_item),
-          ],
-          if (_resolvedItems.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              l10n.mass_migration_matched_so_far(
-                _resolvedItems.where((item) => item.hasMatch).length,
-              ),
-            ),
-            Text(
-              l10n.mass_migration_no_match_count(
-                _resolvedItems.where((item) => !item.hasMatch).length,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 
@@ -155,31 +96,42 @@ class _MassMigrationRunnerScreenState
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(ShioriSpace.s16),
           child: Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(ShioriSpace.s16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       MassMigrationSourceIcon(source: widget.destinationSource),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: ShioriSpace.s12),
                       Expanded(
                         child: Text(
                           l10n.mass_migration_review_matches(
                             widget.destinationSource.name ?? '',
                           ),
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: context.shiori.text.section.copyWith(
+                            color: context.shiori.color.fg,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(l10n.mass_migration_found_matches(matchedCount)),
-                  Text(l10n.mass_migration_no_matches(noMatchCount)),
-                  Text(l10n.mass_migration_selected_to_migrate(selectedCount)),
+                  const SizedBox(height: ShioriSpace.s12),
+                  Text(
+                    l10n.mass_migration_found_matches(matchedCount),
+                    style: context.shiori.caption,
+                  ),
+                  Text(
+                    l10n.mass_migration_no_matches(noMatchCount),
+                    style: context.shiori.caption,
+                  ),
+                  Text(
+                    l10n.mass_migration_selected_to_migrate(selectedCount),
+                    style: context.shiori.caption,
+                  ),
                 ],
               ),
             ),
@@ -187,386 +139,47 @@ class _MassMigrationRunnerScreenState
         ),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: ShioriSpace.s16),
             itemCount: _resolvedItems.length,
             itemBuilder: (context, index) {
               final item = _resolvedItems[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
+                  horizontal: ShioriSpace.s16,
+                  vertical: ShioriSpace.s8,
                 ),
-                child: _buildResolvedItemCard(context, item, index),
+                child: MassMigrationResolvedItemCard(
+                  item: item,
+                  index: index,
+                  sourceGroup: widget.sourceGroup,
+                  destinationSource: widget.destinationSource,
+                  isLoadingCandidate: _loadingCandidateIndexes.contains(index),
+                  onShouldMigrateChanged: (v) => _updateShouldMigrate(index, v),
+                  onPickAnotherCandidate: () => _pickAnotherCandidate(index),
+                ),
               );
             },
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(
+            ShioriSpace.s16,
+            0,
+            ShioriSpace.s16,
+            ShioriSpace.s16,
+          ),
           child: SizedBox(
             width: double.infinity,
-            child: FilledButton(
+            child: ShioriButton(
+              expand: true,
               onPressed: _startMigration,
-              child: Text(
-                selectedCount == 0
-                    ? l10n.mass_migration_finish_review
-                    : l10n.mass_migration_migrate_selected(selectedCount),
-              ),
+              label: selectedCount == 0
+                  ? l10n.mass_migration_finish_review
+                  : l10n.mass_migration_migrate_selected(selectedCount),
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildApplyingPhase(BuildContext context) {
-    final l10n = context.l10n;
-    final selectedItems = _resolvedItems
-        .where((item) => item.shouldMigrate)
-        .toList();
-    final total = selectedItems.isEmpty ? 1 : selectedItems.length;
-    final currentItem = selectedItems.isEmpty
-        ? null
-        : selectedItems[_currentIndex.clamp(0, selectedItems.length - 1)];
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.mass_migration_migrating_selected(
-              widget.destinationSource.name ?? '',
-            ),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 16),
-          LinearProgressIndicator(
-            value: selectedItems.isEmpty ? 1 : (_currentIndex + 1) / total,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            selectedItems.isEmpty
-                ? l10n.mass_migration_no_items_selected
-                : l10n.mass_migration_migrating_item(_currentIndex + 1, total),
-          ),
-          const SizedBox(height: 16),
-          if (currentItem != null)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    MassMigrationCover(
-                      libraryItem: currentItem.sourceItem,
-                      source: widget.sourceGroup.source,
-                    ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.arrow_forward_rounded),
-                    const SizedBox(width: 12),
-                    MassMigrationCover(
-                      remoteItem: currentItem.selectedCandidate,
-                      source: widget.destinationSource,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentItem.sourceItem.name ??
-                                l10n.mass_migration_unknown_title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            currentItem.selectedCandidate?.name ??
-                                l10n.mass_migration_unknown_match,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          if (_isWaitingForNextItem) ...[
-            const SizedBox(height: 12),
-            Text(l10n.mass_migration_waiting_next_migration),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryPhase(BuildContext context) {
-    final l10n = context.l10n;
-    final total = widget.sourceGroup.items.length;
-    final matchedCount = _resolvedItems.where((item) => item.hasMatch).length;
-    final successTone = _failedItems.isEmpty ? Colors.green : Colors.orange;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: Theme.of(context).cardColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).shadowColor.withValues(alpha: 0.08),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: successTone.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    _failedItems.isEmpty
-                        ? Icons.task_alt_rounded
-                        : Icons.done_all_rounded,
-                    color: successTone,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.mass_migration_complete,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _failedItems.isEmpty
-                            ? l10n.mass_migration_complete_success_message
-                            : l10n.mass_migration_complete_partial_message,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        l10n.mass_migration_route_summary(
-                          widget.sourceGroup.sourceName,
-                          widget.destinationSource.name ?? '',
-                        ),
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _SummaryStatCard(
-                label: l10n.mass_migration_processed,
-                value: '$total',
-              ),
-              _SummaryStatCard(
-                label: l10n.mass_migration_matched,
-                value: '$matchedCount',
-              ),
-              _SummaryStatCard(
-                label: l10n.mass_migration_migrated,
-                value: '$_migratedCount',
-              ),
-              _SummaryStatCard(
-                label: l10n.mass_migration_skipped,
-                value: '$_skippedCount',
-              ),
-              _SummaryStatCard(
-                label: l10n.mass_migration_failed,
-                value: '${_failedItems.length}',
-              ),
-            ],
-          ),
-          if (_failedItems.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.mass_migration_failed_items,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  for (final item in _failedItems)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.error_outline_rounded,
-                            size: 18,
-                            color: Colors.orange,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(item)),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _exitMassMigrationFlow,
-            icon: const Icon(Icons.exit_to_app_rounded),
-            label: Text(l10n.mass_migration_exit),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResolvedItemCard(
-    BuildContext context,
-    MassMigrationResolvedItem item,
-    int index,
-  ) {
-    final l10n = context.l10n;
-    final destinationChapterNames =
-        item.destinationPreview?.chapters
-            ?.map(
-              (chapter) => chapter.name ?? l10n.mass_migration_unknown_chapter,
-            )
-            .toList() ??
-        const <String>[];
-    final sourceChapterNames = item.sourceItem.chapters
-        .map((chapter) => chapter.name ?? l10n.mass_migration_unknown_chapter)
-        .toList();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MassMigrationCover(
-                  libraryItem: item.sourceItem,
-                  source: widget.sourceGroup.source,
-                ),
-                const SizedBox(width: 12),
-                const Icon(Icons.arrow_forward_rounded),
-                const SizedBox(width: 12),
-                MassMigrationCover(
-                  remoteItem: item.selectedCandidate,
-                  source: widget.destinationSource,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.sourceItem.name ??
-                            l10n.mass_migration_unknown_title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.hasMatch
-                            ? (item.selectedCandidate?.name ??
-                                  l10n.mass_migration_unknown_match)
-                            : l10n.mass_migration_no_destination_match,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        [
-                          l10n.mass_migration_source_chapter_count(
-                            item.sourceItem.chapters.length,
-                          ),
-                          l10n.mass_migration_destination_chapter_count(
-                            destinationChapterNames.length,
-                          ),
-                          if ((item.searchResult.usedQuery ?? '').isNotEmpty)
-                            l10n.mass_migration_query(
-                              item.searchResult.usedQuery!,
-                            ),
-                        ].join(' • '),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if ((item.errorMessage ?? '').isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(item.errorMessage!),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                ChoiceChip(
-                  label: Text(l10n.mass_migration_skip),
-                  selected: !item.shouldMigrate,
-                  onSelected: (_) => _updateShouldMigrate(index, false),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: Text(l10n.migrate),
-                  selected: item.shouldMigrate,
-                  onSelected: item.canMigrate
-                      ? (_) => _updateShouldMigrate(index, true)
-                      : null,
-                ),
-                const Spacer(),
-                if (item.searchResult.candidates.length > 1)
-                  TextButton(
-                    onPressed: _loadingCandidateIndexes.contains(index)
-                        ? null
-                        : () => _pickAnotherCandidate(index),
-                    child: Text(
-                      _loadingCandidateIndexes.contains(index)
-                          ? l10n.mass_migration_loading
-                          : l10n.mass_migration_choose_another_result,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            MassMigrationChapterSection(
-              title: l10n.mass_migration_source_chapters,
-              chapters: sourceChapterNames,
-            ),
-            MassMigrationChapterSection(
-              title: l10n.mass_migration_destination_chapters,
-              chapters: destinationChapterNames,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -614,34 +227,22 @@ class _MassMigrationRunnerScreenState
 
   Future<void> _pickAnotherCandidate(int index) async {
     final item = _resolvedItems[index];
-    final selected = await showModalBottomSheet<MManga>(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: ListView.separated(
-            itemCount: item.searchResult.candidates.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, candidateIndex) {
-              final l10n = context.l10n;
-              final candidate = item.searchResult.candidates[candidateIndex];
-              return ListTile(
-                title: Text(
-                  candidate.name ?? l10n.mass_migration_unknown_title,
-                ),
-                subtitle: Text(
-                  [
-                    if ((candidate.author ?? '').trim().isNotEmpty)
-                      candidate.author!,
-                    if ((candidate.artist ?? '').trim().isNotEmpty)
-                      candidate.artist!,
-                  ].join(' • '),
-                ),
-                onTap: () => Navigator.pop(context, candidate),
-              );
-            },
+    final l10n = context.l10n;
+    final selected = await showShioriChoice<MManga>(
+      context,
+      title: l10n.mass_migration_choose_another_result,
+      selected: item.selectedCandidate,
+      options: [
+        for (final candidate in item.searchResult.candidates)
+          ShioriChoice(
+            candidate,
+            candidate.name ?? l10n.mass_migration_unknown_title,
+            subtitle: [
+              if ((candidate.author ?? '').trim().isNotEmpty) candidate.author!,
+              if ((candidate.artist ?? '').trim().isNotEmpty) candidate.artist!,
+            ].join(' · '),
           ),
-        );
-      },
+      ],
     );
 
     if (selected == null || !mounted) return;
@@ -750,34 +351,5 @@ class _MassMigrationRunnerScreenState
       navigator.pop();
       pops++;
     }
-  }
-}
-
-class _SummaryStatCard extends StatelessWidget {
-  const _SummaryStatCard({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 156,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 6),
-            Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
-      ),
-    );
   }
 }

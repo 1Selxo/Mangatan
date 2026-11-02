@@ -8,13 +8,29 @@ part of 'restore.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Restores the backup at [path], replacing or merging into the library.
+///
+/// Throws when the restore fails, and leaves reporting it to the caller: the
+/// restore flows announce the outcome themselves, so an error swallowed here
+/// used to be followed by their success message.
 
 @ProviderFor(doRestore)
 final doRestoreProvider = DoRestoreFamily._();
 
+/// Restores the backup at [path], replacing or merging into the library.
+///
+/// Throws when the restore fails, and leaves reporting it to the caller: the
+/// restore flows announce the outcome themselves, so an error swallowed here
+/// used to be followed by their success message.
+
 final class DoRestoreProvider
     extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
     with $FutureModifier<void>, $FutureProvider<void> {
+  /// Restores the backup at [path], replacing or merging into the library.
+  ///
+  /// Throws when the restore fails, and leaves reporting it to the caller: the
+  /// restore flows announce the outcome themselves, so an error swallowed here
+  /// used to be followed by their success message.
   DoRestoreProvider._({
     required DoRestoreFamily super.from,
     required ({
@@ -86,7 +102,13 @@ final class DoRestoreProvider
   }
 }
 
-String _$doRestoreHash() => r'38e3eec4816621c5f709b499eecec53498add7a8';
+String _$doRestoreHash() => r'1053fd23c26546ec3c99c0df4f0daaa9e1f1dea6';
+
+/// Restores the backup at [path], replacing or merging into the library.
+///
+/// Throws when the restore fails, and leaves reporting it to the caller: the
+/// restore flows announce the outcome themselves, so an error swallowed here
+/// used to be followed by their success message.
 
 final class DoRestoreFamily extends $Family
     with
@@ -110,6 +132,12 @@ final class DoRestoreFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
+
+  /// Restores the backup at [path], replacing or merging into the library.
+  ///
+  /// Throws when the restore fails, and leaves reporting it to the caller: the
+  /// restore flows announce the outcome themselves, so an error swallowed here
+  /// used to be followed by their success message.
 
   DoRestoreProvider call({
     required String path,
@@ -207,7 +235,7 @@ final class RestoreBackupProvider
   }
 }
 
-String _$restoreBackupHash() => r'4a62bccc3deffa39da7f60f515f4acda283311b9';
+String _$restoreBackupHash() => r'565b754bb5c6e56283aff9c3db768b56becab631';
 
 final class RestoreBackupFamily extends $Family
     with
@@ -301,7 +329,7 @@ final class RestoreKotatsuBackupProvider
 }
 
 String _$restoreKotatsuBackupHash() =>
-    r'3b6d3d74922dffce8f953c79bb3e9140fae5106e';
+    r'39c3d5bba8974765f3ecf602cc949fb31c4078cb';
 
 final class RestoreKotatsuBackupFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<void>, Archive> {

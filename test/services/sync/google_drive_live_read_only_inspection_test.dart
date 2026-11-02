@@ -28,55 +28,49 @@ void main() {
       ? 'Set CHIMAHON_REFERENCE_BACKUP to the local comparison backup.'
       : false;
 
-  test(
-    'inspects Chimahon appDataFolder without making Drive writes',
-    () async {
-      final keychainResult = await Process.run(
-        '/usr/bin/security',
-        [
-          'find-generic-password',
-          '-a',
-          SecureGoogleDriveRefreshTokenStore.defaultStorageKey,
-          '-w',
-        ],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-      );
-      if (keychainResult.exitCode != 0) {
-        throw StateError('The Google Drive refresh token is not in Keychain.');
-      }
-      final refreshToken = (keychainResult.stdout as String).trim();
-      if (refreshToken.isEmpty) {
-        throw StateError(
-          'The Google Drive refresh token in Keychain is blank.',
-        );
-      }
+  test('inspects Chimahon appDataFolder without making Drive writes', () async {
+    final keychainResult = await Process.run(
+      '/usr/bin/security',
+      [
+        'find-generic-password',
+        '-a',
+        SecureGoogleDriveRefreshTokenStore.defaultStorageKey,
+        '-w',
+      ],
+      stdoutEncoding: utf8,
+      stderrEncoding: utf8,
+    );
+    if (keychainResult.exitCode != 0) {
+      throw StateError('The Google Drive refresh token is not in Keychain.');
+    }
+    final refreshToken = (keychainResult.stdout as String).trim();
+    if (refreshToken.isEmpty) {
+      throw StateError('The Google Drive refresh token in Keychain is blank.');
+    }
 
-      final oauth = GoogleDriveOAuthClient();
+    final oauth = GoogleDriveOAuthClient();
+    try {
+      final tokens = await oauth.refresh(refreshToken);
+      final inspector = GoogleDriveReadOnlyInspector(
+        accessToken: tokens.accessToken,
+      );
       try {
-        final tokens = await oauth.refresh(refreshToken);
-        final inspector = GoogleDriveReadOnlyInspector(
-          accessToken: tokens.accessToken,
+        final report = await inspector.inspect(
+          referenceBytes: await File(referencePath!).readAsBytes(),
         );
-        try {
-          final report = await inspector.inspect(
-            referenceBytes: await File(referencePath!).readAsBytes(),
-          );
-          debugPrint(
-            const JsonEncoder.withIndent('  ').convert(report.toSafeJson()),
-          );
-          expect(report.files, isNotEmpty);
-          expect(
-            report.files.where((file) => file.fingerprint != null),
-            isNotEmpty,
-          );
-        } finally {
-          inspector.close();
-        }
+        debugPrint(
+          const JsonEncoder.withIndent('  ').convert(report.toSafeJson()),
+        );
+        expect(report.files, isNotEmpty);
+        expect(
+          report.files.where((file) => file.fingerprint != null),
+          isNotEmpty,
+        );
       } finally {
-        oauth.close();
+        inspector.close();
       }
-    },
-    skip: skipReason,
-  );
+    } finally {
+      oauth.close();
+    }
+  }, skip: skipReason);
 }

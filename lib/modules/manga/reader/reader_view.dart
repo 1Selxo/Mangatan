@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:mangayomi/modules/manga/reader/utils/download_ahead.dart';
+import 'package:mangayomi/modules/reader_common/key_bindings.dart';
+import 'package:mangayomi/modules/reader_common/reader_chapter_navigation.dart';
+import 'package:mangayomi/services/local_folders.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:mangayomi/services/perf/perf_metrics.dart';
 import 'package:mangayomi/modules/widgets/error_state.dart';
 import 'package:mangayomi/services/downloaded_chapter.dart';
 import 'package:mangayomi/modules/manga/archive_reader/providers/archive_reader_providers.dart';
-import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/gestures.dart';
@@ -19,8 +22,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/modules/anime/widgets/desktop.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
+import 'package:mangayomi/modules/reader_common/mixins/reader_gestures.dart';
 import 'package:mangayomi/modules/manga/reader/reader_eink_state.dart';
 import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
 import 'package:mangayomi/modules/manga/reader/services/page_navigation_service.dart';
@@ -28,11 +30,11 @@ import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_memory_management.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/reader_app_bar.dart';
+import 'package:mangayomi/modules/reader_common/widgets/reader_app_bar.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_bottom_bar.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_gesture_handler.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_settings_modal.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/auto_scroll_button.dart';
+import 'package:mangayomi/modules/reader_common/widgets/auto_scroll_button.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/page_indicator.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/image_actions_dialog.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
@@ -40,10 +42,10 @@ import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/modules/more/statistics/widgets/manga_stats_sheet.dart';
 import 'package:mangayomi/services/statistics/manga_statistics_tracker.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:mangayomi/utils/riverpod.dart';
-import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
+import 'package:mangayomi/router/push_router.dart';
 import 'package:mangayomi/services/get_chapter_pages.dart';
 import 'package:mangayomi/services/chapter_cache.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
@@ -153,12 +155,6 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
   }
 }
 
-class MangaChapterPageGalleryState {
-  static void setNavigatingToChapter() {
-    _MangaChapterPageGalleryState._isNavigatingToChapter = true;
-  }
-}
-
 class MangaChapterPageGallery extends ConsumerStatefulWidget {
   const MangaChapterPageGallery({
     super.key,
@@ -203,10 +199,6 @@ class _MangaChapterPageGalleryState
   /// Rebuilt whenever the sheet is open so its live session values update.
   final ValueNotifier<int> _statsSheetRevision = ValueNotifier(0);
 
-  /// Flag to prevent fullscreen from being disabled when navigating between
-  /// chapters via pushReplacement. The old widget's dispose runs after the new
-  /// widget is created, which would clobber the new reader's fullscreen state.
-  static bool _isNavigatingToChapter = false;
   bool _backNavigationInProgress = false;
 
   @override
@@ -231,12 +223,13 @@ class _MangaChapterPageGalleryState
     _photoViewScaleStateController.dispose();
     _extendedController.dispose();
     clearGestureDetailsCache();
-    if (_isNavigatingToChapter) {
-      _isNavigatingToChapter = false;
-    } else if (isDesktop) {
-      setFullScreen(value: false);
-    } else {
-      restoreSystemUI();
+    // A chapter switch replaces this reader; leave fullscreen to the new one.
+    if (!ReaderChapterNavigation.consume()) {
+      if (isDesktop) {
+        setFullScreen(value: false);
+      } else {
+        restoreSystemUI();
+      }
     }
     discordRpc?.showIdleText();
     final actualIdx = _pageViewToActualIndexSync(_currentIndex!);
@@ -346,6 +339,9 @@ class _MangaChapterPageGalleryState
     discordRpc?.showChapterDetails(ref, chapter);
     WidgetsBinding.instance.addObserver(this);
     _initWakelock();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) downloadAhead(ref, chapter);
+    });
   }
 
   void _eInkChanged() {
@@ -442,7 +438,7 @@ class _MangaChapterPageGalleryState
   void _goToChapter(bool next) {
     if (next && !_readerController.hasNextChapter) return;
     if (!next && !_readerController.hasPreviousChapter) return;
-    _isNavigatingToChapter = true;
+    ReaderChapterNavigation.markNavigatingToChapter();
     pushReplacementMangaReaderView(
       context: context,
       chapter: next
@@ -542,7 +538,11 @@ class _MangaChapterPageGalleryState
     }
     final bool isHorizontalContinuous = readerMode.isHorizontalContinuous;
     final ocrProgressTop = _isView
-        ? ReaderAppBar.visibleHeight(fullScreenReader: fullScreenReader) + 12
+        ? ReaderAppBar.visibleHeight(
+                context,
+                fullScreenReader: fullScreenReader,
+              ) +
+              12
         : 12.0;
 
     return ReaderKeyboardHandler(
@@ -552,6 +552,7 @@ class _MangaChapterPageGalleryState
       onFullScreen: () => _setFullScreen(),
       onNextChapter: () => _goToChapter(true),
       onPreviousChapter: () => _goToChapter(false),
+      bindings: ref.watch(keyBindingsStateProvider),
       onLookupTrigger: ReaderOcrState.handleLookupTriggerKey,
     ).wrapWithKeyboardListener(
       isReverseHorizontal: _isReverseHorizontal,

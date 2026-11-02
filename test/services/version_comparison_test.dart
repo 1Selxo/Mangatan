@@ -18,18 +18,19 @@ void main() {
       expect(compareVersions('', '0'), 0);
     });
 
-    test('uses component count when shared components are equal', () {
-      expect(compareVersions('1.0', '1.0.0'), lessThan(0));
-      expect(compareVersions('1.0.0', '1.0.0'), 0);
+    test('treats missing components as zero', () {
+      expect(compareVersions('1.0', '1.0.0'), 0);
+      expect(compareVersions('1.0', '1.0.1'), lessThan(0));
     });
 
-    test('ignores a non-numeric suffix on a version component', () {
+    test('accepts a non-numeric suffix on a version component', () {
       // Extension repos and server releases can publish pre-release / build
       // tags such as "1.2.0-beta" or "2.0.1727-r1234". These reach
       // compareVersions unsanitised from external source.json (appMinVerReq /
-      // version). The numeric prefix must decide the comparison instead of
-      // throwing FormatException and breaking source listing/auto-update.
-      expect(compareVersions('1.2.0-beta', '1.2.0'), 0);
+      // version). They must compare instead of throwing FormatException and
+      // breaking source listing/auto-update; a pre-release sorts before its
+      // release.
+      expect(compareVersions('1.2.0-beta', '1.2.0'), lessThan(0));
       expect(compareVersions('2.0.1727-r1234', '2.0.1728'), lessThan(0));
       expect(compareVersions('1.3.0', '1.2.0-beta'), greaterThan(0));
     });

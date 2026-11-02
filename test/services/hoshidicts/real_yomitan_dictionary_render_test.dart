@@ -22,13 +22,11 @@ void main() {
     ),
     _DictionaryZipSample(
       name: 'Nihongo no Sensei',
-      path:
-          r'D:\Japanese\Yomitan Dictionaries\Japanese\[JA Grammar] nihongo_no_sensei_1_04.zip',
+      path: r'D:\Japanese\Yomitan Dictionaries\Japanese\[JA Grammar] nihongo_no_sensei_1_04.zip',
     ),
     _DictionaryZipSample(
       name: 'Onomatoproject',
-      path:
-          r'D:\Japanese\Yomitan Dictionaries\Japanese\[JA-EN Onomatopoeia] Onomatoproject.zip',
+      path: r'D:\Japanese\Yomitan Dictionaries\Japanese\[JA-EN Onomatopoeia] Onomatoproject.zip',
     ),
   ];
 

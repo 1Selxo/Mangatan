@@ -39,12 +39,9 @@ void main() {
     }
   });
 
-  test(
-    'OCR processing is enabled by default on a fresh install',
-    () async {
-      expect(await MiningPreferences.getOcrOverlayEnabled(), isTrue);
-    },
-  );
+  test('OCR processing is enabled by default on a fresh install', () async {
+    expect(await MiningPreferences.getOcrOverlayEnabled(), isTrue);
+  });
 
   test(
     'enabling the overlay persists across a reader/session restart',

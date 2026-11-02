@@ -7,7 +7,7 @@ import 'package:mangayomi/main.dart' as app;
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/chapter_controller_mixin.dart';
+import 'package:mangayomi/modules/reader_common/mixins/chapter_controller_mixin.dart';
 
 import '../../../test_utils/isar_library.dart';
 

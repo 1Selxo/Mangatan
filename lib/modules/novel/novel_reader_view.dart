@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:mangayomi/services/external_browser.dart';
+import 'package:mangayomi/modules/reader_common/key_bindings.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
@@ -14,13 +16,12 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
-import 'package:mangayomi/modules/anime/widgets/desktop.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/reader_gestures.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/auto_scroll_button.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/reader_app_bar.dart';
+import 'package:mangayomi/modules/reader_common/mixins/reader_gestures.dart';
+import 'package:mangayomi/modules/reader_common/widgets/auto_scroll_button.dart';
+import 'package:mangayomi/modules/reader_common/widgets/reader_app_bar.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
 import 'package:mangayomi/modules/more/statistics/widgets/novel_stats_sheet.dart';
 import 'package:mangayomi/modules/novel/novel_reader_progress.dart';
@@ -45,9 +46,8 @@ import 'package:mangayomi/utils/extensions/dom_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/system_ui.dart';
 import 'package:mangayomi/utils/utils.dart';
-import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
+import 'package:mangayomi/router/push_router.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:html/dom.dart' as dom;
@@ -989,6 +989,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
       onPreviousPage: () => _onBtnTapped(-100),
       onNextPage: () => _onBtnTapped(100),
       onNextChapter: () => _goToChapter(true),
+      bindings: ref.watch(keyBindingsStateProvider),
       onPreviousChapter: () => _goToChapter(false),
       onLookupTrigger: (event) {
         if (!_usingTtsuReader ||
@@ -1874,13 +1875,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                 chapter: chapter,
               );
               if (Platform.isLinux) {
-                final uri = Uri.parse(url);
-                await launchUrl(
-                  uri,
-                  mode: LaunchMode.inAppBrowserView,
-                ).catchError(
-                  (_) => launchUrl(uri, mode: LaunchMode.externalApplication),
-                );
+                // The chosen browser, or the system default: the reader cannot
+                // show a page on Linux, so the link leaves the app.
+                await ExternalBrowser.open(url);
               } else {
                 if (!mounted) return;
                 context.push(

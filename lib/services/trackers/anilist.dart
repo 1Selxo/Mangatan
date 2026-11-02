@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:mangayomi/services/external_browser.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/track.dart';
@@ -11,8 +11,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:mangayomi/models/track_search.dart';
-import 'package:mangayomi/modules/more/settings/track/myanimelist/model.dart';
-import 'package:mangayomi/modules/more/settings/track/providers/track_providers.dart';
+import 'package:mangayomi/models/oauth.dart';
+import 'package:mangayomi/providers/track_providers.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/utils/localized_message.dart';
 import 'package:mangayomi/services/discovery/service_availability.dart';
@@ -21,6 +21,7 @@ import 'base_tracker.dart';
 import 'tracker_account.dart';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 part 'anilist.g.dart';
 
 @riverpod
@@ -52,12 +53,13 @@ class Anilist extends _$Anilist implements BaseTracker {
         '&redirect_uri=$_redirectUri&response_type=code';
 
     try {
-      final uri = await FlutterWebAuth2.authenticate(
-        url: loginUrl,
+      final uri = await ExternalBrowser.openOAuth(
+        loginUrl,
+        port: 43824,
         callbackUrlScheme: callbackUrlScheme,
       );
-
-      final code = Uri.parse(uri).queryParameters['code'];
+      final code = uri?.queryParameters['code'];
+      if (code == null) return null;
       final response = await http.post(
         Uri.parse('https://anilist.co/api/v2/oauth/token'),
         body: {
@@ -88,7 +90,8 @@ class Anilist extends _$Anilist implements BaseTracker {
           );
 
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      recordError(e, stack: stackTrace, source: 'anilist');
       return false;
     }
   }
@@ -162,28 +165,7 @@ class Anilist extends _$Anilist implements BaseTracker {
       data['Page']['media'] as List,
     );
     return entries
-        .map(
-          (jsonRes) => TrackSearch(
-            libraryId: jsonRes['id'],
-            syncId: syncId,
-            trackingUrl: "",
-            mediaId: jsonRes['id'],
-            summary: jsonRes['description'] ?? "",
-            totalChapter: jsonRes[contentUnit] ?? 0,
-            coverUrl: jsonRes['coverImage']['large'] ?? "",
-            title: jsonRes['title']['userPreferred'],
-            startDate:
-                jsonRes["start_date"] ??
-                DateTime.fromMillisecondsSinceEpoch(
-                  parseDate(jsonRes, 'startDate'),
-                ).toString(),
-            publishingType: "",
-            publishingStatus: jsonRes['status'],
-            score: jsonRes["averageScore"] != null
-                ? jsonRes["averageScore"] * 1.0
-                : 0,
-          ),
-        )
+        .map((jsonRes) => _mediaToTrackSearch(jsonRes, contentUnit))
         .toList();
   }
 
@@ -279,30 +261,31 @@ class Anilist extends _$Anilist implements BaseTracker {
       data['Page']['media'] as List,
     );
     return entries
-        .map(
-          (jsonRes) => TrackSearch(
-            libraryId: jsonRes['id'],
-            syncId: syncId,
-            trackingUrl: "",
-            mediaId: jsonRes['id'],
-            summary: jsonRes['description'] ?? "",
-            totalChapter: jsonRes[contentUnit] ?? 0,
-            coverUrl: jsonRes['coverImage']['large'] ?? "",
-            title: jsonRes['title']['userPreferred'],
-            startDate:
-                jsonRes["start_date"] ??
-                DateTime.fromMillisecondsSinceEpoch(
-                  parseDate(jsonRes, 'startDate'),
-                ).toString(),
-            publishingType: "",
-            publishingStatus: jsonRes['status'],
-            score: jsonRes["averageScore"] != null
-                ? jsonRes["averageScore"] * 1.0
-                : 0,
-          ),
-        )
+        .map((jsonRes) => _mediaToTrackSearch(jsonRes, contentUnit))
         .toList();
   }
+
+  /// A `media` node from a search or ranking query, as a search result.
+  TrackSearch _mediaToTrackSearch(
+    Map<String, dynamic> jsonRes,
+    String contentUnit,
+  ) => TrackSearch(
+    libraryId: jsonRes['id'],
+    syncId: syncId,
+    trackingUrl: "",
+    mediaId: jsonRes['id'],
+    summary: jsonRes['description'] ?? "",
+    totalChapter: jsonRes[contentUnit] ?? 0,
+    coverUrl: jsonRes['coverImage']['large'] ?? "",
+    title: jsonRes['title']['userPreferred'],
+    startDate:
+        jsonRes["start_date"] ??
+        DateTime.fromMillisecondsSinceEpoch(parseDate(jsonRes, 'startDate'))
+            .toString(),
+    publishingType: "",
+    publishingStatus: jsonRes['status'],
+    score: jsonRes["averageScore"] != null ? jsonRes["averageScore"] * 1.0 : 0,
+  );
 
   @override
   Future<List<TrackSearch>> fetchUserData({bool isManga = true}) async {
@@ -505,7 +488,7 @@ class Anilist extends _$Anilist implements BaseTracker {
     if (DateTime.now().isAfter(expiresIn)) {
       widgetRef.read(tracksProvider(syncId: syncId).notifier).logout();
       botToast(
-        localizedMessage((l10n) => l10n.tracker_token_expired("Anilist")),
+        localizedMessage((l10n) => l10n.tracker_token_expired("AniList")),
       );
       throw Exception("Token expired");
     }

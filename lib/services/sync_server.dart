@@ -5,11 +5,13 @@
 // sequences those three pieces and turns their results into UI-facing state
 // (toasts, progress, invalidated providers).
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:crypto/crypto.dart';
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:mangayomi/services/external_browser.dart';
+import 'package:mangayomi/services/background_work/background_work.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
@@ -18,18 +20,21 @@ import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/providers/blend_level_state_provider.dart';
+import 'package:mangayomi/providers/flex_scheme_color_state_provider.dart';
+import 'package:mangayomi/providers/floating_navigation_bar_state_provider.dart';
+import 'package:mangayomi/providers/show_updates_badge_state_provider.dart';
+import 'package:mangayomi/providers/pure_black_dark_mode_state_provider.dart';
+import 'package:mangayomi/providers/theme_mode_state_provider.dart';
+import 'package:mangayomi/providers/browse_state_provider.dart';
+import 'package:mangayomi/providers/security_state_provider.dart';
+import 'package:mangayomi/providers/sync_progress_provider.dart';
+import 'package:mangayomi/providers/sync_providers.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/restore.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/sync/providers/sync_progress_provider.dart';
-import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
@@ -57,9 +62,11 @@ import 'package:mangayomi/services/sync/sync_user_message.dart';
 import 'package:mangayomi/services/sync/webdav_credential_store.dart';
 import 'package:mangayomi/services/sync/webdav_sync_storage.dart';
 import 'package:mangayomi/utils/client_id.dart';
+
 import 'package:mangayomi/utils/log/logger.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:mangayomi/providers/tint_surfaces_state_provider.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 import 'package:mangayomi/services/sync/sync_bytes.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
 import 'package:mangayomi/modules/more/settings/sync/widgets/sync_error_details_dialog.dart';
@@ -83,6 +90,23 @@ String _syncMilliseconds(Duration duration) =>
     (duration.inMicroseconds / Duration.microsecondsPerMillisecond)
         .toStringAsFixed(2);
 
+/// Where the sync server sends the browser back after login: a loopback
+/// server catches it on Windows and Linux, the app's own scheme everywhere
+/// else. flutter_web_auth_2 takes a loopback address only on Windows and
+/// Linux; macOS, counted as a desktop here, rejected it as a scheme (#1062).
+/// The trackers already split it this way.
+({String redirectUri, String callbackUrlScheme}) syncOAuthCallback({
+  required bool loopback,
+}) => loopback
+    ? (
+        redirectUri: 'http://localhost:$_desktopOAuthCallbackPort/callback',
+        callbackUrlScheme: 'http://localhost:$_desktopOAuthCallbackPort',
+      )
+    : (
+        redirectUri: 'mangayomi://oauth-callback',
+        callbackUrlScheme: 'mangayomi',
+      );
+
 @riverpod
 class SyncServer extends _$SyncServer {
   static final Set<int> _syncsInProgress = <int>{};
@@ -98,8 +122,8 @@ class SyncServer extends _$SyncServer {
 
   // ------------------------------------------------------------------
   // Login. OAuth (PKCE) only - the server's own authorize/token endpoints,
-  // opened in the system browser. There is no password form: this app talks
-  // to exactly one server it's paired with, not a third-party OAuth
+  // opened in the browser the user chose. There is no password form: this app
+  // talks to exactly one server it's paired with, not a third-party OAuth
   // provider, so the browser round trip is purely local - it's whichever
   // session is already logged into that server's website.
   // ------------------------------------------------------------------
@@ -110,12 +134,9 @@ class SyncServer extends _$SyncServer {
       final verifier = _generatePkceVerifier();
       final challenge = _codeChallengeFromVerifier(verifier);
       final state = _generatePkceVerifier();
-      final redirectUri = isDesktop
-          ? 'http://localhost:$_desktopOAuthCallbackPort/callback'
-          : 'mangayomi://oauth-callback';
-      final callbackUrlScheme = isDesktop
-          ? 'http://localhost:$_desktopOAuthCallbackPort'
-          : 'mangayomi';
+      final (:redirectUri, :callbackUrlScheme) = syncOAuthCallback(
+        loopback: Platform.isWindows || Platform.isLinux,
+      );
 
       final authorizeUrl = Uri.parse('$server/api/oauth/authorize').replace(
         queryParameters: {
@@ -126,11 +147,12 @@ class SyncServer extends _$SyncServer {
         },
       );
 
-      final resultUrl = await FlutterWebAuth2.authenticate(
-        url: authorizeUrl.toString(),
+      final resultUri = await ExternalBrowser.openOAuth(
+        authorizeUrl.toString(),
+        port: _desktopOAuthCallbackPort,
         callbackUrlScheme: callbackUrlScheme,
       );
-      final resultParams = Uri.parse(resultUrl).queryParameters;
+      final resultParams = resultUri?.queryParameters ?? const {};
       final code = resultParams['code'];
       // Confirms this callback answers the authorize call this same login()
       // just made, not a stray/replayed one.
@@ -162,7 +184,8 @@ class SyncServer extends _$SyncServer {
           .login(server, username, accessToken);
       botToast(l10n.sync_logged);
       return (true, "");
-    } catch (e) {
+    } catch (e, stackTrace) {
+      recordError(e, stack: stackTrace, source: 'sync_server');
       return (false, e.toString());
     }
   }
@@ -191,7 +214,7 @@ class SyncServer extends _$SyncServer {
   /// or a [scheduled] one that finds automatic sync turned off, is a benign
   /// skip and returns true.
   Future<bool> startSync(
-    AppLocalizations l10n,
+    AppLocalizations? l10n,
     bool silent, {
     bool upload = false,
     bool download = false,
@@ -205,7 +228,7 @@ class SyncServer extends _$SyncServer {
     // Anything else - the periodic timer or a manual trigger - must wait,
     // otherwise it could race the restore and pull stale data back down.
     if (!bypassRestoreGuard && ref.read(restoreSyncGuardProvider)) {
-      if (!silent) {
+      if (!silent && l10n != null) {
         botToast(l10n.sync_restore_in_progress, second: 3);
       }
       return false;
@@ -226,7 +249,7 @@ class SyncServer extends _$SyncServer {
         final ran = await _startChimahonSync(
           silent: silent,
           scheduled: scheduled,
-          onStarting: silent
+          onStarting: silent || l10n == null
               ? null
               : () => botToast(l10n.sync_starting, second: 500),
           upload: upload,
@@ -235,7 +258,7 @@ class SyncServer extends _$SyncServer {
         );
         if (!ran) return true;
         if (ref.mounted) ref.invalidate(synchingProvider(syncId: syncId));
-        if (!silent) {
+        if (!silent && l10n != null) {
           botToast(l10n.sync_finished, second: 2);
         }
         return true;
@@ -263,19 +286,20 @@ class SyncServer extends _$SyncServer {
   }
 
   Future<bool> _startNativeSync(
-    AppLocalizations l10n,
+    AppLocalizations? l10n,
     bool silent, {
     required bool upload,
     required bool download,
   }) async {
-    if (!silent) {
+    if (!silent && l10n != null) {
       botToast(l10n.sync_starting, second: 500);
     }
     final progress = ref.read(syncProgressProvider(syncId: syncId).notifier);
     progress.begin();
+    BackgroundWork.begin(BackgroundWorkKind.sync);
     try {
       if (!await _apiClient.checkVersion(_getServer())) {
-        if (!silent) {
+        if (!silent && l10n != null) {
           botToast(l10n.sync_failed, second: 5);
         }
         return false;
@@ -295,7 +319,7 @@ class SyncServer extends _$SyncServer {
           : await _incrementalSync(notifier);
 
       if (!ok) {
-        if (!silent) {
+        if (!silent && l10n != null) {
           botToast(l10n.sync_failed, second: 5);
         }
         return false;
@@ -303,12 +327,13 @@ class SyncServer extends _$SyncServer {
       if (ref.mounted) {
         ref.invalidate(synchingProvider(syncId: syncId));
       }
-      if (!silent) {
+      if (!silent && l10n != null) {
         botToast(l10n.sync_finished, second: 2);
       }
       return true;
     } finally {
       progress.finish();
+      BackgroundWork.end(BackgroundWorkKind.sync);
     }
   }
 
@@ -973,11 +998,24 @@ class SyncServer extends _$SyncServer {
   // until every entity has fully caught up, then saves the new `since`.
   // ------------------------------------------------------------------
 
-  Future<bool> _incrementalSync(Synching notifier) async {
+  Future<bool> _incrementalSync(Synching notifier) {
     final prefs = ref.read(synchingProvider(syncId: syncId));
-    final since = prefs.since ?? 0;
-    final changed = ChangedRows.collect(prefs, notifier);
-    final chunks = changed.chunked(_maxRowsPerEntity);
+    return _syncLoop(
+      notifier,
+      since: prefs.since ?? 0,
+      changed: ChangedRows.collect(prefs, notifier),
+    );
+  }
+
+  /// Sends [changed] in chunks while paging through what the server has
+  /// since [since], then saves the new `since`. With no [changed], it only
+  /// pulls.
+  Future<bool> _syncLoop(
+    Synching notifier, {
+    required int since,
+    ChangedRows? changed,
+  }) async {
+    final chunks = changed?.chunked(_maxRowsPerEntity) ?? const [];
     final progress = ref.read(syncProgressProvider(syncId: syncId).notifier);
     progress.addTotal(chunks.length);
 
@@ -1011,7 +1049,7 @@ class SyncServer extends _$SyncServer {
         if (syncedAt != null) {
           await notifier.setSince(syncedAt);
           await notifier.setLastSync(DateTime.now().millisecondsSinceEpoch);
-          await changed.clearUploaded(notifier);
+          await changed?.clearUploaded(notifier);
         }
         return true;
       }
@@ -1054,50 +1092,14 @@ class SyncServer extends _$SyncServer {
   // traded for not being a one-click way to destroy real data by accident.
   // ------------------------------------------------------------------
 
-  Future<bool> _forceUpload(Synching notifier) async {
+  Future<bool> _forceUpload(Synching notifier) {
     final prefs = ref.read(synchingProvider(syncId: syncId));
-    final since = prefs.since ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final changed = ChangedRows.collectAll(forcedUpdatedAt: now);
-    final chunks = changed.chunked(_maxRowsPerEntity);
-    final progress = ref.read(syncProgressProvider(syncId: syncId).notifier);
-    progress.addTotal(chunks.length);
-
-    Map<String, String?>? cursors;
-    String? sessionToken;
-    var chunkIndex = 0;
-
-    while (true) {
-      if (!ref.mounted) return false;
-      final hasChunk = chunkIndex < chunks.length;
-      final body = <String, dynamic>{
-        'since': since,
-        'sessionToken': ?sessionToken,
-        'cursors': ?cursors,
-        if (hasChunk) ...chunks[chunkIndex],
-      };
-      if (hasChunk) chunkIndex += 1;
-
-      final response = await _postSync(body);
-      if (response == null) return false;
-      if (hasChunk) progress.addDone(1);
-      _trackDownloadProgress(progress, response);
-
-      await _applyPulledEntities(response);
-      sessionToken = response['sessionToken'] as String?;
-      cursors = _apiClient.decodeCursors(response['cursors']);
-      final hasMore = response['hasMore'] == true;
-
-      if (chunkIndex >= chunks.length && !hasMore) {
-        final syncedAt = response['syncedAt'] as int?;
-        if (syncedAt != null) {
-          await notifier.setSince(syncedAt);
-          await notifier.setLastSync(DateTime.now().millisecondsSinceEpoch);
-          await changed.clearUploaded(notifier);
-        }
-        return true;
-      }
-    }
+    return _syncLoop(
+      notifier,
+      since: prefs.since ?? 0,
+      changed: ChangedRows.collectAll(forcedUpdatedAt: now),
+    );
   }
 
   // ------------------------------------------------------------------
@@ -1109,38 +1111,8 @@ class SyncServer extends _$SyncServer {
   // over just leaving them alone.
   // ------------------------------------------------------------------
 
-  Future<bool> _fullDownload(Synching notifier) async {
-    const since = 0;
-    Map<String, String?>? cursors;
-    String? sessionToken;
-    final progress = ref.read(syncProgressProvider(syncId: syncId).notifier);
-
-    while (true) {
-      if (!ref.mounted) return false;
-      final body = <String, dynamic>{
-        'since': since,
-        'sessionToken': ?sessionToken,
-        'cursors': ?cursors,
-      };
-      final response = await _postSync(body);
-      if (response == null) return false;
-      _trackDownloadProgress(progress, response);
-
-      await _applyPulledEntities(response);
-      sessionToken = response['sessionToken'] as String?;
-      cursors = _apiClient.decodeCursors(response['cursors']);
-      final hasMore = response['hasMore'] == true;
-
-      if (!hasMore) {
-        final syncedAt = response['syncedAt'] as int?;
-        if (syncedAt != null) {
-          await notifier.setSince(syncedAt);
-          await notifier.setLastSync(DateTime.now().millisecondsSinceEpoch);
-        }
-        return true;
-      }
-    }
-  }
+  Future<bool> _fullDownload(Synching notifier) =>
+      _syncLoop(notifier, since: 0);
 
   // ------------------------------------------------------------------
   // Wire transport
@@ -1179,9 +1151,41 @@ class SyncServer extends _$SyncServer {
     ref.invalidate(blendLevelStateProvider);
     ref.invalidate(flexSchemeColorStateProvider);
     ref.invalidate(pureBlackDarkModeStateProvider);
+    ref.invalidate(tintSurfacesStateProvider);
+    ref.invalidate(floatingNavigationBarStateProvider);
+    ref.invalidate(showUpdatesBadgeStateProvider);
     ref.invalidate(l10nLocaleStateProvider);
     ref.invalidate(extensionsRepoStateProvider(ItemType.manga));
     ref.invalidate(extensionsRepoStateProvider(ItemType.anime));
     ref.invalidate(extensionsRepoStateProvider(ItemType.novel));
   }
+}
+
+/// Triggers auto sync if sync is enabled, user is logged in, autoSyncFrequency > 0,
+/// and enough time has elapsed since lastSync.
+Future<void> autoSyncIfDue(dynamic ref, {int syncId = 1}) async {
+  if (!ref.read(appUnlockedStateProvider)) return;
+
+  final syncPrefs = ref.read(synchingProvider(syncId: syncId));
+  if (!syncPrefs.syncOn) return;
+  // Chimahon sync keeps its own credentials; the native server needs a login.
+  if (syncPrefs.syncMode != SyncMode.chimahon) {
+    final authToken = syncPrefs.authToken;
+    if (authToken == null || authToken.isEmpty) return;
+  }
+
+  final autoSyncFrequency = syncPrefs.autoSyncFrequency;
+  if (autoSyncFrequency <= 0) return;
+
+  final now = DateTime.now().millisecondsSinceEpoch;
+  final lastSync = syncPrefs.lastSync ?? 0;
+  final elapsedMs = now - lastSync;
+  if (elapsedMs < autoSyncFrequency * 1000) return;
+
+  if (ref.read(syncProgressProvider(syncId: syncId)).active) return;
+  if (ref.read(restoreSyncGuardProvider)) return;
+
+  await ref
+      .read(syncServerProvider(syncId: syncId).notifier)
+      .startSync(null, true, scheduled: true);
 }

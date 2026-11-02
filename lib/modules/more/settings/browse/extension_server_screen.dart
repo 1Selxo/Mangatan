@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:mangayomi/services/external_browser.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/browse/extension_server/android_proxy_server_dialog.dart';
 import 'package:mangayomi/modules/more/settings/browse/extension_server/extension_server_release.dart';
@@ -21,7 +22,6 @@ import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as path;
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../providers/storage_provider.dart';
 
@@ -636,10 +636,7 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
 
   Future<void> _openMExtensionServerRelease() async {
     final l10n = l10nLocalizations(context)!;
-    if (!await launchUrl(
-      Uri.parse(mExtensionServerReleaseUrl),
-      mode: LaunchMode.externalApplication,
-    )) {
+    if (!await ExternalBrowser.open(mExtensionServerReleaseUrl)) {
       botToast(l10n.could_not_launch_apk_bridge_page);
     }
   }

@@ -13,7 +13,7 @@ import 'package:mangayomi/modules/browse/providers/browse_initial_tab_provider.d
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/data_and_storage/widgets/unified_restore.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/onboarding/providers/onboarding_state_provider.dart';
 import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/modules/widgets/tv_pill.dart';

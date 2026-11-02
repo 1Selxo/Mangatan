@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flex_color_scheme/flex_color_scheme.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/utils/app_font_fallback.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'blend_level_state_provider.dart';
 import 'flex_scheme_color_state_provider.dart';
 import 'pure_black_dark_mode_state_provider.dart';
-import 'app_font_family.dart';
+import 'tint_surfaces_state_provider.dart';
+
+import 'package:shiori/shiori.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
 /// Material draws a focused InkWell's highlight from the ambient
@@ -28,7 +30,7 @@ ThemeData _tvFocus(ThemeData theme) {
   ButtonStyle withRing(ButtonStyle? base) =>
       (base ?? const ButtonStyle()).copyWith(side: ring);
   return theme.copyWith(
-    focusColor: theme.colorScheme.primary.withValues(alpha: 0.45),
+    focusColor: theme.colorScheme.primary.withValues(alpha: Alphas.tvFocus),
     textButtonTheme: TextButtonThemeData(
       style: withRing(theme.textButtonTheme.style),
     ),
@@ -41,63 +43,48 @@ ThemeData _tvFocus(ThemeData theme) {
   );
 }
 
-/// Provides the light theme for the app, recomputed only when
-/// flex scheme colors, blend level, or font family change.
-final lightThemeProvider = Provider<ThemeData>((ref) {
-  final colors = ref.watch(flexSchemeColorStateProvider.select((value) => value.$1));
-  final blendLevel = ref.watch(blendLevelStateProvider).toInt();
-  final fontFamily = ref.watch(appFontFamilyProvider.select((value) => value.$2));
+/// The density the interface is laid out for on this device.
+ShioriDensity get _density => isTv
+    ? ShioriDensity.tv
+    : isDesktop
+    ? ShioriDensity.desktop
+    : ShioriDensity.phone;
 
+/// Provides the light theme for the app, recomputed only when the palette,
+/// the blend level, or the surface tint change.
+final lightThemeProvider = Provider<ThemeData>((ref) {
+  final schemeIndex = ref.watch(
+    flexSchemeColorStateProvider.select((theme) => theme.$2),
+  );
   return _tvFocus(
+    // Japanese UI text falls back to a CJK font the theme's font lacks.
     applyAppFontFallback(
-      FlexThemeData.light(
-        colors: colors,
-        surfaceMode: FlexSurfaceMode.highScaffoldLevelSurface,
-        blendLevel: blendLevel,
-        appBarOpacity: 0.00,
-        subThemesData: const FlexSubThemesData(
-          blendOnLevel: 10,
-          thinBorderWidth: 2.0,
-          unselectedToggleIsColored: true,
-          inputDecoratorRadius: 24.0,
-          chipRadius: 24.0,
-        ),
-        useMaterial3ErrorColors: true,
-        visualDensity: FlexColorScheme.comfortablePlatformDensity,
-        useMaterial3: true,
-        fontFamily: fontFamily,
+      buildShioriTheme(
+        brightness: Brightness.light,
+        colors: ThemeAA.schemes[schemeIndex].light,
+        tintSurfaces: ref.watch(tintSurfacesStateProvider),
+        blendLevel: ref.watch(blendLevelStateProvider).toInt(),
+        density: _density,
       ),
     ),
   );
 });
 
-/// Provides the dark theme for the app, recomputed only when
-/// flex scheme colors, blend level, font family, or pure-black toggle change.
+/// Provides the dark theme for the app, recomputed only when the palette,
+/// the blend level, the surface tint, or the pure-black toggle change.
 final darkThemeProvider = Provider<ThemeData>((ref) {
-  final colors = ref.watch(flexSchemeColorStateProvider.select((value) => value.$1));
-  final blendLevel = ref.watch(blendLevelStateProvider).toInt();
-  final fontFamily = ref.watch(appFontFamilyProvider.select((value) => value.$2));
-  final pureBlack = ref.watch(pureBlackDarkModeStateProvider);
-
+  final schemeIndex = ref.watch(
+    flexSchemeColorStateProvider.select((theme) => theme.$2),
+  );
   return _tvFocus(
     applyAppFontFallback(
-      FlexThemeData.dark(
-        colors: colors,
-        surfaceMode: FlexSurfaceMode.level,
-        blendLevel: blendLevel,
-        appBarOpacity: 0.00,
-        scaffoldBackground: pureBlack ? Colors.black : null,
-        subThemesData: const FlexSubThemesData(
-          blendOnLevel: 10,
-          thinBorderWidth: 2.0,
-          unselectedToggleIsColored: true,
-          inputDecoratorRadius: 24.0,
-          chipRadius: 24.0,
-        ),
-        useMaterial3ErrorColors: true,
-        visualDensity: FlexColorScheme.comfortablePlatformDensity,
-        useMaterial3: true,
-        fontFamily: fontFamily,
+      buildShioriTheme(
+        brightness: Brightness.dark,
+        colors: ThemeAA.schemes[schemeIndex].dark,
+        tintSurfaces: ref.watch(tintSurfacesStateProvider),
+        blendLevel: ref.watch(blendLevelStateProvider).toInt(),
+        density: _density,
+        pureBlack: ref.watch(pureBlackDarkModeStateProvider),
       ),
     ),
   );

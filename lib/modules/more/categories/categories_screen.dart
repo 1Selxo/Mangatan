@@ -1,24 +1,22 @@
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/widgets/error_state.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:isar_community/isar.dart';
-import 'package:mangayomi/main.dart';
 import 'package:mangayomi/repositories/category_repository.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/changed.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
 import 'package:mangayomi/modules/more/categories/widgets/custom_textfield.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
-import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/services/category_service.dart';
 import 'package:mangayomi/utils/item_type_filters.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 
 class CategoriesScreen extends ConsumerStatefulWidget {
-  final (bool, ItemType) data;
+  final (bool, int) data;
   const CategoriesScreen({required this.data, super.key});
 
   @override
@@ -38,12 +36,21 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen>
       types = types.where((t) => t == ItemType.anime).toList();
     }
     _visibleTabTypes = types;
+    final requestedIndex = widget.data.$2;
+    final requestedType =
+        requestedIndex >= 0 && requestedIndex < ItemType.values.length
+        ? ItemType.values[requestedIndex]
+        : null;
+    final initialIndex = requestedType != null
+        ? _visibleTabTypes.indexOf(requestedType)
+        : 0;
     _tabBarController = TabController(
       length: _visibleTabTypes.length,
+      initialIndex: _visibleTabTypes.isEmpty || initialIndex < 0
+          ? 0
+          : initialIndex,
       vsync: this,
     );
-    final initialIndex = _visibleTabTypes.indexOf(widget.data.$2);
-    if (initialIndex >= 0) _tabBarController.animateTo(initialIndex);
   }
 
   @override
@@ -57,7 +64,11 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen>
     if (_visibleTabTypes.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: Text(context.l10n.categories)),
-        body: Center(child: Text(context.l10n.empty_placeholder)),
+        body: ShioriEmptyState(
+          icon: Symbols.label_rounded,
+          title: context.l10n.empty_placeholder,
+          compact: true,
+        ),
       );
     }
     final l10n = l10nLocalizations(context)!;
@@ -66,19 +77,15 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen>
       length: _visibleTabTypes.length,
       child: Scaffold(
         appBar: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          title: Text(
-            widget.data.$1 ? l10n.edit_categories : l10n.categories,
-            style: TextStyle(color: Theme.of(context).hintColor),
-          ),
-          bottom: TabBar(
-            indicatorSize: TabBarIndicatorSize.label,
-            controller: _tabBarController,
-            tabs: _visibleTabTypes.map((type) {
-              return Tab(text: type.localized(l10n));
-            }).toList(),
-          ),
+          title: Text(widget.data.$1 ? l10n.edit_categories : l10n.categories),
+          bottom: _visibleTabTypes.length < 2
+              ? null
+              : TabBar(
+                  controller: _tabBarController,
+                  tabs: _visibleTabTypes.map((type) {
+                    return Tab(text: type.localized(l10n));
+                  }).toList(),
+                ),
         ),
         body: TabBarView(
           controller: _tabBarController,
@@ -113,17 +120,17 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab> {
         data: (data) {
           if (data.isEmpty) {
             _entries = [];
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  l10n.edit_categories_description,
-                  textAlign: TextAlign.center,
-                ),
-              ),
+            return ShioriEmptyState(
+              icon: Symbols.label_rounded,
+              title: l10n.no_categories_yet,
+              message: l10n.no_categories_yet_message,
+              actionLabel: l10n.add_category,
+              onAction: _addCategory,
             );
           }
-          _entries = CategoryService.ordered(data);
+          final sortedData = [...data]
+            ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
+          _entries = sortedData;
 
           return ReorderableListView.builder(
             buildDefaultDragHandles: false,
@@ -148,109 +155,20 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab> {
         },
         error: (Object error, StackTrace stackTrace) {
           _entries = [];
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                l10n.edit_categories_description,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
+          return ErrorState(detail: error.toString());
         },
         loading: () {
-          return const ProgressCenter();
+          return const ShioriLoading();
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          bool isExist = false;
-          final controller = TextEditingController();
-          showDialog(
-            context: context,
-            builder: (context) {
-              return SizedBox(
-                child: StatefulBuilder(
-                  builder: (context, setState) {
-                    return AlertDialog(
-                      title: Text(l10n.add_category),
-                      content: CustomTextFormField(
-                        controller: controller,
-                        entries: _entries,
-                        context: context,
-                        exist: (value) {
-                          setState(() {
-                            isExist = value;
-                          });
-                        },
-                        isExist: isExist,
-                        val: (val) {},
-                      ),
-                      actions: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              child: Text(l10n.cancel),
-                            ),
-                            const SizedBox(width: 15),
-                            TextButton(
-                              onPressed:
-                                  controller.text.trim().isEmpty || isExist
-                                  ? null
-                                  : () async {
-                                      final category = Category(
-                                        forItemType: widget.itemType,
-                                        name: controller.text.trim(),
-                                        pos: _nextPosition(),
-                                        hide: false,
-                                        shouldUpdate: true,
-                                        updatedAt: DateTime.now()
-                                            .millisecondsSinceEpoch,
-                                      );
-                                      // create() would replace pos with the id.
-                                      await categoryRepository.writeTransaction(
-                                        () => categoryRepository.putSync(
-                                          category,
-                                        ),
-                                      );
-
-                                      if (context.mounted) {
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                              child: Text(
-                                l10n.add,
-                                style: TextStyle(
-                                  color:
-                                      controller.text.trim().isEmpty || isExist
-                                      ? Theme.of(context).primaryColor
-                                            .withValues(alpha: 0.2)
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              );
-            },
-          );
-        },
-        label: Row(
-          children: [
-            const Icon(Icons.add),
-            const SizedBox(width: 10),
-            Text(l10n.add),
-          ],
-        ),
-      ),
+      // Only beside a list: an empty screen offers its own Add.
+      floatingActionButton: (categories.asData?.value.isEmpty ?? true)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _addCategory,
+              icon: const Icon(Symbols.add_rounded),
+              label: Text(l10n.add),
+            ),
     );
   }
 
@@ -259,147 +177,79 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab> {
     Category category,
     int index,
   ) {
-    final l10n = l10nLocalizations(context)!;
-    return Padding(
+    final l10n = context.l10n;
+    final hidden = category.hide ?? false;
+    final updates = category.shouldUpdate ?? true;
+    return ShioriListRow(
       key: Key('category_${category.id}'),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Card(
-        child: Row(
-          children: [
-            ReorderableDragStartListener(
-              index: index,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Icon(Icons.drag_handle),
-              ),
+      leading: ReorderableDragStartListener(
+        index: index,
+        child: const Icon(Symbols.drag_handle_rounded),
+      ),
+      title: category.name!,
+      subtitle: updates ? null : l10n.skip_updates,
+      // A hidden category stays here, faded, so it can be shown again.
+      dimmed: hidden,
+      onTap: () => _renameCategory(category),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: hidden ? l10n.show_category : l10n.hide_category,
+            onPressed: () async {
+              category.hide = !hidden;
+              await categoryRepository.save(category);
+            },
+            icon: Icon(
+              hidden
+                  ? Symbols.visibility_off_rounded
+                  : Symbols.visibility_rounded,
             ),
-            Expanded(
-              child: Column(
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      shadowColor: Colors.transparent,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.only(
-                          bottomLeft: Radius.circular(0),
-                          bottomRight: Radius.circular(0),
-                          topRight: Radius.circular(10),
-                          topLeft: Radius.circular(10),
-                        ),
-                      ),
-                    ),
-                    onPressed: () {
-                      _renameCategory(category);
-                    },
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Icon(Icons.label_outline_rounded),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(category.name!)),
-                      ],
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          _renameCategory(category);
-                        },
-                        icon: const Icon(Icons.mode_edit_outline_outlined),
-                      ),
-                      SizedBox(width: 10),
-                      IconButton(
-                        onPressed: () async {
-                          category.shouldUpdate =
-                              !(category.shouldUpdate ?? true);
-                          await categoryRepository.save(category);
-                        },
-                        icon: Icon(
-                          category.shouldUpdate ?? true
-                              ? Icons.update_outlined
-                              : Icons.update_disabled_outlined,
-                        ),
-                      ),
-                      if (widget.itemType != ItemType.novel) ...[
-                        SizedBox(width: 10),
-                        IconButton(
-                          onPressed: () async {
-                            category.hide = !(category.hide ?? false);
-                            await categoryRepository.save(category);
-                          },
-                          icon: Icon(
-                            !(category.hide ?? false)
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                        ),
-                      ],
-                      SizedBox(width: 10),
-                      IconButton(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) {
-                              return StatefulBuilder(
-                                builder: (context, setState) {
-                                  return AlertDialog(
-                                    title: Text(l10n.delete_category),
-                                    content: Text(
-                                      l10n.delete_category_msg(category.name!),
-                                    ),
-                                    actions: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                            },
-                                            child: Text(l10n.cancel),
-                                          ),
-                                          const SizedBox(width: 15),
-                                          TextButton(
-                                            onPressed: () async {
-                                              await _removeCategory(
-                                                category,
-                                                context,
-                                              );
-                                            },
-                                            child: Text(l10n.ok),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        },
-                        icon: const Icon(Icons.delete_outlined),
-                      ),
-                    ],
-                  ),
-                ],
+          ),
+          ShioriMenuButton(
+            tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+            items: [
+              ShioriMenuItem(
+                label: l10n.rename,
+                icon: Symbols.edit_rounded,
+                onSelected: () => _renameCategory(category),
               ),
-            ),
-          ],
-        ),
+              ShioriMenuItem(
+                label: l10n.skip_updates,
+                checked: !updates,
+                onSelected: () async {
+                  category.shouldUpdate = !updates;
+                  await categoryRepository.save(category);
+                },
+              ),
+              null,
+              ShioriMenuItem(
+                label: l10n.delete,
+                icon: Symbols.delete_rounded,
+                destructive: true,
+                onSelected: () async {
+                  // Removing a category also takes every series out of it,
+                  // which Undo could not put back: this one asks.
+                  final confirmed = await showShioriConfirm(
+                    context,
+                    title: l10n.delete_category,
+                    message: l10n.delete_category_msg(category.name!),
+                    confirmLabel: l10n.delete,
+                    cancelLabel: l10n.cancel,
+                    destructive: true,
+                  );
+                  if (confirmed) await _removeCategory(category);
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  int _nextPosition() => _entries.isEmpty
-      ? 0
-      : _entries.map((e) => e.pos ?? 0).reduce((a, b) => a > b ? a : b) + 1;
-
-  Future<void> _removeCategory(Category category, BuildContext context) async {
-    await removeCategoryForItemType(category, widget.itemType);
+  Future<void> _removeCategory(Category category) async {
+    await categoryRepository.remove(category);
 
     await ref
         .read(synchingProvider(syncId: 1).notifier)
@@ -410,88 +260,36 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab> {
           true,
           clientId: category.clientId,
         );
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
   }
 
-  void _renameCategory(Category category) {
-    bool isExist = false;
-    final controller = TextEditingController(text: category.name);
-    bool sameName() =>
-        CategoryService.normalizeName(controller.text) ==
-        CategoryService.normalizeName(category.name ?? '');
-    bool isSameName = sameName();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            final l10n = l10nLocalizations(context);
-            return AlertDialog(
-              title: Text(l10n!.rename_category),
-              content: CustomTextFormField(
-                controller: controller,
-                entries: _entries,
-                context: context,
-                exist: (value) {
-                  setState(() {
-                    isExist = value;
-                  });
-                },
-                isExist: isExist,
-                name: category.name!,
-                val: (val) {
-                  setState(() {
-                    isSameName = sameName();
-                  });
-                },
-              ),
-              actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: Text(l10n.cancel),
-                    ),
-                    const SizedBox(width: 15),
-                    TextButton(
-                      onPressed:
-                          controller.text.trim().isEmpty ||
-                              isExist ||
-                              isSameName
-                          ? null
-                          : () async {
-                              category.name = controller.text.trim();
-                              await categoryRepository.save(category);
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                              }
-                            },
-                      child: Text(
-                        l10n.ok,
-                        style: TextStyle(
-                          color:
-                              controller.text.trim().isEmpty ||
-                                  isExist ||
-                                  isSameName
-                              ? Theme.of(context).primaryColor
-                                    .withValues(alpha: 0.2)
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
-        );
-      },
+  Future<void> _addCategory() async {
+    final name = await promptCategoryName(
+      context,
+      title: context.l10n.add_category,
+      confirmLabel: context.l10n.add,
+      existing: _entries,
     );
+    if (name == null) return;
+    await categoryRepository.create(
+      Category(
+        forItemType: widget.itemType,
+        name: name,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
+  Future<void> _renameCategory(Category category) async {
+    final name = await promptCategoryName(
+      context,
+      title: context.l10n.rename_category,
+      confirmLabel: context.l10n.ok,
+      existing: _entries,
+      initial: category.name,
+    );
+    if (name == null) return;
+    category.name = name;
+    await categoryRepository.save(category);
   }
 }
 
@@ -499,21 +297,4 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab> {
 /// gap it leaves in that type's category order.
 @visibleForTesting
 Future<void> removeCategoryForItemType(Category category, ItemType itemType) =>
-    categoryRepository.writeTransactionAsync(() async {
-      final items = await isar.mangas
-          .filter()
-          .categoriesElementEqualTo(category.id!)
-          .and()
-          .itemTypeEqualTo(itemType)
-          .findAll();
-      for (final item in items) {
-        CategoryService.removeMembership(item, category.id!);
-      }
-      await isar.mangas.putAll(items);
-      await isar.categorys.delete(category.id!);
-      await isar.categorys.putAll(
-        CategoryService.normalizePositions(
-          await isar.categorys.filter().forItemTypeEqualTo(itemType).findAll(),
-        ),
-      );
-    });
+    categoryRepository.remove(category..forItemType = itemType);

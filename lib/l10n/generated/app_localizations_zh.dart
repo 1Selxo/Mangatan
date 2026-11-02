@@ -261,7 +261,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String mass_migration_finding_matches(Object source, Object language) {
-    return '正在 $source • $language 中查找匹配项';
+    return '正在 $source · $language 中寻找匹配项';
   }
 
   @override
@@ -479,6 +479,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get about => '关于';
 
   @override
+  String get open_source_licenses => '开源许可证';
+
+  @override
+  String get open_source_licenses_subtitle => 'Mangayomi 所使用的软件包及其许可证';
+
+  @override
+  String get open_source_licenses_empty => '没有可用的许可证信息。';
+
+  @override
   String get help => '帮助';
 
   @override
@@ -559,6 +568,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pure_black_dark_mode => '纯黑深色模式';
+
+  @override
+  String get tint_surfaces_with_palette => '用调色板为界面着色';
+
+  @override
+  String get tint_surfaces_with_palette_subtitle =>
+      '像以前一样，用所选调色板为背景、卡片和栏着色。关闭时它们保持中性色，调色板只用于强调色。';
 
   @override
   String get timestamp => '时间戳';
@@ -643,6 +659,52 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get delete_download_after_reading => '完成阅读后删除下载内容';
+
+  @override
+  String get delete_after_reading_slot => '删除哪个章节';
+
+  @override
+  String get delete_after_reading_last => '刚读完的章节';
+
+  @override
+  String delete_after_reading_nth(int n) {
+    return '往前 $n 个章节';
+  }
+
+  @override
+  String get delete_after_reading_slot_subtitle => '保留几个已读章节，方便离线时回看。';
+
+  @override
+  String get delete_bookmarked_after_reading => '同时删除已书签的章节';
+
+  @override
+  String get auto_download => '自动下载';
+
+  @override
+  String get download_new_chapters => '下载新章节';
+
+  @override
+  String get download_new_chapters_subtitle => '图书馆更新后，将库中作品的新未读章节加入下载队列。';
+
+  @override
+  String get download_new_chapters_included => '仅限这些类别';
+
+  @override
+  String get download_new_chapters_excluded => '这些类别除外';
+
+  @override
+  String get download_new_chapters_all_categories => '所有类别';
+
+  @override
+  String get download_ahead => '阅读时提前下载';
+
+  @override
+  String get download_ahead_subtitle => '阅读库中作品的已下载章节时，下载接下来的未读章节。';
+
+  @override
+  String download_ahead_count(int n) {
+    return '接下来的 $n 个章节';
+  }
 
   @override
   String get concurrent_downloads => '并发下载';
@@ -1078,8 +1140,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sync_button_download => '仅下载';
 
   @override
-  String get sync_button_download_info =>
-      'This replaces enabled synced media and settings with the remote Chimahon data. Disabled media and device-only files are retained.';
+  String get sync_button_download_info => '此操作将完全用远程数据替换本地数据！';
 
   @override
   String get sync_status_not_configured => '未连接';
@@ -1148,6 +1209,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reorder_navigation_description => '根据需要重新排序和切换每个导航。';
 
   @override
+  String get floating_navigation_bar => '悬浮导航栏';
+
+  @override
+  String get floating_navigation_bar_description => '使用悬浮胶囊代替固定的导航栏。';
+
+  @override
+  String get show_updates_badge => '在“更新”图标上显示角标';
+
+  @override
+  String get show_updates_badge_description => '统计自上次打开“更新”以来发现的章节数。';
+
+  @override
   String get full_screen_player => '使用全屏';
 
   @override
@@ -1159,7 +1232,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String n_episodes(Object n) {
+  String n_episodes(int n) {
     return '$n集';
   }
 
@@ -1547,6 +1620,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mark_duplicate_chapters_read => '将重复的章节号标记为已读';
 
   @override
+  String get skip_read_chapters => '跳过已读章节';
+
+  @override
+  String get skip_read_chapters_subtitle => '切换到下一章或上一章时，跳过已读的章节。';
+
+  @override
+  String get skip_filtered_chapters => '跳过被筛选的章节';
+
+  @override
+  String get skip_duplicate_chapters => '跳过重复章节';
+
+  @override
+  String get skip_duplicate_chapters_subtitle =>
+      '每个章节号只阅读一份；如有多个版本，优先选择同一译者的版本。';
+
+  @override
   String get default_skip_intro_length => '默认片头跳过时长';
 
   @override
@@ -1731,6 +1820,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get edit_code => '编辑代码';
 
   @override
+  String get subtitles_on_by_default => '开启字幕';
+
+  @override
+  String get subtitles_on_by_default_info => '关闭时，剧集开始时没有字幕，直到你选择字幕轨道。';
+
+  @override
   String get use_libass => '启用 libass';
 
   @override
@@ -1740,10 +1835,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libass_not_disable_message => '在播放器设置中禁用 `use libass` 以便自定义字幕。';
 
   @override
-  String get override_ass_subtitles => '覆盖 ASS 字幕样式';
+  String get override_ass_subtitles => '使用我的字幕样式';
 
   @override
-  String get override_ass_subtitles_info => '将自定义样式应用到 ASS/SSA 字幕';
+  String get override_ass_subtitles_info =>
+      '将你的大小和颜色应用到所有字幕，包括 ASS。关闭时，字幕使用默认样式';
 
   @override
   String get torrent_stream => '种子流';
@@ -1840,6 +1936,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloads_are_limited_to_wifi => '下载仅限于WiFi';
 
   @override
+  String get recommendations => '推荐';
+
+  @override
   String get recommendations_similar => '相似';
 
   @override
@@ -1928,6 +2027,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get add_repo => '添加库';
+
+  @override
+  String get add_repo_sources_to_add => '将添加以下扩展列表：';
+
+  @override
+  String get add_repo_warning => '这些仓库中的扩展会在应用内运行。请只添加你信任的仓库。';
 
   @override
   String get genre_search_library => '按类别搜索图书馆';
@@ -2067,6 +2172,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get custom_buttons_startup => 'lua 代码（启动时）';
 
   @override
+  String get custom_buttons_add_warning =>
+      '此按钮会在视频播放器中运行下面的 Lua 代码，这些代码可以访问你的文件并运行程序。只有在你信任此链接的来源时才添加。';
+
+  @override
   String n_days(Object n) {
     return '$n 天';
   }
@@ -2124,6 +2233,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subtitle_delay => '延迟（毫秒）';
 
   @override
+  String get audio_delay => '音频延迟（毫秒）';
+
+  @override
+  String get audio_delay_subtitle => '让声音比画面延后（正值）或提前（负值）播放。在各集之间保持不变。';
+
+  @override
   String get subtitle_speed => '速度';
 
   @override
@@ -2171,13 +2286,60 @@ class AppLocalizationsZh extends AppLocalizations {
   String get watch_order => '观看顺序';
 
   @override
+  String get watch_order_role_current => '当前';
+
+  @override
+  String get watch_order_role_previous => '上一部';
+
+  @override
+  String get watch_order_role_next => '下一部';
+
+  @override
+  String get watch_order_source_release_order => '上映顺序';
+
+  @override
+  String watch_order_source_community_list(String name, String author) {
+    return '$author 的 $name';
+  }
+
+  @override
+  String watch_order_source_official_collection(String name) {
+    return 'Trakt 官方合集：$name';
+  }
+
+  @override
+  String watch_order_source_trakt_collection(String name) {
+    return 'Trakt 合集：$name';
+  }
+
+  @override
+  String watch_order_source_seasons(String title) {
+    return '$title 的各季';
+  }
+
+  @override
+  String get watch_order_select_source => '顺序来源';
+
+  @override
+  String watch_order_season(int number) {
+    return '第 $number 季';
+  }
+
+  @override
+  String watch_order_episode(int number) {
+    return '第 $number 集';
+  }
+
+  @override
   String get sequels => '续集';
 
   @override
-  String get recommendations => '推荐';
+  String get recommendations_similarity => '相似度：';
 
   @override
-  String get recommendations_similarity => '相似度：';
+  String recommendation_rating_accessibility(String rating) {
+    return '评分 $rating';
+  }
 
   @override
   String get local_folder_structure => '本地文件夹结构';
@@ -2321,6 +2483,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get forceLandscapeModeSubtitle => '强制播放器使用横屏方向。';
 
   @override
+  String get remember_player_volume => '记住音量';
+
+  @override
+  String get remember_player_volume_subtitle => '每集都以上一集结束时的音量开始播放。';
+
+  @override
+  String get remember_player_brightness => '记住亮度';
+
+  @override
   String get dns_over_https => 'DNS-over-HTTPS (DoH)';
 
   @override
@@ -2342,7 +2513,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authenticating => '正在验证...';
 
   @override
-  String get lock => 'Lock';
+  String get lock => '锁定';
 
   @override
   String get unlock => '解锁';
@@ -2355,6 +2526,65 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get app_lock => '应用锁';
+
+  @override
+  String get app_lock_delay => '锁定时机';
+
+  @override
+  String get app_lock_delay_immediately => '离开应用时';
+
+  @override
+  String app_lock_delay_minutes(int n) {
+    return '离开 $n 分钟后';
+  }
+
+  @override
+  String get app_lock_delay_launch_only => '仅在应用启动时';
+
+  @override
+  String get secure_screen => '安全屏幕';
+
+  @override
+  String get secure_screen_subtitle => '在应用切换器中隐藏应用；在 Android 上还会禁止截图和录屏。';
+
+  @override
+  String get secure_screen_never => '从不';
+
+  @override
+  String get secure_screen_incognito => '隐身模式时';
+
+  @override
+  String get secure_screen_always => '始终';
+
+  @override
+  String get background_work => '后台任务';
+
+  @override
+  String get background_work_in_progress => '处理中…';
+
+  @override
+  String get background_downloading => '下载中';
+
+  @override
+  String get background_updating_library => '正在更新图书馆';
+
+  @override
+  String get background_restoring => '正在恢复备份';
+
+  @override
+  String get background_syncing => '同步中';
+
+  @override
+  String get background_cancel_downloads => '取消下载';
+
+  @override
+  String get background_stop_update => '停止更新';
+
+  @override
+  String get hide_notification_content => '隐藏通知内容';
+
+  @override
+  String get hide_notification_content_subtitle => '通知只说明应用正在执行的操作，不显示作品或章节名称。';
 
   @override
   String get require_biometric_or_device_credential => '需要生物识别或设备凭证才能打开应用';
@@ -2382,6 +2612,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get brightness => '亮度';
+
+  @override
+  String get video_filters => '视频滤镜';
+
+  @override
+  String get video_filter_contrast => '对比度';
+
+  @override
+  String get video_filter_saturation => '饱和度';
+
+  @override
+  String get video_filter_gamma => '伽马';
+
+  @override
+  String get video_filter_hue => '色相';
+
+  @override
+  String get volume => '音量';
 
   @override
   String get contrast => '对比度';
@@ -2648,6 +2896,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get split_wide_pages => '拆分双页';
+
+  @override
+  String get split_tall_images => '分割长图';
+
+  @override
+  String get split_tall_images_subtitle =>
+      '条漫：将超高图片分片显示，每次只解码一片，以减少内存占用。不能与「裁剪边框」同时使用。';
 
   @override
   String get dual_page_invert => '反转拆分的半页';
@@ -3056,6 +3311,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboarding_title => '欢迎使用 Mangayomi';
 
   @override
+  String get onboarding_language_title => '选择语言';
+
+  @override
+  String get onboarding_language_body => 'Mangayomi 将以此语言显示。之后可在“外观”中更改。';
+
+  @override
+  String get onboarding_nav_grouped_body =>
+      '为每个书库保留一个标签页，或将它们合并到一个“书库”标签页，并将“更新”和“历史”合并到一个“动态”标签页。';
+
+  @override
+  String get onboarding_nav_grouped => '合并的标签页';
+
+  @override
+  String get onboarding_nav_grouped_inside => '每个合并的标签页都在其屏幕顶部切换';
+
+  @override
   String get onboarding_libraries_body => '选择您要阅读和观看的内容类型。';
 
   @override
@@ -3065,13 +3336,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboarding_nav_body => '可以为每种类型设置独立标签页，或合并在一个“书库”标签页中。';
 
   @override
-  String get onboarding_nav_split => '独立标签页';
-
-  @override
   String get onboarding_nav_merged => '统一书库标签页';
 
   @override
   String get onboarding_nav_inside => '点击“书库”可在各类型间切换';
+
+  @override
+  String get onboarding_nav_split => '独立标签页';
 
   @override
   String get onboarding_next => '下一步';
@@ -3242,6 +3513,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get auto_library_update_wifi_only_subtitle => '使用移动数据时跳过计划更新。';
 
   @override
+  String get library_update_restrictions => '更新时跳过';
+
+  @override
+  String get library_update_skip_completed => '已完结的作品';
+
+  @override
+  String get library_update_skip_unread => '有未读章节的作品';
+
+  @override
+  String get library_update_skip_not_started => '未开始的作品';
+
+  @override
+  String get library_update_restrictions_subtitle =>
+      '适用于所有图书馆更新。设为跳过更新的类别，在更新整个图书馆时也会被排除。';
+
+  @override
+  String get library_update_restrictions_none => '无';
+
+  @override
   String get padding => '内边距';
 
   @override
@@ -3296,13 +3586,969 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chapter_swipe_disabled => '已禁用';
 
   @override
+  String get update_errors => '更新错误';
+
+  @override
+  String get no_update_errors => '没有更新错误';
+
+  @override
+  String get clear_all => '全部清除';
+
+  @override
+  String get dismiss => '关闭';
+
+  @override
+  String get previous_episode => '上一集';
+
+  @override
+  String get clear_logs => '清除日志';
+
+  @override
+  String get bold => '粗体';
+
+  @override
+  String get italic => '斜体';
+
+  @override
+  String get color_yellow => '黄色';
+
+  @override
+  String get color_cyan => '青色';
+
+  @override
+  String get color_green => '绿色';
+
+  @override
+  String get color_orange => '橙色';
+
+  @override
+  String get continue_watching => '继续观看';
+
+  @override
+  String get search_your_anime => '搜索你的动画';
+
+  @override
+  String get category => '分类';
+
+  @override
+  String get hidden_categories => '隐藏的分类';
+
+  @override
+  String get new_category => '新建分类';
+
+  @override
+  String get local => '本地';
+
+  @override
+  String get tv_home_rows => '行';
+
+  @override
+  String get genre_rows => '类型行';
+
+  @override
+  String get share_backup_file => '分享 Mangayomi 备份';
+
+  @override
+  String get close => '关闭';
+
+  @override
+  String get migrate_source => '迁移来源';
+
+  @override
+  String get cloudflare_bypass_proxy => 'Cloudflare 绕过代理';
+
+  @override
+  String get custom_doh_url => '自定义 DoH 地址';
+
+  @override
+  String get custom_doh_url_helper => '必须是 https 的 DoH（JSON）端点';
+
+  @override
+  String get anime_only_tv_layout => '仅动画的电视布局';
+
+  @override
+  String get anime_only_beta => '仅动画（测试版）';
+
+  @override
+  String get tv_home_beta => '电视主页（测试版）';
+
+  @override
+  String get tv_player_beta => '电视播放器（测试版）';
+
+  @override
+  String get mark_as_read => '标为已读';
+
+  @override
+  String get mark_as_unread => '标为未读';
+
+  @override
+  String get bookmark => '书签';
+
+  @override
+  String get remove_bookmark => '移除书签';
+
+  @override
+  String get mark_below_as_read => '将下方标为已读';
+
+  @override
+  String get previous_chapter => '上一章';
+
+  @override
+  String get pin => '固定';
+
+  @override
+  String get go_forward => '前进';
+
+  @override
+  String get invert_selection => '反选';
+
+  @override
+  String get select_between => '选择之间的内容';
+
+  @override
+  String get show_password => '显示密码';
+
+  @override
+  String get hide_password => '隐藏密码';
+
+  @override
+  String get always_on_top => '窗口置顶';
+
+  @override
+  String get mute => '静音';
+
+  @override
+  String get unmute => '取消静音';
+
+  @override
+  String get exit_fullscreen => '退出全屏';
+
+  @override
+  String get play => '播放';
+
+  @override
+  String get pause => '暂停';
+
+  @override
+  String get switch_tracker => '切换追踪器';
+
+  @override
+  String get rename => '重命名';
+
+  @override
+  String get show_category => '显示分类';
+
+  @override
+  String get hide_category => '隐藏分类';
+
+  @override
+  String get update_with_library => '随书库一起更新';
+
+  @override
+  String get skip_updates => '更新书库时跳过';
+
+  @override
+  String get show_repository => '显示仓库';
+
+  @override
+  String get hide_repository => '隐藏仓库';
+
+  @override
+  String get set_as_default => '设为默认';
+
+  @override
+  String get change_display_mode => '更改显示模式';
+
+  @override
+  String get back_to_results => '返回结果';
+
+  @override
+  String get activity => '动态';
+
+  @override
+  String get group_nav_destinations => '合并导航';
+
+  @override
+  String get group_nav_destinations_subtitle =>
+      '一个可在漫画、动画和小说之间切换的“书库”标签，以及一个包含更新和历史的“动态”标签';
+
+  @override
+  String get search_all_sources => '搜索所有来源';
+
+  @override
+  String get continue_reading => '继续';
+
+  @override
+  String get show_continue_shelf => '显示正在阅读的作品';
+
+  @override
+  String get show_continue_shelf_subtitle => '在书库顶部显示一行进行中的系列';
+
+  @override
+  String get excluded => '已排除';
+
+  @override
+  String get remove_filter => '移除筛选';
+
+  @override
+  String get current_chapter => '当前章节';
+
+  @override
+  String get series => '系列';
+
+  @override
+  String get chapters_read => '已读章节';
+
+  @override
+  String get search_settings => '搜索设置';
+
+  @override
+  String get search_settings_hint => '输入设置名称，或其说明中的一个词';
+
+  @override
+  String reading_mode_for(String name) {
+    return '$name 的阅读模式';
+  }
+
+  @override
+  String default_is(String name) {
+    return '默认：$name';
+  }
+
+  @override
+  String get use_default => '使用默认';
+
+  @override
+  String get is_the_default => '这是你的默认阅读模式';
+
+  @override
+  String get page_layout => '页面布局与缩放';
+
+  @override
+  String get reader_section_mode_summary => '默认模式、缩放、背景、预加载、全屏';
+
+  @override
+  String get reader_section_layout_summary => '宽页面、双页、横屏缩放';
+
+  @override
+  String get reader_section_navigation_summary => '点击区域、布局、隐藏菜单、翻页闪烁';
+
+  @override
+  String get reader_section_swipe_summary => '在列表中滑动章节时的操作';
+
+  @override
+  String get all_reader_settings => '所有阅读器设置';
+
+  @override
+  String get undo => '撤销';
+
+  @override
+  String get removed_from_history => '已从历史中移除';
+
+  @override
+  String n_new_chapters(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个新章节',
+      one: '1 个新章节',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get page_color_white => '白色';
+
+  @override
+  String get page_color_black => '黑色';
+
+  @override
+  String get page_color_night => '夜间';
+
+  @override
+  String get page_color_sepia => '棕褐';
+
+  @override
+  String get page_color_coffee => '咖啡';
+
+  @override
+  String get page_color_silver => '银色';
+
+  @override
+  String get page_color_graphite => '石墨';
+
+  @override
+  String get page_color_mist => '薄雾';
+
+  @override
+  String get page_color_paper => '纸张';
+
+  @override
+  String get page_color_sky => '天空';
+
+  @override
+  String get page_color_mint => '薄荷';
+
+  @override
+  String get page_color_honey => '蜂蜜';
+
+  @override
+  String next_episode_in(int seconds) {
+    return '$seconds 秒后播放下一集';
+  }
+
+  @override
+  String get stay_on_this_episode => '停留在本集';
+
+  @override
+  String get got_it => '知道了';
+
+  @override
+  String get gesture_brightness => '在左侧上下滑动调节亮度';
+
+  @override
+  String get gesture_volume => '在右侧上下滑动调节音量';
+
+  @override
+  String get gesture_double_tap_skip => '双击一侧可后退或快进';
+
+  @override
+  String get gesture_drag_seek => '左右拖动以调整播放位置';
+
+  @override
+  String get gesture_long_press_speed => '长按加速播放';
+
+  @override
+  String get tap_to_continue => '点按任意位置继续';
+
+  @override
+  String get empty_library_hint => '在“浏览”中找到系列并添加到书库。';
+
+  @override
+  String get more_filters => '更多筛选';
+
+  @override
+  String get resume_all_downloads => '继续所有下载';
+
+  @override
+  String get download_failed => '失败';
+
+  @override
+  String get download_all => '全部下载';
+
+  @override
+  String n_chapters_queued(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 章已加入队列',
+      one: '1 章已加入队列',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String n_selected(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get settings_general_summary => '语言、书库更新、网络';
+
+  @override
+  String get settings_appearance_summary => '主题、调色板、导航、字体';
+
+  @override
+  String get settings_novel_reader_summary => '字体、页面颜色、朗读';
+
+  @override
+  String get settings_player_summary => '播放、字幕、音频、解码器';
+
+  @override
+  String get settings_downloads_summary => '位置、仅限 Wi-Fi、同时下载';
+
+  @override
+  String get settings_tracking_summary => 'MyAnimeList、AniList、Kitsu 等';
+
+  @override
+  String get settings_syncing_summary => '在你自己的服务器上同步进度';
+
+  @override
+  String get settings_browse_summary => '扩展、仓库、来源';
+
+  @override
+  String get settings_security_summary => '应用锁';
+
+  @override
+  String get settings_about_summary => '版本、更新、错误报告';
+
+  @override
+  String minutes_left(int minutes) {
+    return '约剩 $minutes 分钟';
+  }
+
+  @override
+  String get group_playback => '播放';
+
+  @override
+  String get group_subtitles => '字幕';
+
+  @override
+  String get group_screen => '屏幕';
+
+  @override
+  String get aniskip => 'AniSkip';
+
+  @override
+  String seconds_short(int n) {
+    return '$n 秒';
+  }
+
+  @override
+  String unknown_language_codes(String codes) {
+    return '未知语言代码：$codes';
+  }
+
+  @override
+  String get group_network => '网络';
+
+  @override
+  String get group_discord => 'Discord';
+
+  @override
+  String invalid_url(String scheme) {
+    return '请输入以 $scheme 开头的网址';
+  }
+
+  @override
+  String get group_cleanup => '清理';
+
+  @override
+  String remove_entries_confirm(int n) {
+    return '要移除 $n 个条目及其历史吗？此操作无法撤销。';
+  }
+
+  @override
+  String get group_library_maintenance => '书库维护';
+
+  @override
+  String get group_diagnostics => '诊断';
+
+  @override
+  String get update_no_notes => '没有发行说明。';
+
+  @override
+  String update_download_failed(String error) {
+    return '下载失败：$error';
+  }
+
+  @override
+  String get update_network_error => '下载时发生网络错误。';
+
+  @override
+  String get update_write_failed => '无法写入 APK 文件。';
+
+  @override
+  String get update_later => '稍后';
+
+  @override
+  String get update_installed_version => '已安装';
+
+  @override
+  String get update_new_version => '新版本';
+
+  @override
+  String update_published(String date) {
+    return '发布于 $date';
+  }
+
+  @override
+  String get update_pre_release => '预发布版';
+
+  @override
+  String get update_notes_features => '新功能';
+
+  @override
+  String get update_notes_fixes => '修复';
+
+  @override
+  String get update_notes_other => '改进';
+
+  @override
+  String get update_hint_install => '应用会下载更新，然后 Android 会请你确认安装。你的书库不会改变。';
+
+  @override
+  String get update_hint_browser => '发布页面将在浏览器中打开：请从那里下载适合你系统的文件，然后安装。';
+
+  @override
+  String get update_downloading => '正在下载…';
+
+  @override
+  String get update_installing => '正在打开安装程序…';
+
+  @override
+  String get update_install_failed => '无法打开安装程序。';
+
+  @override
+  String get update_browser_failed => '无法打开浏览器。';
+
+  @override
+  String get deselect_all => '取消全选';
+
+  @override
+  String update_failed_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个条目无法更新',
+      one: '1 个条目无法更新',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sort_ascending => '升序';
+
+  @override
+  String get sort_descending => '降序';
+
+  @override
+  String get not_downloaded => '未下载';
+
+  @override
+  String n_tracked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '正在追踪 $count 个条目',
+      one: '正在追踪 1 个条目',
+      zero: '尚未追踪任何条目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get no_tracker_connected => '未连接追踪器';
+
+  @override
+  String get no_tracker_connected_message => '在 设置 › 追踪 中登录服务后，其列表会显示在这里。';
+
+  @override
+  String get edit_metadata => '编辑元数据';
+
+  @override
+  String get group_modes => '模式';
+
+  @override
+  String get group_app => '应用';
+
+  @override
+  String get group_sources_services => '来源与服务';
+
+  @override
+  String n_sources(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个来源',
+      one: '1 个来源',
+      zero: '没有来源',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get tv_player_beta_subtitle => '开启：为电视遥控器设计的播放器。关闭：原来的播放器。';
+
+  @override
+  String get anime_only_beta_subtitle => '在整个应用中隐藏漫画和小说。关闭即可显示全部。';
+
+  @override
+  String download_queue_start_failed(String error) {
+    return '无法启动下载队列：$error';
+  }
+
+  @override
+  String get group_interface => '界面';
+
+  @override
+  String get group_navigation => '导航';
+
+  @override
+  String get tv_home_beta_subtitle => '按行排列的动画主页（继续观看、新剧集、分类），代替平铺网格';
+
+  @override
+  String get cloudflare_bypass_proxy_hint => '可选的 FlareSolverr 或 Byparr 地址';
+
+  @override
+  String get cloudflare_bypass_proxy_message =>
+      'FlareSolverr 或 Byparr 端点。留空即关闭。';
+
+  @override
+  String get group_explore => '探索';
+
+  @override
+  String get explore_recommendations_subtitle => '与此类似的作品';
+
+  @override
+  String get explore_related_subtitle => '其改编、衍生作品和其他版本';
+
+  @override
+  String get explore_watch_order_subtitle => '观看完整故事的顺序';
+
+  @override
+  String get explore_sequels_subtitle => '来自追踪器的后续作品';
+
+  @override
+  String get tap_zone_menu => '菜单';
+
+  @override
+  String get tap_zone_previous => '上一页';
+
+  @override
+  String get tap_zone_next => '下一页';
+
+  @override
+  String get back_to_series => '返回系列';
+
+  @override
+  String get keyboard_shortcuts => '键盘快捷键';
+
+  @override
+  String get shortcut_previous_page => '上一页';
+
+  @override
+  String get shortcut_next_page => '下一页';
+
+  @override
+  String get shortcut_toggle_bars => '显示或隐藏栏';
+
+  @override
+  String get shortcut_zoom_in => '放大';
+
+  @override
+  String get shortcut_zoom_out => '缩小';
+
+  @override
+  String get shortcut_zoom_reset => '适应页面';
+
+  @override
+  String get shortcut_wheel_zoom => '用鼠标缩放';
+
+  @override
+  String get mouse_wheel => '滚轮';
+
+  @override
+  String get shortcut_leave => '退出阅读器';
+
+  @override
+  String get shortcut_show => '显示这些快捷键';
+
+  @override
+  String get color_red => '红色';
+
+  @override
+  String get color_blue => '蓝色';
+
+  @override
+  String get color_opacity => '不透明度';
+
+  @override
+  String get volume_keys_paging => '用音量键翻页';
+
+  @override
+  String get volume_keys_paging_ios => '阅读时音量保持在一半，以便两个按键都能使用，离开时恢复原样。';
+
+  @override
+  String get volume_keys_inverted => '反转音量键';
+
+  @override
+  String get reader_orientation => '屏幕方向';
+
+  @override
+  String get orientation_free => '跟随设备';
+
+  @override
+  String get orientation_portrait => '竖屏';
+
+  @override
+  String get orientation_landscape => '横屏';
+
+  @override
+  String get screen_brightness => '屏幕亮度';
+
+  @override
+  String get screen_brightness_system => '跟随系统';
+
+  @override
+  String get shortcut_play_pause => '播放或暂停';
+
+  @override
+  String shortcut_seek_back(int n) {
+    return '后退 $n 秒';
+  }
+
+  @override
+  String shortcut_seek_forward(int n) {
+    return '前进 $n 秒';
+  }
+
+  @override
+  String get shortcut_volume_up => '调高音量';
+
+  @override
+  String get shortcut_volume_down => '调低音量';
+
+  @override
+  String get shortcut_mute => '静音或取消静音';
+
+  @override
+  String shortcut_skip_intro(int n) {
+    return '跳过片头（$n 秒）';
+  }
+
+  @override
+  String get shortcut_previous_frame => '上一帧';
+
+  @override
+  String get shortcut_next_frame => '下一帧';
+
+  @override
+  String get shortcut_shaders => 'Anime4K 着色器';
+
+  @override
+  String get shortcut_shaders_off => '关闭着色器';
+
+  @override
+  String get autoplay_next_on => '自动播放下一集：开';
+
+  @override
+  String get autoplay_next_off => '自动播放下一集：关';
+
+  @override
+  String get autoplay_next => '自动播放下一集';
+
+  @override
+  String get next_episode_short => '下一集';
+
+  @override
+  String get subtitle_preview_sample => '旅程仍在继续。';
+
+  @override
+  String get text_style => '样式';
+
+  @override
+  String get code_editor => '代码编辑器';
+
+  @override
+  String get code_view_code => '代码';
+
+  @override
+  String get code_view_test => '测试';
+
+  @override
+  String get code_view_console => '控制台';
+
+  @override
+  String get code_function => '函数';
+
+  @override
+  String get code_page => '页码';
+
+  @override
+  String get code_query => '查询';
+
+  @override
+  String get code_url => 'URL';
+
+  @override
+  String get code_html => 'HTML';
+
+  @override
+  String get code_execute => '运行';
+
+  @override
+  String get code_executing => '正在运行…';
+
+  @override
+  String get code_no_result => '暂无结果';
+
+  @override
+  String get code_no_result_message => '运行一个函数，查看它返回的内容。';
+
+  @override
+  String get code_console => '控制台';
+
+  @override
+  String get code_no_logs => '暂无日志';
+
+  @override
+  String get tv_empty_anime_library => '你的动画书库是空的';
+
+  @override
+  String get tv_empty_anime_library_hint => '从“浏览”添加动画来充实你的主页';
+
+  @override
+  String get browse_anime => '浏览动画';
+
+  @override
+  String get no_episodes_yet => '暂无剧集';
+
+  @override
+  String get filler => '填充集';
+
+  @override
+  String get obsolete => '已过时';
+
+  @override
+  String every_n_days(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '每 $n 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get update_interval_unknown => '无法估计';
+
+  @override
+  String get group_reading => '阅读';
+
+  @override
+  String get group_reading_watching => '阅读与观看';
+
+  @override
+  String get novel_reader => '小说阅读器';
+
+  @override
+  String get all_languages => '所有语言';
+
+  @override
+  String get custom_dns_title => '自定义 DNS';
+
+  @override
+  String get custom_dns_system => '系统 DNS';
+
+  @override
+  String get calendar_format_month => '月';
+
+  @override
+  String get calendar_format_two_weeks => '两周';
+
+  @override
+  String get calendar_format_week => '周';
+
+  @override
+  String get read_count => '已读';
+
+  @override
+  String get watched_count => '已看';
+
+  @override
+  String get source_code_error_title => '此来源的代码未能运行';
+
+  @override
+  String source_code_error_failed(String what) {
+    return '$what 失败：界面已改用备用值，以便继续使用';
+  }
+
+  @override
+  String get copy_error => '复制';
+
+  @override
+  String get error_copied => '已复制错误';
+
+  @override
+  String get no_categories_yet => '还没有分类';
+
+  @override
+  String get no_categories_yet_message => '用你自己命名和排序的分类来整理书库。';
+
+  @override
+  String get settings_keyboard_shortcuts_summary => '更改阅读器和播放器的按键';
+
+  @override
+  String get shortcut_reset_all => '重置所有快捷键';
+
+  @override
+  String get shortcut_press_key => '请按一个键…';
+
+  @override
+  String shortcut_key_in_use(String action) {
+    return '已被占用：$action';
+  }
+
+  @override
+  String get external_browser => '打开外部链接的方式';
+
+  @override
+  String get system_default => '系统默认';
+
+  @override
+  String get no_browsers_detected => '未检测到浏览器';
+
+  @override
+  String get on_this_device => '在此设备上';
+
+  @override
+  String get local_tracking => '在此设备上追踪';
+
+  @override
+  String get local_tracking_desc =>
+      '无需账号，在此保存每部作品的状态、进度、评分和日期。不会发送任何内容。关闭后，已保存的内容仍会保留。';
+
+  @override
+  String get track_add_one => '再加一个';
+
+  @override
+  String get track_change_match => '更改匹配';
+
+  @override
+  String get track_remove => '停止追踪';
+
+  @override
+  String get track_remove_local_msg => '其状态、进度、评分和日期将从此设备删除。';
+
+  @override
+  String track_remove_online_msg(String tracker) {
+    return '该条目仍保留在 $tracker 上：这里只移除它与此作品的关联。';
+  }
+
+  @override
+  String update_from_repo(String repo) {
+    return '来自 $repo';
+  }
+
+  @override
+  String get update_from_other_repo => '要从其他存储库更新吗？';
+
+  @override
+  String update_from_other_repo_msg(
+    String name,
+    String origin,
+    String version,
+    String other,
+  ) {
+    return '$name 是从 $origin 安装的。版本 $version 来自 $other：安装后，$name 将从 $other 获取更新。请仅在信任该存储库时继续。';
+  }
+
+  @override
+  String get update_all_foreign => '部分更新来自其他存储库';
+
+  @override
+  String get update_all_foreign_msg => '更新后，这些扩展将从新存储库获取更新。请仅在信任它时才包含。';
+
+  @override
+  String get update_all_skip_foreign => '仅来自其原有存储库';
+
+  @override
   String get seasons => 'Seasons';
 
   @override
   String get season_number => 'Season number';
-
-  @override
-  String get migrate_source => 'Migrate source';
 
   @override
   String season_n(String number) {
@@ -3319,9 +4565,6 @@ class AppLocalizationsZh extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get filler => 'Filler';
 
   @override
   String get episode_fetch_date => 'Episode fetch date';

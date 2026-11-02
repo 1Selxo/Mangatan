@@ -1,0 +1,15 @@
+10 lib/modules/anime/anime_player_view.dart
+2 lib/modules/anime/widgets/desktop.dart
+1 lib/modules/anime/widgets/play_or_pause_button.dart
+1 lib/modules/anime/widgets/subtitle_cue_list.dart
+1 lib/modules/anime/widgets/subtitle_setting_widget.dart
+1 lib/modules/browse/extension/extension_detail.dart
+5 lib/modules/manga/detail/manga_detail_view.dart
+6 lib/modules/manga/home/manga_home_screen.dart
+4 lib/modules/manga/reader/widgets/reader_bottom_bar.dart
+2 lib/modules/more/download_queue/download_queue_screen.dart
+1 lib/modules/more/settings/downloads/downloads_screen.dart
+5 lib/modules/more/settings/sync/sync.dart
+2 lib/modules/more/statistics/immersion_stats_screen.dart
+1 lib/modules/more/statistics/immersion_stats_titles_screen.dart
+5 lib/modules/novel/novel_reader_view.dart

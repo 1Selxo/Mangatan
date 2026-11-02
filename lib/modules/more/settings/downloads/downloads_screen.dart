@@ -1,9 +1,12 @@
+import 'package:mangayomi/services/local_folders.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shiori/shiori.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/modules/library/providers/file_scanner.dart';
 import 'package:mangayomi/modules/more/settings/downloads/providers/downloads_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/downloads/widgets/auto_download_group.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/local_directory_access.dart';
@@ -62,6 +65,28 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                     .set(value);
               },
             ),
+            if (deleteDownloadAfterReading) ...[
+              ShioriValueRow<int>(
+                title: l10n.delete_after_reading_slot,
+                description: l10n.delete_after_reading_slot_subtitle,
+                value: ref.watch(deleteAfterReadingSlotStateProvider),
+                options: [
+                  ShioriChoice(0, l10n.delete_after_reading_last),
+                  for (var n = 1; n <= 4; n++)
+                    ShioriChoice(n, l10n.delete_after_reading_nth(n)),
+                ],
+                onChanged: (v) => ref
+                    .read(deleteAfterReadingSlotStateProvider.notifier)
+                    .set(v),
+              ),
+              SwitchListTile(
+                value: ref.watch(deleteBookmarkedAfterReadingStateProvider),
+                title: Text(l10n.delete_bookmarked_after_reading),
+                onChanged: (value) => ref
+                    .read(deleteBookmarkedAfterReadingStateProvider.notifier)
+                    .set(value),
+              ),
+            ],
             SwitchListTile(
               value: allowConcurrentDownloads,
               title: Text(l10n.allow_concurrent_downloads),
@@ -211,6 +236,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 style: TextStyle(fontSize: 11, color: context.secondaryColor),
               ),
             ),
+            const AutoDownloadGroup(),
             ListTile(
               onTap: () async {
                 final result =

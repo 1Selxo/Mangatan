@@ -4,27 +4,32 @@ import 'dart:io';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:app_links/app_links.dart';
+import 'package:hive_flutter/adapters.dart';
+import 'package:mangayomi/services/crash_native.dart';
+import 'package:mangayomi/services/sync_server.dart';
 import 'package:archive/archive.dart';
 import 'package:bot_toast/bot_toast.dart';
-import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/adapters.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 import 'package:mangayomi/models/custom_button.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/repositories/custom_button_repository.dart';
+import 'package:mangayomi/repositories/db.dart';
 import 'package:mangayomi/repositories/track_repository.dart';
+export 'package:mangayomi/repositories/db.dart';
+export 'package:mangayomi/services/http/m_client.dart'
+    show webViewEnvironment, customDns;
 import 'package:mangayomi/models/track.dart' as track;
-import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/storage_usage.dart';
@@ -62,6 +67,15 @@ import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/url_protocol/api.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_provider.dart';
 import 'package:mangayomi/modules/library/providers/file_scanner.dart';
+import 'package:mangayomi/utils/app_lock.dart';
+import 'package:mangayomi/services/secure_screen.dart';
+import 'package:mangayomi/modules/manga/download/providers/download_provider.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:mangayomi/services/background_work/background_work.dart';
+import 'package:mangayomi/services/background_work/download_work.dart';
+import 'package:mangayomi/repositories/chapter_repository.dart';
+import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
+import 'package:mangayomi/services/download_manager/download_gate.dart';
 import 'package:mangayomi/modules/more/settings/security/providers/security_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/security/app_lock_screen.dart';
 import 'package:media_kit/media_kit.dart';
@@ -73,13 +87,11 @@ import 'package:mangayomi/utils/window_geometry.dart';
 import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart';
 import 'package:mangayomi/modules/widgets/app_ui_scale.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
-import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/utils/error_toast.dart';
+import 'package:mangayomi/utils/startup_error_hint.dart';
+export 'package:mangayomi/services/discord_rpc.dart' show discordRpc;
 import 'package:mangayomi/services/perf/startup_trace.dart';
 
-late Isar isar;
-DiscordRPC? discordRpc;
-WebViewEnvironment? webViewEnvironment;
-String? customDns;
 bool _didMountApplication = false;
 
 /// Captures a supported cold-start URI supplied directly to a desktop runner.
@@ -111,7 +123,6 @@ void main(List<String> args) async {
     WidgetsFlutterBinding.ensureInitialized();
     StartupTrace.mark('bindings');
     _registerBundledLibraryLicenses();
-    if (Platform.isLinux && runWebViewTitleBarWidget(args)) return;
 
     // Cap the decoded image cache so a large library grid can't fill the
     // default 100 MB ceiling with full-resolution covers and OOM constrained
@@ -182,8 +193,19 @@ void main(List<String> args) async {
     // can start, browse and read online without it. The permission is still
     // requested lazily by `createDirectorySafely` / `initDB` the first time a
     // public path actually needs to be written (e.g. a download). See #740.
+    // Caught errors are kept for everyone, unlike the verbose log behind
+    // "Enable logs". Anything raised before this is held in memory and
+    // written out here.
     unawaited(
-      storage.getDefaultDirectory().then(CrashReports.init).catchError((_) {}),
+      storage
+          .getDefaultDirectory()
+          .then((directory) async {
+            await CrashReports.init(directory);
+            // After CrashReports, because a native crash from the last run
+            // is recorded into it.
+            await NativeCrashHandler.init(directory);
+          })
+          .catchError((_) {}),
     );
     Object? startupError;
     try {
@@ -193,6 +215,9 @@ void main(List<String> args) async {
       startupError = e;
     }
     StartupTrace.mark('database');
+    // The background work notification's buttons reach the app through
+    // this port.
+    if (Platform.isAndroid) FlutterForegroundTask.initCommunicationPort();
     runApp(
       startupError != null
           ? _StartupErrorApp(error: startupError.toString())
@@ -258,12 +283,24 @@ class _StartupErrorApp extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const Icon(
+                  Symbols.error_outline_rounded,
+                  fill: 1,
+                  size: 64,
+                  color: Colors.red,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Failed to start Mangatan',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
+                if (startupErrorHint(error) case final hint?) ...[
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Text(hint, textAlign: TextAlign.center),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 SelectableText(
                   error,
@@ -275,6 +312,26 @@ class _StartupErrorApp extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// The tracker library cache moved from Hive to Isar. Remove the box Hive
+/// left behind, in the directory `Hive.initFlutter` used to open it.
+Future<void> _deleteLegacyHiveCache() async {
+  try {
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Platform.isAndroid
+        ? docs.path
+        : p.join(
+            docs.path,
+            isApple ? "databases" : p.join("Mangayomi", "databases"),
+          );
+    for (final name in ["tracker_library.hive", "tracker_library.lock"]) {
+      final file = File(p.join(dir, name));
+      if (await file.exists()) await file.delete();
+    }
+  } catch (error, stackTrace) {
+    recordError(error, stack: stackTrace, source: 'main');
   }
 }
 
@@ -304,7 +361,8 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
     Hive.init(databaseDirectory!.path);
     MiningPreferences.configureStorageDirectory(databaseDirectory.path);
   }
-  Hive.registerAdapter(TrackSearchAdapter());
+  // The tracker library cache moved to Isar; its old Hive files go.
+  unawaited(_deleteLegacyHiveCache());
   YouTubePreferences.markStorageReady();
   unawaited(DictionaryUpdateService.instance.runAutomaticIfDue());
   if (isDesktop && !kDebugMode) {
@@ -365,6 +423,12 @@ class _MyAppState extends ConsumerState<MyApp>
     WidgetsBinding.instance.addObserver(this);
     if (!isMobile) windowManager.addListener(this);
     initializeDateFormatting();
+    ref.listenManual(
+      secureScreenOnProvider,
+      (_, secure) => SecureScreen.apply(secure),
+      fireImmediately: true,
+    );
+    _initBackgroundWork();
     customDns = ref.read(customDnsStateProvider);
     if (kDebugMode && supportsGoogleDriveChimahonSyncOnCurrentPlatform) {
       final previewRunner = GoogleDriveChimahonPreviewRunner.forDatabase(isar);
@@ -393,7 +457,8 @@ class _MyAppState extends ConsumerState<MyApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 5), () {
         if (!mounted) return;
-        unawaited(autoUpdateLibraryIfDue(ref));
+        unawaited(_autoUpdateLibrary());
+        unawaited(autoSyncIfDue(ref));
       });
     });
 
@@ -436,6 +501,22 @@ class _MyAppState extends ConsumerState<MyApp>
     }
   }
 
+  /// When the app last left the screen, for the lock delay.
+  DateTime? _backgroundedAt;
+
+  /// Whether the app is off screen or on its way, on iOS, where a secure
+  /// screen is covered so the app switcher's preview shows nothing.
+  bool _obscured = false;
+
+  /// The scheduled library refresh, when due; starts the download queue when
+  /// it queued new chapters.
+  Future<void> _autoUpdateLibrary() async {
+    final result = await autoUpdateLibraryIfDue(ref);
+    if (!mounted || (result?.queued ?? 0) == 0) return;
+    ref.invalidate(processDownloadsProvider());
+    ref.read(processDownloadsProvider());
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -449,22 +530,39 @@ class _MyAppState extends ConsumerState<MyApp>
         unawaited(_mExtensionServer.resumeEmbeddedIosBridge());
       }
     }
+    // iOS takes the app switcher's preview as the app goes inactive.
+    if (Platform.isIOS) {
+      final obscured = state != AppLifecycleState.resumed;
+      if (obscured != _obscured) setState(() => _obscured = obscured);
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       if (Platform.isLinux) {
         return;
       }
-      // Lock the app when going to background (if lock is enabled)
-      final lockEnabled = isar.settings.getSync(227)!.appLockEnabled ?? false;
-      if (lockEnabled) {
+      // Lock the app when going to background (if lock is enabled), or note
+      // when it left for a lock delay to count from.
+      _backgroundedAt ??= DateTime.now();
+      final lockEnabled = ref.read(appLockEnabledStateProvider);
+      if (lockEnabled && ref.read(appLockDelayStateProvider) == 0) {
         ref.read(appUnlockedStateProvider.notifier).lock();
       }
     } else if (state == AppLifecycleState.resumed) {
+      if (ref.read(appLockEnabledStateProvider) &&
+          shouldLockOnResume(
+            delayMinutes: ref.read(appLockDelayStateProvider),
+            backgroundedAt: _backgroundedAt,
+            now: DateTime.now(),
+          )) {
+        ref.read(appUnlockedStateProvider.notifier).lock();
+      }
+      _backgroundedAt = null;
       // Launch is the other trigger for the scheduled refresh, so without this
       // a session that stays open for days - a desktop one, typically - would
       // never run one. The interval check makes this a no-op the rest of the
       // time.
-      unawaited(autoUpdateLibraryIfDue(ref));
+      unawaited(_autoUpdateLibrary());
+      unawaited(autoSyncIfDue(ref));
     }
   }
 
@@ -516,6 +614,13 @@ class _MyAppState extends ConsumerState<MyApp>
               ? const OnboardingScreen()
               : KeyedSubtree(key: const ValueKey('app'), child: content),
         );
+        // The theme's ground behind every page: a page transition fades the
+        // page it leaves, and the window's black showed through on a light
+        // theme.
+        content = ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: content,
+        );
         // On TV, a single-line text field consumes Up/Down for the text cursor,
         // trapping focus so the remote can't reach the surrounding buttons (a
         // dialog's Cancel/Add, etc.). Remap Up/Down to move focus app-wide: a
@@ -546,6 +651,16 @@ class _MyAppState extends ConsumerState<MyApp>
                 child: base,
               )
             : base;
+
+        if (_obscured && ref.watch(secureScreenOnProvider)) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              content,
+              ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
+            ],
+          );
+        }
 
         if (!Platform.isLinux) {
           final isUnlocked = ref.watch(appUnlockedStateProvider);
@@ -581,10 +696,29 @@ class _MyAppState extends ConsumerState<MyApp>
     );
   }
 
+  /// The notification shown while the app works in the background, and
+  /// what its buttons do.
+  void _initBackgroundWork() {
+    DownloadWork.instance.start();
+    FlutterForegroundTask.addTaskDataCallback(BackgroundWork.handleAction);
+    BackgroundWork.onAction = (action) {
+      switch (action) {
+        case 'stop_library_update':
+          ref.read(libraryUpdateProvider.notifier).requestCancel();
+        case 'cancel_downloads':
+          for (final id in scheduledDownloads.value) {
+            chapterRepository.findByIdSync(id)?.cancelDownloads(id);
+          }
+      }
+    };
+  }
+
   @override
   void dispose() {
     if (!isMobile) timeDilation = defaultAnimationDurationScale;
     _disabledProgressController.dispose();
+    DownloadWork.instance.dispose();
+    FlutterForegroundTask.removeTaskDataCallback(BackgroundWork.handleAction);
     WidgetsBinding.instance.removeObserver(this);
     if (!isMobile) {
       windowManager.removeListener(this);
@@ -679,27 +813,56 @@ class _MyAppState extends ConsumerState<MyApp>
         final context = navigatorKey.currentContext;
         if (context == null || !context.mounted) return;
         final l10n = context.l10n;
+        // repo_name and repo_url are only labels the link chooses for
+        // itself; the *_url lists are what actually gets installed. Show
+        // those, or a link can borrow a trusted repo's name for its own.
+        final sourcesToAdd = [
+          for (final url in mangaRepoUrls ?? const <String>[])
+            (l10n.manga, url),
+          for (final url in animeRepoUrls ?? const <String>[])
+            (l10n.anime, url),
+          for (final url in novelRepoUrls ?? const <String>[])
+            (l10n.novel, url),
+        ];
+        if (sourcesToAdd.isEmpty) return;
         showDialog(
           context: navigatorKey.currentContext!,
           builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text(l10n.add_repo),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("${l10n.name}: ${repoName ?? 'Unknown'}"),
-                  const SizedBox(height: 8),
-                  Text("URL: ${repoUrl ?? 'Unknown'}"),
-                ],
+            return ShioriDialog(
+              title: l10n.add_repo,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.label_value(l10n.name, repoName ?? l10n.unknown)),
+                    const SizedBox(height: 8),
+                    Text(l10n.label_value(l10n.url, repoUrl ?? l10n.unknown)),
+                    const SizedBox(height: 16),
+                    Text(l10n.add_repo_sources_to_add),
+                    const SizedBox(height: 4),
+                    for (final (type, url) in sourcesToAdd)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: SelectableText(l10n.label_value(type, url)),
+                      ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.add_repo_warning,
+                      style: TextStyle(
+                        color: context.shiori.color.error.foreground,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
-                TextButton(
-                  child: Text(l10n.cancel),
+                ShioriButton.quiet(
+                  label: l10n.cancel,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
-                FilledButton(
-                  child: Text(l10n.add),
+                ShioriButton(
+                  label: l10n.add,
                   onPressed: () async {
                     if (context.mounted) Navigator.of(context).pop();
 
@@ -722,16 +885,31 @@ class _MyAppState extends ConsumerState<MyApp>
                       final current = ref.read(
                         extensionsRepoStateProvider(type),
                       );
-                      final updated = [
-                        ...current,
-                        ...urls.map(
-                          (e) => Repo(
-                            name: repoName,
-                            jsonUrl: e,
-                            website: repoUrl,
-                          ),
-                        ),
-                      ];
+                      final existingUrls = current
+                          .map((r) => r.jsonUrl?.trim().toLowerCase())
+                          .whereType<String>()
+                          .toSet();
+                      final newRepos = urls
+                          .where((e) {
+                            final clean = e.trim().toLowerCase();
+                            return !existingUrls.contains(clean) &&
+                                !existingUrls.contains('$clean/') &&
+                                !existingUrls.contains(
+                                  clean.endsWith('/')
+                                      ? clean.substring(0, clean.length - 1)
+                                      : clean,
+                                );
+                          })
+                          .map(
+                            (e) => Repo(
+                              name: repoName,
+                              jsonUrl: e,
+                              website: repoUrl,
+                            ),
+                          )
+                          .toList();
+                      if (newRepos.isEmpty) return;
+                      final updated = [...current, ...newRepos];
                       await ref
                           .read(extensionsRepoStateProvider(type).notifier)
                           .set(updated);
@@ -758,41 +936,80 @@ class _MyAppState extends ConsumerState<MyApp>
         }
         final l10n = context.l10n;
         for (final buttonRaw in buttonDataRaw) {
-          final buttonData = jsonDecode(utf8.decode(base64.decode(buttonRaw)));
+          final Object? buttonData;
+          try {
+            buttonData = jsonDecode(utf8.decode(base64.decode(buttonRaw)));
+          } catch (_) {
+            continue;
+          }
           if (buttonData is Map<String, dynamic>) {
             final customButton = CustomButton.fromJson(buttonData);
+            // The button's code becomes an mpv Lua script, which can touch
+            // the filesystem and spawn processes. Show every line of it
+            // before it is saved, not just the title the link picked.
+            final codeSections = [
+              (l10n.custom_buttons_js_code, customButton.codePress),
+              (l10n.custom_buttons_js_code_long, customButton.codeLongPress),
+              (l10n.custom_buttons_startup, customButton.codeStartup),
+            ].where((s) => s.$2?.trim().isNotEmpty ?? false);
             await showDialog(
               context: navigatorKey.currentContext!,
               builder: (BuildContext context) {
-                return AlertDialog(
-                  title: Text(l10n.custom_buttons_add),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("${l10n.name}: ${customButton.title ?? 'Unknown'}"),
-                    ],
+                return ShioriDialog(
+                  title: l10n.custom_buttons_add,
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.label_value(
+                            l10n.name,
+                            customButton.title ?? l10n.unknown,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          l10n.custom_buttons_add_warning,
+                          style: TextStyle(
+                            color: context.shiori.color.error.foreground,
+                          ),
+                        ),
+                        for (final (label, code) in codeSections) ...[
+                          const SizedBox(height: 16),
+                          Text(label),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(8),
+                            color: context.shiori.color.ink2,
+                            child: SelectableText(
+                              code!,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                   actions: [
-                    TextButton(
-                      child: Text(l10n.cancel),
+                    ShioriButton.quiet(
+                      label: l10n.cancel,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
-                    FilledButton(
-                      child: Text(l10n.add),
+                    ShioriButton(
+                      label: l10n.add,
                       onPressed: () async {
                         if (context.mounted) Navigator.of(context).pop();
-                        await dbWriteQueue.run(
-                          () => isar.writeTxn(() async {
-                            await isar.customButtons.put(
-                              customButton
-                                ..pos = await isar.customButtons.count()
-                                ..isFavourite = false
-                                ..id = null
-                                ..updatedAt =
-                                    DateTime.now().millisecondsSinceEpoch,
-                            );
-                          }),
+                        final pos = await customButtonRepository.count();
+                        await customButtonRepository.save(
+                          customButton
+                            ..pos = pos
+                            ..isFavourite = false
+                            ..id = null,
                         );
                         botToast(l10n.custom_buttons_added);
                       },
@@ -811,15 +1028,16 @@ class _MyAppState extends ConsumerState<MyApp>
   Future<bool> _checkValidUrls(List<String> urls) async {
     final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
     for (final url in urls) {
-      final req = await http.get(Uri.parse(url));
       try {
+        final req = await http.get(Uri.parse(url));
         final sourceList = (jsonDecode(req.body) as List).map(
           (e) => Source.fromJson(e),
         );
         if (sourceList.firstOrNull?.name == null) {
           return false;
         }
-      } catch (err) {
+      } catch (err, stackTrace) {
+        recordError(err, stack: stackTrace, source: 'main');
         return false;
       }
     }

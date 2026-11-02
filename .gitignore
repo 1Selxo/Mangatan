@@ -76,7 +76,7 @@ AGENTS.override.md
 /mpv/
 
 # Chapters downloaded by the debug build
-downloads/
+/downloads/
 .codegraph/
 
 # Crash reports written by debug runs; they contain local library paths

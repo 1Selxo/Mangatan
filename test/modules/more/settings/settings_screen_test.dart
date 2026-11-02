@@ -5,6 +5,7 @@ import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/settings/dictionary/dictionary_settings_section.dart';
 import 'package:mangayomi/modules/more/settings/settings_screen.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 
 void main() {
   test('dictionary settings match the Chimahon learning categories', () {
@@ -27,6 +28,7 @@ void main() {
       ProviderScope(
         overrides: [
           animeOnlyTvModeProvider.overrideWith(_TestAnimeOnlyTvMode.new),
+          hideItemsStateProvider.overrideWith(_TestHideItems.new),
         ],
         child: const MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -36,8 +38,13 @@ void main() {
       ),
     );
 
-    for (final section in ['General', 'Media', 'Learning', 'Sync']) {
-      expect(find.text(section), findsWidgets);
+    for (final section in [
+      'App',
+      'Reading and watching',
+      'Learning',
+      'Sources and services',
+    ]) {
+      expect(find.text(section.toUpperCase()), findsWidgets);
     }
     for (final section in DictionarySettingsSection.values) {
       expect(find.text(section.title), findsOneWidget);
@@ -50,4 +57,9 @@ void main() {
 class _TestAnimeOnlyTvMode extends AnimeOnlyTvMode {
   @override
   bool build() => false;
+}
+
+class _TestHideItems extends HideItemsState {
+  @override
+  List<String> build() => const [];
 }

@@ -67,8 +67,10 @@ void main() {
     expect(html, isNot(contains('&quot;Count&quot;')));
   });
 
-  test('renders MOE Concised Pinyin structured-content with MOE styling hooks', () {
-    const raw = '''[
+  test(
+    'renders MOE Concised Pinyin structured-content with MOE styling hooks',
+    () {
+      const raw = '''[
       {
         "type": "structured-content",
         "content": {
@@ -122,16 +124,20 @@ void main() {
       }
     ]''';
 
-    final html = yomitanGlossaryToHtml(raw);
+      final html = yomitanGlossaryToHtml(raw);
 
-    expect(html, contains('data-sc-moedict="traditional-term"'));
-    expect(html, contains('data-sc-moedict="simplified-term"'));
-    expect(html, contains('lang="zh-CN"'));
-    expect(html, contains('data-sc-moedict="definition-entry-example-label"'));
-    expect(html, contains('data-sc-type="例"'));
-    expect(html, contains('[data-sc-moedict="terms-parent"]'));
-    expect(html, contains('[data-sc-moedict="definition-entry"]'));
-  });
+      expect(html, contains('data-sc-moedict="traditional-term"'));
+      expect(html, contains('data-sc-moedict="simplified-term"'));
+      expect(html, contains('lang="zh-CN"'));
+      expect(
+        html,
+        contains('data-sc-moedict="definition-entry-example-label"'),
+      );
+      expect(html, contains('data-sc-type="例"'));
+      expect(html, contains('[data-sc-moedict="terms-parent"]'));
+      expect(html, contains('[data-sc-moedict="definition-entry"]'));
+    },
+  );
 
   test('ports Hoshi structured content attributes and base styles', () {
     const raw = '''{

@@ -187,13 +187,10 @@ void main() {
     }
   });
 
-  Future<void> refresh() => fetchSourcesList(
-    refresh: true,
-    androidProxyServer: '',
-    autoUpdateExtensions: false,
-    itemType: ItemType.manga,
-    repo: repo,
-  );
+  Future<void> refresh() async {
+    final listed = await fetchRepoSources(repo: repo, itemType: ItemType.manga);
+    await recordRepoSources(listed, repo, ItemType.manga);
+  }
 
   // The obsolete check runs unawaited after each refresh; let it finish so
   // it doesn't overlap the next measurement.

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:shiori/shiori.dart';
 
 typedef StringCallback = void Function(String value);
 
@@ -155,7 +156,7 @@ class ExpandableTextState extends State<ExpandableText>
     final linkColor =
         widget.linkColor ??
         widget.linkStyle?.color ??
-        Theme.of(context).colorScheme.secondary;
+        context.shiori.color.accentInk;
     final linkTextStyle = effectiveTextStyle!
         .merge(widget.linkStyle)
         .copyWith(color: linkColor);
@@ -322,9 +323,10 @@ class ExpandableTextState extends State<ExpandableText>
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Theme.of(context).scaffoldBackgroundColor
-                                    .withValues(alpha: 0.2),
-                                Theme.of(context).scaffoldBackgroundColor,
+                                context.shiori.color.ink0.withValues(
+                                  alpha: 0.2,
+                                ),
+                                context.shiori.color.ink0,
                               ],
                               stops: const [0, 0.9],
                             ),
@@ -332,9 +334,10 @@ class ExpandableTextState extends State<ExpandableText>
                           child: Align(
                             alignment: Alignment.bottomCenter,
                             child: Icon(
+                              fill: 1,
                               widget.expandIcon ??
-                                  Icons.keyboard_arrow_down_sharp,
-                              color: Theme.of(context).iconTheme.color,
+                                  Symbols.keyboard_arrow_down_rounded,
+                              color: context.shiori.color.fgMuted,
                             ),
                           ),
                         ),
@@ -342,17 +345,19 @@ class ExpandableTextState extends State<ExpandableText>
                     ),
                 ],
               ),
-              // Collapse icon when expanded
-              if (widget.showExpandCollapseIcon &&
-                  _expanded &&
-                  hasExceededMaxLines)
+              if (widget.showExpandCollapseIcon && hasExceededMaxLines)
                 GestureDetector(
                   onTap: _linkTapped,
                   child: SizedBox(
                     height: 20,
                     child: Icon(
-                      widget.collapseIcon ?? Icons.keyboard_arrow_up_sharp,
-                      color: Theme.of(context).iconTheme.color,
+                      fill: 1,
+                      _expanded
+                          ? widget.collapseIcon ??
+                                Symbols.keyboard_arrow_up_rounded
+                          : widget.expandIcon ??
+                                Symbols.keyboard_arrow_down_rounded,
+                      color: context.shiori.color.fgMuted,
                     ),
                   ),
                 ),

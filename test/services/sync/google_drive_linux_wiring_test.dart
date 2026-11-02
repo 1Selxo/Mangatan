@@ -89,7 +89,7 @@ void main() {
     expect(packagingScript, isNot(contains('wget ')));
   });
 
-  test('Linux build wires secure storage and GTK app links', () {
+  test('Linux build wires secure storage and app links', () {
     final registrant = source('linux/flutter/generated_plugin_registrant.cc');
     final plugins = source('linux/flutter/generated_plugins.cmake');
 
@@ -101,8 +101,17 @@ void main() {
       plugins,
       contains(RegExp(r'^  flutter_secure_storage_linux$', multiLine: true)),
     );
-    expect(registrant, contains('gtk_plugin_register_with_registrar'));
-    expect(plugins, contains(RegExp(r'^  gtk$', multiLine: true)));
+    // app_links_linux 1.0.4 reads links from the command line itself, in
+    // place of the gtk package, so the runner must hand the command line on.
+    expect(
+      registrant,
+      contains('app_links_plugin_linux_register_with_registrar'),
+    );
+    expect(plugins, contains(RegExp(r'^  app_links_linux$', multiLine: true)));
+    expect(
+      source('linux/my_application.cc'),
+      contains('G_APPLICATION_HANDLES_COMMAND_LINE'),
+    );
   });
 
   test(

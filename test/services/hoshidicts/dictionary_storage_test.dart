@@ -58,9 +58,8 @@ void main() {
     final root = await Directory.systemTemp.createTemp('dictionary-storage-');
     addTearDown(() => root.delete(recursive: true));
     final dictionary = await _createDictionary(root, 'Kanji');
-    await File(
-      p.join(dictionary.path, yomitanKanjiDataFileName),
-    ).writeAsString('{}');
+    await File(p.join(dictionary.path, yomitanKanjiDataFileName))
+        .writeAsString('{}');
 
     await DictionaryStorage.instance.recordImport(
       name: 'Kanji',
@@ -173,9 +172,8 @@ void main() {
         'My preferred name',
         root: root,
       );
-      final installed = (await DictionaryStorage.instance.installed(
-        root: root,
-      )).single;
+      final installed = (await DictionaryStorage.instance.installed(root: root))
+          .single;
 
       expect(installed.name, 'stable-storage-name');
       expect(installed.displayName, 'My preferred name');
@@ -212,33 +210,30 @@ void main() {
     expect(installed.first.displayName, 'Preferred');
   });
 
-  test(
-    'applies profile order and enabled dictionaries without rewriting disk order',
-    () async {
-      final root = await Directory.systemTemp.createTemp('dictionary-storage-');
-      addTearDown(() => root.delete(recursive: true));
-      final alpha = await _createDictionary(root, 'Alpha');
-      await _createDictionary(root, 'Beta');
-      final gamma = await _createDictionary(root, 'Gamma');
+  test('applies profile order and enabled dictionaries without rewriting disk order', () async {
+    final root = await Directory.systemTemp.createTemp('dictionary-storage-');
+    addTearDown(() => root.delete(recursive: true));
+    final alpha = await _createDictionary(root, 'Alpha');
+    await _createDictionary(root, 'Beta');
+    final gamma = await _createDictionary(root, 'Gamma');
 
-      final installed = await DictionaryStorage.instance.installed(
-        root: root,
-        order: const ['Gamma', 'Alpha', 'Beta'],
-      );
-      final paths = await DictionaryStorage.instance.paths(
-        root: root,
-        order: const ['Gamma', 'Alpha', 'Beta'],
-        enabled: const {'Gamma', 'Alpha'},
-      );
+    final installed = await DictionaryStorage.instance.installed(
+      root: root,
+      order: const ['Gamma', 'Alpha', 'Beta'],
+    );
+    final paths = await DictionaryStorage.instance.paths(
+      root: root,
+      order: const ['Gamma', 'Alpha', 'Beta'],
+      enabled: const {'Gamma', 'Alpha'},
+    );
 
-      expect(installed.map((dictionary) => dictionary.name), [
-        'Gamma',
-        'Alpha',
-        'Beta',
-      ]);
-      expect(paths.termPaths, [gamma.path, alpha.path]);
-    },
-  );
+    expect(installed.map((dictionary) => dictionary.name), [
+      'Gamma',
+      'Alpha',
+      'Beta',
+    ]);
+    expect(paths.termPaths, [gamma.path, alpha.path]);
+  });
 }
 
 Future<Directory> _createDictionary(Directory root, String name) async {

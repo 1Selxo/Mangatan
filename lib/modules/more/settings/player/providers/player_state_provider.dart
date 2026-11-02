@@ -1,5 +1,4 @@
-import 'dart:ui';
-
+import 'package:flutter/painting.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -172,5 +171,62 @@ class ForceLandscapePlayerState extends _$ForceLandscapePlayerState {
   void set(bool value) {
     state = value;
     settingsRepository.update((s) => s.forceLandscapePlayer = value);
+  }
+}
+
+@riverpod
+class RememberPlayerVolumeState extends _$RememberPlayerVolumeState {
+  @override
+  bool build() {
+    return settingsRepository.current.rememberPlayerVolume ?? false;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.rememberPlayerVolume = value);
+  }
+}
+
+@riverpod
+class RememberPlayerBrightnessState extends _$RememberPlayerBrightnessState {
+  @override
+  bool build() {
+    return settingsRepository.current.rememberPlayerBrightness ?? false;
+  }
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.rememberPlayerBrightness = value);
+  }
+}
+
+/// The player's fit, kept from one episode to the next (#996).
+@riverpod
+class PlayerVideoFitState extends _$PlayerVideoFitState {
+  @override
+  BoxFit build() {
+    final name = settingsRepository.current.playerVideoFit;
+    return BoxFit.values.firstWhere(
+      (fit) => fit.name == name,
+      orElse: () => BoxFit.contain,
+    );
+  }
+
+  void set(BoxFit value) {
+    if (value == state) return;
+    state = value;
+    settingsRepository.update((s) => s.playerVideoFit = value.name);
+  }
+}
+
+/// Whether a subtitle track is turned on when an episode starts (#615).
+@riverpod
+class SubtitlesOnByDefaultState extends _$SubtitlesOnByDefaultState {
+  @override
+  bool build() => settingsRepository.current.subtitlesOnByDefault ?? true;
+
+  void set(bool value) {
+    state = value;
+    settingsRepository.update((s) => s.subtitlesOnByDefault = value);
   }
 }

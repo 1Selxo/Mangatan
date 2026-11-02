@@ -47,7 +47,7 @@ abstract class _$LocalFoldersState extends $Notifier<List<String>> {
   List<String> build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<List<String>, List<String>>;
     final element =
         ref.element
@@ -57,7 +57,7 @@ abstract class _$LocalFoldersState extends $Notifier<List<String>> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }
 
@@ -145,4 +145,4 @@ final class ScanLocalLibraryProvider
   }
 }
 
-String _$scanLocalLibraryHash() => r'7fdedaa37917728d9f3b9d8f15090c94bdb34238';
+String _$scanLocalLibraryHash() => r'a826d910b1283f82a4fa62e5542af2e1f02d91c2';

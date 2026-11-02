@@ -81,20 +81,24 @@ void main() {
       deleted: true,
     );
 
-    final merged = MangatanEpubManifest(
-      generatedAtUtc: DateTime.utc(2026),
-      deviceId: 'old-device',
-      entries: {
-        remoteOnly.stableNovelId: remoteOnly,
-        tombstone.stableNovelId: tombstone,
-      },
-    ).mergeLocalEntries(
-      deviceId: 'new-device',
-      localEntries: {local.stableNovelId: local},
-      generatedAtUtc: DateTime.utc(2026, 7, 19),
-    );
+    final merged =
+        MangatanEpubManifest(
+          generatedAtUtc: DateTime.utc(2026),
+          deviceId: 'old-device',
+          entries: {
+            remoteOnly.stableNovelId: remoteOnly,
+            tombstone.stableNovelId: tombstone,
+          },
+        ).mergeLocalEntries(
+          deviceId: 'new-device',
+          localEntries: {local.stableNovelId: local},
+          generatedAtUtc: DateTime.utc(2026, 7, 19),
+        );
 
-    expect(merged.entries.keys, containsAll(['remote-only', 'local', 'deleted']));
+    expect(
+      merged.entries.keys,
+      containsAll(['remote-only', 'local', 'deleted']),
+    );
     expect(merged.entries['deleted']!.deleted, isTrue);
   });
 }

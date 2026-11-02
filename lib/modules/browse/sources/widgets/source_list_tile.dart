@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/modules/browse/widgets/source_extension_icon.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_profile_override_dialog.dart';
+import 'package:mangayomi/modules/widgets/entry_badge_chip.dart';
 import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/extension_icon_resolver.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
-import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:mangayomi/utils/language.dart';
 
@@ -37,104 +39,62 @@ class SourceListTile extends StatelessWidget {
           }
           context.push('/mangaHome', extra: (source, false));
         },
-        leading: Container(
-          height: 37,
-          width: 37,
-          decoration: BoxDecoration(
-            color: Theme.of(context).secondaryHeaderColor
-                .withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: SourceExtensionIcon(source: source, size: 37),
-        ),
-        subtitle: Row(
-          children: [
-            Text(
-              completeLanguageName(source.lang!.toLowerCase()),
-              style: const TextStyle(fontWeight: FontWeight.w300, fontSize: 12),
-            ),
-            if (source.isNsfw ?? false)
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    "NSFW",
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        leading: SourceIcon(iconUrl: source.iconUrl, source: source),
+        subtitle: SourceMeta(source: source),
         title: Text(
           !isLocal
               ? source.name!
               : "${context.l10n.local_source} ${source.itemType.localized(context.l10n)}",
         ),
+        // As wide as its actions: a longer word for "Latest" in another
+        // language is not cut.
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.end,
+          spacing: ShioriSpace.s4,
           children: [
-            Consumer(
-              builder: (context, ref, child) {
-                // final supportsLatest =  ref.watch(supportsLatestProvider(source: source));
-                // if (supportsLatest) {
-                return TextButton(
-                  style: const ButtonStyle(
-                    padding: WidgetStatePropertyAll(EdgeInsets.all(10)),
-                  ),
-                  onPressed: () =>
-                      context.push('/mangaHome', extra: (source, true)),
-                  child: Text(context.l10n.latest),
-                );
-                // }
-                // return const SizedBox.shrink();
-              },
+            ShioriButton.quiet(
+              label: context.l10n.latest,
+              onPressed: () =>
+                  context.push('/mangaHome', extra: (source, true)),
             ),
-            const SizedBox(width: 10),
-            if (!isLocal) ...[
-              if (dictionaryProfileSourceId != null)
-                IconButton(
-                  tooltip: 'Set dictionary profile',
-                  onPressed: () async {
-                    await showDictionaryProfileOverrideDialog(
-                      context: context,
-                      overrideKey: DictionaryProfileResolver.sourceOverrideKey(
-                        dictionaryProfileSourceId,
-                      ),
-                      autoProfile: DictionaryProfileResolver.resolve(
-                        sourceLanguage:
-                            DictionaryProfileResolver.sourceLanguageForSource(
-                              source,
-                            ),
-                      ),
-                      title: 'Dictionary profile for this source',
-                    );
-                  },
-                  icon: const Icon(Icons.menu_book_outlined),
-                ),
+            if (!isLocal && dictionaryProfileSourceId != null)
+              IconButton(
+                tooltip: 'Set dictionary profile',
+                onPressed: () async {
+                  await showDictionaryProfileOverrideDialog(
+                    context: context,
+                    overrideKey: DictionaryProfileResolver.sourceOverrideKey(
+                      dictionaryProfileSourceId,
+                    ),
+                    autoProfile: DictionaryProfileResolver.resolve(
+                      sourceLanguage:
+                          DictionaryProfileResolver.sourceLanguageForSource(
+                            source,
+                          ),
+                    ),
+                    title: 'Dictionary profile for this source',
+                  );
+                },
+                icon: const Icon(Symbols.menu_book_rounded),
+              ),
+            if (!isLocal)
               IconButton(
                 padding: const EdgeInsets.all(0),
                 onPressed: () {
                   sourceRepository.save(source..isPinned = !source.isPinned!);
                 },
+                tooltip: context.l10n.pin,
                 icon: Icon(
-                  Icons.push_pin_outlined,
-                  color: source.isPinned! ? context.primaryColor : null,
+                  Symbols.push_pin_rounded,
+                  fill: source.isPinned! ? 1 : 0,
+                  color: source.isPinned!
+                      ? context.shiori.color.accentInk
+                      : null,
                 ),
-              ),
-            ],
+              )
+            else
+              // The pin's room, kept so Latest lines up with the rows above.
+              SizedBox.square(dimension: context.shiori.density.minTarget),
           ],
         ),
       ),
@@ -142,7 +102,9 @@ class SourceListTile extends StatelessWidget {
   }
 }
 
-/// D-pad-friendly source row used by the Android TV source browser.
+/// TV variant of [SourceListTile]: three independently d-pad-focusable buttons
+/// in a row — the source (opens popular), Latest, and Pin — so the remote moves
+/// Left/Right between them and Up/Down between rows. See #729.
 class TvSourceRow extends StatelessWidget {
   final Source source;
   final ItemType itemType;
@@ -163,7 +125,14 @@ class TvSourceRow extends StatelessWidget {
 
   void _openPopular(BuildContext context) {
     if (!isLocal) {
-      sourceRepository.markLastUsed(itemType, source.id);
+      final sources = sourceRepository.getByItemType(itemType);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      for (var src in sources) {
+        src
+          ..lastUsed = src.id == source.id
+          ..updatedAt = now;
+      }
+      sourceRepository.putAll(sources);
     }
     context.push('/mangaHome', extra: (source, false));
   }
@@ -179,22 +148,13 @@ class TvSourceRow extends StatelessWidget {
               onTap: () => _openPopular(context),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
+                  horizontal: ShioriSpace.s12,
+                  vertical: ShioriSpace.s8,
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      height: 37,
-                      width: 37,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).secondaryHeaderColor
-                            .withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: SourceExtensionIcon(source: source, size: 37),
-                    ),
-                    const SizedBox(width: 14),
+                    SourceIcon(iconUrl: source.iconUrl, source: source),
+                    const SizedBox(width: ShioriSpace.s12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,45 +164,11 @@ class TvSourceRow extends StatelessWidget {
                             !isLocal
                                 ? source.name!
                                 : "${context.l10n.local_source} ${source.itemType.localized(context.l10n)}",
-                            style: const TextStyle(fontSize: 16),
+                            style: context.shiori.text.body,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          Row(
-                            children: [
-                              Text(
-                                completeLanguageName(
-                                  source.lang!.toLowerCase(),
-                                ),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w300,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              if (source.isNsfw ?? false)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 4),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withValues(alpha: 0.8),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      "NSFW",
-                                      style: TextStyle(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
+                          SourceMeta(source: source),
                         ],
                       ),
                     ),
@@ -251,36 +177,122 @@ class TvSourceRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: ShioriSpace.s8),
           TvRowButton(
             focusNode: latestNode,
             onTap: () => context.push('/mangaHome', extra: (source, true)),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: ShioriSpace.s12,
+                vertical: ShioriSpace.s12,
+              ),
               child: Text(
                 context.l10n.latest,
-                style: TextStyle(color: context.primaryColor),
+                style: TextStyle(color: context.shiori.color.accentInk),
               ),
             ),
           ),
           if (!isLocal) ...[
-            const SizedBox(width: 6),
+            const SizedBox(width: ShioriSpace.s8),
             TvRowButton(
               focusNode: pinNode,
               onTap: () {
                 sourceRepository.save(source..isPinned = !source.isPinned!);
               },
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(ShioriSpace.s12),
                 child: Icon(
-                  Icons.push_pin_outlined,
-                  color: source.isPinned! ? context.primaryColor : null,
+                  Symbols.push_pin_rounded,
+                  fill: source.isPinned! ? 1 : 0,
+                  color: source.isPinned!
+                      ? context.shiori.color.accentInk
+                      : null,
                 ),
               ),
             ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// A source's or an extension's icon, on a quiet tile while it loads or
+/// when it has none.
+class SourceIcon extends StatelessWidget {
+  const SourceIcon({
+    super.key,
+    required this.iconUrl,
+    this.size = 37,
+    this.source,
+  });
+
+  final String? iconUrl;
+
+  /// When given, every icon its extension may have is tried in turn
+  /// ([extensionIconCandidates]) before the placeholder.
+  final Source? source;
+
+  /// The side of the tile: a list row's by default, larger on a detail page.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Center(
+      child: Icon(Symbols.extension_rounded, size: size * 0.6),
+    );
+    final url = iconUrl ?? '';
+    final candidates = source != null
+        ? extensionIconCandidates(source!)
+        : [if (url.isNotEmpty) url];
+    Widget candidate(int index) => index >= candidates.length
+        ? placeholder
+        : cachedNetworkImage(
+            imageUrl: candidates[index],
+            fit: BoxFit.contain,
+            width: size,
+            height: size,
+            errorWidget: candidate(index + 1),
+            useCustomNetworkImage: false,
+          );
+    return Container(
+      height: size,
+      width: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: context.shiori.color.ink2,
+        borderRadius: BorderRadius.circular(ShioriShape.cover),
+      ),
+      child: candidate(0),
+    );
+  }
+}
+
+/// A source's language, and an NSFW badge when it carries one.
+class SourceMeta extends StatelessWidget {
+  const SourceMeta({super.key, required this.source});
+
+  final Source source;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.shiori;
+    return Row(
+      spacing: ShioriSpace.s4,
+      children: [
+        // Shrinks before the trailing actions do, which the fork's
+        // dictionary profile button makes wider on a phone.
+        Flexible(
+          child: Text(
+            languageName(context, source.lang!.toLowerCase()),
+            style: tokens.caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (source.isNsfw ?? false)
+          EntryBadgeChip(label: 'NSFW', tone: tokens.color.error),
+      ],
     );
   }
 }

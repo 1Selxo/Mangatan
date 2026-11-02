@@ -1,24 +1,49 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:isar_community/isar.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
+import 'package:mangayomi/main.dart' as app;
 import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/modules/main_view/main_screen.dart';
+import 'package:mangayomi/modules/main_view/nav_groups.dart';
 import 'package:mangayomi/modules/main_view/providers/migration.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/router/router.dart';
+import 'package:shiori/shiori.dart';
 
 void main() {
-  test('mobile navigation keeps an accessible width for every destination', () {
-    expect(mobileNavigationContentWidth(320, 8), 576);
-    expect(mobileNavigationContentWidth(430, 4), 430);
+  late Directory dir;
+
+  setUpAll(() async {
+    // The test binding answers every request with a 400; step out of it for
+    // the one download Isar needs.
+    final overrides = HttpOverrides.current;
+    HttpOverrides.global = null;
+    try {
+      await Isar.initializeIsarCore(download: true);
+    } finally {
+      HttpOverrides.global = overrides;
+    }
+    dir = await Directory.systemTemp.createTemp('mangayomi-nav-');
+    app.isar = await StorageProvider().initDB(dir.path);
+  });
+
+  // MainScreen's deferred startup work may still hold a transaction, which
+  // would make close() wait forever. The test process exits anyway, so only
+  // the temporary folder needs removing.
+  tearDownAll(() async {
+    if (await dir.exists()) await dir.delete(recursive: true);
   });
 
   testWidgets('keeps the More rail destination aligned with its route', (
@@ -53,6 +78,7 @@ void main() {
             '/more',
           ]),
           hideItemsStateProvider.overrideWithValue(const []),
+          navGroupingProvider.overrideWith(_StubNavGrouping.new),
           mergeLibraryNavMobileStateProvider.overrideWithValue(false),
           animeOnlyTvModeProvider.overrideWith(() => _StubAnimeOnlyTvMode()),
           l10nLocaleStateProvider.overrideWithValue(const Locale('en')),
@@ -74,7 +100,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.more_horiz_outlined));
+    await tester.tap(find.byIcon(Symbols.more_horiz_rounded));
     await tester.pumpAndSettle();
 
     expect(router.routerDelegate.currentConfiguration.uri.path, '/more');
@@ -86,6 +112,11 @@ void main() {
 }
 
 class _StubAnimeOnlyTvMode extends AnimeOnlyTvMode {
+  @override
+  bool build() => false;
+}
+
+class _StubNavGrouping extends NavGroupingState {
   @override
   bool build() => false;
 }

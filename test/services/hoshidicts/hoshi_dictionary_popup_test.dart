@@ -280,8 +280,7 @@ void main() {
           glossaries: [
             HoshiGlossaryEntry(
               dictName: '深辞海',
-              glossary:
-                  '{"type":"structured-content","content":{"tag":"img","path":"yomitan_images/3494.jpg"}}',
+              glossary: '{"type":"structured-content","content":{"tag":"img","path":"yomitan_images/3494.jpg"}}',
               definitionTags: '',
               termTags: '',
             ),
@@ -463,8 +462,7 @@ void main() {
     );
 
     final html = buildHoshiPopupHtml(
-      popupCss:
-          '@media (prefers-color-scheme: dark) { .overlay { background: #222; } }',
+      popupCss: '@media (prefers-color-scheme: dark) { .overlay { background: #222; } }',
       popupJs: 'window.renderPopup = function() {};',
       selectionJs: 'window.hoshiSelection = {};',
       audioPreferences: AnkiAudioPreferences.defaults,

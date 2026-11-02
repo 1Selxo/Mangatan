@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/anime/utils/video_filters.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'state_provider.g.dart';
@@ -113,6 +114,7 @@ class SubtitleSettingsState extends _$SubtitleSettingsState {
 
   void reset() {
     state = PlayerSubtitleSettings(
+      // shiori: the default subtitle size, a stored setting rather than interface type
       fontSize: 45,
       useBold: true,
       useItalic: false,
@@ -134,10 +136,41 @@ class SubtitleSettingsState extends _$SubtitleSettingsState {
   }
 
   void setOverrideAss(bool value) {
-    set(state..overrideAssSubtitles = value, true);
+    // On a copy: changing the current settings in place left the listeners'
+    // previous value already switched, so none could tell it had changed.
+    set(
+      PlayerSubtitleSettings.fromJson(state.toJson())
+        ..overrideAssSubtitles = value,
+      true,
+    );
   }
 }
 
 final overrideAssSubtitlesStateProvider = Provider<bool>((ref) {
-  return ref.watch(subtitleSettingsStateProvider).overrideAssSubtitles ?? false;
+  return ref.watch(
+    subtitleSettingsStateProvider.select(
+      (s) => s.overrideAssSubtitles ?? false,
+    ),
+  );
 });
+
+/// The player's picture adjustments, kept from one episode to the next.
+@riverpod
+class VideoFiltersState extends _$VideoFiltersState {
+  @override
+  Map<VideoFilter, int> build() =>
+      videoFiltersFrom(settingsRepository.current.playerVideoFilters);
+
+  void set(VideoFilter filter, int value) => _save({...state, filter: value});
+
+  void reset() => _save({for (final filter in VideoFilter.values) filter: 0});
+
+  void _save(Map<VideoFilter, int> filters) {
+    state = filters;
+    settingsRepository.update(
+      (s) => s.playerVideoFilters = [
+        for (final filter in VideoFilter.values) filters[filter] ?? 0,
+      ],
+    );
+  }
+}

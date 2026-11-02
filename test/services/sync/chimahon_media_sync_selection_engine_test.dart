@@ -63,13 +63,11 @@ void main() {
         (source: 1, url: '/manga', syncId: 2),
       });
       expect(
-        BackupMihon(
-          backupPreferences: preview.proposedMerged.backupPreferences,
-        ).writeToBuffer(),
+        BackupMihon(backupPreferences: preview.proposedMerged.backupPreferences)
+            .writeToBuffer(),
         orderedEquals(
-          BackupMihon(
-            backupPreferences: remote.backupPreferences,
-          ).writeToBuffer(),
+          BackupMihon(backupPreferences: remote.backupPreferences)
+              .writeToBuffer(),
         ),
         reason: 'remote order and exact messages must not churn',
       );

@@ -8,7 +8,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
+import 'package:mangayomi/router/push_router.dart';
 
 void main() {
   late Directory dir;

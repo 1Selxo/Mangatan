@@ -1,7 +1,9 @@
 import 'dart:io';
 
-import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/widgets/error_state.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
@@ -9,7 +11,6 @@ import 'package:mangayomi/modules/more/about/providers/check_for_update.dart';
 import 'package:mangayomi/modules/more/about/providers/download_file_screen.dart';
 import 'package:mangayomi/modules/more/about/providers/get_package_info.dart';
 import 'package:mangayomi/modules/more/about/providers/logs_state.dart';
-import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/crash_report.dart';
@@ -18,185 +19,169 @@ import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/share.dart';
 import 'package:path/path.dart' as path;
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:mangayomi/services/external_browser.dart';
 
 class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = l10nLocalizations(context);
+    final l10n = context.l10n;
     final checkForUpdates = ref.watch(checkForAppUpdatesProvider);
     final enableLogs = ref.watch(logsStateProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n!.about)),
+      appBar: AppBar(title: Text(l10n.about)),
       body: ref
           .watch(getPackageInfoProvider)
           .when(
-            data: (data) => SingleChildScrollView(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 40),
-                    child: Image.asset(
-                      "assets/app_icons/icon-red.png",
-                      fit: BoxFit.contain,
-                      height: 100,
-                    ),
+            data: (data) => ListView(
+              padding: tvPageInsets,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: ShioriSpace.s32,
                   ),
-                  Column(
+                  child: Column(
+                    spacing: ShioriSpace.s8,
                     children: [
-                      const Divider(),
-                      ListTile(
-                        onTap: () {},
-                        title: Text(l10n.version),
-                        subtitle: Text(
-                          l10n.beta_version(data.version),
-                          style: const TextStyle(fontSize: 12),
-                        ),
+                      Image.asset(
+                        "assets/app_icons/icon-red.png",
+                        fit: BoxFit.contain,
+                        height: 88,
                       ),
-                      SwitchListTile(
-                        title: Text(l10n.check_for_app_updates),
-                        value: checkForUpdates,
-                        onChanged: (value) {
-                          ref
-                              .read(checkForAppUpdatesProvider.notifier)
-                              .set(value);
-                        },
-                      ),
-                      ListTile(
-                        onTap: () async {
-                          BotToast.showText(text: l10n.searching_for_updates);
-                          try {
-                            final updateInfo = await performManualUpdateCheck();
-                            if (updateInfo != null) {
-                              BotToast.showText(
-                                text: l10n.new_update_available,
-                              );
-                              await Future.delayed(const Duration(seconds: 1));
-                              if (context.mounted) {
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => DownloadFileScreen(
-                                    updateAvailable: updateInfo,
-                                  ),
-                                );
-                              }
-                            } else {
-                              BotToast.showText(
-                                text: l10n.no_new_updates_available,
-                              );
-                            }
-                          } catch (_) {
-                            BotToast.showText(
-                              text: l10n.no_new_updates_available,
-                            );
-                          }
-                        },
-                        title: Text(l10n.check_for_update),
-                      ),
-                      ListTile(
-                        onTap: () => context.push('/errorReports'),
-                        title: Text(l10n.error_reports),
-                        subtitle: Text(l10n.error_reports_subtitle),
-                        trailing: CrashReports.reports.isEmpty
-                            ? null
-                            : Text('${CrashReports.reports.length}'),
-                      ),
-                      SwitchListTile(
-                        title: Text(l10n.logs_on),
-                        value: enableLogs,
-                        onChanged: (value) async {
-                          ref.read(logsStateProvider.notifier).set(value);
-                          if (value) {
-                            await AppLogger.init();
-                          } else {
-                            await AppLogger.dispose();
-                          }
-                        },
-                      ),
-                      if (enableLogs)
-                        ListTile(
-                          onTap: () async {
-                            final storage = StorageProvider();
-                            final directory = await storage
-                                .getDefaultDirectory();
-                            final file = File(
-                              path.join(directory!.path, 'logs.txt'),
-                            );
-                            if (await file.exists()) {
-                              if (context.mounted) {
-                                final box =
-                                    context.findRenderObject() as RenderBox?;
-                                await shareOrCopy(
-                                  ShareParams(
-                                    files: [XFile(file.path)],
-                                    text: "log.txt",
-                                    sharePositionOrigin:
-                                        box!.localToGlobal(Offset.zero) &
-                                        box.size,
-                                  ),
-                                );
-                              }
-                            } else {
-                              botToast(l10n.no_app_logs);
-                            }
-                          },
-                          title: Text(l10n.share_app_logs),
-                        ),
-                      // ListTile(
-                      //   onTap: () {},
-                      //   title: const Text("What's news"),
-                      // ),
-                      // ListTile(
-                      //   onTap: () {},
-                      //   title: const Text('Help translation'),
-                      // ),
-                      // ListTile(
-                      //   onTap: () {},
-                      //   title: const Text('Privacy policy'),
-                      // ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              _launchInBrowser(
-                                Uri.parse('https://github.com/1Selxo/Mangatan'),
-                              );
-                            },
-                            icon: const Padding(
-                              padding: EdgeInsets.only(left: 2.5, right: 2.5),
-                              child: FaIcon(FontAwesomeIcons.github),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () {
-                              _launchInBrowser(
-                                Uri.parse('https://discord.gg/SqwE6b7Bb'),
-                              );
-                            },
-                            icon: const Padding(
-                              padding: EdgeInsets.only(right: 5),
-                              child: FaIcon(FontAwesomeIcons.discord),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        l10n.beta_version(data.version),
+                        style: context.shiori.caption,
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                ShioriSettingsGroup(
+                  title: l10n.updates,
+                  children: [
+                    ShioriSwitchRow(
+                      autofocus: isTv,
+                      title: l10n.check_for_app_updates,
+                      value: checkForUpdates,
+                      onChanged: (v) =>
+                          ref.read(checkForAppUpdatesProvider.notifier).set(v),
+                    ),
+                    ShioriSettingRow(
+                      icon: Symbols.system_update_rounded,
+                      title: l10n.check_for_update,
+                      onTap: () => _checkNow(context),
+                    ),
+                  ],
+                ),
+                ShioriSettingsGroup(
+                  title: l10n.group_diagnostics,
+                  children: [
+                    ShioriSettingRow(
+                      icon: Symbols.bug_report_rounded,
+                      title: l10n.error_reports,
+                      subtitle: l10n.error_reports_subtitle,
+                      trailing: ShioriBadge(CrashReports.reports.length),
+                      onTap: () => context.push('/errorReports'),
+                    ),
+                    ShioriSwitchRow(
+                      title: l10n.logs_on,
+                      value: enableLogs,
+                      onChanged: (value) async {
+                        ref.read(logsStateProvider.notifier).set(value);
+                        if (value) {
+                          await AppLogger.init();
+                        } else {
+                          await AppLogger.dispose();
+                        }
+                      },
+                    ),
+                    if (enableLogs)
+                      ShioriSettingRow(
+                        icon: Symbols.share_rounded,
+                        title: l10n.share_app_logs,
+                        onTap: () => _shareLogs(context),
+                      ),
+                  ],
+                ),
+                ShioriSettingsGroup(
+                  children: [
+                    ShioriSettingRow(
+                      icon: Symbols.gavel_rounded,
+                      title: l10n.open_source_licenses,
+                      subtitle: l10n.open_source_licenses_subtitle,
+                      onTap: () => context.push('/openSourceLicenses'),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: 'GitHub',
+                      onPressed: () => _launchInBrowser(
+                        Uri.parse('https://github.com/1Selxo/Mangatan'),
+                      ),
+                      icon: const FaIcon(FontAwesomeIcons.github),
+                    ),
+                    IconButton(
+                      tooltip: 'Discord',
+                      onPressed: () => _launchInBrowser(
+                        Uri.parse('https://discord.gg/SqwE6b7Bb'),
+                      ),
+                      icon: const FaIcon(FontAwesomeIcons.discord),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: ShioriSpace.s24),
+              ],
             ),
-            error: (error, stackTrace) => ErrorWidget(error),
-            loading: () => const ProgressCenter(),
+            error: (error, stackTrace) => ErrorState(detail: '$error'),
+            loading: () => const ShioriLoading(),
           ),
+    );
+  }
+
+  Future<void> _checkNow(BuildContext context) async {
+    final l10n = context.l10n;
+    botToast(l10n.searching_for_updates, second: 2);
+    try {
+      final updateInfo = await performManualUpdateCheck();
+      if (updateInfo == null) {
+        botToast(l10n.no_new_updates_available, second: 2);
+        return;
+      }
+      botToast(l10n.new_update_available, second: 2);
+      await Future.delayed(const Duration(seconds: 1));
+      if (context.mounted) {
+        showUpdateDialog(context, updateInfo);
+      }
+    } catch (_) {
+      botToast(l10n.no_new_updates_available, second: 2);
+    }
+  }
+
+  Future<void> _shareLogs(BuildContext context) async {
+    final noLogs = context.l10n.no_app_logs;
+    final directory = await StorageProvider().getDefaultDirectory();
+    final file = File(path.join(directory!.path, 'logs.txt'));
+    if (!await file.exists()) {
+      botToast(noLogs);
+      return;
+    }
+    if (!context.mounted) return;
+    final box = context.findRenderObject() as RenderBox?;
+    await shareOrCopy(
+      ShareParams(
+        files: [XFile(file.path)],
+        text: "log.txt",
+        sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
+      ),
     );
   }
 }
 
 Future<void> _launchInBrowser(Uri url) async {
-  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+  if (!await ExternalBrowser.open(url.toString())) {
     throw 'Could not launch $url';
   }
 }

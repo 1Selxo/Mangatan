@@ -267,7 +267,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String mass_migration_finding_matches(Object source, Object language) {
-    return '$source • $language içinde eşleşmeler aranıyor';
+    return '$source · $language içinde eşleşmeler aranıyor';
   }
 
   @override
@@ -492,6 +492,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get about => 'Hakkında';
 
   @override
+  String get open_source_licenses => 'Açık kaynak lisansları';
+
+  @override
+  String get open_source_licenses_subtitle =>
+      'Mangayomi\'nin üzerine inşa edildiği paketler ve lisansları';
+
+  @override
+  String get open_source_licenses_empty => 'Lisans bilgisi mevcut değil.';
+
+  @override
   String get help => 'Yardım';
 
   @override
@@ -573,6 +583,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get pure_black_dark_mode => 'Saf Siyah Karanlık Mod';
+
+  @override
+  String get tint_surfaces_with_palette => 'Yüzeyleri paletle renklendir';
+
+  @override
+  String get tint_surfaces_with_palette_subtitle =>
+      'Arka planları, kartları ve çubukları eskisi gibi seçilen paletle renklendirir. Kapalıyken nötr kalırlar ve palet yalnızca vurgu rengini boyar.';
 
   @override
   String get timestamp => 'Zaman Damgası';
@@ -657,6 +674,55 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get delete_download_after_reading => 'Okuduktan sonra indirmeyi sil';
+
+  @override
+  String get delete_after_reading_slot => 'Hangi bölüm silinsin';
+
+  @override
+  String get delete_after_reading_last => 'Az önce okunan bölüm';
+
+  @override
+  String delete_after_reading_nth(int n) {
+    return '$n bölüm geriden';
+  }
+
+  @override
+  String get delete_after_reading_slot_subtitle =>
+      'Okunmuş birkaç bölümü saklamak, onlara çevrimdışıyken dönmenizi sağlar.';
+
+  @override
+  String get delete_bookmarked_after_reading => 'Yer imli bölümleri de sil';
+
+  @override
+  String get auto_download => 'Otomatik indirme';
+
+  @override
+  String get download_new_chapters => 'Yeni bölümleri indir';
+
+  @override
+  String get download_new_chapters_subtitle =>
+      'Kütüphane güncellendikten sonra, kütüphanedeki serilerin yeni okunmamış bölümlerini indirme kuyruğuna ekle.';
+
+  @override
+  String get download_new_chapters_included => 'Yalnızca bu kategoriler';
+
+  @override
+  String get download_new_chapters_excluded => 'Bu kategoriler hariç';
+
+  @override
+  String get download_new_chapters_all_categories => 'Tüm kategoriler';
+
+  @override
+  String get download_ahead => 'Okurken önden indir';
+
+  @override
+  String get download_ahead_subtitle =>
+      'Kütüphanedeki bir serinin indirilmiş bölümünü okurken, sonraki okunmamış bölümleri indir.';
+
+  @override
+  String download_ahead_count(int n) {
+    return 'Sonraki $n bölüm';
+  }
 
   @override
   String get concurrent_downloads => 'Eş zamanlı indirmeler';
@@ -1171,6 +1237,20 @@ class AppLocalizationsTr extends AppLocalizations {
       'Gezinmeyi ihtiyaçlarınıza göre yeniden düzenleyin ve ayarlayın.';
 
   @override
+  String get floating_navigation_bar => 'Yüzen gezinme çubuğu';
+
+  @override
+  String get floating_navigation_bar_description =>
+      'Sabit gezinme çubuğu yerine yüzen bir kapsül kullan.';
+
+  @override
+  String get show_updates_badge => 'Güncellemeler simgesinde rozet göster';
+
+  @override
+  String get show_updates_badge_description =>
+      'Güncellemeler\'i son açışınızdan beri bulunan bölümleri sayar.';
+
+  @override
   String get full_screen_player => 'Tam ekran kullan';
 
   @override
@@ -1183,7 +1263,7 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String n_episodes(Object n) {
+  String n_episodes(int n) {
     return '$n bölüm';
   }
 
@@ -1594,6 +1674,23 @@ class AppLocalizationsTr extends AppLocalizations {
       'Yinelenen bölüm numaralarını okunmuş olarak işaretleyin';
 
   @override
+  String get skip_read_chapters => 'Okunmuş bölümleri atla';
+
+  @override
+  String get skip_read_chapters_subtitle =>
+      'Sonraki ve önceki bölüm, zaten okunmuş olanların üzerinden geçer.';
+
+  @override
+  String get skip_filtered_chapters => 'Filtrelenmiş bölümleri atla';
+
+  @override
+  String get skip_duplicate_chapters => 'Yinelenen bölümleri atla';
+
+  @override
+  String get skip_duplicate_chapters_subtitle =>
+      'Her bölüm numarasının bir kopyasını oku; mümkünse aynı scanlator\'dan olanı.';
+
+  @override
   String get default_skip_intro_length => 'Varsayılan giriş atlama süresi';
 
   @override
@@ -1782,6 +1879,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get edit_code => 'Kodu düzenle';
 
   @override
+  String get subtitles_on_by_default => 'Altyazıları aç';
+
+  @override
+  String get subtitles_on_by_default_info =>
+      'Kapalıyken bölümler, siz bir parça seçene kadar altyazısız başlar.';
+
+  @override
   String get use_libass => 'libass\'ı etkinleştir';
 
   @override
@@ -1793,11 +1897,11 @@ class AppLocalizationsTr extends AppLocalizations {
       'Altyazıları özelleştirmek için oyuncu ayarlarında `libass kullan` seçeneğini devre dışı bırakın.';
 
   @override
-  String get override_ass_subtitles => 'ASS altyazılarını geçersiz kıl';
+  String get override_ass_subtitles => 'Kendi altyazı stilimi kullan';
 
   @override
   String get override_ass_subtitles_info =>
-      'ASS/SSA altyazılarına özel stil uygula';
+      'Boyutunuzu ve renklerinizi ASS dahil tüm altyazılara uygular. Kapalıyken altyazılar varsayılan stillerini kullanır';
 
   @override
   String get torrent_stream => 'Torrent Akışı';
@@ -1899,6 +2003,9 @@ class AppLocalizationsTr extends AppLocalizations {
       'İndirmeler yalnızca Wi-Fi ile sınırlıdır';
 
   @override
+  String get recommendations => 'Öneriler';
+
+  @override
   String get recommendations_similar => 'benzer';
 
   @override
@@ -1992,6 +2099,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get add_repo => 'Depo ekle?';
+
+  @override
+  String get add_repo_sources_to_add => 'Eklenecek uzantı listeleri:';
+
+  @override
+  String get add_repo_warning =>
+      'Bu depolardaki uzantılar uygulamanın içinde çalışır. Yalnızca güvendiğin depoları ekle.';
 
   @override
   String get genre_search_library => 'Kütüphanede tür ara';
@@ -2140,6 +2254,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get custom_buttons_startup => 'lua kodu (başlangıçta)';
 
   @override
+  String get custom_buttons_add_warning =>
+      'Bu düğme aşağıdaki Lua kodunu video oynatıcıda çalıştırır; bu kod dosyalarına erişebilir ve program çalıştırabilir. Yalnızca bu bağlantının kaynağına güveniyorsan ekle.';
+
+  @override
   String n_days(Object n) {
     return '$n gün';
   }
@@ -2200,6 +2318,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get subtitle_delay => 'Gecikme (ms)';
 
   @override
+  String get audio_delay => 'Ses gecikmesi (ms)';
+
+  @override
+  String get audio_delay_subtitle =>
+      'Sesi görüntüye göre daha geç (pozitif) veya daha erken (negatif) çalar. Bölümler arasında korunur.';
+
+  @override
   String get subtitle_speed => 'Hız';
 
   @override
@@ -2249,13 +2374,60 @@ class AppLocalizationsTr extends AppLocalizations {
   String get watch_order => 'İzleme sırası';
 
   @override
+  String get watch_order_role_current => 'Şu anki';
+
+  @override
+  String get watch_order_role_previous => 'Önceki';
+
+  @override
+  String get watch_order_role_next => 'Sonraki';
+
+  @override
+  String get watch_order_source_release_order => 'Yayın sırası';
+
+  @override
+  String watch_order_source_community_list(String name, String author) {
+    return '$author tarafından $name';
+  }
+
+  @override
+  String watch_order_source_official_collection(String name) {
+    return 'Resmî Trakt koleksiyonu: $name';
+  }
+
+  @override
+  String watch_order_source_trakt_collection(String name) {
+    return 'Trakt koleksiyonu: $name';
+  }
+
+  @override
+  String watch_order_source_seasons(String title) {
+    return '$title sezonları';
+  }
+
+  @override
+  String get watch_order_select_source => 'Sıra kaynağı';
+
+  @override
+  String watch_order_season(int number) {
+    return 'Sezon $number';
+  }
+
+  @override
+  String watch_order_episode(int number) {
+    return 'Bölüm $number';
+  }
+
+  @override
   String get sequels => 'Devam filmleri';
 
   @override
-  String get recommendations => 'Öneriler';
+  String get recommendations_similarity => 'Benzerlik:';
 
   @override
-  String get recommendations_similarity => 'Benzerlik:';
+  String recommendation_rating_accessibility(String rating) {
+    return 'Puan $rating';
+  }
 
   @override
   String get local_folder_structure => 'Yerel klasör yapısı';
@@ -2405,6 +2577,16 @@ class AppLocalizationsTr extends AppLocalizations {
       'Oynatıcıyı yatay yönelim kullanmaya zorla.';
 
   @override
+  String get remember_player_volume => 'Ses düzeyini hatırla';
+
+  @override
+  String get remember_player_volume_subtitle =>
+      'Her bölüm, bir önceki bölümün bittiği ses düzeyinde başlar.';
+
+  @override
+  String get remember_player_brightness => 'Parlaklığı hatırla';
+
+  @override
   String get dns_over_https => 'DNS-over-HTTPS (DoH)';
 
   @override
@@ -2427,7 +2609,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get authenticating => 'Kimlik doğrulanıyor...';
 
   @override
-  String get lock => 'Lock';
+  String get lock => 'Kilitle';
 
   @override
   String get unlock => 'Kilit Aç';
@@ -2441,6 +2623,67 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get app_lock => 'Uygulama Kilidi';
+
+  @override
+  String get app_lock_delay => 'Şu süreden sonra kilitle';
+
+  @override
+  String get app_lock_delay_immediately => 'Uygulamadan çıkıldığında';
+
+  @override
+  String app_lock_delay_minutes(int n) {
+    return '$n dk uzakta';
+  }
+
+  @override
+  String get app_lock_delay_launch_only => 'Yalnızca uygulama başladığında';
+
+  @override
+  String get secure_screen => 'Güvenli ekran';
+
+  @override
+  String get secure_screen_subtitle =>
+      'Uygulamayı uygulama değiştiricide gizle; Android\'de ekran görüntülerini ve ekran kayıtlarını da engelle.';
+
+  @override
+  String get secure_screen_never => 'Asla';
+
+  @override
+  String get secure_screen_incognito => 'Gizli modda';
+
+  @override
+  String get secure_screen_always => 'Her zaman';
+
+  @override
+  String get background_work => 'Arka plan işlemleri';
+
+  @override
+  String get background_work_in_progress => 'Çalışıyor…';
+
+  @override
+  String get background_downloading => 'İndiriliyor';
+
+  @override
+  String get background_updating_library => 'Kütüphane güncelleniyor';
+
+  @override
+  String get background_restoring => 'Yedek geri yükleniyor';
+
+  @override
+  String get background_syncing => 'Senkronize ediliyor';
+
+  @override
+  String get background_cancel_downloads => 'İndirmeleri iptal et';
+
+  @override
+  String get background_stop_update => 'Güncellemeyi durdur';
+
+  @override
+  String get hide_notification_content => 'Bildirim içeriğini gizle';
+
+  @override
+  String get hide_notification_content_subtitle =>
+      'Bildirimler, uygulamanın ne yaptığını serileri veya bölümleri adlandırmadan belirtir.';
 
   @override
   String get require_biometric_or_device_credential =>
@@ -2471,6 +2714,24 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get brightness => 'Parlaklık';
+
+  @override
+  String get video_filters => 'Video filtreleri';
+
+  @override
+  String get video_filter_contrast => 'Kontrast';
+
+  @override
+  String get video_filter_saturation => 'Doygunluk';
+
+  @override
+  String get video_filter_gamma => 'Gama';
+
+  @override
+  String get video_filter_hue => 'Ton';
+
+  @override
+  String get volume => 'Ses düzeyi';
 
   @override
   String get contrast => 'Kontrast';
@@ -2752,6 +3013,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get split_wide_pages => 'Geniş sayfaları böl';
+
+  @override
+  String get split_tall_images => 'Uzun görselleri böl';
+
+  @override
+  String get split_tall_images_subtitle =>
+      'Webtoon: çok uzun görselleri dilimler halinde, seferde bir tanesini çözerek gösterir; daha az bellek kullanır. Kenarlıkları kırp seçeneğiyle birlikte kullanılmaz.';
 
   @override
   String get dual_page_invert => 'Bölünen yarım sayfaları ters çevir';
@@ -3181,6 +3449,24 @@ class AppLocalizationsTr extends AppLocalizations {
   String get onboarding_title => 'Mangayomi\'ye Hoş Geldiniz';
 
   @override
+  String get onboarding_language_title => 'Dilinizi seçin';
+
+  @override
+  String get onboarding_language_body =>
+      'Mangayomi bu dilde gösterilir. Daha sonra Görünüm bölümünden değiştirebilirsiniz.';
+
+  @override
+  String get onboarding_nav_grouped_body =>
+      'Her kütüphane için ayrı bir sekme kullanın ya da hepsini tek bir Kütüphane sekmesinde, Güncellemeler ve Geçmiş\'i de tek bir Etkinlik sekmesinde toplayın.';
+
+  @override
+  String get onboarding_nav_grouped => 'Gruplanmış sekmeler';
+
+  @override
+  String get onboarding_nav_grouped_inside =>
+      'Her gruplanmış sekme, ekranının üst kısmından değiştirilir';
+
+  @override
   String get onboarding_libraries_body =>
       'Okumak ve izlemek istediklerinizi seçin.';
 
@@ -3192,14 +3478,14 @@ class AppLocalizationsTr extends AppLocalizations {
       'Her biri için ayrı sekme veya tek bir Kitaplık sekmesi altında toplayın.';
 
   @override
-  String get onboarding_nav_split => 'Ayrı sekmeler';
-
-  @override
   String get onboarding_nav_merged => 'Tek Kitaplık sekmesi';
 
   @override
   String get onboarding_nav_inside =>
       'Kitaplık\'a dokunmak sekmeleri değiştirir';
+
+  @override
+  String get onboarding_nav_split => 'Ayrı sekmeler';
 
   @override
   String get onboarding_next => 'İleri';
@@ -3382,6 +3668,25 @@ class AppLocalizationsTr extends AppLocalizations {
       'Hücresel verideyken planlanan güncellemeyi atlayın.';
 
   @override
+  String get library_update_restrictions => 'Güncellerken atla';
+
+  @override
+  String get library_update_skip_completed => 'Tamamlanmış seriler';
+
+  @override
+  String get library_update_skip_unread => 'Okunmamış bölümü olan seriler';
+
+  @override
+  String get library_update_skip_not_started => 'Başlanmamış seriler';
+
+  @override
+  String get library_update_restrictions_subtitle =>
+      'Her kütüphane güncellemesi için geçerlidir. Güncellemelerin atlanmasına ayarlanmış kategoriler, tüm kütüphane güncellenirken de dışarıda bırakılır.';
+
+  @override
+  String get library_update_restrictions_none => 'Hiçbiri';
+
+  @override
   String get padding => 'Kenar Boşluğu';
 
   @override
@@ -3436,13 +3741,998 @@ class AppLocalizationsTr extends AppLocalizations {
   String get chapter_swipe_disabled => 'Devre dışı';
 
   @override
+  String get update_errors => 'Güncelleme hataları';
+
+  @override
+  String get no_update_errors => 'Güncelleme hatası yok';
+
+  @override
+  String get clear_all => 'Tümünü temizle';
+
+  @override
+  String get dismiss => 'Kapat';
+
+  @override
+  String get previous_episode => 'Önceki bölüm';
+
+  @override
+  String get clear_logs => 'Günlükleri temizle';
+
+  @override
+  String get bold => 'Kalın';
+
+  @override
+  String get italic => 'İtalik';
+
+  @override
+  String get color_yellow => 'Sarı';
+
+  @override
+  String get color_cyan => 'Camgöbeği';
+
+  @override
+  String get color_green => 'Yeşil';
+
+  @override
+  String get color_orange => 'Turuncu';
+
+  @override
+  String get continue_watching => 'İzlemeye devam et';
+
+  @override
+  String get search_your_anime => 'Animelerinde ara';
+
+  @override
+  String get category => 'Kategori';
+
+  @override
+  String get hidden_categories => 'Gizli kategoriler';
+
+  @override
+  String get new_category => 'Yeni kategori';
+
+  @override
+  String get local => 'Yerel';
+
+  @override
+  String get tv_home_rows => 'Satırlar';
+
+  @override
+  String get genre_rows => 'Tür satırları';
+
+  @override
+  String get share_backup_file => 'Mangayomi yedeğini paylaş';
+
+  @override
+  String get close => 'Kapat';
+
+  @override
+  String get migrate_source => 'Kaynağı taşı';
+
+  @override
+  String get cloudflare_bypass_proxy => 'Cloudflare atlatma proxy\'si';
+
+  @override
+  String get custom_doh_url => 'Özel DoH URL\'si';
+
+  @override
+  String get custom_doh_url_helper => 'https DoH (JSON) uç noktası olmalı';
+
+  @override
+  String get anime_only_tv_layout => 'Yalnızca anime TV düzeni';
+
+  @override
+  String get anime_only_beta => 'Yalnızca anime (beta)';
+
+  @override
+  String get tv_home_beta => 'TV ana sayfası (beta)';
+
+  @override
+  String get tv_player_beta => 'TV oynatıcısı (beta)';
+
+  @override
+  String get mark_as_read => 'Okundu olarak işaretle';
+
+  @override
+  String get mark_as_unread => 'Okunmadı olarak işaretle';
+
+  @override
+  String get bookmark => 'Yer imi';
+
+  @override
+  String get remove_bookmark => 'Yer imini kaldır';
+
+  @override
+  String get mark_below_as_read => 'Alttakileri okundu işaretle';
+
+  @override
+  String get previous_chapter => 'Önceki bölüm';
+
+  @override
+  String get pin => 'Sabitle';
+
+  @override
+  String get go_forward => 'İleri';
+
+  @override
+  String get invert_selection => 'Seçimi tersine çevir';
+
+  @override
+  String get select_between => 'Arasında seç';
+
+  @override
+  String get show_password => 'Şifreyi göster';
+
+  @override
+  String get hide_password => 'Şifreyi gizle';
+
+  @override
+  String get always_on_top => 'Her zaman üstte';
+
+  @override
+  String get mute => 'Sesi kapat';
+
+  @override
+  String get unmute => 'Sesi aç';
+
+  @override
+  String get exit_fullscreen => 'Tam ekrandan çık';
+
+  @override
+  String get play => 'Oynat';
+
+  @override
+  String get pause => 'Duraklat';
+
+  @override
+  String get switch_tracker => 'Takipçiyi değiştir';
+
+  @override
+  String get rename => 'Yeniden adlandır';
+
+  @override
+  String get show_category => 'Kategoriyi göster';
+
+  @override
+  String get hide_category => 'Kategoriyi gizle';
+
+  @override
+  String get update_with_library => 'Kütüphaneyle birlikte güncelle';
+
+  @override
+  String get skip_updates => 'Kütüphane güncellenirken atla';
+
+  @override
+  String get show_repository => 'Depoyu göster';
+
+  @override
+  String get hide_repository => 'Depoyu gizle';
+
+  @override
+  String get set_as_default => 'Varsayılan yap';
+
+  @override
+  String get change_display_mode => 'Görünüm modunu değiştir';
+
+  @override
+  String get back_to_results => 'Sonuçlara dön';
+
+  @override
+  String get activity => 'Etkinlik';
+
+  @override
+  String get group_nav_destinations => 'Gezinmeyi grupla';
+
+  @override
+  String get group_nav_destinations_subtitle =>
+      'Manga, anime ve roman için geçişli tek bir Kütüphane sekmesi ve güncellemeler ile geçmiş için tek bir Etkinlik sekmesi';
+
+  @override
+  String get search_all_sources => 'Tüm kaynaklarda ara';
+
+  @override
+  String get continue_reading => 'Devam et';
+
+  @override
+  String get show_continue_shelf => 'Okuduklarını göster';
+
+  @override
+  String get show_continue_shelf_subtitle =>
+      'Kütüphanenin üstünde devam eden seriler satırı';
+
+  @override
+  String get excluded => 'Hariç';
+
+  @override
+  String get remove_filter => 'Filtreyi kaldır';
+
+  @override
+  String get current_chapter => 'Mevcut bölüm';
+
+  @override
+  String get series => 'Seri';
+
+  @override
+  String get chapters_read => 'Okunan bölümler';
+
+  @override
+  String get search_settings => 'Ayarlarda ara';
+
+  @override
+  String get search_settings_hint =>
+      'Bir ayarın adını ya da açıklamasından bir kelime yaz';
+
+  @override
+  String reading_mode_for(String name) {
+    return '$name için okuma modu';
+  }
+
+  @override
+  String default_is(String name) {
+    return 'Varsayılan: $name';
+  }
+
+  @override
+  String get use_default => 'Varsayılanı kullan';
+
+  @override
+  String get is_the_default => 'Bu, varsayılan okuma modun';
+
+  @override
+  String get page_layout => 'Sayfa düzeni ve yakınlaştırma';
+
+  @override
+  String get reader_section_mode_summary =>
+      'Varsayılan mod, ölçek, arka plan, ön yükleme, tam ekran';
+
+  @override
+  String get reader_section_layout_summary =>
+      'Geniş sayfalar, çift sayfa, yatay yakınlaştırma';
+
+  @override
+  String get reader_section_navigation_summary =>
+      'Dokunma bölgeleri, düzen, menüyü gizleme, sayfa flaşı';
+
+  @override
+  String get reader_section_swipe_summary =>
+      'Listede bir bölümü kaydırmanın ne yaptığı';
+
+  @override
+  String get all_reader_settings => 'Tüm okuyucu ayarları';
+
+  @override
+  String get undo => 'Geri al';
+
+  @override
+  String get removed_from_history => 'Geçmişten kaldırıldı';
+
+  @override
+  String n_new_chapters(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count yeni bölüm',
+      one: '1 yeni bölüm',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get page_color_white => 'Beyaz';
+
+  @override
+  String get page_color_black => 'Siyah';
+
+  @override
+  String get page_color_night => 'Gece';
+
+  @override
+  String get page_color_sepia => 'Sepya';
+
+  @override
+  String get page_color_coffee => 'Kahve';
+
+  @override
+  String get page_color_silver => 'Gümüş';
+
+  @override
+  String get page_color_graphite => 'Grafit';
+
+  @override
+  String get page_color_mist => 'Sis';
+
+  @override
+  String get page_color_paper => 'Kâğıt';
+
+  @override
+  String get page_color_sky => 'Gökyüzü';
+
+  @override
+  String get page_color_mint => 'Nane';
+
+  @override
+  String get page_color_honey => 'Bal';
+
+  @override
+  String next_episode_in(int seconds) {
+    return 'Sonraki bölüm $seconds sn içinde';
+  }
+
+  @override
+  String get stay_on_this_episode => 'Bu bölümde kal';
+
+  @override
+  String get got_it => 'Anladım';
+
+  @override
+  String get gesture_brightness =>
+      'Parlaklık için solda yukarı veya aşağı kaydır';
+
+  @override
+  String get gesture_volume => 'Ses için sağda yukarı veya aşağı kaydır';
+
+  @override
+  String get gesture_double_tap_skip =>
+      'Geri ya da ileri atlamak için bir tarafa iki kez dokun';
+
+  @override
+  String get gesture_drag_seek => 'Videoda ilerlemek için yana sürükle';
+
+  @override
+  String get gesture_long_press_speed => 'Hızlandırmak için basılı tut';
+
+  @override
+  String get tap_to_continue => 'Devam etmek için herhangi bir yere dokun';
+
+  @override
+  String get empty_library_hint =>
+      'Göz At\'ta bir seri bul ve kütüphanene ekle.';
+
+  @override
+  String get more_filters => 'Diğer filtreler';
+
+  @override
+  String get resume_all_downloads => 'Tüm indirmeleri sürdür';
+
+  @override
+  String get download_failed => 'Başarısız';
+
+  @override
+  String get download_all => 'Tümünü indir';
+
+  @override
+  String n_chapters_queued(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Sırada $count bölüm',
+      one: 'Sırada 1 bölüm',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String n_selected(int count) {
+    return '$count seçildi';
+  }
+
+  @override
+  String get settings_general_summary => 'Dil, kütüphane güncellemeleri, ağ';
+
+  @override
+  String get settings_appearance_summary => 'Tema, palet, gezinme, yazı tipi';
+
+  @override
+  String get settings_novel_reader_summary =>
+      'Yazı tipi, sayfa rengi, sesli okuma';
+
+  @override
+  String get settings_player_summary => 'Oynatma, altyazılar, ses, kod çözücü';
+
+  @override
+  String get settings_downloads_summary =>
+      'Konum, yalnızca Wi-Fi, eşzamanlı indirmeler';
+
+  @override
+  String get settings_tracking_summary =>
+      'MyAnimeList, AniList, Kitsu ve diğerleri';
+
+  @override
+  String get settings_syncing_summary =>
+      'İlerlemeni kendi sunucunda senkronize tut';
+
+  @override
+  String get settings_browse_summary => 'Uzantılar, depolar, kaynaklar';
+
+  @override
+  String get settings_security_summary => 'Uygulama kilidi';
+
+  @override
+  String get settings_about_summary => 'Sürüm, güncellemeler, hata raporları';
+
+  @override
+  String minutes_left(int minutes) {
+    return '≈ $minutes dk kaldı';
+  }
+
+  @override
+  String get group_playback => 'Oynatma';
+
+  @override
+  String get group_subtitles => 'Altyazılar';
+
+  @override
+  String get group_screen => 'Ekran';
+
+  @override
+  String get aniskip => 'AniSkip';
+
+  @override
+  String seconds_short(int n) {
+    return '$n sn';
+  }
+
+  @override
+  String unknown_language_codes(String codes) {
+    return 'Bilinmeyen dil kodu: $codes';
+  }
+
+  @override
+  String get group_network => 'Ağ';
+
+  @override
+  String get group_discord => 'Discord';
+
+  @override
+  String invalid_url(String scheme) {
+    return '$scheme ile başlayan bir URL gir';
+  }
+
+  @override
+  String get group_cleanup => 'Temizlik';
+
+  @override
+  String remove_entries_confirm(int n) {
+    return '$n giriş ve geçmişi kaldırılsın mı? Bu geri alınamaz.';
+  }
+
+  @override
+  String get group_library_maintenance => 'Kütüphane bakımı';
+
+  @override
+  String get group_diagnostics => 'Tanılama';
+
+  @override
+  String get update_no_notes => 'Sürüm notu yok.';
+
+  @override
+  String update_download_failed(String error) {
+    return 'İndirme başarısız: $error';
+  }
+
+  @override
+  String get update_network_error => 'İndirme sırasında ağ hatası.';
+
+  @override
+  String get update_write_failed => 'APK dosyası yazılamadı.';
+
+  @override
+  String get update_later => 'Daha sonra';
+
+  @override
+  String get update_installed_version => 'Yüklü';
+
+  @override
+  String get update_new_version => 'Yeni sürüm';
+
+  @override
+  String update_published(String date) {
+    return 'Yayın tarihi: $date';
+  }
+
+  @override
+  String get update_pre_release => 'Ön sürüm';
+
+  @override
+  String get update_notes_features => 'Yenilikler';
+
+  @override
+  String get update_notes_fixes => 'Düzeltmeler';
+
+  @override
+  String get update_notes_other => 'İyileştirmeler';
+
+  @override
+  String get update_hint_install =>
+      'Uygulama güncellemeyi indirir, ardından Android kurulumu onaylamanızı ister. Kitaplığınız olduğu gibi kalır.';
+
+  @override
+  String get update_hint_browser =>
+      'Sürüm sayfası tarayıcınızda açılır: sisteminize uygun dosyayı oradan indirip kurun.';
+
+  @override
+  String get update_downloading => 'İndiriliyor…';
+
+  @override
+  String get update_installing => 'Yükleyici açılıyor…';
+
+  @override
+  String get update_install_failed => 'Yükleyici açılamadı.';
+
+  @override
+  String get update_browser_failed => 'Tarayıcı açılamadı.';
+
+  @override
+  String get deselect_all => 'Tüm seçimi kaldır';
+
+  @override
+  String update_failed_count(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count giriş güncellenemedi',
+      one: '1 giriş güncellenemedi',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sort_ascending => 'Artan';
+
+  @override
+  String get sort_descending => 'Azalan';
+
+  @override
+  String get not_downloaded => 'İndirilmedi';
+
+  @override
+  String n_tracked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count giriş takip ediliyor',
+      one: '1 giriş takip ediliyor',
+      zero: 'Henüz takip edilen yok',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get no_tracker_connected => 'Bağlı takipçi yok';
+
+  @override
+  String get no_tracker_connected_message =>
+      'Listelerini burada görmek için Ayarlar › Takip bölümünden bir hizmete giriş yap.';
+
+  @override
+  String get edit_metadata => 'Meta verileri düzenle';
+
+  @override
+  String get group_modes => 'Modlar';
+
+  @override
+  String get group_app => 'Uygulama';
+
+  @override
+  String get group_sources_services => 'Kaynaklar ve hizmetler';
+
+  @override
+  String n_sources(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count kaynak',
+      one: '1 kaynak',
+      zero: 'Kaynak yok',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get tv_player_beta_subtitle =>
+      'Açık: TV kumandası için yapılmış oynatıcı. Kapalı: orijinal oynatıcı.';
+
+  @override
+  String get anime_only_beta_subtitle =>
+      'Uygulama genelinde manga ve romanları gizle. Her şeyi göstermek için kapat.';
+
+  @override
+  String download_queue_start_failed(String error) {
+    return 'İndirme kuyruğu başlatılamadı: $error';
+  }
+
+  @override
+  String get group_interface => 'Arayüz';
+
+  @override
+  String get group_navigation => 'Gezinme';
+
+  @override
+  String get tv_home_beta_subtitle =>
+      'Düz ızgara yerine satırlardan oluşan bir anime ana sayfası (devam et, yeni bölümler, kategoriler)';
+
+  @override
+  String get cloudflare_bypass_proxy_hint =>
+      'İsteğe bağlı FlareSolverr veya Byparr adresi';
+
+  @override
+  String get cloudflare_bypass_proxy_message =>
+      'Bir FlareSolverr veya Byparr uç noktası. Kapatmak için boş bırak.';
+
+  @override
+  String get group_explore => 'Keşfet';
+
+  @override
+  String get explore_recommendations_subtitle => 'Buna benzer yapımlar';
+
+  @override
+  String get explore_related_subtitle =>
+      'Uyarlamaları, yan hikâyeleri ve diğer sürümleri';
+
+  @override
+  String get explore_watch_order_subtitle => 'Tüm hikâyeyi izleme sırası';
+
+  @override
+  String get explore_sequels_subtitle => 'Sonra gelenler, takipçinden';
+
+  @override
+  String get tap_zone_menu => 'Menü';
+
+  @override
+  String get tap_zone_previous => 'Önceki';
+
+  @override
+  String get tap_zone_next => 'Sonraki';
+
+  @override
+  String get back_to_series => 'Seriye dön';
+
+  @override
+  String get keyboard_shortcuts => 'Klavye kısayolları';
+
+  @override
+  String get shortcut_previous_page => 'Önceki sayfa';
+
+  @override
+  String get shortcut_next_page => 'Sonraki sayfa';
+
+  @override
+  String get shortcut_toggle_bars => 'Çubukları göster veya gizle';
+
+  @override
+  String get shortcut_zoom_in => 'Yakınlaştır';
+
+  @override
+  String get shortcut_zoom_out => 'Uzaklaştır';
+
+  @override
+  String get shortcut_zoom_reset => 'Sayfaya sığdır';
+
+  @override
+  String get shortcut_wheel_zoom => 'Fare ile yakınlaştır';
+
+  @override
+  String get mouse_wheel => 'Tekerlek';
+
+  @override
+  String get shortcut_leave => 'Okuyucudan çık';
+
+  @override
+  String get shortcut_show => 'Bu kısayolları göster';
+
+  @override
+  String get color_red => 'Kırmızı';
+
+  @override
+  String get color_blue => 'Mavi';
+
+  @override
+  String get color_opacity => 'Opaklık';
+
+  @override
+  String get volume_keys_paging => 'Ses tuşlarıyla sayfa çevir';
+
+  @override
+  String get volume_keys_paging_ios =>
+      'Okurken ses yarıda tutulur, böylece iki tuş da çalışır; çıktığında eski haline döner.';
+
+  @override
+  String get volume_keys_inverted => 'Ses tuşlarını ters çevir';
+
+  @override
+  String get reader_orientation => 'Ekran yönü';
+
+  @override
+  String get orientation_free => 'Cihazı izle';
+
+  @override
+  String get orientation_portrait => 'Dikey';
+
+  @override
+  String get orientation_landscape => 'Yatay';
+
+  @override
+  String get screen_brightness => 'Ekran parlaklığı';
+
+  @override
+  String get screen_brightness_system => 'Sistemi izler';
+
+  @override
+  String get shortcut_play_pause => 'Oynat veya duraklat';
+
+  @override
+  String shortcut_seek_back(int n) {
+    return '$n sn geri';
+  }
+
+  @override
+  String shortcut_seek_forward(int n) {
+    return '$n sn ileri';
+  }
+
+  @override
+  String get shortcut_volume_up => 'Sesi artır';
+
+  @override
+  String get shortcut_volume_down => 'Sesi azalt';
+
+  @override
+  String get shortcut_mute => 'Sesi kapat veya aç';
+
+  @override
+  String shortcut_skip_intro(int n) {
+    return 'Girişi atla ($n sn)';
+  }
+
+  @override
+  String get shortcut_previous_frame => 'Önceki kare';
+
+  @override
+  String get shortcut_next_frame => 'Sonraki kare';
+
+  @override
+  String get shortcut_shaders => 'Anime4K gölgelendiricileri';
+
+  @override
+  String get shortcut_shaders_off => 'Gölgelendiriciler kapalı';
+
+  @override
+  String get autoplay_next_on => 'Sonraki bölümü otomatik oynat: açık';
+
+  @override
+  String get autoplay_next_off => 'Sonraki bölümü otomatik oynat: kapalı';
+
+  @override
+  String get autoplay_next => 'Sonraki bölümü otomatik oynat';
+
+  @override
+  String get next_episode_short => 'Sonraki';
+
+  @override
+  String get subtitle_preview_sample => 'Yolculuk sürüyor.';
+
+  @override
+  String get text_style => 'Stil';
+
+  @override
+  String get code_editor => 'Kod düzenleyici';
+
+  @override
+  String get code_view_code => 'Kod';
+
+  @override
+  String get code_view_test => 'Test';
+
+  @override
+  String get code_view_console => 'Konsol';
+
+  @override
+  String get code_function => 'Fonksiyon';
+
+  @override
+  String get code_page => 'Sayfa';
+
+  @override
+  String get code_query => 'Sorgu';
+
+  @override
+  String get code_url => 'URL';
+
+  @override
+  String get code_html => 'HTML';
+
+  @override
+  String get code_execute => 'Çalıştır';
+
+  @override
+  String get code_executing => 'Çalışıyor…';
+
+  @override
+  String get code_no_result => 'Henüz sonuç yok';
+
+  @override
+  String get code_no_result_message =>
+      'Ne döndürdüğünü görmek için bir fonksiyon çalıştır.';
+
+  @override
+  String get code_console => 'Konsol';
+
+  @override
+  String get code_no_logs => 'Henüz günlük yok';
+
+  @override
+  String get tv_empty_anime_library => 'Anime kütüphanen boş';
+
+  @override
+  String get tv_empty_anime_library_hint =>
+      'Ana sayfanı doldurmak için Göz At\'tan anime ekle';
+
+  @override
+  String get browse_anime => 'Animelere göz at';
+
+  @override
+  String get no_episodes_yet => 'Henüz bölüm yok';
+
+  @override
+  String get filler => 'Dolgu';
+
+  @override
+  String get obsolete => 'Eskimiş';
+
+  @override
+  String every_n_days(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: 'Her $n günde bir',
+      one: 'Her gün',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get update_interval_unknown => 'Tahmin yok';
+
+  @override
+  String get group_reading => 'Okuma';
+
+  @override
+  String get group_reading_watching => 'Okuma ve izleme';
+
+  @override
+  String get novel_reader => 'Roman okuyucu';
+
+  @override
+  String get all_languages => 'Tüm diller';
+
+  @override
+  String get custom_dns_title => 'Özel DNS';
+
+  @override
+  String get custom_dns_system => 'Sistem DNS\'i';
+
+  @override
+  String get calendar_format_month => 'Ay';
+
+  @override
+  String get calendar_format_two_weeks => '2 hafta';
+
+  @override
+  String get calendar_format_week => 'Hafta';
+
+  @override
+  String get read_count => 'Okunan';
+
+  @override
+  String get watched_count => 'İzlenen';
+
+  @override
+  String get source_code_error_title => 'Bu kaynağın kodu çalışmadı';
+
+  @override
+  String source_code_error_failed(String what) {
+    return '$what başarısız: ekran devam edebilmek için yedek değere döndü';
+  }
+
+  @override
+  String get copy_error => 'Kopyala';
+
+  @override
+  String get error_copied => 'Hata kopyalandı';
+
+  @override
+  String get no_categories_yet => 'Henüz kategori yok';
+
+  @override
+  String get no_categories_yet_message =>
+      'Kütüphaneni kendi adlandırıp sıraladığın kategorilere ayır.';
+
+  @override
+  String get settings_keyboard_shortcuts_summary =>
+      'Okuyucu ve oynatıcı tuşlarını yeniden ata';
+
+  @override
+  String get shortcut_reset_all => 'Tüm kısayolları sıfırla';
+
+  @override
+  String get shortcut_press_key => 'Bir tuşa basın…';
+
+  @override
+  String shortcut_key_in_use(String action) {
+    return 'Zaten kullanılıyor: $action';
+  }
+
+  @override
+  String get external_browser => 'Harici bağlantıları şununla aç';
+
+  @override
+  String get system_default => 'Sistem varsayılanı';
+
+  @override
+  String get no_browsers_detected => 'Tarayıcı algılanmadı';
+
+  @override
+  String get on_this_device => 'Bu cihazda';
+
+  @override
+  String get local_tracking => 'Bu cihazda takip et';
+
+  @override
+  String get local_tracking_desc =>
+      'Her serinin durumunu, ilerlemesini, puanını ve tarihlerini hesap olmadan burada tutar. Hiçbir şey gönderilmez. Kapatmak kayıtlı verileri silmez.';
+
+  @override
+  String get track_add_one => 'Bir tane daha';
+
+  @override
+  String get track_change_match => 'Eşleşmeyi değiştir';
+
+  @override
+  String get track_remove => 'Takibi bırak';
+
+  @override
+  String get track_remove_local_msg =>
+      'Durumu, ilerlemesi, puanı ve tarihleri bu cihazdan silinir.';
+
+  @override
+  String track_remove_online_msg(String tracker) {
+    return 'Kayıt $tracker üzerinde kalır: burada yalnızca bu seriyle bağlantısı kaldırılır.';
+  }
+
+  @override
+  String update_from_repo(String repo) {
+    return 'Kaynak: $repo';
+  }
+
+  @override
+  String get update_from_other_repo => 'Başka bir depodan güncellensin mi?';
+
+  @override
+  String update_from_other_repo_msg(
+    String name,
+    String origin,
+    String version,
+    String other,
+  ) {
+    return '$name, $origin deposundan yüklendi. $version sürümü $other deposundan geliyor: yüklendikten sonra $name güncellemelerini $other deposundan alır. Yalnızca bu depoya güveniyorsanız devam edin.';
+  }
+
+  @override
+  String get update_all_foreign =>
+      'Bazı güncellemeler başka bir depodan geliyor';
+
+  @override
+  String get update_all_foreign_msg =>
+      'Güncellendikten sonra bu eklentiler güncellemelerini yeni depodan alır. Yalnızca ona güveniyorsanız dahil edin.';
+
+  @override
+  String get update_all_skip_foreign => 'Yalnızca kendi deposundan';
+
+  @override
   String get seasons => 'Seasons';
 
   @override
   String get season_number => 'Season number';
-
-  @override
-  String get migrate_source => 'Migrate source';
 
   @override
   String season_n(String number) {
@@ -3459,9 +4749,6 @@ class AppLocalizationsTr extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get filler => 'Filler';
 
   @override
   String get episode_fetch_date => 'Episode fetch date';

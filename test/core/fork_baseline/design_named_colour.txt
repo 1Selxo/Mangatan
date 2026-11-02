@@ -1,0 +1,11 @@
+1 lib/modules/anime/widgets/chimahon_primary_controls.dart
+12 lib/modules/anime/widgets/subtitle_cue_list.dart
+10 lib/modules/anime/widgets/video_ocr_overlay.dart
+6 lib/modules/manga/detail/manga_detail_view.dart
+1 lib/modules/manga/detail/manga_details_view.dart
+3 lib/modules/manga/detail/widgets/chapter_list_tile_widget.dart
+1 lib/modules/mining/widgets/dictionary_lookup_popup.dart
+1 lib/modules/more/settings/browse/extension_server/extension_server_tiles.dart
+5 lib/modules/more/settings/sync/sync.dart
+10 lib/modules/novel/novel_reader_view.dart
+12 lib/modules/novel/widgets/novel_reader_settings_sheet.dart

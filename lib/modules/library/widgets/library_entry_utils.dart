@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:mangayomi/utils/haptics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
@@ -12,14 +13,19 @@ import 'package:mangayomi/modules/library/providers/library_state_provider.dart'
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
-import 'package:mangayomi/modules/widgets/manga_image_card_widget.dart';
+import 'package:mangayomi/modules/manga/widgets/manga_image_card_widget.dart';
 import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/constant.dart';
-import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/headers.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:mangayomi/services/sync/chimahon_novel_materializer.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
+import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:shiori/shiori.dart';
+
+import 'package:mangayomi/modules/widgets/entry_badge_chip.dart';
+
+export 'package:mangayomi/modules/widgets/entry_badge_chip.dart';
 
 /// Resolves the correct [ImageProvider] for a manga entry, preferring a custom
 /// local cover over the remote URL. Remote covers are wrapped in
@@ -50,6 +56,7 @@ ImageProvider resolveCoverImage(Manga entry, WidgetRef ref) {
 void handleLongOrSecondaryTap(bool isLongPressed, WidgetRef ref, Manga entry) {
   ref.read(mangasListStateProvider.notifier).update(entry);
   if (!isLongPressed) {
+    selectionHaptic();
     ref.read(isLongPressedStateProvider.notifier).update(!isLongPressed);
   }
 }
@@ -135,38 +142,6 @@ bool isMissingCloudNovelEntry(Manga entry, {Set<int>? missingParentIds}) {
       .isNotEmptySync();
 }
 
-/// A small rounded chip using the theme's hint colour as its background.
-///
-/// Used for the Local, download-count, and language badges.
-class EntryBadgeChip extends StatelessWidget {
-  const EntryBadgeChip({
-    super.key,
-    required this.label,
-    this.borderRadius = const BorderRadius.only(
-      topLeft: Radius.circular(3),
-      bottomLeft: Radius.circular(3),
-    ),
-  });
-
-  final String label;
-  final BorderRadius borderRadius;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: borderRadius,
-        color: Theme.of(context).hintColor,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: Text(
-        label,
-        style: TextStyle(color: context.dynamicBlackWhiteColor),
-      ),
-    );
-  }
-}
-
 /// Shows the number of downloaded chapters for [entry], or nothing when zero.
 ///
 /// Uses a [Consumer] internally so it can watch [downloadedChapterIdsProvider]
@@ -187,13 +162,17 @@ class DownloadCountBadge extends ConsumerWidget {
 
     if (count == 0) return const SizedBox.shrink();
 
-    return EntryBadgeChip(label: count.toString());
+    return EntryBadgeChip(
+      label: count.toString(),
+      tone: context.shiori.color.downloaded,
+    );
   }
 }
 
-/// A unified badge widget that combines Local, Download, and Unread counts.
-/// Only renders a non-empty widget when there is actually something to display,
-/// resolving the "0 unread" empty badge container UX bug.
+/// The badges at the top of a library cover: Local, the number of
+/// downloaded chapters, and the number of unread ones, each in its own
+/// status colour. Renders nothing when there is nothing to count, so a cover
+/// never carries an empty "0".
 class LibraryBadgeWidget extends ConsumerWidget {
   final Manga entry;
   final bool showLocal;
@@ -216,7 +195,7 @@ class LibraryBadgeWidget extends ConsumerWidget {
       final downloadedIds =
           ref.watch(downloadedChapterIdsProvider).asData?.value ??
           const <int>{};
-      for (final c in entry.chapters) {
+      for (final c in userFacingChapters(entry)) {
         if (c.id != null && downloadedIds.contains(c.id)) {
           downloadCount++;
         }
@@ -224,39 +203,26 @@ class LibraryBadgeWidget extends ConsumerWidget {
     }
 
     // Scanlator-aware: the badge count respects the per-manga scanlator filter.
-    final unreadCount = entry.unreadChaptersCount;
+    // A local EPUB counts the book's own chapters, not its navigation rows.
+    final unreadCount = isLocalEpubManga(entry)
+        ? userFacingChapters(entry).where((c) => !(c.isRead ?? false)).length
+        : entry.unreadChaptersCount;
 
-    // If there is nothing to show (no local, no download, no unread), return empty
     if (!hasLocal && downloadCount == 0 && unreadCount == 0) {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(3),
-        color: context.primaryColor,
-      ),
-      padding: const EdgeInsets.only(right: 5),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hasLocal) const EntryBadgeChip(label: 'Local'),
-          if (downloadCount > 0)
-            EntryBadgeChip(label: downloadCount.toString()),
-          if (unreadCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(left: 3),
-              child: Text(
-                unreadCount.toString(),
-                style: TextStyle(
-                  color: context.dynamicBlackWhiteColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-        ],
-      ),
+    final c = context.shiori.color;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 2,
+      children: [
+        if (hasLocal) EntryBadgeChip(label: context.l10n.local),
+        if (downloadCount > 0)
+          EntryBadgeChip(label: downloadCount.toString(), tone: c.downloaded),
+        if (unreadCount > 0)
+          EntryBadgeChip(label: unreadCount.toString(), tone: c.unread),
+      ],
     );
   }
 }

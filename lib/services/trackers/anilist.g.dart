@@ -58,7 +58,7 @@ final class AnilistProvider extends $NotifierProvider<Anilist, void> {
   }
 }
 
-String _$anilistHash() => r'672ad874c5082538d285b074c4c19ea5169e131f';
+String _$anilistHash() => r'434b305ec28a3d1e6e188d81b66bd4cd4cdf6aa4';
 
 final class AnilistFamily extends $Family
     with
@@ -105,7 +105,7 @@ abstract class _$Anilist extends $Notifier<void> {
   });
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<void, void>;
     final element =
         ref.element
@@ -115,7 +115,7 @@ abstract class _$Anilist extends $Notifier<void> {
               Object?,
               Object?
             >;
-    element.handleCreate(
+    return element.handleCreate(
       ref,
       () => build(
         syncId: _$args.syncId,

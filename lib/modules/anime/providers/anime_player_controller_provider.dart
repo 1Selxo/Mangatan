@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/repositories/track_repository.dart';
 import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/chapter_controller_mixin.dart';
+import 'package:mangayomi/modules/reader_common/mixins/chapter_controller_mixin.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
 import 'package:mangayomi/services/aniskip.dart';
@@ -20,9 +20,15 @@ class AnimeStreamController extends _$AnimeStreamController
     with ChapterControllerMixin {
   @override
   KeepAliveLink build({required Chapter episode}) {
+    _sessionEpisode = chapterRepository.resolveForReading(episode);
+    ref.onDispose(chapterRepository.retainForReading(this.episode));
     _keepAliveLink = ref.keepAlive();
     return _keepAliveLink!;
   }
+
+  Chapter? _sessionEpisode;
+  @override
+  Chapter get episode => _sessionEpisode ?? super.episode;
 
   KeepAliveLink? _keepAliveLink;
   KeepAliveLink? get keepAliveLink => _keepAliveLink;

@@ -10,7 +10,7 @@ import 'package:mangayomi/modules/manga/reader/reader_eink_state.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_popup_menu_button.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';

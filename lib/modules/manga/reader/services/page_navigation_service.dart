@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_motion.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -94,10 +95,19 @@ class PageNavigationService {
     if (!extendedController.hasClients) return;
 
     if (animate) {
+      // 100 ms a page plus 100 ms, landing softly: a page turned by a tap
+      // reads as a slide rather than a cut.
+      final position = extendedController.position;
+      final from = extendedController.page ?? index.toDouble();
+      final duration = ReaderMotion.settle(
+        distance: (index - from) * position.viewportDimension,
+        extent: position.viewportDimension,
+      );
+      if (duration == Duration.zero) return;
       extendedController.animateToPage(
         index,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.ease,
+        duration: duration,
+        curve: ReaderMotion.quinticOut,
       );
     } else {
       extendedController.jumpToPage(index);

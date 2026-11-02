@@ -510,7 +510,7 @@ void main() {
     File(path)
         .writeAsBytesSync(const GZipEncoder().encode(mihon.writeToBuffer()));
     final expected = legacyPreviewTachiBkImport(path);
-    final actual = previewTachiBkImport(path);
+    final actual = await previewTachiBkImport(path);
     expect(actual?.newSeriesCount, expected?.newSeriesCount);
     expect(actual?.updatedSeriesCount, expected?.updatedSeriesCount);
     expect(actual?.newChapterCount, expected?.newChapterCount);

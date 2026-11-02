@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:isar_community/isar.dart';
-import 'package:mangayomi/main.dart';
+import 'package:mangayomi/repositories/db.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/download.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/repositories/chapter_consolidation.dart';
 
 class DownloadRepository {
   Future<List<int>> getAllIds() =>
@@ -79,8 +80,11 @@ class DownloadRepository {
       .findAll();
 
   // No updatedAt stamping - Download has no such field.
-  /// Append atomically; repeated taps must not reset progress or other entries.
-  Future<void> enqueue(Chapter chapter) =>
+  /// Atomically appends a chapter to the queue. Repeated requests preserve
+  /// completed and active entries, while failed entries become retryable.
+  /// Resolves to the stored chapter queued (an alias resolved to the chapter
+  /// it was merged into), or null when it no longer exists.
+  Future<Chapter?> enqueue(Chapter chapter) =>
       dbWriteQueue.run(() => isar.writeTxnSync(() => _enqueueSync(chapter)));
 
   /// Queues [chapters] in order, with the same result as awaiting [enqueue]
@@ -111,10 +115,15 @@ class DownloadRepository {
   }
 
   /// [enqueue]'s body. Must run inside a write transaction.
-  void _enqueueSync(Chapter chapter) {
+  Chapter? _enqueueSync(Chapter chapter) {
+    final current =
+        isar.chapters.getSync(chapter.id!) ??
+        isar.chapters.getSync(resolveChapterAlias(isar, chapter.id!));
+    if (current == null || current.mangaId != chapter.mangaId) return null;
+    chapter = current;
     final existing = isar.downloads.getSync(chapter.id!);
     if (existing?.isDownload == true || existing?.isStartDownload == true) {
-      return;
+      return chapter;
     }
     final download =
         existing ??
@@ -129,6 +138,7 @@ class DownloadRepository {
     download
       ..succeeded = 0
       ..failed = 0
+      ..total = 100
       ..isDownload = false
       ..isStartDownload = true
       ..chapter.value = chapter;
@@ -161,6 +171,7 @@ class DownloadRepository {
       settings.updatedAt = DateTime.now().millisecondsSinceEpoch;
       isar.settings.putSync(settings);
     }
+    return chapter;
   }
 
   Future<void> save(Download download) => dbWriteQueue.run(

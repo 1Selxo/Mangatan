@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shiori/shiori.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/tracker_widget.dart';
-import 'package:mangayomi/modules/tracker_library/tracker_library_screen.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/repositories/track_repository.dart';
 import 'package:mangayomi/utils/constant.dart';
@@ -45,15 +45,12 @@ class _TrackingDetailState extends State<TrackingDetail>
       length: isMovies ? 1 : 2,
       child: Scaffold(
         appBar: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
           title: Text(
             widget.trackerPref.syncId == -1
-                ? 'Local'
+                ? context.l10n.local
                 : trackInfos(widget.trackerPref.syncId!).$2,
           ),
           bottom: TabBar(
-            indicatorSize: TabBarIndicatorSize.tab,
             controller: _tabBarController,
             tabs: [
               if (!isMovies) Tab(text: l10n.manga),
@@ -90,10 +87,18 @@ class TrackingTab extends StatelessWidget {
     return StreamBuilder(
       stream: trackRepository.watchByItemTypeAndSyncId(itemType, syncId),
       builder: (context, snapshot) {
-        List<Track>? trackRes = snapshot.hasData ? snapshot.data : [];
-        final mediaIds = trackRes!.map((e) => e.mediaId).toSet().toList();
+        if (!snapshot.hasData) return const ShioriLoading();
+        final trackRes = snapshot.data!;
+        final mediaIds = trackRes.map((e) => e.mediaId).toSet().toList();
+        if (mediaIds.isEmpty) {
+          return ShioriEmptyState(
+            icon: Symbols.sync_rounded,
+            title: context.l10n.n_tracked(0),
+            compact: true,
+          );
+        }
         return Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(ShioriSpace.s8),
           child: SuperListView.separated(
             padding: const EdgeInsets.all(0),
             itemCount: mediaIds.length,
@@ -105,7 +110,12 @@ class TrackingTab extends StatelessWidget {
                 (element) => element.mediaId == mediaId,
               );
               return ExpansionTile(
-                title: Text(track.title!),
+                title: Text(
+                  track.title ?? '',
+                  style: context.shiori.text.row.copyWith(
+                    color: context.shiori.color.fg,
+                  ),
+                ),
                 children: [
                   TrackingWidget(
                     itemType: itemType,
@@ -115,9 +125,7 @@ class TrackingTab extends StatelessWidget {
                 ],
               );
             },
-            separatorBuilder: (_, index) {
-              return const Divider();
-            },
+            separatorBuilder: (_, _) => const Divider(height: 1),
           ),
         );
       },
@@ -142,7 +150,12 @@ class TrackingWidget extends StatelessWidget {
       stream: trackRepository.watchByMediaIdAndItemType(mediaId, itemType),
       builder: (context, snapshot) {
         List<Track>? trackRes = [];
-        List<Track> res = snapshot.data ?? [];
+        // Media ids are each tracker's own: the same number on another
+        // tracker is another series.
+        final res = [
+          for (final t in snapshot.data ?? <Track>[])
+            if (t.syncId == syncId) t,
+        ];
         for (var track in res) {
           if (!trackRes
               .map((e) => e.mediaId)
@@ -152,7 +165,7 @@ class TrackingWidget extends StatelessWidget {
           }
         }
         return Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(ShioriSpace.s8),
           child: SuperListView.separated(
             padding: const EdgeInsets.all(0),
             itemCount: trackRes.length,
@@ -168,9 +181,7 @@ class TrackingWidget extends StatelessWidget {
                 hide: true,
               );
             },
-            separatorBuilder: (_, index) {
-              return const Divider();
-            },
+            separatorBuilder: (_, _) => const Divider(height: 1),
           ),
         );
       },

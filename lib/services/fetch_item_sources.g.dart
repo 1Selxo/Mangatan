@@ -8,13 +8,26 @@ part of 'fetch_item_sources.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Reads the extension repositories of [itemType], or acts on the one
+/// extension [id]: installs it, or installs the update the last read found
+/// for it, from where it was found. Installing [id] fails with
+/// [ExtensionInstallException] when it did not end up installed.
 
 @ProviderFor(fetchItemSourcesList)
 final fetchItemSourcesListProvider = FetchItemSourcesListFamily._();
 
+/// Reads the extension repositories of [itemType], or acts on the one
+/// extension [id]: installs it, or installs the update the last read found
+/// for it, from where it was found. Installing [id] fails with
+/// [ExtensionInstallException] when it did not end up installed.
+
 final class FetchItemSourcesListProvider
     extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
     with $FutureModifier<void>, $FutureProvider<void> {
+  /// Reads the extension repositories of [itemType], or acts on the one
+  /// extension [id]: installs it, or installs the update the last read found
+  /// for it, from where it was found. Installing [id] fails with
+  /// [ExtensionInstallException] when it did not end up installed.
   FetchItemSourcesListProvider._({
     required FetchItemSourcesListFamily super.from,
     required ({int? id, bool reFresh, ItemType itemType}) super.argument,
@@ -65,7 +78,12 @@ final class FetchItemSourcesListProvider
 }
 
 String _$fetchItemSourcesListHash() =>
-    r'239688783ed3154e42cb5ac7fbba51bc5e4a8aa2';
+    r'994f5e6c76cee88ea95f0374d9cc5fbd4f3156ab';
+
+/// Reads the extension repositories of [itemType], or acts on the one
+/// extension [id]: installs it, or installs the update the last read found
+/// for it, from where it was found. Installing [id] fails with
+/// [ExtensionInstallException] when it did not end up installed.
 
 final class FetchItemSourcesListFamily extends $Family
     with
@@ -81,6 +99,11 @@ final class FetchItemSourcesListFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: false,
       );
+
+  /// Reads the extension repositories of [itemType], or acts on the one
+  /// extension [id]: installs it, or installs the update the last read found
+  /// for it, from where it was found. Installing [id] fails with
+  /// [ExtensionInstallException] when it did not end up installed.
 
   FetchItemSourcesListProvider call({
     int? id,

@@ -6,6 +6,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/proto/mihon_extension_store.pb.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/utils/log/logger.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 
 class ExtensionStoreFetchResult {
   final String name;
@@ -26,7 +27,12 @@ class ExtensionStoreService {
     if (bytes.length >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B) {
       try {
         return gzip.decode(bytes);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        recordError(
+          error,
+          stack: stackTrace,
+          source: 'extension_store_service',
+        );
         return bytes;
       }
     }
@@ -71,7 +77,13 @@ class ExtensionStoreService {
               if (repoJson['index_v2'] != null &&
                   (repoJson['index_v2'] as String).isNotEmpty) {
                 // Redirect to V2 index (.pb or JSON store)
-                return await fetchStore(repoJson['index_v2'] as String, client);
+                final v2Result = await fetchStore(
+                  repoJson['index_v2'] as String,
+                  client,
+                );
+                if (v2Result != null && v2Result.sources.isNotEmpty) {
+                  return v2Result;
+                }
               }
               repoName =
                   (repoJson['meta']?['name'] ?? repoJson['name']) as String?;
@@ -104,7 +116,13 @@ class ExtensionStoreService {
           // Check for index_v2 redirect in legacy repo JSON
           if (jsonMap['index_v2'] != null &&
               (jsonMap['index_v2'] as String).isNotEmpty) {
-            return await fetchStore(jsonMap['index_v2'] as String, client);
+            final v2Result = await fetchStore(
+              jsonMap['index_v2'] as String,
+              client,
+            );
+            if (v2Result != null && v2Result.sources.isNotEmpty) {
+              return v2Result;
+            }
           }
 
           // Try parsing JSON NetworkExtensionStore
@@ -114,7 +132,8 @@ class ExtensionStoreService {
 
       // 3. Binary Protobuf: NetworkExtensionStore
       return await _parseProtobufStore(currentUrl, bytes, client);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'extension_store_service');
       return null;
     }
   }
@@ -171,7 +190,8 @@ class ExtensionStoreService {
         indexUrl: indexUrl,
         sources: sources,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'extension_store_service');
       return null;
     }
   }
@@ -226,7 +246,8 @@ class ExtensionStoreService {
         indexUrl: indexUrl,
         sources: sources,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'extension_store_service');
       return null;
     }
   }
@@ -310,7 +331,8 @@ class ExtensionStoreService {
         indexUrl: indexUrl,
         sources: sources,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'extension_store_service');
       return null;
     }
   }
@@ -385,10 +407,46 @@ class ExtensionStoreService {
             e['code'] != null &&
             e['lang'] != null &&
             e['nsfw'] != null &&
-            e['sources'] != null &&
             e['apk'] != null) {
-          final subSources = e['sources'] as List;
-          for (final source in subSources) {
+          final rawName = e['name'] as String;
+          final cleanName = _cleanExtensionName(rawName);
+          final pkg = e['pkg'] as String;
+          final subSources = e['sources'] as List?;
+          if (subSources != null && subSources.isNotEmpty) {
+            for (final source in subSources) {
+              final src = Source.fromJson(e)
+                ..apiUrl = ''
+                ..appMinVerReq = ''
+                ..dateFormat = ''
+                ..dateFormatLocale = ''
+                ..hasCloudflare = false
+                ..headers = ''
+                ..isActive = true
+                ..isAdded = false
+                ..isFullData = false
+                ..isNsfw = e['nsfw'] == 1
+                ..isPinned = false
+                ..lastUsed = false
+                ..sourceCode = ''
+                ..typeSource = ''
+                ..versionLast = (e['version'] as String?) ?? '0.0.1'
+                ..isObsolete = false
+                ..isLocal = false
+                ..name = source['name']
+                ..lang = source['lang']
+                ..baseUrl = source['baseUrl']
+                ..sourceCodeUrl = '$repoBaseUrl/apk/${e['apk']}'
+                ..sourceCodeLanguage = SourceCodeLanguage.mihon
+                ..itemType =
+                    pkg.startsWith('eu.kanade.tachiyomi.animeextension')
+                    ? ItemType.anime
+                    : ItemType.manga
+                ..iconUrl = '$repoBaseUrl/icon/$pkg.png'
+                ..notes = null;
+              src.id = 'mihon-${source['id']}'.hashCode;
+              sources.add(src);
+            }
+          } else {
             final src = Source.fromJson(e)
               ..apiUrl = ''
               ..appMinVerReq = ''
@@ -407,20 +465,17 @@ class ExtensionStoreService {
               ..versionLast = (e['version'] as String?) ?? '0.0.1'
               ..isObsolete = false
               ..isLocal = false
-              ..name = source['name']
-              ..lang = source['lang']
-              ..baseUrl = source['baseUrl']
+              ..name = cleanName
+              ..lang = (e['lang'] as String?) ?? _extractLangFromPkg(pkg)
+              ..baseUrl = (e['baseUrl'] as String?) ?? ''
               ..sourceCodeUrl = '$repoBaseUrl/apk/${e['apk']}'
               ..sourceCodeLanguage = SourceCodeLanguage.mihon
-              ..itemType =
-                  (e['pkg'] as String).startsWith(
-                    'eu.kanade.tachiyomi.animeextension',
-                  )
+              ..itemType = pkg.startsWith('eu.kanade.tachiyomi.animeextension')
                   ? ItemType.anime
                   : ItemType.manga
-              ..iconUrl = '$repoBaseUrl/icon/${e['pkg']}.png'
+              ..iconUrl = '$repoBaseUrl/icon/$pkg.png'
               ..notes = null;
-            src.id = 'mihon-${source['id']}'.hashCode;
+            src.id = 'mihon-$pkg'.hashCode;
             sources.add(src);
           }
           continue;
@@ -472,7 +527,13 @@ class ExtensionStoreService {
           if (src.name != null && src.name!.isNotEmpty) {
             sources.add(src);
           }
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          recordError(
+            error,
+            stack: stackTrace,
+            source: 'extension_store_service',
+          );
+        }
       }
 
       String defaultRepoName = 'Extension Repo';
@@ -519,7 +580,8 @@ class ExtensionStoreService {
         indexUrl: indexUrl,
         sources: sources,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'extension_store_service');
       return null;
     }
   }
@@ -547,7 +609,9 @@ class ExtensionStoreService {
           ? ItemType.anime
           : ItemType.manga;
 
-      for (final src in ext.sources) {
+      if (ext.sources.isEmpty) {
+        final lang = _extractLangFromPkg(pkgName);
+        final cleanName = _cleanExtensionName(ext.name);
         final source = Source()
           ..apiUrl = ''
           ..appMinVerReq = ''
@@ -567,17 +631,50 @@ class ExtensionStoreService {
           ..versionLast = versionName
           ..isObsolete = false
           ..isLocal = false
-          ..name = src.name
-          ..lang = src.language
-          ..baseUrl = src.homeUrl
+          ..name = cleanName
+          ..lang = lang
+          ..baseUrl = ''
           ..sourceCodeUrl = apkUrl
           ..iconUrl = iconUrl
           ..sourceCodeLanguage = SourceCodeLanguage.mihon
           ..itemType = itemType
           ..notes = null;
 
-        source.id = 'mihon-${src.id}'.hashCode;
+        source.id = 'mihon-$pkgName'.hashCode;
         sources.add(source);
+      } else {
+        for (final src in ext.sources) {
+          final source = Source()
+            ..apiUrl = ''
+            ..appMinVerReq = ''
+            ..dateFormat = ''
+            ..dateFormatLocale = ''
+            ..hasCloudflare = false
+            ..headers = ''
+            ..isActive = true
+            ..isAdded = false
+            ..isFullData = false
+            ..isNsfw = isNsfw
+            ..isPinned = false
+            ..lastUsed = false
+            ..sourceCode = ''
+            ..typeSource = ''
+            ..version = versionName
+            ..versionLast = versionName
+            ..isObsolete = false
+            ..isLocal = false
+            ..name = src.name
+            ..lang = src.language
+            ..baseUrl = src.homeUrl
+            ..sourceCodeUrl = apkUrl
+            ..iconUrl = iconUrl
+            ..sourceCodeLanguage = SourceCodeLanguage.mihon
+            ..itemType = itemType
+            ..notes = null;
+
+          source.id = 'mihon-${src.id}'.hashCode;
+          sources.add(source);
+        }
       }
     }
 
@@ -622,7 +719,7 @@ class ExtensionStoreService {
           : ItemType.manga;
 
       final srcList = e['sources'] as List?;
-      if (srcList != null) {
+      if (srcList != null && srcList.isNotEmpty) {
         for (final srcJson in srcList) {
           if (srcJson is! Map<String, dynamic>) continue;
           final srcName = (srcJson['name'] as String?) ?? '';
@@ -667,10 +764,69 @@ class ExtensionStoreService {
           source.id = 'mihon-$srcId'.hashCode;
           sources.add(source);
         }
+      } else {
+        final rawName = (e['name'] as String?) ?? pkgName;
+        final cleanName = _cleanExtensionName(rawName);
+        final lang = (e['lang'] as String?) ?? _extractLangFromPkg(pkgName);
+
+        final source = Source()
+          ..apiUrl = ''
+          ..appMinVerReq = ''
+          ..dateFormat = ''
+          ..dateFormatLocale = ''
+          ..hasCloudflare = false
+          ..headers = ''
+          ..isActive = true
+          ..isAdded = false
+          ..isFullData = false
+          ..isNsfw = isNsfw
+          ..isPinned = false
+          ..lastUsed = false
+          ..sourceCode = ''
+          ..typeSource = ''
+          ..version = versionName
+          ..versionLast = versionName
+          ..isObsolete = false
+          ..isLocal = false
+          ..name = cleanName
+          ..lang = lang
+          ..baseUrl = (e['baseUrl'] as String?) ?? ''
+          ..sourceCodeUrl = apkUrl
+          ..iconUrl = iconUrl
+          ..sourceCodeLanguage = SourceCodeLanguage.mihon
+          ..itemType = itemType
+          ..notes = null;
+
+        source.id = 'mihon-$pkgName'.hashCode;
+        sources.add(source);
       }
     }
 
     return sources;
+  }
+
+  static String _cleanExtensionName(String name) {
+    if (name.startsWith('Aniyomi: ')) {
+      return name.substring(9);
+    }
+    if (name.startsWith('Tachiyomi: ')) {
+      return name.substring(11);
+    }
+    return name;
+  }
+
+  static String _extractLangFromPkg(String pkgName) {
+    final parts = pkgName.split('.');
+    final extIndex = parts.indexWhere(
+      (p) => p == 'animeextension' || p == 'extension',
+    );
+    if (extIndex != -1 && extIndex + 1 < parts.length) {
+      return parts[extIndex + 1];
+    }
+    if (parts.length >= 5 && parts[0] == 'eu' && parts[1] == 'kanade') {
+      return parts[4];
+    }
+    return 'all';
   }
 
   static ExtensionStoreItem _extensionItemFromJson(Map<String, dynamic> json) {

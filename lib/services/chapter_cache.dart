@@ -6,6 +6,7 @@ import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/page.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 
 /// Service managing the disk cache for chapter page lists
 ///
@@ -20,6 +21,15 @@ class ChapterCache {
   factory ChapterCache() => _instance;
 
   static const String cacheFolderName = 'chapter_disk_cache';
+
+  static bool _isLoopbackProxyUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    return (uri.host == '127.0.0.1' ||
+            uri.host == 'localhost' ||
+            uri.host == '::1') &&
+        uri.path.startsWith('/image/');
+  }
 
   @visibleForTesting
   Directory? customCacheDir;
@@ -79,6 +89,13 @@ class ChapterCache {
         }
       }
 
+      if (pageUrls.any((p) => _isLoopbackProxyUrl(p.url))) {
+        try {
+          await file.delete();
+        } catch (_) {}
+        return null;
+      }
+
       return pageUrls.isNotEmpty ? pageUrls : null;
     } catch (e) {
       if (kDebugMode) {
@@ -91,8 +108,12 @@ class ChapterCache {
   /// Writes [pages] for [chapter] to the disk cache.
   Future<void> putPageListToCache(Chapter chapter, List<PageUrl> pages) async {
     try {
-      // Do not cache empty or placeholder page lists
-      if (pages.isEmpty || pages.every((p) => p.url.isEmpty)) return;
+      // Do not cache empty, placeholder, or transient loopback proxy page lists
+      if (pages.isEmpty ||
+          pages.every((p) => p.url.isEmpty) ||
+          pages.any((p) => _isLoopbackProxyUrl(p.url))) {
+        return;
+      }
 
       final file = await _getCacheFile(chapter);
       final data = {
@@ -128,7 +149,9 @@ class ChapterCache {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'chapter_cache');
+    }
   }
 
   /// Trims the cache directory using an LRU policy (deleting least-recently modified files)
@@ -152,7 +175,9 @@ class ChapterCache {
           final stat = file.statSync();
           currentSize += stat.size;
           fileStats.add((file: file, size: stat.size, modified: stat.modified));
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          recordError(error, stack: stackTrace, source: 'chapter_cache');
+        }
       }
 
       if (currentSize <= maxBytes) return;
@@ -165,7 +190,9 @@ class ChapterCache {
         try {
           await item.file.delete();
           currentSize -= item.size;
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          recordError(error, stack: stackTrace, source: 'chapter_cache');
+        }
       }
     } catch (e) {
       if (kDebugMode) {

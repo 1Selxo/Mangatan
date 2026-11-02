@@ -38,14 +38,14 @@ import 'package:mangayomi/modules/anime/widgets/chimahon_primary_controls.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/anime/widgets/jimaku_subtitle_dialog.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/btn_chapter_list_dialog.dart';
+import 'package:mangayomi/modules/reader_common/widgets/btn_chapter_list_dialog.dart';
 import 'package:mangayomi/modules/anime/widgets/mobile.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_setting_widget.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_cue_list.dart';
 import 'package:mangayomi/modules/anime/widgets/video_ocr_overlay.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
-import 'package:mangayomi/modules/manga/reader/providers/push_router.dart';
+import 'package:mangayomi/router/push_router.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_audio_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_decoder_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
@@ -56,7 +56,6 @@ import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/services/aniskip.dart';
-import 'package:mangayomi/services/fetch_subtitles.dart';
 import 'package:mangayomi/services/mining/anime_sentence_audio_service.dart';
 import 'package:mangayomi/services/get_video_list.dart';
 import 'package:mangayomi/services/mining/jimaku_service.dart';
@@ -2568,7 +2567,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   context,
                   chapter: widget.episode,
                   isLocal: widget.isLocal,
-                ) as ImdbSubtitle?;
+                );
                 if (subtitle != null && context.mounted) {
                   await _setSubtitleTrack(
                     SubtitleTrack.uri(

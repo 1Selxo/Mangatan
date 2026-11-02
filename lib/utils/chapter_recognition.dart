@@ -43,14 +43,14 @@ String chapterNumberDisplayTitle({
 
 class ChapterRecognition {
   static final _unwanted = RegExp(
-    r"\b(?:v|ver|vol|version|volume|season|staffel|saison|temporada|s)[^a-z]?[0-9]+",
+    r"\b(?:v|ver|vol|version|volume|season|staffel|saison|temporada|s|t)[^a-z]?[0-9]+",
   );
   static final _unwantedWhiteSpace = RegExp(r"\s(?=extra|special|omake)");
   static final _seasonKeyword = RegExp(
-    r"\b(?:staffel|season|saison|temporada|s)\s*([0-9]+)",
+    r"\b(?:staffel|season|saison|temporada|s|t)\s*([0-9]+)",
   );
   static final _episodeKeyword = RegExp(
-    r"\b(?:folge|episode|ep\.?)\s*([0-9]+(?:\.[0-9]+)?)",
+    r"\b(?:folge|episode|episodio|ep\.?)\s*([0-9]+(?:\.[0-9]+)?)",
   );
   static final _japaneseVolume = RegExp(
     r"第\s*([0-9]+)(\.[0-9]+)?(\.?[a-z]+)?\s*巻",

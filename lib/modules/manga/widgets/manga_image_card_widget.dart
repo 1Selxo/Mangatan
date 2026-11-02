@@ -1,0 +1,382 @@
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/widgets/in_library_badge.dart';
+import 'package:shiori/shiori.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mangayomi/eval/model/m_manga.dart';
+import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/models/source.dart';
+import 'package:mangayomi/modules/manga/detail/manga_detail_main.dart';
+import 'package:mangayomi/repositories/manga_repository.dart';
+import 'package:mangayomi/repositories/settings_repository.dart';
+import 'package:mangayomi/utils/cached_network.dart';
+import 'package:mangayomi/router/router.dart';
+import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/constant.dart';
+import 'package:mangayomi/utils/headers.dart';
+import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
+import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/main.dart';
+import 'package:mangayomi/repositories/db_write_queue.dart';
+
+class MangaImageCardWidget extends ConsumerWidget {
+  final Source source;
+  final ItemType itemType;
+  final bool isComfortableGrid;
+  final MManga? getMangaDetail;
+  final Manga? libraryManga;
+  final bool autofocus;
+
+  const MangaImageCardWidget({
+    required this.source,
+    super.key,
+    required this.getMangaDetail,
+    required this.isComfortableGrid,
+    required this.itemType,
+    this.libraryManga,
+    this.autofocus = false,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasData = libraryManga != null;
+    return CoverViewWidget(
+      autofocus: autofocus,
+      bottomTextWidget: BottomTextWidget(
+        maxLines: 1,
+        text: getMangaDetail!.name!,
+        isComfortableGrid: isComfortableGrid,
+      ),
+      isComfortableGrid: isComfortableGrid,
+      image: hasData && libraryManga!.customCoverImage != null
+          ? MemoryImage(libraryManga!.customCoverImage as Uint8List)
+                as ImageProvider
+          : coverProvider(
+              toImgUrl(
+                hasData
+                    ? libraryManga!.customCoverFromTracker ??
+                          libraryManga!.imageUrl ??
+                          ""
+                    : getMangaDetail!.imageUrl ?? "",
+              ),
+              headers: ref.watch(
+                headersProvider(
+                  source: source.name!,
+                  lang: source.lang!,
+                  sourceId: source.id,
+                ),
+              ),
+              cacheMaxAge: const Duration(days: 7),
+            ),
+      onTap: () => _toMangaRdD(ref, context, false),
+      onLongPress: () => _toMangaRdD(ref, context, true),
+      onSecondaryTap: () => _toMangaRdD(ref, context, true),
+      children: [
+        Container(
+          color: hasData && libraryManga!.favorite! ? inLibraryVeil : null,
+        ),
+        if (hasData && libraryManga!.favorite!)
+          const PositionedDirectional(
+            top: ShioriSpace.s4,
+            start: ShioriSpace.s4,
+            child: InLibraryBadge(),
+          ),
+        if (!isComfortableGrid)
+          BottomTextWidget(
+            isTorrent: source.isTorrent,
+            text: getMangaDetail!.name!,
+          ),
+      ],
+    );
+  }
+
+  Future<void> _toMangaRdD(WidgetRef ref, BuildContext context, bool favorite) {
+    return pushToMangaReaderDetail(
+      ref: ref,
+      context: context,
+      getManga: getMangaDetail!,
+      lang: source.lang!,
+      source: source.name!,
+      itemType: itemType,
+      addToFavourite: favorite,
+      sourceId: source.id,
+    );
+  }
+}
+
+class MangaImageCardListTileWidget extends ConsumerWidget {
+  final Source source;
+  final ItemType itemType;
+  final MManga? getMangaDetail;
+  final Manga? libraryManga;
+
+  const MangaImageCardListTileWidget({
+    required this.source,
+    super.key,
+    required this.itemType,
+    required this.getMangaDetail,
+    this.libraryManga,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasData = libraryManga != null;
+    final image = hasData && libraryManga!.customCoverImage != null
+        ? MemoryImage(libraryManga!.customCoverImage as Uint8List)
+              as ImageProvider
+        : coverProvider(
+            toImgUrl(
+              hasData
+                  ? libraryManga!.customCoverFromTracker ??
+                        libraryManga!.imageUrl ??
+                        ""
+                  : getMangaDetail!.imageUrl ?? "",
+            ),
+            headers: ref.watch(
+              headersProvider(
+                source: source.name!,
+                lang: source.lang!,
+                sourceId: source.id,
+              ),
+            ),
+          );
+    return Padding(
+      padding: const EdgeInsets.all(ShioriSpace.s8),
+      child: Material(
+        borderRadius: BorderRadius.circular(ShioriShape.cover),
+        color: Colors.transparent,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => pushToMangaReaderDetail(
+            ref: ref,
+            context: context,
+            getManga: getMangaDetail!,
+            lang: source.lang!,
+            source: source.name!,
+            itemType: itemType,
+            sourceId: source.id,
+          ),
+          onLongPress: () => pushToMangaReaderDetail(
+            ref: ref,
+            context: context,
+            getManga: getMangaDetail!,
+            lang: source.lang!,
+            source: source.name!,
+            itemType: itemType,
+            addToFavourite: true,
+            sourceId: source.id,
+          ),
+          onSecondaryTap: () => pushToMangaReaderDetail(
+            ref: ref,
+            context: context,
+            getManga: getMangaDetail!,
+            lang: source.lang!,
+            source: source.name!,
+            itemType: itemType,
+            addToFavourite: true,
+            sourceId: source.id,
+          ),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ShioriSpace.s12,
+                ),
+                child: Stack(
+                  children: [
+                    Material(
+                      borderRadius: BorderRadius.circular(ShioriShape.cover),
+                      color: Colors.transparent,
+                      clipBehavior: Clip.antiAlias,
+                      child: Image(
+                        height: 55,
+                        width: 40,
+                        fit: BoxFit.cover,
+                        image: image,
+                      ),
+                    ),
+                    Container(
+                      height: 55,
+                      width: 40,
+                      color: hasData && libraryManga!.favorite!
+                          ? inLibraryVeil
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  getMangaDetail!.name!,
+                  maxLines: 2,
+                  style: TextStyle(
+                    overflow: TextOverflow.ellipsis,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+              if (hasData && libraryManga!.favorite!)
+                const Padding(
+                  padding: EdgeInsets.all(ShioriSpace.s8),
+                  child: InLibraryBadge(),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> pushToMangaReaderDetail({
+  MManga? getManga,
+  required WidgetRef ref,
+  required String lang,
+  required BuildContext context,
+  required String source,
+  required int? sourceId,
+  int? archiveId,
+  Manga? mangaM,
+  ItemType? itemType,
+  bool useMaterialRoute = false,
+  bool addToFavourite = false,
+}) async {
+  int? mangaId;
+  if (archiveId != null) {
+    mangaId = archiveId;
+  } else if (mangaM?.id != null) {
+    // A library entry is already a stored row. Re-resolving it by title would
+    // open another row with the same name, such as a different series' season
+    // that is also called "Season 1" on the same source.
+    mangaId = (await mangaRepository.findByIdAsync(mangaM!.id!))?.id;
+  } else if (source == "local") {
+    mangaId = (await mangaRepository.findLocalArchiveByName(getManga?.name))
+        ?.id;
+  }
+
+  if (mangaId == null) {
+    final manga =
+        mangaM ??
+        Manga(
+          imageUrl: getManga!.imageUrl,
+          name: getManga.name!.trim(),
+          genre: getManga.genre?.map((e) => e.toString()).toList() ?? [],
+          author: getManga.author ?? "",
+          status: getManga.status ?? Status.unknown,
+          description: getManga.description ?? "",
+          link: getManga.link,
+          source: source,
+          lang: lang,
+          lastUpdate: 0,
+          itemType: itemType ?? ItemType.manga,
+          artist: getManga.artist ?? '',
+          sourceId: sourceId,
+        );
+    mangaId = await resolveBrowsedMangaId(manga, lang, sourceId);
+  }
+
+  final mang = await mangaRepository.findByIdAsync(mangaId);
+  if (mang!.sourceId == null && !(mang.isLocalArchive ?? false)) {
+    await mangaRepository.save(mang..sourceId = sourceId);
+  }
+  final settings = await settingsRepository.currentAsync;
+  final exists =
+      settings!.sortChapterList?.any((e) => e.mangaId == mangaId) ?? false;
+  if (!exists) {
+    await settingsRepository.update(
+      (s) => s
+        ..sortChapterList = [
+          ...(settings.sortChapterList ?? []),
+          SortChapter()..mangaId = mangaId,
+        ]
+        ..chapterFilterBookmarkedList = [
+          ...(settings.chapterFilterBookmarkedList ?? []),
+          ChapterFilterBookmarked()..mangaId = mangaId,
+        ]
+        ..chapterFilterDownloadedList = [
+          ...(settings.chapterFilterDownloadedList ?? []),
+          ChapterFilterDownloaded()..mangaId = mangaId,
+        ]
+        ..chapterFilterUnreadList = [
+          ...(settings.chapterFilterUnreadList ?? []),
+          ChapterFilterUnread()..mangaId = mangaId,
+        ],
+    );
+  }
+  if (!addToFavourite) {
+    if (context.mounted) {
+      if (useMaterialRoute) {
+        await Navigator.push(
+          context,
+          createRoute(page: MangaReaderDetail(mangaId: mangaId)),
+        );
+      } else {
+        await context.push('/manga-reader/detail', extra: mangaId);
+      }
+    }
+  } else {
+    final getManga = await isar.mangas.get(mangaId);
+    await dbWriteQueue.run(
+      () => isar.writeTxn(() async {
+        await isar.mangas.put(
+          getManga!..updateFavorite(!(getManga.favorite ?? false)),
+        );
+      }),
+    );
+  }
+}
+
+/// Finds the stored entry for a browsed title, saving [manga] when there is
+/// none, and returns its ID.
+@visibleForTesting
+Future<int> resolveBrowsedMangaId(
+  Manga manga,
+  String lang,
+  int? sourceId,
+) async {
+  // Also match by source ID: a Mihon factory source's name follows its
+  // preferences (Jellyfin's custom label), and a name change must not
+  // save the same title a second time.
+  QueryBuilder<Manga, Manga, QAfterFilterCondition> sameEntry() => isar.mangas
+      .filter()
+      .langEqualTo(lang)
+      .titleMatchesSourceIdentity(manga.sourceTitle ?? manga.name)
+      .group(
+        (q) => sourceId == null
+            ? q.sourceEqualTo(manga.source)
+            : q.sourceEqualTo(manga.source).or().sourceIdEqualTo(sourceId),
+      );
+  // The title alone is not an identity: Jellyfin names every season
+  // "Season 1", "Season 2", and so on. A stored row with a different source
+  // URL is a different entry, while a row without a URL still matches by
+  // title as before.
+  final link = manga.link?.trim() ?? '';
+  bool sameLink(Manga stored) {
+    final storedLink = stored.link?.trim() ?? '';
+    return link.isEmpty || storedLink.isEmpty || storedLink == link;
+  }
+
+  final foundMangas = (await sameEntry().findAll()).where(sameLink).toList()
+    ..sort((left, right) {
+      final leftExact = link.isNotEmpty && left.link?.trim() == link;
+      final rightExact = link.isNotEmpty && right.link?.trim() == link;
+      if (leftExact != rightExact) return leftExact ? -1 : 1;
+      return (left.id ?? 0).compareTo(right.id ?? 0);
+    });
+  Manga? matchedManga;
+  for (final foundManga in foundMangas) {
+    if (foundManga.sourceId == null || foundManga.sourceId == sourceId) {
+      matchedManga = foundManga;
+      break;
+    }
+  }
+  if (matchedManga == null) {
+    await mangaRepository.save(manga);
+    matchedManga = manga;
+  }
+  return matchedManga.id!;
+}

@@ -5,7 +5,7 @@ import 'package:mangayomi/modules/manga/detail/widgets/custom_floating_action_bt
 import 'package:mangayomi/modules/manga/detail/resume_chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
+import 'package:mangayomi/modules/library/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/repositories/category_repository.dart';
 import 'package:mangayomi/repositories/history_repository.dart';

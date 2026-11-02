@@ -165,6 +165,10 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
   String _title = 'YouTube';
   bool _openingVideo = false;
   bool _externalWindowClosed = false;
+  // The published desktop_webview_window cannot hide its window, so the
+  // external window is closed while the player is open and reopened on the
+  // same page afterwards.
+  Webview? _windowClosedForPlayback;
   bool _disposing = false;
   String? _lastVideoId;
   String? _sitePlaybackVideoId;
@@ -191,7 +195,7 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
     super.dispose();
   }
 
-  Future<void> _openDesktop() async {
+  Future<void> _openDesktop({String initialUrl = _youtubeHomeUrl}) async {
     if (!mounted) return;
     final view = await WebviewWindow.create(
       configuration: const CreateConfiguration(
@@ -217,8 +221,12 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
         }
         return true;
       })
-      ..launch(_youtubeHomeUrl);
+      ..launch(initialUrl);
     view.onClose.whenComplete(() {
+      if (identical(_windowClosedForPlayback, view)) {
+        _windowClosedForPlayback = null;
+        return;
+      }
       _externalWindowClosed = true;
       if (mounted && !_disposing && !_openingVideo) context.pop();
     });
@@ -300,12 +308,21 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
       await _controller?.stopLoading();
       await _desktopWebview?.evaluateJavaScript(_stopYouTubePlaybackScript);
       await _controller?.evaluateJavascript(source: _stopYouTubePlaybackScript);
-      if (_usesExternalWindow) {
-        await _desktopWebview?.setWebviewWindowVisibility(false);
-      }
       final chapterId = await _youtube.prepareVideoUrlForPlayback(url);
       if (!mounted) return;
+      final view = _usesExternalWindow && !_externalWindowClosed
+          ? _desktopWebview
+          : null;
+      final resumeUrl = view?.navigationState.value.url;
+      if (view != null) {
+        _windowClosedForPlayback = view;
+        _desktopWebview = null;
+        view.close();
+      }
       await context.push('/animePlayerView', extra: chapterId);
+      if (view != null && mounted && !_disposing) {
+        await _openDesktop(initialUrl: resumeUrl ?? _youtubeHomeUrl);
+      }
     } catch (error) {
       extractionError = error;
       _sitePlaybackVideoId = videoId;
@@ -320,10 +337,6 @@ class _YouTubeBrowserScreenState extends State<YouTubeBrowserScreen> {
       }
     } finally {
       _openingVideo = false;
-      if (_usesExternalWindow && !_externalWindowClosed) {
-        await _desktopWebview?.setWebviewWindowVisibility(true);
-        await _desktopWebview?.bringToForeground();
-      }
       if (extractionError != null && !_externalWindowClosed) {
         if (_usesExternalWindow) {
           _desktopWebview?.launch(url);

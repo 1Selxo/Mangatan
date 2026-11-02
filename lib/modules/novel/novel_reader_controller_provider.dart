@@ -3,8 +3,8 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/epub_book_progress.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/chapter_reader_settings_mixin.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/chapter_controller_mixin.dart';
+import 'package:mangayomi/modules/reader_common/mixins/chapter_reader_settings_mixin.dart';
+import 'package:mangayomi/modules/reader_common/mixins/chapter_controller_mixin.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
@@ -15,7 +15,14 @@ part 'novel_reader_controller_provider.g.dart';
 class NovelReaderController extends _$NovelReaderController
     with ChapterControllerMixin, ChapterReaderSettingsMixin {
   @override
-  void build({required Chapter chapter}) {}
+  void build({required Chapter chapter}) {
+    _sessionChapter = chapterRepository.resolveForReading(chapter);
+    ref.onDispose(chapterRepository.retainForReading(this.chapter));
+  }
+
+  Chapter? _sessionChapter;
+  @override
+  Chapter get chapter => _sessionChapter ?? super.chapter;
 
   // Keep incognitoMode as a final field (read once, not on every access).
   @override

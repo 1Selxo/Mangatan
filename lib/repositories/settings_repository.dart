@@ -1,9 +1,10 @@
 import 'dart:async';
 
 import 'package:isar_community/isar.dart';
-import 'package:mangayomi/main.dart';
+import 'package:mangayomi/repositories/db.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 
 class SettingsRepository {
   Settings get current => isar.settings.getSync(227)!;
@@ -11,7 +12,8 @@ class SettingsRepository {
   Settings? get currentOrNull {
     try {
       return isar.settings.getSync(227);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      recordError(error, stack: stackTrace, source: 'settings_repository');
       return null;
     }
   }
@@ -76,6 +78,18 @@ class SettingsRepository {
       isar.settings.putSync(s);
     });
   });
+
+  // Like update(), but leaves updatedAt alone: for app state this device keeps
+  // (when Updates was last seen), which is not a settings change and must not
+  // make this device's settings win the next sync.
+  Future<void> updateLocalState(void Function(Settings s) mutate) =>
+      dbWriteQueue.run(() {
+        isar.writeTxnSync(() {
+          final s = currentOrNull ?? Settings();
+          mutate(s);
+          isar.settings.putSync(s);
+        });
+      });
 
   // For callers that already hold the Settings instance to mutate (e.g. a family
   // provider's cached param) rather than wanting a freshly-fetched one.

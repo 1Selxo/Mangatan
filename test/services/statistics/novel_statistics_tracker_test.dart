@@ -5,8 +5,9 @@ import 'package:mangayomi/services/statistics/novel_statistics_tracker.dart';
 void main() {
   /// A tracker driven by a controllable clock, so the character/time arithmetic
   /// can be asserted exactly rather than approximately.
-  ({NovelStatisticsTracker tracker, void Function(int seconds) advance})
-  build({List<NovelStatsEntry> initial = const []}) {
+  ({NovelStatisticsTracker tracker, void Function(int seconds) advance}) build({
+    List<NovelStatsEntry> initial = const [],
+  }) {
     var now = DateTime(2026, 7, 18, 12);
     return (
       tracker: NovelStatisticsTracker(
@@ -160,10 +161,7 @@ void main() {
 
   test('a session spanning midnight splits across both days', () {
     var now = DateTime(2026, 7, 18, 23, 59);
-    final tracker = NovelStatisticsTracker(
-      novelId: 'book',
-      clock: () => now,
-    );
+    final tracker = NovelStatisticsTracker(novelId: 'book', clock: () => now);
     tracker.start(0);
     now = now.add(const Duration(seconds: 30));
     tracker.update(300);

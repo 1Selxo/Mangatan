@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/utils/chapter_recognition.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/chapter_reader_settings_mixin.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/chapter_controller_mixin.dart';
+import 'package:mangayomi/modules/reader_common/mixins/chapter_reader_settings_mixin.dart';
+import 'package:mangayomi/modules/reader_common/mixins/chapter_controller_mixin.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/providers/incognito_mode_state_provider.dart';
 import 'package:mangayomi/repositories/chapter_repository.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/modules/more/settings/downloads/providers/downloads_state_provider.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
+import 'package:mangayomi/services/download_manager/delete_after_reading.dart';
+import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/main.dart';
 part 'reader_controller_provider.g.dart';
@@ -47,9 +49,15 @@ class ReaderController extends _$ReaderController
     with ChapterControllerMixin, ChapterReaderSettingsMixin {
   @override
   KeepAliveLink build({required Chapter chapter}) {
+    _sessionChapter = chapterRepository.resolveForReading(chapter);
+    ref.onDispose(chapterRepository.retainForReading(this.chapter));
     _keepAliveLink = ref.keepAlive();
     return _keepAliveLink!;
   }
+
+  Chapter? _sessionChapter;
+  @override
+  Chapter get chapter => _sessionChapter ?? super.chapter;
 
   KeepAliveLink? _keepAliveLink;
   KeepAliveLink? get keepAliveLink => _keepAliveLink;
@@ -272,7 +280,14 @@ class ReaderController extends _$ReaderController
       if (isRead) {
         chapter.updateTrackChapterRead(ref);
         if (ref.read(deleteDownloadAfterReadingStateProvider)) {
-          chapter.deleteDownloadedFiles();
+          chapterToDeleteAfterReading(
+            getManga().getChapterListForReading(),
+            chapter,
+            slot: ref.read(deleteAfterReadingSlotStateProvider),
+            deleteBookmarked: ref.read(
+              deleteBookmarkedAfterReadingStateProvider,
+            ),
+          )?.deleteDownloadedFiles();
         }
       }
     }

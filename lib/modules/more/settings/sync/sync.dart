@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mangayomi/services/external_browser.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_connection_status_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_progress_provider.dart';
@@ -27,7 +28,6 @@ import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:mangayomi/repositories/sync_preference_repository.dart';
 
 final _googleDriveConnectionSingleFlight = GoogleDriveConnectionSingleFlight();
@@ -401,10 +401,7 @@ class SyncScreen extends ConsumerWidget {
                       children: [
                         OutlinedButton.icon(
                           onPressed: () async {
-                            if (!await launchUrl(
-                              Uri.parse(serverUrl),
-                              mode: LaunchMode.externalApplication,
-                            )) {
+                            if (!await ExternalBrowser.open(serverUrl)) {
                               AppLogger.log(
                                 'Could not launch $serverUrl',
                                 logLevel: LogLevel.error,

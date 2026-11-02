@@ -83,13 +83,16 @@ void main() {
         mangaId: Int64(1),
         charactersRead: 10,
       );
-      ChimahonStatsRowMerge.mangaStats([local], [
-        BackupMangaStats(
-          dateKey: '2026-07-18',
-          mangaId: Int64(1),
-          charactersRead: 99,
-        ),
-      ]);
+      ChimahonStatsRowMerge.mangaStats(
+        [local],
+        [
+          BackupMangaStats(
+            dateKey: '2026-07-18',
+            mangaId: Int64(1),
+            charactersRead: 99,
+          ),
+        ],
+      );
 
       expect(local.charactersRead, 10);
     });
@@ -155,11 +158,7 @@ void main() {
 
     test('merging is idempotent', () {
       final rows = [
-        BackupAnkiStats(
-          dateKey: '2026-07-18',
-          profileId: 'ja',
-          mangaCards: 5,
-        ),
+        BackupAnkiStats(dateKey: '2026-07-18', profileId: 'ja', mangaCards: 5),
       ];
       final twice = ChimahonStatsRowMerge.ankiStats(
         ChimahonStatsRowMerge.ankiStats(rows, rows),

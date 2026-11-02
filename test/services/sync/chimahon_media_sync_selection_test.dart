@@ -370,23 +370,20 @@ void main() {
       ],
     );
 
-    final mangaOff = const ChimahonMediaSyncSelection(
-      manga: false,
-    ).projectLocal(local);
+    final mangaOff = const ChimahonMediaSyncSelection(manga: false)
+        .projectLocal(local);
     expect(mangaOff.backupManga, isEmpty);
     expect(mangaOff.backupAnime, hasLength(1));
     expect(mangaOff.backupNovels, hasLength(1));
 
-    final animeOff = const ChimahonMediaSyncSelection(
-      anime: false,
-    ).projectLocal(local);
+    final animeOff = const ChimahonMediaSyncSelection(anime: false)
+        .projectLocal(local);
     expect(animeOff.backupManga, hasLength(1));
     expect(animeOff.backupAnime, isEmpty);
     expect(animeOff.backupNovels, hasLength(1));
 
-    final novelsOff = const ChimahonMediaSyncSelection(
-      novels: false,
-    ).projectLocal(local);
+    final novelsOff = const ChimahonMediaSyncSelection(novels: false)
+        .projectLocal(local);
     expect(novelsOff.backupManga, hasLength(1));
     expect(novelsOff.backupAnime, hasLength(1));
     expect(novelsOff.backupNovels, isEmpty);

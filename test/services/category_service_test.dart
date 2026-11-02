@@ -6,31 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('normalizes duplicate names and orders categories contiguously', () {
     final categories = [
-      Category(
-        name: ' Reading ',
-        forItemType: ItemType.manga,
-        pos: 7,
-      ),
-      Category(
-        name: 'watching',
-        forItemType: ItemType.anime,
-        pos: 1,
-      ),
-      Category(
-        name: 'Study',
-        forItemType: ItemType.novel,
-        pos: 3,
-      ),
+      Category(name: ' Reading ', forItemType: ItemType.manga, pos: 7),
+      Category(name: 'watching', forItemType: ItemType.anime, pos: 1),
+      Category(name: 'Study', forItemType: ItemType.novel, pos: 3),
     ];
 
-    expect(
-      CategoryService.hasDuplicateName(categories, 'reading'),
-      isTrue,
-    );
-    expect(
-      CategoryService.hasDuplicateName(categories, 'Notes'),
-      isFalse,
-    );
+    expect(CategoryService.hasDuplicateName(categories, 'reading'), isTrue);
+    expect(CategoryService.hasDuplicateName(categories, 'Notes'), isFalse);
 
     final ordered = CategoryService.ordered(categories);
     expect(ordered.first.name, 'watching');

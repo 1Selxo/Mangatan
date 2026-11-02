@@ -42,13 +42,13 @@ final class AnimationDurationScaleProvider
 }
 
 String _$animationDurationScaleHash() =>
-    r'07a6990893df150df9b580ce191f495ecabfee37';
+    r'4733a2d447c228e48bd50c387d5991fe06c3aa9e';
 
 abstract class _$AnimationDurationScale extends $Notifier<double> {
   double build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<double, double>;
     final element =
         ref.element
@@ -58,6 +58,6 @@ abstract class _$AnimationDurationScale extends $Notifier<double> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

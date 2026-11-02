@@ -1,34 +1,40 @@
 import 'dart:async';
 
-import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
-import 'package:archive/archive_io.dart';
-import 'package:bot_toast/bot_toast.dart';
-import 'package:collection/collection.dart';
-import 'package:flutter/material.dart';
-import 'package:isar_community/isar.dart';
-import 'package:mangayomi/eval/model/m_bridge.dart';
-import 'package:mangayomi/l10n/generated/app_localizations.dart';
-import 'package:mangayomi/eval/model/source_preference.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
-import 'package:mangayomi/models/custom_button.dart';
 import 'package:mangayomi/models/download.dart';
-import 'package:mangayomi/models/epub_book_progress.dart';
-import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart';
-import 'package:mangayomi/models/track_preference.dart';
+import 'package:mangayomi/models/update.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
+import 'package:mangayomi/repositories/chapter_repository.dart';
+import 'package:mangayomi/repositories/restore_repository.dart';
+import 'package:mangayomi/router/router.dart';
+
+import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
+import 'package:archive/archive_io.dart';
+import 'package:flutter/material.dart';
+import 'package:mangayomi/services/background_work/background_work.dart';
+import 'package:isar_community/isar.dart';
+import 'package:mangayomi/eval/model/m_bridge.dart';
+import 'package:mangayomi/l10n/generated/app_localizations.dart';
+import 'package:mangayomi/models/epub_book_progress.dart';
+import 'package:mangayomi/models/sync_preference.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/backup_decoder.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/backup_format.dart';
-import 'package:mangayomi/modules/more/data_and_storage/providers/kotatsu_backup.dart';
-import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAniyomi.pb.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/kotatsu_restore_service.dart';
+import 'package:mangayomi/modules/more/data_and_storage/providers/mangayomi_restore_service.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupAnime.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupCategory.pb.dart';
-import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupMihon.pb.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupSource.pb.dart';
 import 'package:mangayomi/services/sync/chimahon_app_settings_adapter.dart';
 import 'package:mangayomi/services/sync/chimahon_deferred_payload_store.dart';
@@ -49,38 +55,24 @@ import 'package:mangayomi/services/sync/chimahon_sync_codec.dart';
 import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
 import 'package:mangayomi/services/sync/chimahon_source_preferences_adapter.dart';
 import 'package:mangayomi/services/sync/mihon_backup_source_resolver.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/blend_level_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/flex_scheme_color_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_dark_mode_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
-import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
-import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_provider.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/router/router.dart';
-import 'package:mangayomi/repositories/category_repository.dart';
-import 'package:mangayomi/repositories/chapter_repository.dart';
-import 'package:mangayomi/repositories/custom_button_repository.dart';
-import 'package:mangayomi/repositories/download_repository.dart';
-import 'package:mangayomi/repositories/history_repository.dart';
-import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
-import 'package:mangayomi/repositories/restore_repository.dart';
-import 'package:mangayomi/repositories/settings_repository.dart';
-import 'package:mangayomi/repositories/source_preference_repository.dart';
-import 'package:mangayomi/repositories/source_repository.dart';
 import 'package:mangayomi/repositories/sync_preference_repository.dart';
-import 'package:mangayomi/repositories/track_repository.dart';
-import 'package:mangayomi/repositories/update_repository.dart';
 import 'package:mangayomi/services/sync_server.dart';
-import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/utils/error_toast.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mangayomi/main.dart';
 part 'restore.g.dart';
 
+/// Restores the backup at [path], replacing or merging into the library.
+///
+/// Throws when the restore fails, and leaves reporting it to the caller: the
+/// restore flows announce the outcome themselves, so an error swallowed here
+/// used to be followed by their success message.
 @riverpod
 Future<void> doRestore(
   Ref ref, {
@@ -103,7 +95,7 @@ Future<void> doRestore(
   // watch keeping it alive — if that widget unmounts mid-restore (dialog
   // closes, screen pops), the provider gets disposed mid-flight and every
   // ref use below throws UnmountedRefException.
-  ref.keepAlive();
+  final keepAliveLink = ref.keepAlive();
   // Resolved before any await, so it's safe to use after one.
   final l10n = l10nLocalizations(context);
   // Yield once first: doRestore is itself a provider, and mutating another
@@ -116,6 +108,7 @@ Future<void> doRestore(
   // restore (and its post-restore upload, if any) finishes — otherwise
   // either could race the restore and pull stale server data back down.
   ref.read(restoreSyncGuardProvider.notifier).start();
+  BackgroundWork.begin(BackgroundWorkKind.restore);
   var uploadStarted = false;
   try {
     // Zip filenames aren't encrypted even when file content is, so this
@@ -143,30 +136,33 @@ Future<void> doRestore(
         final backup =
             decodedMangayomiBackup ??
             await decodeMangayomiBackup(path, context);
-        await ref.read(
-          restoreBackupProvider(
-            backup,
-            merge: merge,
-            categoryDecisions: categoryDecisions,
-            sourceDecisions: sourceDecisions,
-          ).future,
+        final restoreProvider = restoreBackupProvider(
+          backup,
+          merge: merge,
+          categoryDecisions: categoryDecisions,
+          sourceDecisions: sourceDecisions,
         );
+        // Listened to so the auto-dispose sub-provider lives until we're done.
+        ref.listen(restoreProvider, (_, _) {}, onError: (_, _) {});
+        await ref.read(restoreProvider.future);
         break;
       case BackupType.kotatsu:
-        await ref.read(restoreKotatsuBackupProvider(archive).future);
+        final restoreProvider = restoreKotatsuBackupProvider(archive);
+        ref.listen(restoreProvider, (_, _) {}, onError: (_, _) {});
+        await ref.read(restoreProvider.future);
         break;
       case BackupType.mihon:
       case BackupType.aniyomi:
       case BackupType.neko:
-        await ref.read(
-          restoreTachiBkBackupProvider(
-            path,
-            backupType,
-            merge: merge,
-            categoryDecisions: categoryDecisions,
-            sourceDecisions: sourceDecisions,
-          ).future,
+        final restoreProvider = restoreTachiBkBackupProvider(
+          path,
+          backupType,
+          merge: merge,
+          categoryDecisions: categoryDecisions,
+          sourceDecisions: sourceDecisions,
         );
+        ref.listen(restoreProvider, (_, _) {}, onError: (_, _) {});
+        await ref.read(restoreProvider.future);
         break;
       default:
     }
@@ -189,16 +185,20 @@ Future<void> doRestore(
         // shouldn't hold up the restore flow (e.g. a caller's busy dialog)
         // waiting on it. It owns clearing the guard once it settles.
         uploadStarted = true;
-        unawaited(_uploadToSyncServerIfConnected(ref, l10n));
+        unawaited(
+          _uploadToSyncServerIfConnected(ref, l10n, keepAliveLink.close),
+        );
       }
     } else {
       showBotToast("Backup Type not supported!");
     }
-  } catch (e, s) {
-    toastError(e, stack: s, source: 'restore');
   } finally {
+    BackgroundWork.end(BackgroundWorkKind.restore);
     if (!uploadStarted) {
       ref.read(restoreSyncGuardProvider.notifier).finish();
+      // Released on a later event-loop turn so the provider isn't disposed
+      // before its future has delivered the result to the caller.
+      Timer.run(keepAliveLink.close);
     }
   }
 }
@@ -211,6 +211,7 @@ Future<void> doRestore(
 Future<void> _uploadToSyncServerIfConnected(
   Ref ref,
   AppLocalizations l10n,
+  void Function() releaseKeepAlive,
 ) async {
   try {
     final syncPreference = ref.read(synchingProvider(syncId: 1));
@@ -228,28 +229,20 @@ Future<void> _uploadToSyncServerIfConnected(
     if (success) {
       botToast(l10n.restore_sync_upload_success);
     }
-  } catch (e) {
+  } catch (e, s) {
+    recordError(e, stack: s, source: 'restore_sync_upload');
     botToast(
       "Backup restored, but couldn't push it to your sync server: $e. "
       "The server still has the old data until the next successful sync.",
     );
   } finally {
     ref.read(restoreSyncGuardProvider.notifier).finish();
+    releaseKeepAlive();
   }
 }
 
 void showBotToast(String text) {
-  BotToast.showNotification(
-    animationDuration: const Duration(milliseconds: 200),
-    animationReverseDuration: const Duration(milliseconds: 200),
-    duration: const Duration(seconds: 5),
-    backButtonBehavior: BackButtonBehavior.none,
-    leading: (_) => Image.asset(appIconAssets[1], height: 40),
-    title: (_) => Text(text, style: TextStyle(fontWeight: FontWeight.bold)),
-    enableSlideOff: true,
-    onlyOne: true,
-    crossPage: true,
-  );
+  botToast(text, second: 5);
 }
 
 BackupType? _tachiBackupTypeFromPath(String path) {
@@ -272,475 +265,23 @@ Future<void> restoreBackup(
   Ref ref,
   Map<String, dynamic> backup, {
   bool full = true,
-  // When true, adds this backup's library into the existing one instead of
-  // wiping it first - only categories/manga/chapters/history/updates
-  // participate (mirrors what Mihon-family merge covers; device config like
-  // settings/sources/customButtons is a replace-only concept either way).
   bool merge = false,
   Map<String, bool> categoryDecisions = const {},
   Map<String, int> sourceDecisions = const {},
 }) async {
-  // This provider is awaited through ref.read(...future) by doRestore. Keep
-  // the nested operation alive until the database restore and state
-  // invalidation have both completed.
-  ref.keepAlive();
-  final version = backup['version'];
-  if (["1", "2"].any((e) => e == version)) {
-    try {
-      final manga = (backup["manga"] as List?)
-          ?.map((e) => Manga.fromJson(e)..itemType = convertToItemType(e))
-          .toList();
-      final chapters = (backup["chapters"] as List?)
-          ?.map((e) => Chapter.fromJson(e))
-          .toList();
-      final categories = (backup["categories"] as List?)
-          ?.map(
-            (e) =>
-                Category.fromJson(e)
-                  ..forItemType = convertToItemTypeCategory(e),
-          )
-          .toList();
-      final track = (backup["tracks"] as List?)
-          ?.map((e) => Track.fromJson(e)..itemType = convertToItemType(e))
-          .toList();
-      final trackPreferences = (backup["trackPreferences"] as List?)
-          ?.map((e) => TrackPreference.fromJson(e))
-          .toList();
-      final history = (backup["history"] as List?)
-          ?.map((e) => History.fromJson(e)..itemType = convertToItemType(e))
-          .toList();
-      final downloads = (backup["downloads"] as List?)
-          ?.map((e) => Download.fromJson(e))
-          .toList();
-      final settings = (backup["settings"] as List?)
-          ?.map((e) => Settings.fromJson(e))
-          .toList();
-      final extensions = (backup["extensions"] as List?)
-          ?.map((e) => Source.fromJson(e)..itemType = convertToItemType(e))
-          .toList();
-      final sourcesPrefs = (backup["extensions_preferences"] as List?)
-          ?.map((e) => SourcePreference.fromJson(e))
-          .toList();
-      final updates = (backup["updates"] as List?)
-          ?.map((e) => Update.fromJson(e))
-          .toList();
-      final customButtons = (backup["customButtons"] as List?)
-          ?.map((e) => CustomButton.fromJson(e))
-          .toList();
-
-      final currentSettings = settingsRepository.currentOrNull;
-      await restoreRepository.run(() {
-        if (merge) {
-          _mergeMangayomiBackup(
-            manga: manga,
-            chapters: chapters,
-            categories: categories,
-            history: history,
-            updates: updates,
-            categoryDecisions: categoryDecisions,
-            sourceDecisions: sourceDecisions,
-          );
-          return;
-        }
-        mangaRepository.clearSync();
-        if (manga != null) {
-          mangaRepository.putAllSync(manga);
-          if (chapters != null) {
-            isar.chapters.clearSync();
-            // Mangas don't change while chapters are restored, so each one
-            // is read once instead of once per chapter.
-            final mangaById = <int, Manga?>{};
-            for (var chapter in chapters) {
-              final mangaId = chapter.mangaId!;
-              final manga = mangaById.containsKey(mangaId)
-                  ? mangaById[mangaId]
-                  : mangaById[mangaId] = isar.mangas.getSync(mangaId);
-              if (manga != null) {
-                isar.chapters.putSync(chapter..manga.value = manga);
-                chapter.manga.saveSync();
-              }
-            }
-
-            if (full) {
-              downloadRepository.clearSync();
-              if (downloads != null) {
-                for (var download in downloads) {
-                  final chapter = isar.chapters.getSync(download.id!);
-                  if (chapter != null) {
-                    isar.downloads.putSync(download..chapter.value = chapter);
-                    download.chapter.saveSync();
-                  }
-                }
-              }
-            }
-
-            historyRepository.clearSync();
-            if (history != null) {
-              for (var element in history) {
-                final chapter = isar.chapters.getSync(element.chapterId!);
-                if (chapter != null) {
-                  isar.historys.putSync(element..chapter.value = chapter);
-                  element.chapter.saveSync();
-                }
-              }
-            }
-
-            updateRepository.clearSync();
-            if (updates != null) {
-              final tempChapters = isar.chapters
-                  .filter()
-                  .idIsNotNull()
-                  .findAllSync()
-                  .toList();
-              // The first chapter (in id order) for each manga and name, which
-              // is the one a linear search of tempChapters finds first.
-              final firstChapterByMangaAndName = <(int?, String?), Chapter>{};
-              for (final chapter in tempChapters) {
-                firstChapterByMangaAndName.putIfAbsent((
-                  chapter.mangaId,
-                  chapter.name,
-                ), () => chapter);
-              }
-              for (var update in updates) {
-                final matchingChapter =
-                    firstChapterByMangaAndName[(
-                      update.mangaId,
-                      update.chapterName,
-                    )];
-                if (matchingChapter != null) {
-                  isar.updates.putSync(update..chapter.value = matchingChapter);
-                  update.chapter.saveSync();
-                }
-              }
-            }
-          }
-
-          categoryRepository.clearSync();
-          if (categories != null) {
-            categoryRepository.putAllSync(categories);
-          }
-        }
-
-        trackRepository.clearSync();
-        if (track != null) {
-          trackRepository.putAllSync(track);
-        }
-
-        if (full) {
-          if (trackPreferences != null) {
-            trackRepository.clearPreferencesSync();
-            trackRepository.putAllPreferencesSync(trackPreferences);
-          }
-          sourceRepository.clearSync();
-          if (extensions != null) {
-            sourceRepository.putAllSync(extensions);
-          }
-          sourcePreferenceRepository.clearSync();
-          if (sourcesPrefs != null) {
-            sourcePreferenceRepository.putAllSync(sourcesPrefs);
-          }
-          settingsRepository.clearSync();
-          if (settings != null) {
-            isar.settings.putAllSync([
-              for (final incoming in settings)
-                currentSettings == null
-                    ? incoming
-                    : preserveDeviceLocalSettings(incoming, currentSettings),
-            ]);
-          }
-          customButtonRepository.clearSync();
-          if (customButtons != null) {
-            customButtonRepository.putAllSync(customButtons);
-          }
-        }
-      });
-      if (full) {
-        _invalidateCommonState(ref);
-      }
-    } catch (e) {
-      rethrow;
-    }
-  } else {
-    throw "Failed to restore the backup";
-  }
-}
-
-/// Adds a mangayomi-format backup's library into the existing one instead of
-/// wiping it first. Mirrors what restoreTachiBkBackup already does for
-/// Mihon-family merges: match manga by link, keep the existing entry's
-/// state on conflict, only carry over chapters/history/updates that don't
-/// already exist. Everything here re-inserts with a fresh id rather than
-/// reusing the backup's original one - unlike a full replace (which clears
-/// the tables first, so reusing ids is safe), a merge runs against a
-/// non-empty library where the backup's ids could belong to something else
-/// entirely on this device.
-void _mergeMangayomiBackup({
-  required List<Manga>? manga,
-  required List<Chapter>? chapters,
-  required List<Category>? categories,
-  required List<History>? history,
-  required List<Update>? updates,
-  required Map<String, bool> categoryDecisions,
-  required Map<String, int> sourceDecisions,
-}) {
-  final oldToNewCategoryId = <int, int>{};
-  if (categories != null) {
-    final existingCategories = categoryRepository.getAll();
-    for (final category in categories) {
-      final oldId = category.id;
-      final existing = existingCategories.firstWhereOrNull(
-        (c) => c.name == category.name && c.forItemType == category.forItemType,
-      );
-      if (existing != null) {
-        if (oldId != null) oldToNewCategoryId[oldId] = existing.id!;
-        continue;
-      }
-      if (categoryDecisions[category.name] == false) continue;
-      category.id = null;
-      categoryRepository.putSync(category);
-      if (oldId != null) oldToNewCategoryId[oldId] = category.id!;
-    }
-  }
-
-  final oldToNewMangaId = <int, int>{};
-  final newMangaIds = <int>{};
-  String restoreIdentity(Manga entry) {
-    final source = entry.itemType == ItemType.anime
-        ? entry.mihonSourceId?.toString() ?? '${entry.source}|${entry.lang}'
-        : '';
-    return '${entry.itemType.index}|$source|${entry.link}';
-  }
-
-  if (manga != null) {
-    final existingMangaByKey = {
-      for (final m in mangaRepository.getAll())
-        if (m.link != null) restoreIdentity(m): m,
-    };
-    for (final tempManga in manga) {
-      final oldId = tempManga.id;
-      final key = restoreIdentity(tempManga);
-      final existing = tempManga.link != null ? existingMangaByKey[key] : null;
-      final remappedCategories = (tempManga.categories ?? [])
-          .map((id) => oldToNewCategoryId[id])
-          .whereType<int>()
-          .toList();
-      if (existing != null) {
-        if (existing.itemType == ItemType.anime) {
-          if (existing.animeFetchType == null) {
-            existing.animeParentUrl = tempManga.animeParentUrl;
-          }
-          existing.animeFetchType ??= tempManga.animeFetchType;
-          existing.seasonNumber ??= tempManga.seasonNumber;
-          existing.seasonSourceOrder ??= tempManga.seasonSourceOrder;
-          existing.seasonFlags ??= tempManga.seasonFlags;
-          existing.backgroundUrl ??= tempManga.backgroundUrl;
-        }
-        existing.favorite =
-            existing.favorite == true || tempManga.favorite == true;
-        existing.categories = {
-          ...?existing.categories,
-          ...remappedCategories,
-        }.toList();
-        mangaRepository.putSync(existing);
-        if (oldId != null) oldToNewMangaId[oldId] = existing.id!;
-        continue;
-      }
-      final originalSourceName = tempManga.source ?? "Unknown";
-      final decidedSourceId = sourceDecisions[originalSourceName];
-      final boundSource = decidedSourceId != null
-          ? sourceRepository.getById(decidedSourceId)
-          : installedSourcesFor(tempManga.itemType).firstWhereOrNull(
-              (s) => s.name?.toLowerCase() == originalSourceName.toLowerCase(),
-            );
-      tempManga.id = null;
-      tempManga.categories = remappedCategories;
-      tempManga.favorite ??= true;
-      if (boundSource != null) {
-        tempManga.sourceId = boundSource.id;
-        tempManga.source = boundSource.name;
-      } else {
-        tempManga.sourceId = null;
-      }
-      mangaRepository.putSync(tempManga);
-      if (oldId != null) oldToNewMangaId[oldId] = tempManga.id!;
-      newMangaIds.add(tempManga.id!);
-    }
-  }
-
-  final oldToNewChapterId = <int, int>{};
-  if (chapters != null) {
-    final existingUrlsByMangaId = <int, Set<String>>{};
-    final mangaRefs = <int, Manga?>{};
-    for (final tempChapter in chapters) {
-      final newMangaId = tempChapter.mangaId != null
-          ? oldToNewMangaId[tempChapter.mangaId]
-          : null;
-      if (newMangaId == null) continue;
-      // Only ever landed on genuinely new manga above - an existing manga's
-      // own chapters (with real read/download state) are left untouched.
-      if (!newMangaIds.contains(newMangaId)) continue;
-      final existingUrls = existingUrlsByMangaId.putIfAbsent(
-        newMangaId,
-        () => _chapterUrlsOfManga(newMangaId),
-      );
-      if (tempChapter.url != null && existingUrls.contains(tempChapter.url)) {
-        continue;
-      }
-      // Mangas don't change while chapters are merged, so each one is read
-      // once instead of once per chapter.
-      final mangaRef = mangaRefs.containsKey(newMangaId)
-          ? mangaRefs[newMangaId]
-          : mangaRefs[newMangaId] = mangaRepository.findById(newMangaId);
-      if (mangaRef == null) continue;
-      final oldId = tempChapter.id;
-      tempChapter.id = null;
-      tempChapter.mangaId = newMangaId;
-      chapterRepository.putSync(tempChapter..manga.value = mangaRef);
-      tempChapter.manga.saveSync();
-      if (tempChapter.url != null) existingUrls.add(tempChapter.url!);
-      if (oldId != null) oldToNewChapterId[oldId] = tempChapter.id!;
-    }
-  }
-
-  if (history != null) {
-    for (final tempHistory in history) {
-      final newChapterId = tempHistory.chapterId != null
-          ? oldToNewChapterId[tempHistory.chapterId]
-          : null;
-      final newMangaId = tempHistory.mangaId != null
-          ? oldToNewMangaId[tempHistory.mangaId]
-          : null;
-      // Only for chapters we just inserted above - an existing chapter's
-      // history already reflects this device's own progress.
-      if (newChapterId == null || newMangaId == null) continue;
-      final chapterRef = chapterRepository.findByIdSync(newChapterId);
-      if (chapterRef == null) continue;
-      tempHistory.id = null;
-      tempHistory.mangaId = newMangaId;
-      tempHistory.chapterId = newChapterId;
-      historyRepository.putSync(tempHistory..chapter.value = chapterRef);
-      tempHistory.chapter.saveSync();
-    }
-  }
-
-  if (updates != null) {
-    // No chapters are written below, so each manga's chapters are read once.
-    final firstChapterByName = <int, Map<String?, Chapter>>{};
-    for (final tempUpdate in updates) {
-      final newMangaId = tempUpdate.mangaId != null
-          ? oldToNewMangaId[tempUpdate.mangaId]
-          : null;
-      if (newMangaId == null || !newMangaIds.contains(newMangaId)) continue;
-      final chapter = firstChapterByName.putIfAbsent(
-        newMangaId,
-        () => _firstChapterByName(newMangaId),
-      )[tempUpdate.chapterName];
-      if (chapter == null) continue;
-      tempUpdate.id = null;
-      tempUpdate.mangaId = newMangaId;
-      updateRepository.putSync(tempUpdate..chapter.value = chapter);
-      tempUpdate.chapter.saveSync();
-    }
-  }
-}
-
-/// Every chapter of [mangaId], read through the manga index. The same rows
-/// as `chapterRepository.getAllByMangaId`, which scans the whole table.
-List<Chapter> _chaptersOfManga(int mangaId) =>
-    isar.chapters.where().mangaIdEqualToAnyIsRead(mangaId).findAllSync();
-
-/// The non-null chapter URLs of [mangaId], read through the manga index and
-/// without loading whole chapters. The same set as mapping
-/// `chapterRepository.getAllByMangaId`, which scans the whole table.
-Set<String> _chapterUrlsOfManga(int mangaId) => isar.chapters
-    .where()
-    .mangaIdEqualToAnyIsRead(mangaId)
-    .urlProperty()
-    .findAllSync()
-    .whereType<String>()
-    .toSet();
-
-/// For each chapter name of [mangaId], the chapter with the lowest id: the
-/// one `chapterRepository.findByMangaIdAndName` returns, since its filter
-/// query scans in id order.
-Map<String?, Chapter> _firstChapterByName(int mangaId) {
-  final byName = <String?, Chapter>{};
-  for (final chapter in _chaptersOfManga(mangaId)) {
-    final current = byName[chapter.name];
-    if (current == null || chapter.id! < current.id!) {
-      byName[chapter.name] = chapter;
-    }
-  }
-  return byName;
+  await MangayomiRestoreService.restore(
+    ref,
+    backup,
+    full: full,
+    merge: merge,
+    categoryDecisions: categoryDecisions,
+    sourceDecisions: sourceDecisions,
+  );
 }
 
 @riverpod
 Future<void> restoreKotatsuBackup(Ref ref, Archive archive) async {
-  // This provider is awaited through ref.read(...future) by doRestore. Keep
-  // the nested operation alive until the restore has finished using ref.
-  ref.keepAlive();
-  try {
-    final backup = parseKotatsuBackup(archive);
-    await restoreRepository.run(() {
-      categoryRepository.clearSync();
-      mangaRepository.clearSync();
-
-      final categoryIdMap = <int, int>{};
-      for (final category in backup.categories) {
-        final restoredId = categoryRepository.putSync(
-          Category(
-            name: category.name,
-            forItemType: ItemType.manga,
-            pos: category.position,
-            hide: category.hidden,
-          ),
-        );
-        final sourceId = category.sourceId;
-        if (sourceId != null) categoryIdMap[sourceId] = restoredId;
-      }
-
-      for (final favourite in backup.mangas) {
-        final tempManga = favourite.manga;
-        final manga = Manga(
-          source: tempManga["source"],
-          author: tempManga["author"],
-          artist: null,
-          genre:
-              (tempManga["tags"] as List?)
-                  ?.map((t) => t["title"] as String)
-                  .toList() ??
-              [],
-          imageUrl: tempManga["large_cover_url"],
-          lang: 'en',
-          link: tempManga["url"],
-          name: tempManga["title"],
-          status: Status.values.firstWhere(
-            (s) =>
-                s.name.toLowerCase() ==
-                (tempManga["state"] as String?)?.toLowerCase(),
-            orElse: () => Status.unknown,
-          ),
-          description: null,
-          categories: remapKotatsuCategoryIds(favourite, categoryIdMap),
-          itemType: ItemType.manga,
-          favorite: true,
-          sourceId: null,
-        );
-        mangaRepository.putSync(manga);
-      }
-    });
-    await restoreRepository.run(() {
-      chapterRepository.clearSync();
-      downloadRepository.clearSync();
-      historyRepository.clearSync();
-      updateRepository.clearSync();
-      trackRepository.clearSync();
-      trackRepository.clearPreferencesSync();
-    });
-    _invalidateCommonState(ref);
-  } catch (e) {
-    rethrow;
-  }
+  await KotatsuRestoreService.restore(ref, archive);
 }
 
 @riverpod

@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/browse/sources/widgets/source_list_tile.dart';
+import 'package:mangayomi/modules/widgets/entry_badge_chip.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/changed.dart';
+import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/browse/extension/extension_package.dart';
-import 'package:mangayomi/modules/browse/widgets/source_extension_icon.dart';
-import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
+import 'package:mangayomi/repositories/changed_part_repository.dart';
+import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/services/extension_update.dart';
 import 'package:mangayomi/services/uninstall_extension.dart';
-import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
+/// One extension of the list: a Mihon APK's sources are one [entry].
 class ExtensionListTileWidget extends ConsumerStatefulWidget {
   final ExtensionCatalogEntry entry;
   const ExtensionListTileWidget({super.key, required this.entry});
@@ -23,142 +30,233 @@ class ExtensionListTileWidget extends ConsumerStatefulWidget {
 class _ExtensionListTileWidgetState
     extends ConsumerState<ExtensionListTileWidget> {
   bool _isLoading = false;
-  late bool _updateAvailable;
-  late bool _sourceNotEmpty;
 
-  @override
-  void initState() {
-    super.initState();
-    _updateState();
-  }
+  Source get _source => widget.entry.source;
 
-  @override
-  void didUpdateWidget(covariant ExtensionListTileWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _updateState();
-  }
+  bool get _updateAvailable => widget.entry.package.updateAvailable;
 
-  void _updateState() {
-    _updateAvailable = widget.entry.package.updateAvailable;
-    _sourceNotEmpty = widget.entry.package.hasInstalledCode;
-  }
+  bool get _sourceNotEmpty => widget.entry.package.hasInstalledCode;
 
   Future<void> _handleSourceFetch() async {
+    if (_updateAvailable &&
+        isForeignUpdate(_source) &&
+        !await _confirmForeignUpdate()) {
+      return;
+    }
     setState(() => _isLoading = true);
 
     try {
       final provider = fetchItemSourcesListProvider(
-        id: widget.entry.source.id,
+        id: _source.id,
         reFresh: true,
-        itemType: widget.entry.source.itemType,
+        itemType: _source.itemType,
       );
 
-      // A keep-alive family can otherwise return a completed prior attempt.
-      // Invalidate it, then read it from this callback (`watch` belongs in
-      // build methods and silently aborted installs in debug builds).
       ref.invalidate(provider);
       await ref.read(provider.future);
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text('Failed to install ${widget.entry.name}: $error'),
-          ),
-        );
+    } catch (e, stack) {
+      toastError(e, stack: stack, source: 'extension install');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  /// An update another repository offers moves the extension over to it:
+  /// any repository can list an extension under the same id, so the reader
+  /// says whether this one is to be trusted with it.
+  Future<bool> _confirmForeignUpdate() {
+    final source = _source;
+    final name = widget.entry.name;
+    return showShioriConfirm(
+      context,
+      title: context.l10n.update_from_other_repo,
+      message: context.l10n.update_from_other_repo_msg(
+        name,
+        repoLabel(source.repo, source.updateRepo),
+        source.versionLast ?? '',
+        repoLabel(source.updateRepo, source.repo),
+      ),
+      confirmLabel: context.l10n.update,
+    );
+  }
+
+  /// The row's primary tap: open the extension when it is installed, otherwise
+  /// install it.
+  void _onMainTap(BuildContext context) {
+    if (_isLoading) return;
+    if (_sourceNotEmpty) {
+      context.push('/extension_detail', extra: _source);
+    } else {
+      _handleSourceFetch();
+    }
+  }
+
+  /// The action button: settings when installed and up to date, otherwise
+  /// install or update.
+  void _onActionTap(BuildContext context) {
+    if (_isLoading) return;
+    if (!_updateAvailable && _sourceNotEmpty) {
+      context.push('/extension_detail', extra: _source);
+    } else {
+      _handleSourceFetch();
+    }
+  }
+
+  IconData _actionIcon(BuildContext context, String label) {
+    if (label == context.l10n.install) return Symbols.download_rounded;
+    if (label == context.l10n.update) return Symbols.system_update_alt_rounded;
+    return Symbols.settings_rounded;
+  }
+
+  Future<void> _openUninstallDialog(BuildContext context) async {
+    final l10n = context.l10n;
+    final confirmed = await showShioriConfirm(
+      context,
+      title: widget.entry.name,
+      message: l10n.uninstall_extension(widget.entry.name),
+      confirmLabel: l10n.uninstall,
+      destructive: true,
+    );
+    if (!confirmed) return;
+    // The whole APK goes for a Mihon source.
+    await uninstallExtension(
+      _source,
+      recordObsoleteRemoval: (sourceId) => changedPartRepository.recordIfSyncOn(
+        ActionType.removeExtension,
+        sourceId,
+        "{}",
+        false,
+      ),
+    );
+  }
+
+  Widget _icon() => SourceIcon(iconUrl: _source.iconUrl, source: _source);
+
+  /// Language, version and the NSFW / repo / obsolete badges.
+  Widget _meta(BuildContext context) {
+    final tokens = context.shiori;
+    final repo = _source.repo?.name;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        spacing: ShioriSpace.s4,
+        children: [
+          Text(
+            [
+              languageName(context, widget.entry.lang.toLowerCase()),
+              _source.version ?? '',
+              ?repo,
+            ].join(' · '),
+            style: tokens.caption,
+          ),
+          if (widget.entry.package.isNsfw)
+            EntryBadgeChip(label: 'NSFW', tone: tokens.color.error),
+          if (_updateAvailable && isForeignUpdate(_source))
+            EntryBadgeChip(
+              label: context.l10n.update_from_repo(
+                repoLabel(_source.updateRepo, _source.repo),
+              ),
+              tone: tokens.color.newChapter,
+            ),
+          if (_source.isObsolete ?? false)
+            EntryBadgeChip(
+              label: context.l10n.obsolete.toUpperCase(),
+              tone: tokens.color.offline,
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTrailingButton(BuildContext context, String label) {
-    final isInstall = label == context.l10n.install;
-    final isUpdate = label == context.l10n.update;
     return _isLoading
-        ? const SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2.0),
+        ? const Padding(
+            padding: EdgeInsets.all(ShioriSpace.s12),
+            child: ShioriLoading.inline(),
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextButton(
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        if (!_updateAvailable && _sourceNotEmpty) {
-                          context.push(
-                            '/extension_detail',
-                            extra: widget.entry.source,
-                          );
-                        } else {
-                          _handleSourceFetch();
-                        }
-                      },
-                child: Icon(
-                  isInstall
-                      ? Icons.download_outlined
-                      : isUpdate
-                      ? Icons.system_update_alt_outlined
-                      : Icons.settings_outlined,
-                  size: 24,
-                ),
+              IconButton(
+                tooltip: label,
+                onPressed: () => _onActionTap(context),
+                icon: Icon(_actionIcon(context, label)),
               ),
               if (_sourceNotEmpty)
-                TextButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) {
-                        return AlertDialog(
-                          title: Text(widget.entry.name),
-                          content: Text(
-                            ctx.l10n.uninstall_extension(widget.entry.name),
-                          ),
-                          actions: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                  },
-                                  child: Text(ctx.l10n.cancel),
-                                ),
-                                const SizedBox(width: 15),
-                                TextButton(
-                                  onPressed: () async {
-                                    final syncNotifier = ref.read(
-                                      synchingProvider(syncId: 1).notifier,
-                                    );
-                                    await uninstallExtension(
-                                      widget.entry.source,
-                                      recordObsoleteRemoval: (sourceId) =>
-                                          syncNotifier.addChangedPart(
-                                            ActionType.removeExtension,
-                                            sourceId,
-                                            "{}",
-                                            false,
-                                          ),
-                                    );
-                                    if (!ctx.mounted) return;
-                                    Navigator.pop(ctx);
-                                  },
-                                  child: Text(ctx.l10n.ok),
-                                ),
-                              ],
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                  child: Icon(Icons.delete_outline, size: 24),
+                IconButton(
+                  tooltip: context.l10n.uninstall,
+                  onPressed: () => _openUninstallDialog(context),
+                  icon: const Icon(Symbols.delete_rounded),
                 ),
             ],
           );
+  }
+
+  /// The TV row: three focusable buttons once the extension is installed
+  /// (extension / settings or update / uninstall), two while it is not
+  /// (extension / install), mirroring the source rows.
+  Widget _buildTvRow(BuildContext context, String label) {
+    return TvListRow(
+      children: [
+        Expanded(
+          child: TvRowButton(
+            onTap: () => _onMainTap(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ShioriSpace.s12,
+                vertical: ShioriSpace.s8,
+              ),
+              child: Row(
+                children: [
+                  _icon(),
+                  const SizedBox(width: ShioriSpace.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.entry.name,
+                          style: context.shiori.text.body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        _meta(context),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: ShioriSpace.s8),
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(ShioriSpace.s12),
+            child: ShioriLoading.inline(),
+          )
+        else ...[
+          TvRowButton(
+            onTap: () => _onActionTap(context),
+            child: Padding(
+              padding: const EdgeInsets.all(ShioriSpace.s12),
+              child: Icon(_actionIcon(context, label), size: 24),
+            ),
+          ),
+          if (_sourceNotEmpty) ...[
+            const SizedBox(width: ShioriSpace.s8),
+            TvRowButton(
+              onTap: () => _openUninstallDialog(context),
+              child: const Padding(
+                padding: EdgeInsets.all(ShioriSpace.s12),
+                child: Icon(Symbols.delete_rounded, size: 24),
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
   }
 
   @override
@@ -170,79 +268,13 @@ class _ExtensionListTileWidgetState
         ? l10n.update
         : l10n.settings;
 
+    if (isTv) return _buildTvRow(context, buttonLabel);
+
     return ListTile(
-      onTap: _isLoading
-          ? null
-          : () {
-              if (_sourceNotEmpty) {
-                context.push('/extension_detail', extra: widget.entry.source);
-              } else {
-                _handleSourceFetch();
-              }
-            },
-      leading: Container(
-        height: 37,
-        width: 37,
-        decoration: BoxDecoration(
-          color: Theme.of(context).secondaryHeaderColor.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: SourceExtensionIcon(source: widget.entry.source, size: 37),
-      ),
+      onTap: _isLoading ? null : () => _onMainTap(context),
+      leading: _icon(),
       title: Text(widget.entry.name),
-      subtitle: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            completeLanguageName(widget.entry.lang.toLowerCase()),
-            style: const TextStyle(fontWeight: FontWeight.w300, fontSize: 12),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            widget.entry.source.version ?? '',
-            style: const TextStyle(fontWeight: FontWeight.w300, fontSize: 12),
-          ),
-          if (widget.entry.package.isNsfw)
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  "NSFW",
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          if (widget.entry.source.repo?.name != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                "- ${widget.entry.source.repo!.name!}",
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-          if (widget.entry.source.isObsolete ?? false)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                "OBSOLETE",
-                style: TextStyle(
-                  color: context.primaryColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-        ],
-      ),
+      subtitle: _meta(context),
       trailing: _buildTrailingButton(context, buttonLabel),
     );
   }

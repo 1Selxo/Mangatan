@@ -1,0 +1,3 @@
+1 lib/utils/extensions/chapter_extensions.dart -> package:mangayomi/main.dart
+1 lib/utils/extensions/manga_extensions.dart -> package:mangayomi/main.dart
+1 lib/utils/utils.dart -> package:mangayomi/main.dart

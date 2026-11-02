@@ -193,165 +193,156 @@ void main() {
     },
   );
 
-  test(
-    'preview is write-free and matches a stable first-contact upload byte for byte',
-    () async {
-      final local = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('persisted', 'Mangatan default'),
-          preferenceCodec.encode('constructor-default', false),
-          preferenceCodec.encode('unrepresentable', 'local projection'),
-        ],
-        backupSourcePreferences: [
-          sourcePreferences(
-            'Mangatan descriptor default',
-            descriptorDefault: 'not persisted by Chimahon',
-          ),
-        ],
-        backupNovels: [
-          BackupNovel(
-            id: 'local-novel',
-            title: 'Local novel',
-            lastModified: Int64(20),
-          ),
-        ],
-      );
-      final remote = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('persisted', 'Chimahon value'),
-        ],
-        backupSourcePreferences: [sourcePreferences('Chimahon source value')],
-        backupNovels: [
-          BackupNovel(
-            id: 'remote-novel',
-            title: 'Remote novel',
-            lastModified: Int64(10),
-          ),
-        ],
-      );
-      final storage = _CountingStorage(codec.encode(remote));
-      final sidecar = _CountingSidecarStore();
-      var importCount = 0;
-      final engine = CrossDeviceSyncEngine(
-        storage: storage,
-        deferredPayloadStore: sidecar,
-        exportLocal: () async => local.deepCopy(),
-        importMerged: (_) async => importCount++,
-        localTrackingDeletions: const {(source: 1, url: '/manga', syncId: 2)},
-        localUnrepresentablePreferenceKeys: () => {'unrepresentable'},
-      );
-
-      final preview = await engine.preview();
-      final proposedBytes = preview.proposedBytes;
-
-      expect(storage.downloadCount, 1);
-      expect(storage.uploadCount, 0);
-      expect(importCount, 0);
-      expect(sidecar.deferredSaveCount, 0);
-      expect(sidecar.preferenceBaselineSaveCount, 0);
-      expect(sidecar.sourcePreferenceBaselineSaveCount, 0);
-      expect(preview.pendingManualRestorePresent, isFalse);
-      expect(preview.preferenceSafetyPolicy.remoteAuthoritativeAppKeys, {
-        'constructor-default',
-        'persisted',
-        'unrepresentable',
-      });
-      expect(
-        preview.preferenceSafetyPolicy.remoteAuthoritativeSourceKeys,
-        const {
-          (sourceKey: 'source_1', preferenceKey: 'descriptor-default'),
-          (sourceKey: 'source_1', preferenceKey: 'persisted'),
-        },
-      );
-      expect(preview.unrepresentablePreferenceKeys, {'unrepresentable'});
-      expect(preview.localTrackingDeletions, const {
-        (source: 1, url: '/manga', syncId: 2),
-      });
-      expect(
-        () => preview.unrepresentablePreferenceKeys.add('mutation'),
-        throwsUnsupportedError,
-      );
-      expect(
-        () => preview.localTrackingDeletions.add((
-          source: 2,
-          url: '/mutation',
-          syncId: 3,
-        )),
-        throwsUnsupportedError,
-      );
-      expect(
-        preview.exportedLocal.writeToBuffer(),
-        orderedEquals(local.writeToBuffer()),
-      );
-      final effectiveLocalIntent = preview.effectiveLocalIntent;
-      expect(
-        {
-          for (final preference in effectiveLocalIntent.backupPreferences)
-            preference.key: preferenceCodec.decode(preference).value,
-        },
-        {'persisted': 'Chimahon value'},
-        reason: 'the effective merger input contains reconciled app settings',
-      );
-      expect(
-        BackupMihon(
-          backupSourcePreferences: effectiveLocalIntent.backupSourcePreferences,
-          backupNovels: effectiveLocalIntent.backupNovels,
-        ).writeToBuffer(),
-        orderedEquals(
-          BackupMihon(
-            backupSourcePreferences: local.backupSourcePreferences,
-            backupNovels: local.backupNovels,
-          ).writeToBuffer(),
+  test('preview is write-free and matches a stable first-contact upload byte for byte', () async {
+    final local = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('persisted', 'Mangatan default'),
+        preferenceCodec.encode('constructor-default', false),
+        preferenceCodec.encode('unrepresentable', 'local projection'),
+      ],
+      backupSourcePreferences: [
+        sourcePreferences(
+          'Mangatan descriptor default',
+          descriptorDefault: 'not persisted by Chimahon',
         ),
-        reason: 'unrelated local intent remains unchanged',
-      );
-      expect(preview.remoteSnapshot!.revision, 'revision-1');
-      expect(
-        preview.remoteSnapshot!.bytes,
-        orderedEquals(codec.encode(remote)),
-      );
-      expect(
-        preview.decodedRemote!.writeToBuffer(),
-        orderedEquals(remote.writeToBuffer()),
-      );
-      expect(
-        codec.decode(proposedBytes).backup.writeToBuffer(),
-        orderedEquals(preview.proposedMerged.writeToBuffer()),
-      );
+      ],
+      backupNovels: [
+        BackupNovel(
+          id: 'local-novel',
+          title: 'Local novel',
+          lastModified: Int64(20),
+        ),
+      ],
+    );
+    final remote = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('persisted', 'Chimahon value'),
+      ],
+      backupSourcePreferences: [sourcePreferences('Chimahon source value')],
+      backupNovels: [
+        BackupNovel(
+          id: 'remote-novel',
+          title: 'Remote novel',
+          lastModified: Int64(10),
+        ),
+      ],
+    );
+    final storage = _CountingStorage(codec.encode(remote));
+    final sidecar = _CountingSidecarStore();
+    var importCount = 0;
+    final engine = CrossDeviceSyncEngine(
+      storage: storage,
+      deferredPayloadStore: sidecar,
+      exportLocal: () async => local.deepCopy(),
+      importMerged: (_) async => importCount++,
+      localTrackingDeletions: const {(source: 1, url: '/manga', syncId: 2)},
+      localUnrepresentablePreferenceKeys: () => {'unrepresentable'},
+    );
 
-      final appValues = {
-        for (final preference in preview.proposedMerged.backupPreferences)
+    final preview = await engine.preview();
+    final proposedBytes = preview.proposedBytes;
+
+    expect(storage.downloadCount, 1);
+    expect(storage.uploadCount, 0);
+    expect(importCount, 0);
+    expect(sidecar.deferredSaveCount, 0);
+    expect(sidecar.preferenceBaselineSaveCount, 0);
+    expect(sidecar.sourcePreferenceBaselineSaveCount, 0);
+    expect(preview.pendingManualRestorePresent, isFalse);
+    expect(preview.preferenceSafetyPolicy.remoteAuthoritativeAppKeys, {
+      'constructor-default',
+      'persisted',
+      'unrepresentable',
+    });
+    expect(preview.preferenceSafetyPolicy.remoteAuthoritativeSourceKeys, const {
+      (sourceKey: 'source_1', preferenceKey: 'descriptor-default'),
+      (sourceKey: 'source_1', preferenceKey: 'persisted'),
+    });
+    expect(preview.unrepresentablePreferenceKeys, {'unrepresentable'});
+    expect(preview.localTrackingDeletions, const {
+      (source: 1, url: '/manga', syncId: 2),
+    });
+    expect(
+      () => preview.unrepresentablePreferenceKeys.add('mutation'),
+      throwsUnsupportedError,
+    );
+    expect(
+      () => preview.localTrackingDeletions.add((
+        source: 2,
+        url: '/mutation',
+        syncId: 3,
+      )),
+      throwsUnsupportedError,
+    );
+    expect(
+      preview.exportedLocal.writeToBuffer(),
+      orderedEquals(local.writeToBuffer()),
+    );
+    final effectiveLocalIntent = preview.effectiveLocalIntent;
+    expect(
+      {
+        for (final preference in effectiveLocalIntent.backupPreferences)
           preference.key: preferenceCodec.decode(preference).value,
-      };
-      expect(appValues, {'persisted': 'Chimahon value'});
-      final sourceValues = {
-        for (final preference
-            in preview.proposedMerged.backupSourcePreferences.single.prefs)
-          preference.key: preferenceCodec.decode(preference).value,
-      };
-      expect(sourceValues, {'persisted': 'Chimahon source value'});
+      },
+      {'persisted': 'Chimahon value'},
+      reason: 'the effective merger input contains reconciled app settings',
+    );
+    expect(
+      BackupMihon(
+        backupSourcePreferences: effectiveLocalIntent.backupSourcePreferences,
+        backupNovels: effectiveLocalIntent.backupNovels,
+      ).writeToBuffer(),
+      orderedEquals(
+        BackupMihon(
+          backupSourcePreferences: local.backupSourcePreferences,
+          backupNovels: local.backupNovels,
+        ).writeToBuffer(),
+      ),
+      reason: 'unrelated local intent remains unchanged',
+    );
+    expect(preview.remoteSnapshot!.revision, 'revision-1');
+    expect(preview.remoteSnapshot!.bytes, orderedEquals(codec.encode(remote)));
+    expect(
+      preview.decodedRemote!.writeToBuffer(),
+      orderedEquals(remote.writeToBuffer()),
+    );
+    expect(
+      codec.decode(proposedBytes).backup.writeToBuffer(),
+      orderedEquals(preview.proposedMerged.writeToBuffer()),
+    );
 
-      // The result is defensive even though protobuf messages and byte buffers
-      // are mutable.
-      preview.exportedLocal.backupNovels.clear();
-      preview.effectiveLocalIntent.backupNovels.clear();
-      final mutatedBytes = preview.proposedBytes;
-      mutatedBytes[0] = (mutatedBytes[0] + 1) & 0xff;
-      expect(preview.exportedLocal.backupNovels, hasLength(1));
-      expect(preview.effectiveLocalIntent.backupNovels, hasLength(1));
-      expect(mutatedBytes, isNot(orderedEquals(preview.proposedBytes)));
+    final appValues = {
+      for (final preference in preview.proposedMerged.backupPreferences)
+        preference.key: preferenceCodec.decode(preference).value,
+    };
+    expect(appValues, {'persisted': 'Chimahon value'});
+    final sourceValues = {
+      for (final preference
+          in preview.proposedMerged.backupSourcePreferences.single.prefs)
+        preference.key: preferenceCodec.decode(preference).value,
+    };
+    expect(sourceValues, {'persisted': 'Chimahon source value'});
 
-      await engine.uploadPreservingRemote();
+    // The result is defensive even though protobuf messages and byte buffers
+    // are mutable.
+    preview.exportedLocal.backupNovels.clear();
+    preview.effectiveLocalIntent.backupNovels.clear();
+    final mutatedBytes = preview.proposedBytes;
+    mutatedBytes[0] = (mutatedBytes[0] + 1) & 0xff;
+    expect(preview.exportedLocal.backupNovels, hasLength(1));
+    expect(preview.effectiveLocalIntent.backupNovels, hasLength(1));
+    expect(mutatedBytes, isNot(orderedEquals(preview.proposedBytes)));
 
-      expect(storage.downloadCount, 2);
-      expect(storage.uploadCount, 1);
-      expect(importCount, 0);
-      expect(storage.uploaded, orderedEquals(proposedBytes));
-      expect(sidecar.deferredSaveCount, 1);
-      expect(sidecar.preferenceBaselineSaveCount, 1);
-      expect(sidecar.sourcePreferenceBaselineSaveCount, 1);
-    },
-  );
+    await engine.uploadPreservingRemote();
+
+    expect(storage.downloadCount, 2);
+    expect(storage.uploadCount, 1);
+    expect(importCount, 0);
+    expect(storage.uploaded, orderedEquals(proposedBytes));
+    expect(sidecar.deferredSaveCount, 1);
+    expect(sidecar.preferenceBaselineSaveCount, 1);
+    expect(sidecar.sourcePreferenceBaselineSaveCount, 1);
+  });
 
   test(
     'existing selector-less sidecar keeps absent remote controls exact',
@@ -453,163 +444,155 @@ void main() {
     },
   );
 
-  test(
-    'preview retains pending restore intent without consuming it and matches upload',
-    () async {
-      final baseline = BackupMihon(
-        backupPreferences: [preferenceCodec.encode('known', 'old baseline')],
-        backupSourcePreferences: [sourcePreferences('old baseline')],
-      );
-      final pending = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('known', 'restored value'),
-          preferenceCodec.encode('pending-only', 'preserve me'),
-        ],
-        backupSourcePreferences: [
-          BackupSourcePreferences(
-            sourceKey: 'source_1',
-            prefs: [
-              preferenceCodec.encode('persisted', 'restored source value'),
-              preferenceCodec.encode('pending-only', 'preserve source value'),
-            ],
-          ),
-        ],
-        backupNovels: [
-          BackupNovel(
-            id: 'selected-novel',
-            title: 'Selected novel',
-            chapterIndex: 4,
-            progress: 0.75,
-            lastModified: Int64(100),
-          ),
-        ],
-      );
-      final local = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('known', 'post-restore local value'),
-        ],
-        backupSourcePreferences: [
-          sourcePreferences('post-restore source value'),
-        ],
-        backupNovels: [
-          BackupNovel(
-            id: 'selected-novel',
-            title: 'Selected novel',
-            chapterIndex: 5,
-            progress: 0.8,
-            lastModified: Int64(110),
-          ),
-        ],
-      );
-      final remote = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('known', 'newer remote value'),
-        ],
-        backupSourcePreferences: [sourcePreferences('newer remote value')],
-        backupNovels: [
-          BackupNovel(
-            id: 'cloud-only',
-            title: 'Cloud-only novel',
-            lastModified: Int64(200),
-          ),
-        ],
-      );
-      final storage = _CountingStorage(codec.encode(remote));
-      final pendingProjectedBaseline = BackupMihon(
-        backupPreferences: [preferenceCodec.encode('known', 'restored value')],
-        backupSourcePreferences: [sourcePreferences('restored source value')],
-      );
-      final sidecar = _CountingSidecarStore(
-        baseline: baseline,
-        pending: pending,
-        localPreferenceBaseline: baseline.backupPreferences,
-        localSourcePreferenceBaseline: baseline.backupSourcePreferences,
-        pendingLocalPreferenceBaseline:
-            pendingProjectedBaseline.backupPreferences,
-        pendingLocalSourcePreferenceBaseline:
-            pendingProjectedBaseline.backupSourcePreferences,
-      );
-      var importCount = 0;
-      final engine = CrossDeviceSyncEngine(
-        storage: storage,
-        deferredPayloadStore: sidecar,
-        exportLocal: () async => local.deepCopy(),
-        importMerged: (_) async => importCount++,
-      );
-
-      final preview = await engine.preview();
-      final proposedBytes = preview.proposedBytes;
-
-      expect(storage.downloadCount, 1);
-      expect(storage.uploadCount, 0);
-      expect(importCount, 0);
-      expect(preview.pendingManualRestorePresent, isTrue);
-      expect(
-        preview.preferenceSafetyPolicy.remoteAuthoritativeAppKeys,
-        isEmpty,
-      );
-      expect(
-        preview.preferenceSafetyPolicy.remoteAuthoritativeSourceKeys,
-        isEmpty,
-      );
-      expect(sidecar.pending, isNotNull);
-      expect(sidecar.deferredSaveCount, 0);
-      expect(sidecar.preferenceBaselineSaveCount, 0);
-      expect(sidecar.sourcePreferenceBaselineSaveCount, 0);
-      final effectiveLocalIntent = preview.effectiveLocalIntent;
-      expect(
-        effectiveLocalIntent.backupPreferences.map(
-          (preference) => preference.key,
+  test('preview retains pending restore intent without consuming it and matches upload', () async {
+    final baseline = BackupMihon(
+      backupPreferences: [preferenceCodec.encode('known', 'old baseline')],
+      backupSourcePreferences: [sourcePreferences('old baseline')],
+    );
+    final pending = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('known', 'restored value'),
+        preferenceCodec.encode('pending-only', 'preserve me'),
+      ],
+      backupSourcePreferences: [
+        BackupSourcePreferences(
+          sourceKey: 'source_1',
+          prefs: [
+            preferenceCodec.encode('persisted', 'restored source value'),
+            preferenceCodec.encode('pending-only', 'preserve source value'),
+          ],
         ),
-        containsAll(['known', 'pending-only']),
-      );
-      expect(
-        preferenceCodec
-            .decode(
-              effectiveLocalIntent.backupPreferences.singleWhere(
-                (preference) => preference.key == 'known',
-              ),
-            )
-            .value,
-        'post-restore local value',
-      );
-      final effectiveSelectedNovel = effectiveLocalIntent.backupNovels.single;
-      expect(effectiveSelectedNovel.title, 'Selected novel');
-      expect(effectiveSelectedNovel.chapterIndex, 5);
-      expect(effectiveSelectedNovel.progress, 0.8);
-      expect(
-        effectiveLocalIntent.backupNovels.map((novel) => novel.title),
-        isNot(contains('Cloud-only novel')),
-      );
-      effectiveLocalIntent.backupNovels.clear();
-      expect(preview.effectiveLocalIntent.backupNovels, hasLength(1));
-      final proposed = codec.decode(proposedBytes).backup;
-      expect(
-        proposed.backupPreferences.map((preference) => preference.key),
-        contains('pending-only'),
-      );
-      final selectedNovel = proposed.backupNovels.singleWhere(
-        (novel) => novel.title == 'Selected novel',
-      );
-      expect(selectedNovel.chapterIndex, 5);
-      expect(selectedNovel.progress, 0.8);
-      expect(
-        proposed.backupNovels.map((novel) => novel.title),
-        contains('Cloud-only novel'),
-      );
+      ],
+      backupNovels: [
+        BackupNovel(
+          id: 'selected-novel',
+          title: 'Selected novel',
+          chapterIndex: 4,
+          progress: 0.75,
+          lastModified: Int64(100),
+        ),
+      ],
+    );
+    final local = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('known', 'post-restore local value'),
+      ],
+      backupSourcePreferences: [sourcePreferences('post-restore source value')],
+      backupNovels: [
+        BackupNovel(
+          id: 'selected-novel',
+          title: 'Selected novel',
+          chapterIndex: 5,
+          progress: 0.8,
+          lastModified: Int64(110),
+        ),
+      ],
+    );
+    final remote = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('known', 'newer remote value'),
+      ],
+      backupSourcePreferences: [sourcePreferences('newer remote value')],
+      backupNovels: [
+        BackupNovel(
+          id: 'cloud-only',
+          title: 'Cloud-only novel',
+          lastModified: Int64(200),
+        ),
+      ],
+    );
+    final storage = _CountingStorage(codec.encode(remote));
+    final pendingProjectedBaseline = BackupMihon(
+      backupPreferences: [preferenceCodec.encode('known', 'restored value')],
+      backupSourcePreferences: [sourcePreferences('restored source value')],
+    );
+    final sidecar = _CountingSidecarStore(
+      baseline: baseline,
+      pending: pending,
+      localPreferenceBaseline: baseline.backupPreferences,
+      localSourcePreferenceBaseline: baseline.backupSourcePreferences,
+      pendingLocalPreferenceBaseline:
+          pendingProjectedBaseline.backupPreferences,
+      pendingLocalSourcePreferenceBaseline:
+          pendingProjectedBaseline.backupSourcePreferences,
+    );
+    var importCount = 0;
+    final engine = CrossDeviceSyncEngine(
+      storage: storage,
+      deferredPayloadStore: sidecar,
+      exportLocal: () async => local.deepCopy(),
+      importMerged: (_) async => importCount++,
+    );
 
-      await engine.uploadPreservingRemote();
+    final preview = await engine.preview();
+    final proposedBytes = preview.proposedBytes;
 
-      expect(storage.downloadCount, 2);
-      expect(storage.uploadCount, 1);
-      expect(importCount, 0);
-      expect(storage.uploaded, orderedEquals(proposedBytes));
-      expect(sidecar.pending, isNull);
-      expect(sidecar.deferredSaveCount, 1);
-      expect(sidecar.preferenceBaselineSaveCount, 1);
-      expect(sidecar.sourcePreferenceBaselineSaveCount, 1);
-    },
-  );
+    expect(storage.downloadCount, 1);
+    expect(storage.uploadCount, 0);
+    expect(importCount, 0);
+    expect(preview.pendingManualRestorePresent, isTrue);
+    expect(preview.preferenceSafetyPolicy.remoteAuthoritativeAppKeys, isEmpty);
+    expect(
+      preview.preferenceSafetyPolicy.remoteAuthoritativeSourceKeys,
+      isEmpty,
+    );
+    expect(sidecar.pending, isNotNull);
+    expect(sidecar.deferredSaveCount, 0);
+    expect(sidecar.preferenceBaselineSaveCount, 0);
+    expect(sidecar.sourcePreferenceBaselineSaveCount, 0);
+    final effectiveLocalIntent = preview.effectiveLocalIntent;
+    expect(
+      effectiveLocalIntent.backupPreferences.map(
+        (preference) => preference.key,
+      ),
+      containsAll(['known', 'pending-only']),
+    );
+    expect(
+      preferenceCodec
+          .decode(
+            effectiveLocalIntent.backupPreferences.singleWhere(
+              (preference) => preference.key == 'known',
+            ),
+          )
+          .value,
+      'post-restore local value',
+    );
+    final effectiveSelectedNovel = effectiveLocalIntent.backupNovels.single;
+    expect(effectiveSelectedNovel.title, 'Selected novel');
+    expect(effectiveSelectedNovel.chapterIndex, 5);
+    expect(effectiveSelectedNovel.progress, 0.8);
+    expect(
+      effectiveLocalIntent.backupNovels.map((novel) => novel.title),
+      isNot(contains('Cloud-only novel')),
+    );
+    effectiveLocalIntent.backupNovels.clear();
+    expect(preview.effectiveLocalIntent.backupNovels, hasLength(1));
+    final proposed = codec.decode(proposedBytes).backup;
+    expect(
+      proposed.backupPreferences.map((preference) => preference.key),
+      contains('pending-only'),
+    );
+    final selectedNovel = proposed.backupNovels.singleWhere(
+      (novel) => novel.title == 'Selected novel',
+    );
+    expect(selectedNovel.chapterIndex, 5);
+    expect(selectedNovel.progress, 0.8);
+    expect(
+      proposed.backupNovels.map((novel) => novel.title),
+      contains('Cloud-only novel'),
+    );
+
+    await engine.uploadPreservingRemote();
+
+    expect(storage.downloadCount, 2);
+    expect(storage.uploadCount, 1);
+    expect(importCount, 0);
+    expect(storage.uploaded, orderedEquals(proposedBytes));
+    expect(sidecar.pending, isNull);
+    expect(sidecar.deferredSaveCount, 1);
+    expect(sidecar.preferenceBaselineSaveCount, 1);
+    expect(sidecar.sourcePreferenceBaselineSaveCount, 1);
+  });
 
   test(
     'pending tracker deletion survives the promoted local parent overlay',
@@ -775,115 +758,108 @@ void main() {
     });
   });
 
-  test(
-    'pending projection evidence preserves incompatible values, app deletion, source gaps, and both group envelopes',
-    () async {
-      final futurePending = preferenceCodec.encode(
-        'future-setting',
-        'selected future value',
-      )..unknownFields.mergeVarintField(701, Int64(2));
-      final pendingGroup = BackupSourcePreferences(
-        sourceKey: 'source_1',
-        prefs: [preferenceCodec.encode('preserve-source-setting', true)],
-      )..unknownFields.mergeVarintField(702, Int64(3));
-      final pending = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('delete-app-setting', true),
-          futurePending,
-        ],
-        backupSourcePreferences: [pendingGroup],
-      );
-      final projectedBaseline = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('delete-app-setting', true),
-          preferenceCodec.encode('future-setting', 'fallback projection'),
-        ],
-        backupSourcePreferences: [
-          BackupSourcePreferences(
-            sourceKey: 'source_1',
-            prefs: [preferenceCodec.encode('preserve-source-setting', true)],
-          ),
-        ],
-      );
-      final remoteGroup = BackupSourcePreferences(
-        sourceKey: 'source_1',
-        prefs: [
-          preferenceCodec.encode('preserve-source-setting', true),
-          preferenceCodec.encode('remote-only', 'keep'),
-        ],
-      )..unknownFields.mergeVarintField(703, Int64(4));
-      final remote = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('delete-app-setting', true),
-          preferenceCodec.encode('future-setting', 'cloud value'),
-        ],
-        backupSourcePreferences: [remoteGroup],
-      );
-      final current = BackupMihon(
-        backupPreferences: [
-          preferenceCodec.encode('future-setting', 'fallback projection'),
-        ],
-      );
-      final sidecar = _CountingSidecarStore(
-        baseline: remote,
-        pending: pending,
-        localPreferenceBaseline: projectedBaseline.backupPreferences,
-        localSourcePreferenceBaseline:
-            projectedBaseline.backupSourcePreferences,
-        pendingLocalPreferenceBaseline: projectedBaseline.backupPreferences,
-        pendingLocalSourcePreferenceBaseline:
-            projectedBaseline.backupSourcePreferences,
-      );
-
-      final preview = await CrossDeviceSyncEngine(
-        storage: _CountingStorage(codec.encode(remote)),
-        deferredPayloadStore: sidecar,
-        exportLocal: () async => current.deepCopy(),
-        importMerged: (_) async {},
-      ).preview();
-      final proposed = preview.proposedMerged;
-      final appByKey = {
-        for (final preference in proposed.backupPreferences)
-          preference.key: preference,
-      };
-      final proposedGroup = proposed.backupSourcePreferences.single;
-      final sourceByKey = {
-        for (final preference in proposedGroup.prefs)
-          preference.key: preference,
-      };
-
-      expect(appByKey, isNot(contains('delete-app-setting')));
-      expect(
-        preferenceCodec.decode(appByKey['future-setting']!).value,
-        'selected future value',
-      );
-      expect(appByKey['future-setting']!.unknownFields.hasField(701), isTrue);
-      expect(
-        preferenceCodec.decode(sourceByKey['preserve-source-setting']!).value,
-        isTrue,
-      );
-      expect(preferenceCodec.decode(sourceByKey['remote-only']!).value, 'keep');
-      expect(proposedGroup.unknownFields.hasField(702), isTrue);
-      expect(proposedGroup.unknownFields.hasField(703), isTrue);
-      expect(
-        preview.preferenceSafetyPolicy.appSelections['delete-app-setting'],
-        ChimahonPreferenceSelectionOrigin.deleted,
-      );
-      expect(
-        preview.preferenceSafetyPolicy.sourceSelections[const (
+  test('pending projection evidence preserves incompatible values, app deletion, source gaps, and both group envelopes', () async {
+    final futurePending = preferenceCodec.encode(
+      'future-setting',
+      'selected future value',
+    )..unknownFields.mergeVarintField(701, Int64(2));
+    final pendingGroup = BackupSourcePreferences(
+      sourceKey: 'source_1',
+      prefs: [preferenceCodec.encode('preserve-source-setting', true)],
+    )..unknownFields.mergeVarintField(702, Int64(3));
+    final pending = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('delete-app-setting', true),
+        futurePending,
+      ],
+      backupSourcePreferences: [pendingGroup],
+    );
+    final projectedBaseline = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('delete-app-setting', true),
+        preferenceCodec.encode('future-setting', 'fallback projection'),
+      ],
+      backupSourcePreferences: [
+        BackupSourcePreferences(
           sourceKey: 'source_1',
-          preferenceKey: 'preserve-source-setting',
-        )],
-        ChimahonPreferenceSelectionOrigin.local,
-      );
-      expect(
-        preview
-            .preferenceSafetyPolicy
-            .sourceGroupEnvelopeSelections['source_1'],
-        ChimahonPreferenceSelectionOrigin.local,
-      );
-    },
-  );
+          prefs: [preferenceCodec.encode('preserve-source-setting', true)],
+        ),
+      ],
+    );
+    final remoteGroup = BackupSourcePreferences(
+      sourceKey: 'source_1',
+      prefs: [
+        preferenceCodec.encode('preserve-source-setting', true),
+        preferenceCodec.encode('remote-only', 'keep'),
+      ],
+    )..unknownFields.mergeVarintField(703, Int64(4));
+    final remote = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('delete-app-setting', true),
+        preferenceCodec.encode('future-setting', 'cloud value'),
+      ],
+      backupSourcePreferences: [remoteGroup],
+    );
+    final current = BackupMihon(
+      backupPreferences: [
+        preferenceCodec.encode('future-setting', 'fallback projection'),
+      ],
+    );
+    final sidecar = _CountingSidecarStore(
+      baseline: remote,
+      pending: pending,
+      localPreferenceBaseline: projectedBaseline.backupPreferences,
+      localSourcePreferenceBaseline: projectedBaseline.backupSourcePreferences,
+      pendingLocalPreferenceBaseline: projectedBaseline.backupPreferences,
+      pendingLocalSourcePreferenceBaseline:
+          projectedBaseline.backupSourcePreferences,
+    );
+
+    final preview = await CrossDeviceSyncEngine(
+      storage: _CountingStorage(codec.encode(remote)),
+      deferredPayloadStore: sidecar,
+      exportLocal: () async => current.deepCopy(),
+      importMerged: (_) async {},
+    ).preview();
+    final proposed = preview.proposedMerged;
+    final appByKey = {
+      for (final preference in proposed.backupPreferences)
+        preference.key: preference,
+    };
+    final proposedGroup = proposed.backupSourcePreferences.single;
+    final sourceByKey = {
+      for (final preference in proposedGroup.prefs) preference.key: preference,
+    };
+
+    expect(appByKey, isNot(contains('delete-app-setting')));
+    expect(
+      preferenceCodec.decode(appByKey['future-setting']!).value,
+      'selected future value',
+    );
+    expect(appByKey['future-setting']!.unknownFields.hasField(701), isTrue);
+    expect(
+      preferenceCodec.decode(sourceByKey['preserve-source-setting']!).value,
+      isTrue,
+    );
+    expect(preferenceCodec.decode(sourceByKey['remote-only']!).value, 'keep');
+    expect(proposedGroup.unknownFields.hasField(702), isTrue);
+    expect(proposedGroup.unknownFields.hasField(703), isTrue);
+    expect(
+      preview.preferenceSafetyPolicy.appSelections['delete-app-setting'],
+      ChimahonPreferenceSelectionOrigin.deleted,
+    );
+    expect(
+      preview.preferenceSafetyPolicy.sourceSelections[const (
+        sourceKey: 'source_1',
+        preferenceKey: 'preserve-source-setting',
+      )],
+      ChimahonPreferenceSelectionOrigin.local,
+    );
+    expect(
+      preview.preferenceSafetyPolicy.sourceGroupEnvelopeSelections['source_1'],
+      ChimahonPreferenceSelectionOrigin.local,
+    );
+  });
 }
 
 class _CountingStorage implements CrossDeviceSyncStorage {

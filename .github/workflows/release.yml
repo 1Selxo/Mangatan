@@ -110,7 +110,7 @@ jobs:
           submodules: recursive
 
       - name: setup flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           flutter-version: "3.47.1"
 
@@ -153,12 +153,14 @@ jobs:
           submodules: recursive
 
       - name: setup flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           flutter-version: "3.47.1"
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Copy workspace to short path
         shell: pwsh
@@ -278,12 +280,14 @@ jobs:
             pkg-config
 
       - name: setup flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           flutter-version: "3.47.1"
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: flutter pub get
         run: flutter pub get

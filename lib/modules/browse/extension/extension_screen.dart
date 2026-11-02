@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
@@ -8,10 +9,14 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/browse/extension/extension_package.dart';
 import 'package:mangayomi/modules/browse/extension/providers/extensions_provider.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
-import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/modules/browse/extension/widgets/foreign_updates_dialog.dart';
+import 'package:mangayomi/services/extension_update.dart';
+import 'package:mangayomi/utils/error_toast.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:mangayomi/modules/browse/extension/widgets/extension_list_tile_widget.dart';
+import 'package:mangayomi/modules/browse/widgets/extension_server_warning_banner.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class ExtensionScreen extends ConsumerStatefulWidget {
   final ItemType itemType;
@@ -55,6 +60,41 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
     return ref.read(provider.future);
   }
 
+  /// Updates [entries], asking first, once for all of them, about those
+  /// whose update comes from another repository. One that fails doesn't stop
+  /// the others, and says so.
+  Future<void> _updateAll(
+    List<ExtensionCatalogEntry> updateEntries,
+    void Function(VoidCallback) setRowState,
+  ) async {
+    final entries = [for (final entry in updateEntries) entry.source];
+    final foreign = entries.where(isForeignUpdate).toList();
+    var toUpdate = entries;
+    if (foreign.isNotEmpty) {
+      final choice = await showForeignUpdatesDialog(
+        context,
+        foreign: foreign,
+        hasOthers: foreign.length < entries.length,
+      );
+      if (choice == null || !mounted) return;
+      if (choice == ForeignUpdatesChoice.skipThem) {
+        toUpdate = entries.where((s) => !isForeignUpdate(s)).toList();
+      }
+    }
+    setRowState(() => isUpdating = true);
+    try {
+      for (final source in toUpdate) {
+        try {
+          await _updateSource(source);
+        } catch (e, stack) {
+          toastError(e, stack: stack, source: 'extension update all');
+        }
+      }
+    } finally {
+      if (mounted) setRowState(() => isUpdating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.read(
@@ -74,13 +114,20 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
     final showNSFW = ref.watch(showNSFWStateProvider);
 
     final l10n = l10nLocalizations(context)!;
+    final tvHorizontalInset = tvHorizontalSafeInset(context);
 
     return RefreshIndicator(
       onRefresh: _refreshSources,
       child: Padding(
-        padding: const EdgeInsets.only(top: 10),
+        // Match the sources tab's inset so the two Browse tabs line up on TV.
+        padding: EdgeInsets.only(
+          top: ShioriSpace.s12,
+          left: tvHorizontalInset,
+          right: tvHorizontalInset,
+        ),
         child: streamExtensions.when(
           data: (data) {
+            // A Mihon APK's sources are one extension.
             final packages = groupExtensionPackages(data);
             final filteredData = widget.query.isEmpty
                 ? packages
@@ -91,6 +138,7 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
             final updateEntries = <ExtensionCatalogEntry>[];
             final installedEntries = <ExtensionCatalogEntry>[];
             final notInstalledEntries = <ExtensionCatalogEntry>[];
+            var showWarning = false;
 
             for (final package in filteredData) {
               final element = package.source;
@@ -103,17 +151,17 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
               if (!showNSFW && package.isNsfw) {
                 continue;
               }
+              if (element.sourceCodeLanguage == SourceCodeLanguage.mihon) {
+                showWarning = true;
+              }
               for (final entry in package.catalogEntries) {
                 switch (entry.section) {
                   case ExtensionCatalogSection.update:
                     updateEntries.add(entry);
-                    break;
                   case ExtensionCatalogSection.installed:
                     installedEntries.add(entry);
-                    break;
                   case ExtensionCatalogSection.available:
                     notInstalledEntries.add(entry);
-                    break;
                 }
               }
             }
@@ -122,27 +170,41 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
               interactive: true,
               controller: controller,
               thickness: 12,
-              radius: const Radius.circular(10),
+              radius: const Radius.circular(ShioriShape.card),
               child: CustomScrollView(
                 controller: controller,
                 slivers: [
+                  if (showWarning)
+                    const SliverToBoxAdapter(
+                      child: ExtensionServerWarningBanner(),
+                    ),
                   if (updateEntries.isNotEmpty)
                     _buildUpdateSection(updateEntries, l10n),
                   if (installedEntries.isNotEmpty)
                     _buildInstalledSection(installedEntries, l10n),
                   if (notInstalledEntries.isNotEmpty)
                     _buildNotInstalledSection(notInstalledEntries),
+                  // Trailing room rather than padding around the viewport, so
+                  // rows scroll under the translucent bar (which is what gives
+                  // it something to blur) and only the last one clears it.
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: pageBottomInsets(context).bottom),
+                  ),
                 ],
               ),
             );
           },
-          error: (error, _) => Center(
-            child: ElevatedButton(
-              onPressed: _refreshSources,
-              child: Text(context.l10n.refresh),
-            ),
+          error: (error, _) => ShioriEmptyState(
+            icon: Symbols.cloud_off_rounded,
+            title: '$error',
+            compact: true,
+            actionLabel: context.l10n.refresh,
+            onAction: _refreshSources,
           ),
-          loading: () => const ProgressCenter(),
+          loading: () => ListView(
+            physics: const NeverScrollableScrollPhysics(),
+            children: [for (var i = 0; i < 8; i++) const ShioriSkeletonRow()],
+          ),
         ),
       ),
     );
@@ -157,48 +219,26 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
       groupBy: (_) => "",
       groupSeparatorBuilder: (_) => StatefulBuilder(
         builder: (context, setState) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  l10n.update_pending,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: isUpdating
-                      ? null
-                      : () async {
-                          setState(() => isUpdating = true);
-                          try {
-                            for (final entry in updateEntries) {
-                              await _updateSource(entry.source);
-                            }
-                          } finally {
-                            if (context.mounted) {
-                              setState(() => isUpdating = false);
-                            }
-                          }
-                        },
-                  child: isUpdating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(l10n.update_all),
-                ),
-              ],
+          // The group's label as the other groups', with Update all as its
+          // action, as Download all heads a day of updates: a full button
+          // stood taller than the label and pushed into the row above.
+          return ShioriSectionHeader(
+            overline: true,
+            title: l10n.update_pending,
+            padding: const EdgeInsets.fromLTRB(
+              ShioriSpace.s16,
+              ShioriSpace.s16,
+              ShioriSpace.s8,
+              ShioriSpace.s4,
             ),
+            actionLabel: l10n.update_all,
+            actionBusy: isUpdating,
+            onAction: () => _updateAll(updateEntries, setState),
           );
         },
       ),
       itemBuilder: (context, ExtensionCatalogEntry entry) =>
-          ExtensionListTileWidget(entry: entry),
+          ExtensionListTileWidget(key: ValueKey(entry.source.id), entry: entry),
       groupComparator: (group1, group2) => group1.compareTo(group2),
       itemComparator: (item1, item2) => item1.name.compareTo(item2.name),
       order: GroupedListOrder.ASC,
@@ -213,14 +253,16 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
       elements: installedEntries,
       groupBy: (_) => "",
       groupSeparatorBuilder: (_) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Text(
-          l10n.installed,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        padding: const EdgeInsets.fromLTRB(
+          ShioriSpace.s16,
+          ShioriSpace.s16,
+          ShioriSpace.s16,
+          ShioriSpace.s4,
         ),
+        child: ShioriGroupLabel(l10n.installed),
       ),
       itemBuilder: (context, ExtensionCatalogEntry entry) =>
-          ExtensionListTileWidget(entry: entry),
+          ExtensionListTileWidget(key: ValueKey(entry.source.id), entry: entry),
       groupComparator: (group1, group2) => group1.compareTo(group2),
       itemComparator: (item1, item2) => item1.name.compareTo(item2.name),
       order: GroupedListOrder.ASC,
@@ -232,16 +274,18 @@ class _ExtensionScreenState extends ConsumerState<ExtensionScreen> {
   ) {
     return CustomSliverGroupedListView<ExtensionCatalogEntry, String>(
       elements: notInstalledEntries,
-      groupBy: (entry) => completeLanguageName(entry.lang.toLowerCase()),
+      groupBy: (entry) => languageName(context, entry.lang.toLowerCase()),
       groupSeparatorBuilder: (String groupByValue) => Padding(
-        padding: const EdgeInsets.only(left: 12),
-        child: Text(
-          groupByValue,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        padding: const EdgeInsets.fromLTRB(
+          ShioriSpace.s16,
+          ShioriSpace.s16,
+          ShioriSpace.s16,
+          ShioriSpace.s4,
         ),
+        child: ShioriGroupLabel(groupByValue),
       ),
       itemBuilder: (context, ExtensionCatalogEntry entry) =>
-          ExtensionListTileWidget(entry: entry),
+          ExtensionListTileWidget(key: ValueKey(entry.source.id), entry: entry),
       groupComparator: (group1, group2) => group1.compareTo(group2),
       itemComparator: (item1, item2) => item1.name.compareTo(item2.name),
       order: GroupedListOrder.ASC,

@@ -1,0 +1,9 @@
+8 lib/modules/anime/widgets/desktop.dart
+14 lib/modules/anime/widgets/mobile.dart
+1 lib/modules/browse/sources/sources_screen.dart
+14 lib/modules/mining/widgets/dictionary_lookup_popup.dart
+1 lib/modules/mining/widgets/hoshi_dictionary_popup.dart
+2 lib/modules/mining/widgets/reader_ocr_overlay.dart
+1 lib/modules/novel/novel_reader_view.dart
+4 lib/modules/novel/widgets/novel_reader_settings_sheet.dart
+5 lib/modules/novel/widgets/ttsu_epub_reader.dart

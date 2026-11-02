@@ -10,7 +10,6 @@ import 'package:mangayomi/modules/manga/detail/widgets/anime_season_list.dart';
 
 import 'package:mangayomi/services/download_manager/next_downloads.dart';
 
-import 'package:draggable_menu/draggable_menu.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -25,7 +24,6 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/track.dart';
 import 'package:mangayomi/models/track_preference.dart';
-import 'package:mangayomi/models/track_search.dart';
 import 'package:mangayomi/modules/library/library_screen.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
@@ -40,7 +38,7 @@ import 'package:mangayomi/modules/more/settings/appearance/providers/pure_black_
 import 'package:mangayomi/modules/more/settings/track/widgets/track_listile.dart';
 import 'package:mangayomi/modules/tracker_library/tracker_library_screen.dart';
 import 'package:mangayomi/modules/widgets/bottom_select_bar.dart';
-import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
+import 'package:mangayomi/modules/library/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/modules/widgets/custom_extended_image_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -2210,8 +2208,8 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
             const SizedBox(height: 4),
             Text(
               widget.manga?.smartUpdateDays != null
-                  ? context.l10n.n_days(widget.manga!.smartUpdateDays!)
-                  : "N/A",
+                  ? context.l10n.every_n_days(widget.manga!.smartUpdateDays!)
+                  : context.l10n.update_interval_unknown,
               style: TextStyle(fontSize: 11, color: context.secondaryColor),
               textAlign: TextAlign.center,
             ),
@@ -2339,7 +2337,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                                 syncId: e.syncId!,
                                                 title: widget.manga!.name!,
                                               ),
-                                            ) as TrackSearch?;
+                                            );
                                         if (trackSearch != null) {
                                           mangaRepository.save(
                                             widget.manga!
@@ -2617,9 +2615,12 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
   }
 
   void _trackingDraggableMenu(List<TrackPreference>? entries) {
-    DraggableMenu.open(
-      context,
-      Consumer(
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Consumer(
         builder: (context, ref, _) {
           final isPureBlack = ref.watch(pureBlackDarkModeStateProvider);
           final theme = Theme.of(context);
@@ -2627,82 +2628,74 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
               ? theme.scaffoldBackgroundColor.withValues(alpha: 0.9)
               : theme.cardColor;
 
-          return DraggableMenu(
-            ui: ClassicDraggableMenu(
-              radius: 20,
-              barItem: Container(),
-              color: theme.scaffoldBackgroundColor,
-            ),
-            allowToShrink: true,
-            child: Material(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(20),
-              clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: SuperListView.separated(
-                  padding: const EdgeInsets.all(0),
-                  itemCount: entries!.length,
-                  primary: false,
-                  shrinkWrap: true,
-                  itemBuilder: (context, index) {
-                    return StreamBuilder(
-                      stream: isar.tracks
-                          .filter()
-                          .idIsNotNull()
-                          .syncIdEqualTo(entries[index].syncId)
-                          .mangaIdEqualTo(widget.manga!.id!)
-                          .watch(fireImmediately: true),
-                      builder: (context, snapshot) {
-                        List<Track>? trackRes = snapshot.hasData
-                            ? snapshot.data
-                            : [];
-                        return trackRes!.isNotEmpty
-                            ? TrackerWidget(
-                                mangaId: widget.manga!.id!,
-                                syncId: entries[index].syncId!,
-                                trackRes: trackRes.first,
-                                itemType: widget.manga!.itemType,
-                              )
-                            : TrackListile(
-                                text: l10nLocalizations(context)!.add_tracker,
-                                onTap: () async {
-                                  final trackSearch =
-                                      await trackersSearchDraggableMenu(
-                                        context,
-                                        itemType: widget.manga!.itemType,
-                                        track: Track(
-                                          status: TrackStatus.planToRead,
-                                          syncId: entries[index].syncId!,
-                                          title: widget.manga!.name!,
-                                        ),
-                                      ) as TrackSearch?;
-                                  if (trackSearch != null) {
-                                    await ref
-                                        .read(
-                                          trackStateProvider(
-                                            track: null,
-                                            itemType: widget.manga!.itemType,
-                                            widgetRef: ref,
-                                          ).notifier,
-                                        )
-                                        .setTrackSearch(
-                                          trackSearch,
-                                          widget.manga!.id!,
-                                          entries[index].syncId!,
-                                        );
-                                  }
-                                },
-                                id: entries[index].syncId!,
-                                entries: const [],
-                              );
-                      },
-                    );
-                  },
-                  separatorBuilder: (BuildContext context, int index) {
-                    return const Divider();
-                  },
-                ),
+          return Material(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(20),
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: SuperListView.separated(
+                padding: const EdgeInsets.all(0),
+                itemCount: entries!.length,
+                primary: false,
+                shrinkWrap: true,
+                itemBuilder: (context, index) {
+                  return StreamBuilder(
+                    stream: isar.tracks
+                        .filter()
+                        .idIsNotNull()
+                        .syncIdEqualTo(entries[index].syncId)
+                        .mangaIdEqualTo(widget.manga!.id!)
+                        .watch(fireImmediately: true),
+                    builder: (context, snapshot) {
+                      List<Track>? trackRes = snapshot.hasData
+                          ? snapshot.data
+                          : [];
+                      return trackRes!.isNotEmpty
+                          ? TrackerWidget(
+                              mangaId: widget.manga!.id!,
+                              syncId: entries[index].syncId!,
+                              trackRes: trackRes.first,
+                              itemType: widget.manga!.itemType,
+                            )
+                          : TrackListile(
+                              text: l10nLocalizations(context)!.add_tracker,
+                              onTap: () async {
+                                final trackSearch =
+                                    await trackersSearchDraggableMenu(
+                                      context,
+                                      itemType: widget.manga!.itemType,
+                                      track: Track(
+                                        status: TrackStatus.planToRead,
+                                        syncId: entries[index].syncId!,
+                                        title: widget.manga!.name!,
+                                      ),
+                                    );
+                                if (trackSearch != null) {
+                                  await ref
+                                      .read(
+                                        trackStateProvider(
+                                          track: null,
+                                          itemType: widget.manga!.itemType,
+                                          widgetRef: ref,
+                                        ).notifier,
+                                      )
+                                      .setTrackSearch(
+                                        trackSearch,
+                                        widget.manga!.id!,
+                                        entries[index].syncId!,
+                                      );
+                                }
+                              },
+                              id: entries[index].syncId!,
+                              entries: const [],
+                            );
+                    },
+                  );
+                },
+                separatorBuilder: (BuildContext context, int index) {
+                  return const Divider();
+                },
               ),
             ),
           );

@@ -42,13 +42,13 @@ final class DownloadedOnlyStateProvider
 }
 
 String _$downloadedOnlyStateHash() =>
-    r'928a7883b58004f2ff6e384778b8b5de3811b73d';
+    r'ff7069f7a93c337f97cb81a6a589b30c0049bb1c';
 
 abstract class _$DownloadedOnlyState extends $Notifier<bool> {
   bool build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<bool, bool>;
     final element =
         ref.element
@@ -58,6 +58,6 @@ abstract class _$DownloadedOnlyState extends $Notifier<bool> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

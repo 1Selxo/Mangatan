@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
@@ -389,11 +390,19 @@ class ChapterPreloadManager {
   }
 
   /// Splits a single page into two pages dynamically.
-  void splitPage(int index, UChapDataPreload page1, UChapDataPreload page2) {
-    if (index < 0 || index >= _pages.length) return;
-    _pages.removeAt(index);
-    _pages.insert(index, page1);
-    _pages.insert(index + 1, page2);
+  void splitPage(int index, UChapDataPreload page1, UChapDataPreload page2) =>
+      replacePage(index, [page1, page2]);
+
+  /// Puts [parts] in place of the page at [index], as when a page is split.
+  void replacePage(int index, List<UChapDataPreload> parts) {
+    if (index < 0 || index >= _pages.length || parts.isEmpty) return;
+    _pages
+      ..removeAt(index)
+      ..insertAll(index, parts);
+    // Every page after the split moved down.
+    for (int i = index; i < _pages.length; i++) {
+      _pages[i].pageIndex = i;
+    }
     onPagesUpdated?.call();
   }
 

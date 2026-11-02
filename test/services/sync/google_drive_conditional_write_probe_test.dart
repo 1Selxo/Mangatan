@@ -599,9 +599,9 @@ class _MultipartPayload {
 
 _MultipartPayload _parseMultipart(http.Request request) {
   final contentType = request.headers['content-type']!;
-  final boundary = RegExp(
-    r'boundary=([^;]+)',
-  ).firstMatch(contentType)!.group(1)!;
+  final boundary = RegExp(r'boundary=([^;]+)')
+      .firstMatch(contentType)!
+      .group(1)!;
   final text = utf8.decode(request.bodyBytes);
   final parts = text.split('--$boundary');
   expect(parts, hasLength(4));

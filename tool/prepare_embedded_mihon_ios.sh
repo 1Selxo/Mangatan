@@ -13,8 +13,8 @@ trap 'find "$work_dir" -depth -delete' EXIT
 # avoiding jdk.zipfs, which is intentionally absent from the small embedded
 # iOS JRE.
 server_commit="26cb31e9cc56f4e7aef2931eeba042c9858a8ba4"
-server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v15/MExtensionServer-ios.jar"
-server_jar_sha256="fa91f953972b0d40251c9b7cf19a69a6749dcc7fa6f30d149188efafeffd9142"
+server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v16/MExtensionServer-ios.jar"
+server_jar_sha256="5c06eaabc1230ccff914421c3692509094247596872bb0f76fecd0d5f5cfee29"
 openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/OpenJDK.xcframework.zip"
 openjdk_framework_sha256="f21681caae40e508647e7f18c9082f27fa9aa67ee7f1376725eae528fa2d38cb"
 openjdk_bundle_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/java_bundle-device.zip"

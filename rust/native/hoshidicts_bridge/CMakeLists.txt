@@ -44,8 +44,6 @@ set(HOSHIDICTS_MEMORY_SOURCE "${HOSHIDICTS_ROOT}/src/memory/memory.cpp")
 set(HOSHIDICTS_MEMORY_PATCHED "${HOSHIDICTS_GENERATED_DIR}/memory.cpp")
 set(HOSHIDICTS_QUERY_SOURCE "${HOSHIDICTS_ROOT}/src/query.cpp")
 set(HOSHIDICTS_QUERY_PATCHED "${HOSHIDICTS_GENERATED_DIR}/query.cpp")
-set(HOSHIDICTS_YOMITAN_PARSER_SOURCE "${HOSHIDICTS_ROOT}/src/json/yomitan_parser.cpp")
-set(HOSHIDICTS_YOMITAN_PARSER_PATCHED "${HOSHIDICTS_GENERATED_DIR}/yomitan_parser.cpp")
 set(HOSHIDICTS_KANJI_MAPPING_HEADER "${HOSHIDICTS_GENERATED_DIR}/hoshidicts_full_list_embedded.hpp")
 
 file(MAKE_DIRECTORY "${HOSHIDICTS_GENERATED_DIR}")
@@ -271,52 +269,6 @@ else()
     file(WRITE "${HOSHIDICTS_QUERY_PATCHED}" "${HOSHIDICTS_QUERY_CONTENT}")
 endif()
 
-file(READ "${HOSHIDICTS_YOMITAN_PARSER_SOURCE}" HOSHIDICTS_YOMITAN_PARSER_CONTENT)
-hoshidicts_replace_or_fail(
-    HOSHIDICTS_YOMITAN_PARSER_CONTENT
-    [=[#include <string_view>
-#include <variant>]=]
-    [=[#include <charconv>
-#include <string_view>
-#include <system_error>
-#include <variant>]=]
-    "include numeric-string parsing support"
-)
-hoshidicts_replace_or_fail(
-    HOSHIDICTS_YOMITAN_PARSER_CONTENT
-    [=[  int val;
-  error = glz::read_json(val, content);
-  if (!error) {
-    out.value = val;
-    out.display_value = std::to_string(val);
-    out.reading = "";
-    return true;
-  }]=]
-    [=[  int val;
-  error = glz::read_json(val, content);
-  if (!error) {
-    out.value = val;
-    out.display_value = std::to_string(val);
-    out.reading = "";
-    return true;
-  }
-
-  std::string string_value;
-  error = glz::read_json(string_value, content);
-  if (!error) {
-    const auto [end, parse_error] =
-        std::from_chars(string_value.data(), string_value.data() + string_value.size(), val);
-    if (parse_error == std::errc{} && end == string_value.data() + string_value.size()) {
-      out.value = val;
-      out.display_value = string_value;
-      out.reading = "";
-      return true;
-    }
-  }]=]
-    "accept numeric frequency values encoded as JSON strings"
-)
-file(WRITE "${HOSHIDICTS_YOMITAN_PARSER_PATCHED}" "${HOSHIDICTS_YOMITAN_PARSER_CONTENT}")
-
 file(READ "${HOSHIDICTS_ROOT}/external/kanji-processor/src/full_list.json" HOSHIDICTS_KANJI_MAPPING_HEX HEX)
 string(REGEX REPLACE "([0-9A-Fa-f][0-9A-Fa-f])" "0x\\1," HOSHIDICTS_KANJI_MAPPING_BYTES "${HOSHIDICTS_KANJI_MAPPING_HEX}")
 string(REGEX REPLACE "((0x[0-9A-Fa-f][0-9A-Fa-f],){16})" "\\1\n" HOSHIDICTS_KANJI_MAPPING_BYTES "${HOSHIDICTS_KANJI_MAPPING_BYTES}")
@@ -348,9 +300,6 @@ foreach(HOSHIDICTS_SOURCE IN LISTS HOSHIDICTS_SOURCES)
     elseif(HOSHIDICTS_SOURCE STREQUAL "src/query.cpp" OR
            HOSHIDICTS_SOURCE STREQUAL "${HOSHIDICTS_QUERY_SOURCE}")
         list(APPEND HOSHIDICTS_PATCHED_SOURCES "${HOSHIDICTS_QUERY_PATCHED}")
-    elseif(HOSHIDICTS_SOURCE STREQUAL "src/json/yomitan_parser.cpp" OR
-           HOSHIDICTS_SOURCE STREQUAL "${HOSHIDICTS_YOMITAN_PARSER_SOURCE}")
-        list(APPEND HOSHIDICTS_PATCHED_SOURCES "${HOSHIDICTS_YOMITAN_PARSER_PATCHED}")
     else()
         list(APPEND HOSHIDICTS_PATCHED_SOURCES "${HOSHIDICTS_SOURCE}")
     endif()

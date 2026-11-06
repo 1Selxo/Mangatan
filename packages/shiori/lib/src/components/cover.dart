@@ -177,9 +177,57 @@ class ShioriCoverTile extends StatelessWidget {
   /// A muted line under the title: the source, the last chapter read.
   final String? subtitle;
 
+  static const int _titleLines = 2;
+
+  /// The style a caption line is drawn in, merged into the ambient one as
+  /// [Text] does, so the strut uses the theme's font family.
+  static TextStyle _resolve(BuildContext context, TextStyle style) =>
+      DefaultTextStyle.of(context).style.merge(style);
+
+  /// Pins every line to the primary font's metrics. Without it a line of
+  /// CJK or emoji takes the taller metrics of a fallback font, and a tile
+  /// sized from a Latin measure overflows by a pixel or two.
+  static StrutStyle _strut(TextStyle resolved) =>
+      StrutStyle.fromTextStyle(resolved, forceStrutHeight: true);
+
+  static double _linesHeight(BuildContext context, TextStyle style, int n) {
+    final resolved = _resolve(context, style);
+    final painter = TextPainter(
+      text: TextSpan(text: List.filled(n, 'Hg').join('\n'), style: resolved),
+      strutStyle: _strut(resolved),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
+
+  /// The height a tile [width] wide takes at most, in the current theme and
+  /// text size, for rows that must give their tiles a fixed extent.
+  static double maxHeight(
+    BuildContext context, {
+    required double width,
+    bool withSubtitle = true,
+  }) {
+    final text = context.shiori.text;
+    return width / coverAspect +
+        ShioriSpace.s4 +
+        _linesHeight(context, text.card, _titleLines) +
+        (withSubtitle ? _linesHeight(context, text.meta, 1) : 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = context.shiori;
+    final titleStyle = _resolve(
+      context,
+      tokens.text.card.copyWith(color: tokens.color.fg),
+    );
+    final subtitleStyle = _resolve(
+      context,
+      tokens.text.meta.copyWith(color: tokens.color.fgMuted),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -189,9 +237,10 @@ class ShioriCoverTile extends StatelessWidget {
         ExcludeSemantics(
           child: Text(
             cover.title,
-            maxLines: 2,
+            maxLines: _titleLines,
             overflow: TextOverflow.ellipsis,
-            style: tokens.text.card.copyWith(color: tokens.color.fg),
+            style: titleStyle,
+            strutStyle: _strut(titleStyle),
           ),
         ),
         if (subtitle != null)
@@ -200,7 +249,8 @@ class ShioriCoverTile extends StatelessWidget {
               subtitle!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tokens.text.meta.copyWith(color: tokens.color.fgMuted),
+              style: subtitleStyle,
+              strutStyle: _strut(subtitleStyle),
             ),
           ),
       ],

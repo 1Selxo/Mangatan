@@ -192,12 +192,22 @@ extension UChapDataPreloadExtensions on UChapDataPreload {
   }
 }
 
+/// The file name [CustomExtendedNetworkImageProvider] stores a reader page
+/// under in the image cache.
+///
+/// The provider receives the trimmed page URL and strips the per-launch port
+/// from loopback Mihon proxy URLs before hashing. A lookup that hashed the raw
+/// URL instead would miss every Mihon page and stall OCR until it timed out.
+@visibleForTesting
+String readerImageCacheFileKey(String url) =>
+    keyToMd5(CustomExtendedNetworkImageProvider.normalizeCacheUrl(url.trim()));
+
 Future<File?> _getCachedImageFile(String url, {String? cacheKey}) async {
   try {
     // Cache files are named exactly by their md5 key, so the path can be
     // built directly — listing the whole cache directory to find one file
     // scaled with the cache size.
-    final String key = cacheKey ?? keyToMd5(url);
+    final String key = cacheKey ?? readerImageCacheFileKey(url);
     final Directory cacheImagesDirectory = await StorageProvider()
         .getCacheDirectory('cacheimagemanga');
     final file = File(p.join(cacheImagesDirectory.path, key));

@@ -10,8 +10,10 @@ import 'package:mangayomi/src/rust/api/epub.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:path/path.dart' as p;
 
-typedef LocalArchiveDropImporter =
-    Future<void> Function(List<String> filePaths, ItemType itemType);
+typedef LocalArchiveDropImporter = Future<void> Function(
+  List<String> filePaths,
+  ItemType itemType,
+);
 typedef EpubDropClassifier = Future<EpubContentKind> Function(String filePath);
 
 Future<EpubContentKind> classifyDroppedEpub(String filePath) async {
@@ -47,8 +49,13 @@ class _LibraryFileDropTargetState extends State<LibraryFileDropTarget> {
     if (!isDesktop) return widget.child;
 
     final routeIsCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    // The Manga, Anime and Novel libraries stay mounted side by side in the
+    // shell's stack, and desktop_drop delivers every drop to every enabled
+    // target whose bounds contain it. Only the tab on screen, the one whose
+    // tickers run, may claim a drop.
+    final tabIsVisible = TickerMode.valuesOf(context).enabled;
     return DropTarget(
-      enable: routeIsCurrent && !_isImporting,
+      enable: routeIsCurrent && tabIsVisible && !_isImporting,
       onDragEntered: (_) => setState(() => _isDragging = true),
       onDragExited: (_) => setState(() => _isDragging = false),
       onDragDone: _handleDrop,
@@ -248,7 +255,7 @@ class _ImportOverlay extends StatelessWidget {
 }
 
 String _extensionLabel(ItemType itemType) {
-  return supportedLocalArchiveExtensions(
-    itemType,
-  ).map((extension) => '.$extension').join(', ');
+  return supportedLocalArchiveExtensions(itemType)
+      .map((extension) => '.$extension')
+      .join(', ');
 }

@@ -201,6 +201,48 @@ void main() {
     expect(importedType, ItemType.manga);
   });
 
+  testWidgets('only the visible library tab listens for drops', (tester) async {
+    Widget target(ItemType itemType, {required bool visible}) => TickerMode(
+      enabled: visible,
+      child: LibraryFileDropTarget(
+        key: ValueKey(itemType),
+        itemType: itemType,
+        onImport: (_, _) async {},
+        child: const SizedBox.expand(),
+      ),
+    );
+
+    Future<void> showTab(ItemType visibleType) => tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Stack(
+          children: [
+            for (final type in [ItemType.manga, ItemType.novel])
+              target(type, visible: type == visibleType),
+          ],
+        ),
+      ),
+    );
+
+    bool enabled(ItemType type) => tester
+        .widget<DropTarget>(
+          find.descendant(
+            of: find.byKey(ValueKey(type)),
+            matching: find.byType(DropTarget),
+          ),
+        )
+        .enable;
+
+    await showTab(ItemType.novel);
+    expect(enabled(ItemType.novel), isTrue);
+    expect(enabled(ItemType.manga), isFalse);
+
+    await showTab(ItemType.manga);
+    expect(enabled(ItemType.manga), isTrue);
+    expect(enabled(ItemType.novel), isFalse);
+  });
+
   testWidgets('canceling a recommendation imports nothing', (tester) async {
     var importAttempts = 0;
     await _pumpDropTarget(

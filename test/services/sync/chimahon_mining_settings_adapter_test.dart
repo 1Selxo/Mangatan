@@ -226,6 +226,77 @@ void main() {
     },
   );
 
+  test('sync merges enabled dictionaries by local name', () async {
+    InstalledDictionary terms(String name) => InstalledDictionary(
+      name: name,
+      hasTerms: true,
+      hasFrequencies: false,
+      hasPitch: false,
+    );
+    const adapter = ChimahonMiningSettingsAdapter();
+    await MiningPreferences.setDictionaryProfiles(const [
+      DictionaryProfile(
+        id: 'chinese',
+        name: 'Chinese',
+        languageCode: 'zh',
+        dictionaryOrder: ['BLCUmixed', 'Wenlin ABC'],
+        enabledDictionaries: {'BLCUmixed', 'Wenlin ABC'},
+      ),
+      DictionaryProfile(
+        id: 'japanese',
+        name: 'Japanese',
+        dictionaryOrder: ['JMdict [2026-11-20]', 'Daijisen'],
+        enabledDictionaries: {'JMdict [2026-11-20]'},
+      ),
+    ], activeId: 'japanese');
+    final exported = await adapter.export(
+      dictionaryStorage: _DictionaryStorageStub([
+        terms('BLCUmixed'),
+        terms('Wenlin ABC'),
+        terms('JMdict [2026-11-20]'),
+        terms('Daijisen'),
+      ]),
+    );
+
+    await resetPreferences();
+    await MiningPreferences.setDictionaryProfiles(const [
+      DictionaryProfile(
+        id: 'japanese',
+        name: 'Japanese',
+        enabledDictionaries: {'JMdict [2026-11-06]'},
+      ),
+    ], activeId: 'japanese');
+    final local = _DictionaryStorageStub([
+      terms('Wenlin ABC (Zhuyin)'),
+      terms('JMdict [2026-11-06]'),
+      terms('Daijisen'),
+      terms('Local frequency'),
+    ]);
+    await adapter.import(exported, dictionaryStorage: local);
+
+    final installed = local.dictionaries.map((item) => item.name);
+    final restored = {
+      for (final profile in await MiningPreferences.getDictionaryProfiles())
+        profile.id: profile,
+    };
+    // Nothing in the remote Chinese set exists here; it must not turn the
+    // local Chinese dictionaries off.
+    expect(
+      restored['chinese']!.effectiveEnabledDictionaries(installed),
+      installed.toSet(),
+    );
+    // The remote turned Daijisen off and kept JMdict on under a newer
+    // revision name; the local-only dictionary keeps its local state (off).
+    expect(restored['japanese']!.effectiveEnabledDictionaries(installed), {
+      'JMdict [2026-11-06]',
+    });
+    expect(restored['japanese']!.dictionaryOrder, [
+      'JMdict [2026-11-06]',
+      'Daijisen',
+    ]);
+    expect(local.lastReorderedNames, ['JMdict [2026-11-20]', 'Daijisen']);
+  });
+
   test('read-only projection does not migrate an open legacy box', () async {
     final box = await Hive.openBox<dynamic>('mining_preferences');
     await box.put('ocr_engine', OcrEnginePreference.googleLens.name);
@@ -448,7 +519,9 @@ void main() {
       jsonEncode([remoteProfile]),
     );
 
-    await const ChimahonMiningSettingsAdapter().import([encoded]);
+    await const ChimahonMiningSettingsAdapter().import([
+      encoded,
+    ], dictionaryStorage: _DictionaryStorageStub());
 
     final restored = (await MiningPreferences.getDictionaryProfiles()).single;
     expect(restored.name, 'Remote name');

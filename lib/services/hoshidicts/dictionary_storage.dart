@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:mangayomi/services/hoshidicts/dictionary_names.dart';
 import 'package:mangayomi/services/hoshidicts/yomitan_kanji_dictionary.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -66,10 +67,12 @@ class DictionaryStorage {
   }) async {
     final directory = root ?? await rootDirectory;
     final installed = await _installedFromRoot(directory);
+    final active = resolveEnabledDictionaryNames(
+      enabled,
+      installed.map((dictionary) => dictionary.name),
+    );
     final dictionaries = _applyProfileOrder(installed, order)
-        .where(
-          (dictionary) => enabled.isEmpty || enabled.contains(dictionary.name),
-        )
+        .where((dictionary) => active.contains(dictionary.name))
         .toList(growable: false);
     return DictionaryPaths(
       termPaths: [
@@ -172,7 +175,11 @@ class DictionaryStorage {
     final directory = root ?? await rootDirectory;
     final manifest = await _readManifest(directory);
     final installedNames = await _dictionaryNames(directory);
-    _writeOrder(manifest, installedNames, names);
+    _writeOrder(
+      manifest,
+      installedNames,
+      alignDictionaryOrder(names, installedNames),
+    );
     await _writeManifest(directory, manifest);
   }
 
@@ -246,7 +253,8 @@ class DictionaryStorage {
       for (final dictionary in dictionaries) dictionary.name: dictionary,
     };
     return [
-      for (final name in preferredOrder) ?byName.remove(name),
+      for (final name in alignDictionaryOrder(preferredOrder, byName.keys))
+        ?byName.remove(name),
       for (final dictionary in dictionaries) ?byName.remove(dictionary.name),
     ];
   }

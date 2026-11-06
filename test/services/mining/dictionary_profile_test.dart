@@ -97,4 +97,28 @@ void main() {
     expect(deleted.enabledDictionaries, {'Beta'});
     expect(deleted.dictionaryDisplayModes, isNot(contains('Alpha')));
   });
+
+  test('importing into a stale enabled set keeps existing dictionaries on', () {
+    const profile = DictionaryProfile(
+      id: 'profile',
+      name: 'Profile',
+      dictionaryOrder: ['Remote only'],
+      enabledDictionaries: {'Remote only'},
+    );
+
+    final installed = profile.withInstalledDictionary(
+      'New',
+      installedBefore: const ['Local A', 'Local B'],
+    );
+
+    expect(
+      installed.effectiveEnabledDictionaries(const [
+        'Local A',
+        'Local B',
+        'New',
+      ]),
+      {'Local A', 'Local B', 'New'},
+    );
+    expect(installed.enabledDictionaries, contains('Remote only'));
+  });
 }

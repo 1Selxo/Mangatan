@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:mangayomi/eval/mihon/bridge_protocol.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPreference.pb.dart';
+import 'package:mangayomi/services/hoshidicts/dictionary_names.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -206,10 +207,19 @@ class ChimahonMiningSettingsAdapter {
       for (final profile in await MiningPreferences.getDictionaryProfiles())
         profile.id: profile,
     };
+    final storage = dictionaryStorage ?? DictionaryStorage.instance;
+    final installedNames = payload.languageProfiles.isEmpty
+        ? const <String>[]
+        : (await storage.installed())
+              .map((dictionary) => dictionary.name)
+              .toList(growable: false);
     final importedProfiles = payload.languageProfiles
         .map(
-          (profile) =>
-              _importProfile(profile, local: localProfiles[profile.id]),
+          (profile) => _importProfile(
+            profile,
+            local: localProfiles[profile.id],
+            installedNames: installedNames,
+          ),
         )
         .where((profile) => profile.id.isNotEmpty)
         .toList(growable: false);
@@ -261,9 +271,7 @@ class ChimahonMiningSettingsAdapter {
         ),
       );
       if (profile.dictionaryOrder.isNotEmpty) {
-        await (dictionaryStorage ?? DictionaryStorage.instance).reorder(
-          profile.dictionaryOrder,
-        );
+        await storage.reorder(profile.dictionaryOrder);
       }
     }
 
@@ -463,6 +471,7 @@ class ChimahonMiningSettingsAdapter {
   DictionaryProfile _importProfile(
     ChimahonLanguageProfile profile, {
     DictionaryProfile? local,
+    List<String> installedNames = const [],
   }) {
     final localAnki = local?.anki ?? const AnkiMiningProfile();
     return DictionaryProfile(
@@ -484,8 +493,18 @@ class ChimahonMiningSettingsAdapter {
         syncOnCreate: profile.ankiSyncOnCreate,
         fieldMap: profile.ankiFieldMap,
       ),
-      dictionaryOrder: profile.dictionaryOrder,
-      enabledDictionaries: profile.enabledDictionaries,
+      dictionaryOrder: alignDictionaryOrder(
+        profile.dictionaryOrder,
+        installedNames,
+      ),
+      // The remote names need not match this device's dictionaries; replacing
+      // the set wholesale can leave every local dictionary disabled.
+      enabledDictionaries: mergeSyncedEnabledDictionaryNames(
+        remoteEnabled: profile.enabledDictionaries,
+        remoteKnown: profile.dictionaryOrder,
+        localEnabled: local?.enabledDictionaries,
+        installed: installedNames,
+      ),
       dictionaryCollapseMode: profile.dictionaryCollapseMode,
       dictionaryDisplayModes: profile.dictionaryDisplayModes,
       duplicateAction: profile.ankiDuplicateAction,

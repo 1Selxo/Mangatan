@@ -12,6 +12,7 @@ import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_history_sheet
 import 'package:mangayomi/modules/mining/widgets/mining_lookup_sheet.dart';
 import 'package:mangayomi/modules/mining/widgets/ocr_processing_queue_sheet.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_languages.dart';
+import 'package:mangayomi/services/hoshidicts/dictionary_names.dart';
 import 'package:mangayomi/services/hoshidicts/dictionary_storage.dart';
 import 'package:mangayomi/services/hoshidicts/hoshidicts_backend.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
@@ -340,8 +341,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         }
       }
       var updatedProfile = _activeProfile;
+      final installedBefore = _dictionaries.map((item) => item.name).toList();
       for (final name in importedNames) {
-        updatedProfile = updatedProfile.withInstalledDictionary(name);
+        updatedProfile = updatedProfile.withInstalledDictionary(
+          name,
+          installedBefore: installedBefore,
+        );
       }
       if (!identical(updatedProfile, _activeProfile)) {
         await _updateActiveProfile(updatedProfile);
@@ -536,7 +541,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     final byName = {
       for (final dictionary in dictionaries) dictionary.name: dictionary,
     };
-    return [for (final name in order) ?byName.remove(name), ...byName.values];
+    return [
+      for (final name in alignDictionaryOrder(order, byName.keys))
+        ?byName.remove(name),
+      ...byName.values,
+    ];
   }
 
   Future<void> _updateActiveProfile(DictionaryProfile profile) async {
@@ -608,10 +617,13 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     await _load();
   }
 
+  Set<String> get _effectiveEnabledDictionaries => _activeProfile
+      .effectiveEnabledDictionaries(_dictionaries.map((item) => item.name));
+
   Future<void> _toggleDictionary(String name, bool enabled) async {
-    var enabledNames = _activeProfile.enabledDictionaries.isEmpty
-        ? _dictionaries.map((dictionary) => dictionary.name).toSet()
-        : {..._activeProfile.enabledDictionaries};
+    // Start from what is actually active here, so stale names synced from
+    // another device or an older revision are replaced by local names.
+    var enabledNames = {..._effectiveEnabledDictionaries};
     enabled ? enabledNames.add(name) : enabledNames.remove(name);
     if (enabledNames.length == _dictionaries.length) enabledNames = {};
     await _updateActiveProfile(
@@ -868,9 +880,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       fields = _ankiMobileFieldsByModel[modelName] ?? const [];
     } else {
       try {
-        fields = await AnkiConnectService(
-          endpoint: _ankiEndpoint,
-        ).modelFieldNames(modelName);
+        fields = await AnkiConnectService(endpoint: _ankiEndpoint)
+            .modelFieldNames(modelName);
       } catch (error) {
         botToast('Could not fetch fields: $error', second: 5);
       }
@@ -1394,7 +1405,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         index: index,
                         canMoveUp: index > 0,
                         canMoveDown: index < _dictionaries.length - 1,
-                        enabled: _activeProfile.isDictionaryEnabled(
+                        enabled: _effectiveEnabledDictionaries.contains(
                           dictionary.name,
                         ),
                         displayMode: collapseMode == 'custom'
@@ -1631,8 +1642,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     initialValue: _lookupTrigger,
                     decoration: const InputDecoration(
                       labelText: 'Lookup trigger',
-                      helperText:
-                          'Used in manga and EPUB readers when hover lookup is off',
+                      helperText: 'Used in manga and EPUB readers when hover lookup is off',
                       prefixIcon: Icon(Icons.mouse_outlined),
                     ),
                     items: const [
@@ -1844,8 +1854,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 const SizedBox(height: 8),
                 _SliderSetting(
                   title: 'OCR text box opacity',
-                  description:
-                      '0% keeps the current transparent background; raise it for a more opaque white text box.',
+                  description: '0% keeps the current transparent background; raise it for a more opaque white text box.',
                   value: _backgroundOpacity,
                   min: 0,
                   max: 1,

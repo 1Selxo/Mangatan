@@ -234,6 +234,36 @@ void main() {
     ]);
     expect(paths.termPaths, [gamma.path, alpha.path]);
   });
+
+  test('a synced enabled set that matches nothing keeps lookups on', () async {
+    final root = await Directory.systemTemp.createTemp('dictionary-storage-');
+    addTearDown(() => root.delete(recursive: true));
+    final cedict = await _createDictionary(root, 'CC-CEDICT (Zhuyin)');
+    final wenlin = await _createDictionary(root, 'Wenlin ABC (Zhuyin)');
+
+    final paths = await DictionaryStorage.instance.paths(
+      root: root,
+      enabled: const {'BLCUmixed', 'CC-CEDICT [2026-04-18]', 'Wenlin ABC'},
+    );
+
+    expect(paths.termPaths, [cedict.path, wenlin.path]);
+  });
+
+  test('enabled set and order follow a dictionary across revisions', () async {
+    final root = await Directory.systemTemp.createTemp('dictionary-storage-');
+    addTearDown(() => root.delete(recursive: true));
+    final jmdict = await _createDictionary(root, 'JMdict [2026-11-06]');
+    await _createDictionary(root, 'Kroll');
+    final nomhan = await _createDictionary(root, 'Nom Han');
+
+    final paths = await DictionaryStorage.instance.paths(
+      root: root,
+      order: const ['Nom Han', 'JMdict [2026-11-20]'],
+      enabled: const {'JMdict [2026-11-20]', 'Nom Han'},
+    );
+
+    expect(paths.termPaths, [nomhan.path, jmdict.path]);
+  });
 }
 
 Future<Directory> _createDictionary(Directory root, String name) async {

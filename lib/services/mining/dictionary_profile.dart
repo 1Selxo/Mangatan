@@ -1,3 +1,4 @@
+import 'package:mangayomi/services/hoshidicts/dictionary_names.dart';
 import 'package:mangayomi/services/mining/anki_markers.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 
@@ -57,14 +58,36 @@ class DictionaryProfile {
   bool isDictionaryEnabled(String name) =>
       enabledDictionaries.isEmpty || enabledDictionaries.contains(name);
 
+  /// The installed dictionaries this profile actually enables. Stale names
+  /// (from another device or an older revision) are matched by identity, and
+  /// a set that matches nothing enables everything; see
+  /// [resolveEnabledDictionaryNames].
+  Set<String> effectiveEnabledDictionaries(Iterable<String> installed) =>
+      resolveEnabledDictionaryNames(enabledDictionaries, installed);
+
   /// Applies Chimahon's profile update when a dictionary is imported.
-  DictionaryProfile withInstalledDictionary(String name) {
+  ///
+  /// [installedBefore] lists the dictionaries installed before this import.
+  /// Their effective state is written out by name so that adding the new
+  /// title to a stale set (one matching nothing, which enables everything)
+  /// cannot narrow lookups down to the new dictionary alone.
+  DictionaryProfile withInstalledDictionary(
+    String name, {
+    Iterable<String> installedBefore = const [],
+  }) {
     if (name.isEmpty || dictionaryOrder.contains(name)) return this;
     return copyWith(
       dictionaryOrder: [...dictionaryOrder, name],
       enabledDictionaries: enabledDictionaries.isEmpty
           ? enabledDictionaries
-          : {...enabledDictionaries, name},
+          : {
+              ...enabledDictionaries,
+              ...resolveEnabledDictionaryNames(
+                enabledDictionaries,
+                installedBefore,
+              ),
+              name,
+            },
     );
   }
 

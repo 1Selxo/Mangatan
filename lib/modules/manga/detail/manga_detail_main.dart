@@ -75,6 +75,7 @@ class _MangaReaderDetailState extends ConsumerState<MangaReaderDetail> {
               ? sourceLookupQuery(
                   currentManga.lang!,
                   currentManga.sourceId,
+                  name: currentManga.source,
                   installedOnly: true,
                 )
               : null;

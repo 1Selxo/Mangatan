@@ -459,6 +459,38 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
           String? mihonSourceId,
         })
       >[];
+  // Titles restored or synced before their extension was installed carry
+  // neither id, only the source's name and a placeholder language. Bind them
+  // by name when exactly one installed source anywhere has that name.
+  final reconciledIds = {
+    ...groupSourceIds,
+    for (final source in updates)
+      if (source.id != null) source.id!,
+  };
+  final installedNameCounts = <String, int>{};
+  void countName(String? name) {
+    if (name == null) return;
+    final key = name.toLowerCase();
+    installedNameCounts[key] = (installedNameCounts[key] ?? 0) + 1;
+  }
+
+  // Other extensions' installed sources, as stored; this extension's, as
+  // reconciled above (new factory children are not stored yet).
+  (await isar.sources
+          .filter()
+          .isAddedEqualTo(true)
+          .not()
+          .anyOf(reconciledIds, (q, int id) => q.idEqualTo(id))
+          .nameProperty()
+          .findAll())
+      .forEach(countName);
+  reconciledByNativeId.values.map((source) => source.name).forEach(countName);
+  final reconciledByName = <String, Source>{
+    for (final source in reconciledByNativeId.values)
+      if (source.name case final name?
+          when installedNameCounts[name.toLowerCase()] == 1)
+        name.toLowerCase(): source,
+  };
   for (final manga in await isar.mangas.where().findAll()) {
     final mangaId = manga.id;
     if (mangaId == null) continue;
@@ -473,6 +505,16 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
           ? null
           : mihonSourceMetadata(priorSource)?.sourceId;
       changed = nativeId != null;
+    }
+    if (nativeId == null &&
+        sourceId == null &&
+        manga.isLocalArchive != true &&
+        source != null) {
+      final byName = reconciledByName[source.toLowerCase()];
+      if (byName != null && byName.itemType == manga.itemType) {
+        nativeId = mihonSourceMetadata(byName)?.sourceId;
+        changed = nativeId != null;
+      }
     }
     final target = nativeId == null ? null : reconciledByNativeId[nativeId];
     final priorSourceBelongsToGroup = groupSourceIds.contains(sourceId);

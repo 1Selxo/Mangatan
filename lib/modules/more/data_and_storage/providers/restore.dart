@@ -579,6 +579,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
             : retainedLastReadByMangaId[retained!.id!] ?? retained.lastRead,
         lastUpdate: normalizeMihonTimestamp(protoInt(tempManga.lastModifiedAt)),
         sourceId: resolvedSource.localId,
+        mihonSourceId: resolvedSource.portableId,
         isManga: retained?.isManga,
         isLocalArchive: retained?.isLocalArchive ?? false,
         hasLocalChapterOverlay:
@@ -687,6 +688,7 @@ Future<void> _restoreTachiBkBackupDataExclusive(
             protoInt(tempAnime.lastModifiedAt),
           ),
           sourceId: resolvedSource.localId,
+          mihonSourceId: resolvedSource.portableId,
           isManga: retained?.isManga,
           isLocalArchive: retained?.isLocalArchive ?? false,
           hasLocalChapterOverlay:

@@ -439,6 +439,7 @@ class ChimahonSyncImporter {
               ..categories = authoritativeSelection != null && retainedOverlay
                   ? <int>[]
                   : local.categories;
+            _bindTombstoneSource(local, resolvedSource);
             _applyFavoriteVersion(local, remote);
             database.mangas.putSync(local);
             _upsertTracking(
@@ -582,6 +583,7 @@ class ChimahonSyncImporter {
               ..categories = authoritativeSelection != null && retainedOverlay
                   ? <int>[]
                   : local.categories;
+            _bindTombstoneSource(local, resolvedSource);
             _applyAnimeFavoriteVersion(local, remote);
             // A season can remain in the source cache after leaving both its
             // parent and the library. The tombstone fast path must still apply
@@ -1104,6 +1106,19 @@ class ChimahonSyncImporter {
         continue;
       }
       database.categorys.deleteSync(categoryId);
+    }
+  }
+
+  /// A removal record still names the title's source. Record its portable
+  /// id, and bind the installed source when there is one, so a title cached
+  /// before its extension was installed does not stay unresolvable.
+  void _bindTombstoneSource(Manga local, ResolvedMihonBackupSource source) {
+    local.mihonSourceId ??= source.portableId;
+    if (source.installed && local.isLocalArchive != true) {
+      local
+        ..source = source.name
+        ..sourceId = source.localId
+        ..lang = source.language;
     }
   }
 

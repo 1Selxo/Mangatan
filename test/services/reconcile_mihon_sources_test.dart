@@ -235,6 +235,92 @@ void main() {
       expect(restored.favoriteModifiedAt, 200);
     },
   );
+
+  group('title restored before its extension was installed', () {
+    Source template() => Source(
+      id: 201,
+      name: 'KissLove',
+      lang: 'ja',
+      sourceCodeUrl: 'https://extensions.example/kisslove.apk',
+      sourceCode: 'apk-bytes',
+      itemType: ItemType.manga,
+      isAdded: true,
+      additionalParams: encodeMihonSourceMetadata(
+        sourceId: '6304',
+        packageName: 'eu.kanade.tachiyomi.extension.ja.kisslove',
+      ),
+    )..sourceCodeLanguage = SourceCodeLanguage.mihon;
+
+    // What a backup restore stored without the extension: the backup's
+    // source name, the placeholder language and neither id.
+    Manga orphan() => Manga(
+      id: 60,
+      source: 'KissLove',
+      author: '',
+      artist: '',
+      favorite: false,
+      genre: const [],
+      imageUrl: '',
+      lang: 'en',
+      link: 'kuso-onna-ni-sachiare',
+      name: 'KUSO ONNA NI SACHIARE',
+      status: Status.ongoing,
+      description: '',
+      sourceId: null,
+      itemType: ItemType.manga,
+    );
+
+    const descriptors = [
+      MihonSourceDescriptor(
+        id: '6304',
+        name: 'KissLove',
+        lang: 'ja',
+        baseUrl: 'https://klz9.com',
+      ),
+    ];
+
+    test('is bound by its unique source name', () async {
+      final source = template();
+      await database.writeTxn(() async {
+        await database.sources.put(source);
+        await database.mangas.put(orphan());
+      });
+
+      await reconcileMihonFactorySources(source, descriptors);
+
+      final rebound = database.mangas.getSync(60)!;
+      expect(rebound.sourceId, source.id);
+      expect(rebound.lang, 'ja');
+      expect(rebound.mihonSourceId, '6304');
+    });
+
+    test(
+      'stays unbound when another installed source shares the name',
+      () async {
+        final source = template();
+        final namesake = Source(
+          id: 202,
+          name: 'kisslove',
+          lang: 'en',
+          sourceCodeUrl: 'https://extensions.example/other.apk',
+          sourceCode: 'other-bytes',
+          itemType: ItemType.manga,
+          isAdded: true,
+        );
+        await database.writeTxn(() async {
+          await database.sources.putAll([source, namesake]);
+          await database.mangas.put(orphan());
+        });
+
+        await reconcileMihonFactorySources(source, descriptors);
+
+        final untouched = database.mangas.getSync(60)!;
+        expect(untouched.sourceId, isNull);
+        expect(untouched.lang, 'en');
+        expect(untouched.mihonSourceId, isNull);
+      },
+    );
+  });
 }
 
 Future<String> _isarLibraryPath() async {

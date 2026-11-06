@@ -14,6 +14,9 @@ Source? findSourceFromList(
   required int? sourceId,
   bool installedOnly = false,
 }) {
+  final lowerName = name.toLowerCase();
+  Source? nameOnly;
+  var nameOnlyCount = 0;
   for (final source in sources) {
     if (installedOnly && !(source.isAdded ?? false)) continue;
     if (installedOnly &&
@@ -22,11 +25,18 @@ Source? findSourceFromList(
     }
     if (source.sourceCode == null) continue;
 
-    final matches = sourceId != null
-        ? source.id == sourceId
-        : source.name?.toLowerCase() == name.toLowerCase() &&
-              source.lang == lang;
-    if (matches) return source;
+    if (sourceId != null) {
+      if (source.id == sourceId) return source;
+      continue;
+    }
+    if (source.name?.toLowerCase() != lowerName) continue;
+    if (source.lang == lang) return source;
+    nameOnly = source;
+    nameOnlyCount++;
   }
-  return null;
+  // A title restored or synced before its extension was installed carries
+  // no source id and a placeholder language (the backup format stores only
+  // the source's name). When exactly one source of that name is available,
+  // it is the title's source; with several, the language cannot be guessed.
+  return sourceId == null && nameOnlyCount == 1 ? nameOnly : null;
 }

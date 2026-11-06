@@ -1078,6 +1078,31 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     return _audioTrackForNativeId(activeId) ?? selectedAudio;
   }
 
+  /// The subtitle track mpv is actually showing. media_kit never observes
+  /// `sid`, so a track mpv picked on its own (e.g. an embedded ASS track)
+  /// leaves `state.track.subtitle` at `auto`.
+  Future<SubtitleTrack> _activeSubtitleTrack() async {
+    final selected = _player.state.track.subtitle;
+    if (selected.id != 'auto') return selected;
+
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return selected;
+
+    final activeId =
+        await _nativeAudioProperty(platform, 'current-tracks/sub/id') ??
+        await _nativeAudioProperty(platform, 'sid');
+    if (activeId == null ||
+        activeId == 'auto' ||
+        activeId == 'no' ||
+        activeId == '-1') {
+      return SubtitleTrack.no();
+    }
+    for (final track in _player.state.tracks.subtitle) {
+      if (track.id == activeId) return track;
+    }
+    return SubtitleTrack(activeId, null, null);
+  }
+
   Future<bool> _shouldPreserveAudioSelection() async {
     final selectedAudio = _player.state.track.audio;
     if (selectedAudio.id != 'auto') return true;
@@ -2275,6 +2300,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     var openJimaku = false;
     final resumePlayback = _player.state.playing;
     await _player.pause();
+    final activeSubtitle = await _activeSubtitleTrack();
     if (!context.mounted) return;
     await customDraggableTabBar(
       tabs: [
@@ -2287,6 +2313,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         _videoSubtitle(
           context,
           (value) => hasSubtitleTrack = value,
+          activeSubtitle: activeSubtitle,
           onSearchJimaku: () => openJimaku = true,
         ),
         _videoAudios(context),
@@ -2342,6 +2369,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   Widget _videoSubtitle(
     BuildContext context,
     Function(bool) hasSubtitleTrack, {
+    required SubtitleTrack activeSubtitle,
     required VoidCallback onSearchJimaku,
   }) {
     List<VideoPrefs> videoSubtitle = _player.state.tracks.subtitle
@@ -2374,7 +2402,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         }
       }
     }
-    final subtitle = _player.state.track.subtitle;
+    final subtitle = activeSubtitle;
+    final subtitleOff = subtitle.id == 'no' || subtitle.id == 'auto';
+    final activeTitle =
+        subtitle.title ?? subtitle.language ?? subtitle.channels;
     videoSubtitle = videoSubtitle
         .map((e) {
           VideoPrefs vid = e;
@@ -2525,13 +2556,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                 sub.subtitle?.channels ??
                 "None";
 
-            final selected =
-                (title ==
-                    (subtitle.title ??
-                        subtitle.language ??
-                        subtitle.channels ??
-                        "None")) ||
-                (subtitle.id == "no" && title == "None");
+            // A track without a title must never fall back to "None" and
+            // highlight the off row; match concrete tracks by id first.
+            final selected = sub.subtitle?.id == 'no'
+                ? subtitleOff
+                : !subtitleOff &&
+                      (sub.subtitle?.id == subtitle.id ||
+                          (activeTitle != null && title == activeTitle));
             return GestureDetector(
               onTap: () {
                 Navigator.pop(context);

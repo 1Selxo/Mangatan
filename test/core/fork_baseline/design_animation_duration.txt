@@ -7,7 +7,6 @@
 1 lib/modules/manga/detail/widgets/custom_floating_action_btn.dart
 2 lib/modules/manga/reader/reader_view.dart
 1 lib/modules/manga/reader/services/page_navigation_service.dart
-1 lib/modules/manga/reader/widgets/reader_bottom_bar.dart
 1 lib/modules/mining/widgets/reader_ocr_overlay.dart
 1 lib/modules/more/download_queue/download_queue_screen.dart
 1 lib/modules/more/settings/dictionary/dictionary_screen.dart

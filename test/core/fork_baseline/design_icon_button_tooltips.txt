@@ -6,7 +6,6 @@
 1 lib/modules/browse/extension/extension_detail.dart
 5 lib/modules/manga/detail/manga_detail_view.dart
 6 lib/modules/manga/home/manga_home_screen.dart
-4 lib/modules/manga/reader/widgets/reader_bottom_bar.dart
 2 lib/modules/more/download_queue/download_queue_screen.dart
 1 lib/modules/more/settings/downloads/downloads_screen.dart
 5 lib/modules/more/settings/sync/sync.dart

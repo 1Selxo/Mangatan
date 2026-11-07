@@ -16,9 +16,7 @@
 1 lib/modules/manga/detail/widgets/custom_floating_action_btn.dart
 2 lib/modules/manga/home/manga_home_screen.dart
 1 lib/modules/manga/reader/widgets/color_filter_widget.dart
-6 lib/modules/manga/reader/widgets/reader_bottom_bar.dart
 39 lib/modules/manga/reader/widgets/reader_settings_modal.dart
-1 lib/modules/mining/widgets/reader_ocr_overlay.dart
 3 lib/modules/more/download_queue/download_queue_screen.dart
 5 lib/modules/more/settings/browse/extension_server_screen.dart
 4 lib/modules/more/settings/downloads/downloads_screen.dart

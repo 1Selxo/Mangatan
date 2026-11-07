@@ -34,6 +34,8 @@ import 'package:mangayomi/modules/manga/reader/mixins/reader_memory_management.d
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
 import 'package:mangayomi/modules/reader_common/widgets/reader_app_bar.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_bottom_bar.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/reader_auto_scroll_sheet.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/reader_slider_preview_overlay.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_gesture_handler.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_settings_modal.dart';
 import 'package:mangayomi/modules/reader_common/widgets/auto_scroll_button.dart';
@@ -216,6 +218,7 @@ class _MangaChapterPageGalleryState
     _autoScroll.value = false;
     _autoScroll.dispose();
     _autoScrollPage.dispose();
+    _sliderPreviewIndex.dispose();
     _currentPageDisplayIndex.dispose();
     _scrollIdleTimer?.cancel();
     _isScrolling.dispose();
@@ -288,6 +291,10 @@ class _MangaChapterPageGalleryState
     _readerController.autoScrollValues().$1,
   );
   late final _autoScrollPage = ValueNotifier(_autoScroll.value);
+
+  /// The slider position while the bottom bar's slider is dragged, for the
+  /// page preview above it; null otherwise.
+  final ValueNotifier<int?> _sliderPreviewIndex = ValueNotifier(null);
   late GetChapterPagesModel _chapterUrlModel = widget.chapterUrlModel;
 
   late Chapter chapter = widget.chapter;
@@ -707,12 +714,14 @@ class _MangaChapterPageGalleryState
                       onPreviousChapter: () => _goToChapter(false),
                       onNextChapter: () => _goToChapter(true),
                       onSliderChanged: (value, ref) {
+                        _sliderPreviewIndex.value = value;
                         _currentPageDisplayIndex.value = value;
                         ref
                             .read(currentIndexProvider(chapter).notifier)
                             .setCurrentIndex(value);
                       },
                       onSliderChangeEnd: (value) {
+                        _sliderPreviewIndex.value = null;
                         try {
                           final page = pages.firstWhere(
                             (element) =>
@@ -809,6 +818,19 @@ class _MangaChapterPageGalleryState
                       ),
                       currentIndexLabel: _currentIndexLabel,
                       backgroundColor: _backgroundColor,
+                      autoScrollEnabled: _autoScrollPage,
+                      onAutoScrollPressed: _showAutoScrollSheet,
+                    ),
+                    // The page under the slider while it is dragged.
+                    ReaderSliderPreviewOverlay(
+                      sliderPreviewIndex: _sliderPreviewIndex,
+                      isUiVisible: _isView,
+                      totalPages: _readerController.getPageLength(
+                        _chapterUrlModel.pageUrls,
+                      ),
+                      isReverseHorizontal: _isReverseHorizontal,
+                      imageForPage: _sliderPreviewImage,
+                      currentIndexLabel: _currentIndexLabel,
                     ),
                     PageIndicator(
                       isUiVisible: _isView,
@@ -1548,6 +1570,29 @@ class _MangaChapterPageGalleryState
   late final _pageOffset = ValueNotifier(
     _readerController.autoScrollValues().$2,
   );
+
+  void _showAutoScrollSheet() {
+    showReaderAutoScrollSheet(
+      context,
+      autoScrollPage: _autoScrollPage,
+      autoScroll: _autoScroll,
+      pageOffset: _pageOffset,
+      onSave: (enabled, offset) =>
+          _readerController.setAutoScroll(enabled, offset),
+      onAutoPageScroll: _autoPagescroll,
+    );
+  }
+
+  ImageProvider? _sliderPreviewImage(int pageInChapter) {
+    for (final page in pages) {
+      if (page.chapter == chapter &&
+          page.index == pageInChapter &&
+          !page.isTransitionPage) {
+        return page.getImageProvider(ref, false);
+      }
+    }
+    return null;
+  }
 
   void _autoPagescroll() async {
     if (_isContinuousMode()) {

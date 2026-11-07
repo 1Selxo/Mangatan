@@ -51,6 +51,62 @@ void main() {
     expect(result.blocks.single.lineGeometries, hasLength(1));
   });
 
+  test('places each character where its word box puts it', () {
+    void box(_TestProtoWriter geometry, double left, double right) {
+      geometry.message(1, (box) {
+        box.float32(1, (left + right) / 2);
+        box.float32(2, 0.5);
+        box.float32(3, right - left);
+        box.float32(4, 0.05);
+        box.float32(5, 0);
+      });
+    }
+
+    final response = _message((root) {
+      root.message(2, (objects) {
+        objects.message(3, (text) {
+          text.message(1, (layout) {
+            layout.message(1, (paragraph) {
+              paragraph.message(2, (line) {
+                line.message(1, (word) {
+                  word.string(2, '请');
+                  word.message(4, (geometry) => box(geometry, 0.30, 0.36));
+                });
+                line.message(1, (word) {
+                  word.string(2, '欺负');
+                  word.message(4, (geometry) => box(geometry, 0.40, 0.52));
+                });
+                line.message(1, (word) {
+                  word.string(2, '！');
+                  word.message(4, (geometry) => box(geometry, 0.66, 0.70));
+                });
+                line.message(2, (geometry) => box(geometry, 0.30, 0.70));
+              });
+            });
+          });
+        });
+      });
+    });
+
+    final client = ChromeLensOcrClient();
+    addTearDown(client.close);
+    final result = client.decodeResponse(
+      response,
+      imageWidth: 1000,
+      imageHeight: 1000,
+      language: 'zh',
+    );
+
+    final line = result.blocks.single.lineGeometries.single;
+    expect(result.blocks.single.text, '请欺负！');
+    expect(line.glyphEdgesVertical, isFalse);
+    final edges = line.glyphEdges!;
+    expect(edges, hasLength(5));
+    for (final (index, expected) in [0.0, 0.2, 0.4, 0.725, 1.0].indexed) {
+      expect(edges[index], closeTo(expected, 0.001));
+    }
+  });
+
   test('sends extremely tall pages as multiple OCR requests', () async {
     var requestCount = 0;
     final client = ChromeLensOcrClient(

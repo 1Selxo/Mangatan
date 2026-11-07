@@ -190,6 +190,8 @@ OcrTextBlock remapOcrBlockToRegion(OcrTextBlock block, Rect region) {
           xmax: x(line.xmax),
           ymax: y(line.ymax),
           rotation: line.rotation,
+          glyphEdges: line.glyphEdges,
+          glyphEdgesVertical: line.glyphEdgesVertical,
         ),
     ],
   );

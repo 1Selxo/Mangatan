@@ -44,4 +44,29 @@ void main() {
       expect(block.text, 'A\nB');
     });
   });
+
+  group('ocrGlyphEdges', () {
+    test('shares a word among its characters and splits gaps', () {
+      final edges = ocrGlyphEdges([
+        (text: 'ab', start: 0.0, end: 0.4),
+        (text: 'c', start: 0.6, end: 1.0),
+      ], 'abc');
+      expect(edges, [0.0, 0.2, 0.5, 1.0]);
+    });
+
+    test('lets a kept space span the gap between words', () {
+      final edges = ocrGlyphEdges([
+        (text: 'hi', start: 0.0, end: 0.4),
+        (text: 'yo', start: 0.6, end: 1.0),
+      ], 'hi yo');
+      expect(edges, [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]);
+    });
+
+    test('gives up when the pieces do not spell the line', () {
+      expect(
+        ocrGlyphEdges([(text: 'ab', start: 0.0, end: 1.0)], 'abc'),
+        isNull,
+      );
+    });
+  });
 }

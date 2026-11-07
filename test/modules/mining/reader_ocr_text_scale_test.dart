@@ -88,4 +88,42 @@ void main() {
       expect(fontSize, closeTo(34.2, 0.01));
     });
   });
+
+  group('reader OCR character cells', () {
+    test('uses engine edges that fit the line, equal cells otherwise', () {
+      expect(readerOcrCellEdges(2, const [0.0, 0.3, 1.0]), [0.0, 0.3, 1.0]);
+      expect(readerOcrCellEdges(2, const [0.0, 1.0]), [0.0, 0.5, 1.0]);
+      expect(readerOcrCellEdges(4, null), [0.0, 0.25, 0.5, 0.75, 1.0]);
+    });
+
+    test('finds the cell under a point along the line', () {
+      const edges = [0.0, 0.2, 0.4, 0.725, 1.0];
+      expect(readerOcrCellAt(edges, -0.1), 0);
+      expect(readerOcrCellAt(edges, 0.1), 0);
+      expect(readerOcrCellAt(edges, 0.2), 1);
+      expect(readerOcrCellAt(edges, 0.7), 2);
+      expect(readerOcrCellAt(edges, 0.9), 3);
+      expect(readerOcrCellAt(edges, 1.5), 3);
+    });
+
+    test('sizes glyphs past the ink-tight line height', () {
+      // Six even cells of 37 px on a 32 px line: the glyph's ink matches
+      // the line, so the em is a ninth larger, still inside its cell.
+      final fontSize = readerOcrCellFontSize(
+        lineThickness: 32,
+        lineLength: 222,
+        cellEdges: readerOcrCellEdges(6, null),
+      );
+      expect(fontSize, closeTo(35.56, 0.01));
+    });
+
+    test('never lets glyphs outgrow a typical cell', () {
+      final fontSize = readerOcrCellFontSize(
+        lineThickness: 60,
+        lineLength: 120,
+        cellEdges: readerOcrCellEdges(4, null),
+      );
+      expect(fontSize, 30);
+    });
+  });
 }

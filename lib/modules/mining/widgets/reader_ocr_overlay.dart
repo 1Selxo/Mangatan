@@ -1109,12 +1109,14 @@ class ReaderOcrController extends ChangeNotifier {
           activeBackgroundOpacity: activeBackgroundOpacity,
           rotation: lineBox.rotation,
           singleLine: true,
+          cellEdges: lineBox.cellEdges,
           highlight: active
               ? _lineHighlightFor(
                   lineStart: lineStart,
                   lineLength: lineLength,
                   rect: lineBox.rect,
                   vertical: lineBox.vertical,
+                  cellEdges: lineBox.cellEdges,
                 )
               : null,
         );
@@ -1305,15 +1307,10 @@ class ReaderOcrController extends ChangeNotifier {
     Size size,
     int lineStart,
   ) {
-    final line = lineBox.text;
-    final char = lineBox.vertical
-        ? (local.dy / math.max(1, size.height / math.max(1, line.length)))
-              .floor()
-              .clamp(0, math.max(0, line.length - 1))
-        : (local.dx / math.max(1, size.width / math.max(1, line.length)))
-              .floor()
-              .clamp(0, math.max(0, line.length - 1));
-    return lineStart + char.toInt();
+    final fraction = lineBox.vertical
+        ? local.dy / math.max(1, size.height)
+        : local.dx / math.max(1, size.width);
+    return lineStart + readerOcrCellAt(lineBox.cellEdges, fraction);
   }
 
   Future<bool> _activateHit(
@@ -1617,6 +1614,7 @@ class ReaderOcrController extends ChangeNotifier {
     double rotation = 0,
     bool singleLine = false,
     int lineCount = 1,
+    List<double>? cellEdges,
   }) {
     if (text.isEmpty) return;
     final contentOpacity = readerOcrContentOpacities(
@@ -1647,10 +1645,11 @@ class ReaderOcrController extends ChangeNotifier {
       );
     }
     if (contentOpacity.text > 0) {
+      final edges = cellEdges ?? readerOcrCellEdges(text.length, null);
       if (vertical) {
-        _paintVerticalText(canvas, rect, text, contentOpacity.text);
+        _paintVerticalText(canvas, rect, text, contentOpacity.text, edges);
       } else if (singleLine) {
-        _paintHorizontalLine(canvas, rect, text, contentOpacity.text);
+        _paintHorizontalLine(canvas, rect, text, contentOpacity.text, edges);
       } else {
         _paintHorizontalText(
           canvas,
@@ -1726,18 +1725,16 @@ class ReaderOcrController extends ChangeNotifier {
     Rect rect,
     String text,
     double alpha,
+    List<double> edges,
   ) {
     final color = Colors.black.withValues(alpha: alpha);
     canvas.save();
     canvas.clipRect(rect);
     if (readerOcrUsesCharacterCells(text)) {
-      final cellWidth = rect.width / text.length;
-      // The vertical fit with the axes swapped: a glyph fits its cell's width
-      // and the line's height.
-      final fontSize = readerOcrVerticalFontSize(
-        boxWidth: rect.height,
-        boxHeight: rect.width,
-        glyphCount: text.length,
+      final fontSize = readerOcrCellFontSize(
+        lineThickness: rect.height,
+        lineLength: rect.width,
+        cellEdges: edges,
       );
       for (var index = 0; index < text.length; index++) {
         final painter = TextPainter(
@@ -1751,7 +1748,9 @@ class ReaderOcrController extends ChangeNotifier {
         painter.paint(
           canvas,
           Offset(
-            rect.left + cellWidth * (index + 0.5) - painter.width / 2,
+            rect.left +
+                rect.width * (edges[index] + edges[index + 1]) / 2 -
+                painter.width / 2,
             rect.center.dy - painter.height / 2,
           ),
         );
@@ -1777,8 +1776,13 @@ class ReaderOcrController extends ChangeNotifier {
     canvas.restore();
   }
 
-  void _paintVerticalText(Canvas canvas, Rect rect, String text, double alpha) {
-    final rowHeight = rect.height / math.max(1, text.length);
+  void _paintVerticalText(
+    Canvas canvas,
+    Rect rect,
+    String text,
+    double alpha,
+    List<double> edges,
+  ) {
     final fontSize = readerOcrVerticalFontSize(
       boxWidth: rect.width,
       boxHeight: rect.height,
@@ -1804,7 +1808,9 @@ class ReaderOcrController extends ChangeNotifier {
         canvas,
         Offset(
           rect.center.dx - painter.width / 2,
-          rect.top + rowHeight * (index + 0.5) - painter.height / 2,
+          rect.top +
+              rect.height * (edges[index] + edges[index + 1]) / 2 -
+              painter.height / 2,
         ),
       );
     }
@@ -1816,6 +1822,7 @@ class ReaderOcrController extends ChangeNotifier {
     required int lineLength,
     required Rect rect,
     required bool vertical,
+    List<double>? cellEdges,
   }) {
     if (_matchLength <= 0 || _activeOffset < 0 || lineLength <= 0) {
       return null;
@@ -1826,20 +1833,21 @@ class ReaderOcrController extends ChangeNotifier {
     if (start >= lineEnd || end <= lineStart) return null;
     final overlapStart = math.max(start, lineStart) - lineStart;
     final overlapEnd = math.min(end, lineEnd) - lineStart;
+    final edges = cellEdges ?? readerOcrCellEdges(lineLength, null);
+    final from = edges[overlapStart];
+    final to = edges[overlapEnd];
     if (vertical) {
-      final cellHeight = rect.height / lineLength;
       return Rect.fromLTWH(
         rect.left,
-        rect.top + overlapStart * cellHeight,
+        rect.top + from * rect.height,
         rect.width,
-        math.max(1, (overlapEnd - overlapStart) * cellHeight),
+        math.max(1, (to - from) * rect.height),
       );
     }
-    final cellWidth = rect.width / lineLength;
     return Rect.fromLTWH(
-      rect.left + overlapStart * cellWidth,
+      rect.left + from * rect.width,
       rect.top,
-      math.max(1, (overlapEnd - overlapStart) * cellWidth),
+      math.max(1, (to - from) * rect.width),
       rect.height,
     );
   }
@@ -1866,12 +1874,17 @@ class ReaderOcrController extends ChangeNotifier {
         scaleY,
       );
       if (rect.isEmpty) continue;
+      final vertical = block.vertical || _looksVertical(geo);
       boxes.add(
         _OcrLineBox(
           text: line,
           rect: rect,
-          vertical: block.vertical || _looksVertical(geo),
+          vertical: vertical,
           rotation: geo.rotation,
+          cellEdges: readerOcrCellEdges(
+            line.length,
+            geo.glyphEdgesVertical == vertical ? geo.glyphEdges : null,
+          ),
         ),
       );
     }
@@ -2034,6 +2047,53 @@ double readerOcrBlockFontSize({
   return (lineHeight * 0.85).clamp(8.0, 96.0).toDouble();
 }
 
+/// Character cell edges along a line's reading axis, as fractions of its
+/// box: the engine's [glyphEdges] when they fit [length] characters,
+/// otherwise equal cells. Cell `i` spans `edges[i]` to `edges[i + 1]`.
+@visibleForTesting
+List<double> readerOcrCellEdges(int length, List<double>? glyphEdges) {
+  if (glyphEdges != null && glyphEdges.length == length + 1) return glyphEdges;
+  final count = math.max(1, length);
+  return [for (var index = 0; index <= count; index++) index / count];
+}
+
+/// The character whose cell holds [fraction] of the way along the line.
+@visibleForTesting
+int readerOcrCellAt(List<double> edges, double fraction) {
+  final last = edges.length - 2;
+  if (last <= 0) return 0;
+  for (var index = 0; index < last; index++) {
+    if (fraction < edges[index + 1]) return index;
+  }
+  return last;
+}
+
+/// Font size for CJK glyphs painted one per cell along a line, so they
+/// match the source lettering.
+///
+/// OCR engines box a line by its ink, and a CJK glyph's ink fills about 90%
+/// of its em square, so a glyph whose ink is as tall as the line needs a
+/// font about a ninth larger than the line. Solid-set CJK advances about one
+/// em per character, so the typical cell length caps the size and
+/// neighbours never overlap.
+@visibleForTesting
+double readerOcrCellFontSize({
+  required double lineThickness,
+  required double lineLength,
+  required List<double> cellEdges,
+}) {
+  if (lineThickness <= 0 || lineLength <= 0 || cellEdges.length < 2) {
+    return 0.0;
+  }
+  final cells = [
+    for (var index = 0; index + 1 < cellEdges.length; index++)
+      (cellEdges[index + 1] - cellEdges[index]) * lineLength,
+  ]..sort();
+  final typicalCell = cells[cells.length ~/ 2];
+  final fontSize = math.min(lineThickness / 0.9, typicalCell);
+  return math.max(fontSize, math.min(8.0, typicalCell));
+}
+
 /// Whether a horizontal line is painted one glyph per equal cell, as the
 /// lookup highlight and the hit test divide it: true when most of its
 /// characters are full-width CJK, kana or Hangul.
@@ -2149,12 +2209,17 @@ class _OcrLineBox {
     required this.rect,
     required this.vertical,
     required this.rotation,
+    required this.cellEdges,
   });
 
   final String text;
   final Rect rect;
   final bool vertical;
   final double rotation;
+
+  /// Character cell edges along the reading axis, as fractions of [rect]:
+  /// [readerOcrCellEdges].
+  final List<double> cellEdges;
 }
 
 class _PaintedOcrBlock {

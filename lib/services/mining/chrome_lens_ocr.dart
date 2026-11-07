@@ -116,6 +116,13 @@ class ChromeLensOcrClient {
             xmax: rect.right,
             ymax: rect.bottom,
             rotation: geometry.rotation,
+            glyphEdges: _wordGlyphEdges(
+              line.messages(1),
+              normalizedText,
+              line: rect,
+              vertical: geometry.isVertical,
+            ),
+            glyphEdgesVertical: geometry.isVertical,
           ),
         );
         if (geometry.isVertical) verticalVotes++;
@@ -267,6 +274,35 @@ class ChromeLensOcrClient {
       return trimmed.replaceAll(RegExp(r'\s+'), '');
     }
     return trimmed.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  /// Character edges of a line from its words' boxes, so the overlay can
+  /// place each character where the source shows it instead of in an equal
+  /// share of the line.
+  static List<double>? _wordGlyphEdges(
+    Iterable<ProtoWireMessage> words,
+    String lineText, {
+    required _NormalizedRect line,
+    required bool vertical,
+  }) {
+    final lineStart = vertical ? line.top : line.left;
+    final lineLength = vertical
+        ? line.bottom - line.top
+        : line.right - line.left;
+    if (lineLength <= 0) return null;
+    final pieces = <OcrGlyphPiece>[];
+    for (final word in words) {
+      final box = _readGeometry(word.message(4))?.rect;
+      if (box == null) return null;
+      final start = vertical ? box.top : box.left;
+      final end = vertical ? box.bottom : box.right;
+      pieces.add((
+        text: word.string(2),
+        start: (start - lineStart) / lineLength,
+        end: (end - lineStart) / lineLength,
+      ));
+    }
+    return ocrGlyphEdges(pieces, lineText);
   }
 
   static _LensGeometry? _readGeometry(ProtoWireMessage? geometry) {

@@ -321,6 +321,7 @@ List<OcrTextBlock> _parseVisualAnnotation(
     final paragraph = line.int32(11) ?? 0;
     final language = line.string(4);
     final direction = line.int32(7) ?? 0;
+    final vertical = direction == 3 || rect.height > rect.width * 1.25;
     grouped
         .putIfAbsent('$block:$paragraph:$language', () => [])
         .add(
@@ -328,7 +329,15 @@ List<OcrTextBlock> _parseVisualAnnotation(
             text: text,
             rect: rect,
             language: language,
-            vertical: direction == 3 || rect.height > rect.width * 1.25,
+            vertical: vertical,
+            glyphEdges: _symbolGlyphEdges(
+              line.messages(1),
+              text,
+              line: rect,
+              vertical: vertical,
+              imageWidth: imageWidth,
+              imageHeight: imageHeight,
+            ),
           ),
         );
   }
@@ -355,6 +364,8 @@ List<OcrTextBlock> _parseVisualAnnotation(
               ymin: line.rect.top,
               xmax: line.rect.right,
               ymax: line.rect.bottom,
+              glyphEdges: line.glyphEdges,
+              glyphEdgesVertical: line.vertical,
             ),
         ],
         language: lines.first.language,
@@ -362,6 +373,43 @@ List<OcrTextBlock> _parseVisualAnnotation(
     );
   }
   return blocks;
+}
+
+/// Character edges of a line from the boxes ScreenAI reports for each
+/// symbol, or for each word when it reports no symbols.
+List<double>? _symbolGlyphEdges(
+  Iterable<ProtoWireMessage> words,
+  String lineText, {
+  required _NormalizedRect line,
+  required bool vertical,
+  required int imageWidth,
+  required int imageHeight,
+}) {
+  final lineStart = vertical ? line.top : line.left;
+  final lineLength = vertical ? line.bottom - line.top : line.right - line.left;
+  if (lineLength <= 0) return null;
+  final pieces = <OcrGlyphPiece>[];
+  void add(ProtoWireMessage piece) {
+    final box = _readRect(piece.message(2), imageWidth, imageHeight);
+    if (box == null) return;
+    final start = vertical ? box.top : box.left;
+    final end = vertical ? box.bottom : box.right;
+    pieces.add((
+      text: piece.string(3),
+      start: (start - lineStart) / lineLength,
+      end: (end - lineStart) / lineLength,
+    ));
+  }
+
+  for (final word in words) {
+    final symbols = word.messages(1);
+    if (symbols.isEmpty) {
+      add(word);
+    } else {
+      symbols.forEach(add);
+    }
+  }
+  return ocrGlyphEdges(pieces, lineText);
 }
 
 _NormalizedRect? _readRect(
@@ -417,12 +465,14 @@ class _ScreenAiLine {
     required this.rect,
     required this.language,
     required this.vertical,
+    this.glyphEdges,
   });
 
   final String text;
   final _NormalizedRect rect;
   final String language;
   final bool vertical;
+  final List<double>? glyphEdges;
 }
 
 class _NormalizedRect {

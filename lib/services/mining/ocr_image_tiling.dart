@@ -118,6 +118,8 @@ List<OcrTextBlock> remapOcrBlocksFromTile(
               xmax: line.xmax,
               ymax: _mapY(line.ymax, tile),
               rotation: line.rotation,
+              glyphEdges: line.glyphEdges,
+              glyphEdgesVertical: line.glyphEdgesVertical,
             ),
         ],
         language: block.language,

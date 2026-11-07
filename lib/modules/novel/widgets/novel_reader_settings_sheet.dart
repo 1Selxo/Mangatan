@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
@@ -655,7 +656,7 @@ class _NovelFontPickerState extends ConsumerState<_NovelFontPicker> {
                   const SizedBox(width: 2),
                   AnimatedRotation(
                     turns: _expanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
+                    duration: ShioriMotion.of(context, ShioriMotion.standard),
                     child: const Icon(Icons.expand_more_rounded, size: 18),
                   ),
                 ],
@@ -665,8 +666,8 @@ class _NovelFontPickerState extends ConsumerState<_NovelFontPicker> {
           ],
         ),
         AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
+          duration: ShioriMotion.of(context, ShioriMotion.standard),
+          curve: ShioriMotion.standardCurve,
           alignment: Alignment.topCenter,
           child: !_expanded
               ? const SizedBox(width: double.infinity)
@@ -676,7 +677,7 @@ class _NovelFontPickerState extends ConsumerState<_NovelFontPicker> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: primary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(ShioriShape.card),
                   ),
                   child: Wrap(
                     spacing: 8,

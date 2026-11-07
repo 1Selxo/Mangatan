@@ -63,4 +63,29 @@ void main() {
       expect(scale, greaterThan(0));
     });
   });
+  group('horizontal OCR line sizing', () {
+    test('a block without line geometry starts at its own line height', () {
+      // A two-line block 80 px tall: each line is 40 px, not a fixed 20 px.
+      expect(readerOcrBlockFontSize(boxHeight: 80, lineCount: 2), 34);
+      expect(readerOcrBlockFontSize(boxHeight: 4, lineCount: 1), 8);
+    });
+
+    test('CJK lines are painted in the hit-test character cells', () {
+      expect(readerOcrUsesCharacterCells('请欺负我吧，恶役小姐！'), isTrue);
+      expect(readerOcrUsesCharacterCells('こんにちは'), isTrue);
+      expect(readerOcrUsesCharacterCells('Hello world'), isFalse);
+      expect(readerOcrUsesCharacterCells(''), isFalse);
+    });
+
+    test('a CJK glyph fills its cell in a wide line box', () {
+      // A 10-glyph line in a 400 x 36 box: cells are 40 px wide, so the line
+      // height, not a fixed 20 px, bounds the glyph.
+      final fontSize = readerOcrVerticalFontSize(
+        boxWidth: 36,
+        boxHeight: 400,
+        glyphCount: 10,
+      );
+      expect(fontSize, closeTo(34.2, 0.01));
+    });
+  });
 }

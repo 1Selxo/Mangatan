@@ -1075,6 +1075,7 @@ class ReaderOcrController extends ChangeNotifier {
           rect: rect,
           text: orderedBlockSentence(block),
           vertical: block.vertical,
+          lineCount: block.lines.length,
           active: active,
           boxOpacity: boxOpacity,
           activeTextOpacity: activeTextOpacity,
@@ -1107,6 +1108,7 @@ class ReaderOcrController extends ChangeNotifier {
           activeTextOpacity: activeTextOpacity,
           activeBackgroundOpacity: activeBackgroundOpacity,
           rotation: lineBox.rotation,
+          singleLine: true,
           highlight: active
               ? _lineHighlightFor(
                   lineStart: lineStart,
@@ -1613,6 +1615,8 @@ class ReaderOcrController extends ChangeNotifier {
     required double activeBackgroundOpacity,
     Rect? highlight,
     double rotation = 0,
+    bool singleLine = false,
+    int lineCount = 1,
   }) {
     if (text.isEmpty) return;
     final contentOpacity = readerOcrContentOpacities(
@@ -1645,8 +1649,16 @@ class ReaderOcrController extends ChangeNotifier {
     if (contentOpacity.text > 0) {
       if (vertical) {
         _paintVerticalText(canvas, rect, text, contentOpacity.text);
+      } else if (singleLine) {
+        _paintHorizontalLine(canvas, rect, text, contentOpacity.text);
       } else {
-        _paintHorizontalText(canvas, rect, text, contentOpacity.text);
+        _paintHorizontalText(
+          canvas,
+          rect,
+          text,
+          contentOpacity.text,
+          lineCount: lineCount,
+        );
       }
     }
     canvas.restore();
@@ -1666,8 +1678,9 @@ class ReaderOcrController extends ChangeNotifier {
     Canvas canvas,
     Rect rect,
     String text,
-    double alpha,
-  ) {
+    double alpha, {
+    int lineCount = 1,
+  }) {
     // Wrap the text to the box width instead of forcing a single line. A wide
     // or merged panel (issue #39) then keeps a readable font by wrapping rather
     // than shrinking the whole line to fit the box's aspect ratio.
@@ -1676,7 +1689,10 @@ class ReaderOcrController extends ChangeNotifier {
         text: text,
         style: TextStyle(
           color: Colors.black.withValues(alpha: alpha),
-          fontSize: 20,
+          fontSize: readerOcrBlockFontSize(
+            boxHeight: rect.height,
+            lineCount: lineCount,
+          ),
           height: 1,
         ),
       ),
@@ -1695,6 +1711,69 @@ class ReaderOcrController extends ChangeNotifier {
     );
     canvas.scale(scale);
     painter.paint(canvas, Offset.zero);
+    canvas.restore();
+  }
+
+  /// One recognised horizontal line, filling its box the way the source text
+  /// does.
+  ///
+  /// The lookup highlight and the hit test divide a line box into equal
+  /// character cells, so CJK text is painted one glyph per cell, sized to
+  /// the box, and lines up with both. Other scripts, whose glyphs vary in
+  /// width, are drawn as one line fitted to the box's height and width.
+  void _paintHorizontalLine(
+    Canvas canvas,
+    Rect rect,
+    String text,
+    double alpha,
+  ) {
+    final color = Colors.black.withValues(alpha: alpha);
+    canvas.save();
+    canvas.clipRect(rect);
+    if (readerOcrUsesCharacterCells(text)) {
+      final cellWidth = rect.width / text.length;
+      // The vertical fit with the axes swapped: a glyph fits its cell's width
+      // and the line's height.
+      final fontSize = readerOcrVerticalFontSize(
+        boxWidth: rect.height,
+        boxHeight: rect.width,
+        glyphCount: text.length,
+      );
+      for (var index = 0; index < text.length; index++) {
+        final painter = TextPainter(
+          maxLines: 1,
+          text: TextSpan(
+            text: text[index],
+            style: TextStyle(color: color, fontSize: fontSize, height: 1),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        painter.paint(
+          canvas,
+          Offset(
+            rect.left + cellWidth * (index + 0.5) - painter.width / 2,
+            rect.center.dy - painter.height / 2,
+          ),
+        );
+      }
+    } else {
+      final painter = TextPainter(
+        maxLines: 1,
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            color: color,
+            fontSize: math.max(1, rect.height * 0.85),
+            height: 1,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final scaleX = rect.width / math.max(1, painter.width);
+      canvas.translate(rect.left, rect.center.dy - painter.height / 2);
+      canvas.scale(scaleX, 1);
+      painter.paint(canvas, Offset.zero);
+    }
     canvas.restore();
   }
 
@@ -1941,6 +2020,33 @@ bool readerOcrShouldDismissRepeatedLookup({
 /// the wrapped block when it still overflows the box, and never enlarges past
 /// its natural size. Text that already fits renders at scale 1.0 instead of
 /// being blown up or collapsed to fit the box's aspect ratio.
+/// Starting font size for a horizontal block painted without per-line
+/// geometry: the height one of its recognised lines takes in the box, so the
+/// text matches the source rather than a fixed 20 px that looks tiny over a
+/// large webtoon panel. [readerOcrHorizontalTextScale] still shrinks it when
+/// the wrapped text overflows.
+@visibleForTesting
+double readerOcrBlockFontSize({
+  required double boxHeight,
+  required int lineCount,
+}) {
+  final lineHeight = boxHeight / math.max(1, lineCount);
+  return (lineHeight * 0.85).clamp(8.0, 96.0).toDouble();
+}
+
+/// Whether a horizontal line is painted one glyph per equal cell, as the
+/// lookup highlight and the hit test divide it: true when most of its
+/// characters are full-width CJK, kana or Hangul.
+@visibleForTesting
+bool readerOcrUsesCharacterCells(String text) {
+  if (text.isEmpty) return false;
+  var wide = 0;
+  for (final unit in text.codeUnits) {
+    if (unit >= 0x2E80) wide++;
+  }
+  return wide * 2 >= text.length;
+}
+
 @visibleForTesting
 double readerOcrHorizontalTextScale({
   required Size rect,

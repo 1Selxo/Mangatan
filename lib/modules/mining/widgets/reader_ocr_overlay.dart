@@ -12,6 +12,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_popup_aim.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/generated_ocr.dart';
@@ -54,6 +55,7 @@ class ReaderOcrState {
   static final progress = ValueNotifier<ReaderOcrProgress?>(null);
   static DictionaryPopupHandle? _hoverPopup;
   static Timer? _hoverDismissTimer;
+  static final _popupAim = DictionaryPopupAimGuard();
   static String? _hoverLookupKey;
   static bool _hoveringPopup = false;
   static int _hoverGeneration = 0;
@@ -325,6 +327,18 @@ class ReaderOcrState {
   static Future<bool> handleHover(Offset globalPosition) async {
     _lastPointerPosition = globalPosition;
     if (!enabled.value) return false;
+    if (lookupOnHover.value) {
+      // Shift holds the popup; moving toward it skips the text on the way.
+      if (dictionaryPopupHoverFrozen()) {
+        _hoverDismissTimer?.cancel();
+        _popupAim.reset();
+        return true;
+      }
+      if (_popupAim.defer(globalPosition, _lookUpAfterDwell)) {
+        _hoverDismissTimer?.cancel();
+        return true;
+      }
+    }
     final hoverLookupActive = _hoverLookupActive;
     final hit = _bestGlobalHit(globalPosition);
     if (hit == null) {
@@ -352,8 +366,14 @@ class ReaderOcrState {
     );
   }
 
+  static void _lookUpAfterDwell(Offset position) {
+    if (_lastPointerPosition != position) return;
+    unawaited(handleHover(position));
+  }
+
   static void handleHoverExit() {
     _lastPointerPosition = null;
+    _popupAim.reset();
     if (_hoverLookupActive) {
       _scheduleHoverDismiss();
     } else {
@@ -454,6 +474,11 @@ class ReaderOcrState {
     _hoverDismissTimer?.cancel();
     _hoverDismissTimer = Timer(const Duration(milliseconds: 250), () {
       if (_hoveringPopup) return;
+      if (lookupOnHover.value && dictionaryPopupHoverFrozen()) {
+        // Check again once Shift is released.
+        _scheduleHoverDismiss();
+        return;
+      }
       _dismissHoverPopup();
       clearActive();
     });

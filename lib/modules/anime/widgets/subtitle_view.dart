@@ -17,6 +17,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
+import 'package:mangayomi/modules/mining/widgets/dictionary_popup_aim.dart';
 import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/subtitles/subtitle_regex_filters.dart';
@@ -64,6 +65,8 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   DictionaryPopupHandle? _hoverPopup;
   _SubtitleLookupSelection? _hoverSelection;
   bool _subtitleHovered = false;
+  Offset? _lastHoverPosition;
+  final _popupAim = DictionaryPopupAimGuard();
   bool _popupHovered = false;
   bool _resumeAfterHover = false;
   bool _popupPrewarmed = false;
@@ -147,6 +150,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     _nativeSubtitlePaintTimer?.cancel();
     _hoverLookupTimer?.cancel();
     _hoverExitTimer?.cancel();
+    _popupAim.dispose();
     _hoverPopup?.dismiss();
     [
       ..._recentCaptureContexts,
@@ -341,6 +345,26 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   }) {
     _subtitleHovered = true;
     _hoverExitTimer?.cancel();
+    // Shift holds the popup; moving toward it skips the words on the way.
+    if (_hoverPopup != null && dictionaryPopupHoverFrozen()) {
+      _hoverLookupTimer?.cancel();
+      _popupAim.reset();
+      return;
+    }
+    _lastHoverPosition = globalPosition;
+    if (_popupAim.defer(globalPosition, (position) {
+      if (!mounted || !_subtitleHovered || _lastHoverPosition != position) {
+        return;
+      }
+      _handleSubtitleHover(
+        context: context,
+        globalPosition: position,
+        subtitleText: subtitleText,
+      );
+    })) {
+      _hoverLookupTimer?.cancel();
+      return;
+    }
     final selection = _selectionAtPosition(
       globalPosition: globalPosition,
       subtitleText: subtitleText,
@@ -465,6 +489,11 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   void _scheduleHoverDismiss() {
     _hoverExitTimer?.cancel();
     _hoverExitTimer = Timer(const Duration(milliseconds: 220), () {
+      if (_hoverPopup != null && dictionaryPopupHoverFrozen()) {
+        // Check again once Shift is released.
+        _scheduleHoverDismiss();
+        return;
+      }
       if (!_subtitleHovered && !_popupHovered) {
         _dismissHoverLookup(resume: true);
       }
@@ -598,6 +627,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
                       onExit: (_) {
                         if (_desktopHoverEnabled) {
                           _subtitleHovered = false;
+                          _popupAim.reset();
                           _scheduleHoverDismiss();
                         } else {
                           _clearHighlightIfNeeded();

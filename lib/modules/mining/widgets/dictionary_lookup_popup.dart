@@ -185,6 +185,9 @@ class DictionaryPopupPresentationGate {
 
 final _dictionaryPopupHost = _DictionaryPopupHostController();
 
+/// The visible root popup's rectangle in root overlay coordinates.
+final _dictionaryPopupBounds = ValueNotifier<Rect?>(null);
+
 class _DictionaryPopupHostController {
   final key = GlobalKey<_DictionaryPopupOverlayHostState>();
   final _presentationGate = DictionaryPopupPresentationGate();
@@ -606,6 +609,7 @@ class _DictionaryPopupOverlayHostState
       _width = popupRect.width;
       _height = popupRect.height;
     });
+    _dictionaryPopupBounds.value = _popupBounds;
     return DictionaryPopupHandle(
       dismiss: () => dismiss(expectedGeneration: generation),
       dismissed: completer.future,
@@ -659,6 +663,7 @@ class _DictionaryPopupOverlayHostState
       _left = -_width - 100;
       _top = 0;
     });
+    _dictionaryPopupBounds.value = null;
     _completeDismissal();
   }
 
@@ -850,6 +855,7 @@ class _DictionaryPopupOverlayHostState
       _handleGlobalPointer,
     );
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
+    _dictionaryPopupBounds.value = null;
     _completeDismissal();
     super.dispose();
   }
@@ -925,6 +931,10 @@ class DictionaryLookupPopup extends StatelessWidget {
   static bool dismissActive() => _dictionaryPopupHost.dismissActive();
 
   static bool get isActive => _dictionaryPopupHost.isActive;
+
+  /// The visible popup's rectangle in global coordinates, or null while no
+  /// popup is shown.
+  static ValueListenable<Rect?> get bounds => _dictionaryPopupBounds;
 
   static Future<List<HoshiLookupResult>> lookup(
     String text, {

@@ -147,6 +147,11 @@ enum DictionaryPopupPresentationDecision { present, empty, stale }
 /// Orders asynchronous popup lookups before they are allowed to become
 /// visible. The latest lookup wins even when older requests finish later.
 @visibleForTesting
+/// How long a popup on screen waits for the lookup that replaces it before
+/// it hides: long enough to bridge quick successive lookups without a flash,
+/// short enough that a slow one never leaves another word's result showing.
+const dictionaryPopupStaleReplacementLimit = Duration(milliseconds: 200);
+
 class DictionaryPopupPresentationGate {
   int _generation = 0;
 
@@ -307,15 +312,31 @@ class _DictionaryPopupHostController {
     }
     final existingState = key.currentState;
 
-    // Hide an older result immediately, then give the persistent WebView the
-    // new request off-screen while the lookup and host initialization overlap.
-    // Reusing the exact Future also preserves EPUB/subtitle prefetch caches.
-    existingState?.dismiss();
-    existingState?.prepare(
-      text: text,
-      initialResults: results,
-      profile: profile,
-    );
+    // A popup already on screen stays there until this one replaces it in
+    // place. Hiding it first made quick successive lookups, such as hover
+    // moving across a sentence, flash the popup off and on; the new popup
+    // still appears the moment it would have. A lookup slower than
+    // [dictionaryPopupStaleReplacementLimit] hides the old result rather
+    // than leave it standing for another word.
+    //
+    // A hidden host instead gets the new request off-screen while the lookup
+    // and host initialization overlap. Reusing the exact Future also
+    // preserves EPUB/subtitle prefetch caches.
+    void hideAndPrepare() {
+      final state = key.currentState;
+      state?.dismiss();
+      state?.prepare(text: text, initialResults: results, profile: profile);
+    }
+
+    final replacing = existingState?.isVisible ?? false;
+    Timer? staleHide;
+    if (replacing) {
+      staleHide = Timer(dictionaryPopupStaleReplacementLimit, () {
+        if (_presentationGate.isCurrent(generation)) hideAndPrepare();
+      });
+    } else {
+      hideAndPrepare();
+    }
     final decisionFuture = _presentationGate.resolve(
       generation: generation,
       results: results,
@@ -329,8 +350,12 @@ class _DictionaryPopupHostController {
       );
     }
     final decision = await decisionFuture;
-    if (decision != DictionaryPopupPresentationDecision.present ||
-        !_presentationGate.isCurrent(generation)) {
+    staleHide?.cancel();
+    if (!_presentationGate.isCurrent(generation)) return null;
+    if (decision != DictionaryPopupPresentationDecision.present) {
+      // Nothing replaces the popup kept on screen: close it now, as hiding
+      // it up front used to.
+      if (replacing) key.currentState?.dismiss();
       return null;
     }
 

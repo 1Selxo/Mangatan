@@ -1352,7 +1352,12 @@ String buildTtsuEpubDocument({
       user-select: text;
     }
     #reader-content {
-      max-width: 72rem;
+      /* Pixels, never rem: publisher CSS may set the root font size, and
+         some Japanese EPUBs set html { font-size: 0 }. A root-relative
+         width then became 0,
+         the text column shrank to its narrowest, and with
+         overflow-wrap: anywhere that is one character per line. */
+      max-width: 1152px;
       min-height: calc(100vh - ${padding * 2}vh);
       margin: 0 auto;
       color: inherit !important;
@@ -1531,6 +1536,20 @@ String buildTtsuEpubDocument({
     html[data-mangatan-reader-layout="horizontal-scroll"] .mangatan-logical-target {
       min-height: 100vh;
     }
+    /* Publisher blocks sized to the window, such as a vertical-text page
+       wrapper, would overflow the centred column to the right. */
+    html[data-mangatan-reader-layout="horizontal-scroll"] #reader-content * {
+      max-width: 100% !important;
+    }
+    /* Inside a vertical block, a picture's container shrinks to the picture,
+       so a percentage cannot cap it: use the column's own width. */
+    html[data-mangatan-reader-layout="horizontal-scroll"] #reader-content .mangatan-orthogonal-fit :is(img, svg) {
+      width: auto !important;
+      height: auto !important;
+      max-width: min(1152px, calc(100vw - 2 * var(--reader-padding))) !important;
+      max-height: 100vh !important;
+      object-fit: contain;
+    }
     html[data-mangatan-reader-layout="vertical-scroll"] .mangatan-logical-target {
       min-width: 100vw;
     }
@@ -1590,6 +1609,34 @@ String buildTtsuEpubDocument({
       const scrollElement = () => (pageMode || continuousVertical)
         ? content
         : (document.scrollingElement || document.documentElement || document.body);
+      // Horizontal continuous text scrolls only down. Publisher blocks can
+      // still overflow the page sideways, and overflow-x: hidden does not
+      // stop scripts from scrolling there, so undo any sideways scroll.
+      // A vertical-text block inside horizontal text is an orthogonal flow
+      // root. With an automatic width, Chromium sizes it, and resolves the
+      // percentages inside it, against the whole window instead of the text
+      // column: a page wrapper centring its picture on a width: 100% strut
+      // then puts the picture beside the column once the window is wider
+      // than it. A definite column width keeps that layout inside it.
+      const fitOrthogonalBlocks = () => {
+        if (verticalWriting) return;
+        for (const element of content.querySelectorAll('*')) {
+          const style = getComputedStyle(element);
+          if (!style.writingMode.startsWith('vertical')) continue;
+          if (style.display !== 'block' && style.display !== 'flow-root') continue;
+          const parent = element.parentElement;
+          if (!parent || getComputedStyle(parent).writingMode.startsWith('vertical')) continue;
+          const specified = element.computedStyleMap?.().get('width');
+          if (!specified || String(specified) !== 'auto') continue;
+          element.style.setProperty('width', '100%', 'important');
+          element.classList.add('mangatan-orthogonal-fit');
+        }
+      };
+      const keepHorizontalFlowCentred = () => {
+        if (pageMode || verticalWriting) return;
+        const root = scrollElement();
+        if (root.scrollLeft) root.scrollLeft = 0;
+      };
       const continuousVerticalContext = () => {
         const max = Math.max(0, content.scrollWidth - content.clientWidth);
         return {
@@ -1801,9 +1848,12 @@ String buildTtsuEpubDocument({
         const element = targetNode?.parentElement || section;
         element.scrollIntoView({
           block: p >= .999999 ? 'end' : 'start',
-          inline: 'start',
+          // Horizontal text flows down the page: its inline axis must never
+          // scroll, or the column slides sideways off its centre.
+          inline: verticalWriting ? 'start' : 'nearest',
           behavior: 'auto',
         });
+        keepHorizontalFlowCentred();
         queueReport();
         return true;
       };
@@ -1986,6 +2036,7 @@ String buildTtsuEpubDocument({
           );
         } else if (!pageMode) {
           target.scrollIntoView({ block: 'start', behavior: 'auto' });
+          keepHorizontalFlowCentred();
         } else {
           const context = pageContext();
           const rect = target.getClientRects()[0] || target.getBoundingClientRect();
@@ -2415,7 +2466,16 @@ String buildTtsuEpubDocument({
       window.addEventListener('scroll', queueReport, { passive: true });
       scrollElement().addEventListener('scroll', queueReport, { passive: true });
       let resizeTimer = 0;
+      let resizedBeforeReady = false;
       window.addEventListener('resize', () => {
+        // Before the book is ready its position is still being restored:
+        // the fraction read here would be the unrestored top, and restoring
+        // it later would undo the restore. Opening places the book again
+        // after a resize instead.
+        if (!ready) {
+          resizedBeforeReady = true;
+          return;
+        }
         const savedFraction = fraction();
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => restoreProgress(savedFraction), 80);
@@ -2691,39 +2751,41 @@ String buildTtsuEpubDocument({
         .then(() => classifyFullPageMedia())
         .then(() => new Promise((resolve) => setTimeout(resolve, 50)))
         .then(() => document.fonts?.ready)
-        .then(() => {
-          measuredPageMax = measureLastContentPage();
-        })
-        .then(() => restoreProgress(initialProgress))
         .then(async () => {
-          let positionedExactly = false;
-          if (initialSpineIndex !== null) {
-            await jumpToLogicalSpine(initialSpineIndex);
-            positionedExactly = true;
-          } else if (
-            initialChapterIndex !== null &&
-            initialChapterProgress !== null
-          ) {
-            await jumpToBookmark(
-              initialChapterIndex,
-              initialChapterProgress,
-            );
-            positionedExactly = true;
-          }
-          if (positionedExactly) {
+          fitOrthogonalBlocks();
+          // The web view can still be taking its final size while the book
+          // opens. A resize reflows the text under the position just
+          // restored, so place the book again until a pass completes
+          // without one.
+          for (let attempt = 0; attempt < 4; attempt += 1) {
+            resizedBeforeReady = false;
+            measuredPageMax = measureLastContentPage();
+            await restoreProgress(initialProgress);
+            if (initialSpineIndex !== null) {
+              await jumpToLogicalSpine(initialSpineIndex);
+            } else if (
+              initialChapterIndex !== null &&
+              initialChapterProgress !== null
+            ) {
+              await jumpToBookmark(
+                initialChapterIndex,
+                initialChapterProgress,
+              );
+            }
             await new Promise((resolve) => requestAnimationFrame(
               () => requestAnimationFrame(resolve),
             ));
+            if (!resizedBeforeReady) break;
           }
         })
         .catch((error) => {
           console.error('Mangatan EPUB initialization failed', error);
         })
-        .then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        .then(() => {
           ready = true;
           queueReport();
           call('readerReady', { textLength: (content.innerText || '').trim().length, metrics: metrics() });
-        })));
+        });
     })();
   </script>
 </body>

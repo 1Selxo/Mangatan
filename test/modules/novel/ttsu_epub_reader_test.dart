@@ -64,6 +64,29 @@ void main() {
     expect(document, contains('metrics,'));
   });
 
+  test('sizes the reader without rem, which publisher CSS can zero', () {
+    // Japanese EPUBs may set html { font-size: 0 }; a rem-based width then
+    // collapsed horizontal continuous mode to one character per line.
+    final document = buildTtsuEpubDocument(
+      html: '<p>本文</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 4,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: false,
+    );
+    final style = document.substring(
+      document.indexOf('<style>'),
+      document.indexOf('</style>'),
+    );
+    expect(style, isNot(matches(RegExp(r'\d(?:\.\d+)?rem\b'))));
+  });
+
   test('drops script URLs from every attribute', () {
     final document = buildTtsuEpubDocument(
       html:

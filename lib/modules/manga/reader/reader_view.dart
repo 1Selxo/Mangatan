@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show lerpDouble;
 
 import 'package:mangayomi/modules/manga/reader/utils/download_ahead.dart';
 import 'package:mangayomi/modules/reader_common/key_bindings.dart';
@@ -27,6 +28,7 @@ import 'package:mangayomi/modules/manga/reader/reader_eink_state.dart';
 import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
 import 'package:mangayomi/modules/manga/reader/services/page_navigation_service.dart';
 import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_motion.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_memory_management.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
@@ -324,11 +326,17 @@ class _MangaChapterPageGalleryState
       duration: _doubleTapAnimationDuration(),
       vsync: this,
     );
-    _animation = Tween(begin: 1.0, end: 2.0).animate(
-      CurvedAnimation(curve: Curves.ease, parent: _scaleAnimationController),
+    _animation = CurvedAnimation(
+      curve: Curves.decelerate,
+      parent: _scaleAnimationController,
     );
-    _scaleAnimationListener = () =>
-        _photoViewController.scale = _animation.value;
+    _scaleAnimationListener = () {
+      final t = _animation.value;
+      _photoViewController.updateMultiple(
+        scale: lerpDouble(_zoomFromScale, _zoomToScale, t),
+        position: Offset.lerp(_zoomFromPosition, _zoomToPosition, t),
+      );
+    };
     _animation.addListener(_scaleAnimationListener);
     _itemPositionsListener.itemPositions.addListener(_readProgressListener);
     initPageNavigation(
@@ -385,7 +393,7 @@ class _MangaChapterPageGalleryState
 
   /// Cached reader mode to safely access in dispose without ref.read()
   ReaderMode? _cachedReaderMode;
-  Alignment _scalePosition = Alignment.center;
+  final Alignment _scalePosition = Alignment.center;
   final PhotoViewController _photoViewController = PhotoViewController();
   final PhotoViewScaleStateController _photoViewScaleStateController =
       PhotoViewScaleStateController();
@@ -397,12 +405,6 @@ class _MangaChapterPageGalleryState
   double get pixelRatio => View.of(context).devicePixelRatio;
 
   Size get size => View.of(context).physicalSize / pixelRatio;
-  Alignment _computeAlignmentByTapOffset(Offset offset) {
-    return Alignment(
-      (offset.dx - size.width / 2) / (size.width / 2),
-      (offset.dy - size.height / 2) / (size.height / 2),
-    );
-  }
 
   Axis _scrollDirection = Axis.vertical;
   bool _isReverseHorizontal = false;
@@ -968,17 +970,11 @@ class _MangaChapterPageGalleryState
     navigationService.jumpToPage(index: targetIndex, readerMode: readerMode);
   }
 
-  Duration? _doubleTapAnimationDuration() {
-    int doubleTapAnimationValue = isar.settings
-        .getSync(227)!
-        .doubleTapAnimationSpeed!;
-    if (doubleTapAnimationValue == 0) {
-      return const Duration(milliseconds: 10);
-    } else if (doubleTapAnimationValue == 1) {
-      return const Duration(milliseconds: 800);
-    }
-    return const Duration(milliseconds: 200);
-  }
+  /// The continuous strip's double-tap zoom: short and decelerating, so the
+  /// strip stays under the pointer, and none when that is the setting.
+  Duration _doubleTapAnimationDuration() => ReaderMotion.stripDoubleTapZoom(
+    isar.settings.getSync(227)!.doubleTapAnimationSpeed,
+  );
 
   void _readProgressListener() async {
     if (_isAdjustingScroll) return;
@@ -1569,33 +1565,42 @@ class _MangaChapterPageGalleryState
     }
   }
 
+  /// Double tap on the continuous strip: at the default scale it zooms to
+  /// 2x around the tapped point; at any other scale (a previous double tap,
+  /// a wheel or pinch zoom, zoomed out) it returns to the default scale.
+  ///
+  /// Scale and position move together from wherever the strip is, around
+  /// the base position the wheel zoom uses too, so neither input makes the
+  /// other jump.
   void _toggleScale(Offset tapPosition) {
-    if (mounted) {
-      setState(() {
-        if (_scaleAnimationController.isAnimating) {
-          return;
-        }
+    if (!mounted || _scaleAnimationController.isAnimating) return;
 
-        if (_photoViewController.scale == 1.0) {
-          _scalePosition = _computeAlignmentByTapOffset(tapPosition);
-
-          if (_scaleAnimationController.isCompleted) {
-            _scaleAnimationController.reset();
-          }
-
-          _scaleAnimationController.forward();
-          return;
-        }
-
-        if (_photoViewController.scale == 2.0) {
-          _scaleAnimationController.reverse();
-          return;
-        }
-
-        _photoViewScaleStateController.reset();
-      });
+    final fromScale = _photoViewController.scale ?? readerDefaultZoomScale;
+    final fromPosition = _photoViewController.position;
+    final atDefault = (fromScale - readerDefaultZoomScale).abs() < 0.01;
+    final double toScale = atDefault ? 2.0 : readerDefaultZoomScale;
+    final Offset toPosition;
+    if (atDefault) {
+      final focal = tapPosition - _scalePosition.alongSize(size);
+      final ratio = toScale / fromScale;
+      toPosition = fromPosition * ratio + focal * (1 - ratio);
+    } else {
+      toPosition = Offset.zero;
     }
+
+    _zoomFromScale = fromScale;
+    _zoomToScale = toScale;
+    _zoomFromPosition = fromPosition;
+    _zoomToPosition = toPosition;
+    _scaleAnimationController
+      ..duration = _doubleTapAnimationDuration()
+      ..forward(from: 0);
   }
+
+  double _zoomFromScale = readerDefaultZoomScale;
+  double _zoomToScale = readerDefaultZoomScale;
+  Offset _zoomFromPosition = Offset.zero;
+  Offset _zoomToPosition = Offset.zero;
 
   void _setReaderMode(
     ReaderMode value,

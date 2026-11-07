@@ -12,7 +12,7 @@ trap 'find "$work_dir" -depth -delete' EXIT
 # Keep the current Mihon/TachiyomiX bytecode and media-proxy repairs while
 # avoiding jdk.zipfs, which is intentionally absent from the small embedded
 # iOS JRE.
-server_commit="26cb31e9cc56f4e7aef2931eeba042c9858a8ba4"
+server_commit="a8149c743c8b31a8e080adcef93be6e71e290fde"
 server_jar_url="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v16/MExtensionServer-ios.jar"
 server_jar_sha256="5c06eaabc1230ccff914421c3692509094247596872bb0f76fecd0d5f5cfee29"
 openjdk_framework_url="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/OpenJDK.xcframework.zip"

@@ -140,7 +140,7 @@ fn parse_epub_with_doc<R: Read + Seek>(
                         escape_html_attribute(file_name)
                     )
                 } else {
-                    decode_text_resource(&bytes)
+                    decode_chapter_markup(&bytes)
                 };
 
                 // Preserve every linear item even when its XHTML body is
@@ -794,6 +794,105 @@ fn epub_content_is_renderable(markup: &str) -> bool {
     false
 }
 
+/// Chapter markup as the app's HTML parsers will read it.
+fn decode_chapter_markup(bytes: &[u8]) -> String {
+    expand_self_closing_xhtml_tags(&decode_text_resource(bytes))
+}
+
+/// HTML void elements: the only ones an HTML parser lets close themselves.
+const HTML_VOID_ELEMENTS: &[&str] = &[
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link", "meta", "param",
+    "source", "track", "wbr",
+];
+
+/// Rewrites XHTML self-closing tags of non-void elements, `<script .../>`,
+/// `<span .../>` or `<a id="x"/>`, as an explicit `<tag ...></tag>` pair.
+///
+/// EPUB chapters are XHTML, but the reader parses them as HTML, where the
+/// trailing slash means nothing. A self-closed `<script/>` then opens a raw
+/// text element that runs to the end of the file: Kobo kepubs put one in
+/// every chapter's head, and the whole body disappeared into it. A
+/// self-closed `<span/>` or `<a/>` likewise swallowed the text after it.
+/// Comments, CDATA sections and processing instructions are left as they
+/// are, as is anything inside a quoted attribute value.
+fn expand_self_closing_xhtml_tags(markup: &str) -> String {
+    if !markup.contains("/>") {
+        return markup.to_owned();
+    }
+    let bytes = markup.as_bytes();
+    let mut output = String::with_capacity(markup.len() + 64);
+    let mut copied = 0;
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] != b'<' {
+            index += 1;
+            continue;
+        }
+        let rest = &markup[index..];
+        // Skip markup that is not an element tag.
+        let skip_to = if rest.starts_with("<!--") {
+            rest.find("-->").map(|end| end + 3)
+        } else if rest.starts_with("<![CDATA[") {
+            rest.find("]]>").map(|end| end + 3)
+        } else if rest.starts_with("<!") || rest.starts_with("<?") {
+            rest.find('>').map(|end| end + 1)
+        } else {
+            None
+        };
+        if rest.starts_with("<!") || rest.starts_with("<?") {
+            index += skip_to.unwrap_or(rest.len());
+            continue;
+        }
+        if !bytes
+            .get(index + 1)
+            .is_some_and(|byte| byte.is_ascii_alphabetic())
+        {
+            index += 1;
+            continue;
+        }
+
+        // Find the tag's closing '>' outside quoted attribute values.
+        let mut cursor = index + 1;
+        let mut quote: Option<u8> = None;
+        while cursor < bytes.len() {
+            let byte = bytes[cursor];
+            match quote {
+                Some(open) if byte == open => quote = None,
+                Some(_) => {}
+                None if byte == b'"' || byte == b'\'' => quote = Some(byte),
+                None if byte == b'>' => break,
+                None => {}
+            }
+            cursor += 1;
+        }
+        if cursor >= bytes.len() {
+            break;
+        }
+
+        let tag = &markup[index + 1..cursor];
+        let name_end = tag
+            .find(|character: char| character.is_ascii_whitespace() || character == '/')
+            .unwrap_or(tag.len());
+        let name = &tag[..name_end];
+        let body = tag.trim_end();
+        if let Some(open) = body.strip_suffix('/') {
+            let lower = name.to_ascii_lowercase();
+            if !HTML_VOID_ELEMENTS.contains(&lower.as_str()) {
+                output.push_str(&markup[copied..index]);
+                output.push('<');
+                output.push_str(open.trim_end());
+                output.push_str("></");
+                output.push_str(name);
+                output.push('>');
+                copied = cursor + 1;
+            }
+        }
+        index = cursor + 1;
+    }
+    output.push_str(&markup[copied..]);
+    output
+}
+
 /// Get chapter content from EPUB by path
 pub fn get_chapter_content(epub_path: String, chapter_path: String) -> Result<String, String> {
     let mut doc = EpubDoc::new(&epub_path).map_err(|e| format!("Failed to open EPUB: {}", e))?;
@@ -803,7 +902,7 @@ pub fn get_chapter_content(epub_path: String, chapter_path: String) -> Result<St
         .get_resource(&chapter_path)
         .ok_or_else(|| format!("Failed to read chapter: {}", chapter_path))?;
 
-    Ok(decode_text_resource(&content))
+    Ok(decode_chapter_markup(&content))
 }
 
 /// EPUB XHTML is normally UTF-8, but real-world books also contain UTF-16 or
@@ -875,11 +974,46 @@ fn declared_encoding(declaration: &str) -> Option<&str> {
 mod tests {
     use super::{
         chimahon_epub_title, declared_encoding, decode_text_resource, epub_content_is_renderable,
-        epub_paths_match, is_epub_reader_auxiliary_asset, mark_repeated_numeric_subsection_markers,
-        normalize_epub_path, parse_epub3_navigation, parse_epub_from_bytes, parse_ncx_navigation,
+        epub_paths_match, expand_self_closing_xhtml_tags, is_epub_reader_auxiliary_asset,
+        mark_repeated_numeric_subsection_markers, normalize_epub_path, parse_epub3_navigation,
+        parse_epub_from_bytes, parse_ncx_navigation,
     };
     use std::io::{Cursor, Write};
     use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+    #[test]
+    fn expands_self_closing_non_void_tags_for_html_parsers() {
+        // A Kobo kepub head: a self-closed script swallowed the whole body.
+        let kepub = concat!(
+            r#"<head><meta charset="UTF-8"/>"#,
+            r#"<script type="text/javascript" src="../../js/kobo.js"/>"#,
+            r#"</head><body><p>本文<br/><span class="x"/>続き</p></body>"#
+        );
+        assert_eq!(
+            expand_self_closing_xhtml_tags(kepub),
+            concat!(
+                r#"<head><meta charset="UTF-8"/>"#,
+                r#"<script type="text/javascript" src="../../js/kobo.js"></script>"#,
+                r#"</head><body><p>本文<br/><span class="x"></span>続き</p></body>"#
+            )
+        );
+    }
+
+    #[test]
+    fn leaves_comments_quotes_and_void_tags_alone() {
+        let markup = concat!(
+            r#"<!-- <a/> --><?xml version="1.0"?>"#,
+            r#"<img alt="a/>b" src="x.png" /><a id="n1" title='x/>'/>"#
+        );
+        assert_eq!(
+            expand_self_closing_xhtml_tags(markup),
+            concat!(
+                r#"<!-- <a/> --><?xml version="1.0"?>"#,
+                r#"<img alt="a/>b" src="x.png" /><a id="n1" title='x/>'></a>"#
+            )
+        );
+        assert_eq!(expand_self_closing_xhtml_tags("plain text"), "plain text");
+    }
 
     #[test]
     fn missing_title_matches_chimahon_import_identity_fallback() {

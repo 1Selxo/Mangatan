@@ -184,6 +184,45 @@ void _handleHorizontalContinuousScroll(
   scrollEvent.respond(allowPlatformDefault: false);
 }
 
+/// Where a double tap takes a zoomable reader view at [fromScale] and
+/// [fromPosition]: at the default scale, to 2x around [focalPoint], so the
+/// spot under the pointer stays under it; at any other scale, back to the
+/// default, centred.
+///
+/// [focalPoint] is the tap relative to the view's base position, as
+/// [readerZoomFocalPoint] gives it.
+({double scale, Offset position}) readerDoubleTapZoomTarget({
+  required double fromScale,
+  required Offset fromPosition,
+  required Offset? focalPoint,
+}) {
+  final atDefault = (fromScale - readerDefaultZoomScale).abs() < 0.01;
+  if (!atDefault) {
+    return (scale: readerDefaultZoomScale, position: Offset.zero);
+  }
+  const toScale = 2.0;
+  final ratio = toScale / fromScale;
+  return (
+    scale: toScale,
+    position: focalPoint == null
+        ? fromPosition * ratio
+        : fromPosition * ratio + focalPoint * (1 - ratio),
+  );
+}
+
+/// A pointer at [globalPosition] relative to the base position of the zoom
+/// view laid out by [zoomContext], as PhotoView positions its child.
+Offset? readerZoomFocalPoint(
+  Offset globalPosition,
+  BuildContext zoomContext,
+  Alignment basePosition,
+) {
+  final renderObject = zoomContext.findRenderObject();
+  if (renderObject is! RenderBox || !renderObject.hasSize) return null;
+  final localPosition = renderObject.globalToLocal(globalPosition);
+  return localPosition - basePosition.alongSize(renderObject.size);
+}
+
 Offset? _focalPointFromBasePosition(
   PointerScrollEvent event,
   BuildContext zoomContext,

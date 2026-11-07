@@ -5,6 +5,7 @@ import 'package:mangayomi/eval/mihon/image_proxy.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_paged.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_colors.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_motion.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
@@ -18,6 +19,7 @@ import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'dart:async';
+import 'dart:ui' show lerpDouble;
 import 'package:mangayomi/repositories/settings_repository.dart';
 
 /// Unified double page view for both paged and continuous reading modes.
@@ -96,7 +98,14 @@ class DoublePageViewState extends State<DoublePageView>
   late AnimationController _scaleAnimationController;
   late Animation<double> _animation;
   late VoidCallback _animationListener;
-  Alignment _scalePosition = Alignment.center;
+  // PhotoView's anchor stays put: a double tap zooms around the pointer by
+  // moving the position with the scale, as the wheel zoom does, so the page
+  // never jumps when the anchor would move under an earlier pan or zoom.
+  static const Alignment _scalePosition = Alignment.center;
+  double _zoomFromScale = readerDefaultZoomScale;
+  double _zoomToScale = readerDefaultZoomScale;
+  Offset _zoomFromPosition = Offset.zero;
+  Offset _zoomToPosition = Offset.zero;
   final PhotoViewController _photoViewController = PhotoViewController();
   final PhotoViewScaleStateController _photoViewScaleStateController =
       PhotoViewScaleStateController();
@@ -104,36 +113,25 @@ class DoublePageViewState extends State<DoublePageView>
   int _panelStopIndex = -1;
   Future<List<Rect>>? _panelDetection;
 
-  Duration _doubleTapAnimationDuration() {
-    final doubleTapAnimationValue =
-        settingsRepository.current.doubleTapAnimationSpeed ?? 1;
-    return switch (doubleTapAnimationValue) {
-      0 => const Duration(milliseconds: 10),
-      1 => const Duration(milliseconds: 800),
-      _ => const Duration(milliseconds: 200),
-    };
-  }
-
-  double get pixelRatio => View.of(context).devicePixelRatio;
-  Size get size => View.of(context).physicalSize / pixelRatio;
-
-  Alignment _computeAlignmentByTapOffset(Offset offset) {
-    return Alignment(
-      (offset.dx - size.width / 2) / (size.width / 2),
-      (offset.dy - size.height / 2) / (size.height / 2),
-    );
-  }
+  Duration _doubleTapAnimationDuration() => ReaderMotion.quickDoubleTapZoom(
+    settingsRepository.current.doubleTapAnimationSpeed,
+  );
 
   @override
   void initState() {
     super.initState();
     if (widget.isPagedMode) {
       _scaleAnimationController = AnimationController(vsync: this);
-      _animation = Tween(begin: 1.0, end: 2.0).animate(
-        CurvedAnimation(curve: Curves.ease, parent: _scaleAnimationController),
+      _animation = CurvedAnimation(
+        curve: Curves.decelerate,
+        parent: _scaleAnimationController,
       );
       _animationListener = () {
-        _photoViewController.scale = _animation.value;
+        final t = _animation.value;
+        _photoViewController.updateMultiple(
+          scale: lerpDouble(_zoomFromScale, _zoomToScale, t),
+          position: Offset.lerp(_zoomFromPosition, _zoomToPosition, t),
+        );
       };
       _animation.addListener(_animationListener);
     }
@@ -237,31 +235,29 @@ class DoublePageViewState extends State<DoublePageView>
     );
   }
 
-  void _toggleScale(Offset tapPosition) {
+  void _toggleScale(Offset tapPosition, BuildContext zoomContext) {
     if (!widget.isPagedMode || !mounted) return;
+    if (_scaleAnimationController.isAnimating) return;
 
-    setState(() {
-      if (_scaleAnimationController.isAnimating) return;
-      _scaleAnimationController.duration = _doubleTapAnimationDuration();
-
-      if (_photoViewController.scale == 1.0) {
-        _scalePosition = _computeAlignmentByTapOffset(tapPosition);
-
-        if (_scaleAnimationController.isCompleted) {
-          _scaleAnimationController.reset();
-        }
-
-        _scaleAnimationController.forward();
-        return;
-      }
-
-      if (_photoViewController.scale == 2.0) {
-        _scaleAnimationController.reverse();
-        return;
-      }
-
-      _photoViewScaleStateController.reset();
-    });
+    final fromScale = _photoViewController.scale ?? readerDefaultZoomScale;
+    final fromPosition = _photoViewController.position;
+    final target = readerDoubleTapZoomTarget(
+      fromScale: fromScale,
+      fromPosition: fromPosition,
+      focalPoint: readerZoomFocalPoint(
+        tapPosition,
+        zoomContext,
+        _scalePosition,
+      ),
+    );
+    _panelStopIndex = -1;
+    _zoomFromScale = fromScale;
+    _zoomToScale = target.scale;
+    _zoomFromPosition = fromPosition;
+    _zoomToPosition = target.position;
+    _scaleAnimationController
+      ..duration = _doubleTapAnimationDuration()
+      ..forward(from: 0);
   }
 
   @override
@@ -312,7 +308,7 @@ class DoublePageViewState extends State<DoublePageView>
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onDoubleTapDown: (details) =>
-                    _toggleScale(details.globalPosition),
+                    _toggleScale(details.globalPosition, zoomContext),
                 onDoubleTap: () {},
                 child: _buildPageRow(),
               ),

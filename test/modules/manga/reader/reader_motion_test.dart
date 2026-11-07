@@ -56,9 +56,9 @@ void main() {
     });
 
     test('on a strip, quicker unless none', () {
-      expect(ReaderMotion.stripDoubleTapZoom(1).inMilliseconds, 200);
-      expect(ReaderMotion.stripDoubleTapZoom(2).inMilliseconds, 200);
-      expect(ReaderMotion.stripDoubleTapZoom(0).inMilliseconds, 1);
+      expect(ReaderMotion.quickDoubleTapZoom(1).inMilliseconds, 200);
+      expect(ReaderMotion.quickDoubleTapZoom(2).inMilliseconds, 200);
+      expect(ReaderMotion.quickDoubleTapZoom(0).inMilliseconds, 1);
     });
   });
 

@@ -972,7 +972,7 @@ class _MangaChapterPageGalleryState
 
   /// The continuous strip's double-tap zoom: short and decelerating, so the
   /// strip stays under the pointer, and none when that is the setting.
-  Duration _doubleTapAnimationDuration() => ReaderMotion.stripDoubleTapZoom(
+  Duration _doubleTapAnimationDuration() => ReaderMotion.quickDoubleTapZoom(
     isar.settings.getSync(227)!.doubleTapAnimationSpeed,
   );
 
@@ -1577,21 +1577,16 @@ class _MangaChapterPageGalleryState
 
     final fromScale = _photoViewController.scale ?? readerDefaultZoomScale;
     final fromPosition = _photoViewController.position;
-    final atDefault = (fromScale - readerDefaultZoomScale).abs() < 0.01;
-    final double toScale = atDefault ? 2.0 : readerDefaultZoomScale;
-    final Offset toPosition;
-    if (atDefault) {
-      final focal = tapPosition - _scalePosition.alongSize(size);
-      final ratio = toScale / fromScale;
-      toPosition = fromPosition * ratio + focal * (1 - ratio);
-    } else {
-      toPosition = Offset.zero;
-    }
+    final target = readerDoubleTapZoomTarget(
+      fromScale: fromScale,
+      fromPosition: fromPosition,
+      focalPoint: tapPosition - _scalePosition.alongSize(size),
+    );
 
     _zoomFromScale = fromScale;
-    _zoomToScale = toScale;
+    _zoomToScale = target.scale;
     _zoomFromPosition = fromPosition;
-    _zoomToPosition = toPosition;
+    _zoomToPosition = target.position;
     _scaleAnimationController
       ..duration = _doubleTapAnimationDuration()
       ..forward(from: 0);

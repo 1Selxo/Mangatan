@@ -54,9 +54,9 @@ abstract final class ReaderMotion {
     _ => const Duration(milliseconds: 500),
   };
 
-  /// The double-tap zoom on a long strip: quicker, the strip staying under
-  /// the finger, still none when that is the setting.
-  static Duration stripDoubleTapZoom(int? speed) => speed == 0
+  /// The reader's double-tap zoom, in every mode: quick, the page staying
+  /// under the pointer, still none when that is the setting.
+  static Duration quickDoubleTapZoom(int? speed) => speed == 0
       ? const Duration(milliseconds: 1)
       : const Duration(milliseconds: 200);
 

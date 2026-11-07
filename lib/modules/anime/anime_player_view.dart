@@ -10,6 +10,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shiori/shiori.dart';
+import 'package:mangayomi/modules/reader_common/widgets/chapter_bar_title.dart';
+import 'package:mangayomi/modules/anime/widgets/mobile_player_controls_layout.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riv;
@@ -333,6 +336,9 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   );
   final ValueNotifier<double> _playbackSpeed = ValueNotifier(1.0);
   final ValueNotifier<bool> _isDoubleSpeed = ValueNotifier(false);
+
+  /// The phone's control lock: while on, only the way out of it shows.
+  final ValueNotifier<bool> _controlsLocked = ValueNotifier(false);
   late final ValueNotifier<Duration> _currentPosition = ValueNotifier(
     _streamController.getCurrentPosition(),
   );
@@ -2173,6 +2179,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _video.dispose();
     _playbackSpeed.dispose();
     _isDoubleSpeed.dispose();
+    _controlsLocked.dispose();
     _showFitLabel.dispose();
     _isCompleted.dispose();
     _tempPosition.dispose();
@@ -2824,8 +2831,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     final isFullScreen = ref.watch(fullscreenProvider);
     const speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
+    // Inside the timeline's panel, which brings the margins.
     return Padding(
-      padding: EdgeInsets.fromLTRB(12, 0, 8, isDesktop ? 4 : 12),
+      padding: EdgeInsets.zero,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -2834,6 +2842,20 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                  if (!isDesktop)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        end: ShioriSpace.s8,
+                      ),
+                      child: ShioriOverlayPill(
+                        icon: Symbols.lock_open_rounded,
+                        tooltip: context.l10n.lock,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _controlsLocked.value = true;
+                        },
+                      ),
+                    ),
                   if (isDesktop)
                     CustomMaterialDesktopVolumeButton(controller: _controller),
                   ValueListenableBuilder<double>(
@@ -3034,137 +3056,169 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
 
   Widget _topButtonBar(BuildContext context) {
     final fullScreen = ref.watch(fullscreenProvider);
+    final compactPortrait =
+        !isDesktop &&
+        usesCompactPortraitPlayerControls(
+          orientation: MediaQuery.orientationOf(context),
+          width: MediaQuery.sizeOf(context).width,
+        );
+    void pauseWhileOpen(bool closed) {
+      if (closed) {
+        _player.play();
+      } else {
+        _player.pause();
+      }
+    }
+
+    Widget episodesButton() => btnToShowChapterListDialog(
+      context,
+      context.l10n.episodes,
+      widget.episode,
+      onChanged: pauseWhileOpen,
+      iconColor: Colors.white,
+    );
+    Widget shareButton() =>
+        btnToShowShareScreenshot(widget.episode, onChanged: pauseWhileOpen);
+    final videoOcrButton = IconButton(
+      tooltip: 'Video OCR',
+      icon: _videoOcrCapturing
+          ? const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.document_scanner_rounded),
+      color: Colors.white,
+      onPressed: _videoOcrCapturing ? null : _showVideoOcr,
+    );
+    final liveOcrTooltip = _liveVideoOcrEnabled
+        ? 'Turn off live OCR'
+        : 'Turn on live OCR';
+    void toggleSubtitleList() =>
+        setState(() => _showSubtitleList = !_showSubtitleList);
+
     return Padding(
       padding: EdgeInsets.only(
         top: !isDesktop && !fullScreen ? MediaQuery.of(context).padding.top : 0,
       ),
-      child: Row(
-        children: [
-          BackButton(color: Colors.white, onPressed: _goBackToDetail),
-          Flexible(
-            child: ListTile(
-              dense: true,
-              title: SizedBox(
-                width: context.width(0.8),
-                child: Text(
-                  widget.episode.manga.value!.name!,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              subtitle: SizedBox(
-                width: context.width(0.8),
-                child: Text(
-                  widget.episode.name!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
+      // Who and where: the way back, what is playing, and what is changed
+      // while watching that is not in the panel at the foot.
+      child: MobilePlayerTopControlsLayout(
+        compactPortrait: compactPortrait,
+        backButton: ShioriOverlayIconButton(
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          size: 24,
+          onPressed: _goBackToDetail,
+          icon: const Icon(Symbols.arrow_back_rounded),
+        ),
+        title: Padding(
+          padding: EdgeInsetsDirectional.only(
+            start: compactPortrait ? 0 : ShioriSpace.s8,
+            end: ShioriSpace.s8,
           ),
-          Row(
-            children: [
-              if (_supportAlwaysOnTop())
-                IconButton(
-                  icon: Icon(
-                    _alwaysOnTop ? Icons.push_pin : Icons.push_pin_outlined,
-                    color: Colors.white,
-                  ),
-                  onPressed: () {
-                    setState(() => _alwaysOnTop = !_alwaysOnTop);
-                    windowManager.setAlwaysOnTop(_alwaysOnTop);
-                  },
-                ),
+          child: ChapterBarTitle(chapter: widget.episode, onImage: true),
+        ),
+        wideActions: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_supportAlwaysOnTop())
               IconButton(
-                tooltip: 'Video OCR',
-                icon: _videoOcrCapturing
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.document_scanner_rounded),
-                color: Colors.white,
-                onPressed: _videoOcrCapturing ? null : _showVideoOcr,
-              ),
-              IconButton(
-                tooltip: _liveVideoOcrEnabled
-                    ? 'Turn off live OCR'
-                    : 'Turn on live OCR',
                 icon: Icon(
-                  _liveVideoOcrEnabled
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_outlined,
+                  _alwaysOnTop ? Icons.push_pin : Icons.push_pin_outlined,
+                  color: Colors.white,
                 ),
-                color: _liveVideoOcrEnabled
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.white,
-                onPressed: _videoOcrCapturing ? null : _toggleLiveVideoOcr,
-              ),
-              IconButton(
-                tooltip: 'Subtitle list',
-                icon: const Icon(Icons.format_list_bulleted_rounded),
-                color: Colors.white,
                 onPressed: () {
-                  setState(() => _showSubtitleList = !_showSubtitleList);
+                  setState(() => _alwaysOnTop = !_alwaysOnTop);
+                  windowManager.setAlwaysOnTop(_alwaysOnTop);
                 },
               ),
-              IconButton(
-                tooltip: context.l10n.video_subtitle,
-                icon: const Icon(Icons.subtitles_rounded),
-                color: Colors.white,
-                onPressed: () =>
-                    _videoSettingDraggableMenu(context, initialIndex: 1),
+            videoOcrButton,
+            IconButton(
+              tooltip: liveOcrTooltip,
+              icon: Icon(
+                _liveVideoOcrEnabled
+                    ? Icons.visibility_rounded
+                    : Icons.visibility_outlined,
               ),
-              IconButton(
-                tooltip: context.l10n.video_audio,
-                icon: const Icon(Icons.audiotrack_rounded),
-                color: Colors.white,
-                onPressed: () =>
-                    _videoSettingDraggableMenu(context, initialIndex: 2),
-              ),
-              IconButton(
-                tooltip: context.l10n.video_quality,
-                icon: const Icon(Icons.high_quality_rounded),
-                color: Colors.white,
-                onPressed: () => _videoSettingDraggableMenu(context),
-              ),
-              btnToShowChapterListDialog(
-                context,
-                context.l10n.episodes,
-                widget.episode,
-                onChanged: (v) {
-                  if (v) {
-                    _player.play();
-                  } else {
-                    _player.pause();
-                  }
-                },
-                iconColor: Colors.white,
-              ),
-              btnToShowShareScreenshot(
-                widget.episode,
-                onChanged: (v) {
-                  if (v) {
-                    _player.play();
-                  } else {
-                    _player.pause();
-                  }
-                },
+              color: _liveVideoOcrEnabled
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.white,
+              onPressed: _videoOcrCapturing ? null : _toggleLiveVideoOcr,
+            ),
+            IconButton(
+              tooltip: 'Subtitle list',
+              icon: const Icon(Icons.format_list_bulleted_rounded),
+              color: Colors.white,
+              onPressed: toggleSubtitleList,
+            ),
+            IconButton(
+              tooltip: context.l10n.video_subtitle,
+              icon: const Icon(Icons.subtitles_rounded),
+              color: Colors.white,
+              onPressed: () =>
+                  _videoSettingDraggableMenu(context, initialIndex: 1),
+            ),
+            IconButton(
+              tooltip: context.l10n.video_audio,
+              icon: const Icon(Icons.audiotrack_rounded),
+              color: Colors.white,
+              onPressed: () =>
+                  _videoSettingDraggableMenu(context, initialIndex: 2),
+            ),
+            IconButton(
+              tooltip: context.l10n.video_quality,
+              icon: const Icon(Icons.high_quality_rounded),
+              color: Colors.white,
+              onPressed: () => _videoSettingDraggableMenu(context),
+            ),
+            episodesButton(),
+            shareButton(),
+          ],
+        ),
+        // A narrow phone held upright keeps the title readable: the OCR, the
+        // episodes and sharing stay in sight, the rest goes in a menu.
+        portraitActions: MobilePlayerPortraitActionTheme(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              videoOcrButton,
+              episodesButton(),
+              shareButton(),
+              PopupMenuButton<VoidCallback>(
+                tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                onSelected: (action) => action(),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    enabled: !_videoOcrCapturing,
+                    value: _toggleLiveVideoOcr,
+                    child: Text(liveOcrTooltip),
+                  ),
+                  PopupMenuItem(
+                    value: toggleSubtitleList,
+                    child: const Text('Subtitle list'),
+                  ),
+                  PopupMenuItem(
+                    value: () =>
+                        _videoSettingDraggableMenu(context, initialIndex: 1),
+                    child: Text(context.l10n.video_subtitle),
+                  ),
+                  PopupMenuItem(
+                    value: () =>
+                        _videoSettingDraggableMenu(context, initialIndex: 2),
+                    child: Text(context.l10n.video_audio),
+                  ),
+                  PopupMenuItem(
+                    value: () => _videoSettingDraggableMenu(context),
+                    child: Text(context.l10n.video_quality),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -3255,10 +3309,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                           bottomButtonBarWidget: _mobileBottomButtonBar(
                             context,
                           ),
-                          doubleSpeed: (value) {
-                            _isDoubleSpeed.value = value ?? false;
-                          },
                           chapterMarks: _chapterMarks,
+                          isLocked: _controlsLocked,
                           subtitleMiningContextBuilder: _subtitleMiningContext,
                           subtitleLookupProfileBuilder: _subtitleLookupProfile,
                         ),

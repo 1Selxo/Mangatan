@@ -1,5 +1,4 @@
 4 lib/modules/anime/widgets/desktop.dart
-3 lib/modules/anime/widgets/mobile.dart
 1 lib/modules/anime/widgets/play_or_pause_button.dart
 3 lib/modules/anime/widgets/subtitle_cue_list.dart
 2 lib/modules/anime/widgets/subtitle_view.dart

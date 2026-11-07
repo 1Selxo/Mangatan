@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:mangayomi/utils/system_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/anime/widgets/player_overlay_surface.dart';
+import 'package:shiori/shiori.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/anime_player_view.dart';
@@ -437,18 +439,29 @@ class _DesktopControllerWidgetState
                           clipBehavior: Clip.none,
                           alignment: Alignment.bottomCenter,
                           children: [
-                            Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  stops: [0.0, 0.2, 0.7, 1.0],
-                                  colors: [
-                                    Color(0xCC000000),
-                                    Color(0x00000000),
-                                    Color(0x00000000),
-                                    Color(0xCC000000),
-                                  ],
+                            // A scrim behind the top bar only: the timeline
+                            // brings its own ground.
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: 140,
+                              child: IgnorePointer(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Theme.of(context).colorScheme.scrim
+                                            .withValues(alpha: 0.75),
+                                        Theme.of(context).colorScheme.scrim
+                                            .withValues(alpha: 0.35),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.65, 1.0],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -505,51 +518,69 @@ class _DesktopControllerWidgetState
                                         ],
                                       ),
                                     ),
-                                    Transform.translate(
-                                      offset: Offset.zero,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 5,
+                                    // The timeline and the bar in one panel
+                                    // floating over the foot, as on a phone.
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        ShioriSpace.s12,
+                                        0,
+                                        ShioriSpace.s12,
+                                        ShioriSpace.s12,
+                                      ),
+                                      child: ShioriOverlayPanel(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          ShioriSpace.s8,
+                                          ShioriSpace.s8,
+                                          ShioriSpace.s8,
+                                          ShioriSpace.s4,
                                         ),
-                                        child: CustomSeekBar(
-                                          key: _seekBarKey,
-                                          onSeekStart: (value) {
-                                            setState(() {
-                                              swipeDuration = value.inSeconds;
-                                              showSwipeDuration = true;
-                                              widget.tempDuration(
-                                                widget
-                                                        .videoController
-                                                        .player
-                                                        .state
-                                                        .position +
-                                                    value,
-                                              );
-                                            });
-                                            _timer?.cancel();
-                                          },
-                                          onSeekEnd: (value) {
-                                            _timer = Timer(
-                                              controlsHoverDuration,
-                                              () {
-                                                if (mounted) {
-                                                  setState(() {
-                                                    visible = false;
-                                                  });
-                                                }
+                                        maxWidth: double.infinity,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            CustomSeekBar(
+                                              key: _seekBarKey,
+                                              onSeekStart: (value) {
+                                                setState(() {
+                                                  swipeDuration =
+                                                      value.inSeconds;
+                                                  showSwipeDuration = true;
+                                                  widget.tempDuration(
+                                                    widget
+                                                            .videoController
+                                                            .player
+                                                            .state
+                                                            .position +
+                                                        value,
+                                                  );
+                                                });
+                                                _timer?.cancel();
                                               },
-                                            );
-                                            setState(() {
-                                              showSwipeDuration = false;
-                                            });
-                                            widget.tempDuration(null);
-                                          },
-                                          player: widget.videoController.player,
-                                          chapterMarks: widget.chapterMarks,
+                                              onSeekEnd: (value) {
+                                                _timer = Timer(
+                                                  controlsHoverDuration,
+                                                  () {
+                                                    if (mounted) {
+                                                      setState(() {
+                                                        visible = false;
+                                                      });
+                                                    }
+                                                  },
+                                                );
+                                                setState(() {
+                                                  showSwipeDuration = false;
+                                                });
+                                                widget.tempDuration(null);
+                                              },
+                                              player:
+                                                  widget.videoController.player,
+                                              chapterMarks: widget.chapterMarks,
+                                            ),
+                                            widget.bottomButtonBarWidget,
+                                          ],
                                         ),
                                       ),
                                     ),
-                                    widget.bottomButtonBarWidget,
                                   ],
                                 ),
                               ),
@@ -591,9 +622,7 @@ class _DesktopControllerWidgetState
                                         }
                                         return const SizedBox.shrink();
                                       },
-                                      child: const CircularProgressIndicator(
-                                        color: Color(0xFFFFFFFF),
-                                      ),
+                                      child: const PlayerBuffering(),
                                     ),
                                   ),
                                 ),

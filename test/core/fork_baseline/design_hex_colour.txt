@@ -1,5 +1,4 @@
-8 lib/modules/anime/widgets/desktop.dart
-14 lib/modules/anime/widgets/mobile.dart
+3 lib/modules/anime/widgets/desktop.dart
 1 lib/modules/browse/sources/sources_screen.dart
 14 lib/modules/mining/widgets/dictionary_lookup_popup.dart
 1 lib/modules/mining/widgets/hoshi_dictionary_popup.dart

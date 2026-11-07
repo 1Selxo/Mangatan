@@ -10,8 +10,8 @@ out, so it can be adopted later on purpose rather than by accident.
 
 | Area | Fork keeps | Upstream redesign not adopted | Effort to adopt |
 | --- | --- | --- | --- |
-| Anime player | `anime_player_view.dart`, `widgets/mobile.dart`, `widgets/desktop.dart`, subtitle widgets | Player split into mixins, new controls and TV player | High: subtitles, mining, Jimaku and lookup live inside the player |
-| Manga reader | `reader_view.dart`, `image_view_*.dart`, `reader_bottom_bar.dart`, `reader_settings_modal.dart` | Reader split into mixins, mode picker, page preview | Medium-high: upstream merges reading mode and direction into one enum, so settings need a migration |
+| Anime player | `anime_player_view.dart` logic, subtitle widgets; the controls now use upstream's Shiori layout (floating timeline panel, top bar layout, lock, hold-and-slide speed) | Player split into mixins, shortcut pills, desktop volume/position buttons, settings sections | High: subtitles, mining, Jimaku and lookup live inside the player |
+| Manga reader | `reader_view.dart`, `image_view_*.dart`; the bottom bar, mode picker (with a separate direction control), slider page preview, auto-scroll sheet and settings sheet follow upstream's Shiori design | Reader split into mixins | Medium-high: upstream merges reading mode and direction into one enum, so settings need a migration |
 | Novel reader | `novel_reader_view.dart`, settings sheet | Split widgets and tap zones | High: the fork's EPUB reader is a different engine |
 | Manga detail | `manga_detail_view.dart`, `manga_details_view.dart` | Quick filters, filter sheet | Medium |
 | Local folders and onboarding | Plain folder paths (`Settings.localFolders`) | Named folders with virtual paths | Low-medium, pending a product decision |
@@ -29,8 +29,7 @@ them. Restore any of them with
 - Anime player: `anime/mixins/anime_{mpv_bridge,player_controls,player_settings,track_selection}_mixin.dart`,
   `anime/utils/always_on_top.dart`, `anime/widgets/{anime_screenshot_sheet,desktop_fullscreen_button,desktop_position_indicator,desktop_volume_button,mobile_primary_button_bar,player_settings_sections,player_shortcut_pills,seek_indicator_text}.dart`
 - Manga reader: `manga/reader/mixins/reader_{double_page,input_and_mode,prefetch}_mixin.dart`,
-  `reader_zoom_control.dart`,
-  `widgets/{crop_off_glyph,page_preview,reader_auto_scroll_sheet,reader_mode_picker,reader_page_content,reader_slider_preview_overlay}.dart`,
+  `reader_zoom_control.dart`, `widgets/reader_page_content.dart`,
   `reader_common/mixins/reader_auto_scroll.dart`
 - Novel reader: `novel/mixins/novel_pagination_tts_mixin.dart`,
   `novel/widgets/{novel_bottom_bar,novel_general_settings_tab,novel_html_content,novel_settings_controls,novel_tap_zones}.dart`
@@ -78,11 +77,10 @@ are worth porting by hand, or come for free with the redesign.
 - `092d9196` reader page indexing and widget key stability
 - `358a13db` panning a zoomed webtoon page without losing double tap
 - `c4edbe9a` Ctrl and wheel zoom
-- `7c3a1fa1` crossed-out crop glyph
 - `305c4e47` press and hover overlays bounded to their decoration
 - `a4db8257` memory work in the reader and restore service
-- Player: hold-and-slide speed (`022a8677`, `714ad41a`, `985b3a3c`) and
-  the compact and portrait controls
+- Player: the compact portrait bottom bar (`MobilePlayerBottomControlsLayout`
+  with shortcut pills); the top bar and hold-and-slide speed are adopted
 
 ## Known debt
 

@@ -781,6 +781,7 @@ class _MangaChapterPageGalleryState
                         currentReaderModeProvider: _currentReaderMode,
                         currentReadingDirectionProvider:
                             _currentReadingDirection,
+                        seriesName: _readerController.getMangaName(),
                         autoScroll: _autoScroll,
                         autoScrollPage: _autoScrollPage,
                         pageOffset: _pageOffset,

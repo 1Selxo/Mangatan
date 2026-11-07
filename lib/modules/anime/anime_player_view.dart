@@ -61,6 +61,7 @@ import 'package:mangayomi/services/get_video_list.dart';
 import 'package:mangayomi/services/mining/jimaku_service.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
 import 'package:mangayomi/services/mining/desktop_scene_capture.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/scene_capture_timing.dart';
@@ -1226,6 +1227,24 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       newPhase = _AniSkipPhase.none;
     }
     if (_skipPhase.value != newPhase) _skipPhase.value = newPhase;
+  }
+
+  /// The dictionary profile a subtitle lookup uses, from the same entry and
+  /// source fields as [_subtitleMiningContext] but without its screenshot,
+  /// so a hover lookup need not wait for a video frame to be encoded.
+  Future<DictionaryProfile> _subtitleLookupProfile() {
+    final manga = widget.episode.manga.value;
+    final source = manga?.sourceId == null
+        ? null
+        : isar.sources.getSync(manga!.sourceId!);
+    return DictionaryProfileResolver.resolve(
+      mangaId: manga?.id,
+      sourceId: DictionaryProfileResolver.overrideIdForSource(source),
+      sourceLanguage: DictionaryProfileResolver.sourceLanguageForSource(
+        source,
+        fallback: manga?.lang ?? '',
+      ),
+    );
   }
 
   Future<MiningContext> _subtitleMiningContext(
@@ -3225,6 +3244,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                               widget.desktopFullScreenPlayer,
                           chapterMarks: _chapterMarks,
                           subtitleMiningContextBuilder: _subtitleMiningContext,
+                          subtitleLookupProfileBuilder: _subtitleLookupProfile,
                           videoOcrActive: _videoOcrBytes != null,
                           onVideoOcrShortcut: _handleVideoOcrShortcut,
                         )
@@ -3240,6 +3260,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                           },
                           chapterMarks: _chapterMarks,
                           subtitleMiningContextBuilder: _subtitleMiningContext,
+                          subtitleLookupProfileBuilder: _subtitleLookupProfile,
                         ),
                   controller: _controller,
                   width: context.width(1),

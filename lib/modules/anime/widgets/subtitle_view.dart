@@ -17,6 +17,7 @@ import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/anime/utils/subtitle_track_support.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/subtitles/subtitle_regex_filters.dart';
 import 'package:media_kit/media_kit.dart';
@@ -26,6 +27,11 @@ class CustomSubtitleView extends ConsumerStatefulWidget {
   final VideoController controller;
   final SubtitleViewConfiguration configuration;
   final Future<MiningContext> Function(String text)? miningContextBuilder;
+
+  /// Resolves the dictionary profile for a lookup without building the
+  /// mining context, whose video screenshot would delay every first hover
+  /// on a cue.
+  final Future<DictionaryProfile> Function()? lookupProfileBuilder;
   final bool paintSubtitle;
   final double verticalOffset;
 
@@ -34,6 +40,7 @@ class CustomSubtitleView extends ConsumerStatefulWidget {
     required this.controller,
     required this.configuration,
     this.miningContextBuilder,
+    this.lookupProfileBuilder,
     this.paintSubtitle = true,
     this.verticalOffset = 0,
   });
@@ -62,6 +69,26 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
   bool _popupPrewarmed = false;
   String _captureCueText = '';
   Future<MiningContext>? _captureContext;
+
+  /// The cue last received from the player, to tell a new cue from the same
+  /// one emitted again (mpv repeats it, on pause among other times).
+  String? _lastCueText;
+
+  /// Bumped for every hover lookup opened, so a superseded one neither
+  /// dismisses its successor's popup nor resumes playback under it.
+  int _hoverGeneration = 0;
+
+  /// Lookups already started for words of the current cue.
+  final Map<String, DictionaryLookupPrefetch> _hoverPrefetches = {};
+  Future<DictionaryProfile>? _lookupProfile;
+
+  /// Character boxes of the laid-out cue, measured once per layout rather
+  /// than on every pointer move.
+  _SubtitleGlyphBoxes? _glyphBoxes;
+
+  /// How long the pointer rests on a word before its lookup starts, so a
+  /// pointer sweeping across a line does not start one for every word.
+  static const _hoverSettleDelay = Duration(milliseconds: 40);
   final List<Future<MiningContext>> _recentCaptureContexts = [];
 
   StreamSubscription<List<String>>? _subtitleSubscription;
@@ -84,7 +111,14 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
           .map((line) => line.trim())
           .where((line) => line.isNotEmpty)
           .join('\n');
+      // The same cue again: nothing changed, and dismissing here would close
+      // the popup the hover just opened and resume playback it paused.
+      if (text == _lastCueText) return;
+      _lastCueText = text;
       if (text != _captureCueText) _rotateCaptureContext(text);
+      _hoverPrefetches.clear();
+      _lookupProfile = null;
+      _glyphBoxes = null;
       setState(() {
         subtitle = value;
         _clearHighlight();
@@ -233,21 +267,24 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     bool hoverTriggered = false,
     DictionaryLookupPrefetch? prefetch,
     Future<MiningContext>? miningContext,
+    _SubtitleLookupSelection? knownSelection,
   }) async {
     final builder = widget.miningContextBuilder;
     if (builder == null || subtitleText.trim().isEmpty) return null;
     final paragraph = _visibleSubtitleParagraph;
-    final selection = paragraph == null
-        ? _SubtitleLookupSelection(
-            text: subtitleText.trim(),
-            start: 0,
-            end: subtitleText.trim().length,
-          )
-        : _lookupTextAtPosition(
-            paragraph: paragraph,
-            globalPosition: globalPosition,
-            subtitleText: subtitleText,
-          );
+    final selection =
+        knownSelection ??
+        (paragraph == null
+            ? _SubtitleLookupSelection(
+                text: subtitleText.trim(),
+                start: 0,
+                end: subtitleText.trim().length,
+              )
+            : _lookupTextAtPosition(
+                paragraph: paragraph,
+                globalPosition: globalPosition,
+                subtitleText: subtitleText,
+              ));
     if (selection.text.trim().isEmpty || !context.mounted) return null;
     final anchor = paragraph == null
         ? Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1)
@@ -315,25 +352,39 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     if (_sameSelection(_hoverSelection, selection)) return;
     _clearHighlightIfNeeded();
     _hoverSelection = selection;
-    final miningContext = _miningContextFor(subtitleText);
-    final prefetch = DictionaryLookupPopup.prefetch(
-      selection.text,
-      miningContext: miningContext,
-    );
-    unawaited(prefetch.results.then<void>((_) {}, onError: (_) {}));
     _hoverLookupTimer?.cancel();
-    _hoverLookupTimer = Timer(const Duration(milliseconds: 60), () {
+    _hoverLookupTimer = Timer(_hoverSettleDelay, () {
       unawaited(
         _openHoverLookup(
           context: context,
           selection: selection,
           subtitleText: subtitleText,
           globalPosition: globalPosition,
-          prefetch: prefetch,
-          miningContext: miningContext,
         ),
       );
     });
+  }
+
+  /// The lookup for [query] in the current cue, started once and reused when
+  /// the pointer comes back to the same word.
+  DictionaryLookupPrefetch _hoverPrefetch(
+    String query,
+    Future<MiningContext> miningContext,
+  ) {
+    final existing = _hoverPrefetches[query];
+    if (existing != null) return existing;
+    final profileBuilder = widget.lookupProfileBuilder;
+    final prefetch = profileBuilder == null
+        ? DictionaryLookupPopup.prefetch(query, miningContext: miningContext)
+        : DictionaryLookupPopup.prefetch(
+            query,
+            profile: _lookupProfile ??= profileBuilder(),
+          );
+    unawaited(prefetch.results.then<void>((_) {}, onError: (_) {}));
+    if (_hoverPrefetches.length >= 32) {
+      _hoverPrefetches.remove(_hoverPrefetches.keys.first);
+    }
+    return _hoverPrefetches[query] = prefetch;
   }
 
   Future<void> _openHoverLookup({
@@ -341,51 +392,60 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     required _SubtitleLookupSelection selection,
     required String subtitleText,
     required Offset globalPosition,
-    required DictionaryLookupPrefetch prefetch,
-    required Future<MiningContext> miningContext,
   }) async {
     if (!mounted ||
         !_subtitleHovered ||
-        !_sameSelection(_hoverSelection, selection)) {
+        !_sameSelection(_hoverSelection, selection) ||
+        !context.mounted) {
       return;
     }
+    final generation = ++_hoverGeneration;
+    // Pausing keeps the cue on screen; the popup need not wait for mpv to
+    // acknowledge it.
     if (widget.controller.player.state.playing && !_resumeAfterHover) {
       _resumeAfterHover = true;
-      await widget.controller.player.pause();
+      unawaited(widget.controller.player.pause());
     }
-    final previous = _hoverPopup;
-    _hoverPopup = null;
-    previous?.dismiss();
-    if (!context.mounted) {
-      _resumeHoverPlayback();
-      return;
-    }
+    final miningContext = _miningContextFor(subtitleText);
+    // The popup host replaces whatever it shows in place, so the previous
+    // word's popup is not dismissed first: closing it would flash the popup
+    // and, through its watcher, resume playback between two words.
     final handle = await _showLookupAtPosition(
       context,
       globalPosition,
       subtitleText,
       hoverTriggered: true,
-      prefetch: prefetch,
+      prefetch: _hoverPrefetch(selection.text, miningContext),
       miningContext: miningContext,
+      knownSelection: selection,
     );
-    if (!mounted ||
-        !_sameSelection(_hoverSelection, selection) ||
-        (!_subtitleHovered && !_popupHovered)) {
+    // A later word took over; its own lookup owns the popup and playback.
+    if (!mounted || generation != _hoverGeneration) return;
+    if (!_subtitleHovered && !_popupHovered) {
       handle?.dismiss();
-      if (_hoverPopup == null) _resumeHoverPlayback();
+      _hoverPopup = null;
+      _hoverSelection = null;
+      _resumeHoverPlayback();
       return;
     }
     _hoverPopup = handle;
     if (handle != null) {
-      unawaited(_watchHoverPopup(handle));
+      unawaited(_watchHoverPopup(handle, generation));
     } else {
       _resumeHoverPlayback();
     }
   }
 
-  Future<void> _watchHoverPopup(DictionaryPopupHandle handle) async {
+  Future<void> _watchHoverPopup(
+    DictionaryPopupHandle handle,
+    int generation,
+  ) async {
     await handle.dismissed;
-    if (!mounted || !identical(_hoverPopup, handle)) return;
+    if (!mounted ||
+        generation != _hoverGeneration ||
+        !identical(_hoverPopup, handle)) {
+      return;
+    }
     _hoverPopup = null;
     _popupHovered = false;
     _hoverSelection = null;
@@ -413,6 +473,7 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
 
   void _dismissHoverLookup({required bool resume}) {
     _hoverLookupTimer?.cancel();
+    _hoverGeneration++;
     _hoverExitTimer?.cancel();
     _hoverSelection = null;
     final popup = _hoverPopup;
@@ -450,9 +511,15 @@ class _CustomSubtitleViewState extends ConsumerState<CustomSubtitleView> {
     required Offset globalPosition,
     required String subtitleText,
   }) {
+    var glyphs = _glyphBoxes;
+    if (glyphs == null || !glyphs.matches(paragraph, subtitleText)) {
+      glyphs = _glyphBoxes = _SubtitleGlyphBoxes.measure(
+        paragraph,
+        subtitleText,
+      );
+    }
     final position = _nearestLookupOffset(
-      paragraph,
-      subtitleText,
+      glyphs.boxes,
       paragraph.globalToLocal(globalPosition),
     );
     if (position == null) {
@@ -648,44 +715,63 @@ bool _sameSelection(
   _SubtitleLookupSelection right,
 ) => left != null && left.start == right.start && left.end == right.end;
 
-int? _nearestLookupOffset(
-  RenderParagraph paragraph,
-  String text,
-  Offset position,
-) {
+/// The character boxes of one laid-out cue, with the offsets they belong to.
+/// Lookup boundaries (spaces, punctuation) are left out, as a lookup never
+/// starts on one.
+class _SubtitleGlyphBoxes {
+  _SubtitleGlyphBoxes._(this.paragraph, this.text, this.size, this.boxes);
+
+  factory _SubtitleGlyphBoxes.measure(RenderParagraph paragraph, String text) {
+    final boxes = <(int, Rect)>[];
+    for (var offset = 0; offset < text.length; offset++) {
+      if (_isLookupBoundary(text[offset])) continue;
+      for (final box in paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: offset, extentOffset: offset + 1),
+        boxHeightStyle: ui.BoxHeightStyle.tight,
+        boxWidthStyle: ui.BoxWidthStyle.tight,
+      )) {
+        final rect = box.toRect();
+        if (rect.width > 0 && rect.height > 0) boxes.add((offset, rect));
+      }
+    }
+    return _SubtitleGlyphBoxes._(paragraph, text, paragraph.size, boxes);
+  }
+
+  final RenderParagraph paragraph;
+  final String text;
+  final Size size;
+  final List<(int, Rect)> boxes;
+
+  bool matches(RenderParagraph paragraph, String text) =>
+      identical(this.paragraph, paragraph) &&
+      this.text == text &&
+      size == paragraph.size;
+}
+
+int? _nearestLookupOffset(List<(int, Rect)> boxes, Offset position) {
   int? nearest;
   double nearestScore = double.infinity;
-  for (var offset = 0; offset < text.length; offset++) {
-    if (_isLookupBoundary(text[offset])) continue;
-    final boxes = paragraph.getBoxesForSelection(
-      TextSelection(baseOffset: offset, extentOffset: offset + 1),
-      boxHeightStyle: ui.BoxHeightStyle.tight,
-      boxWidthStyle: ui.BoxWidthStyle.tight,
-    );
-    for (final box in boxes) {
-      final rect = box.toRect();
-      if (rect.width <= 0 || rect.height <= 0) continue;
-      final dx = position.dx < rect.left
-          ? rect.left - position.dx
-          : position.dx > rect.right
-          ? position.dx - rect.right
-          : 0.0;
-      final dy = position.dy < rect.top
-          ? rect.top - position.dy
-          : position.dy > rect.bottom
-          ? position.dy - rect.bottom
-          : 0.0;
-      final horizontalLimit = (rect.width * 0.9).clamp(8.0, 28.0);
-      final verticalLimit = (rect.height * 0.8).clamp(10.0, 30.0);
-      if (dx > horizontalLimit || dy > verticalLimit) continue;
-      final centerDistance =
-          (position.dx - rect.center.dx).abs() +
-          (position.dy - rect.center.dy).abs() * 0.55;
-      final score = dx * 2.2 + dy * 1.4 + centerDistance * 0.2;
-      if (score < nearestScore) {
-        nearest = offset;
-        nearestScore = score;
-      }
+  for (final (offset, rect) in boxes) {
+    final dx = position.dx < rect.left
+        ? rect.left - position.dx
+        : position.dx > rect.right
+        ? position.dx - rect.right
+        : 0.0;
+    final dy = position.dy < rect.top
+        ? rect.top - position.dy
+        : position.dy > rect.bottom
+        ? position.dy - rect.bottom
+        : 0.0;
+    final horizontalLimit = (rect.width * 0.9).clamp(8.0, 28.0);
+    final verticalLimit = (rect.height * 0.8).clamp(10.0, 30.0);
+    if (dx > horizontalLimit || dy > verticalLimit) continue;
+    final centerDistance =
+        (position.dx - rect.center.dx).abs() +
+        (position.dy - rect.center.dy).abs() * 0.55;
+    final score = dx * 2.2 + dy * 1.4 + centerDistance * 0.2;
+    if (score < nearestScore) {
+      nearest = offset;
+      nearestScore = score;
     }
   }
   return nearest;

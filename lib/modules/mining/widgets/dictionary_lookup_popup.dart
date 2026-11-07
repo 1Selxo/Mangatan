@@ -267,13 +267,17 @@ class _DictionaryPopupHostController {
     ValueChanged<bool>? onHoverChanged,
   }) async {
     final generation = _presentationGate.begin();
-    final resolvedMiningContext = await Future<MiningContext>.value(
-      miningContext,
-    );
+    final compatiblePrefetch = prefetch?.text == text.trim() ? prefetch : null;
+    // A compatible prefetch already carries the lookup's profile, so the
+    // popup need not wait for the mining context: a subtitle's holds a video
+    // screenshot and scene capture, which only an Anki export reads. Without
+    // a prefetch the context is what resolves the profile.
+    final MiningContext? resolvedMiningContext = compatiblePrefetch == null
+        ? await Future<MiningContext>.value(miningContext)
+        : null;
     if (!_presentationGate.isCurrent(generation) || !context.mounted) {
       return null;
     }
-    final compatiblePrefetch = prefetch?.text == text.trim() ? prefetch : null;
     final profile = compatiblePrefetch == null
         ? await DictionaryProfileResolver.resolveMiningContext(
             resolvedMiningContext,
@@ -290,9 +294,12 @@ class _DictionaryPopupHostController {
           scanLength: hoshiPopupScanLength,
           profile: profile,
         );
-    final miningContextFuture = Future<MiningContext?>.value(
-      resolvedMiningContext,
-    );
+    final Future<MiningContext?> miningContextFuture =
+        resolvedMiningContext != null
+        ? Future<MiningContext?>.value(resolvedMiningContext)
+        : Future<MiningContext?>.value(
+            miningContext,
+          ).catchError((Object _) => null);
     await _ensure(context);
     await _refreshPreferences();
     if (!_presentationGate.isCurrent(generation) || !context.mounted) {
@@ -906,10 +913,12 @@ class DictionaryLookupPopup extends StatelessWidget {
     ).results;
   }
 
+  /// Starts a lookup ahead of [show]. A known [profile], or one still
+  /// resolving, saves waiting for [miningContext] to build first.
   static DictionaryLookupPrefetch prefetch(
     String text, {
     FutureOr<MiningContext?> miningContext,
-    DictionaryProfile? profile,
+    FutureOr<DictionaryProfile>? profile,
   }) {
     final query = text.trim();
     final profileFuture = profile == null

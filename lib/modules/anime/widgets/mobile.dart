@@ -10,6 +10,7 @@ import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/indicator_builder.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:mangayomi/services/screen_brightness.dart';
@@ -26,6 +27,10 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
   final ValueNotifier<List<(String, int)>> chapterMarks;
   final Future<MiningContext> Function(String text)?
   subtitleMiningContextBuilder;
+
+  /// Resolves the dictionary profile for subtitle lookups without the
+  /// screenshot [subtitleMiningContextBuilder] takes.
+  final Future<DictionaryProfile> Function()? subtitleLookupProfileBuilder;
   const MobileControllerWidget({
     super.key,
     required this.videoController,
@@ -35,6 +40,7 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
     required this.doubleSpeed,
     required this.chapterMarks,
     this.subtitleMiningContextBuilder,
+    this.subtitleLookupProfileBuilder,
   });
 
   @override
@@ -736,6 +742,7 @@ class _MobileControllerWidgetState
                 paintSubtitle: true,
                 verticalOffset: (subtitleSettings.position ?? 0).toDouble(),
                 miningContextBuilder: widget.subtitleMiningContextBuilder,
+                lookupProfileBuilder: widget.subtitleLookupProfileBuilder,
               ),
             );
           },

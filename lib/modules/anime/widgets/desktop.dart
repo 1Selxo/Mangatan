@@ -11,6 +11,7 @@ import 'package:mangayomi/modules/anime/providers/state_provider.dart';
 import 'package:mangayomi/modules/anime/utils/player_keyboard_listener.dart';
 import 'package:mangayomi/modules/anime/widgets/custom_seekbar.dart';
 import 'package:mangayomi/modules/anime/widgets/subtitle_view.dart';
+import 'package:mangayomi/services/mining/dictionary_profile.dart';
 import 'package:mangayomi/services/mining/mining_models.dart';
 import 'package:mangayomi/services/player_hotkeys.dart';
 import 'package:media_kit/media_kit.dart';
@@ -29,6 +30,10 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
   final ValueNotifier<List<(String, int)>> chapterMarks;
   final Future<MiningContext> Function(String text)?
   subtitleMiningContextBuilder;
+
+  /// Resolves the dictionary profile for subtitle lookups without the
+  /// screenshot [subtitleMiningContextBuilder] takes.
+  final Future<DictionaryProfile> Function()? subtitleLookupProfileBuilder;
   final bool videoOcrActive;
   final Future<void> Function()? onVideoOcrShortcut;
   const DesktopControllerWidget({
@@ -43,6 +48,7 @@ class DesktopControllerWidget extends ConsumerStatefulWidget {
     required this.desktopFullScreenPlayer,
     required this.chapterMarks,
     this.subtitleMiningContextBuilder,
+    this.subtitleLookupProfileBuilder,
     this.videoOcrActive = false,
     this.onVideoOcrShortcut,
   });
@@ -624,6 +630,7 @@ class _DesktopControllerWidgetState
                   paintSubtitle: true,
                   verticalOffset: (subtitleSettings.position ?? 0).toDouble(),
                   miningContextBuilder: widget.subtitleMiningContextBuilder,
+                  lookupProfileBuilder: widget.subtitleLookupProfileBuilder,
                 ),
               );
             },

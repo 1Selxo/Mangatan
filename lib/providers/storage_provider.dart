@@ -289,6 +289,21 @@ class StorageProvider {
     }
   }
 
+  /// User-imported reader fonts. Lives beside the database so the copies
+  /// stay in app-owned storage (no all-files permission on Android) and are
+  /// independent of wherever the user originally picked the file from.
+  Future<Directory> getFontsDirectory() async {
+    final dbDir = await getDatabaseDirectory();
+    if (dbDir == null) {
+      throw StateError('The app storage directory is unavailable');
+    }
+    final fontsDir = Platform.isAndroid
+        ? path.join(dbDir.path, 'fonts')
+        : path.join(path.dirname(dbDir.path), 'fonts');
+    await Directory(fontsDir).create(recursive: true);
+    return Directory(fontsDir);
+  }
+
   Future<Directory?> getGalleryDirectory() async {
     String gPath;
     if (Platform.isAndroid) {

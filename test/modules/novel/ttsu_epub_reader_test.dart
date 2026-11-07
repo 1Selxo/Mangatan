@@ -64,6 +64,40 @@ void main() {
     expect(document, contains('metrics,'));
   });
 
+  test('puts an imported font first and keeps the Japanese fallbacks', () {
+    String build({String? fontUrl}) => buildTtsuEpubDocument(
+      html: '<p>本文</p>',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 4,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: false,
+      customFontUrl: fontUrl,
+    );
+
+    final withFont = build(fontUrl: '../mangatan-fonts/MangatanUserFont_a.ttf');
+    expect(
+      withFont,
+      contains(
+        'font-family: "MangatanReaderCustom"; '
+        'src: url("../mangatan-fonts/MangatanUserFont_a.ttf")',
+      ),
+    );
+    expect(
+      withFont,
+      contains('font-family: "MangatanReaderCustom", "Yu Mincho"'),
+    );
+
+    final withoutFont = build();
+    expect(withoutFont, isNot(contains('MangatanReaderCustom')));
+    expect(withoutFont, contains('font-family: "Yu Mincho"'));
+  });
+
   test('sizes the reader without rem, which publisher CSS can zero', () {
     // Japanese EPUBs may set html { font-size: 0 }; a rem-based width then
     // collapsed horizontal continuous mode to one character per line.

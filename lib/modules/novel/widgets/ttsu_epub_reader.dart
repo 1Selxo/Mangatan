@@ -16,6 +16,7 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
+import 'package:mangayomi/modules/novel/utils/novel_custom_fonts.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
 import 'package:mangayomi/services/epub_reader_asset_server.dart';
 import 'package:mangayomi/services/epub_chapter_metadata.dart';
@@ -245,6 +246,7 @@ class TtsuEpubReader extends StatefulWidget {
     required this.backgroundColor,
     required this.textColor,
     required this.fontSize,
+    this.customFontKey,
     required this.lineHeight,
     required this.padding,
     required this.textAlign,
@@ -270,6 +272,10 @@ class TtsuEpubReader extends StatefulWidget {
   final String backgroundColor;
   final String textColor;
   final double fontSize;
+
+  /// Stored novel font setting; only user-imported fonts apply here, since
+  /// the WebView cannot see Flutter-registered asset or Google fonts.
+  final String? customFontKey;
   final double lineHeight;
   final double padding;
   final String textAlign;
@@ -388,6 +394,7 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         oldWidget.backgroundColor != widget.backgroundColor ||
         oldWidget.textColor != widget.textColor ||
         oldWidget.fontSize != widget.fontSize ||
+        oldWidget.customFontKey != widget.customFontKey ||
         oldWidget.lineHeight != widget.lineHeight ||
         oldWidget.padding != widget.padding ||
         oldWidget.textAlign != widget.textAlign ||
@@ -422,8 +429,9 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
         book: widget.book,
         chapterHref: _chapterHref,
       );
+      await bundle.prepareCustomFont(widget.customFontKey, _chapterHref);
       final document = await bundle.writeDocument(
-        _buildDocument(resourceUrlFor: bundle.relativeUrlFor),
+        _buildDocument(bundle: bundle),
         revision: generation,
       );
       if (!mounted || generation != _generation) {
@@ -462,6 +470,8 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     _restoreAfterReload = previousProgress;
     _previewRestoreAfterReload = previewSnapshot;
     try {
+      await bundle.prepareCustomFont(widget.customFontKey, _chapterHref);
+      if (!mounted || generation != _generation) return;
       final document = await bundle.writeDocument(
         _buildDocument(),
         revision: generation,
@@ -479,37 +489,39 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     }
   }
 
-  String _buildDocument({
-    String? Function(EpubResource resource)? resourceUrlFor,
-  }) => buildTtsuEpubDocument(
-    html: widget.html,
-    book: widget.book,
-    title: widget.chapter.name ?? widget.book.name,
-    backgroundColor: widget.backgroundColor,
-    textColor: widget.textColor,
-    fontSize: widget.fontSize,
-    lineHeight: widget.lineHeight,
-    padding: widget.padding,
-    textAlign: widget.textAlign,
-    initialProgress: _restoreAfterReload ?? widget.initialProgress,
-    initialChapterIndex: _initialLocationPending
-        ? widget.initialChapterIndex
-        : null,
-    initialChapterProgress: _initialLocationPending
-        ? widget.initialChapterProgress
-        : null,
-    initialSpineIndex: _initialLocationPending
-        ? widget.initialSpineIndex
-        : null,
-    tapToScroll: widget.tapToScroll,
-    paragraphSpacing: widget.paragraphSpacing,
-    layout: widget.layout,
-    lookupTrigger: _lookupTrigger,
-    additionalLeftClick: isDesktop && _additionalLeftClick,
-    lookupOnHover: _lookupOnHover,
-    chapterHref: _chapterHref,
-    resourceUrlFor: resourceUrlFor ?? _bundle?.relativeUrlFor,
-  );
+  String _buildDocument({_EpubRenderBundle? bundle}) {
+    final source = bundle ?? _bundle;
+    return buildTtsuEpubDocument(
+      html: widget.html,
+      book: widget.book,
+      title: widget.chapter.name ?? widget.book.name,
+      backgroundColor: widget.backgroundColor,
+      textColor: widget.textColor,
+      fontSize: widget.fontSize,
+      lineHeight: widget.lineHeight,
+      padding: widget.padding,
+      textAlign: widget.textAlign,
+      initialProgress: _restoreAfterReload ?? widget.initialProgress,
+      initialChapterIndex: _initialLocationPending
+          ? widget.initialChapterIndex
+          : null,
+      initialChapterProgress: _initialLocationPending
+          ? widget.initialChapterProgress
+          : null,
+      initialSpineIndex: _initialLocationPending
+          ? widget.initialSpineIndex
+          : null,
+      tapToScroll: widget.tapToScroll,
+      paragraphSpacing: widget.paragraphSpacing,
+      layout: widget.layout,
+      lookupTrigger: _lookupTrigger,
+      additionalLeftClick: isDesktop && _additionalLeftClick,
+      lookupOnHover: _lookupOnHover,
+      chapterHref: _chapterHref,
+      resourceUrlFor: source?.relativeUrlFor,
+      customFontUrl: source?.customFontUrl,
+    );
+  }
 
   @override
   void dispose() {
@@ -1212,6 +1224,28 @@ class _EpubRenderBundle {
   String? relativeUrlFor(EpubResource resource) =>
       _resourceUrls[_resourceKey(resource)];
 
+  /// Document-relative URL of the selected imported font, if any.
+  String? customFontUrl;
+  String? _customFontKey;
+
+  /// Copies the selected imported font into the session so the WebView can
+  /// load it through the same file/loopback origin as the book itself.
+  Future<void> prepareCustomFont(String? key, String? chapterHref) async {
+    if (key == _customFontKey) return;
+    _customFontKey = key;
+    customFontUrl = null;
+    final source = await novelCustomFontFile(key);
+    if (source == null) return;
+    final extension = p.extension(source.path).toLowerCase();
+    final relative =
+        'mangatan-fonts/${novelCustomFontFamilyName(p.basename(source.path))}'
+        '$extension';
+    final target = File(p.joinAll([root.path, ...relative.split('/')]));
+    await target.parent.create(recursive: true);
+    if (!await target.exists()) await source.copy(target.path);
+    customFontUrl = _relativeUrl(relative, chapterHref);
+  }
+
   Uri documentUri(File document, {required int revision}) {
     final query = {'mangatan-reader-revision': '$revision'};
     return _assetServer?.uriFor(document, queryParameters: query) ??
@@ -1275,6 +1309,7 @@ String buildTtsuEpubDocument({
   bool lookupOnHover = false,
   String? chapterHref,
   String? Function(EpubResource resource)? resourceUrlFor,
+  String? customFontUrl,
 }) {
   final document = html_parser.parse(html);
   _sanitizeEpubDocument(document);
@@ -1317,6 +1352,15 @@ String buildTtsuEpubDocument({
   final additionalLeftClickValue = additionalLeftClick ? 'true' : 'false';
   final lookupOnHoverValue = lookupOnHover ? 'true' : 'false';
   final pageGap = (padding * 2).toStringAsFixed(1);
+  // The URL is built from a sanitized family name and percent-encoded path
+  // segments, so it cannot break out of the quoted CSS string.
+  final customFontFace = customFontUrl == null
+      ? ''
+      : '@font-face { font-family: "MangatanReaderCustom"; '
+            'src: url("$customFontUrl"); font-display: block; }';
+  final customFontFirst = customFontUrl == null
+      ? ''
+      : '"MangatanReaderCustom", ';
 
   return '''<!doctype html>
 <html lang="ja" data-mangatan-reader-href="$documentHref" data-mangatan-reader-layout="$layoutValue">
@@ -1326,6 +1370,7 @@ String buildTtsuEpubDocument({
   <title>$safeTitle</title>
   $links
   <style>
+    $customFontFace
     :root {
       color-scheme: light dark;
       --reader-bg: $background;
@@ -1343,7 +1388,7 @@ String buildTtsuEpubDocument({
     body {
       box-sizing: border-box;
       padding: var(--reader-padding);
-      font-family: "Yu Mincho", "Noto Serif CJK JP", "Meiryo", serif !important;
+      font-family: $customFontFirst"Yu Mincho", "Noto Serif CJK JP", "Meiryo", serif !important;
       font-size: ${fontSize}px !important;
       line-height: $lineHeight !important;
       text-align: $align !important;

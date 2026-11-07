@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
+import 'package:mangayomi/modules/novel/utils/novel_custom_fonts.dart';
 import 'package:mangayomi/modules/novel/utils/novel_reader_fonts.dart';
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -466,22 +468,7 @@ class ReaderSettingsTab extends ConsumerWidget {
 
           _SettingSection(
             title: 'Font',
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final option in novelReaderFontOptions)
-                  ChoiceChip(
-                    label: Text(option.label),
-                    selected: fontFamilyKey == option.key,
-                    onSelected: (_) {
-                      ref
-                          .read(novelFontFamilyStateProvider.notifier)
-                          .set(option.key);
-                    },
-                  ),
-              ],
-            ),
+            child: _NovelFontPicker(selectedKey: fontFamilyKey),
           ),
 
           const SizedBox(height: 16),
@@ -539,6 +526,194 @@ class ReaderSettingsTab extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Preset font chips plus a "Custom" chip that expands into the imported
+/// fonts and an import action.
+class _NovelFontPicker extends ConsumerStatefulWidget {
+  const _NovelFontPicker({required this.selectedKey});
+
+  final String? selectedKey;
+
+  @override
+  ConsumerState<_NovelFontPicker> createState() => _NovelFontPickerState();
+}
+
+class _NovelFontPickerState extends ConsumerState<_NovelFontPicker> {
+  late bool _expanded = isNovelCustomFontKey(widget.selectedKey);
+  List<NovelCustomFont>? _fonts;
+  bool _importing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final fonts = await listNovelCustomFonts();
+      // Register each font so its chip can preview itself.
+      for (final font in fonts) {
+        unawaited(ensureNovelCustomFontLoaded(font.key));
+      }
+      if (mounted) setState(() => _fonts = fonts);
+    } catch (_) {
+      if (mounted) setState(() => _fonts = const []);
+    }
+  }
+
+  void _select(String? key) =>
+      ref.read(novelFontFamilyStateProvider.notifier).set(key);
+
+  Future<void> _import() async {
+    setState(() => _importing = true);
+    try {
+      final font = await importNovelCustomFont();
+      if (font != null) {
+        await _refresh();
+        _select(font.key);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is NovelFontImportException
+                  ? error.message
+                  : 'Could not import the font: $error',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  Future<void> _delete(NovelCustomFont font) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove font?'),
+        content: Text('"${font.label}" will be removed from Mangatan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (widget.selectedKey == font.key) _select(null);
+    await deleteNovelCustomFont(font);
+    await _refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedKey = widget.selectedKey;
+    final customSelected = isNovelCustomFontKey(selectedKey);
+    final selectedCustom = customSelected
+        ? _fonts?.where((f) => f.key == selectedKey).firstOrNull
+        : null;
+    final customLabel = customSelected
+        ? selectedCustom?.label ??
+              novelCustomFontFileName(selectedKey)!.split('.').first
+        : 'Custom';
+    final primary = Theme.of(context).primaryColor;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in novelReaderFontOptions)
+              ChoiceChip(
+                label: Text(option.label),
+                selected: selectedKey == option.key,
+                onSelected: (_) => _select(option.key),
+              ),
+            FilterChip(
+              showCheckmark: false,
+              selected: customSelected,
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(customLabel, overflow: TextOverflow.ellipsis),
+                  ),
+                  const SizedBox(width: 2),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.expand_more_rounded, size: 18),
+                  ),
+                ],
+              ),
+              onSelected: (_) => setState(() => _expanded = !_expanded),
+            ),
+          ],
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: !_expanded
+              ? const SizedBox(width: double.infinity)
+              : Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final font in _fonts ?? const <NovelCustomFont>[])
+                        InputChip(
+                          label: Text(
+                            font.label,
+                            style: TextStyle(fontFamily: font.familyName),
+                          ),
+                          selected: selectedKey == font.key,
+                          showCheckmark: false,
+                          onPressed: () => _select(font.key),
+                          onDeleted: () => _delete(font),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                          deleteButtonTooltipMessage: 'Remove font',
+                        ),
+                      ActionChip(
+                        avatar: _importing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Import font'),
+                        onPressed: _importing ? null : _import,
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

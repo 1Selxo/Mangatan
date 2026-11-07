@@ -34,6 +34,8 @@ import 'package:mangayomi/modules/novel/tts/tts_settings_tab.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_reader_settings_sheet.dart';
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
+import 'package:mangayomi/modules/novel/utils/novel_custom_fonts.dart';
+import 'package:mangayomi/modules/novel/utils/novel_reader_fonts.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
 import 'package:mangayomi/modules/widgets/error_state.dart';
@@ -1109,6 +1111,15 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                   final fontSize = ref.watch(
                                     novelFontSizeStateProvider,
                                   );
+                                  final fontKey = ref.watch(
+                                    novelFontFamilyStateProvider,
+                                  );
+                                  final fontFamily = resolveNovelFontFamily(
+                                    fontKey,
+                                  );
+                                  unawaited(
+                                    ensureNovelCustomFontLoaded(fontKey),
+                                  );
                                   final usePageTapZones = ref.watch(
                                     novelTapToScrollStateProvider,
                                   );
@@ -1130,6 +1141,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                               customBackgroundColor,
                                           textColor: customTextColor,
                                           fontSize: fontSize.toDouble(),
+                                          customFontKey: fontKey,
                                           lineHeight: lineHeight,
                                           padding: padding.toDouble(),
                                           textAlign: switch (textAlign) {
@@ -1242,6 +1254,8 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                         data: htmlData,
                                                         style: {
                                                           "body": Style(
+                                                            fontFamily:
+                                                                fontFamily,
                                                             fontSize: FontSize(
                                                               fontSize
                                                                   .toDouble(),
@@ -1274,6 +1288,8 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                                 getTextAlign(),
                                                           ),
                                                           "p": Style(
+                                                            fontFamily:
+                                                                fontFamily,
                                                             margin: Margins.only(
                                                               bottom:
                                                                   fontSize *
@@ -1291,6 +1307,8 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                                 getTextAlign(),
                                                           ),
                                                           "div": Style(
+                                                            fontFamily:
+                                                                fontFamily,
                                                             fontSize: FontSize(
                                                               fontSize
                                                                   .toDouble(),
@@ -1303,6 +1321,8 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                                                 getTextAlign(),
                                                           ),
                                                           "span": Style(
+                                                            fontFamily:
+                                                                fontFamily,
                                                             fontSize: FontSize(
                                                               fontSize
                                                                   .toDouble(),

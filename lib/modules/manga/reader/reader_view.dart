@@ -59,6 +59,7 @@ import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/manga/reader/providers/manga_reader_provider.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_webtoon.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/services/reader/decoded_image_budget.dart';
 import 'package:mangayomi/utils/system_ui.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -254,6 +255,9 @@ class _MangaChapterPageGalleryState
       ),
     );
     disposePreloadManager();
+    // The decoded pages are only worth their memory while the reader shows
+    // them.
+    DecodedImageBudget.instance.clear();
     // Attribute the page still on screen before the OCR cache goes away.
     unawaited(
       _statsTracker.flush(
@@ -266,6 +270,14 @@ class _MangaChapterPageGalleryState
     _readerController.keepAliveLink?.close();
     WakelockPlus.disable();
     super.dispose();
+  }
+
+  /// The system is short of memory: give back the decoded pages, which
+  /// are decoded again when they are shown.
+  @override
+  void didHaveMemoryPressure() {
+    DecodedImageBudget.instance.clear();
+    super.didHaveMemoryPressure();
   }
 
   @override

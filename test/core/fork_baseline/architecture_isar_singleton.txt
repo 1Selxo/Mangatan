@@ -1,0 +1,1 @@
+1 lib/services/isolate_service.dart -> package:mangayomi/repositories/db.dart

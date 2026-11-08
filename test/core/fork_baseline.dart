@@ -63,8 +63,10 @@ void expectWithinForkBaseline(
 }
 
 /// `lib/a.dart:12: code` -> `lib/a.dart: code`; `lib/a.dart:12` and
-/// `lib/a.dart (1500 lines > 1400)` -> `lib/a.dart`.
+/// `lib/a.dart (1500 lines > 1400)` -> `lib/a.dart`. Windows paths use `/`
+/// like the baselines, so the tests pass on every desktop.
 String _key(String finding) => finding
+    .replaceAll(r'\', '/')
     .replaceFirst(RegExp(r':\d+(?=:|$)'), '')
     .replaceFirst(RegExp(r' \(\d+ lines > \d+\)$'), '');
 

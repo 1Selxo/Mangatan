@@ -11,6 +11,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shiori/shiori.dart';
+import 'package:mangayomi/modules/widgets/settings/settings_rows.dart';
+import 'package:mangayomi/modules/anime/utils/temporary_playback_speed.dart';
+import 'package:mangayomi/modules/anime/utils/player_labels.dart';
+import 'package:mangayomi/modules/anime/widgets/player_shortcut_pills.dart';
 import 'package:mangayomi/modules/reader_common/widgets/chapter_bar_title.dart';
 import 'package:mangayomi/modules/anime/widgets/mobile_player_controls_layout.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
@@ -2747,77 +2751,184 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
   }
 
-  Widget _seekToWidget() {
+  /// The skip (+85 s, or the source's own button) as one of the player's
+  /// pills; a long press is the custom button's second action.
+  Widget _seekToWidget({bool iconOnly = false}) {
     final defaultSkipIntroLength = ref.watch(
       defaultSkipIntroLengthStateProvider,
     );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: SizedBox(
-        height: 35,
-        child: ValueListenableBuilder(
-          valueListenable: _customButton,
-          builder: (context, value, child) => (value?.visible ?? true)
-              ? ElevatedButton(
-                  onPressed:
-                      value?.onPress ??
-                      () async => await _seekBy(defaultSkipIntroLength),
-                  onLongPress: value?.onLongPress,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      value != null
-                          ? value.currentTitle
-                          : "+$defaultSkipIntroLength",
-                      style: const TextStyle(fontWeight: FontWeight.w100),
+    return ValueListenableBuilder(
+      valueListenable: _customButton,
+      builder: (context, value, child) {
+        if (!(value?.visible ?? true)) return const SizedBox.shrink();
+        final label = value?.currentTitle ?? "+$defaultSkipIntroLength";
+        final tooltip =
+            value?.currentTitle ??
+            context.l10n.shortcut_seek_forward(defaultSkipIntroLength);
+        void onPressed() {
+          if (value != null) {
+            value.onPress();
+          } else {
+            unawaited(_seekBy(defaultSkipIntroLength));
+          }
+        }
+
+        final onLongPress = value == null ? null : () => value.onLongPress();
+        if (iconOnly) {
+          return MobilePlayerCompactSeekControl(
+            tooltip: tooltip,
+            seconds: value == null ? defaultSkipIntroLength : null,
+            onPressed: onPressed,
+            onLongPress: onLongPress,
+          );
+        }
+        return PlayerPillButton(
+          icon: Symbols.fast_forward_rounded,
+          label: label,
+          tooltip: tooltip,
+          onTap: onPressed,
+          onLongPress: onLongPress,
+        );
+      },
+    );
+  }
+
+  /// The chapter of the video now, as a pill that lists the chapters.
+  Widget _chapterMarkWidget() {
+    return ValueListenableBuilder(
+      valueListenable: _currentChapterMark,
+      builder: (context, value, child) {
+        // The marks of the previous video can be gone while the index stays.
+        final chapter = value == null
+            ? null
+            : _chapterMarks.value.elementAtOrNull(value);
+        if (chapter == null) return const SizedBox.shrink();
+        final start = Duration(milliseconds: chapter.$2).label();
+        final label = chapter.$1.trim().isEmpty
+            ? start
+            : "${chapter.$1} · $start";
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.s4),
+          child: Builder(
+            builder: (pillContext) => PlayerPillButton(
+              icon: Symbols.bookmark_rounded,
+              label: label,
+              tooltip: label,
+              onTap: () => _showMenuBy<int>(
+                pillContext,
+                items: [
+                  for (final mark in _chapterMarks.value)
+                    PopupMenuItem<int>(
+                      value: mark.$2,
+                      child: Text(
+                        "${mark.$1} - ${Duration(milliseconds: mark.$2).label()}",
+                      ),
                     ),
-                  ),
-                )
-              : Container(),
-        ),
+                ],
+                onSelected: (ms) => _player.seek(Duration(milliseconds: ms)),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Opens a menu next to [anchor], the pill that asked for it.
+  Future<void> _showMenuBy<T>(
+    BuildContext anchor, {
+    required List<PopupMenuEntry<T>> items,
+    required ValueChanged<T> onSelected,
+  }) async {
+    final box = anchor.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(anchor).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null) return;
+    final rect = box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
+    final value = await showMenu<T>(
+      context: anchor,
+      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
+      items: items,
+    );
+    if (value != null) onSelected(value);
+  }
+
+  void _showSpeedMenu(BuildContext anchor) {
+    const speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+    unawaited(
+      _showMenuBy<double>(
+        anchor,
+        items: [
+          for (final value in speeds)
+            CheckedPopupMenuItem<double>(
+              value: value,
+              checked: value == _playbackSpeed.value,
+              child: Text(temporaryPlaybackSpeedLabel(value)),
+            ),
+        ],
+        onSelected: _setPlaybackSpeed,
       ),
     );
   }
 
-  Widget _chapterMarkWidget() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
-      child: SizedBox(
-        height: 35,
-        child: ValueListenableBuilder(
-          valueListenable: _currentChapterMark,
-          builder: (context, value, child) => value != null
-              ? PopupMenuButton<int>(
-                  tooltip: '',
-                  itemBuilder: (context) => _chapterMarks.value
-                      .map(
-                        (mark) => PopupMenuItem<int>(
-                          value: mark.$2,
-                          child: Text(
-                            "${mark.$1} - ${Duration(milliseconds: mark.$2).label()}",
-                          ),
-                          onTap: () =>
-                              _player.seek(Duration(milliseconds: mark.$2)),
-                        ),
-                      )
-                      .toList(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      "${_chapterMarks.value[value].$1} - ${Duration(milliseconds: _chapterMarks.value[value].$2).label()}",
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                )
-              : Container(),
-        ),
-      ),
-    );
+  /// The stream's quality, when there is another to pick.
+  String? _qualityPillLabel() {
+    final choices = widget.isLocal
+        ? _player.state.tracks.video
+              .where((track) => track.w != null && track.h != null)
+              .length
+        : widget.videos.length;
+    if (choices < 2) return null;
+    return _video.value?.videoTrack?.title ?? _firstVid.quality;
   }
+
+  /// The subtitle now: an mpv track, or one the app draws itself.
+  String _subtitlePillLabel() {
+    final track = _player.state.track.subtitle;
+    if (track.id == 'no') {
+      return _subtitleCues.isNotEmpty ? 'On' : 'Off';
+    }
+    if (track.id == 'auto') {
+      return _subtitleCues.isNotEmpty ? 'On' : 'Auto';
+    }
+    final short = shortTrackLabel(subtitleTrackLabel(track));
+    return short.isNotEmpty ? short : 'On';
+  }
+
+  /// The audio track now, or null when there is only one.
+  String? _audioPillLabel() {
+    final real = _player.state.tracks.audio
+        .where((track) => track.id != 'auto' && track.id != 'no')
+        .length;
+    if (real < 2) return null;
+    final track = _player.state.track.audio;
+    if (track.id == 'auto' || track.id == 'no') return '';
+    return shortTrackLabel(audioTrackLabel(track));
+  }
+
+  Widget _shortcutPills(
+    BuildContext context, {
+    required Set<PlayerPill> pills,
+    bool iconOnly = false,
+    VoidCallback? onToggleFullscreen,
+    bool isFullscreen = false,
+  }) => PlayerShortcutPills(
+    player: _player,
+    qualityListenable: _video,
+    qualityLabel: _qualityPillLabel,
+    subtitleLabel: _subtitlePillLabel,
+    audioLabel: _audioPillLabel,
+    playbackSpeed: _playbackSpeed,
+    fit: _fit,
+    iconOnly: iconOnly,
+    pills: pills,
+    onQuality: (_) => _videoSettingDraggableMenu(context),
+    onSubtitles: (_) => _videoSettingDraggableMenu(context, initialIndex: 1),
+    onAudio: (_) => _videoSettingDraggableMenu(context, initialIndex: 2),
+    onSpeed: _showSpeedMenu,
+    onChangeFit: () => _changeFitLabel(ref),
+    onToggleFullscreen: onToggleFullscreen,
+    isFullscreen: isFullscreen,
+  );
 
   Widget _mobileBottomButtonBar(BuildContext context) {
     return _playerBottomButtonBar(context);
@@ -2827,125 +2938,129 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     return _playerBottomButtonBar(context);
   }
 
+  /// The line under the timeline, after upstream's: on the left what moves
+  /// the video on (the lock on a phone, the skip, the chapter), on the right
+  /// the stream's and the playback's choices as pills with their values.
   Widget _playerBottomButtonBar(BuildContext context) {
     final isFullScreen = ref.watch(fullscreenProvider);
-    const speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+    final compact =
+        !isDesktop &&
+        usesCompactPortraitPlayerControls(
+          orientation: MediaQuery.orientationOf(context),
+          width: MediaQuery.sizeOf(context).width,
+        );
+    // Mangatan's: move the subtitle delay so the line before or after
+    // starts now.
+    final snapButtons = [
+      if (_subtitleCues.isNotEmpty || _player.platform is NativePlayer) ...[
+        IconButton(
+          tooltip: 'Snap delay to previous subtitle',
+          icon: const Icon(Icons.skip_previous_rounded),
+          color: Colors.white,
+          visualDensity: compact ? VisualDensity.compact : null,
+          onPressed: () => unawaited(_snapSubtitleDelay(next: false)),
+        ),
+        IconButton(
+          tooltip: 'Snap delay to next subtitle',
+          icon: const Icon(Icons.skip_next_rounded),
+          color: Colors.white,
+          visualDensity: compact ? VisualDensity.compact : null,
+          onPressed: () => unawaited(_snapSubtitleDelay(next: true)),
+        ),
+      ],
+    ];
 
-    // Inside the timeline's panel, which brings the margins.
-    return Padding(
-      padding: EdgeInsets.zero,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    if (!isDesktop) {
+      void toggleFullscreen() {
+        _setLandscapeMode(!isFullScreen);
+        ref.read(fullscreenProvider.notifier).state = !isFullScreen;
+        widget.desktopFullScreenPlayer(!isFullScreen);
+      }
+
+      final shortcuts = Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Flexible(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  if (!isDesktop)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                        end: ShioriSpace.s8,
-                      ),
-                      child: ShioriOverlayPill(
-                        icon: Symbols.lock_open_rounded,
-                        tooltip: context.l10n.lock,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _controlsLocked.value = true;
-                        },
-                      ),
-                    ),
-                  if (isDesktop)
-                    CustomMaterialDesktopVolumeButton(controller: _controller),
-                  ValueListenableBuilder<double>(
-                    valueListenable: _playbackSpeed,
-                    builder: (context, speed, _) => PopupMenuButton<double>(
-                      tooltip: 'Playback speed',
-                      onSelected: _setPlaybackSpeed,
-                      itemBuilder: (context) => speeds
-                          .map(
-                            (value) => PopupMenuItem<double>(
-                              value: value,
-                              child: Text('${value}x'),
-                            ),
-                          )
-                          .toList(),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        child: Text(
-                          '${speed}x',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
-                  _chapterMarkWidget(),
-                ],
-              ),
-            ),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_subtitleCues.isNotEmpty ||
-                      _player.platform is NativePlayer) ...[
-                    IconButton(
-                      tooltip: 'Snap delay to previous subtitle',
-                      icon: const Icon(Icons.skip_previous_rounded),
-                      color: Colors.white,
-                      onPressed: () =>
-                          unawaited(_snapSubtitleDelay(next: false)),
-                    ),
-                    IconButton(
-                      tooltip: 'Snap delay to next subtitle',
-                      icon: const Icon(Icons.skip_next_rounded),
-                      color: Colors.white,
-                      onPressed: () =>
-                          unawaited(_snapSubtitleDelay(next: true)),
-                    ),
-                  ],
-                  _seekToWidget(),
-                  if (isDesktop && useMpvConfig)
-                    ..._buildMpvSettingsButton(context),
-                  IconButton(
-                    tooltip: 'Aspect ratio',
-                    icon: const Icon(Icons.aspect_ratio_rounded),
-                    color: Colors.white,
-                    onPressed: () => _changeFitLabel(ref),
-                  ),
-                  if (isDesktop)
-                    CustomMaterialDesktopFullscreenButton(
-                      controller: _controller,
-                      desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
-                    )
-                  else
-                    IconButton(
-                      tooltip: isFullScreen ? 'Exit fullscreen' : 'Fullscreen',
-                      icon: Icon(
-                        isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                      ),
-                      color: Colors.white,
-                      onPressed: () {
-                        _setLandscapeMode(!isFullScreen);
-                        ref.read(fullscreenProvider.notifier).state =
-                            !isFullScreen;
-                        widget.desktopFullScreenPlayer(!isFullScreen);
-                      },
-                    ),
-                ],
-              ),
-            ),
+          ...snapButtons,
+          _shortcutPills(
+            context,
+            iconOnly: compact,
+            // A narrow phone keeps the ones used most; audio, quality and
+            // the fit are in the top bar's menu.
+            pills: compact
+                ? const {
+                    PlayerPill.subtitles,
+                    PlayerPill.speed,
+                    PlayerPill.fullscreen,
+                  }
+                : const {...PlayerPill.values},
+            onToggleFullscreen: toggleFullscreen,
+            isFullscreen: isFullScreen,
           ),
         ],
-      ),
+      );
+      return MobilePlayerBottomControlsLayout(
+        compactPortrait: compact,
+        lockButton: ShioriOverlayPill(
+          icon: Symbols.lock_open_rounded,
+          tooltip: context.l10n.lock,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _controlsLocked.value = true;
+          },
+        ),
+        seekButton: _seekToWidget(iconOnly: compact),
+        chapterButton: compact ? const SizedBox.shrink() : _chapterMarkWidget(),
+        // Shrinks rather than overflows on the narrowest phones.
+        shortcutButtons: compact
+            ? FittedBox(fit: BoxFit.scaleDown, child: shortcuts)
+            : shortcuts,
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                CustomMaterialDesktopVolumeButton(controller: _controller),
+                const SizedBox(width: ShioriSpace.s4),
+                _seekToWidget(),
+                _chapterMarkWidget(),
+              ],
+            ),
+          ),
+        ),
+        Flexible(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ...snapButtons,
+                _shortcutPills(
+                  context,
+                  pills: const {
+                    PlayerPill.quality,
+                    PlayerPill.subtitles,
+                    PlayerPill.audio,
+                    PlayerPill.speed,
+                    PlayerPill.fit,
+                  },
+                ),
+                if (useMpvConfig) ..._buildMpvSettingsButton(context),
+                CustomMaterialDesktopFullscreenButton(
+                  controller: _controller,
+                  desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -3153,26 +3268,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               color: Colors.white,
               onPressed: toggleSubtitleList,
             ),
-            IconButton(
-              tooltip: context.l10n.video_subtitle,
-              icon: const Icon(Icons.subtitles_rounded),
-              color: Colors.white,
-              onPressed: () =>
-                  _videoSettingDraggableMenu(context, initialIndex: 1),
-            ),
-            IconButton(
-              tooltip: context.l10n.video_audio,
-              icon: const Icon(Icons.audiotrack_rounded),
-              color: Colors.white,
-              onPressed: () =>
-                  _videoSettingDraggableMenu(context, initialIndex: 2),
-            ),
-            IconButton(
-              tooltip: context.l10n.video_quality,
-              icon: const Icon(Icons.high_quality_rounded),
-              color: Colors.white,
-              onPressed: () => _videoSettingDraggableMenu(context),
-            ),
             episodesButton(),
             shareButton(),
           ],
@@ -3202,17 +3297,16 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   ),
                   PopupMenuItem(
                     value: () =>
-                        _videoSettingDraggableMenu(context, initialIndex: 1),
-                    child: Text(context.l10n.video_subtitle),
-                  ),
-                  PopupMenuItem(
-                    value: () =>
                         _videoSettingDraggableMenu(context, initialIndex: 2),
                     child: Text(context.l10n.video_audio),
                   ),
                   PopupMenuItem(
                     value: () => _videoSettingDraggableMenu(context),
                     child: Text(context.l10n.video_quality),
+                  ),
+                  PopupMenuItem(
+                    value: () => _changeFitLabel(ref),
+                    child: Text(context.l10n.scale_type_fit_screen),
                   ),
                 ],
               ),

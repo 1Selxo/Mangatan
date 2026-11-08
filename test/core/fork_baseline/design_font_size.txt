@@ -1,4 +1,4 @@
-6 lib/modules/anime/anime_player_view.dart
+5 lib/modules/anime/anime_player_view.dart
 1 lib/modules/anime/widgets/aniskip_countdown_btn.dart
 2 lib/modules/anime/widgets/custom_seekbar.dart
 1 lib/modules/anime/widgets/desktop.dart

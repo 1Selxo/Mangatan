@@ -305,9 +305,8 @@ class _DictionaryPopupHostController {
     final Future<MiningContext?> miningContextFuture =
         resolvedMiningContext != null
         ? Future<MiningContext?>.value(resolvedMiningContext)
-        : Future<MiningContext?>.value(
-            miningContext,
-          ).catchError((Object _) => null);
+        : Future<MiningContext?>.value(miningContext)
+              .catchError((Object _) => null);
     await _ensure(context);
     await _refreshPreferences();
     if (!_presentationGate.isCurrent(generation) || !context.mounted) {
@@ -460,6 +459,41 @@ class _DictionaryPopupOverlayHostState
 
   bool get isVisible => _visible;
 
+  /// The popup's focus: a click or a key inside it, or its WebView, can take
+  /// the keyboard. Dismissing only hides the popup, which keeps focus where
+  /// it was, so a reader's arrow keys stopped reaching the reader until it
+  /// was reopened.
+  final FocusScopeNode _popupScope = FocusScopeNode(
+    debugLabel: 'Dictionary popup',
+  );
+
+  /// What had the keyboard before the popup opened, to give it back.
+  FocusNode? _focusBeforePopup;
+
+  bool _focusIsInPopup(FocusNode node) =>
+      identical(node, _popupScope) || node.ancestors.contains(_popupScope);
+
+  void _rememberFocusBeforePopup() {
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus != null && !_focusIsInPopup(focus)) _focusBeforePopup = focus;
+  }
+
+  /// Gives the keyboard back to what had it before the popup, if the popup
+  /// took it (or nothing has it now).
+  void _restoreFocusAfterPopup() {
+    final previous = _focusBeforePopup;
+    _focusBeforePopup = null;
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus != null && !_focusIsInPopup(focus)) return;
+    if (previous != null &&
+        previous.context != null &&
+        previous.canRequestFocus) {
+      previous.requestFocus();
+    } else if (_popupScope.hasFocus) {
+      _popupScope.unfocus();
+    }
+  }
+
   void updatePreferences(DictionaryPopupPreferences preferences) {
     if (_preferences == preferences) return;
     setState(() {
@@ -589,6 +623,7 @@ class _DictionaryPopupOverlayHostState
       placement: placement,
     );
     final completer = Completer<void>();
+    _rememberFocusBeforePopup();
     setState(() {
       _children.clear();
       _childLookupGeneration++;
@@ -664,6 +699,7 @@ class _DictionaryPopupOverlayHostState
       _top = 0;
     });
     _dictionaryPopupBounds.value = null;
+    _restoreFocusAfterPopup();
     _completeDismissal();
   }
 
@@ -746,6 +782,28 @@ class _DictionaryPopupOverlayHostState
     final request = _request;
     final presentationGeneration = _presentationGeneration;
     final popupTheme = _popupTheme(Theme.of(context), _preferences.theme);
+    // While hidden, nothing in the popup (its warm WebView included) may
+    // take the keyboard from the page behind it.
+    return FocusScope(
+      node: _popupScope,
+      child: ExcludeFocus(
+        excluding: !_visible,
+        child: _buildPopups(
+          context,
+          request,
+          presentationGeneration,
+          popupTheme,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPopups(
+    BuildContext context,
+    _DictionaryPopupRequest request,
+    int presentationGeneration,
+    ThemeData popupTheme,
+  ) {
     return Stack(
       children: [
         Positioned(
@@ -856,6 +914,7 @@ class _DictionaryPopupOverlayHostState
     );
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     _dictionaryPopupBounds.value = null;
+    _popupScope.dispose();
     _completeDismissal();
     super.dispose();
   }
@@ -957,9 +1016,8 @@ class DictionaryLookupPopup extends StatelessWidget {
   }) {
     final query = text.trim();
     final profileFuture = profile == null
-        ? Future<MiningContext?>.value(
-            miningContext,
-          ).then(DictionaryProfileResolver.resolveMiningContext)
+        ? Future<MiningContext?>.value(miningContext)
+              .then(DictionaryProfileResolver.resolveMiningContext)
         : Future<DictionaryProfile>.value(profile);
     final results = query.isEmpty
         ? Future<List<HoshiLookupResult>>.value(const [])
@@ -1617,9 +1675,8 @@ class _LookupEntryMarker extends StatelessWidget {
         size: hasTransform ? 18 : 6,
         color: hasTransform
             ? Theme.of(context).colorScheme.primary
-            : Theme.of(
-                context,
-              ).colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
+            : Theme.of(context).colorScheme.onSurfaceVariant
+                  .withValues(alpha: 0.55),
       ),
     );
   }
@@ -1751,12 +1808,12 @@ class _GlossarySense extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final seen = <String>{...hiddenTermTags};
-    final termTags = _splitTags(
-      glossary.termTags,
-    ).where((tag) => seen.add(tag)).toList();
-    final definitionTags = _splitTags(
-      glossary.definitionTags,
-    ).where((tag) => tag != index.toString() && seen.add(tag)).toList();
+    final termTags = _splitTags(glossary.termTags)
+        .where((tag) => seen.add(tag))
+        .toList();
+    final definitionTags = _splitTags(glossary.definitionTags)
+        .where((tag) => tag != index.toString() && seen.add(tag))
+        .toList();
     return Padding(
       padding: EdgeInsets.only(bottom: compact ? 8 : 12),
       child: Row(
@@ -1876,10 +1933,8 @@ class _LookupChip extends StatelessWidget {
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: colors.$2,
-          fontWeight: FontWeight.w600,
-        ),
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: colors.$2, fontWeight: FontWeight.w600),
       ),
     );
   }

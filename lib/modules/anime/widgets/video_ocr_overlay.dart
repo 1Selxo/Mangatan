@@ -13,6 +13,9 @@ import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/ocr_models.dart';
 import 'package:mangayomi/services/mining/profile_ocr_language.dart';
 
+/// The colour of a looked-up block and of its looked-up characters.
+const _videoOcrSelectionColor = Colors.amber;
+
 class VideoOcrResult {
   const VideoOcrResult({
     required this.imageWidth,
@@ -189,11 +192,13 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay>
                           duration: const Duration(milliseconds: 100),
                           decoration: BoxDecoration(
                             color: identical(_selection?.block, item.block)
-                                ? Colors.amber.withValues(alpha: 0.28)
+                                ? _videoOcrSelectionColor.withValues(
+                                    alpha: 0.28,
+                                  )
                                 : Colors.transparent,
                             border: Border.all(
                               color: identical(_selection?.block, item.block)
-                                  ? Colors.amber
+                                  ? _videoOcrSelectionColor
                                   : Colors.lightBlueAccent.withValues(
                                       alpha: 0.7,
                                     ),
@@ -472,13 +477,15 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay>
                             duration: const Duration(milliseconds: 100),
                             decoration: BoxDecoration(
                               color: identical(_selection?.block, item.block)
-                                  ? Colors.amber.withValues(alpha: 0.28)
+                                  ? _videoOcrSelectionColor.withValues(
+                                      alpha: 0.28,
+                                    )
                                   : Colors.lightBlueAccent.withValues(
                                       alpha: 0.08,
                                     ),
                               border: Border.all(
                                 color: identical(_selection?.block, item.block)
-                                    ? Colors.amber
+                                    ? _videoOcrSelectionColor
                                     : Colors.lightBlueAccent.withValues(
                                         alpha: 0.75,
                                       ),
@@ -901,7 +908,7 @@ class _VideoOcrLinesPainter extends CustomPainter {
       if (highlight != null) {
         canvas.drawRect(
           highlight,
-          Paint()..color = Colors.amber.withValues(alpha: 0.45),
+          Paint()..color = _videoOcrSelectionColor.withValues(alpha: 0.45),
         );
       }
       canvas.save();

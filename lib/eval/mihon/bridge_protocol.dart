@@ -5,6 +5,18 @@ import 'package:mangayomi/models/source.dart';
 
 const mihonBridgeContextKey = '__mangatan_bridge_context__';
 
+/// The name the bridge took over from upstream M-Extension-Server when it
+/// merged it (0141af5). A bridge reads only one of the two names, so the
+/// context goes under both: without it the bridge cannot tell a factory's
+/// sources apart (it falls back to the base URL, which Jellyfin's sources
+/// share) and ignores the changed key and the apply mode.
+const mihonUpstreamBridgeContextKey = '__mangayomi_bridge_context__';
+
+const mihonBridgeContextKeys = [
+  mihonBridgeContextKey,
+  mihonUpstreamBridgeContextKey,
+];
+
 /// Controls how preference snapshots sent to the JVM bridge are applied.
 ///
 /// Normal requests only bootstrap keys missing from the bridge's persistent
@@ -200,13 +212,15 @@ List<Map<String, dynamic>> mihonPreferencePayload(
       .map((preference) => preference.toJson())
       .toList(growable: true);
   final metadata = mihonSourceMetadata(source);
-  payload.add({
-    'key': mihonBridgeContextKey,
-    if (metadata != null) 'sourceId': metadata.sourceId,
-    'changedPreferenceKey': ?changedPreferenceKey,
-    if (applyMode == MihonPreferenceApplyMode.replacePresent)
-      'preferenceApplyMode': 'replace-present',
-  });
+  for (final contextKey in mihonBridgeContextKeys) {
+    payload.add({
+      'key': contextKey,
+      if (metadata != null) 'sourceId': metadata.sourceId,
+      'changedPreferenceKey': ?changedPreferenceKey,
+      if (applyMode == MihonPreferenceApplyMode.replacePresent)
+        'preferenceApplyMode': 'replace-present',
+    });
+  }
   return payload;
 }
 

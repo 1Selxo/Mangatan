@@ -79,11 +79,16 @@ void main() {
       ], changedPreferenceKey: 'host_url');
 
       expect(payload.first['key'], 'host_url');
-      expect(payload.last, {
-        'key': mihonBridgeContextKey,
-        'sourceId': '5716273013801838310',
-        'changedPreferenceKey': 'host_url',
-      });
+      // Under both names, so the merged bridge (upstream's name) and an
+      // older one (Mangatan's) both find which source is meant.
+      for (final contextKey in mihonBridgeContextKeys) {
+        expect(payload.singleWhere((entry) => entry['key'] == contextKey), {
+          'key': contextKey,
+          'sourceId': '5716273013801838310',
+          'changedPreferenceKey': 'host_url',
+        });
+      }
+      expect(mihonBridgeContextKeys, contains('__mangayomi_bridge_context__'));
     });
 
     test('merges a selected list value by entry value', () {

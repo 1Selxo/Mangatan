@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:flutter/rendering.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/services/mining/dictionary_profile_resolver.dart';
@@ -202,6 +204,10 @@ class _VideoOcrOverlayState extends State<VideoOcrOverlay>
                           ),
                           child: VideoOcrText(
                             block: item.block,
+                            lineRects: mapping?.lineRectsWithin(
+                              item.block,
+                              item.rect,
+                            ),
                             selectionOffset:
                                 identical(_selection?.block, item.block)
                                 ? _selection?.offset
@@ -483,6 +489,10 @@ class _LiveVideoOcrOverlayState extends State<LiveVideoOcrOverlay>
                             ),
                             child: VideoOcrText(
                               block: item.block,
+                              lineRects: mapping?.lineRectsWithin(
+                                item.block,
+                                item.rect,
+                              ),
                               selectionOffset:
                                   identical(_selection?.block, item.block)
                                   ? _selection?.offset
@@ -639,12 +649,116 @@ mixin _VideoOcrLookup<T extends StatefulWidget> on State<T> {
   }
 }
 
+/// One recognised line of a block, in the block's own coordinates.
+@visibleForTesting
+class VideoOcrLine {
+  const VideoOcrLine({
+    required this.text,
+    required this.rect,
+    required this.vertical,
+    required this.cellEdges,
+    required this.start,
+  });
+
+  final String text;
+  final Rect rect;
+  final bool vertical;
+
+  /// Character cell edges along the reading axis, as fractions of [rect].
+  final List<double> cellEdges;
+
+  /// Where the line starts in [OcrTextBlock.sentence].
+  final int start;
+}
+
+/// The block's non-empty lines placed in their own boxes, or null when the
+/// engine gave no box for each line (the text is then drawn as one centred
+/// paragraph). [lineRects] are in the block's coordinates, one per
+/// [OcrTextBlock.lines] entry.
+@visibleForTesting
+List<VideoOcrLine>? videoOcrLines(OcrTextBlock block, List<Rect>? lineRects) {
+  if (lineRects == null ||
+      lineRects.length != block.lines.length ||
+      block.lineGeometries.length != block.lines.length) {
+    return null;
+  }
+  final lines = <VideoOcrLine>[];
+  var start = 0;
+  for (var index = 0; index < block.lines.length; index++) {
+    final text = block.lines[index];
+    if (text.trim().isEmpty) continue;
+    final rect = lineRects[index];
+    final geometry = block.lineGeometries[index];
+    final vertical = block.vertical || readerOcrLineLooksVertical(geometry);
+    if (!rect.isEmpty) {
+      lines.add(
+        VideoOcrLine(
+          text: text,
+          rect: rect,
+          vertical: vertical,
+          cellEdges: readerOcrCellEdges(
+            text.length,
+            geometry.glyphEdgesVertical == vertical
+                ? geometry.glyphEdges
+                : null,
+          ),
+          start: start,
+        ),
+      );
+    }
+    start += text.length;
+  }
+  return lines.isEmpty ? null : lines;
+}
+
+/// The offset in [OcrTextBlock.sentence] of the character at [position], by
+/// the same cells the text is painted in: the line under it, or the nearest.
+@visibleForTesting
+int? videoOcrOffsetAt(List<VideoOcrLine> lines, Offset position) {
+  VideoOcrLine? best;
+  var bestDistance = double.infinity;
+  for (final line in lines) {
+    if (line.rect.contains(position)) {
+      best = line;
+      break;
+    }
+    final dx = math.max(
+      0.0,
+      math.max(line.rect.left - position.dx, position.dx - line.rect.right),
+    );
+    final dy = math.max(
+      0.0,
+      math.max(line.rect.top - position.dy, position.dy - line.rect.bottom),
+    );
+    final distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = line;
+    }
+  }
+  if (best == null) return null;
+  final fraction = best.vertical
+      ? (position.dy - best.rect.top) / math.max(1, best.rect.height)
+      : (position.dx - best.rect.left) / math.max(1, best.rect.width);
+  return best.start +
+      readerOcrCellAt(best.cellEdges, fraction.clamp(0.0, 1.0).toDouble());
+}
+
+/// The recognised text of a block, drawn over the frame.
+///
+/// Each line sits in the box the engine found it in, the way the manga
+/// reader's OCR overlay draws it: CJK text one glyph per character cell,
+/// sized to the line; other scripts as one line fitted to its box; vertical
+/// lines as a column. The lookup highlight and the tap use the same cells,
+/// so they land on the characters under them. A block without line boxes is
+/// drawn as one paragraph fitted to the block.
 class VideoOcrText extends StatelessWidget {
   const VideoOcrText({
     super.key,
     required this.block,
     required this.selected,
     required this.onLookup,
+    this.lineRects,
     this.selectionOffset,
     this.matchLength = 0,
   });
@@ -653,10 +767,35 @@ class VideoOcrText extends StatelessWidget {
   final bool selected;
   final int? selectionOffset;
   final int matchLength;
+
+  /// Each line's box in this block's coordinates, one per
+  /// [OcrTextBlock.lines] entry.
+  final List<Rect>? lineRects;
   final void Function(int offset, Offset position) onLookup;
 
   @override
   Widget build(BuildContext context) {
+    final lines = videoOcrLines(block, lineRects);
+    if (lines == null) return _paragraph();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (details) {
+        final offset = videoOcrOffsetAt(lines, details.localPosition);
+        if (offset != null) onLookup(offset, details.globalPosition);
+      },
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: _VideoOcrLinesPainter(
+          lines: lines,
+          selected: selected,
+          selectionOffset: selectionOffset,
+          matchLength: matchLength,
+        ),
+      ),
+    );
+  }
+
+  Widget _paragraph() {
     final lines = block.lines.where((line) => line.trim().isNotEmpty).toList();
     final text = lines.join('\n');
     if (text.isEmpty) return const SizedBox.shrink();
@@ -710,19 +849,7 @@ class VideoOcrText extends StatelessWidget {
               textDirection: TextDirection.ltr,
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: selected ? 0.75 : 0.10),
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withValues(
-                        alpha: selected ? 0.75 : 0.10,
-                      ),
-                      blurRadius: 2,
-                    ),
-                  ],
-                ),
+                style: _videoOcrTextStyle(selected, 28),
                 children: [
                   if (start == null)
                     TextSpan(text: text)
@@ -739,6 +866,146 @@ class VideoOcrText extends StatelessWidget {
       ),
     );
   }
+}
+
+TextStyle _videoOcrTextStyle(bool selected, double fontSize) => TextStyle(
+  color: Colors.white.withValues(alpha: selected ? 0.75 : 0.10),
+  fontSize: fontSize,
+  fontWeight: FontWeight.w600,
+  height: 1,
+  shadows: [
+    Shadow(
+      color: Colors.black.withValues(alpha: selected ? 0.75 : 0.10),
+      blurRadius: 2,
+    ),
+  ],
+);
+
+class _VideoOcrLinesPainter extends CustomPainter {
+  const _VideoOcrLinesPainter({
+    required this.lines,
+    required this.selected,
+    required this.selectionOffset,
+    required this.matchLength,
+  });
+
+  final List<VideoOcrLine> lines;
+  final bool selected;
+  final int? selectionOffset;
+  final int matchLength;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final line in lines) {
+      final highlight = _highlight(line);
+      if (highlight != null) {
+        canvas.drawRect(
+          highlight,
+          Paint()..color = Colors.amber.withValues(alpha: 0.45),
+        );
+      }
+      canvas.save();
+      canvas.clipRect(line.rect);
+      if (line.vertical) {
+        _paintVertical(canvas, line);
+      } else if (readerOcrUsesCharacterCells(line.text)) {
+        _paintCells(canvas, line);
+      } else {
+        _paintFitted(canvas, line);
+      }
+      canvas.restore();
+    }
+  }
+
+  /// The looked-up characters' cells on [line], if any fall on it.
+  Rect? _highlight(VideoOcrLine line) {
+    final start = selectionOffset;
+    if (start == null) return null;
+    final end = start + (matchLength > 0 ? matchLength : 1);
+    final lineEnd = line.start + line.text.length;
+    if (start >= lineEnd || end <= line.start) return null;
+    final from = line.cellEdges[math.max(start, line.start) - line.start];
+    final to = line.cellEdges[math.min(end, lineEnd) - line.start];
+    final rect = line.rect;
+    return line.vertical
+        ? Rect.fromLTRB(
+            rect.left,
+            rect.top + from * rect.height,
+            rect.right,
+            rect.top + to * rect.height,
+          )
+        : Rect.fromLTRB(
+            rect.left + from * rect.width,
+            rect.top,
+            rect.left + to * rect.width,
+            rect.bottom,
+          );
+  }
+
+  TextPainter _glyph(String text, double fontSize) => TextPainter(
+    maxLines: 1,
+    text: TextSpan(text: text, style: _videoOcrTextStyle(selected, fontSize)),
+    textDirection: TextDirection.ltr,
+  )..layout();
+
+  void _paintCells(Canvas canvas, VideoOcrLine line) {
+    final rect = line.rect;
+    final fontSize = readerOcrCellFontSize(
+      lineThickness: rect.height,
+      lineLength: rect.width,
+      cellEdges: line.cellEdges,
+    );
+    final edges = line.cellEdges;
+    for (var index = 0; index < line.text.length; index++) {
+      final painter = _glyph(line.text[index], fontSize);
+      painter.paint(
+        canvas,
+        Offset(
+          rect.left +
+              rect.width * (edges[index] + edges[index + 1]) / 2 -
+              painter.width / 2,
+          rect.center.dy - painter.height / 2,
+        ),
+      );
+    }
+  }
+
+  void _paintFitted(Canvas canvas, VideoOcrLine line) {
+    final rect = line.rect;
+    final painter = _glyph(line.text, math.max(1, rect.height * 0.85));
+    canvas.translate(rect.left, rect.center.dy - painter.height / 2);
+    canvas.scale(rect.width / math.max(1, painter.width), 1);
+    painter.paint(canvas, Offset.zero);
+  }
+
+  void _paintVertical(Canvas canvas, VideoOcrLine line) {
+    final rect = line.rect;
+    final fontSize = readerOcrVerticalFontSize(
+      boxWidth: rect.width,
+      boxHeight: rect.height,
+      glyphCount: line.text.length,
+    );
+    final edges = line.cellEdges;
+    for (var index = 0; index < line.text.length; index++) {
+      final painter = _glyph(line.text[index], fontSize);
+      painter.paint(
+        canvas,
+        Offset(
+          rect.center.dx - painter.width / 2,
+          rect.top +
+              rect.height * (edges[index] + edges[index + 1]) / 2 -
+              painter.height / 2,
+        ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_VideoOcrLinesPainter oldDelegate) =>
+      !identical(oldDelegate.lines, lines) ||
+      oldDelegate.selected != selected ||
+      oldDelegate.selectionOffset != selectionOffset ||
+      oldDelegate.matchLength != matchLength;
 }
 
 class _VideoFrameMapping {
@@ -768,11 +1035,29 @@ class _VideoFrameMapping {
     );
   }
 
-  Rect mapBlock(OcrTextBlock block) {
-    final left = block.xmin * imageSize.width;
-    final top = block.ymin * imageSize.height;
-    final right = block.xmax * imageSize.width;
-    final bottom = block.ymax * imageSize.height;
+  Rect mapBlock(OcrTextBlock block) =>
+      _mapNormalized(block.xmin, block.ymin, block.xmax, block.ymax);
+
+  /// Each of [block]'s lines' boxes relative to [blockRect], the block's own
+  /// mapped box; null when the engine gave no box for each line.
+  List<Rect>? lineRectsWithin(OcrTextBlock block, Rect blockRect) {
+    if (block.lineGeometries.length != block.lines.length) return null;
+    return [
+      for (final geometry in block.lineGeometries)
+        _mapNormalized(
+          geometry.xmin,
+          geometry.ymin,
+          geometry.xmax,
+          geometry.ymax,
+        ).shift(-blockRect.topLeft),
+    ];
+  }
+
+  Rect _mapNormalized(double xmin, double ymin, double xmax, double ymax) {
+    final left = xmin * imageSize.width;
+    final top = ymin * imageSize.height;
+    final right = xmax * imageSize.width;
+    final bottom = ymax * imageSize.height;
     return Rect.fromLTRB(
       destination.left +
           (left - source.left) * destination.width / source.width,

@@ -1899,7 +1899,7 @@ class ReaderOcrController extends ChangeNotifier {
         scaleY,
       );
       if (rect.isEmpty) continue;
-      final vertical = block.vertical || _looksVertical(geo);
+      final vertical = block.vertical || readerOcrLineLooksVertical(geo);
       boxes.add(
         _OcrLineBox(
           text: line,
@@ -2016,7 +2016,9 @@ bool _isLookupStartChar(String char) {
   return true;
 }
 
-bool _looksVertical(OcrLineGeometry geo) {
+/// Whether an OCR line box is tall enough to be a vertical (top-to-bottom)
+/// line, for engines that do not say.
+bool readerOcrLineLooksVertical(OcrLineGeometry geo) {
   final width = geo.xmax - geo.xmin;
   if (width <= 0) return false;
   return (geo.ymax - geo.ymin) / width > 1.2;
@@ -2075,7 +2077,6 @@ double readerOcrBlockFontSize({
 /// Character cell edges along a line's reading axis, as fractions of its
 /// box: the engine's [glyphEdges] when they fit [length] characters,
 /// otherwise equal cells. Cell `i` spans `edges[i]` to `edges[i + 1]`.
-@visibleForTesting
 List<double> readerOcrCellEdges(int length, List<double>? glyphEdges) {
   if (glyphEdges != null && glyphEdges.length == length + 1) return glyphEdges;
   final count = math.max(1, length);
@@ -2083,7 +2084,6 @@ List<double> readerOcrCellEdges(int length, List<double>? glyphEdges) {
 }
 
 /// The character whose cell holds [fraction] of the way along the line.
-@visibleForTesting
 int readerOcrCellAt(List<double> edges, double fraction) {
   final last = edges.length - 2;
   if (last <= 0) return 0;
@@ -2101,7 +2101,6 @@ int readerOcrCellAt(List<double> edges, double fraction) {
 /// font about a ninth larger than the line. Solid-set CJK advances about one
 /// em per character, so the typical cell length caps the size and
 /// neighbours never overlap.
-@visibleForTesting
 double readerOcrCellFontSize({
   required double lineThickness,
   required double lineLength,
@@ -2122,7 +2121,6 @@ double readerOcrCellFontSize({
 /// Whether a horizontal line is painted one glyph per equal cell, as the
 /// lookup highlight and the hit test divide it: true when most of its
 /// characters are full-width CJK, kana or Hangul.
-@visibleForTesting
 bool readerOcrUsesCharacterCells(String text) {
   if (text.isEmpty) return false;
   var wide = 0;
@@ -2154,7 +2152,6 @@ double readerOcrHorizontalTextScale({
 /// the bottom characters. The size now tracks the smaller of the per-row height
 /// and the box width and is clamped so the whole column stays inside the box in
 /// both dimensions; a floor is only applied when it does not force overflow.
-@visibleForTesting
 double readerOcrVerticalFontSize({
   required double boxWidth,
   required double boxHeight,

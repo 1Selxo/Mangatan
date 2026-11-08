@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shiori/shiori.dart';
+import 'package:mangayomi/services/player_output_preferences.dart';
 import 'package:mangayomi/modules/widgets/settings/settings_rows.dart';
 import 'package:mangayomi/modules/anime/utils/temporary_playback_speed.dart';
 import 'package:mangayomi/modules/anime/utils/player_labels.dart';
@@ -256,9 +257,9 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   bool _routeExitInProgress = false;
   bool _videoTextureVisible = true;
   bool _resumePlaybackAfterWindowsSuspend = false;
-  ({double width, double height})? _linuxVideoViewport;
-  ({int width, int height})? _linuxVideoOutputSize;
-  bool _linuxVideoResizeScheduled = false;
+  ({double width, double height})? _videoViewport;
+  ({int width, int height})? _videoOutputSize;
+  bool _videoResizeScheduled = false;
   late final GlobalKey<VideoState> _key = GlobalKey<VideoState>();
   late final useLibass = ref.read(useLibassStateProvider);
   late final useMpvConfig = ref.read(useMpvConfigStateProvider);
@@ -276,6 +277,8 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
       libass: useLibass,
       config: true,
       configDir: useMpvConfig ? widget.mpvDirectory?.path ?? "" : "",
+      // Warnings too, so a shader the video output rejects is logged.
+      logLevel: MPVLogLevel.warn,
       options: {
         if (debandingType == DebandingType.cpu) "vf": "gradfun=radius=12",
         if (debandingType == DebandingType.gpu) "deband": "yes",
@@ -323,6 +326,14 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   );
   late final hwdecMode = ref.read(hwdecModeStateProvider());
   late final enableHardwareAccel = ref.read(enableHardwareAccelStateProvider);
+
+  /// Whether video reaches Flutter through a GPU texture: mpv's shaders
+  /// need it. Windows opts in (see [PlayerOutputPreferences]).
+  late final bool _gpuVideoOutput = shouldUseHardwareAcceleratedVideoOutput(
+    userEnabled: enableHardwareAccel,
+    isWindows: Platform.isWindows,
+    windowsGpuOptIn: PlayerOutputPreferences.windowsGpuOutput.value,
+  );
   late final VideoController _controller;
   late final _streamController = ref.read(
     animeStreamControllerProvider(episode: widget.episode).notifier,
@@ -396,6 +407,10 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
   late final StreamSubscription<List<String>> _subtitleTextSub;
   late final StreamSubscription<Track> _selectedTrackSub;
   late final StreamSubscription<String> _playerErrorSub;
+  late final StreamSubscription<int?> _videoWidthSub;
+  late final StreamSubscription<PlayerLog> _mpvLogSub;
+  final Set<String> _loggedMpvMessages = {};
+  late final StreamSubscription<int?> _videoHeightSub;
   String? _lastPlayerError;
   DateTime? _lastPlayerErrorAt;
   final Set<String> _failedAudioTrackKeys = {};
@@ -1780,10 +1795,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _player,
       configuration: VideoControllerConfiguration(
         hwdec: hwdecMode,
-        enableHardwareAcceleration: shouldUseHardwareAcceleratedVideoOutput(
-          userEnabled: enableHardwareAccel,
-          isWindows: Platform.isWindows,
-        ),
+        enableHardwareAcceleration: _gpuVideoOutput,
         vo: Platform.isAndroid
             ? useGpuNext
                   ? "gpu-next"
@@ -1840,6 +1852,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       _syncNativeSubtitlePaintSoon();
     });
     _playerErrorSub = _player.stream.error.listen(_reportPlaybackError);
+    _mpvLogSub = _player.stream.log.listen(_logMpvVideoMessage);
+    _videoWidthSub = _player.stream.width.listen(
+      (_) => _scheduleVideoOutputResize(),
+    );
+    _videoHeightSub = _player.stream.height.listen(
+      (_) => _scheduleVideoOutputResize(),
+    );
+    _fit.addListener(_scheduleVideoOutputResize);
     _completed;
     _currentTotalDurationSub;
     unawaited(_initializePlayback());
@@ -1937,7 +1957,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           start: start,
         ),
       );
-      _scheduleLinuxVideoOutputResize();
+      _scheduleVideoOutputResize();
       if (start > Duration.zero) {
         // Media(start:) is unreliable for some sources. Seek again once the
         // stream reports a duration; a redundant seek is harmless.
@@ -2150,6 +2170,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     _currentPosition.removeListener(_updateRpcTimestamp);
     _subDelayController.removeListener(_onSubDelayChanged);
     _subSpeedController.removeListener(_onSubSpeedChanged);
+    _fit.removeListener(_scheduleVideoOutputResize);
     _nativeSubtitlePaintTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _setCurrentPosition(true, saveWatchTime: true);
@@ -2160,6 +2181,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
         _subtitleTextSub.cancel(),
         _selectedTrackSub.cancel(),
         _playerErrorSub.cancel(),
+        _mpvLogSub.cancel(),
+        _videoWidthSub.cancel(),
+        _videoHeightSub.cancel(),
         _currentTotalDurationSub.cancel(),
       ],
       // The Video widget is normally retired before route navigation. Keep a
@@ -3065,51 +3089,62 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   }
 
   List<Widget> _buildMpvSettingsButton(BuildContext context) {
+    final shadersAvailable = playerShadersAvailable(
+      useMpvConfig: useMpvConfig,
+      gpuVideoOutput: _gpuVideoOutput,
+    );
     return [
-      PopupMenuButton<String>(
-        tooltip: 'Shaders',
-        icon: const Icon(Icons.high_quality, color: Colors.white),
-        itemBuilder: (context) =>
-            [
-                  ("Anime4K: Mode A (Fast)", "set_anime_a"),
-                  ("Anime4K: Mode B (Fast)", "set_anime_b"),
-                  ("Anime4K: Mode C (Fast)", "set_anime_c"),
-                  ("Anime4K: Mode A+A (Fast)", "set_anime_aa"),
-                  ("Anime4K: Mode B+B (Fast)", "set_anime_bb"),
-                  ("Anime4K: Mode C+A (Fast)", "set_anime_ca"),
-                  ("Anime4K: Mode A (HQ)", "set_anime_hq_a"),
-                  ("Anime4K: Mode B (HQ)", "set_anime_hq_b"),
-                  ("Anime4K: Mode C (HQ)", "set_anime_hq_c"),
-                  ("Anime4K: Mode A+A (HQ)", "set_anime_hq_aa"),
-                  ("Anime4K: Mode B+B (HQ)", "set_anime_hq_bb"),
-                  ("Anime4K: Mode C+A (HQ)", "set_anime_hq_ca"),
-                  ("AMD FSR", "set_fsr"),
-                  ("Luma Upscaling", "set_luma"),
-                  ("Qualcomm Snapdragon GSR", "set_snapdragon"),
-                  ("NVIDIA Image Scaling", "set_nvidia"),
-                  ("Clear GLSL shaders", "clear_anime"),
-                ]
-                .map(
-                  (mode) => PopupMenuItem<String>(
-                    value: mode.$1,
-                    child: Text(
-                      mode.$1,
-                      style: TextStyle(
-                        fontWeight: _selectedShader.value == mode.$1
-                            ? FontWeight.w900
-                            : FontWeight.normal,
-                      ),
+      if (shadersAvailable)
+        PopupMenuButton<String>(
+          tooltip: 'Shaders',
+          icon: const Icon(Icons.high_quality, color: Colors.white),
+          itemBuilder: (context) =>
+              [
+                    ("Anime4K: Mode A (Fast)", "set_anime_a"),
+                    ("Anime4K: Mode B (Fast)", "set_anime_b"),
+                    ("Anime4K: Mode C (Fast)", "set_anime_c"),
+                    ("Anime4K: Mode A+A (Fast)", "set_anime_aa"),
+                    ("Anime4K: Mode B+B (Fast)", "set_anime_bb"),
+                    ("Anime4K: Mode C+A (Fast)", "set_anime_ca"),
+                    ("Anime4K: Mode A (HQ)", "set_anime_hq_a"),
+                    ("Anime4K: Mode B (HQ)", "set_anime_hq_b"),
+                    ("Anime4K: Mode C (HQ)", "set_anime_hq_c"),
+                    ("Anime4K: Mode A+A (HQ)", "set_anime_hq_aa"),
+                    ("Anime4K: Mode B+B (HQ)", "set_anime_hq_bb"),
+                    ("Anime4K: Mode C+A (HQ)", "set_anime_hq_ca"),
+                    ("AMD FSR", "set_fsr"),
+                    ("Luma Upscaling", "set_luma"),
+                    ("Qualcomm Snapdragon GSR", "set_snapdragon"),
+                    ("NVIDIA Image Scaling", "set_nvidia"),
+                    ("Clear GLSL shaders", "clear_anime"),
+                  ]
+                  .where(
+                    (mode) => desktopShaderPresetSupported(
+                      mode.$2,
+                      isLinux: Platform.isLinux,
                     ),
-                    onTap: () {
-                      (_player.platform as NativePlayer).command([
-                        "script-message",
-                        mode.$2,
-                      ]);
-                    },
-                  ),
-                )
-                .toList(),
-      ),
+                  )
+                  .map(
+                    (mode) => PopupMenuItem<String>(
+                      value: mode.$1,
+                      child: Text(
+                        mode.$1,
+                        style: TextStyle(
+                          fontWeight: _selectedShader.value == mode.$1
+                              ? FontWeight.w900
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      onTap: () {
+                        (_player.platform as NativePlayer).command([
+                          "script-message",
+                          mode.$2,
+                        ]);
+                      },
+                    ),
+                  )
+                  .toList(),
+        ),
       PopupMenuButton<String>(
         tooltip: 'Stats',
         icon: const Icon(Icons.memory, color: Colors.white),
@@ -3353,11 +3388,11 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     final skipIntroLength = ref.read(defaultSkipIntroLengthStateProvider);
     return LayoutBuilder(
       builder: (context, constraints) {
-        _linuxVideoViewport = (
+        _videoViewport = (
           width: constraints.maxWidth,
           height: constraints.maxHeight,
         );
-        _scheduleLinuxVideoOutputResize();
+        _scheduleVideoOutputResize();
         return Listener(
           onPointerDown: _handleVideoOcrGestureDown,
           onPointerMove: _handleVideoOcrGestureMove,
@@ -3539,33 +3574,77 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
   }
 
-  void _scheduleLinuxVideoOutputResize() {
-    if (!Platform.isLinux ||
-        _linuxVideoResizeScheduled ||
-        _linuxVideoViewport == null) {
+  /// Keeps mpv's warnings and errors about the video output (a shader it
+  /// cannot compile, a missing GPU feature) in the app's log, each once.
+  void _logMpvVideoMessage(PlayerLog entry) {
+    if (entry.level != 'warn' && entry.level != 'error') return;
+    final prefix = entry.prefix;
+    final aboutVideo =
+        prefix.startsWith('vo') ||
+        prefix.contains('gpu') ||
+        prefix.contains('libmpv') ||
+        entry.text.contains('shader');
+    if (!aboutVideo) return;
+    final message = '[mpv $prefix] ${entry.text.trim()}';
+    if (_loggedMpvMessages.length > 200 || !_loggedMpvMessages.add(message)) {
       return;
     }
-    _linuxVideoResizeScheduled = true;
+    AppLogger.log(message, logLevel: LogLevel.warning);
+  }
+
+  /// Sizes the native video texture to what is on screen.
+  ///
+  /// Linux sizes it to the viewport, which keeps each frame cheap across its
+  /// two EGL contexts. macOS, and Windows on the GPU output, keep the video's
+  /// shape scaled to the screen pixels, so mpv's upscaling shaders see a
+  /// larger output than the source and run. Windows' pixel buffer keeps the
+  /// source size: it is drawn in software, where the shaders never run.
+  void _scheduleVideoOutputResize() {
+    final scalesToScreen =
+        _gpuVideoOutput && (Platform.isMacOS || Platform.isWindows);
+    if (!(Platform.isLinux || scalesToScreen) ||
+        _videoResizeScheduled ||
+        _videoViewport == null) {
+      return;
+    }
+    _videoResizeScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _linuxVideoResizeScheduled = false;
+      _videoResizeScheduled = false;
       if (!mounted) return;
-      final viewport = _linuxVideoViewport;
+      final viewport = _videoViewport;
       if (viewport == null) return;
-      final outputSize = linuxVideoOutputSize(
-        logicalWidth: viewport.width,
-        logicalHeight: viewport.height,
-        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-      );
-      if (outputSize == null || outputSize == _linuxVideoOutputSize) return;
+      final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+      final ({int width, int height})? outputSize;
+      if (Platform.isLinux) {
+        outputSize = linuxVideoOutputSize(
+          logicalWidth: viewport.width,
+          logicalHeight: viewport.height,
+          devicePixelRatio: devicePixelRatio,
+        );
+      } else {
+        final fit = _fit.value;
+        outputSize = scaledVideoOutputSize(
+          videoWidth: _player.state.width ?? 0,
+          videoHeight: _player.state.height ?? 0,
+          logicalWidth: viewport.width,
+          logicalHeight: viewport.height,
+          devicePixelRatio: devicePixelRatio,
+          cover:
+              fit != BoxFit.contain &&
+              fit != BoxFit.scaleDown &&
+              fit != BoxFit.none,
+        );
+      }
+      if (outputSize == null || outputSize == _videoOutputSize) return;
       try {
         await _controller.setSize(
           width: outputSize.width,
           height: outputSize.height,
         );
-        _linuxVideoOutputSize = outputSize;
+        _videoOutputSize = outputSize;
       } catch (error, stackTrace) {
         AppLogger.log(
-          'Failed to resize Linux video output: $error\n$stackTrace',
+          'Failed to resize the video output: $error\n$stackTrace',
           logLevel: LogLevel.warning,
         );
       }

@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:mangayomi/services/player_output_preferences.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -15,6 +18,25 @@ class PlayerDecoderScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerDecoderScreenState extends ConsumerState<PlayerDecoderScreen> {
+  /// Asks before turning the GPU output on: it trades the crash-safe pixel
+  /// buffer for shaders.
+  Future<void> _setWindowsGpuOutput(BuildContext context, bool value) async {
+    if (value) {
+      final confirmed = await showShioriConfirm(
+        context,
+        title: 'Use the GPU video output?',
+        message:
+            'mpv shaders such as Anime4K only run on the GPU output. On some '
+            'Windows systems Flutter loses its graphics while a video is '
+            'drawn this way, which closes the app. Turn it off again if '
+            'that happens.',
+        confirmLabel: 'Use GPU output',
+      );
+      if (!confirmed) return;
+    }
+    await PlayerOutputPreferences.setWindowsGpuOutput(value);
+  }
+
   @override
   Widget build(BuildContext context) {
     final enableHardwareAccel = ref.watch(enableHardwareAccelStateProvider);
@@ -39,6 +61,22 @@ class _PlayerDecoderScreenState extends ConsumerState<PlayerDecoderScreen> {
                 onChanged: (v) =>
                     ref.read(enableHardwareAccelStateProvider.notifier).set(v),
               ),
+              if (Platform.isWindows)
+                ValueListenableBuilder<bool>(
+                  valueListenable: PlayerOutputPreferences.windowsGpuOutput,
+                  builder: (context, gpuOutput, _) => ShioriSwitchRow(
+                    title: 'GPU video output',
+                    subtitle: enableHardwareAccel
+                        ? 'Needed for mpv shaders. Can close the app when '
+                              'Windows resets its graphics (sleep, driver '
+                              'updates). Applies from the next episode.'
+                        : 'Needs hardware acceleration.',
+                    value: gpuOutput && enableHardwareAccel,
+                    onChanged: enableHardwareAccel
+                        ? (v) => _setWindowsGpuOutput(context, v)
+                        : null,
+                  ),
+                ),
               ShioriValueRow<String>(
                 title: l10n.hwdec,
                 value: hwdecMode,

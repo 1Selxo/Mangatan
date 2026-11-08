@@ -86,6 +86,113 @@ void main() {
     );
   });
 
+  test('Windows uses the GPU texture only when opted in', () {
+    expect(
+      shouldUseHardwareAcceleratedVideoOutput(
+        userEnabled: true,
+        isWindows: true,
+        windowsGpuOptIn: true,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldUseHardwareAcceleratedVideoOutput(
+        userEnabled: false,
+        isWindows: true,
+        windowsGpuOptIn: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test('shaders need both the mpv config and the GPU output', () {
+    expect(
+      playerShadersAvailable(useMpvConfig: true, gpuVideoOutput: true),
+      isTrue,
+    );
+    expect(
+      playerShadersAvailable(useMpvConfig: true, gpuVideoOutput: false),
+      isFalse,
+    );
+    expect(
+      playerShadersAvailable(useMpvConfig: false, gpuVideoOutput: true),
+      isFalse,
+    );
+  });
+
+  test('desktop hides the shader presets its renderer cannot run', () {
+    for (final isLinux in [true, false]) {
+      expect(
+        desktopShaderPresetSupported('set_anime_a', isLinux: isLinux),
+        isTrue,
+      );
+      expect(desktopShaderPresetSupported('set_fsr', isLinux: isLinux), isTrue);
+      expect(
+        desktopShaderPresetSupported('set_luma', isLinux: isLinux),
+        isFalse,
+      );
+      expect(
+        desktopShaderPresetSupported('set_snapdragon', isLinux: isLinux),
+        isFalse,
+      );
+    }
+    expect(desktopShaderPresetSupported('set_nvidia', isLinux: true), isTrue);
+    expect(desktopShaderPresetSupported('set_nvidia', isLinux: false), isFalse);
+  });
+
+  test('scaled output keeps the video shape and fits the screen', () {
+    // A 720p video in a 1920x1080 window at 1x: scaled up to the window,
+    // so an x2 upscaling shader sees a larger output than the source.
+    expect(
+      scaledVideoOutputSize(
+        videoWidth: 1280,
+        videoHeight: 720,
+        logicalWidth: 1920,
+        logicalHeight: 1080,
+        devicePixelRatio: 1,
+        cover: false,
+      ),
+      (width: 1920, height: 1080),
+    );
+    // A 4:3 video in a wide window: contained by height, covered by width.
+    expect(
+      scaledVideoOutputSize(
+        videoWidth: 640,
+        videoHeight: 480,
+        logicalWidth: 1600,
+        logicalHeight: 900,
+        devicePixelRatio: 1,
+        cover: false,
+      ),
+      (width: 1200, height: 900),
+    );
+    expect(
+      scaledVideoOutputSize(
+        videoWidth: 640,
+        videoHeight: 480,
+        logicalWidth: 1600,
+        logicalHeight: 900,
+        devicePixelRatio: 1,
+        cover: true,
+      ),
+      (width: 1600, height: 1200),
+    );
+  });
+
+  test('scaled output waits for the video size', () {
+    expect(
+      scaledVideoOutputSize(
+        videoWidth: 0,
+        videoHeight: 0,
+        logicalWidth: 1920,
+        logicalHeight: 1080,
+        devicePixelRatio: 1,
+        cover: false,
+      ),
+      isNull,
+    );
+  });
+
   test('Linux video output follows the physical viewport', () {
     expect(
       linuxVideoOutputSize(

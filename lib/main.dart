@@ -58,6 +58,7 @@ import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/dictionary_update_service.dart';
 import 'package:mangayomi/services/mining/anki_mobile_service.dart';
 import 'package:mangayomi/services/youtube/youtube_preferences.dart';
+import 'package:mangayomi/services/player_output_preferences.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
 import 'package:mangayomi/utils/discord_rpc.dart';
 import 'package:mangayomi/services/crash_report.dart';
@@ -364,6 +365,7 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   // The tracker library cache moved to Isar; its old Hive files go.
   unawaited(_deleteLegacyHiveCache());
   YouTubePreferences.markStorageReady();
+  unawaited(PlayerOutputPreferences.load());
   unawaited(DictionaryUpdateService.instance.runAutomaticIfDue());
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");

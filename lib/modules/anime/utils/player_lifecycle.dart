@@ -63,11 +63,80 @@ bool shouldExitDesktopFullscreenOnDispose({
 /// external texture is still being painted. media_kit's GPU output then calls
 /// `GrDirectContext::flush` through a null context and terminates the process.
 /// The pixel-buffer output avoids that engine path while leaving media decode
-/// acceleration controlled independently by `hwdec`.
+/// acceleration controlled independently by `hwdec`, so Windows uses it
+/// unless the user opts into the GPU output ([windowsGpuOptIn]), which mpv's
+/// GLSL shaders need: the pixel buffer is rendered in software.
 bool shouldUseHardwareAcceleratedVideoOutput({
   required bool userEnabled,
   required bool isWindows,
-}) => userEnabled && !isWindows;
+  bool windowsGpuOptIn = false,
+}) => userEnabled && (!isWindows || windowsGpuOptIn);
+
+/// Whether mpv's GLSL shaders can change the picture: they run only when mpv
+/// draws on the GPU, and only with the mpv configuration that holds them.
+bool playerShadersAvailable({
+  required bool useMpvConfig,
+  required bool gpuVideoOutput,
+}) => useMpvConfig && gpuVideoOutput;
+
+/// Whether a shader preset of the bundled mpv scripts can run on the desktop
+/// player, which draws through libmpv's render API with mpv's older `gpu`
+/// renderer.
+///
+/// That renderer does not know `//!PARAM` (only `gpu-next` does), which the
+/// Luma (CfL) and Snapdragon GSR presets use. Luma's ArtCNN and NVIDIA Image
+/// Scaling are compute shaders, which the OpenGL ES output on Windows and
+/// macOS' OpenGL 4.1 cannot compile. A preset that fails is dropped while the
+/// video plays and draws a black frame while it is paused.
+bool desktopShaderPresetSupported(String command, {required bool isLinux}) =>
+    switch (command) {
+      'set_luma' || 'set_snapdragon' => false,
+      'set_nvidia' => isLinux,
+      _ => true,
+    };
+
+/// The texture size for a GPU video output: the video's own shape, scaled to
+/// the physical pixels the current fit shows it at.
+///
+/// media_kit otherwise renders at the source resolution and Flutter scales
+/// the texture, so mpv never sees the screen's size and upscaling shaders
+/// (Anime4K's x2 stages run only when the output is larger than the source)
+/// are skipped. Keeping the video's aspect lets Flutter's fit modes crop and
+/// stretch the texture as before. [cover] sizes for the fits that fill the
+/// viewport (cover, fill, fit width or height) rather than fit inside it.
+({int width, int height})? scaledVideoOutputSize({
+  required int videoWidth,
+  required int videoHeight,
+  required double logicalWidth,
+  required double logicalHeight,
+  required double devicePixelRatio,
+  required bool cover,
+}) {
+  if (videoWidth <= 0 ||
+      videoHeight <= 0 ||
+      !logicalWidth.isFinite ||
+      !logicalHeight.isFinite ||
+      !devicePixelRatio.isFinite ||
+      logicalWidth <= 0 ||
+      logicalHeight <= 0 ||
+      devicePixelRatio <= 0) {
+    return null;
+  }
+  final viewportWidth = logicalWidth * devicePixelRatio;
+  final viewportHeight = logicalHeight * devicePixelRatio;
+  final scaleX = viewportWidth / videoWidth;
+  final scaleY = viewportHeight / videoHeight;
+  final scale = cover
+      ? (scaleX > scaleY ? scaleX : scaleY)
+      : (scaleX < scaleY ? scaleX : scaleY);
+
+  int even(double pixels) {
+    final rounded = pixels.ceil();
+    return rounded.isEven ? rounded : rounded + 1;
+  }
+
+  return (width: even(videoWidth * scale), height: even(videoHeight * scale));
+}
 
 /// Chooses the native video texture size for the visible Linux viewport.
 ///

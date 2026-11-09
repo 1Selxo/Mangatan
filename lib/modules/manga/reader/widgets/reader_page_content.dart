@@ -13,6 +13,7 @@ import 'package:mangayomi/modules/manga/reader/utils/webtoon_scroll_physics.dart
 import 'package:mangayomi/modules/manga/reader/widgets/reader_page_states.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/color_filter_widget.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/smart_page_background.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/image_actions_dialog.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_paged.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
@@ -231,6 +232,10 @@ class ReaderPageContent extends ConsumerWidget {
                   if (index1 < pages.length) pages[index1],
                   if (index2 != null && index2 < pages.length) pages[index2],
                 ];
+                if (backgroundColor == BackgroundColor.automatic) {
+                  // Two spreads either way.
+                  prefetchSmartBackgrounds(pages, index2 ?? index1, radius: 4);
+                }
                 return DoublePageView.paged(
                   key: ValueKey('spread_${index}_${index1}_$index2'),
                   pages: isReverseHorizontal
@@ -279,6 +284,9 @@ class ReaderPageContent extends ConsumerWidget {
               allowImplicitScrolling: true,
               itemBuilder: (BuildContext context, int index) {
                 final page = pages[index];
+                if (backgroundColor == BackgroundColor.automatic) {
+                  prefetchSmartBackgrounds(pages, index);
+                }
                 return ReaderPagedItem(
                   key: ValueKey('paged-${page.widgetKey(index)}'),
                   index: index,
@@ -332,7 +340,7 @@ class ReaderPagedItem extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (page.isTransitionPage) return TransitionViewPaged(data: page);
 
-    return ImageViewPaged(
+    final view = ImageViewPaged(
       data: page,
       pageController: pageController,
       controller: controller,
@@ -388,5 +396,8 @@ class ReaderPagedItem extends ConsumerWidget {
         chapterName: chapter.name!,
       ),
     );
+    return backgroundColor == BackgroundColor.automatic
+        ? SmartPageBackground(pages: [page], child: view)
+        : view;
   }
 }

@@ -10,6 +10,7 @@ import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_paged.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_page_states.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/smart_page_background.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart';
@@ -220,7 +221,13 @@ class _DoublePageViewState extends State<DoublePageView>
       return _buildTransitionPage();
     }
 
-    return widget.isPagedMode ? _buildPagedMode() : _buildVerticalMode();
+    if (!widget.isPagedMode) return _buildVerticalMode();
+    final view = _buildPagedMode();
+    if (widget.backgroundColor != BackgroundColor.automatic) return view;
+    return SmartPageBackground(
+      pages: widget.pages.whereType<UChapDataPreload>().toList(),
+      child: view,
+    );
   }
 
   bool _isTransitionPage() {

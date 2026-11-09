@@ -15,10 +15,6 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 /// fork's reader implements it.
 const unsupportedReaderSwitches = <ReaderSwitch>{};
 
-/// Whether the reader picks its background from the page; like
-/// [unsupportedReaderSwitches], not implemented by the fork's reader yet.
-const readerAutomaticBackgroundSupported = false;
-
 /// Whether any page layout setting does something, so the group showing
 /// them is worth showing.
 bool get readerPageLayoutSupported => const [

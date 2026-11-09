@@ -132,17 +132,87 @@ Widget applyReaderColorFilter(Widget child, WidgetRef ref) {
 /// The reader's background in [color], filling the space it is given, under
 /// the same colour filters as the pages: a tint or inverted pages would
 /// otherwise sit on a background left as it is.
-Widget readerBackground(BuildContext context, WidgetRef ref, Color color) {
-  final (blendMode, tint) = chapterColorFIlterValues(context, ref);
-  Widget background = SizedBox.expand(child: ColoredBox(color: color));
-  if (tint != null) {
-    background = ColorFiltered(
-      // As the pages are tinted: see SubsamplingImageRenderWidget.
-      colorFilter: ColorFilter.mode(tint, blendMode ?? BlendMode.srcIn),
-      child: background,
+Widget readerBackground(BuildContext context, WidgetRef ref, Color color) =>
+    ReaderBackgroundFill(color: color);
+
+/// [color] or [gradient] filling the space it is given, under the custom
+/// tint and the enhancement filters as the pages are.
+///
+/// The tint is painted onto the background directly rather than through a
+/// [ColorFiltered] layer: with a blend mode such as multiply, such a layer
+/// turns the transparent parts of what is under it into the tint itself, and
+/// a page sliding in before its image was painted flashed in that colour.
+class ReaderBackgroundFill extends ConsumerWidget {
+  const ReaderBackgroundFill({super.key, this.color, this.gradient})
+    : assert(color != null || gradient != null);
+
+  final Color? color;
+  final Gradient? gradient;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (blendMode, tint) = chapterColorFIlterValues(context, ref);
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _BackgroundPainter(
+          color: color,
+          gradient: gradient,
+          tint: tint,
+          // As the pages are tinted: see SubsamplingImageRenderWidget.
+          blendMode: blendMode ?? BlendMode.srcIn,
+          filter: buildReaderColorFilter(ref),
+        ),
+      ),
     );
   }
-  return applyReaderColorFilter(background, ref);
+}
+
+class _BackgroundPainter extends CustomPainter {
+  const _BackgroundPainter({
+    required this.color,
+    required this.gradient,
+    required this.tint,
+    required this.blendMode,
+    required this.filter,
+  });
+
+  final Color? color;
+  final Gradient? gradient;
+  final Color? tint;
+  final BlendMode blendMode;
+  final ColorFilter? filter;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    // Everything in this layer is opaque, so the filters only ever see the
+    // background.
+    if (filter != null) canvas.saveLayer(rect, Paint()..colorFilter = filter);
+    final paint = Paint();
+    if (gradient != null) {
+      paint.shader = gradient!.createShader(rect);
+    } else {
+      paint.color = color!;
+    }
+    canvas.drawRect(rect, paint);
+    if (tint != null) {
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..color = tint!
+          ..blendMode = blendMode,
+      );
+    }
+    if (filter != null) canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BackgroundPainter old) =>
+      old.color != color ||
+      old.gradient != gradient ||
+      old.tint != tint ||
+      old.blendMode != blendMode ||
+      old.filter != filter;
 }
 
 (BlendMode?, Color?) chapterColorFIlterValues(

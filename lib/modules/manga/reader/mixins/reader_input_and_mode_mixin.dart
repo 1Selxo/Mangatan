@@ -29,6 +29,14 @@ mixin ReaderInputAndModeMixin<T extends ConsumerStatefulWidget>
   ScrollController get inputContinuousScrollController;
   bool get isReverseHorizontalForInput;
 
+  /// Focuses the next or previous panel of the page shown instead of
+  /// turning it (Mangatan's panel navigation); false to turn the page.
+  Future<bool> navigatePanel({required bool forward});
+
+  /// Whether page turns go through [navigatePanel], which then also takes
+  /// a zoomed page's turns rather than panning across it.
+  bool get panelNavigationActive;
+
   /// When the wheel last turned a page, so one flick of it turns one page
   /// rather than every notch of a trackpad's inertia.
   DateTime _lastWheelTurn = DateTime.fromMillisecondsSinceEpoch(0);
@@ -108,7 +116,10 @@ mixin ReaderInputAndModeMixin<T extends ConsumerStatefulWidget>
     final navigateToPan = ref.read(navigateToPanStateProvider);
     final actualIdx = pageViewToActualIndex(curIdx);
     final controller = pageControllers[actualIdx];
-    if (navigateToPan && controller != null && controller.isReady) {
+    if (navigateToPan &&
+        !panelNavigationActive &&
+        controller != null &&
+        controller.isReady) {
       if (forward) {
         if (isReverseHorizontalForInput) {
           if (controller.canPanLeft()) {
@@ -145,20 +156,23 @@ mixin ReaderInputAndModeMixin<T extends ConsumerStatefulWidget>
       }
     }
 
-    if (forward) {
-      navigationService.nextPage(
-        readerMode: readerMode,
-        currentIndex: curIdx,
-        maxPages: pageViewPageCount,
-        animate: animatePageTransitions,
-      );
-    } else {
-      navigationService.previousPage(
-        readerMode: readerMode,
-        currentIndex: curIdx,
-        animate: animatePageTransitions,
-      );
-    }
+    navigatePanel(forward: forward).then((focusedPanel) {
+      if (focusedPanel || !mounted) return;
+      if (forward) {
+        navigationService.nextPage(
+          readerMode: readerMode,
+          currentIndex: curIdx,
+          maxPages: pageViewPageCount,
+          animate: animatePageTransitions,
+        );
+      } else {
+        navigationService.previousPage(
+          readerMode: readerMode,
+          currentIndex: curIdx,
+          animate: animatePageTransitions,
+        );
+      }
+    });
   }
 
   /// Turns the page forward or back, panning first across a zoomed double
@@ -166,7 +180,9 @@ mixin ReaderInputAndModeMixin<T extends ConsumerStatefulWidget>
   void turnPage({required bool forward}) {
     final curIdx = currentDoublePageViewIndex;
     final zoomedSpread =
-        isCurrentPageZoomed && doublePageControllers[curIdx] != null;
+        !panelNavigationActive &&
+        isCurrentPageZoomed &&
+        doublePageControllers[curIdx] != null;
     if (zoomedSpread) {
       forward ? handleNextPageZoomed() : handlePreviousPageZoomed();
     } else {

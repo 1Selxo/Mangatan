@@ -92,6 +92,9 @@ class ReaderBottomBar extends ConsumerWidget {
   /// Opens auto-scroll's switch and speed.
   final VoidCallback? onAutoScrollPressed;
 
+  /// Opens the grid of the chapter's pages; null hides the button.
+  final VoidCallback? onPagePreviewsPressed;
+
   const ReaderBottomBar({
     super.key,
     required this.chapter,
@@ -114,6 +117,7 @@ class ReaderBottomBar extends ConsumerWidget {
     required this.backgroundColor,
     this.autoScrollEnabled,
     this.onAutoScrollPressed,
+    this.onPagePreviewsPressed,
   });
 
   bool get _isDoublePageMode => currentPageMode == PageMode.doublePage;
@@ -405,6 +409,13 @@ class ReaderBottomBar extends ConsumerWidget {
               color: accent,
             ),
           ),
+
+          if (onPagePreviewsPressed != null)
+            IconButton(
+              tooltip: 'Page previews',
+              onPressed: onPagePreviewsPressed,
+              icon: const Icon(Symbols.grid_view_rounded),
+            ),
 
           // Auto-scroll, where it runs: lit while it is on.
           if ((readerMode?.isVerticalContinuous ?? false) &&

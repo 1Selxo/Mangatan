@@ -54,6 +54,13 @@ class SubsamplingScaleImageViewController extends ChangeNotifier {
   int get sWidth => _state?._sWidth ?? 0;
   int get sHeight => _state?._sHeight ?? 0;
 
+  /// The size of the view the image is shown in.
+  ui.Size get viewSize => _state?._viewSize ?? ui.Size.zero;
+
+  /// The whole original image in source coordinates, past cropped borders
+  /// and the other half of a split page; null until the image is read.
+  ui.Rect? get wholeImageRect => _state?._wholeImage;
+
   ui.Size get imageSize {
     if (_state == null) return ui.Size.zero;
     return ui.Size(_state!._sWidth.toDouble(), _state!._sHeight.toDouble());

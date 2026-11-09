@@ -28,7 +28,7 @@ import 'package:mangayomi/modules/manga/reader/services/page_navigation_service.
 import 'package:mangayomi/modules/manga/reader/mixins/reader_memory_management.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_prefetch_mixin.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_split_pages_mixin.dart';
-import 'package:mangayomi/modules/manga/reader/mixins/reader_ocr_mixin.dart';
+import 'package:mangayomi/modules/manga/reader/mixins/reader_learning_mixin.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_zoom_control.dart';
 import 'package:mangayomi/modules/reader_common/widgets/reader_app_bar.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_auto_scroll_sheet.dart';
@@ -208,7 +208,7 @@ class _MangaChapterPageGalleryState
         ReaderZoomControl,
         PageNavigationMixin,
         ReaderSplitPagesMixin,
-        ReaderOcrMixin,
+        ReaderLearningMixin,
         ReaderInputAndModeMixin,
         ReaderAutoScroll {
   @override
@@ -538,7 +538,7 @@ class _MangaChapterPageGalleryState
   late bool _isReverseHorizontal = _cachedReaderMode.isRTL;
 
   Color _backgroundColor(BuildContext context) =>
-      context.shiori.color.ink1.withValues(alpha: Alphas.chrome);
+      eInkBarColor(context.shiori.color.ink1.withValues(alpha: Alphas.chrome));
 
   /// Toggles fullscreen. [value] is whether it is on now; F11 passes none,
   /// so off desktop the reader's own setting stands in for it.
@@ -580,7 +580,9 @@ class _MangaChapterPageGalleryState
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = ref.watch(backgroundColorStateProvider);
+    final backgroundColor = eInkBackground(
+      ref.watch(backgroundColorStateProvider),
+    );
     final fullScreenReader = ref.watch(fullScreenReaderStateProvider);
     final readerMode = ref.watch(_currentReaderMode);
     if (readerMode == null) return const SizedBox.shrink();
@@ -661,22 +663,8 @@ class _MangaChapterPageGalleryState
     listenToSplitSettings();
 
     return ReaderKeyboardHandler(
-      onPreviousPage: () {
-        if (isCurrentPageZoomed &&
-            doublePageControllers[_currentIndex] != null) {
-          handlePreviousPageZoomed();
-        } else {
-          handlePageNavigation(forward: false);
-        }
-      },
-      onNextPage: () {
-        if (isCurrentPageZoomed &&
-            doublePageControllers[_currentIndex] != null) {
-          handleNextPageZoomed();
-        } else {
-          handlePageNavigation(forward: true);
-        }
-      },
+      onPreviousPage: () => turnPage(forward: false),
+      onNextPage: () => turnPage(forward: true),
       onEscape: () => _goBack(context),
       onFullScreen: () => _setFullScreen(),
       onNextChapter: () => _goToChapter(true),
@@ -872,6 +860,7 @@ class _MangaChapterPageGalleryState
                   // In the bottom panel, within reach.
                   showChapterList: false,
                   onOcrPressed: ReaderOcrState.handleOcrButton,
+                  onStatsPressed: showStatsSheet,
                   onBackPressed: () => Navigator.pop(context),
                   onBookmarkPressed: () {
                     _readerController.setChapterBookmarked();
@@ -1027,6 +1016,7 @@ class _MangaChapterPageGalleryState
                   backgroundColor: _backgroundColor,
                   autoScrollEnabled: _autoScrollPage,
                   onAutoScrollPressed: _showAutoScrollSheet,
+                  onPagePreviewsPressed: showPagePreviews,
                 ),
                 // The page under the slider while it is dragged.
                 ReaderSliderPreviewOverlay(
@@ -1276,7 +1266,7 @@ class _MangaChapterPageGalleryState
       _updateHasCurrentError();
       _readerController.setPageIndex(idx, false, _chapterUrlModel.pageUrls);
       ref.read(currentIndexProvider(chapter).notifier).setCurrentIndex(idx);
-      scanChapterOcr(actualIndex);
+      onLearningPageShown(actualIndex);
     }
   }
 

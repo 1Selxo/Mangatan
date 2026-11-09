@@ -11,7 +11,6 @@ out, so it can be adopted later on purpose rather than by accident.
 | Area | Fork keeps | Upstream redesign not adopted | Effort to adopt |
 | --- | --- | --- | --- |
 | Anime player | `anime_player_view.dart` logic, subtitle widgets; the controls now use upstream's Shiori layout (floating timeline panel, top bar layout, lock, hold-and-slide speed) | Player split into mixins, shortcut pills, desktop volume/position buttons, settings sections | High: subtitles, mining, Jimaku and lookup live inside the player |
-| Manga reader | `reader_view.dart`, `image_view_*.dart`; the bottom bar, mode picker (with a separate direction control), slider page preview, auto-scroll sheet and settings sheet follow upstream's Shiori design | Reader split into mixins | Medium-high: upstream merges reading mode and direction into one enum, so settings need a migration |
 | Novel reader | `novel_reader_view.dart`, settings sheet | Split widgets and tap zones | High: the fork's EPUB reader is a different engine |
 | Manga detail | `manga_detail_view.dart`, `manga_details_view.dart` | Quick filters, filter sheet | Medium |
 | Local folders and onboarding | Plain folder paths (`Settings.localFolders`) | Named folders with virtual paths | Low-medium, pending a product decision |
@@ -28,9 +27,6 @@ them. Restore any of them with
 
 - Anime player: `anime/mixins/anime_{mpv_bridge,player_controls,player_settings,track_selection}_mixin.dart`,
   `anime/utils/always_on_top.dart`, `anime/widgets/{anime_screenshot_sheet,desktop_fullscreen_button,desktop_position_indicator,desktop_volume_button,mobile_primary_button_bar,player_settings_sections,player_shortcut_pills,seek_indicator_text}.dart`
-- Manga reader: `manga/reader/mixins/reader_{double_page,input_and_mode,prefetch}_mixin.dart`,
-  `reader_zoom_control.dart`, `widgets/reader_page_content.dart`,
-  `reader_common/mixins/reader_auto_scroll.dart`
 - Novel reader: `novel/mixins/novel_pagination_tts_mixin.dart`,
   `novel/widgets/{novel_bottom_bar,novel_general_settings_tab,novel_html_content,novel_settings_controls,novel_tap_zones}.dart`
 - Detail and home: `manga/detail/widgets/{chapter_filter_sort_bottom_sheet,chapter_quick_filters}.dart`,
@@ -39,16 +35,45 @@ them. Restore any of them with
 - Settings: `more/settings/browse/extension_server/extension_server_release_service.dart`,
   `extension_server/widgets/{android_proxy_group,extension_server_actions_group,extension_server_status_group,ios_runtime_group}.dart`
 - Restore: `more/data_and_storage/providers/tachiyomi_restore_service.dart`
-- Tests for the above: `reader_bottom_bar_test`, `reader_mode_picker_test`,
-  `webtoon_gesture_test`, `tachiyomi_history_import_test`,
+- Tests for the above: `tachiyomi_history_import_test`,
   `local_virtual_path_test`, `subtitle_style_switch_test`
+
+## Manga reader: upstream's, with the fork's additions
+
+The manga reader is upstream's v0.9.95 reader, with its combined reading
+modes (the direction is part of the mode). Settings saved with the old
+separate direction fold into the mode when read, and the old cover-offset
+double page becomes a double page with a single first page. The fork's
+parts sit beside upstream's files, each with a hook in them:
+
+- `mixins/reader_learning_mixin.dart`: the chapter OCR scan and its
+  progress, immersion statistics, E-Ink mode, the page preview grid and
+  panel navigation. `reader_view.dart` mixes it in and calls it from the
+  page change, the app bar, the bottom bar and the keyboard handler, so
+  the view is in the file size baseline. Page turns in
+  `reader_input_and_mode_mixin.dart` ask it for a panel first.
+- `mixins/page_ocr_mixin.dart`: the OCR boxes over each page. The image
+  views (`image_view_paged.dart`, `image_view_vertical.dart`) pass its
+  painter to the tiled and plain image views, which take a page overlay
+  painter (`PageOverlayPainter`) given the whole page's rect: past cropped
+  borders (`get_decoder_crop` in the native decoder) and split halves.
+- `widgets/reader_gesture_handler.dart`: OCR taps, hover and middle-button
+  lookup, and the two-finger OCR toggle around upstream's tap zones.
+- `widgets/reader_ocr_settings_group.dart`: the OCR group and the E-Ink
+  switch in the reader's settings sheet.
+- The "Automatic" background picks each page's colour, Mihon's way plus a
+  colour for each side (`utils/smart_background.dart`,
+  `widgets/smart_page_background.dart`). Backgrounds are painted under the
+  page tint directly (`ReaderBackgroundFill`), not through a colour filter
+  layer, which spilled the tint onto pages not yet painted.
+- `mixins/reader_split_pages_mixin.dart` puts split pages back together
+  when splitting or the direction changes; `reader_wheel_interceptor.dart`
+  takes the mouse wheel for paged reading and zoom.
 
 ## Shared code adapted to the fork
 
 - `services/local_folders.dart` keeps upstream's location but the fork's
   plain-path model.
-- `reader_mode_glyph.dart` draws upstream's glyphs for the fork's
-  `ReaderMode` values.
 - `color_filter_widget.dart` keeps the fork's RGBA slider helper, which
   upstream removed.
 - The fork readers use upstream's `ReaderChapterNavigation` and
@@ -74,11 +99,8 @@ them. Restore any of them with
 These upstream fixes target the reader and player files the fork keeps. They
 are worth porting by hand, or come for free with the redesign.
 
-- `092d9196` reader page indexing and widget key stability
-- `358a13db` panning a zoomed webtoon page without losing double tap
-- `c4edbe9a` Ctrl and wheel zoom
 - `305c4e47` press and hover overlays bounded to their decoration
-- `a4db8257` memory work in the reader and restore service
+- `a4db8257` memory work in the restore service (the reader's came with it)
 - Player: the compact portrait bottom bar (`MobilePlayerBottomControlsLayout`
   with shortcut pills); the top bar and hold-and-slide speed are adopted
 
@@ -110,9 +132,9 @@ browser helper this way.
 
 ## Suggested order for adopting the redesign
 
+The manga reader is adopted (above).
+
 1. Decide on named local folders, then adopt onboarding and local folders.
 2. Manga detail, then the extension server screen.
-3. Manga reader: migrate `ReaderMode` and `ReadingDirection` first, then
-   move OCR, lookup and mining into upstream's reader mixins.
-4. Anime player last, porting subtitles, Jimaku, mining and lookup into
+3. Anime player last, porting subtitles, Jimaku, mining and lookup into
    upstream's player mixins one at a time.

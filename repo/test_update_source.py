@@ -23,7 +23,14 @@ class SourceIdentityTest(unittest.TestCase):
             "com.selxo.mangatan",
         )
         self.assertEqual(data["apps"][0]["name"], "Mangatan")
-        self.assertNotIn("kodjodevf/mangayomi", json.dumps(data).lower())
+        # The identity must not point at upstream; release notes may still
+        # mention it, as v1.2.24's do for the Mangayomi version it merged.
+        identity = copy.deepcopy(data)
+        identity.pop("news", None)
+        for app in identity["apps"]:
+            app.pop("versions", None)
+            app.pop("versionDescription", None)
+        self.assertNotIn("kodjodevf/mangayomi", json.dumps(identity).lower())
 
 
 if __name__ == "__main__":

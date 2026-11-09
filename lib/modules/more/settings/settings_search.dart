@@ -34,7 +34,6 @@ List<SettingsEntry> searchSettings(
   final titleHits = <SettingsEntry>[];
   final otherHits = <SettingsEntry>[];
   for (final entry in index ?? settingsIndex) {
-    if (!entry.available) continue;
     final title = foldForSearch(entry.title(l10n));
     final haystack = [
       title,

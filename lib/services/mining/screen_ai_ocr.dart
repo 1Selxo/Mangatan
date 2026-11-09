@@ -310,7 +310,20 @@ List<OcrTextBlock> _parseVisualAnnotation(
   required int imageHeight,
 }) {
   if (bytes.isEmpty) return const [];
-  final root = ProtoWireMessage.decode(bytes);
+  final ProtoWireMessage root;
+  try {
+    root = ProtoWireMessage.decode(bytes);
+  } on FormatException catch (error) {
+    // What came back, to tell a bridge or component mismatch from damage.
+    final head = bytes
+        .take(32)
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join(' ');
+    throw FormatException(
+      'ScreenAI answer not readable (${error.message}): '
+      '${bytes.length} bytes, starting $head',
+    );
+  }
   final grouped = <String, List<_ScreenAiLine>>{};
   for (final line in root.messages(2)) {
     final text = line.string(3).trim();

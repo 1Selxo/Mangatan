@@ -29,12 +29,20 @@ class ProtoWireMessage {
     return ProtoWireMessage._(fields);
   }
 
-  /// Every embedded message stored under [field], in wire order.
+  /// Every embedded message stored under [field], in wire order. A value
+  /// that does not read as a message (a string or packed numbers under a
+  /// field number reused by another version) is skipped rather than failing
+  /// the whole response.
   Iterable<ProtoWireMessage> messages(int field) sync* {
     for (final value in _fields[field] ?? const <_ProtoField>[]) {
-      if (value.wireType == 2 && value.value is Uint8List) {
-        yield ProtoWireMessage.decode(value.value as Uint8List);
+      if (value.wireType != 2 || value.value is! Uint8List) continue;
+      ProtoWireMessage? message;
+      try {
+        message = ProtoWireMessage.decode(value.value as Uint8List);
+      } on FormatException {
+        message = null;
       }
+      if (message != null) yield message;
     }
   }
 

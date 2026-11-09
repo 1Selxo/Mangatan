@@ -240,6 +240,38 @@ class FfiImageDecoder {
         void Function(Pointer<Opaque>)
       >('free_decoder');
 
+  /// The crop offset and whole image size of a decoder, or null with a
+  /// native library built before the function was added.
+  static final void Function(
+    Pointer<Opaque>,
+    Pointer<Int32>,
+    Pointer<Int32>,
+    Pointer<Int32>,
+    Pointer<Int32>,
+  )?
+  _getDecoderCrop = () {
+    try {
+      return dylib.lookupFunction<
+        Void Function(
+          Pointer<Opaque>,
+          Pointer<Int32>,
+          Pointer<Int32>,
+          Pointer<Int32>,
+          Pointer<Int32>,
+        ),
+        void Function(
+          Pointer<Opaque>,
+          Pointer<Int32>,
+          Pointer<Int32>,
+          Pointer<Int32>,
+          Pointer<Int32>,
+        )
+      >('get_decoder_crop');
+    } catch (_) {
+      return null;
+    }
+  }();
+
   /// Decodes a specific region of the image asynchronously in a background Isolate.
   /// This prevents blocking the main UI thread during disk reads and decoding.
   static Future<void> _cIsolateEntryPoint(SendPort mainSendPort) async {
@@ -301,7 +333,20 @@ class FfiImageDecoder {
             lruOrder[key] = true; // O(1) insertion at end
             imgWidth = wPtr.value;
             imgHeight = hPtr.value;
-            cachedDimensions[key] = [imgWidth, imgHeight];
+            // Where the cropped region lies in the whole image, for what is
+            // drawn over the whole page (the OCR boxes).
+            var crop = [0, 0, imgWidth, imgHeight];
+            final getCrop = _getDecoderCrop;
+            if (getCrop != null) {
+              final cropPtr = calloc<Int32>(4);
+              try {
+                getCrop(ctx, cropPtr, cropPtr + 1, cropPtr + 2, cropPtr + 3);
+                crop = [cropPtr[0], cropPtr[1], cropPtr[2], cropPtr[3]];
+              } finally {
+                calloc.free(cropPtr);
+              }
+            }
+            cachedDimensions[key] = [imgWidth, imgHeight, ...crop];
           } catch (e) {
             responsePort.send({
               'success': false,
@@ -323,10 +368,12 @@ class FfiImageDecoder {
         }
 
         if (action == 'getDimensions') {
+          final dims = cachedDimensions[key]!;
           responsePort.send({
             'success': true,
             'width': imgWidth,
             'height': imgHeight,
+            'crop': dims.sublist(2),
           });
           return;
         }
@@ -471,9 +518,18 @@ class FfiImageDecoder {
           if (response is Map<String, dynamic>) {
             if (response['success'] == true) {
               if (job.action == 'getDimensions') {
+                // Width and height, then the crop's left and top and the
+                // whole image's width and height.
                 job.completer.complete([
                   response['width'] as int,
                   response['height'] as int,
+                  ...(response['crop'] as List?)?.cast<int>() ??
+                      [
+                        0,
+                        0,
+                        response['width'] as int,
+                        response['height'] as int,
+                      ],
                 ]);
               } else {
                 final pointerAddress = response['pointerAddress'] as int?;

@@ -5,6 +5,19 @@ import 'package:flutter/material.dart';
 
 import 'coordinate_transformer.dart';
 
+// ─── Page overlay ─────────────────────────────────────────────────────────────
+
+/// Paints over a page, such as the OCR boxes: [pageRect] is where the whole
+/// original page lies, uncropped and unsplit, and [clipRect] the part of it
+/// shown, both in the image view's own coordinates; [canvas] draws at
+/// [origin] in them.
+typedef PageOverlayPainter = void Function(
+  Canvas canvas,
+  Offset origin,
+  Rect pageRect,
+  Rect clipRect,
+);
+
 // ─── Load State ───────────────────────────────────────────────────────────────
 
 /// Image loading state, identical to extended_image.

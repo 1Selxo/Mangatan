@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -302,11 +301,7 @@ class ReaderOcrState {
   }
 
   static bool handleMiddleLookupStart(Offset globalPosition, int buttons) {
-    if (!enabled.value ||
-        buttons != kMiddleMouseButton ||
-        lookupOnHover.value ||
-        ReaderLookupTriggerState.trigger.value !=
-            DictionaryLookupTrigger.middleClick) {
+    if (buttons != kMiddleMouseButton || !middleLookupAvailable) {
       return false;
     }
     _middleLookupActive = true;
@@ -314,6 +309,14 @@ class ReaderOcrState {
     unawaited(handleHover(globalPosition));
     return true;
   }
+
+  /// Whether holding the middle button looks words up, rather than doing
+  /// what it otherwise would, such as dragging the page.
+  static bool get middleLookupAvailable =>
+      enabled.value &&
+      !lookupOnHover.value &&
+      ReaderLookupTriggerState.trigger.value ==
+          DictionaryLookupTrigger.middleClick;
 
   static void handleMiddleLookupMove(Offset globalPosition) {
     if (!_middleLookupActive) return;
@@ -1048,21 +1051,31 @@ class ReaderOcrController extends ChangeNotifier {
     }
   }
 
-  void paint(
-    Canvas canvas,
-    Rect imageRect,
-    ui.Image image,
-    Paint paint, {
-    Rect? hitTestImageRect,
-  }) {
-    final hitImageRect = hitTestImageRect ?? imageRect;
-    _imageRect = hitImageRect;
+  /// Paints the page's text boxes over the page lying at [imageRect], the
+  /// whole page as read, in the coordinates of the box under [imageKey].
+  /// Only [clipRect], the part of the page shown, is painted and can be
+  /// tapped: a cropped page or half of a spread shows only part of it.
+  void paint(Canvas canvas, Rect imageRect, {Rect? clipRect}) {
+    final shownRect = clipRect ?? imageRect;
+    _imageRect = shownRect;
     _paintOrder = ++ReaderOcrState._paintGeneration;
     final page = _page;
     if (!enabled || page == null) {
       _paintedBlocks = const [];
       return;
     }
+    canvas.save();
+    canvas.clipRect(shownRect);
+    _paintBlocks(canvas, page, imageRect, shownRect);
+    canvas.restore();
+  }
+
+  void _paintBlocks(
+    Canvas canvas,
+    _ReaderOcrPage page,
+    Rect imageRect,
+    Rect shownRect,
+  ) {
     final paintedBlocks = <_PaintedOcrBlock>[];
     final boxOpacity = ReaderOcrState.boxOpacity.value;
     final activeTextOpacity = ReaderOcrState.activeTextOpacity.value;
@@ -1071,13 +1084,9 @@ class ReaderOcrController extends ChangeNotifier {
     final outlineVisible = ReaderOcrState.outlineVisible.value;
     for (final block in page.blocks) {
       final rect = _blockRect(block, imageRect, page.boxScaleX, page.boxScaleY);
-      if (rect.isEmpty) continue;
-      final hitRect = _blockRect(
-        block,
-        hitImageRect,
-        page.boxScaleX,
-        page.boxScaleY,
-      );
+      // Text on the part of the page not shown, such as the other half of a
+      // split spread, is neither painted nor looked up.
+      if (rect.isEmpty || !shownRect.contains(rect.center)) continue;
       final active = identical(block, _activeBlock);
       final lineBoxes = _lineBoxes(
         block,
@@ -1085,14 +1094,8 @@ class ReaderOcrController extends ChangeNotifier {
         page.boxScaleX,
         page.boxScaleY,
       );
-      final hitLineBoxes = _lineBoxes(
-        block,
-        hitImageRect,
-        page.boxScaleX,
-        page.boxScaleY,
-      );
       paintedBlocks.add(
-        _PaintedOcrBlock(block: block, rect: hitRect, lineBoxes: hitLineBoxes),
+        _PaintedOcrBlock(block: block, rect: rect, lineBoxes: lineBoxes),
       );
       if (lineBoxes.isEmpty) {
         _paintOcrBox(

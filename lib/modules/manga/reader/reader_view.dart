@@ -28,6 +28,7 @@ import 'package:mangayomi/modules/manga/reader/services/page_navigation_service.
 import 'package:mangayomi/modules/manga/reader/mixins/reader_memory_management.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_prefetch_mixin.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_split_pages_mixin.dart';
+import 'package:mangayomi/modules/manga/reader/mixins/reader_ocr_mixin.dart';
 import 'package:mangayomi/modules/manga/reader/mixins/reader_zoom_control.dart';
 import 'package:mangayomi/modules/reader_common/widgets/reader_app_bar.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_auto_scroll_sheet.dart';
@@ -207,6 +208,7 @@ class _MangaChapterPageGalleryState
         ReaderZoomControl,
         PageNavigationMixin,
         ReaderSplitPagesMixin,
+        ReaderOcrMixin,
         ReaderInputAndModeMixin,
         ReaderAutoScroll {
   @override
@@ -689,6 +691,7 @@ class _MangaChapterPageGalleryState
         bindings: ref.read(keyBindingsStateProvider),
       ),
       bindings: ref.watch(keyBindingsStateProvider),
+      onLookupTrigger: ReaderOcrState.handleLookupTriggerKey,
     ).wrapWithKeyboardListener(
       isReverseHorizontal: _isReverseHorizontal,
       focusNode: _keyboardFocusNode,
@@ -868,6 +871,7 @@ class _MangaChapterPageGalleryState
                   backgroundColor: _backgroundColor,
                   // In the bottom panel, within reach.
                   showChapterList: false,
+                  onOcrPressed: ReaderOcrState.handleOcrButton,
                   onBackPressed: () => Navigator.pop(context),
                   onBookmarkPressed: () {
                     _readerController.setChapterBookmarked();
@@ -905,6 +909,10 @@ class _MangaChapterPageGalleryState
                           }
                         }
                       : null,
+                ),
+                ocrProgressHud(
+                  uiVisible: _isView,
+                  fullScreen: fullScreenReader,
                 ),
                 ReaderBottomBar(
                   chapter: chapter,
@@ -1185,6 +1193,7 @@ class _MangaChapterPageGalleryState
     // forceIndex is a page, not a double-page spread: _currentIndex is
     // already a spread in double page mode, and would be halved again.
     _setReaderMode(readerMode, ref, forceIndex: _savedPageIndex);
+    scanChapterOcr(_savedPageIndex);
 
     if (!readerMode.isVerticalContinuous) {
       _autoScroll.value = false;
@@ -1267,6 +1276,7 @@ class _MangaChapterPageGalleryState
       _updateHasCurrentError();
       _readerController.setPageIndex(idx, false, _chapterUrlModel.pageUrls);
       ref.read(currentIndexProvider(chapter).notifier).setCurrentIndex(idx);
+      scanChapterOcr(actualIndex);
     }
   }
 

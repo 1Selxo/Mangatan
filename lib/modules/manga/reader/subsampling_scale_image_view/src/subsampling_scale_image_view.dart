@@ -306,7 +306,19 @@ class SubsamplingScaleImageView extends StatefulWidget {
     this.onCenterChanged,
     this.onError,
     this.onTileError,
+    this.overlayKey,
+    this.paintOverlay,
+    this.overlayRepaint,
   });
+
+  /// The key of the box [paintOverlay] paints in, to map its coordinates.
+  final GlobalKey? overlayKey;
+
+  /// Paints over the page, such as the OCR boxes.
+  final PageOverlayPainter? paintOverlay;
+
+  /// Repaints [paintOverlay] when it notifies.
+  final Listenable? overlayRepaint;
 
   /// A source sub-region (srcRect) to display.
   /// If provided, the viewer will display only this sub-region and adapt all scales and translations.
@@ -327,6 +339,10 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
   bool _rebuildScheduled = false;
   int _sWidth = 0;
   int _sHeight = 0;
+
+  /// The whole original image in source coordinates: it reaches past the
+  /// region shown when borders are cropped or half of a page is shown.
+  ui.Rect? _wholeImage;
 
   // View
   double _scale = 1.0;
@@ -779,6 +795,16 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
     _sHeight = widget.srcRect != null
         ? widget.srcRect!.height.toInt()
         : outSize[1];
+    // Width, height, then the crop's left and top and the whole size.
+    final crop = outSize.length >= 6
+        ? outSize.sublist(2, 6)
+        : [0, 0, outSize[0], outSize[1]];
+    _wholeImage = ui.Rect.fromLTWH(
+      -((widget.srcRect?.left ?? 0) + crop[0]),
+      -((widget.srcRect?.top ?? 0) + crop[1]),
+      crop[2].toDouble(),
+      crop[3].toDouble(),
+    );
 
     if (widget.preloadData != null) {
       widget.preloadData!.resolvedFilePath = path;
@@ -1298,6 +1324,10 @@ class _SubsamplingScaleImageViewState extends State<SubsamplingScaleImageView>
           onDoubleTapDown: widget.zoomEnabled ? _handleDoubleTapDown : null,
           child: ClipRect(
             child: SubsamplingImageRenderWidget(
+              key: widget.overlayKey,
+              overlaySourceRect: _wholeImage,
+              paintOverlay: widget.paintOverlay,
+              overlayRepaint: widget.overlayRepaint,
               tilingEngine: _tilingEngine,
               scale: _scale,
               vTranslate: _vTranslate,

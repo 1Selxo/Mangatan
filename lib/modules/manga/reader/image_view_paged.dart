@@ -11,6 +11,7 @@ import 'package:mangayomi/modules/manga/reader/providers/reader_controller_provi
 import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart'
     as ssiv;
+import 'package:mangayomi/modules/manga/reader/mixins/page_ocr_mixin.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 
 class ImageViewPaged extends ConsumerStatefulWidget {
@@ -41,8 +42,12 @@ class ImageViewPaged extends ConsumerStatefulWidget {
   ConsumerState<ImageViewPaged> createState() => _ImageViewPagedState();
 }
 
-class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
+class _ImageViewPagedState extends ConsumerState<ImageViewPaged>
+    with PageOcrMixin {
   Color? _autoBgColor;
+
+  @override
+  UChapDataPreload get ocrPage => widget.data;
 
   bool _hasLandscapeZoomed = false;
 
@@ -61,6 +66,7 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
   @override
   void didUpdateWidget(covariant ImageViewPaged oldWidget) {
     super.didUpdateWidget(oldWidget);
+    updateOcrPage(oldWidget.data);
     if (widget.controller != oldWidget.controller) {
       oldWidget.controller?.removeListener(_onControllerChanged);
       widget.controller?.addListener(_onControllerChanged);
@@ -306,7 +312,13 @@ class _ImageViewPagedState extends ConsumerState<ImageViewPaged> {
         panEnabled: widget.panEnabled,
         cropBorders: cropBorders,
         srcRect: widget.data.srcRect,
-        onImageLoaded: widget.onImageLoaded,
+        onImageLoaded: (width, height) {
+          widget.onImageLoaded?.call(width, height);
+          loadOcr();
+        },
+        overlayKey: ocrKey,
+        paintOverlay: paintOcr,
+        overlayRepaint: ocr,
         loadStateChanged: widget.loadStateChanged,
         pageController: widget.pageController,
         rotation: rotation,

@@ -21,6 +21,10 @@ DECODER_EXPORT bool decode_region(ImageDecoderContext* ctx, int left, int top, i
 
 DECODER_EXPORT void free_decoder(ImageDecoderContext* ctx);
 
+// Where the region init_decoder reported lies in the whole image: its offset
+// when borders were cropped, and the whole image's size.
+DECODER_EXPORT void get_decoder_crop(ImageDecoderContext* ctx, int* out_left, int* out_top, int* out_full_width, int* out_full_height);
+
 #ifdef __cplusplus
 }
 #endif

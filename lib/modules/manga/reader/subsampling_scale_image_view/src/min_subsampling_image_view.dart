@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ffi';
+import 'dart:ffi' hide Size;
 import 'dart:ui' as ui;
 
 import 'package:ffi/ffi.dart';
@@ -26,6 +26,15 @@ class MinSubsamplingImage extends ConsumerStatefulWidget {
   final int rotation;
   final Function(double width, double height)? onImageLoaded;
 
+  /// The key of the box [paintOverlay] paints in, to map its coordinates.
+  final GlobalKey? overlayKey;
+
+  /// Paints over the page, such as the OCR boxes.
+  final PageOverlayPainter? paintOverlay;
+
+  /// Repaints [paintOverlay] when it notifies.
+  final Listenable? overlayRepaint;
+
   const MinSubsamplingImage({
     super.key,
     required this.data,
@@ -38,6 +47,9 @@ class MinSubsamplingImage extends ConsumerStatefulWidget {
     this.loadStateChanged,
     this.rotation = 0,
     this.onImageLoaded,
+    this.overlayKey,
+    this.paintOverlay,
+    this.overlayRepaint,
   });
 
   @override
@@ -52,6 +64,11 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
   ImageStreamListener? _streamListener;
   ImageStream? _imageStream;
   ImageChunkEvent? _loadingProgress;
+
+  /// Where the image shown lies in the whole original image, in its pixels:
+  /// cropped borders or half of a page leave out part of it. Null while it
+  /// is the whole image.
+  Rect? _wholeImage;
 
   @override
   void initState() {
@@ -190,6 +207,7 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
             final old = _uiImage;
             setState(() {
               _uiImage = info.image.clone();
+              _wholeImage = null;
               _isLoading = false;
               _loadingProgress = null;
             });
@@ -249,6 +267,22 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
       final int croppedHeight = dims[1];
       final int left = region?.left.round() ?? 0;
       final int top = region?.top.round() ?? 0;
+
+      // Width, height, then the crop's left and top and the whole size.
+      final whole = region != null
+          ? await ffiImageDecoder.getImageDimensionsAsync(
+              path,
+              cancelToken: this,
+            )
+          : dims;
+      final wholeImage = whole != null && whole.length >= 6
+          ? Rect.fromLTWH(
+              -(left + whole[2]).toDouble(),
+              -(top + whole[3]).toDouble(),
+              whole[4].toDouble(),
+              whole[5].toDouble(),
+            )
+          : null;
 
       if (!mounted) return;
 
@@ -330,6 +364,7 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
         final old = _uiImage;
         setState(() {
           _uiImage = img;
+          _wholeImage = wholeImage;
           _isLoading = false;
           _hasError = false;
         });
@@ -444,6 +479,71 @@ class _MinSubsamplingImageState extends ConsumerState<MinSubsamplingImage> {
       }
     }
 
-    return rawImage;
+    final paintOverlay = widget.paintOverlay;
+    if (paintOverlay == null) return rawImage;
+    return CustomPaint(
+      key: widget.overlayKey,
+      foregroundPainter: _PageOverlay(
+        paintOverlay: paintOverlay,
+        imageSize: Size(
+          _uiImage!.width.toDouble(),
+          _uiImage!.height.toDouble(),
+        ),
+        wholeImage: _wholeImage,
+        fit: widget.fit,
+        repaint: widget.overlayRepaint,
+      ),
+      child: rawImage,
+    );
   }
+}
+
+/// Paints [paintOverlay] over an image drawn as [RawImage] draws it: fitted
+/// by [fit] and centred.
+class _PageOverlay extends CustomPainter {
+  _PageOverlay({
+    required this.paintOverlay,
+    required this.imageSize,
+    required this.wholeImage,
+    required this.fit,
+    super.repaint,
+  });
+
+  final PageOverlayPainter paintOverlay;
+  final Size imageSize;
+  final Rect? wholeImage;
+  final BoxFit fit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (imageSize.isEmpty || size.isEmpty) return;
+    final fitted = applyBoxFit(fit, imageSize, size);
+    final shown = Alignment.center.inscribe(
+      fitted.destination,
+      Offset.zero & size,
+    );
+    final scale = shown.width / fitted.source.width;
+    final whole = wholeImage ?? Offset.zero & imageSize;
+    final pageRect = Rect.fromLTWH(
+      shown.left +
+          (whole.left - (imageSize.width - fitted.source.width) / 2) * scale,
+      shown.top +
+          (whole.top - (imageSize.height - fitted.source.height) / 2) * scale,
+      whole.width * scale,
+      whole.height * scale,
+    );
+    paintOverlay(
+      canvas,
+      Offset.zero,
+      pageRect,
+      shown.intersect(Offset.zero & size),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PageOverlay old) =>
+      old.paintOverlay != paintOverlay ||
+      old.imageSize != imageSize ||
+      old.wholeImage != wholeImage ||
+      old.fit != fit;
 }

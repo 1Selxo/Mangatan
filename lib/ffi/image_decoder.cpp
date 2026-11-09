@@ -319,6 +319,13 @@ struct ImageDecoderContext {
     };
 };
 
+void get_decoder_crop(ImageDecoderContext* ctx, int* out_left, int* out_top, int* out_full_width, int* out_full_height) {
+    *out_left = ctx->crop_left;
+    *out_top = ctx->crop_top;
+    *out_full_width = ctx->width;
+    *out_full_height = ctx->height;
+}
+
 static void perform_bmp_autocrop(ImageDecoderContext* ctx) {
     int w = ctx->width;
     int h = ctx->height;

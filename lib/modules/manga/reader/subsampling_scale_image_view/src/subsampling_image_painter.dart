@@ -2,7 +2,9 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
+import 'subsampling_types.dart';
 import 'tiling_engine.dart';
 
 /// A lightweight render object widget that displays the subsampled image.
@@ -20,6 +22,11 @@ class SubsamplingImageRenderWidget extends LeafRenderObjectWidget {
   final FilterQuality filterQuality;
   final Size preferredSize;
 
+  /// The whole original page in source coordinates, for [paintOverlay].
+  final ui.Rect? overlaySourceRect;
+  final PageOverlayPainter? paintOverlay;
+  final Listenable? overlayRepaint;
+
   const SubsamplingImageRenderWidget({
     super.key,
     required this.tilingEngine,
@@ -33,22 +40,28 @@ class SubsamplingImageRenderWidget extends LeafRenderObjectWidget {
     this.colorBlendMode,
     required this.filterQuality,
     required this.preferredSize,
+    this.overlaySourceRect,
+    this.paintOverlay,
+    this.overlayRepaint,
   });
 
   @override
   RenderSubsamplingImage createRenderObject(BuildContext context) {
     return RenderSubsamplingImage(
-      tilingEngine: tilingEngine,
-      scale: scale,
-      vTranslate: vTranslate,
-      rotation: rotation,
-      sWidth: sWidth,
-      sHeight: sHeight,
-      color: color,
-      colorBlendMode: colorBlendMode,
-      filterQuality: filterQuality,
-      preferredSize: preferredSize,
-    );
+        tilingEngine: tilingEngine,
+        scale: scale,
+        vTranslate: vTranslate,
+        rotation: rotation,
+        sWidth: sWidth,
+        sHeight: sHeight,
+        color: color,
+        colorBlendMode: colorBlendMode,
+        filterQuality: filterQuality,
+        preferredSize: preferredSize,
+      )
+      ..overlaySourceRect = overlaySourceRect
+      ..paintOverlay = paintOverlay
+      ..overlayRepaint = overlayRepaint;
   }
 
   @override
@@ -66,7 +79,10 @@ class SubsamplingImageRenderWidget extends LeafRenderObjectWidget {
       ..color = color
       ..colorBlendMode = colorBlendMode
       ..filterQuality = filterQuality
-      ..preferredSize = preferredSize;
+      ..preferredSize = preferredSize
+      ..overlaySourceRect = overlaySourceRect
+      ..paintOverlay = paintOverlay
+      ..overlayRepaint = overlayRepaint;
   }
 }
 
@@ -168,6 +184,41 @@ class RenderSubsamplingImage extends RenderBox {
 
   final Paint _paint = Paint()..isAntiAlias = true;
 
+  ui.Rect? _overlaySourceRect;
+  set overlaySourceRect(ui.Rect? value) {
+    if (_overlaySourceRect == value) return;
+    _overlaySourceRect = value;
+    markNeedsPaint();
+  }
+
+  PageOverlayPainter? _paintOverlay;
+  set paintOverlay(PageOverlayPainter? value) {
+    if (_paintOverlay == value) return;
+    _paintOverlay = value;
+    markNeedsPaint();
+  }
+
+  Listenable? _overlayRepaint;
+  set overlayRepaint(Listenable? value) {
+    if (_overlayRepaint == value) return;
+    if (attached) _overlayRepaint?.removeListener(markNeedsPaint);
+    _overlayRepaint = value;
+    if (attached) _overlayRepaint?.addListener(markNeedsPaint);
+    markNeedsPaint();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _overlayRepaint?.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    _overlayRepaint?.removeListener(markNeedsPaint);
+    super.detach();
+  }
+
   @override
   void performLayout() {
     size = constraints.constrain(_preferredSize);
@@ -234,5 +285,26 @@ class RenderSubsamplingImage extends RenderBox {
     }
 
     canvas.restore();
+    _paintPageOverlay(canvas, offset);
+  }
+
+  void _paintPageOverlay(Canvas canvas, ui.Offset offset) {
+    final overlay = _paintOverlay;
+    final source = _overlaySourceRect;
+    // A turned page would need its boxes turned with it.
+    if (overlay == null || source == null || _rotation != 0) return;
+    ui.Rect toView(ui.Rect rect) => ui.Rect.fromLTWH(
+      _vTranslate.dx + rect.left * _scale,
+      _vTranslate.dy + rect.top * _scale,
+      rect.width * _scale,
+      rect.height * _scale,
+    );
+    // The page shown, also where it reaches past the view when zoomed: a
+    // box half on screen can still be looked up.
+    final shown = toView(
+      ui.Rect.fromLTWH(0, 0, _sWidth.toDouble(), _sHeight.toDouble()),
+    );
+    if (shown.isEmpty) return;
+    overlay(canvas, offset, toView(source), shown);
   }
 }

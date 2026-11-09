@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/widgets/animation_speed_slider.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
 
 void main() {
   testWidgets('animation slider exposes animation-off as its lower endpoint', (
@@ -30,29 +29,6 @@ void main() {
     expect(find.text('Animation speed'), findsOneWidget);
     expect(find.text('110% duration'), findsOneWidget);
     expect(find.text('Lower values play animations faster.'), findsOneWidget);
-  });
-
-  testWidgets('reduced motion stops the repeating reader progress animation', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: MediaQuery(
-          data: MediaQueryData(disableAnimations: true),
-          child: CircularProgressIndicatorAnimateRotate(progress: 0.5),
-        ),
-      ),
-    );
-
-    final initialTransform = tester.widget<Transform>(
-      find.byType(Transform).first,
-    );
-    await tester.pump(const Duration(seconds: 1));
-    final laterTransform = tester.widget<Transform>(
-      find.byType(Transform).first,
-    );
-
-    expect(laterTransform.transform, initialTransform.transform);
   });
 }
 

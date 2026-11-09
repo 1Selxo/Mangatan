@@ -6,19 +6,6 @@ import 'package:mangayomi/repositories/settings_repository.dart';
 part 'reader_state_provider.g.dart';
 
 @riverpod
-class AutomaticBackgroundState extends _$AutomaticBackgroundState {
-  @override
-  bool build() {
-    return isar.settings.getSync(227)!.automaticBackground ?? false;
-  }
-
-  void set(bool value) {
-    state = value;
-    settingsRepository.update((s) => s.automaticBackground = value);
-  }
-}
-
-@riverpod
 class DefaultReadingModeState extends _$DefaultReadingModeState {
   @override
   ReaderMode build() {

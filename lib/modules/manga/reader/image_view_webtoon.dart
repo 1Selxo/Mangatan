@@ -712,23 +712,35 @@ class _ImageViewWebtoonState extends ConsumerState<ImageViewWebtoon>
     }
 
     final uniqueKey = ValueKey('single-${currentPage.widgetKey(index)}');
+    // Fit height down the strip: each page as high as the screen, whole,
+    // as in the paged modes, rather than as wide as the screen.
+    final fitHeight =
+        !widget.isHorizontalContinuous &&
+        ref.watch(scaleTypeStateProvider) == ScaleType.fitHeight;
 
     return Padding(
       key: uniqueKey,
       padding: widget.isHorizontalContinuous
           ? EdgeInsets.zero
           : EdgeInsets.symmetric(horizontal: sidePad),
-      child: ImageViewVertical(
-        data: currentPage,
-        failedToLoadImage: (failed) =>
-            widget.onFailedToLoadImage(index, failed),
-        onLongPressData: widget.onLongPressData,
-        isHorizontal: widget.isHorizontalContinuous,
-        rotation: rotation,
-        onImageLoaded: (width, height) {
-          widget.onImageLoaded?.call(index, width, height);
-          widget.onPageImageLoaded?.call(index);
-        },
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: fitHeight
+              ? MediaQuery.sizeOf(context).height
+              : double.infinity,
+        ),
+        child: ImageViewVertical(
+          data: currentPage,
+          failedToLoadImage: (failed) =>
+              widget.onFailedToLoadImage(index, failed),
+          onLongPressData: widget.onLongPressData,
+          isHorizontal: widget.isHorizontalContinuous,
+          rotation: rotation,
+          onImageLoaded: (width, height) {
+            widget.onImageLoaded?.call(index, width, height);
+            widget.onPageImageLoaded?.call(index);
+          },
+        ),
       ),
     );
   }

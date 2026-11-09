@@ -2027,18 +2027,6 @@ bool readerOcrLineLooksVertical(OcrLineGeometry geo) {
   return (geo.ymax - geo.ymin) / width > 1.2;
 }
 
-Rect readerOcrHitTestImageRect({
-  required Rect paintedImageRect,
-  required Size renderBoxSize,
-  required bool normalizePaintCoordinates,
-}) {
-  if (!normalizePaintCoordinates) return paintedImageRect;
-  return Alignment.center.inscribe(
-    paintedImageRect.size,
-    Offset.zero & renderBoxSize,
-  );
-}
-
 @visibleForTesting
 bool readerOcrShouldConsumeMissedTap({
   required bool popupWasVisibleOnPointerDown,

@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:mangayomi/modules/manga/reader/utils/reader_motion.dart';
+import 'package:shiori/shiori.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 /// Service for handling page navigation in the manga reader.
 ///
 /// Abstracts the complexity of navigating between different reader modes:
-/// - Paged modes (vertical and horizontal)
+/// - Paged modes (vertical, LTR, RTL)
 /// - Continuous modes (vertical continuous, webtoon, horizontal continuous)
 class PageNavigationService {
-  final ItemScrollController itemScrollController;
+  final ListController listController;
+  final ScrollController continuousScrollController;
   final PageController extendedController;
 
   const PageNavigationService({
-    required this.itemScrollController,
+    required this.listController,
+    required this.continuousScrollController,
     required this.extendedController,
   });
 
@@ -71,7 +74,13 @@ class PageNavigationService {
     if (index < 0) return;
 
     if (readerMode.isContinuous) {
-      itemScrollController.jumpTo(index: index);
+      if (listController.isAttached && continuousScrollController.hasClients) {
+        listController.jumpToItem(
+          index: index,
+          scrollController: continuousScrollController,
+          alignment: 0.0,
+        );
+      }
     } else {
       if (extendedController.hasClients) {
         extendedController.jumpToPage(index);
@@ -80,14 +89,35 @@ class PageNavigationService {
   }
 
   void _navigateContinuous(int index, bool animate) {
+    if (!listController.isAttached || !continuousScrollController.hasClients) {
+      return;
+    }
+
     if (animate) {
-      itemScrollController.scrollTo(
-        curve: Curves.ease,
-        index: index,
-        duration: const Duration(milliseconds: 150),
-      );
+      // ignore: invalid_use_of_visible_for_testing_member
+      final offset = listController.getOffsetToReveal(index, 0.0);
+      if (offset.isFinite) {
+        final minExtent = continuousScrollController.position.minScrollExtent;
+        final maxExtent = continuousScrollController.position.maxScrollExtent;
+        final clampedOffset = offset.clamp(minExtent, maxExtent);
+        continuousScrollController.animateTo(
+          clampedOffset,
+          duration: ShioriMotion.standard,
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        listController.jumpToItem(
+          index: index,
+          scrollController: continuousScrollController,
+          alignment: 0.0,
+        );
+      }
     } else {
-      itemScrollController.jumpTo(index: index);
+      listController.jumpToItem(
+        index: index,
+        scrollController: continuousScrollController,
+        alignment: 0.0,
+      );
     }
   }
 
@@ -121,11 +151,13 @@ mixin PageNavigationMixin<T extends StatefulWidget> on State<T> {
 
   /// Initializes the navigation service with the required controllers.
   void initPageNavigation({
-    required ItemScrollController itemScrollController,
+    required ListController listController,
+    required ScrollController continuousScrollController,
     required PageController extendedController,
   }) {
     _navigationService = PageNavigationService(
-      itemScrollController: itemScrollController,
+      listController: listController,
+      continuousScrollController: continuousScrollController,
       extendedController: extendedController,
     );
   }

@@ -15,18 +15,15 @@ class TransitionViewPaged extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final controller = ref.read(
-      readerControllerProvider(chapter: data.chapter!).notifier,
-    );
-    final readerMode = controller.getReaderMode();
-    final readingDirection = controller.getReadingDirection();
+    final readerMode = ref
+        .read(readerControllerProvider(chapter: data.chapter!).notifier)
+        .getReaderMode();
 
     return ChapterTransitionPage(
       currentChapter: data.chapter!,
       nextChapter: data.nextChapter,
       mangaName: data.mangaName ?? '',
       readerMode: readerMode,
-      readingDirection: readingDirection,
     );
   }
 }

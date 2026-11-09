@@ -427,6 +427,7 @@ class StorageProvider {
     }
 
     await _migrateDesktopReaderToWindowed(isar, dir);
+    await _migrateLegacyCoverPageMode(isar);
 
     final prefs = await isar.trackPreferences
         .filter()
@@ -497,6 +498,28 @@ end""",
     } catch (error) {
       if (kDebugMode) {
         debugPrint('[storage] Windowed reader migration skipped: $error');
+      }
+    }
+  }
+
+  /// Older Mangatan had a "double page with cover offset" default page mode.
+  /// The reader now follows upstream: double page, with "Single first page"
+  /// showing the first page alone. Done once; updatedAt is left alone, as
+  /// this only restates the same choice.
+  Future<void> _migrateLegacyCoverPageMode(Isar isar) async {
+    try {
+      final settings = await isar.settings.get(227);
+      if (settings?.defaultPageMode != PageMode.legacyDoublePageCover) return;
+      await isar.writeTxn(() async {
+        await isar.settings.put(
+          settings!
+            ..defaultPageMode = PageMode.doublePage
+            ..doublePageSingleFirstPage = true,
+        );
+      });
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[storage] Cover page mode migration skipped: $error');
       }
     }
   }

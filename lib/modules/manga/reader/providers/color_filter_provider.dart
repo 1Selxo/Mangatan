@@ -11,14 +11,16 @@ class CustomColorFilterState extends _$CustomColorFilterState {
     return settingsRepository.current.customColorFilter;
   }
 
-  void set(int a, int r, int g, int b, bool _) {
+  void set(int a, int r, int g, int b, bool end) {
     var value = CustomColorFilter()
       ..a = a
       ..r = r
       ..g = g
       ..b = b;
+    if (end) {
+      settingsRepository.update((s) => s.customColorFilter = value);
+    }
     state = value;
-    settingsRepository.update((s) => s.customColorFilter = value);
   }
 }
 

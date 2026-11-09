@@ -16,11 +16,9 @@ class TransitionViewVertical extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final controller = ref.read(
-      readerControllerProvider(chapter: data.chapter!).notifier,
-    );
-    final readerMode = controller.getReaderMode();
-    final readingDirection = controller.getReadingDirection();
+    final readerMode = ref
+        .read(readerControllerProvider(chapter: data.chapter!).notifier)
+        .getReaderMode();
 
     return SizedBox(
       height: context.height(1),
@@ -29,7 +27,6 @@ class TransitionViewVertical extends ConsumerWidget {
         nextChapter: data.nextChapter,
         mangaName: data.mangaName ?? '',
         readerMode: readerMode,
-        readingDirection: readingDirection,
       ),
     );
   }

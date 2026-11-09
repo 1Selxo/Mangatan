@@ -1,4 +1,5 @@
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
+import 'package:mangayomi/modules/more/settings/reader/reader_switches.dart';
 
 /// One setting, or settings screen, that the search in Settings can find.
 class SettingsEntry {
@@ -8,6 +9,7 @@ class SettingsEntry {
     required this.section,
     required this.route,
     this.extra,
+    this.available = true,
   });
 
   final String Function(AppLocalizations) title;
@@ -19,6 +21,10 @@ class SettingsEntry {
 
   /// What the route needs to open the right place, such as a section.
   final Object? extra;
+
+  /// False for a setting that is hidden where it lives, such as a reader
+  /// setting the fork's reader does not act on yet; the search skips it.
+  final bool available;
 }
 
 /// Every setting the search can find, by the screen that holds it.
@@ -295,6 +301,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.navigate_to_pan,
+    available: ReaderSwitch.navigateToPan.isSupported,
     subtitle: (l) => l.navigate_to_pan_subtitle,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -302,6 +309,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.webtoon_disable_zoom_out,
+    available: ReaderSwitch.webtoonDisableZoomOut.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -309,6 +317,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.webtoon_double_tap_zoom_enabled,
+    available: ReaderSwitch.webtoonDoubleTapZoom.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -379,6 +388,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.split_wide_pages,
+    available: ReaderSwitch.splitWidePages.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -386,6 +396,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.split_tall_images,
+    available: ReaderSwitch.splitTallImages.isSupported,
     subtitle: (l) => l.split_tall_images_subtitle,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -393,6 +404,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.dual_page_invert,
+    available: ReaderSwitch.dualPageInvert.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -400,6 +412,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.dual_page_rotate_to_fit,
+    available: ReaderSwitch.dualPageRotateToFit.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -407,6 +420,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.dual_page_rotate_to_fit_invert,
+    available: ReaderSwitch.dualPageRotateToFitInvert.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -414,6 +428,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.double_page_single_first_page,
+    available: ReaderSwitch.doublePageSingleFirstPage.isSupported,
     subtitle: (l) => l.double_page_single_first_page_subtitle,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -421,6 +436,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.double_page_auto,
+    available: ReaderSwitch.doublePageAuto.isSupported,
     subtitle: (l) => l.double_page_auto_subtitle,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -428,6 +444,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.landscape_zoom,
+    available: ReaderSwitch.landscapeZoom.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -435,6 +452,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.zoom_start_position,
+    available: ReaderSwitch.landscapeZoom.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -442,6 +460,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.zoom_start_left,
+    available: ReaderSwitch.landscapeZoom.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -449,6 +468,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.zoom_start_right,
+    available: ReaderSwitch.landscapeZoom.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -456,6 +476,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.zoom_start_center,
+    available: ReaderSwitch.landscapeZoom.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -547,6 +568,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.show_navigation_overlay_on_start,
+    available: ReaderSwitch.showNavigationOverlayOnStart.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -554,6 +576,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.volume_keys_paging,
+    available: ReaderSwitch.volumeKeysPaging.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -561,6 +584,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.volume_keys_inverted,
+    available: ReaderSwitch.volumeKeysInverted.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -568,6 +592,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.flash_on_page_change,
+    available: ReaderSwitch.flashOnPageChange.isSupported,
     subtitle: (l) => l.flash_on_page_change_subtitle,
     section: (l) => l.reader,
     route: '/readerSettingsSection',
@@ -575,6 +600,7 @@ final settingsIndex = <SettingsEntry>[
   ),
   SettingsEntry(
     title: (l) => l.flash_color,
+    available: ReaderSwitch.flashOnPageChange.isSupported,
     subtitle: null,
     section: (l) => l.reader,
     route: '/readerSettingsSection',

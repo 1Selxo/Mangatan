@@ -80,114 +80,56 @@ class ReaderController extends _$ReaderController
       (element) => element.mangaId == getManga().id,
     );
     if (personalReaderMode.isNotEmpty) {
-      return personalReaderMode.first.readerMode.normalized;
+      // A direction stored apart from the mode by older Mangatan folds in.
+      return personalReaderMode.first.effectiveReaderMode;
     }
-    return getIsarSetting().effectiveDefaultReaderMode;
+    return ref.read(defaultReadingModeStateProvider);
   }
 
-  ReadingDirection getReadingDirection() {
-    final settings = getIsarSetting();
-    final personalReaderMode = (settings.personalReaderModeList ?? [])
-        .where((element) => element.mangaId == getManga().id)
-        .firstOrNull;
-    final personalDirection = personalReaderMode?.readingDirectionIndex;
-    return personalDirection == null
-        ? personalReaderMode?.readerMode.legacyReadingDirection ??
-              settings.effectiveDefaultReadingDirection
-        : ReadingDirectionExtension.fromPersistedIndex(personalDirection);
-  }
-
+  /// The series' page mode, else Mangatan's default page mode.
   @override
   PageMode getPageMode() {
-    final personalPageModeList = getIsarSetting().personalPageModeList ?? [];
-    final personalPageMode = personalPageModeList.where(
-      (element) => element.mangaId == getManga().id,
-    );
+    final personalPageMode = (getIsarSetting().personalPageModeList ?? [])
+        .where((element) => element.mangaId == getManga().id);
     if (personalPageMode.isNotEmpty) {
-      return personalPageMode.first.pageMode;
+      return personalPageMode.first.pageMode.normalized;
     }
-    return getIsarSetting().defaultPageMode;
+    return getIsarSetting().defaultPageMode.normalized;
   }
 
   void setReaderMode(ReaderMode newReaderMode) {
-    _setPersonalReaderPreference(
-      readerMode: newReaderMode.normalized,
-      readingDirection: getReadingDirection(),
-    );
-  }
-
-  void setReadingDirection(ReadingDirection newReadingDirection) {
-    _setPersonalReaderPreference(
-      readerMode: getReaderMode(),
-      readingDirection: newReadingDirection,
-    );
-  }
-
-  void _setPersonalReaderPreference({
-    required ReaderMode readerMode,
-    required ReadingDirection readingDirection,
-  }) {
-    final personalReaderModes =
-        (getIsarSetting().personalReaderModeList ?? [])
-            .where((preference) => preference.mangaId != getManga().id)
-            .toList()
-          ..add(
-            PersonalReaderMode(
-              mangaId: getManga().id,
-              readerMode: readerMode,
-              readingDirectionIndex: readingDirection.index,
-            ),
-          );
-    isar.writeTxnSync(
-      () => isar.settings.putSync(
-        getIsarSetting()
-          ..personalReaderModeList = personalReaderModes
-          ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
-    onSettingsMutated();
-  }
-
-  @override
-  void setPageMode(PageMode newPageMode) {
-    List<PersonalPageMode>? personalPageModeLists = [];
-    for (var personalPageMode in getIsarSetting().personalPageModeList ?? []) {
-      if (personalPageMode.mangaId != getManga().id) {
-        personalPageModeLists.add(personalPageMode);
+    _cachedIsContinuousLike = null;
+    List<PersonalReaderMode>? personalReaderModeLists = [];
+    for (var personalReaderMode
+        in getIsarSetting().personalReaderModeList ?? []) {
+      if (personalReaderMode.mangaId != getManga().id) {
+        personalReaderModeLists.add(personalReaderMode);
       }
     }
-    personalPageModeLists.add(
-      PersonalPageMode()
+    personalReaderModeLists.add(
+      PersonalReaderMode()
         ..mangaId = getManga().id
-        ..pageMode = newPageMode,
+        ..readerMode = newReaderMode,
     );
     settingsRepository.save(
-      getIsarSetting()..personalPageModeList = personalPageModeLists,
+      getIsarSetting()..personalReaderModeList = personalReaderModeLists,
     );
     onSettingsMutated();
-  }
-
-  void setShowPageNumber(bool value) {
-    if (!incognitoMode) {
-      isar.writeTxnSync(
-        () => isar.settings.putSync(
-          getIsarSetting()
-            ..showPagesNumber = value
-            ..updatedAt = DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-      onSettingsMutated();
-    }
-  }
-
-  bool getShowPageNumber() {
-    if (!incognitoMode) return getIsarSetting().showPagesNumber!;
-    return true;
   }
 
   // ---------------------------------------------------------------------------
   // Page tracking
   // ---------------------------------------------------------------------------
+
+  int? _cachedPageLength;
+  int getCachedPageLength([List fallback = const []]) {
+    return _cachedPageLength ??= getPageLength(fallback);
+  }
+
+  bool? _cachedIsContinuousLike;
+  bool getCachedIsContinuousLike() {
+    return _cachedIsContinuousLike ??= getReaderMode().isVerticalContinuous;
+  }
 
   int getPageIndex() {
     if (incognitoMode) return 0;
@@ -202,7 +144,9 @@ class ReaderController extends _$ReaderController
         : 0;
   }
 
-  int getPageLength(List pages) => pages.length;
+  int getPageLength(List pages) {
+    return pages.length;
+  }
 
   int? _lastSavedIndex;
   void setPageIndex(
@@ -211,42 +155,48 @@ class ReaderController extends _$ReaderController
     List pageUrlsFallback = const [],
   ]) {
     if (chapter.isRead! || incognitoMode) return;
-    final pageLength = getPageLength(pageUrlsFallback);
+    final pageLength = getCachedPageLength(pageUrlsFallback);
     if (pageLength == 0 || (!save && newIndex == _lastSavedIndex)) return;
     _lastSavedIndex = newIndex;
-    final isContinuousLike = getReaderMode().isVerticalContinuous;
+    final isContinuousLike = getCachedIsContinuousLike();
     final isRead = isContinuousLike
         ? (newIndex + 2) >= pageLength - 1
         : (newIndex + 2) >= pageLength;
     if (isRead || save) {
-      List<ChapterPageIndex>? chapterPageIndexs = [];
-      for (var chapterPageIndex
-          in getIsarSetting().chapterPageIndexList ?? []) {
-        if (chapterPageIndex.chapterId != chapter.id) {
-          chapterPageIndexs.add(chapterPageIndex);
+      void executeSave() {
+        if (chapter.isRead! || incognitoMode) return;
+        List<ChapterPageIndex>? chapterPageIndexs = [];
+        for (var chapterPageIndex
+            in getIsarSetting().chapterPageIndexList ?? []) {
+          if (chapterPageIndex.chapterId != chapter.id &&
+              (chapterPageIndex.index ?? 0) > 0) {
+            chapterPageIndexs.add(chapterPageIndex);
+          }
         }
-      }
-      chapterPageIndexs.add(
-        ChapterPageIndex()
-          ..chapterId = chapter.id
-          ..index = isRead ? 0 : newIndex,
-      );
-      final autoReadDuplChap = ref.read(autoReadDuplicateChaptersStateProvider);
-      final now = DateTime.now().millisecondsSinceEpoch;
-      // When the chapter is finished, mark every other scanlation of the same
-      // chapter number as read too, in the same transaction.
-      final List<Chapter> siblings = [];
-      if (isRead && autoReadDuplChap) {
-        final manga = chapter.manga.value;
-        if (manga != null) {
-          final recognition = ChapterRecognition();
-          final chapterNumber = recognition.resolveChapterNumber(
-            manga.name!,
-            chapter.name!,
-            sourceChapterNumber: chapter.chapterNumber,
+        if (!isRead && newIndex > 0) {
+          chapterPageIndexs.add(
+            ChapterPageIndex()
+              ..chapterId = chapter.id
+              ..index = newIndex,
           );
-          if (chapterNumber > 0) {
+        }
+        if (!ref.mounted) return;
+        final autoReadDuplChap = ref.read(
+          autoReadDuplicateChaptersStateProvider,
+        );
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final List<Chapter> siblings = [];
+        if (isRead && autoReadDuplChap) {
+          final manga = chapter.manga.value;
+          if (manga != null) {
+            final recognition = ChapterRecognition();
+            final chapterNumber = recognition.resolveChapterNumber(
+              manga.name!,
+              chapter.name!,
+              sourceChapterNumber: chapter.chapterNumber,
+            );
             for (final c in manga.chapters) {
+              if (chapterNumber <= 0) break;
               if (c.id == chapter.id || (c.isRead ?? false)) continue;
               final n = recognition.resolveChapterNumber(
                 manga.name!,
@@ -262,34 +212,41 @@ class ReaderController extends _$ReaderController
             }
           }
         }
-      }
-      final chap = chapter;
-      chapterRepository.writeTransaction(() {
-        settingsRepository.putSync(
-          getIsarSetting()
-            ..chapterPageIndexList = chapterPageIndexs
-            ..updatedAt = now,
-        );
-        chap.isRead = isRead;
-        chap.lastPageRead = isRead ? '1' : (newIndex + 1).toString();
-        chap.updatedAt = now;
-        chapterRepository.putSync(chap);
-        if (siblings.isNotEmpty) chapterRepository.putAllSync(siblings);
-      });
-      onSettingsMutated();
-      if (isRead) {
-        chapter.updateTrackChapterRead(ref);
-        if (ref.read(deleteDownloadAfterReadingStateProvider)) {
-          chapterToDeleteAfterReading(
-            getManga().getChapterListForReading(),
-            chapter,
-            slot: ref.read(deleteAfterReadingSlotStateProvider),
-            deleteBookmarked: ref.read(
-              deleteBookmarkedAfterReadingStateProvider,
-            ),
-          )?.deleteDownloadedFiles();
+        final chap = chapter;
+        chapterRepository.writeTransaction(() {
+          settingsRepository.putSync(
+            getIsarSetting()
+              ..chapterPageIndexList = chapterPageIndexs
+              ..updatedAt = now,
+          );
+          chap.isRead = isRead;
+          chap.lastPageRead = isRead ? '1' : (newIndex + 1).toString();
+          chap.updatedAt = now;
+          chapterRepository.putSync(chap);
+          if (siblings.isNotEmpty) chapterRepository.putAllSync(siblings);
+        });
+        onSettingsMutated();
+        if (isRead) {
+          chapter.updateTrackChapterRead(ref);
+          if (ref.read(deleteDownloadAfterReadingStateProvider)) {
+            chapterToDeleteAfterReading(
+              getManga().getChapterListForReading(),
+              chapter,
+              slot: ref.read(deleteAfterReadingSlotStateProvider),
+              deleteBookmarked: ref.read(
+                deleteBookmarkedAfterReadingStateProvider,
+              ),
+            )?.deleteDownloadedFiles();
+          }
         }
       }
+
+      if (save) {
+        executeSave();
+      } else {
+        Future.microtask(executeSave);
+      }
+      return;
     }
   }
 }

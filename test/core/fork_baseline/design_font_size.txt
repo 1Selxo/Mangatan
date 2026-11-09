@@ -5,7 +5,6 @@
 2 lib/modules/anime/widgets/subtitle_cue_list.dart
 2 lib/modules/anime/widgets/subtitle_setting_widget.dart
 1 lib/modules/anime/widgets/subtitle_view.dart
-1 lib/modules/anime/widgets/video_ocr_overlay.dart
 8 lib/modules/browse/extension/extension_detail.dart
 7 lib/modules/browse/extension/widgets/source_preference_widget.dart
 9 lib/modules/manga/detail/manga_detail_view.dart

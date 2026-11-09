@@ -430,7 +430,7 @@ class ChimahonAppSettingsAdapter {
     if (readerMode == null) {
       unrepresentableKeys.add('pref_default_reading_mode_key');
     }
-    final pageLayout = _pageLayoutToWire[settings.defaultPageMode];
+    final pageLayout = _pageLayoutToWire[settings.defaultPageMode.normalized];
     _put(values, 'page_layout', pageLayout);
     if (pageLayout == null) unrepresentableKeys.add('page_layout');
     values['pref_image_scale_type_key'] = settings.scaleType.index + 1;
@@ -1125,34 +1125,29 @@ class ChimahonAppSettingsAdapter {
 
   int? _exportReaderMode(Settings settings) {
     return switch (settings.effectiveDefaultReaderMode) {
-      ReaderMode.horizontalPaged =>
-        settings.effectiveDefaultReadingDirection.isRtl ? 2 : 1,
-      ReaderMode.verticalPaged => 3,
+      ReaderMode.ltr => 1,
+      ReaderMode.rtl => 2,
+      ReaderMode.vertical => 3,
       ReaderMode.webtoon => 4,
       ReaderMode.verticalContinuous => 5,
-      ReaderMode.horizontalContinuous => null,
-      ReaderMode.legacyHorizontalPagedRtl ||
-      ReaderMode.legacyHorizontalContinuousRtl => null,
+      ReaderMode.horizontalContinuous ||
+      ReaderMode.horizontalContinuousRTL => null,
     };
   }
 
   void _importReaderMode(Settings settings, int? value) {
-    switch (value) {
-      case 1:
-        settings
-          ..defaultReaderMode = ReaderMode.horizontalPaged
-          ..defaultReadingDirectionIndex = ReadingDirection.leftToRight.index;
-      case 2:
-        settings
-          ..defaultReaderMode = ReaderMode.horizontalPaged
-          ..defaultReadingDirectionIndex = ReadingDirection.rightToLeft.index;
-      case 3:
-        settings.defaultReaderMode = ReaderMode.verticalPaged;
-      case 4:
-        settings.defaultReaderMode = ReaderMode.webtoon;
-      case 5:
-        settings.defaultReaderMode = ReaderMode.verticalContinuous;
-    }
+    final mode = switch (value) {
+      1 => ReaderMode.ltr,
+      2 => ReaderMode.rtl,
+      3 => ReaderMode.vertical,
+      4 => ReaderMode.webtoon,
+      5 => ReaderMode.verticalContinuous,
+      _ => null,
+    };
+    if (mode == null) return;
+    settings
+      ..defaultReaderMode = mode
+      ..defaultReadingDirectionIndex = null;
   }
 
   void _putGridColumns(

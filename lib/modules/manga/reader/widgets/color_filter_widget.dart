@@ -129,6 +129,22 @@ Widget applyReaderColorFilter(Widget child, WidgetRef ref) {
   return ColorFiltered(colorFilter: filter, child: child);
 }
 
+/// The reader's background in [color], filling the space it is given, under
+/// the same colour filters as the pages: a tint or inverted pages would
+/// otherwise sit on a background left as it is.
+Widget readerBackground(BuildContext context, WidgetRef ref, Color color) {
+  final (blendMode, tint) = chapterColorFIlterValues(context, ref);
+  Widget background = SizedBox.expand(child: ColoredBox(color: color));
+  if (tint != null) {
+    background = ColorFiltered(
+      // As the pages are tinted: see SubsamplingImageRenderWidget.
+      colorFilter: ColorFilter.mode(tint, blendMode ?? BlendMode.srcIn),
+      child: background,
+    );
+  }
+  return applyReaderColorFilter(background, ref);
+}
+
 (BlendMode?, Color?) chapterColorFIlterValues(
   BuildContext context,
   WidgetRef ref,

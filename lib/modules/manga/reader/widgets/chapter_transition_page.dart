@@ -25,7 +25,6 @@ class ChapterTransitionPage extends ConsumerWidget {
   final Chapter? nextChapter;
   final String mangaName;
   final ReaderMode readerMode;
-  final ReadingDirection readingDirection;
 
   const ChapterTransitionPage({
     super.key,
@@ -33,7 +32,6 @@ class ChapterTransitionPage extends ConsumerWidget {
     required this.nextChapter,
     required this.mangaName,
     required this.readerMode,
-    required this.readingDirection,
   });
 
   @override
@@ -182,7 +180,7 @@ class ChapterTransitionPage extends ConsumerWidget {
     final Widget arrowIcon = Icon(
       fill: 1,
       nextChapter != null
-          ? (readingDirection.isRtl
+          ? (readerMode.isRTL
                 ? Symbols.keyboard_arrow_left_rounded
                 : Symbols.keyboard_arrow_right_rounded)
           : Symbols.check_circle_rounded,
@@ -224,7 +222,7 @@ class ChapterTransitionPage extends ConsumerWidget {
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: readingDirection.isRtl
+                children: readerMode.isRTL
                     ? [
                         Expanded(child: nextCard),
                         const SizedBox(width: ShioriSpace.s12),
@@ -420,7 +418,7 @@ class ChapterTransitionPage extends ConsumerWidget {
           RotatedBox(
             quarterTurns: readerMode.isVertical
                 ? 1 // turn 90° clockwise, so Icon is pointing down
-                : readingDirection.isRtl
+                : readerMode.isRTL
                 ? 2 // turn 180°, so Icon is pointing left
                 : 0, // no rotation, Icon points to the right.
             child: Icon(

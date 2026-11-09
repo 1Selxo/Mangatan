@@ -2522,7 +2522,7 @@ Settings _settingsDeserialize(
         _SettingsdefaultReaderModeValueEnumMap[reader.readByteOrNull(
           offsets[61],
         )] ??
-        ReaderMode.verticalPaged,
+        ReaderMode.vertical,
     defaultReadingDirectionIndex: reader.readLongOrNull(offsets[62]),
     defaultSkipIntroLength: reader.readLongOrNull(offsets[63]),
     deleteAfterReadingSlot: reader.readLongOrNull(offsets[65]),
@@ -3023,7 +3023,7 @@ P _settingsDeserializeProp<P>(
       return (_SettingsdefaultReaderModeValueEnumMap[reader.readByteOrNull(
                 offset,
               )] ??
-              ReaderMode.verticalPaged)
+              ReaderMode.vertical)
           as P;
     case 62:
       return (reader.readLongOrNull(offset)) as P;
@@ -3587,30 +3587,30 @@ const _SettingsdebandingTypeValueEnumMap = {
 const _SettingsdefaultPageModeEnumValueMap = {
   'onePage': 0,
   'doublePage': 1,
-  'doublePageCover': 2,
+  'legacyDoublePageCover': 2,
 };
 const _SettingsdefaultPageModeValueEnumMap = {
   0: PageMode.onePage,
   1: PageMode.doublePage,
-  2: PageMode.doublePageCover,
+  2: PageMode.legacyDoublePageCover,
 };
 const _SettingsdefaultReaderModeEnumValueMap = {
-  'verticalPaged': 0,
-  'horizontalPaged': 1,
-  'legacyHorizontalPagedRtl': 2,
+  'vertical': 0,
+  'ltr': 1,
+  'rtl': 2,
   'verticalContinuous': 3,
   'webtoon': 4,
   'horizontalContinuous': 5,
-  'legacyHorizontalContinuousRtl': 6,
+  'horizontalContinuousRTL': 6,
 };
 const _SettingsdefaultReaderModeValueEnumMap = {
-  0: ReaderMode.verticalPaged,
-  1: ReaderMode.horizontalPaged,
-  2: ReaderMode.legacyHorizontalPagedRtl,
+  0: ReaderMode.vertical,
+  1: ReaderMode.ltr,
+  2: ReaderMode.rtl,
   3: ReaderMode.verticalContinuous,
   4: ReaderMode.webtoon,
   5: ReaderMode.horizontalContinuous,
-  6: ReaderMode.legacyHorizontalContinuousRtl,
+  6: ReaderMode.horizontalContinuousRTL,
 };
 const _SettingsdisableSectionTypeEnumValueMap = {
   'all': 0,
@@ -34406,7 +34406,7 @@ PersonalReaderMode _personalReaderModeDeserialize(
         _PersonalReaderModereaderModeValueEnumMap[reader.readByteOrNull(
           offsets[1],
         )] ??
-        ReaderMode.verticalPaged,
+        ReaderMode.vertical,
     readingDirectionIndex: reader.readLongOrNull(offsets[2]),
   );
   return object;
@@ -34425,7 +34425,7 @@ P _personalReaderModeDeserializeProp<P>(
       return (_PersonalReaderModereaderModeValueEnumMap[reader.readByteOrNull(
                 offset,
               )] ??
-              ReaderMode.verticalPaged)
+              ReaderMode.vertical)
           as P;
     case 2:
       return (reader.readLongOrNull(offset)) as P;
@@ -34435,22 +34435,22 @@ P _personalReaderModeDeserializeProp<P>(
 }
 
 const _PersonalReaderModereaderModeEnumValueMap = {
-  'verticalPaged': 0,
-  'horizontalPaged': 1,
-  'legacyHorizontalPagedRtl': 2,
+  'vertical': 0,
+  'ltr': 1,
+  'rtl': 2,
   'verticalContinuous': 3,
   'webtoon': 4,
   'horizontalContinuous': 5,
-  'legacyHorizontalContinuousRtl': 6,
+  'horizontalContinuousRTL': 6,
 };
 const _PersonalReaderModereaderModeValueEnumMap = {
-  0: ReaderMode.verticalPaged,
-  1: ReaderMode.horizontalPaged,
-  2: ReaderMode.legacyHorizontalPagedRtl,
+  0: ReaderMode.vertical,
+  1: ReaderMode.ltr,
+  2: ReaderMode.rtl,
   3: ReaderMode.verticalContinuous,
   4: ReaderMode.webtoon,
   5: ReaderMode.horizontalContinuous,
-  6: ReaderMode.legacyHorizontalContinuousRtl,
+  6: ReaderMode.horizontalContinuousRTL,
 };
 
 extension PersonalReaderModeQueryFilter
@@ -35689,12 +35689,12 @@ P _personalPageModeDeserializeProp<P>(
 const _PersonalPageModepageModeEnumValueMap = {
   'onePage': 0,
   'doublePage': 1,
-  'doublePageCover': 2,
+  'legacyDoublePageCover': 2,
 };
 const _PersonalPageModepageModeValueEnumMap = {
   0: PageMode.onePage,
   1: PageMode.doublePage,
-  2: PageMode.doublePageCover,
+  2: PageMode.legacyDoublePageCover,
 };
 
 extension PersonalPageModeQueryFilter

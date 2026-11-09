@@ -102,7 +102,8 @@ class Settings {
   @enumerated
   late ReaderMode defaultReaderMode;
 
-  /// Persisted enum index. Nullable so legacy combined RTL modes can migrate.
+  /// Legacy: the reading direction Mangatan once stored apart from the mode.
+  /// Folded into [defaultReaderMode] when read; null once a mode is saved.
   int? defaultReadingDirectionIndex;
 
   @enumerated
@@ -598,8 +599,8 @@ class Settings {
     this.chapterPageIndexList,
     this.userAgent = defaultUserAgent,
     this.cookiesList,
-    this.defaultReaderMode = ReaderMode.verticalPaged,
-    this.defaultReadingDirectionIndex = 0,
+    this.defaultReaderMode = ReaderMode.vertical,
+    this.defaultReadingDirectionIndex,
     this.defaultPageMode = PageMode.onePage,
     this.updateErrorsList,
     this.savedSearchesList,
@@ -887,18 +888,10 @@ class Settings {
     }
     cropBorders = json['cropBorders'];
     dateFormat = json['dateFormat'];
-    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
+    defaultReaderMode = ReaderModeExtension.fromPersistedIndex(
       json['defaultReaderMode'],
-    );
-    defaultReaderMode = restoredReaderMode.normalized;
-    defaultReadingDirectionIndex =
-        (json['defaultReadingDirection'] == null
-                ? restoredReaderMode.legacyReadingDirection ??
-                      ReadingDirection.leftToRight
-                : ReadingDirectionExtension.fromPersistedIndex(
-                    json['defaultReadingDirection'],
-                  ))
-            .index;
+    ).withLegacyDirection(json['defaultReadingDirection']);
+    defaultReadingDirectionIndex = null;
     defaultPageMode = PageModeExtension.fromPersistedIndex(
       json['defaultPageMode'],
     );
@@ -1266,7 +1259,6 @@ class Settings {
     'cropBorders': cropBorders,
     'dateFormat': dateFormat,
     'defaultReaderMode': effectiveDefaultReaderMode.index,
-    'defaultReadingDirection': effectiveDefaultReadingDirection.index,
     'defaultPageMode': defaultPageMode.index,
     'displayType': displayType.index,
     'doubleTapAnimationSpeed': doubleTapAnimationSpeed,
@@ -1709,37 +1701,32 @@ class PersonalReaderMode {
   int? mangaId;
 
   @enumerated
-  ReaderMode readerMode = ReaderMode.verticalPaged;
+  ReaderMode readerMode = ReaderMode.vertical;
 
-  /// Persisted enum index. Nullable for reader preferences saved before the
-  /// reading-direction setting was split from [readerMode].
+  /// Legacy: the reading direction Mangatan once stored apart from the mode.
+  /// Folded into [readerMode] by [effectiveReaderMode]; null once saved.
   int? readingDirectionIndex;
 
   PersonalReaderMode({
     this.mangaId,
-    this.readerMode = ReaderMode.verticalPaged,
+    this.readerMode = ReaderMode.vertical,
     this.readingDirectionIndex,
   });
 
+  /// The mode to read in, with any legacy direction folded in.
+  @ignore
+  ReaderMode get effectiveReaderMode =>
+      readerMode.withLegacyDirection(readingDirectionIndex);
+
   PersonalReaderMode.fromJson(Map<String, dynamic> json) {
     mangaId = json['mangaId'];
-    final restoredReaderMode = ReaderModeExtension.fromPersistedIndex(
-      json['readerMode'],
-    );
-    readerMode = restoredReaderMode.normalized;
-    readingDirectionIndex =
-        (json['readingDirection'] == null
-                ? restoredReaderMode.legacyReadingDirection
-                : ReadingDirectionExtension.fromPersistedIndex(
-                    json['readingDirection'],
-                  ))
-            ?.index;
+    readerMode = ReaderModeExtension.fromPersistedIndex(json['readerMode'])
+        .withLegacyDirection(json['readingDirection']);
   }
 
   Map<String, dynamic> toJson() => {
     'mangaId': mangaId,
-    'readerMode': readerMode.normalized.index,
-    'readingDirection': readingDirectionIndex,
+    'readerMode': effectiveReaderMode.index,
   };
 }
 
@@ -1812,7 +1799,7 @@ class PersonalPageMode {
 
   PersonalPageMode.fromJson(Map<String, dynamic> json) {
     mangaId = json['mangaId'];
-    pageMode = PageMode.values[json['pageMode']];
+    pageMode = PageModeExtension.fromPersistedIndex(json['pageMode']);
   }
 
   Map<String, dynamic> toJson() => {
@@ -1822,93 +1809,85 @@ class PersonalPageMode {
 }
 
 enum ReaderMode {
-  // Keep these persisted positions stable. The legacy entries are hidden from
-  // selectors and normalized when settings are read.
-  verticalPaged,
-  horizontalPaged,
-  legacyHorizontalPagedRtl,
+  vertical,
+  ltr,
+  rtl,
   verticalContinuous,
   webtoon,
   horizontalContinuous,
-  legacyHorizontalContinuousRtl,
+  horizontalContinuousRTL,
 }
 
 extension ReaderModeExtension on ReaderMode {
-  static const selectableValues = [
-    ReaderMode.horizontalPaged,
-    ReaderMode.verticalPaged,
-    ReaderMode.horizontalContinuous,
-    ReaderMode.verticalContinuous,
-    ReaderMode.webtoon,
-  ];
-
   static ReaderMode fromPersistedIndex(Object? value) {
     final index = value is int ? value : null;
     if (index == null || index < 0 || index >= ReaderMode.values.length) {
-      return ReaderMode.verticalPaged;
+      return ReaderMode.vertical;
     }
     return ReaderMode.values[index];
   }
 
-  ReaderMode get normalized => switch (this) {
-    ReaderMode.legacyHorizontalPagedRtl => ReaderMode.horizontalPaged,
-    ReaderMode.legacyHorizontalContinuousRtl => ReaderMode.horizontalContinuous,
-    _ => this,
-  };
+  /// Folds a reading direction Mangatan once stored apart from the mode
+  /// (0 left to right, 1 right to left; null when none) into the mode.
+  ReaderMode withLegacyDirection(Object? directionIndex) {
+    if (directionIndex == 1) {
+      return switch (this) {
+        ReaderMode.ltr => ReaderMode.rtl,
+        ReaderMode.horizontalContinuous => ReaderMode.horizontalContinuousRTL,
+        _ => this,
+      };
+    }
+    if (directionIndex == 0) {
+      return switch (this) {
+        ReaderMode.rtl => ReaderMode.ltr,
+        ReaderMode.horizontalContinuousRTL => ReaderMode.horizontalContinuous,
+        _ => this,
+      };
+    }
+    return this;
+  }
 
-  ReadingDirection? get legacyReadingDirection => switch (this) {
-    ReaderMode.horizontalPaged => ReadingDirection.leftToRight,
-    ReaderMode.legacyHorizontalPagedRtl => ReadingDirection.rightToLeft,
-    ReaderMode.horizontalContinuous => ReadingDirection.leftToRight,
-    ReaderMode.legacyHorizontalContinuousRtl => ReadingDirection.rightToLeft,
-    _ => null,
-  };
-
-  /// Vertical continuous || Webtoon || Horizontal continuous
+  /// Vertical continuous || Webtoon || Horizontal continuous || Horizontal continuous (RTL)
   bool get isContinuous => isVerticalContinuous || isHorizontalContinuous;
 
-  /// Vertical paged || Vertical continuous || Webtoon
-  bool get isVertical =>
-      this == ReaderMode.verticalPaged || isVerticalContinuous;
+  /// Vertical || Vertical continuous || Webtoon
+  bool get isVertical => this == ReaderMode.vertical || isVerticalContinuous;
 
   /// Vertical continuous || Webtoon
   bool get isVerticalContinuous =>
       this == ReaderMode.verticalContinuous || this == ReaderMode.webtoon;
 
-  /// Horizontal continuous
+  /// Horizontal continuous || Horizontal continuous (RTL)
   bool get isHorizontalContinuous =>
-      normalized == ReaderMode.horizontalContinuous;
+      this == ReaderMode.horizontalContinuous ||
+      this == ReaderMode.horizontalContinuousRTL;
 
-  /// Horizontal paged
-  bool get isHorizontalPaged => normalized == ReaderMode.horizontalPaged;
+  /// Right to Left || Horizontal continuous (RTL)
+  bool get isRTL =>
+      this == ReaderMode.rtl || this == ReaderMode.horizontalContinuousRTL;
+
+  /// Left to Right || Right to Left
+  bool get isHorizontalPaged =>
+      this == ReaderMode.ltr || this == ReaderMode.rtl;
 }
 
-enum ReadingDirection { leftToRight, rightToLeft }
-
-extension ReadingDirectionExtension on ReadingDirection {
-  static ReadingDirection fromPersistedIndex(Object? value) {
-    return value == ReadingDirection.rightToLeft.index
-        ? ReadingDirection.rightToLeft
-        : ReadingDirection.leftToRight;
-  }
-
-  bool get isRtl => this == ReadingDirection.rightToLeft;
-}
-
-extension ReaderSettingsDirectionExtension on Settings {
-  ReaderMode get effectiveDefaultReaderMode => defaultReaderMode.normalized;
-
-  ReadingDirection get effectiveDefaultReadingDirection =>
-      defaultReadingDirectionIndex == null
-      ? defaultReaderMode.legacyReadingDirection ?? ReadingDirection.leftToRight
-      : ReadingDirectionExtension.fromPersistedIndex(
-          defaultReadingDirectionIndex,
-        );
+extension ReaderSettingsModeExtension on Settings {
+  /// The default mode, with any legacy reading direction folded in.
+  ReaderMode get effectiveDefaultReaderMode =>
+      defaultReaderMode.withLegacyDirection(defaultReadingDirectionIndex);
 }
 
 enum NovelTextAlign { left, center, right, block }
 
-enum PageMode { onePage, doublePage, doublePageCover }
+enum PageMode {
+  onePage,
+  doublePage,
+
+  /// Legacy Mangatan "double page, cover alone". Kept so stored values still
+  /// decode; read as [doublePage] (upstream's "Single first page" setting
+  /// shows the first page alone).
+  legacyDoublePageCover,
+}
 
 extension PageModeExtension on PageMode {
   static PageMode fromPersistedIndex(Object? value) {
@@ -1916,13 +1895,12 @@ extension PageModeExtension on PageMode {
     if (index == null || index < 0 || index >= PageMode.values.length) {
       return PageMode.onePage;
     }
-    return PageMode.values[index];
+    return PageMode.values[index].normalized;
   }
 
-  bool get isDoublePage =>
-      this == PageMode.doublePage || this == PageMode.doublePageCover;
-
-  bool get usesCoverOffset => this == PageMode.doublePageCover;
+  /// The legacy cover mode read as upstream's double page.
+  PageMode get normalized =>
+      this == PageMode.legacyDoublePageCover ? PageMode.doublePage : this;
 }
 
 @embedded

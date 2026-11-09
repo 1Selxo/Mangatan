@@ -123,7 +123,7 @@ void main() {
 
     database.writeTxnSync(() {
       database.settings.putSync(
-        Settings(defaultPageMode: PageMode.doublePageCover),
+        Settings(defaultPageMode: PageMode.legacyDoublePageCover),
       );
       database.sources.putSync(source);
       database.sourcePreferences.putSync(sourcePreference);
@@ -260,7 +260,7 @@ void main() {
     });
     expect(
       snapshot.unrepresentablePreferenceKeys,
-      containsAll({'page_layout', 'pref_ocr_engine', 'pref_ocr_box_scale'}),
+      containsAll({'pref_ocr_engine', 'pref_ocr_box_scale'}),
     );
     expect(snapshot.trackingDeletionKeys, {
       (source: 9001, url: '/series', syncId: 2),

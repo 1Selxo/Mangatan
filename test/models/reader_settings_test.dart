@@ -2,45 +2,82 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/models/settings.dart';
 
 void main() {
-  test(
-    'reader mode selector exposes exactly five direction-agnostic modes',
-    () {
-      expect(ReaderModeExtension.selectableValues, [
-        ReaderMode.horizontalPaged,
-        ReaderMode.verticalPaged,
-        ReaderMode.horizontalContinuous,
-        ReaderMode.verticalContinuous,
-        ReaderMode.webtoon,
-      ]);
-    },
-  );
+  test('reader modes keep the stored positions of upstream and old forks', () {
+    expect(ReaderMode.values, [
+      ReaderMode.vertical,
+      ReaderMode.ltr,
+      ReaderMode.rtl,
+      ReaderMode.verticalContinuous,
+      ReaderMode.webtoon,
+      ReaderMode.horizontalContinuous,
+      ReaderMode.horizontalContinuousRTL,
+    ]);
+  });
 
-  test('legacy RTL reader modes migrate into layout plus direction', () {
-    final paged = PersonalReaderMode.fromJson({'mangaId': 1, 'readerMode': 2});
+  test('a direction stored apart from the mode folds into it', () {
+    // Older Mangatan: horizontal mode plus right to left.
+    final paged = PersonalReaderMode.fromJson({
+      'mangaId': 1,
+      'readerMode': ReaderMode.ltr.index,
+      'readingDirection': 1,
+    });
     final continuous = PersonalReaderMode.fromJson({
       'mangaId': 2,
-      'readerMode': 6,
+      'readerMode': ReaderMode.horizontalContinuous.index,
+      'readingDirection': 1,
+    });
+    // Its oldest backups: the combined right-to-left modes, no direction.
+    final legacy = PersonalReaderMode.fromJson({'mangaId': 3, 'readerMode': 2});
+    // A vertical mode has no direction to take.
+    final vertical = PersonalReaderMode.fromJson({
+      'mangaId': 4,
+      'readerMode': ReaderMode.webtoon.index,
+      'readingDirection': 1,
     });
 
-    expect(paged.readerMode, ReaderMode.horizontalPaged);
-    expect(paged.readingDirectionIndex, ReadingDirection.rightToLeft.index);
-    expect(continuous.readerMode, ReaderMode.horizontalContinuous);
+    expect(paged.readerMode, ReaderMode.rtl);
+    expect(continuous.readerMode, ReaderMode.horizontalContinuousRTL);
+    expect(legacy.readerMode, ReaderMode.rtl);
+    expect(vertical.readerMode, ReaderMode.webtoon);
+    expect(paged.toJson(), {'mangaId': 1, 'readerMode': ReaderMode.rtl.index});
+  });
+
+  test('a stored direction folds into a mode read from the database', () {
+    final personal = PersonalReaderMode(
+      readerMode: ReaderMode.ltr,
+      readingDirectionIndex: 1,
+    );
+    final leftToRight = PersonalReaderMode(
+      readerMode: ReaderMode.rtl,
+      readingDirectionIndex: 0,
+    );
+    final settings = Settings()
+      ..defaultReaderMode = ReaderMode.horizontalContinuous
+      ..defaultReadingDirectionIndex = 1;
+
+    expect(personal.effectiveReaderMode, ReaderMode.rtl);
+    expect(leftToRight.effectiveReaderMode, ReaderMode.ltr);
     expect(
-      continuous.readingDirectionIndex,
-      ReadingDirection.rightToLeft.index,
+      settings.effectiveDefaultReaderMode,
+      ReaderMode.horizontalContinuousRTL,
+    );
+    expect(
+      Settings(defaultReaderMode: ReaderMode.rtl).effectiveDefaultReaderMode,
+      ReaderMode.rtl,
     );
   });
 
-  test('legacy database values resolve direction before normalization', () {
+  test('backups store the folded default mode and no direction', () {
     final settings = Settings()
-      ..defaultReaderMode = ReaderMode.legacyHorizontalPagedRtl
-      ..defaultReadingDirectionIndex = null;
+      ..defaultReaderMode = ReaderMode.ltr
+      ..defaultReadingDirectionIndex = 1;
+    final backup = settings.toJson();
+    final restored = Settings.fromJson(backup);
 
-    expect(settings.effectiveDefaultReaderMode, ReaderMode.horizontalPaged);
-    expect(
-      settings.effectiveDefaultReadingDirection,
-      ReadingDirection.rightToLeft,
-    );
+    expect(backup['defaultReaderMode'], ReaderMode.rtl.index);
+    expect(backup.containsKey('defaultReadingDirection'), isFalse);
+    expect(restored.defaultReaderMode, ReaderMode.rtl);
+    expect(restored.defaultReadingDirectionIndex, isNull);
   });
 
   test('page mode persistence falls back safely for old or invalid data', () {
@@ -51,18 +88,17 @@ void main() {
       PageModeExtension.fromPersistedIndex(PageMode.doublePage.index),
       PageMode.doublePage,
     );
-    expect(
-      PageModeExtension.fromPersistedIndex(PageMode.doublePageCover.index),
-      PageMode.doublePageCover,
-    );
+    // The old cover-offset mode reads as double page.
+    expect(PageModeExtension.fromPersistedIndex(2), PageMode.doublePage);
+    expect(PageMode.legacyDoublePageCover.normalized, PageMode.doublePage);
   });
 
   test('default page mode is included in settings backups', () {
-    final settings = Settings(defaultPageMode: PageMode.doublePageCover);
+    final settings = Settings(defaultPageMode: PageMode.doublePage);
     final backup = settings.toJson();
     final restored = Settings.fromJson(backup);
 
-    expect(backup['defaultPageMode'], PageMode.doublePageCover.index);
-    expect(restored.defaultPageMode, PageMode.doublePageCover);
+    expect(backup['defaultPageMode'], PageMode.doublePage.index);
+    expect(restored.defaultPageMode, PageMode.doublePage);
   });
 }

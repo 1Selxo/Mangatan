@@ -16,7 +16,6 @@
 1 lib/modules/manga/detail/widgets/anime_season_list.dart -> package:mangayomi/main.dart
 1 lib/modules/manga/download/providers/download_provider.dart -> package:mangayomi/main.dart
 1 lib/modules/manga/reader/providers/reader_controller_provider.dart -> package:mangayomi/main.dart
-1 lib/modules/manga/reader/reader_view.dart -> package:mangayomi/main.dart
 1 lib/modules/manga/reader/widgets/image_actions_dialog.dart -> package:mangayomi/main.dart
 1 lib/modules/manga/widgets/manga_image_card_widget.dart -> package:mangayomi/main.dart
 1 lib/modules/mass_migration/models/mass_migration_models.dart -> package:mangayomi/main.dart

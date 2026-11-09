@@ -168,7 +168,7 @@ void main() {
               readerNavigationLayout: 99,
               markEpisodeAsSeenType: 101,
               libraryFilterMangasDownloadType: 99,
-              defaultPageMode: PageMode.doublePageCover,
+              defaultPageMode: PageMode.legacyDoublePageCover,
             )
             ..sortLibraryManga = SortLibraryManga(index: 99, reverse: false)
             ..relativeTimesTamps = 1
@@ -189,7 +189,8 @@ void main() {
       expect(keys, isNot(contains('relative_time_v2')));
       expect(keys, isNot(contains('pref_library_columns_portrait_key')));
       expect(keys, isNot(contains('pref_library_columns_landscape_key')));
-      expect(keys, isNot(contains('page_layout')));
+      // The old cover-offset page mode is read, and sent, as double page.
+      expect(keys, contains('page_layout'));
       expect(keys, isNot(contains('pref_subtitle_lang')));
       expect(projection.unrepresentableKeys, {
         'pref_default_reading_mode_key',
@@ -202,7 +203,6 @@ void main() {
         'library_sorting_mode',
         'pref_library_columns_portrait_key',
         'pref_library_columns_landscape_key',
-        'page_layout',
       });
       expect(
         projection.unrepresentableKeys,
@@ -395,7 +395,7 @@ void main() {
               markEpisodeAsSeenType: 85,
               audioChannels: AudioChannel.mono,
               debandingType: DebandingType.cpu,
-              defaultPageMode: PageMode.doublePageCover,
+              defaultPageMode: PageMode.legacyDoublePageCover,
               enableHardwareAcceleration: false,
               backupFrequency: 4,
               playerSubtitleSettings: subtitles,
@@ -448,7 +448,7 @@ void main() {
       expect(settings.markEpisodeAsSeenType, 85);
       expect(settings.audioChannels, AudioChannel.mono);
       expect(settings.debandingType, DebandingType.cpu);
-      expect(settings.defaultPageMode, PageMode.doublePageCover);
+      expect(settings.defaultPageMode, PageMode.legacyDoublePageCover);
       expect(settings.enableHardwareAcceleration, isFalse);
       expect(settings.backupFrequency, 4);
       expect(settings.playerSubtitleSettings, same(subtitles));
@@ -499,7 +499,9 @@ void main() {
 
       for (final pageMode in [PageMode.onePage, PageMode.doublePage]) {
         final source = Settings(defaultPageMode: pageMode);
-        final destination = Settings(defaultPageMode: PageMode.doublePageCover);
+        final destination = Settings(
+          defaultPageMode: PageMode.legacyDoublePageCover,
+        );
         adapter.importInto(destination, adapter.export(source));
         expect(destination.defaultPageMode, pageMode);
       }
@@ -548,8 +550,7 @@ Settings _fullyMappedSettings() => Settings(
   showPagesNumber: false,
   fullScreenReader: true,
   keepScreenOnReader: false,
-  defaultReaderMode: ReaderMode.horizontalPaged,
-  defaultReadingDirectionIndex: ReadingDirection.rightToLeft.index,
+  defaultReaderMode: ReaderMode.rtl,
   defaultPageMode: PageMode.doublePage,
   scaleType: ScaleType.smartFit,
   backgroundColor: BackgroundColor.grey,

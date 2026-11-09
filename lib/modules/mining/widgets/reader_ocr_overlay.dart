@@ -983,9 +983,7 @@ class ReaderOcrController extends ChangeNotifier {
       AppLogger.log('Reader OCR failed: $error', logLevel: LogLevel.warning);
     } finally {
       _loading = false;
-      if (!_disposed) {
-        notifyListeners();
-      }
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -1016,6 +1014,8 @@ class ReaderOcrController extends ChangeNotifier {
       sourceLanguage: sourceLanguage,
       profileLanguage: profile.languageCode,
     );
+    // The whole page is read, also for a cropped page or half of a spread:
+    // the boxes are drawn where the whole page lies on screen.
     final key =
         '${data.pageUrl?.url ?? data.directory?.path ?? ''}:'
         '${data.chapter?.id}:${data.index}:${data.pageIndex}:'
@@ -1322,7 +1322,7 @@ class ReaderOcrController extends ChangeNotifier {
       sentence: sentence,
       pageIndex: data.pageIndex,
       sourceUri: Uri.tryParse(data.pageUrl?.url ?? ''),
-      imageBytesLoader: () async => data.cropImage ?? await data.getImageBytes,
+      imageBytesLoader: () async => await data.getImageBytes,
     );
   }
 
@@ -1591,10 +1591,10 @@ class ReaderOcrController extends ChangeNotifier {
       );
     }
 
-    Uint8List? bytes = data.cropImage ?? await data.getImageBytes;
+    Uint8List? bytes = await data.getImageBytes;
     for (var retry = 0; bytes == null && retry < 3; retry++) {
       await Future<void>.delayed(const Duration(milliseconds: 700));
-      bytes = data.cropImage ?? await data.getImageBytes;
+      bytes = await data.getImageBytes;
     }
     if (bytes == null) throw StateError('Page image is not cached yet');
     final result = await recognizeGeneratedOcr(

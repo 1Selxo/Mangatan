@@ -95,7 +95,7 @@ final class DefaultReadingModeStateProvider
 }
 
 String _$defaultReadingModeStateHash() =>
-    r'59d184f3676f1b4c4135350b11bbd9a943a77e7a';
+    r'263e8c727b089dc164d12c297369cf4a53d5a04d';
 
 abstract class _$DefaultReadingModeState extends $Notifier<ReaderMode> {
   ReaderMode build();
@@ -108,61 +108,6 @@ abstract class _$DefaultReadingModeState extends $Notifier<ReaderMode> {
             as $ClassProviderElement<
               AnyNotifier<ReaderMode, ReaderMode>,
               ReaderMode,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(DefaultReadingDirectionState)
-final defaultReadingDirectionStateProvider =
-    DefaultReadingDirectionStateProvider._();
-
-final class DefaultReadingDirectionStateProvider
-    extends $NotifierProvider<DefaultReadingDirectionState, ReadingDirection> {
-  DefaultReadingDirectionStateProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'defaultReadingDirectionStateProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$defaultReadingDirectionStateHash();
-
-  @$internal
-  @override
-  DefaultReadingDirectionState create() => DefaultReadingDirectionState();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(ReadingDirection value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<ReadingDirection>(value),
-    );
-  }
-}
-
-String _$defaultReadingDirectionStateHash() =>
-    r'5f12bb3791b97811ccdb1e15260edb915233811c';
-
-abstract class _$DefaultReadingDirectionState
-    extends $Notifier<ReadingDirection> {
-  ReadingDirection build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<ReadingDirection, ReadingDirection>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<ReadingDirection, ReadingDirection>,
-              ReadingDirection,
               Object?,
               Object?
             >;
@@ -203,7 +148,7 @@ final class DefaultPageModeStateProvider
 }
 
 String _$defaultPageModeStateHash() =>
-    r'f85899694b0b3a9c4ee95bc627fdbfffc63e51b8';
+    r'907e55852acbce54f9e1d214709f76f82c12ac7b';
 
 abstract class _$DefaultPageModeState extends $Notifier<PageMode> {
   PageMode build();

@@ -1,53 +1,116 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:mangayomi/modules/manga/reader/utils/double_page_layout.dart';
-import 'package:mangayomi/modules/manga/reader/utils/reader_pointer_signals.dart';
+import 'package:flutter/services.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/reader_wheel_interceptor.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_motion.dart';
+import 'package:mangayomi/modules/manga/reader/utils/webtoon_scroll_physics.dart';
+import 'package:shiori/shiori.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/double_page_view.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/continuous_reader_zoom_viewport.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_vertical.dart';
 import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/transition_view_vertical.dart';
-import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
-import 'package:photo_view/photo_view.dart';
-import 'package:photo_view/photo_view_gallery.dart';
-import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
+import 'package:mangayomi/modules/manga/reader/utils/reader_page_index_math.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
-/// Main widget for virtual reading that replaces ScrollablePositionedList
-class ImageViewWebtoon extends StatelessWidget {
+/// A specialized [ScaleGestureRecognizer] for the webtoon reader.
+///
+/// When unzoomed ([canPanCallback] returns false), single-pointer pans are
+/// rejected from the gesture arena so that normal 1-finger vertical scrolls
+/// pass directly to the underlying scrollable widget without competition,
+/// delay, or stutter.
+///
+/// Two-finger pinches (and 1-finger panning when already zoomed) are accepted
+/// as normal scale gestures.
+class WebtoonScaleGestureRecognizer extends ScaleGestureRecognizer {
+  WebtoonScaleGestureRecognizer({
+    super.debugOwner,
+    super.supportedDevices,
+    super.allowedButtonsFilter,
+    this.canPanCallback,
+  });
+
+  bool Function()? canPanCallback;
+
+  @visibleForTesting
+  GestureDisposition resolveDisposition(GestureDisposition disposition) {
+    if (disposition == GestureDisposition.accepted) {
+      final canPan = canPanCallback?.call() ?? false;
+      if (!canPan && pointerCount < 2) {
+        return GestureDisposition.rejected;
+      }
+    }
+    return disposition;
+  }
+
+  @override
+  void resolve(GestureDisposition disposition) {
+    super.resolve(resolveDisposition(disposition));
+  }
+
+  /// How far a pointer must move, while zoomed, before the pan claims the
+  /// gesture. Under the list's own drag slop, so a zoomed page pans instead
+  /// of the list scrolling, but above the jitter of a tap, so a double tap
+  /// can still reset the zoom.
+  static const double zoomedPanSlop = kTouchSlop / 2;
+
+  final Map<int, Offset> _pointerDownAt = {};
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _pointerDownAt[event.pointer] = event.position;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent && canPanCallback?.call() == true) {
+      final downAt = _pointerDownAt[event.pointer];
+      if (downAt != null &&
+          (event.position - downAt).distance > zoomedPanSlop) {
+        resolve(GestureDisposition.accepted);
+      }
+    }
+    super.handleEvent(event);
+  }
+
+  @override
+  void stopTrackingPointer(int pointer) {
+    _pointerDownAt.remove(pointer);
+    super.stopTrackingPointer(pointer);
+  }
+}
+
+/// Main widget for virtual reading using SuperListView from super_sliver_list
+class ImageViewWebtoon extends ConsumerStatefulWidget {
   final List<UChapDataPreload> pages;
-  final ItemScrollController itemScrollController;
-  final ScrollOffsetController scrollOffsetController;
-  final ItemPositionsListener itemPositionsListener;
+  final ListController listController;
+  final ScrollController scrollController;
   final Axis scrollDirection;
   final double minCacheExtent;
   final int initialScrollIndex;
   final ScrollPhysics physics;
   final Function(UChapDataPreload data) onLongPressData;
-  final Function(bool) onFailedToLoadImage;
+  final Function(int index, bool failed) onFailedToLoadImage;
   final BackgroundColor backgroundColor;
   final bool isDoublePageMode;
-  final PageMode pageMode;
   final bool isHorizontalContinuous;
   final ReaderMode readerMode;
-  final ReadingDirection readingDirection;
-  final PhotoViewController photoViewController;
-  final PhotoViewScaleStateController photoViewScaleStateController;
-  final Alignment scalePosition;
-  final Function(Offset) onDoubleTapDown;
-  final VoidCallback onDoubleTap;
   final int webtoonSidePadding;
   final bool showPageGaps;
   final bool reverse;
-  final ValueNotifier<bool> isScrolling;
-  final VoidCallback? onRefreshMihonPages;
+  final bool zoomOutDisabled;
+  final bool doubleTapZoomEnabled;
+  final void Function(int index)? onPageImageLoaded;
 
   const ImageViewWebtoon({
     super.key,
     required this.pages,
-    required this.itemScrollController,
-    required this.scrollOffsetController,
-    required this.itemPositionsListener,
+    required this.listController,
+    required this.scrollController,
     required this.scrollDirection,
     required this.minCacheExtent,
     required this.initialScrollIndex,
@@ -56,222 +119,663 @@ class ImageViewWebtoon extends StatelessWidget {
     required this.onFailedToLoadImage,
     required this.backgroundColor,
     required this.isDoublePageMode,
-    required this.pageMode,
     required this.isHorizontalContinuous,
     required this.readerMode,
-    required this.readingDirection,
-    required this.photoViewController,
-    required this.photoViewScaleStateController,
-    required this.scalePosition,
-    required this.onDoubleTapDown,
-    required this.onDoubleTap,
-    required this.isScrolling,
-    this.onRefreshMihonPages,
     this.webtoonSidePadding = 0,
     this.showPageGaps = true,
     this.reverse = false,
+    this.zoomOutDisabled = false,
+    this.doubleTapZoomEnabled = true,
+    this.onImageLoaded,
+    this.onPageImageLoaded,
   });
 
-  List<List<int?>> get _doublePageSpreadIndices =>
-      transitionAwareDoublePageSpreadIndices(
-        pages.length,
-        pageMode,
-        isTransitionPage: (index) => pages[index].isTransitionPage,
-      );
+  final Function(int index, double width, double height)? onImageLoaded;
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (zoomContext, constraints) => ContinuousReaderZoomViewport(
-        controller: photoViewController,
-        scrollDirection: scrollDirection,
-        alignment: scalePosition,
-        child: PhotoViewGallery.builder(
-          itemCount: 1,
-          builder: (_, _) => PhotoViewGalleryPageOptions.customChild(
-            controller: photoViewController,
-            scaleStateController: photoViewScaleStateController,
-            basePosition: scalePosition,
-            minScale: readerMinimumZoomScale,
-            child: _wrapPointerSignalHandler(
-              zoomContext: zoomContext,
-              child: ScrollConfiguration(
-                behavior: ScrollConfiguration.of(
-                  context,
-                ).copyWith(scrollbars: false),
-                child: ScrollablePositionedList.separated(
-                  scrollDirection: scrollDirection,
-                  reverse: reverse,
-                  minCacheExtent: minCacheExtent,
-                  initialScrollIndex: initialScrollIndex,
-                  itemCount: isDoublePageMode && !isHorizontalContinuous
-                      ? _doublePageSpreadIndices.length
-                      : pages.length,
-                  physics: ContinuousReaderZoomScrollPhysics(
-                    controller: photoViewController,
-                    alignment: scalePosition,
-                    baseViewportDimension: scrollDirection == Axis.vertical
-                        ? constraints.maxHeight
-                        : constraints.maxWidth,
-                    parent: physics,
-                  ),
-                  itemScrollController: itemScrollController,
-                  scrollOffsetController: scrollOffsetController,
-                  itemPositionsListener: itemPositionsListener,
-                  itemBuilder: (context, index) =>
-                      _buildItem(context, index, zoomContext),
-                  separatorBuilder: (context, index) =>
-                      _buildSeparator(context, index, zoomContext),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  ConsumerState<ImageViewWebtoon> createState() => _ImageViewWebtoonState();
+}
 
-  Widget _buildItem(BuildContext context, int index, BuildContext zoomContext) {
-    final currentActualIndex = isDoublePageMode && !isHorizontalContinuous
-        ? _doublePageSpreadIndices[index].first!
-        : index;
-    final currentPage = pages[currentActualIndex];
-    final uniqueKey = ValueKey(
-      '${currentPage.chapter?.id ?? "trans"}-${currentPage.index ?? currentActualIndex}',
-    );
+class _ImageViewWebtoonState extends ConsumerState<ImageViewWebtoon>
+    with TickerProviderStateMixin {
+  double _scale = 1.0;
+  double _baseScale = 1.0;
+  Offset _offset = Offset.zero;
+  Offset _baseOffset = Offset.zero;
+  Offset _pinchStartFocalPoint = Offset.zero;
+  Offset _lastGlobalFocalPoint = Offset.zero;
+  int _previousPointerCount = 0;
 
-    return _wrapPointerSignalHandler(
-      zoomContext: zoomContext,
-      child: KeyedSubtree(
-        key: uniqueKey,
-        child: (isDoublePageMode && !isHorizontalContinuous)
-            ? _buildDoublePageItem(context, index)
-            : _buildSinglePageItem(context, index),
-      ),
-    );
-  }
+  // QuickScale (one-finger double-tap and drag zoom)
+  bool _isQuickScaling = false;
+  double _quickScaleLastY = 0.0;
+  double _quickScaleLastDistance = -1.0;
+  Offset? _quickScaleCenter;
 
-  Widget _buildSinglePageItem(BuildContext context, int index) {
-    final currentPage = pages[index];
-    final double sidePad = webtoonSidePadding > 0
-        ? MediaQuery.of(context).size.width * webtoonSidePadding / 100
-        : 0;
+  late final ValueNotifier<Matrix4> _transformNotifier;
+  late final AnimationController _zoomAnimationController;
 
-    if (currentPage.isTransitionPage) {
-      return GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onDoubleTapDown: (details) => onDoubleTapDown(details.globalPosition),
-        onDoubleTap: onDoubleTap,
-        child: TransitionViewVertical(data: currentPage),
-      );
+  double _animStartScale = 1.0;
+  double _animTargetScale = 1.0;
+  Offset _animStartOffset = Offset.zero;
+  Offset _animTargetOffset = Offset.zero;
+  Curve _animCurve = Curves.decelerate;
+
+  Offset _doubleTapPosition = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialScrollIndex > 0) {
+      void jump([int attempt = 0]) {
+        if (!mounted) return;
+        if (widget.listController.isAttached &&
+            widget.scrollController.hasClients) {
+          // Keep restoration index-based, like ScrollablePositionedList. The
+          // controller accounts for reverse/RTL and estimated item extents.
+          widget.listController.jumpToItem(
+            index: widget.initialScrollIndex,
+            scrollController: widget.scrollController,
+            alignment: 0.0,
+          );
+          if (attempt < 5) {
+            final range = widget.listController.visibleRange;
+            if (range == null ||
+                widget.initialScrollIndex < range.$1 ||
+                widget.initialScrollIndex > range.$2) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                jump(attempt + 1);
+              });
+            }
+          }
+        } else if (attempt < 5) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            jump(attempt + 1);
+          });
+        }
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) => jump());
     }
-
-    return Padding(
-      padding: isHorizontalContinuous
-          ? EdgeInsets.zero
-          : EdgeInsets.symmetric(horizontal: sidePad),
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onDoubleTapDown: (details) => onDoubleTapDown(details.globalPosition),
-        onDoubleTap: onDoubleTap,
-        child: ImageViewVertical(
-          data: currentPage,
-          failedToLoadImage: onFailedToLoadImage,
-          onLongPressData: onLongPressData,
-          isHorizontal: isHorizontalContinuous,
-          isScrolling: isScrolling,
-          onRefreshMihonPages: onRefreshMihonPages,
-        ),
-      ),
+    _transformNotifier = ValueNotifier(Matrix4.identity());
+    final doubleTapAnimationValue = ref.read(
+      doubleTapAnimationSpeedStateProvider,
     );
+    _zoomAnimationController = AnimationController(
+      vsync: this,
+      duration: ReaderMotion.stripDoubleTapZoom(doubleTapAnimationValue),
+    );
+    _zoomAnimationController.addListener(() {
+      final t = _zoomAnimationController.value;
+      final curveVal = _animCurve.transform(t);
+      _scale =
+          _animStartScale + (_animTargetScale - _animStartScale) * curveVal;
+      _offset =
+          Offset.lerp(_animStartOffset, _animTargetOffset, curveVal) ?? _offset;
+      _updateMatrix();
+    });
   }
 
-  Widget _buildDoublePageItem(BuildContext context, int index) {
-    final pageLength = pages.length;
-    if (index >= pageLength) {
-      return const SizedBox.shrink();
-    }
-
-    final datas = _doublePageSpreadIndices[index]
-        .map((actualIndex) => actualIndex == null ? null : pages[actualIndex])
-        .toList();
-
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onDoubleTapDown: (details) => onDoubleTapDown(details.globalPosition),
-      onDoubleTap: onDoubleTap,
-      child: DoublePageView.vertical(
-        pages: datas,
-        readingDirection: readingDirection,
-        backgroundColor: backgroundColor,
-        onFailedToLoadImage: onFailedToLoadImage,
-        onLongPressData: onLongPressData,
-        onRefreshMihonPages: onRefreshMihonPages,
-      ),
-    );
+  void _updateMatrix() {
+    _transformNotifier.value = Matrix4.diagonal3Values(_scale, _scale, 1.0)
+      ..setTranslationRaw(_offset.dx, _offset.dy, 0.0);
   }
 
-  Widget _buildSeparator(
-    BuildContext context,
-    int index,
-    BuildContext zoomContext,
-  ) {
-    if (!showPageGaps || readerMode == ReaderMode.webtoon) {
-      return const SizedBox.shrink();
-    }
+  Duration _doubleTapAnimationDuration() => ReaderMotion.stripDoubleTapZoom(
+    ref.read(doubleTapAnimationSpeedStateProvider),
+  );
 
-    if (isHorizontalContinuous) {
-      return _wrapPointerSignalHandler(
-        zoomContext: zoomContext,
-        child: VerticalDivider(
-          color: getBackgroundColor(backgroundColor),
-          width: 6,
-        ),
-      );
+  /// Decelerating by default, as a double tap and a fling do: the strip
+  /// leaves at the speed it was given.
+  void _animateTo(
+    double targetScale,
+    Offset targetOffset, {
+    Duration? duration,
+    Curve curve = Curves.decelerate,
+  }) {
+    if (_zoomAnimationController.isAnimating) {
+      _zoomAnimationController.stop();
+    }
+    _animStartScale = _scale;
+    _animTargetScale = targetScale;
+    _animStartOffset = _offset;
+    _animTargetOffset = targetOffset;
+    _animCurve = curve;
+
+    _zoomAnimationController.duration =
+        duration ?? _doubleTapAnimationDuration();
+    _zoomAnimationController.forward(from: 0.0);
+  }
+
+  void _animateZoomToFocalPoint(double targetScale, Offset localFocalPoint) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    final focalX = localFocalPoint.dx - screenWidth / 2;
+    final focalY = localFocalPoint.dy - screenHeight / 2;
+
+    double targetDx;
+    double targetDy;
+
+    if (targetScale <= 1.0) {
+      targetDx = 0.0;
+      targetDy = 0.0;
     } else {
-      return _wrapPointerSignalHandler(
-        zoomContext: zoomContext,
-        child: Divider(color: getBackgroundColor(backgroundColor), height: 6),
-      );
+      targetDx = focalX - (focalX - _offset.dx) * (targetScale / _scale);
+      targetDy = focalY - (focalY - _offset.dy) * (targetScale / _scale);
+
+      final maxDx = (screenWidth * (targetScale - 1)) / 2;
+      final maxDy = (screenHeight * (targetScale - 1)) / 2;
+
+      targetDx = targetDx.clamp(-maxDx, maxDx);
+      targetDy = targetDy.clamp(-maxDy, maxDy);
     }
+
+    _animateTo(targetScale, Offset(targetDx, targetDy));
   }
 
-  Widget _wrapPointerSignalHandler({
-    required BuildContext zoomContext,
-    required Widget child,
-  }) {
-    return Builder(
-      builder: (scrollContext) => Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerSignal: (event) => _handlePointerSignal(
-          event,
-          zoomContext: zoomContext,
-          scrollContext: scrollContext,
-        ),
-        child: child,
-      ),
-    );
+  void _handleScaleStart(ScaleStartDetails details) {
+    if (_zoomAnimationController.isAnimating) {
+      _zoomAnimationController.stop();
+    }
+    _baseScale = _scale;
+    _baseOffset = _offset;
+    _pinchStartFocalPoint = details.localFocalPoint;
+    _lastGlobalFocalPoint = details.focalPoint;
+    _previousPointerCount = details.pointerCount;
+    if (details.pointerCount > 1) {
+      _isQuickScaling = false;
+    }
+    _quickScaleLastDistance = -1.0;
   }
 
-  void _handlePointerSignal(
-    PointerSignalEvent event, {
-    required BuildContext zoomContext,
-    required BuildContext scrollContext,
-  }) {
-    if (registerReaderModifierWheelZoom(
-      event,
-      zoomContext: zoomContext,
-      photoViewController: photoViewController,
-      basePosition: scalePosition,
-    )) {
+  void _handleScaleUpdate(ScaleUpdateDetails details) {
+    if (_zoomAnimationController.isAnimating) return;
+
+    // If unzoomed and only 1 pointer is touching, ignore scale updates so
+    // that normal scrolling remains 100% native without matrix recalculation.
+    if (_scale <= 1.01 && details.pointerCount <= 1 && !_isQuickScaling) {
       return;
     }
 
-    registerHorizontalContinuousWheelScroll(
-      event,
-      isHorizontalContinuous: isHorizontalContinuous,
-      scrollContext: scrollContext,
-      scrollOffsetController: scrollOffsetController,
+    if (details.pointerCount != _previousPointerCount) {
+      _baseScale = _scale;
+      _baseOffset = _offset;
+      _pinchStartFocalPoint = details.localFocalPoint;
+      _lastGlobalFocalPoint = details.focalPoint;
+      _previousPointerCount = details.pointerCount;
+    }
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isVertical = widget.scrollDirection == Axis.vertical;
+
+    double newScale = _scale;
+    double newDx = _offset.dx;
+    double newDy = _offset.dy;
+
+    if (_isQuickScaling && _quickScaleCenter != null) {
+      final double dy = details.localFocalPoint.dy;
+      final double dist = (dy - _pinchStartFocalPoint.dy).abs() * 2 + 20;
+
+      if (_quickScaleLastDistance < 0) _quickScaleLastDistance = dist;
+      final bool isUpwards = dy < _quickScaleLastY;
+      _quickScaleLastY = dy;
+
+      final double spanDiff =
+          (1 - (dist / _quickScaleLastDistance)).abs() * 0.5;
+      if (spanDiff > 0.02) {
+        final double multiplier = isUpwards ? (1 + spanDiff) : (1 - spanDiff);
+        newScale = (_scale * multiplier).clamp(
+          widget.zoomOutDisabled ? 1.0 : 0.5,
+          5.0,
+        );
+
+        final focalX = _quickScaleCenter!.dx - screenWidth / 2;
+        final focalY = _quickScaleCenter!.dy - screenHeight / 2;
+        newDx = focalX - (focalX - _baseOffset.dx) * (newScale / _baseScale);
+        newDy = focalY - (focalY - _baseOffset.dy) * (newScale / _baseScale);
+      }
+      _quickScaleLastDistance = dist;
+    } else if (details.pointerCount > 1 && details.scale != 1.0) {
+      newScale = (_baseScale * details.scale).clamp(
+        widget.zoomOutDisabled ? 1.0 : 0.5,
+        5.0,
+      );
+
+      final focalX = details.localFocalPoint.dx - screenWidth / 2;
+      final focalY = details.localFocalPoint.dy - screenHeight / 2;
+      newDx = focalX - (focalX - _baseOffset.dx) * (newScale / _baseScale);
+      newDy = focalY - (focalY - _baseOffset.dy) * (newScale / _baseScale);
+    } else if (details.pointerCount == 1 && !_isQuickScaling) {
+      final globalDelta = details.focalPoint - _lastGlobalFocalPoint;
+      _lastGlobalFocalPoint = details.focalPoint;
+      final proposedOffset = _offset + globalDelta;
+
+      final maxDx =
+          (screenWidth * (_scale - 1).clamp(0.0, double.infinity)) / 2;
+      final maxDy =
+          (screenHeight * (_scale - 1).clamp(0.0, double.infinity)) / 2;
+
+      final clampedOffset = Offset(
+        proposedOffset.dx.clamp(-maxDx, maxDx),
+        proposedOffset.dy.clamp(-maxDy, maxDy),
+      );
+      final overflow = proposedOffset - clampedOffset;
+      newDx = clampedOffset.dx;
+      newDy = clampedOffset.dy;
+
+      final parentOverflow = isVertical ? overflow.dy : overflow.dx;
+      if (parentOverflow != 0 && widget.scrollController.hasClients) {
+        final target = (widget.scrollController.offset - parentOverflow).clamp(
+          0.0,
+          widget.scrollController.position.maxScrollExtent,
+        );
+        widget.scrollController.jumpTo(target);
+      }
+    }
+
+    final maxDx = (screenWidth * (newScale - 1)) / 2;
+    final maxDy = (screenHeight * (newScale - 1)) / 2;
+
+    final clampedDx = newScale > 1.0 ? newDx.clamp(-maxDx, maxDx) : 0.0;
+    final clampedDy = newScale > 1.0 ? newDy.clamp(-maxDy, maxDy) : 0.0;
+
+    _scale = newScale;
+    _offset = Offset(clampedDx, clampedDy);
+    _updateMatrix();
+  }
+
+  void _handleScaleEnd(ScaleEndDetails details) {
+    // A one-finger pan, not the end of a pinch or a double-tap-drag zoom.
+    final wasPanning = _previousPointerCount == 1 && !_isQuickScaling;
+    _isQuickScaling = false;
+
+    // 1. Rebound spring if zoomed out below 1.0
+    if (_scale < 1.0) {
+      _animateTo(
+        1.0,
+        Offset.zero,
+        duration: ShioriMotion.standard,
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+
+    // 2. Fling inertia momentum if panning while zoomed
+    if (_scale > 1.0) {
+      final velocity = details.velocity.pixelsPerSecond;
+      if (velocity.distance > 400) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+        final maxDx =
+            (screenWidth * (_scale - 1).clamp(0.0, double.infinity)) / 2;
+        final maxDy =
+            (screenHeight * (_scale - 1).clamp(0.0, double.infinity)) / 2;
+
+        final targetDx = (_offset.dx + velocity.dx * ReaderMotion.flingTravel)
+            .clamp(-maxDx, maxDx);
+        final targetDy = (_offset.dy + velocity.dy * ReaderMotion.flingTravel)
+            .clamp(-maxDy, maxDy);
+
+        if ((Offset(targetDx, targetDy) - _offset).distance > 8) {
+          _animateTo(
+            _scale,
+            Offset(targetDx, targetDy),
+            duration: ReaderMotion.flingDuration,
+          );
+        }
+
+        // The drag scrolled the strip once the page met its edge; the
+        // fling carries on the same way instead of stopping there.
+        if (wasPanning) {
+          final isVertical = widget.scrollDirection == Axis.vertical;
+          final stripVelocity = stripFlingVelocity(
+            offset: isVertical ? _offset.dy : _offset.dx,
+            maxOffset: isVertical ? maxDy : maxDx,
+            velocity: isVertical ? velocity.dy : velocity.dx,
+          );
+          if (stripVelocity != 0) {
+            glideStrip(widget.scrollController, stripVelocity);
+          }
+        }
+      }
+    }
+  }
+
+  void _handleDoubleTapDown(TapDownDetails details) {
+    _doubleTapPosition = details.localPosition;
+    _isQuickScaling = true;
+    _quickScaleLastY = details.localPosition.dy;
+    _quickScaleLastDistance = -1.0;
+    _quickScaleCenter = details.localPosition;
+  }
+
+  void _toggleScale(Offset localFocalPoint) {
+    if (!widget.doubleTapZoomEnabled || !mounted) return;
+    if (_zoomAnimationController.isAnimating) return;
+
+    _isQuickScaling = false;
+
+    if (_scale <= 1.05) {
+      _animateZoomToFocalPoint(2.5, localFocalPoint);
+    } else {
+      _animateZoomToFocalPoint(1.0, localFocalPoint);
+    }
+  }
+
+  /// The mouse wheel, on desktop: with Ctrl (or Cmd) held it zooms the
+  /// strip about the pointer, as pinching does; on a horizontal strip it
+  /// scrolls it, as its list takes only a sideways wheel. Says whether it
+  /// used the event.
+  bool _handleWheel(PointerScrollEvent event) {
+    final keys = HardwareKeyboard.instance;
+    final dy = event.scrollDelta.dy;
+    if (keys.isControlPressed || keys.isMetaPressed) {
+      if (dy == 0) return true;
+      if (_zoomAnimationController.isAnimating) {
+        _zoomAnimationController.stop();
+      }
+      final targetScale = (_scale * (dy < 0 ? 1.2 : 1 / 1.2)).clamp(1.0, 5.0);
+      final screen = MediaQuery.sizeOf(context);
+      final focal =
+          event.localPosition - Offset(screen.width / 2, screen.height / 2);
+      var target = Offset.zero;
+      if (targetScale > 1.0) {
+        final maxDx = (screen.width * (targetScale - 1)) / 2;
+        final maxDy = (screen.height * (targetScale - 1)) / 2;
+        final moved = focal - (focal - _offset) * (targetScale / _scale);
+        target = Offset(
+          moved.dx.clamp(-maxDx, maxDx),
+          moved.dy.clamp(-maxDy, maxDy),
+        );
+      }
+      _scale = targetScale;
+      _offset = target;
+      _updateMatrix();
+      return true;
+    }
+    if (widget.isHorizontalContinuous &&
+        dy != 0 &&
+        event.scrollDelta.dx == 0 &&
+        widget.scrollController.hasClients) {
+      widget.scrollController.position.pointerScroll(dy);
+      return true;
+    }
+    return false;
+  }
+
+  @override
+  void dispose() {
+    _zoomAnimationController.dispose();
+    _transformNotifier.dispose();
+    super.dispose();
+  }
+
+  int _calculateItemCount(bool singleFirst) {
+    if (widget.isDoublePageMode && !widget.isHorizontalContinuous) {
+      if (widget.pages.isEmpty) return 0;
+      return ReaderPageIndexMath.buildSpreads(
+        widget.pages,
+        singleFirst: singleFirst,
+      ).length;
+    }
+    return widget.pages.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final singleFirst = ref.watch(doublePageSingleFirstPageStateProvider);
+    final dualPageRotateToFit = ref.watch(dualPageRotateToFitStateProvider);
+    final dualPageRotateToFitInvert = ref.watch(
+      dualPageRotateToFitInvertStateProvider,
+    );
+    final itemCount = _calculateItemCount(singleFirst);
+
+    return ReaderWheelInterceptor(
+      onWheel: isDesktop ? _handleWheel : null,
+      child: _buildStrip(
+        itemCount,
+        singleFirst,
+        dualPageRotateToFit,
+        dualPageRotateToFitInvert,
+      ),
+    );
+  }
+
+  Widget _buildStrip(
+    int itemCount,
+    bool singleFirst,
+    bool dualPageRotateToFit,
+    bool dualPageRotateToFitInvert,
+  ) {
+    return RawGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      gestures: <Type, GestureRecognizerFactory>{
+        WebtoonScaleGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<WebtoonScaleGestureRecognizer>(
+              () => WebtoonScaleGestureRecognizer(),
+              (instance) {
+                instance.canPanCallback = () => _scale > 1.01;
+                instance
+                  ..onStart = _handleScaleStart
+                  ..onUpdate = _handleScaleUpdate
+                  ..onEnd = _handleScaleEnd;
+              },
+            ),
+        if (widget.doubleTapZoomEnabled)
+          DoubleTapGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<DoubleTapGestureRecognizer>(
+                () => DoubleTapGestureRecognizer(),
+                (instance) {
+                  instance
+                    ..onDoubleTapDown = _handleDoubleTapDown
+                    ..onDoubleTap = () {
+                      _toggleScale(_doubleTapPosition);
+                    }
+                    ..onDoubleTapCancel = () {
+                      _isQuickScaling = false;
+                    };
+                },
+              ),
+      },
+      child: ValueListenableBuilder<Matrix4>(
+        valueListenable: _transformNotifier,
+        child: SuperListView.builder(
+          scrollDirection: widget.scrollDirection,
+          reverse: widget.reverse,
+          cacheExtent: widget.minCacheExtent,
+          itemCount: itemCount,
+          physics: widget.physics,
+          controller: widget.scrollController,
+          listController: widget.listController,
+          extentEstimation: _estimateExtent,
+          itemBuilder: (context, index) => _buildItem(
+            context,
+            index,
+            itemCount,
+            singleFirst,
+            dualPageRotateToFit,
+            dualPageRotateToFitInvert,
+          ),
+        ),
+        builder: (context, matrix, child) {
+          return Transform(
+            transform: matrix,
+            alignment: Alignment.center,
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  double _estimateExtent(int? index, double crossAxisExtent) {
+    if (index != null && index >= 0 && index < widget.pages.length) {
+      final page = widget.pages[index];
+      if (page.loadedWidth != null &&
+          page.loadedHeight != null &&
+          page.loadedWidth! > 0) {
+        if (widget.isHorizontalContinuous) {
+          return crossAxisExtent * (page.loadedWidth! / page.loadedHeight!);
+        } else {
+          return crossAxisExtent * (page.loadedHeight! / page.loadedWidth!);
+        }
+      }
+    }
+
+    // Look for any loaded page in the chapter to use as aspect ratio heuristic
+    double? sampleAspect;
+    for (final p in widget.pages) {
+      if (p.loadedWidth != null &&
+          p.loadedHeight != null &&
+          p.loadedWidth! > 0) {
+        sampleAspect = p.loadedHeight! / p.loadedWidth!;
+        break;
+      }
+    }
+
+    if (widget.isHorizontalContinuous) {
+      return crossAxisExtent *
+          (sampleAspect != null ? (1.0 / sampleAspect) : 0.7);
+    } else {
+      if (sampleAspect != null) {
+        return crossAxisExtent * sampleAspect;
+      }
+      return widget.readerMode == ReaderMode.webtoon
+          ? crossAxisExtent * 2.5
+          : crossAxisExtent * 1.4;
+    }
+  }
+
+  Widget _buildItem(
+    BuildContext context,
+    int index,
+    int itemCount,
+    bool singleFirst,
+    bool dualPageRotateToFit,
+    bool dualPageRotateToFitInvert,
+  ) {
+    Widget item;
+    if (widget.isDoublePageMode && !widget.isHorizontalContinuous) {
+      item = _buildDoublePageItem(context, index, singleFirst);
+    } else {
+      final currentPage = widget.pages[index];
+      final uniqueKey = ValueKey(currentPage.widgetKey(index));
+
+      item = KeyedSubtree(
+        key: uniqueKey,
+        child: _buildSinglePageItem(
+          context,
+          index,
+          dualPageRotateToFit,
+          dualPageRotateToFitInvert,
+        ),
+      );
+    }
+
+    if (widget.showPageGaps &&
+        widget.readerMode != ReaderMode.webtoon &&
+        index < itemCount - 1) {
+      item = Padding(
+        padding: widget.isHorizontalContinuous
+            ? const EdgeInsets.only(right: ShioriSpace.s8)
+            : const EdgeInsets.only(bottom: ShioriSpace.s8),
+        child: item,
+      );
+    }
+
+    return item;
+  }
+
+  Widget _buildSinglePageItem(
+    BuildContext context,
+    int index,
+    bool dualPageRotateToFit,
+    bool dualPageRotateToFitInvert,
+  ) {
+    final currentPage = widget.pages[index];
+    final double sidePad = widget.webtoonSidePadding > 0
+        ? MediaQuery.of(context).size.width * widget.webtoonSidePadding / 100
+        : 0;
+
+    if (currentPage.isTransitionPage) {
+      return TransitionViewVertical(data: currentPage);
+    }
+
+    int rotation = 0;
+    if (dualPageRotateToFit &&
+        currentPage.loadedWidth != null &&
+        currentPage.loadedHeight != null &&
+        currentPage.loadedWidth! > currentPage.loadedHeight!) {
+      rotation = dualPageRotateToFitInvert ? 270 : 90;
+    }
+
+    final uniqueKey = ValueKey('single-${currentPage.widgetKey(index)}');
+
+    return Padding(
+      key: uniqueKey,
+      padding: widget.isHorizontalContinuous
+          ? EdgeInsets.zero
+          : EdgeInsets.symmetric(horizontal: sidePad),
+      child: ImageViewVertical(
+        data: currentPage,
+        failedToLoadImage: (failed) =>
+            widget.onFailedToLoadImage(index, failed),
+        onLongPressData: widget.onLongPressData,
+        isHorizontal: widget.isHorizontalContinuous,
+        rotation: rotation,
+        onImageLoaded: (width, height) {
+          widget.onImageLoaded?.call(index, width, height);
+          widget.onPageImageLoaded?.call(index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildDoublePageItem(
+    BuildContext context,
+    int index,
+    bool singleFirst,
+  ) {
+    final pageLength = widget.pages.length;
+    final spreads = ReaderPageIndexMath.buildSpreads(
+      widget.pages,
+      singleFirst: singleFirst,
+    );
+
+    if (index >= spreads.length) {
+      return const SizedBox.shrink();
+    }
+
+    final spread = spreads[index];
+    final index1 = spread.firstIndex;
+    final index2 = spread.secondIndex;
+
+    if (index1 >= pageLength) {
+      return const SizedBox.shrink();
+    }
+
+    final page1 = widget.pages[index1];
+    final page2 = (index2 != null && index2 < pageLength)
+        ? widget.pages[index2]
+        : null;
+
+    final List<UChapDataPreload?> datas = [page1, page2];
+
+    final uniqueKey = ValueKey(
+      'double-${page1.widgetKey(index1)}-${page2?.widgetKey(index1 + 1) ?? "none"}',
+    );
+
+    return KeyedSubtree(
+      key: uniqueKey,
+      child: DoublePageView.vertical(
+        pages: datas,
+        backgroundColor: widget.backgroundColor,
+        onFailedToLoadImage: (failed) =>
+            widget.onFailedToLoadImage(index1, failed),
+        onLongPressData: widget.onLongPressData,
+      ),
     );
   }
 }

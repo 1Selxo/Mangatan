@@ -1,25 +1,21 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:mangayomi/modules/reader_common/key_bindings.dart';
+import 'package:mangayomi/modules/more/settings/reader/reader_switches.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mangayomi/modules/reader_common/mixins/reader_gestures.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/reader_mode_picker.dart';
+import 'package:shiori/shiori.dart';
+import 'package:mangayomi/modules/reader_common/utils/reader_orientation.dart';
+import 'package:mangayomi/services/volume_keys.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
-import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/manga/reader/providers/color_filter_provider.dart';
-import 'package:mangayomi/modules/manga/reader/reader_eink_state.dart';
-import 'package:mangayomi/modules/manga/reader/widgets/reader_mode_picker.dart';
-import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
+import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
-import 'package:mangayomi/modules/more/settings/reader/reader_switches.dart';
-import 'package:mangayomi/modules/reader_common/key_bindings.dart';
-import 'package:mangayomi/modules/reader_common/mixins/reader_gestures.dart';
-import 'package:mangayomi/modules/reader_common/utils/reader_orientation.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/providers/reader_state_provider.dart';
-import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
-import 'package:shiori/shiori.dart';
 
 String _navLayoutName(int index, BuildContext context) {
   final l10n = l10nLocalizations(context)!;
@@ -34,24 +30,32 @@ String _navLayoutName(int index, BuildContext context) {
   };
 }
 
-/// The manga reader's settings sheet: the reading mode and direction, what
-/// is changed while reading, and the page's colours, in Shiori's grouped
-/// rows as in Settings › Reader. Mangatan's own settings (the separate
-/// reading direction, E-Ink mode and OCR) sit in the groups they belong to.
+/// Settings modal for the manga reader using Riverpod providers directly.
+///
+/// This is a complete replacement for the _showModalSettings() method.
+/// It uses the same providers and matches the exact behavior.
 class ReaderSettingsModal {
   /// Shows the settings modal.
+  ///
+  /// Parameters:
+  /// - [context]: The build context
+  /// - [vsync]: The ticker provider (usually the State object)
+  /// - [currentReaderModeProvider]: The provider for current reader mode
+  /// - [autoScrollPage]: ValueNotifier for auto-scroll page state
+  /// - [autoScroll]: ValueNotifier for auto-scroll running state
+  /// - [pageOffset]: ValueNotifier for page offset (scroll speed)
+  /// - [onReaderModeChanged]: Callback when reader mode changes
+  /// - [onAutoScrollSave]: Callback to save auto-scroll settings
+  /// - [onFullScreenToggle]: Callback to toggle fullscreen
+  /// - [onAutoPageScroll]: Callback to trigger auto-scroll
   static Future<void> show({
     required BuildContext context,
     required TickerProvider vsync,
     required ProviderListenable<ReaderMode?> currentReaderModeProvider,
-    required ProviderListenable<ReadingDirection?>
-    currentReadingDirectionProvider,
     required ValueNotifier<bool> autoScrollPage,
     required ValueNotifier<bool> autoScroll,
     required ValueNotifier<double> pageOffset,
     required void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged,
-    required void Function(ReadingDirection direction, WidgetRef ref)
-    onReadingDirectionChanged,
     required void Function(bool enabled, double offset) onAutoScrollSave,
     required VoidCallback onFullScreenToggle,
     required VoidCallback onAutoPageScroll,
@@ -64,8 +68,6 @@ class ReaderSettingsModal {
     }
 
     final l10n = l10nLocalizations(context)!;
-    unawaited(ReaderOcrState.initialize());
-    unawaited(ReaderEInkState.initialize());
     // On while the custom filter is, so the sheet lets the page show through
     // on that tab and the filter can be set by eye.
     final filterOn = ValueNotifier(false);
@@ -77,20 +79,23 @@ class ReaderSettingsModal {
         Tab(text: l10n.custom_filter),
       ],
       children: [
+        // Reading Mode Tab
         _ReadingModeTab(
           seriesName: seriesName,
           currentReaderModeProvider: currentReaderModeProvider,
-          currentReadingDirectionProvider: currentReadingDirectionProvider,
           autoScrollPage: autoScrollPage,
           pageOffset: pageOffset,
           onReaderModeChanged: onReaderModeChanged,
-          onReadingDirectionChanged: onReadingDirectionChanged,
           onAutoScrollSave: onAutoScrollSave,
           onAutoScroll: (val) {
             autoScroll.value = val;
           },
         ),
+
+        // General Tab
         _GeneralTab(onFullScreenToggle: onFullScreenToggle),
+
+        // Custom Filter Tab
         _CustomFilterTab(filterOn: filterOn),
       ],
       context: context,
@@ -112,14 +117,12 @@ class ReaderSettingsModal {
   }
 }
 
+/// Reading Mode Tab with Consumer for reactive updates.
 class _ReadingModeTab extends ConsumerWidget {
   final ProviderListenable<ReaderMode?> currentReaderModeProvider;
-  final ProviderListenable<ReadingDirection?> currentReadingDirectionProvider;
   final ValueNotifier<bool> autoScrollPage;
   final ValueNotifier<double> pageOffset;
   final void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged;
-  final void Function(ReadingDirection direction, WidgetRef ref)
-  onReadingDirectionChanged;
   final void Function(bool enabled, double offset) onAutoScrollSave;
   final void Function(bool val) onAutoScroll;
   final String seriesName;
@@ -127,11 +130,9 @@ class _ReadingModeTab extends ConsumerWidget {
   const _ReadingModeTab({
     required this.seriesName,
     required this.currentReaderModeProvider,
-    required this.currentReadingDirectionProvider,
     required this.autoScrollPage,
     required this.pageOffset,
     required this.onReaderModeChanged,
-    required this.onReadingDirectionChanged,
     required this.onAutoScrollSave,
     required this.onAutoScroll,
   });
@@ -140,17 +141,12 @@ class _ReadingModeTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final readerMode = ref.watch(currentReaderModeProvider);
-    final readingDirection = ref.watch(currentReadingDirectionProvider);
-    if (readerMode == null || readingDirection == null) {
-      return const SizedBox.shrink();
-    }
     final splitWidePages = ref.watch(splitWidePagesStateProvider);
     final webtoonSidePadding = ref.watch(webtoonSidePaddingStateProvider);
     final dualPageRotateToFit = ref.watch(dualPageRotateToFitStateProvider);
     final landscapeZoom = ref.watch(landscapeZoomStateProvider);
     final zoomStartPosition = ref.watch(zoomStartPositionStateProvider);
-    final automaticBackground = ref.watch(automaticBackgroundStateProvider);
-    final continuous = readerMode.isContinuous;
+    final continuous = readerMode!.isContinuous;
 
     // The sheet scrolls; a tab is a column, not a list of its own.
     return Padding(
@@ -162,20 +158,11 @@ class _ReadingModeTab extends ConsumerWidget {
           ReaderModePicker(
             mode: readerMode,
             defaultMode: ref.watch(defaultReadingModeStateProvider),
-            direction: readingDirection,
-            defaultDirection: ref.watch(defaultReadingDirectionStateProvider),
             seriesName: seriesName,
             onChanged: (value) => onReaderModeChanged(value, ref),
-            onDirectionChanged: (value) =>
-                onReadingDirectionChanged(value, ref),
-            onSetDefault: () {
-              ref
-                  .read(defaultReadingModeStateProvider.notifier)
-                  .set(readerMode);
-              ref
-                  .read(defaultReadingDirectionStateProvider.notifier)
-                  .set(readingDirection);
-            },
+            onSetDefault: () => ref
+                .read(defaultReadingModeStateProvider.notifier)
+                .set(readerMode),
           ),
           const SizedBox(height: ShioriSpace.s8),
           // Grouped as in Settings › Reader, so a switch is found in the
@@ -188,12 +175,6 @@ class _ReadingModeTab extends ConsumerWidget {
                 const ReaderSwitchRow(ReaderSwitch.navigateToPan),
               const ReaderSwitchRow(ReaderSwitch.usePageTapZones),
               const ReaderSwitchRow(ReaderSwitch.keepScreenOn),
-              ShioriSwitchRow(
-                title: l10n.automatic_background,
-                value: automaticBackground,
-                onChanged: (v) =>
-                    ref.read(automaticBackgroundStateProvider.notifier).set(v),
-              ),
             ],
           ),
           if (continuous)
@@ -203,6 +184,7 @@ class _ReadingModeTab extends ConsumerWidget {
                 const ReaderSwitchRow(ReaderSwitch.webtoonDisableZoomOut),
                 const ReaderSwitchRow(ReaderSwitch.webtoonDoubleTapZoom),
                 const ReaderSwitchRow(ReaderSwitch.showPageGaps),
+                const ReaderSwitchRow(ReaderSwitch.splitTallImages),
                 ShioriSliderRow(
                   title: l10n.webtoon_side_padding,
                   value: webtoonSidePadding.toDouble(),
@@ -238,7 +220,7 @@ class _ReadingModeTab extends ConsumerWidget {
                           valueListenable: pageOffset,
                           builder: (context, speed, _) => ShioriSliderRow(
                             title: l10n.speed,
-                            value: speed.clamp(2.0, 30.0),
+                            value: speed,
                             min: 2,
                             max: 30,
                             divisions: 28,
@@ -326,6 +308,7 @@ class _GeneralTab extends ConsumerWidget {
                 trailing: const Icon(Symbols.chevron_forward_rounded),
                 onTap: () => context.push('/readerMode'),
               ),
+              // Where a keyboard can be found, what it does here.
               if (isDesktop)
                 ShioriSettingRow(
                   icon: Symbols.keyboard_rounded,
@@ -356,23 +339,10 @@ class _GeneralTab extends ConsumerWidget {
                 value: scaleType,
                 options: [
                   for (final (i, name) in scaleNames.indexed)
-                    if (i < ScaleType.values.length)
-                      ShioriChoice(ScaleType.values[i], name),
+                    ShioriChoice(ScaleType.values[i], name),
                 ],
                 onChanged: (v) =>
                     ref.read(scaleTypeStateProvider.notifier).set(v),
-              ),
-              ValueListenableBuilder<bool>(
-                valueListenable: ReaderEInkState.enabled,
-                builder: (context, eInkMode, _) => ShioriSwitchRow(
-                  title: 'E-Ink mode',
-                  subtitle:
-                      'Uses a high-contrast white reader surface for E-Ink '
-                      'displays',
-                  value: eInkMode,
-                  onChanged: (value) =>
-                      unawaited(ReaderEInkState.setEnabled(value)),
-                ),
               ),
               if (!isMobile)
                 ShioriSwitchRow(
@@ -386,7 +356,6 @@ class _GeneralTab extends ConsumerWidget {
               const ReaderSwitchRow(ReaderSwitch.animatePageTransitions),
             ],
           ),
-          const _OcrGroup(),
           ShioriSettingsGroup(
             title: ReaderSettingsSection.navigation.title(context),
             children: [
@@ -426,6 +395,12 @@ class _GeneralTab extends ConsumerWidget {
                     ref.read(readerHideThresholdStateProvider.notifier).set(v),
               ),
               const ReaderSwitchRow(ReaderSwitch.showNavigationOverlayOnStart),
+              // The volume buttons as page turns, where a phone has them.
+              if (VolumeKeys.isSupported) ...[
+                const ReaderSwitchRow(ReaderSwitch.volumeKeysPaging),
+                if (ref.watch(volumeKeysPagingStateProvider))
+                  const ReaderSwitchRow(ReaderSwitch.volumeKeysInverted),
+              ],
             ],
           ),
           ShioriSettingsGroup(
@@ -483,87 +458,6 @@ class _GeneralTab extends ConsumerWidget {
   }
 }
 
-/// Mangatan's OCR: which engine reads the page, when it runs, and how its
-/// boxes behave.
-class _OcrGroup extends StatelessWidget {
-  const _OcrGroup();
-
-  @override
-  Widget build(BuildContext context) {
-    return ShioriSettingsGroup(
-      title: 'OCR',
-      children: [
-        ValueListenableBuilder<OcrEnginePreference>(
-          valueListenable: ReaderOcrState.engine,
-          builder: (context, engine, _) => ShioriValueRow<OcrEnginePreference>(
-            title: 'OCR engine',
-            value: engine,
-            options: [
-              for (final option in availableOcrEngines())
-                ShioriChoice(option, ocrEngineLabel(option)),
-            ],
-            onChanged: (value) => unawaited(ReaderOcrState.setEngine(value)),
-          ),
-        ),
-        ValueListenableBuilder<OcrScanTrigger>(
-          valueListenable: ReaderOcrState.scanTrigger,
-          builder: (context, trigger, _) => ShioriValueRow<OcrScanTrigger>(
-            title: 'OCR trigger',
-            value: trigger,
-            options: const [
-              ShioriChoice(
-                OcrScanTrigger.automatic,
-                'Automatic',
-                subtitle: 'Scans pages in the background',
-              ),
-              ShioriChoice(
-                OcrScanTrigger.manual,
-                'Manual',
-                subtitle: 'Tap the OCR button to scan the current page',
-              ),
-            ],
-            onChanged: (value) =>
-                unawaited(ReaderOcrState.setScanTrigger(value)),
-          ),
-        ),
-        ValueListenableBuilder<int>(
-          valueListenable: ReaderOcrState.parallelOcrLimit,
-          builder: (context, limit, _) => ShioriValueRow<int>(
-            title: 'Parallel OCR tasks',
-            value: limit,
-            options: const [
-              ShioriChoice(1, '1', subtitle: 'Recommended'),
-              ShioriChoice(2, '2', subtitle: 'Higher battery and network use'),
-              ShioriChoice(3, '3', subtitle: 'Higher battery and network use'),
-              ShioriChoice(4, '4', subtitle: 'Higher battery and network use'),
-            ],
-            onChanged: (value) =>
-                unawaited(ReaderOcrState.setParallelOcrLimit(value)),
-          ),
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: ReaderOcrState.outlineVisible,
-          builder: (context, outlineVisible, _) => ShioriSwitchRow(
-            title: 'Show OCR box outlines',
-            value: outlineVisible,
-            onChanged: (value) =>
-                unawaited(ReaderOcrState.setOutlineVisible(value)),
-          ),
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: ReaderOcrState.lookupOnHover,
-          builder: (context, lookupOnHover, _) => ShioriSwitchRow(
-            title: 'Lookup OCR text on hover',
-            value: lookupOnHover,
-            onChanged: (value) =>
-                unawaited(ReaderOcrState.setLookupOnHover(value)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// The page's colours: quick enhancements, then a custom RGBA filter.
 class _CustomFilterTab extends ConsumerWidget {
   const _CustomFilterTab({required this.filterOn});
@@ -603,7 +497,7 @@ class _CustomFilterTab extends ConsumerWidget {
       ValueChanged<double> set,
     ) => ShioriSliderRow(
       title: label,
-      value: value.clamp(min, max),
+      value: value,
       min: min,
       max: max,
       valueLabel: (v) => v.toStringAsFixed(1),

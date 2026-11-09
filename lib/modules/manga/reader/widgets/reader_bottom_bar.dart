@@ -7,25 +7,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/reader_common/widgets/btn_chapter_list_dialog.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/crop_off_glyph.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/custom_value_indicator_shape.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_mode_glyph.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_mode_picker.dart';
-import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
-import 'package:mangayomi/modules/reader_common/widgets/btn_chapter_list_dialog.dart';
-import 'package:mangayomi/modules/reader_common/widgets/reader_app_bar.dart';
-import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
+import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
+import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:shiori/shiori.dart';
+import 'package:mangayomi/modules/reader_common/widgets/reader_app_bar.dart';
 
 /// The manga reader's bottom panel: one floating card, within reach of a
 /// thumb, with the page slider between the previous and next chapters, and
 /// under it what is changed while reading (the chapter list, the reading
-/// mode and direction, cropping, double pages, page previews, auto-scroll,
-/// every setting).
+/// mode, cropping, double pages, every setting).
 ///
-/// Upstream's Shiori design, kept with Mangatan's separate reading
-/// direction, the cover-offset double page and the page preview grid.
+/// It was a pill for the slider over a full-width band of buttons, two
+/// shapes for one control, and it grew from nothing when shown. It slides
+/// up from the bottom edge and back down, and keeps a reading width on a
+/// wide screen.
 class ReaderBottomBar extends ConsumerWidget {
   /// The chapter being read
   final Chapter chapter;
@@ -54,22 +55,16 @@ class ReaderBottomBar extends ConsumerWidget {
   /// Callback when reader mode is changed
   final void Function(ReaderMode mode, WidgetRef ref) onReaderModeChanged;
 
-  /// Callback when reading direction is changed.
-  final void Function(ReadingDirection direction, WidgetRef ref)
-  onReadingDirectionChanged;
-
   /// Callback when page mode toggle button is pressed
   final VoidCallback? onPageModeToggle;
 
   /// Callback when settings button is pressed
   final VoidCallback onSettingsPressed;
-  final VoidCallback? onPagePreviewsPressed;
 
   /// Provider for watching current reader mode
+  /// Accepts any ProviderListenable that returns ReaderMode?
+  /// (StateProvider, NotifierProvider, etc.)
   final ProviderListenable<ReaderMode?> currentReaderModeProvider;
-
-  /// Provider for watching the current reading direction.
-  final ProviderListenable<ReadingDirection?> currentReadingDirectionProvider;
 
   /// Session-local current page index for the visible reader state.
   final ValueListenable<int> currentPageListenable;
@@ -108,12 +103,9 @@ class ReaderBottomBar extends ConsumerWidget {
     required this.onSliderChanged,
     required this.onSliderChangeEnd,
     required this.onReaderModeChanged,
-    required this.onReadingDirectionChanged,
     this.onPageModeToggle,
     required this.onSettingsPressed,
-    this.onPagePreviewsPressed,
     required this.currentReaderModeProvider,
-    required this.currentReadingDirectionProvider,
     required this.currentPageListenable,
     required this.currentPageMode,
     required this.isReverseHorizontal,
@@ -124,7 +116,7 @@ class ReaderBottomBar extends ConsumerWidget {
     this.onAutoScrollPressed,
   });
 
-  bool get _isDoublePageMode => currentPageMode?.isDoublePage ?? false;
+  bool get _isDoublePageMode => currentPageMode == PageMode.doublePage;
 
   /// How far above the bottom edge the panel's top sits, plus a margin:
   /// where something shown over the panel (the page preview) starts.
@@ -141,10 +133,7 @@ class ReaderBottomBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final readerMode = ref.watch(currentReaderModeProvider);
-    final readingDirection = ref.watch(currentReadingDirectionProvider);
-    if (readerMode == null || readingDirection == null) {
-      return const SizedBox.shrink();
-    }
+    if (readerMode == null) return const SizedBox.shrink();
     final isHorizontalContinuous = readerMode.isHorizontalContinuous;
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = max(
@@ -185,13 +174,12 @@ class ReaderBottomBar extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildPageSlider(context, ref),
+                        _buildPageSlider(context, ref, isHorizontalContinuous),
                         const Divider(height: 1),
                         _buildQuickActions(
                           context,
                           ref,
                           readerMode,
-                          readingDirection,
                           isHorizontalContinuous,
                         ),
                       ],
@@ -209,7 +197,11 @@ class ReaderBottomBar extends ConsumerWidget {
   /// The previous chapter, the page slider between the current page and the
   /// count, and the next chapter. Mirrored when reading right to left, the
   /// figures put back the right way round.
-  Widget _buildPageSlider(BuildContext context, WidgetRef ref) {
+  Widget _buildPageSlider(
+    BuildContext context,
+    WidgetRef ref,
+    bool isHorizontalContinuous,
+  ) {
     Widget unmirrored(Widget child) =>
         Transform.scale(scaleX: !isReverseHorizontal ? 1 : -1, child: child);
     return Transform.scale(
@@ -239,7 +231,7 @@ class ReaderBottomBar extends ConsumerWidget {
             ),
             Expanded(
               child: isVisible && totalPages > 0
-                  ? _buildSlider(context, ref)
+                  ? _buildSlider(context, ref, isHorizontalContinuous)
                   : const SizedBox.shrink(),
             ),
             unmirrored(
@@ -265,30 +257,44 @@ class ReaderBottomBar extends ConsumerWidget {
     );
   }
 
-  Widget _buildSlider(BuildContext context, WidgetRef ref) {
-    return ValueListenableBuilder<int>(
-      valueListenable: currentPageListenable,
-      builder: (context, currentIndex, child) {
-        final maxValue = (totalPages - 1).toDouble();
-        final divisions = totalPages <= 1 ? null : totalPages - 1;
-        final currentValue = min(currentIndex.toDouble(), maxValue);
+  Widget _buildSlider(
+    BuildContext context,
+    WidgetRef ref,
+    bool isHorizontalContinuous,
+  ) {
+    return Consumer(
+      builder: (context, ref, child) {
+        return ValueListenableBuilder<int>(
+          valueListenable: currentPageListenable,
+          builder: (context, currentIndex, child) {
+            final maxValue = (totalPages - 1).toDouble();
 
-        return SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            valueIndicatorShape: CustomValueIndicatorShape(
-              tranform: isReverseHorizontal,
-            ),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 5.0),
-          ),
-          child: Slider(
-            onChanged: (value) => onSliderChanged(value.toInt(), ref),
-            onChangeEnd: (newValue) => onSliderChangeEnd(newValue.toInt()),
-            divisions: divisions,
-            value: currentValue,
-            label: currentIndexLabel(currentIndex),
-            min: 0,
-            max: maxValue,
-          ),
+            final divisions = totalPages <= 1 ? null : totalPages - 1;
+
+            final currentValue = min(currentIndex.toDouble(), maxValue);
+
+            return SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                valueIndicatorShape: CustomValueIndicatorShape(
+                  tranform: isReverseHorizontal,
+                ),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 5.0),
+              ),
+              child: Slider(
+                onChanged: (value) {
+                  onSliderChanged(value.toInt(), ref);
+                },
+                onChangeEnd: (newValue) {
+                  onSliderChangeEnd(newValue.toInt());
+                },
+                divisions: divisions,
+                value: currentValue,
+                label: currentIndexLabel(currentIndex),
+                min: 0,
+                max: maxValue,
+              ),
+            );
+          },
         );
       },
     );
@@ -298,18 +304,14 @@ class ReaderBottomBar extends ConsumerWidget {
   TextStyle _pageLabelStyle(BuildContext context) => context.shiori.text.meta
       .copyWith(color: context.shiori.color.fg, fontWeight: FontWeight.w700);
 
-  /// The reading mode and direction picker in a sheet. A mode tile picks
-  /// and closes it; the direction can be flipped while it stays open.
+  /// The reading mode picker in a sheet; a tile picks and closes it.
   Future<void> _pickReaderMode(BuildContext context) {
     return showShioriSheet<void>(
       context,
       builder: (sheetContext) => Consumer(
         builder: (sheetContext, ref, _) {
           final mode = ref.watch(currentReaderModeProvider);
-          final direction = ref.watch(currentReadingDirectionProvider);
-          if (mode == null || direction == null) {
-            return const SizedBox.shrink();
-          }
+          if (mode == null) return const SizedBox.shrink();
           return SafeArea(
             top: false,
             child: Padding(
@@ -320,23 +322,14 @@ class ReaderBottomBar extends ConsumerWidget {
               child: ReaderModePicker(
                 mode: mode,
                 defaultMode: ref.watch(defaultReadingModeStateProvider),
-                direction: direction,
-                defaultDirection: ref.watch(
-                  defaultReadingDirectionStateProvider,
-                ),
                 seriesName: chapter.manga.value?.name ?? '',
                 onChanged: (value) {
                   onReaderModeChanged(value, ref);
                   Navigator.pop(sheetContext);
                 },
-                onDirectionChanged: (value) =>
-                    onReadingDirectionChanged(value, ref),
-                onSetDefault: () {
-                  ref.read(defaultReadingModeStateProvider.notifier).set(mode);
-                  ref
-                      .read(defaultReadingDirectionStateProvider.notifier)
-                      .set(direction);
-                },
+                onSetDefault: () => ref
+                    .read(defaultReadingModeStateProvider.notifier)
+                    .set(mode),
               ),
             ),
           );
@@ -345,25 +338,14 @@ class ReaderBottomBar extends ConsumerWidget {
     );
   }
 
-  String _pageModeTooltip(BuildContext context) => switch (currentPageMode) {
-    PageMode.doublePage => context.l10n.double_page,
-    PageMode.doublePageCover => 'Double page with cover offset',
-    _ => context.l10n.double_page,
-  };
-
   Widget _buildQuickActions(
     BuildContext context,
     WidgetRef ref,
-    ReaderMode readerMode,
-    ReadingDirection readingDirection,
+    ReaderMode? readerMode,
     bool isHorizontalContinuous,
   ) {
     final l10n = context.l10n;
     final accent = context.shiori.color.accentInk;
-    final modeLabel = readerMode.isVertical
-        ? getReaderModeName(readerMode, context)
-        : '${getReaderModeName(readerMode, context)} · '
-              '${getReadingDirectionName(readingDirection, context)}';
     return SizedBox(
       height: context.shiori.density.rowHeight,
       child: Row(
@@ -381,18 +363,21 @@ class ReaderBottomBar extends ConsumerWidget {
             icon: const Icon(Symbols.format_list_numbered_rounded),
           ),
 
-          // The reading mode, drawn turning the way it reads, opening the
-          // mode and direction picker.
+          // The reading mode, shown by its direction, opening the same
+          // picker as the settings sheet: tiles, the series' own mode and
+          // the default.
           IconButton(
-            tooltip: '${l10n.reading_mode} · $modeLabel',
+            tooltip: readerMode == null
+                ? l10n.reading_mode
+                : '${l10n.reading_mode} · ${getReaderModeName(readerMode, context)}',
             onPressed: () => _pickReaderMode(context),
-            icon: ReaderModeGlyph(
-              readerModeGlyphFor(readerMode, readingDirection),
-            ),
+            icon: readerMode == null
+                ? const Icon(Symbols.chrome_reader_mode_rounded)
+                : ReaderModeGlyph(readerMode),
           ),
 
-          // Crop borders: the crop struck through while it is off, and in
-          // the accent while it is on.
+          // Crop borders button: the crop struck through while it is off,
+          // and in the accent while it is on.
           Consumer(
             builder: (context, ref, child) {
               final cropBorders = ref.watch(cropBordersStateProvider);
@@ -408,34 +393,22 @@ class ReaderBottomBar extends ConsumerWidget {
             },
           ),
 
-          // Single, double, then double with the cover alone.
+          // Double page mode button
           IconButton(
-            tooltip: _pageModeTooltip(context),
+            tooltip: l10n.double_page,
             isSelected: _isDoublePageMode,
             onPressed: !isHorizontalContinuous ? onPageModeToggle : null,
             icon: const Icon(Symbols.book_rounded),
-            selectedIcon: currentPageMode == PageMode.doublePageCover
-                ? Badge(
-                    label: const Text('1'),
-                    backgroundColor: accent,
-                    child: Icon(
-                      Symbols.menu_book_rounded,
-                      fill: 1,
-                      color: accent,
-                    ),
-                  )
-                : Icon(Symbols.menu_book_rounded, fill: 1, color: accent),
+            selectedIcon: Icon(
+              Symbols.menu_book_rounded,
+              fill: 1,
+              color: accent,
+            ),
           ),
 
-          if (onPagePreviewsPressed != null)
-            IconButton(
-              tooltip: 'Page previews',
-              onPressed: onPagePreviewsPressed,
-              icon: const Icon(Symbols.grid_view_rounded),
-            ),
-
           // Auto-scroll, where it runs: lit while it is on.
-          if (readerMode.isVerticalContinuous && onAutoScrollPressed != null)
+          if ((readerMode?.isVerticalContinuous ?? false) &&
+              onAutoScrollPressed != null)
             ValueListenableBuilder<bool>(
               valueListenable: autoScrollEnabled ?? ValueNotifier(false),
               builder: (context, enabled, _) => IconButton(
@@ -451,6 +424,7 @@ class ReaderBottomBar extends ConsumerWidget {
               ),
             ),
 
+          // Settings button
           IconButton(
             tooltip: l10n.settings,
             onPressed: onSettingsPressed,

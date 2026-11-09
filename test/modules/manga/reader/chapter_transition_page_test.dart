@@ -43,8 +43,7 @@ void main() {
                   ? null
                   : Chapter(mangaId: 1, name: next),
               mangaName: 'Frieren',
-              readerMode: ReaderMode.verticalPaged,
-              readingDirection: ReadingDirection.leftToRight,
+              readerMode: ReaderMode.vertical,
             ),
           ),
         ),

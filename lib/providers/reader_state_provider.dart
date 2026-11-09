@@ -29,25 +29,9 @@ class DefaultReadingModeState extends _$DefaultReadingModeState {
     state = value;
     settingsRepository.update(
       (s) => s
-        // Pin the direction the old mode implied before switching modes.
-        ..defaultReadingDirectionIndex ??=
-            s.effectiveDefaultReadingDirection.index
-        ..defaultReaderMode = value.normalized,
-    );
-  }
-}
-
-@riverpod
-class DefaultReadingDirectionState extends _$DefaultReadingDirectionState {
-  @override
-  ReadingDirection build() {
-    return isar.settings.getSync(227)!.effectiveDefaultReadingDirection;
-  }
-
-  void set(ReadingDirection value) {
-    state = value;
-    settingsRepository.update(
-      (s) => s.defaultReadingDirectionIndex = value.index,
+        // The direction is part of the mode now.
+        ..defaultReadingDirectionIndex = null
+        ..defaultReaderMode = value,
     );
   }
 }
@@ -56,7 +40,7 @@ class DefaultReadingDirectionState extends _$DefaultReadingDirectionState {
 class DefaultPageModeState extends _$DefaultPageModeState {
   @override
   PageMode build() {
-    return isar.settings.getSync(227)!.defaultPageMode;
+    return isar.settings.getSync(227)!.defaultPageMode.normalized;
   }
 
   void set(PageMode value) {

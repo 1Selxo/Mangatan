@@ -1,6 +1,5 @@
 1 lib/modules/anime/anime_player_view.dart
 1 lib/modules/manga/detail/manga_detail_view.dart
-1 lib/modules/manga/reader/reader_view.dart
 1 lib/modules/mining/widgets/dictionary_lookup_popup.dart
 1 lib/modules/mining/widgets/hoshi_dictionary_popup.dart
 1 lib/modules/mining/widgets/reader_ocr_overlay.dart

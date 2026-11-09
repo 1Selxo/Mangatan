@@ -1,11 +1,5 @@
-import 'dart:async';
-
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:mangayomi/modules/mining/reader_lookup_trigger.dart';
-import 'package:mangayomi/modules/mining/widgets/reader_ocr_overlay.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
 
 /// Navigation layout variants matching Mihon.
 ///
@@ -88,7 +82,69 @@ class ReaderGestureHandler extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final zones = switch (navigationLayout) {
+    if (hasImageError && !isContinuousMode) {
+      // When the visible page has an error:
+      // - The center box (25% to 65% height, 20% to 80% width) is left empty
+      //   so hit-tests fall straight through to the Retry button.
+      // - Top & bottom center zones trigger onToggleUI (to show/hide menus).
+      // - Left & right strips allow page navigation.
+      final topHeight = context.height(0.25);
+      final bottomHeight = context.height(0.35);
+      final sideWidth = context.width(0.20);
+      final prevAction = _shouldInvertHorizontal ? _next() : _prev();
+      final nextAction = _shouldInvertHorizontal ? _prev() : _next();
+
+      return Stack(
+        children: [
+          // Top zone: left/right turn pages, center toggles UI
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: topHeight,
+            child: Row(
+              children: [
+                SizedBox(width: sideWidth, child: _zone(prevAction)),
+                Expanded(child: _uiZone()),
+                SizedBox(width: sideWidth, child: _zone(nextAction)),
+              ],
+            ),
+          ),
+          // Bottom zone: left/right turn pages, center toggles UI
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: bottomHeight,
+            child: Row(
+              children: [
+                SizedBox(width: sideWidth, child: _zone(prevAction)),
+                Expanded(child: _uiZone()),
+                SizedBox(width: sideWidth, child: _zone(nextAction)),
+              ],
+            ),
+          ),
+          // Left middle strip (between top and bottom)
+          Positioned(
+            top: topHeight,
+            bottom: bottomHeight,
+            left: 0,
+            width: sideWidth,
+            child: _zone(prevAction),
+          ),
+          // Right middle strip (between top and bottom)
+          Positioned(
+            top: topHeight,
+            bottom: bottomHeight,
+            right: 0,
+            width: sideWidth,
+            child: _zone(nextAction),
+          ),
+        ],
+      );
+    }
+
+    return switch (navigationLayout) {
       1 => _buildLShaped(context),
       2 => _buildKindle(context),
       3 => _buildEdge(context),
@@ -96,21 +152,6 @@ class ReaderGestureHandler extends StatelessWidget {
       5 => _buildDisabled(context),
       _ => _buildDefault(context),
     };
-    return _TwoFingerOcrToggle(
-      child: Listener(
-        onPointerMove: (event) {
-          ReaderOcrState.handleMiddleLookupMove(event.position);
-        },
-        child: MouseRegion(
-          opaque: false,
-          onHover: (event) {
-            unawaited(ReaderOcrState.handleHover(event.position));
-          },
-          onExit: (_) => ReaderOcrState.handleHoverExit(),
-          child: zones,
-        ),
-      ),
-    );
   }
 
   // ── helpers ──
@@ -156,12 +197,7 @@ class ReaderGestureHandler extends StatelessWidget {
     return Row(
       children: [
         Expanded(flex: 2, child: _zone(leftAction)),
-        Expanded(
-          flex: 2,
-          child: hasImageError
-              ? SizedBox(width: context.width(1), height: context.height(0.7))
-              : _uiZone(),
-        ),
+        Expanded(flex: 2, child: _uiZone()),
         Expanded(flex: 2, child: _zone(rightAction)),
       ],
     );
@@ -172,12 +208,9 @@ class ReaderGestureHandler extends StatelessWidget {
     final bottomAction = _shouldInvertVertical ? onPreviousPage : onNextPage;
     return Column(
       children: [
-        Expanded(flex: 2, child: _zone(hasImageError ? onToggleUI : topAction)),
+        Expanded(flex: 2, child: _zone(topAction)),
         const Expanded(flex: 5, child: SizedBox.shrink()),
-        Expanded(
-          flex: 2,
-          child: _zone(hasImageError ? onToggleUI : bottomAction),
-        ),
+        Expanded(flex: 2, child: _zone(bottomAction)),
       ],
     );
   }
@@ -294,81 +327,8 @@ class ReaderGestureHandler extends StatelessWidget {
   }
 }
 
-class _TwoFingerOcrToggle extends StatefulWidget {
-  const _TwoFingerOcrToggle({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_TwoFingerOcrToggle> createState() => _TwoFingerOcrToggleState();
-}
-
-class _TwoFingerOcrToggleState extends State<_TwoFingerOcrToggle> {
-  final Set<int> _pointers = {};
-  final Map<int, Offset> _starts = {};
-  DateTime? _startedAt;
-  bool _candidate = false;
-
-  void _down(PointerDownEvent event) {
-    if (isDesktop) return;
-    _pointers.add(event.pointer);
-    _starts[event.pointer] = event.position;
-    if (_pointers.length == 2) {
-      _candidate = true;
-      _startedAt = DateTime.now();
-    } else if (_pointers.length > 2) {
-      _candidate = false;
-    }
-  }
-
-  void _move(PointerMoveEvent event) {
-    final start = _starts[event.pointer];
-    if (_candidate && start != null && (event.position - start).distance > 24) {
-      _candidate = false;
-    }
-  }
-
-  void _up(PointerUpEvent event) {
-    final shouldToggle =
-        _candidate &&
-        _pointers.length == 2 &&
-        _startedAt != null &&
-        DateTime.now().difference(_startedAt!) <=
-            const Duration(milliseconds: 350);
-    _pointers.remove(event.pointer);
-    _starts.remove(event.pointer);
-    if (shouldToggle) {
-      _candidate = false;
-      unawaited(ReaderOcrState.toggle());
-    }
-    if (_pointers.isEmpty) _reset();
-  }
-
-  void _cancel(PointerCancelEvent event) {
-    _pointers.remove(event.pointer);
-    _starts.remove(event.pointer);
-    _candidate = false;
-    if (_pointers.isEmpty) _reset();
-  }
-
-  void _reset() {
-    _candidate = false;
-    _startedAt = null;
-  }
-
-  @override
-  Widget build(BuildContext context) => Listener(
-    behavior: HitTestBehavior.translucent,
-    onPointerDown: _down,
-    onPointerMove: _move,
-    onPointerUp: _up,
-    onPointerCancel: _cancel,
-    child: widget.child,
-  );
-}
-
 /// Individual gesture detector for a zone.
-class _ZoneGestureDetector extends StatefulWidget {
+class _ZoneGestureDetector extends StatelessWidget {
   final VoidCallback onTap;
   final void Function(Offset position)? onDoubleTapDown;
   final VoidCallback? onDoubleTap;
@@ -384,86 +344,18 @@ class _ZoneGestureDetector extends StatefulWidget {
   });
 
   @override
-  State<_ZoneGestureDetector> createState() => _ZoneGestureDetectorState();
-}
-
-class _ZoneGestureDetectorState extends State<_ZoneGestureDetector> {
-  bool _pointerHandledByOcr = false;
-  bool _lookupPointer = false;
-  bool _lookupPointerUsesPrimaryButton = false;
-  bool _popupDismissPointer = false;
-  bool _middleHoverPointer = false;
-
-  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onTapUp: (_) {
-        final handled = _pointerHandledByOcr;
-        _pointerHandledByOcr = false;
-        if (!handled) widget.onTap();
-      },
-      onTapCancel: () => _pointerHandledByOcr = false,
-      onDoubleTapDown: widget.onDoubleTapDown != null
-          ? (details) => widget.onDoubleTapDown!(details.globalPosition)
+      onTap: onTap,
+      onDoubleTapDown: onDoubleTapDown != null
+          ? (details) => onDoubleTapDown!(details.globalPosition)
           : null,
-      onDoubleTap: widget.onDoubleTap,
-      onSecondaryTapDown: widget.onSecondaryTapDown != null
-          ? (details) => widget.onSecondaryTapDown!(details.globalPosition)
+      onDoubleTap: onDoubleTap,
+      onSecondaryTapDown: onSecondaryTapDown != null
+          ? (details) => onSecondaryTapDown!(details.globalPosition)
           : null,
-      onSecondaryTap: widget.onSecondaryTap,
-      child: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (event) {
-          _lookupPointerUsesPrimaryButton = event.buttons == kPrimaryButton;
-          _popupDismissPointer =
-              isDesktop &&
-              event.kind == PointerDeviceKind.mouse &&
-              _lookupPointerUsesPrimaryButton;
-          _middleHoverPointer = ReaderOcrState.handleMiddleLookupStart(
-            event.position,
-            event.buttons,
-          );
-          final additionalLeftClick =
-              isDesktop &&
-              event.kind == PointerDeviceKind.mouse &&
-              ReaderLookupTriggerState.additionalLeftClick.value;
-          _lookupPointer = ReaderOcrState.lookupOnHover.value
-              ? _lookupPointerUsesPrimaryButton
-              : _middleHoverPointer ||
-                    readerLookupTriggerMatchesPointer(
-                      ReaderLookupTriggerState.trigger.value,
-                      event.buttons,
-                      additionalLeftClick: additionalLeftClick,
-                    );
-          if (_lookupPointer && !_middleHoverPointer) {
-            ReaderOcrState.handlePointerDown(event.position);
-          }
-        },
-        onPointerUp: (event) {
-          if (_middleHoverPointer) {
-            ReaderOcrState.handleMiddleLookupEnd();
-          } else {
-            final handled = _lookupPointer
-                ? ReaderOcrState.handlePointerUp(event.position)
-                : _popupDismissPointer && ReaderOcrState.dismissActiveLookup();
-            _pointerHandledByOcr = _lookupPointerUsesPrimaryButton && handled;
-          }
-          _lookupPointer = false;
-          _lookupPointerUsesPrimaryButton = false;
-          _popupDismissPointer = false;
-          _middleHoverPointer = false;
-        },
-        onPointerCancel: (_) {
-          if (_lookupPointer) ReaderOcrState.handlePointerCancel();
-          if (_middleHoverPointer) ReaderOcrState.handleMiddleLookupEnd();
-          _lookupPointer = false;
-          _lookupPointerUsesPrimaryButton = false;
-          _popupDismissPointer = false;
-          _middleHoverPointer = false;
-        },
-        child: const SizedBox.expand(),
-      ),
+      onSecondaryTap: onSecondaryTap,
     );
   }
 }

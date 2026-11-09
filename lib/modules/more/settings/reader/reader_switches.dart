@@ -7,6 +7,28 @@ import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 
+/// The reader switches Mangatan's manga reader does not act on yet.
+///
+/// Upstream implements them in its own reader, which the fork did not adopt,
+/// so here they would be switches that change nothing. They stay hidden
+/// wherever reader settings are shown; take one out of this set when the
+/// fork's reader implements it.
+const unsupportedReaderSwitches = <ReaderSwitch>{};
+
+/// Whether the reader picks its background from the page; like
+/// [unsupportedReaderSwitches], not implemented by the fork's reader yet.
+const readerAutomaticBackgroundSupported = false;
+
+/// Whether any page layout setting does something, so the group showing
+/// them is worth showing.
+bool get readerPageLayoutSupported => const [
+  ReaderSwitch.splitWidePages,
+  ReaderSwitch.dualPageRotateToFit,
+  ReaderSwitch.doublePageSingleFirstPage,
+  ReaderSwitch.doublePageAuto,
+  ReaderSwitch.landscapeZoom,
+].any((option) => option.isSupported);
+
 /// The reader's on/off settings, described once: what each is called, what
 /// it says under its name, and the setting it reads and writes. The reader's
 /// own sheet and Settings › Reader both draw them from here, so the two can
@@ -78,6 +100,10 @@ enum ReaderSwitch {
     volumeKeysPaging => Platform.isIOS ? l10n.volume_keys_paging_ios : null,
     _ => null,
   };
+
+  /// Whether the fork's reader acts on this switch:
+  /// [unsupportedReaderSwitches].
+  bool get isSupported => !unsupportedReaderSwitches.contains(this);
 
   bool watch(WidgetRef ref) => switch (this) {
     cropBorders => ref.watch(cropBordersStateProvider),
@@ -179,6 +205,7 @@ class ReaderSwitchRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!option.isSupported) return const SizedBox.shrink();
     final l10n = context.l10n;
     final subtitle = option.subtitle(l10n);
     return ShioriSwitchRow(

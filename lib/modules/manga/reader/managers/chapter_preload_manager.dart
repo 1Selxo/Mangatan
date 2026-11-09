@@ -21,8 +21,10 @@ class ChapterPreloadManager {
   /// Queue of chapter IDs in order of loading (for LRU eviction)
   final Queue<String> _chapterLoadOrder = Queue();
 
-  /// Chapters whose image/archive data was evicted while their page entries
-  /// remain available for navigation.
+  /// Set of chapter IDs whose page data has been evicted (image/archive data
+  /// cleared but the pages themselves still sit in [_pages]). Lets callers
+  /// cheaply check "does this chapter need a reload?" in O(1) instead of
+  /// scanning every page of the chapter looking for cleared data.
   final Set<String> _evictedChapterIds = {};
 
   /// Separate flags to allow concurrent prev/next preloading
@@ -51,12 +53,6 @@ class ChapterPreloadManager {
   bool isChapterLoaded(Chapter? chapter) {
     final id = _getChapterIdentifier(chapter);
     return id != null && _loadedChapterIds.contains(id);
-  }
-
-  /// Returns whether [chapter] needs its evicted page data reloaded.
-  bool isChapterEvicted(Chapter? chapter) {
-    final id = _getChapterIdentifier(chapter);
-    return id != null && _evictedChapterIds.contains(id);
   }
 
   /// Initializes the manager with the first chapter's pages.
@@ -309,12 +305,12 @@ class ChapterPreloadManager {
     return true;
   }
 
-  /// Updates the cropped image cached for a page.
-  void updatePageCropImage(int index, Uint8List? cropImage) {
-    if (index >= 0 && index < _pages.length) {
-      _pages[index].cropImage = cropImage;
-      onPagesUpdated?.call();
-    }
+  /// Returns `true` if [chapter]'s pages were evicted and still need a
+  /// reload before they can render. O(1) - use this to skip the more
+  /// expensive per-page scan in the common case where nothing was evicted.
+  bool isChapterEvicted(Chapter? chapter) {
+    final id = _getChapterIdentifier(chapter);
+    return id != null && _evictedChapterIds.contains(id);
   }
 
   /// Gets a unique identifier for a chapter.
@@ -336,6 +332,11 @@ class ChapterPreloadManager {
     final currentId = _getChapterIdentifier(currentChapter);
     if (currentId == null) return [];
 
+    // _chapterLoadOrder is already maintained incrementally in the same
+    // left-to-right order chapters appear in _pages (appended on next-chapter
+    // preload, prepended on prev-chapter preload, pruned on eviction) - reuse
+    // it directly instead of re-deriving the same ordering with a full O(N)
+    // scan over every page on every call.
     final loadedIdsInOrder = _chapterLoadOrder.toList();
 
     final currentIndex = loadedIdsInOrder.indexOf(currentId);
@@ -393,11 +394,18 @@ class ChapterPreloadManager {
   void splitPage(int index, UChapDataPreload page1, UChapDataPreload page2) =>
       replacePage(index, [page1, page2]);
 
-  /// Puts [parts] in place of the page at [index], as when a page is split.
-  void replacePage(int index, List<UChapDataPreload> parts) {
-    if (index < 0 || index >= _pages.length || parts.isEmpty) return;
+  /// Puts [parts] in place of the [count] pages from [index]: the parts of a
+  /// page when it is split, or the page again when its halves are put back
+  /// together.
+  void replacePage(int index, List<UChapDataPreload> parts, {int count = 1}) {
+    if (index < 0 ||
+        count < 1 ||
+        index + count > _pages.length ||
+        parts.isEmpty) {
+      return;
+    }
     _pages
-      ..removeAt(index)
+      ..removeRange(index, index + count)
       ..insertAll(index, parts);
     // Every page after the split moved down.
     for (int i = index; i < _pages.length; i++) {

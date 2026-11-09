@@ -7,47 +7,28 @@ import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:shiori/shiori.dart';
 
-/// The glyph to draw for [mode] read in [direction]: the horizontal modes
-/// turn the other way when reading right to left.
-ReaderMode readerModeGlyphFor(ReaderMode mode, ReadingDirection direction) {
-  if (!direction.isRtl) return mode.normalized;
-  return switch (mode.normalized) {
-    ReaderMode.horizontalPaged => ReaderMode.legacyHorizontalPagedRtl,
-    ReaderMode.horizontalContinuous => ReaderMode.legacyHorizontalContinuousRtl,
-    final other => other,
-  };
-}
-
 /// Reading modes as tiles that show their direction, for one series, with
-/// the reading direction under them, and the way to make the choice
-/// everyone's default, or to go back to it.
+/// the way to make the choice everyone's default, or to go back to it.
 ///
-/// Upstream merges mode and direction into one value; Mangatan keeps them
-/// apart (the series remembers each), so the direction is its own control.
+/// The reading mode is remembered per series; a list of six names never said
+/// so, nor what the default was.
 class ReaderModePicker extends StatelessWidget {
   const ReaderModePicker({
     super.key,
     required this.mode,
     required this.defaultMode,
-    required this.direction,
-    required this.defaultDirection,
     required this.seriesName,
     required this.onChanged,
-    required this.onDirectionChanged,
     required this.onSetDefault,
   });
 
   /// The mode this series reads in.
   final ReaderMode mode;
   final ReaderMode defaultMode;
-  final ReadingDirection direction;
-  final ReadingDirection defaultDirection;
   final String seriesName;
   final ValueChanged<ReaderMode> onChanged;
-  final ValueChanged<ReadingDirection> onDirectionChanged;
 
-  /// Makes [mode] and [direction] the default for every series without
-  /// its own.
+  /// Makes [mode] the default for every series without one of its own.
   final VoidCallback onSetDefault;
 
   @override
@@ -55,26 +36,26 @@ class ReaderModePicker extends StatelessWidget {
     final l10n = context.l10n;
     final tokens = context.shiori;
     final c = tokens.color;
-    final current = mode.normalized;
-    final differs =
-        current != defaultMode.normalized || direction != defaultDirection;
-    final defaultLabel = defaultMode.isVertical
-        ? getReaderModeName(defaultMode, context)
-        : '${getReaderModeName(defaultMode, context)} · '
-              '${getReadingDirectionName(defaultDirection, context)}';
+    final differs = mode != defaultMode;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.s16),
       child: Column(
+        // As tall as the tiles: in a sheet, a full column stretched it to
+        // nine tenths of the screen.
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: ShioriSpace.s8,
         children: [
+          // The sheet's title, as on every Shiori sheet.
           Text(
             l10n.reading_mode_for(seriesName),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: tokens.text.section.copyWith(color: c.fg),
           ),
+          // Equal columns across the whole width: as many as fit at a
+          // tile's least width, at least three. Fixed-width tiles left a gap
+          // at the end of each row and cut the longer names.
           LayoutBuilder(
             builder: (context, constraints) {
               const gap = ShioriSpace.s8;
@@ -89,58 +70,30 @@ class ReaderModePicker extends StatelessWidget {
                 spacing: gap,
                 runSpacing: gap,
                 children: [
-                  for (final m in ReaderModeExtension.selectableValues)
+                  for (final m in ReaderMode.values)
                     _ModeTile(
                       mode: m,
-                      glyph: readerModeGlyphFor(m, direction),
                       width: width,
-                      selected: m == current,
+                      selected: m == mode,
                       onTap: () => onChanged(m),
                     ),
                 ],
               );
             },
           ),
-          const SizedBox(height: ShioriSpace.s4),
-          Text(
-            l10n.reading_direction,
-            style: tokens.caption.copyWith(color: c.fgMuted),
-          ),
-          ShioriSegmentedControl<ReadingDirection>(
-            segments: [
-              for (final d in ReadingDirection.values)
-                ShioriSegment(
-                  value: d,
-                  label: getReadingDirectionName(d, context),
-                  icon: d.isRtl
-                      ? Icons.format_textdirection_r_to_l
-                      : Icons.format_textdirection_l_to_r,
-                ),
-            ],
-            selected: direction,
-            onSelected: onDirectionChanged,
-          ),
-          const SizedBox(height: ShioriSpace.s4),
           if (differs)
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    l10n.default_is(defaultLabel),
+                    l10n.default_is(getReaderModeName(defaultMode, context)),
                     style: tokens.caption,
                   ),
                 ),
                 ShioriButton.quiet(
                   label: l10n.use_default,
                   icon: Symbols.restart_alt_rounded,
-                  onPressed: () {
-                    if (current != defaultMode.normalized) {
-                      onChanged(defaultMode.normalized);
-                    }
-                    if (direction != defaultDirection) {
-                      onDirectionChanged(defaultDirection);
-                    }
-                  },
+                  onPressed: () => onChanged(defaultMode),
                 ),
               ],
             ),
@@ -167,14 +120,12 @@ class ReaderModePicker extends StatelessWidget {
 class _ModeTile extends StatelessWidget {
   const _ModeTile({
     required this.mode,
-    required this.glyph,
     required this.width,
     required this.selected,
     required this.onTap,
   });
 
   final ReaderMode mode;
-  final ReaderMode glyph;
   final double width;
   final bool selected;
   final VoidCallback onTap;
@@ -193,6 +144,12 @@ class _ModeTile extends StatelessWidget {
         (label.fontSize ?? 12) *
         (label.height ?? 1.3) *
         MediaQuery.textScalerOf(context).scale(1);
+    final icon = ReaderModeGlyph(
+      mode,
+      size: tokens.scaled(28),
+      color: fg,
+      filled: selected,
+    );
     return Semantics(
       button: true,
       selected: selected,
@@ -221,12 +178,9 @@ class _ModeTile extends StatelessWidget {
               child: Column(
                 spacing: ShioriSpace.s4,
                 children: [
-                  ReaderModeGlyph(
-                    glyph,
-                    size: tokens.scaled(28),
-                    color: fg,
-                    filled: selected,
-                  ),
+                  icon,
+                  // Two lines kept for every name, so the tiles line up in
+                  // even rows whatever their name's length.
                   SizedBox(
                     height: labelHeight,
                     child: Center(

@@ -10,9 +10,7 @@
 3 lib/modules/manga/detail/widgets/anime_season_list.dart
 1 lib/modules/manga/detail/widgets/chapter_list_tile_widget.dart
 1 lib/modules/manga/home/manga_home_screen.dart
-1 lib/modules/manga/reader/image_view_vertical.dart
 1 lib/modules/manga/reader/widgets/color_filter_widget.dart
-1 lib/modules/manga/reader/widgets/double_page_view.dart
 2 lib/modules/mining/widgets/dictionary_lookup_popup.dart
 5 lib/modules/mining/widgets/hoshi_dictionary_popup.dart
 1 lib/modules/mining/widgets/mining_lookup_sheet.dart

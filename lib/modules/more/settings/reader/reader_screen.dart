@@ -48,9 +48,6 @@ class ReaderScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // ── Reading Mode & Display ──
     final defaultReadingMode = ref.watch(defaultReadingModeStateProvider);
-    final defaultReadingDirection = ref.watch(
-      defaultReadingDirectionStateProvider,
-    );
     final defaultPageMode = ref.watch(defaultPageModeStateProvider);
     final doubleTapAnimationSpeed = ref.watch(
       doubleTapAnimationSpeedStateProvider,
@@ -92,7 +89,7 @@ class ReaderScreen extends ConsumerWidget {
               title: l10n.default_reading_mode,
               value: defaultReadingMode,
               options: [
-                for (final mode in ReaderModeExtension.selectableValues)
+                for (final mode in ReaderMode.values)
                   ShioriChoice(
                     mode,
                     getReaderModeName(mode, context),
@@ -102,25 +99,11 @@ class ReaderScreen extends ConsumerWidget {
               onChanged: (v) =>
                   ref.read(defaultReadingModeStateProvider.notifier).set(v),
             ),
-            ShioriValueRow<ReadingDirection>(
-              title: l10n.reading_direction,
-              value: defaultReadingDirection,
-              options: [
-                for (final direction in ReadingDirection.values)
-                  ShioriChoice(
-                    direction,
-                    getReadingDirectionName(direction, context),
-                  ),
-              ],
-              onChanged: (v) => ref
-                  .read(defaultReadingDirectionStateProvider.notifier)
-                  .set(v),
-            ),
             ShioriValueRow<PageMode>(
               title: l10n.default_page_mode,
               value: defaultPageMode,
               options: [
-                for (final pageMode in PageMode.values)
+                for (final pageMode in [PageMode.onePage, PageMode.doublePage])
                   ShioriChoice(pageMode, getPageModeName(pageMode, context)),
               ],
               onChanged: (v) =>
@@ -233,7 +216,7 @@ class ReaderScreen extends ConsumerWidget {
             const ReaderSwitchRow(ReaderSwitch.doublePageSingleFirstPage),
             const ReaderSwitchRow(ReaderSwitch.doublePageAuto),
             const ReaderSwitchRow(ReaderSwitch.landscapeZoom),
-            if (landscapeZoom)
+            if (landscapeZoom && ReaderSwitch.landscapeZoom.isSupported)
               ShioriValueRow<int>(
                 title: l10n.zoom_start_position,
                 value: zoomStartPosition,
@@ -294,55 +277,56 @@ class ReaderScreen extends ConsumerWidget {
             ],
           ],
         ),
-        ShioriSettingsGroup(
-          title: l10n.flash_on_page_change,
-          children: [
-            const ReaderSwitchRow(ReaderSwitch.flashOnPageChange),
-            if (flashOnPageChange) ...[
-              ShioriValueRow<int>(
-                title: l10n.flash_color,
-                value: flashColor,
-                options: named([
-                  l10n.flash_color_black,
-                  l10n.flash_color_white,
-                  l10n.flash_color_white_black,
-                ]),
-                onChanged: (v) =>
-                    ref.read(flashColorStateProvider.notifier).set(v),
-              ),
-              ShioriSliderRow(
-                title: l10n.flash_interval(flashInterval.toString()),
-                value: flashInterval.toDouble(),
-                min: 1,
-                max: 10,
-                divisions: 9,
-                valueLabel: (_) => '',
-                defaultValue: 1,
-                onReset: () =>
-                    ref.read(flashIntervalStateProvider.notifier).set(1),
-                resetTooltip: l10n.reset,
-                onChanged: (v) => ref
-                    .read(flashIntervalStateProvider.notifier)
-                    .set(v.round()),
-              ),
-              ShioriSliderRow(
-                title: l10n.flash_duration(flashDuration.toString()),
-                value: flashDuration.toDouble(),
-                min: 50,
-                max: 500,
-                divisions: 9,
-                valueLabel: (_) => '',
-                defaultValue: 100,
-                onReset: () =>
-                    ref.read(flashDurationStateProvider.notifier).set(100),
-                resetTooltip: l10n.reset,
-                onChanged: (v) => ref
-                    .read(flashDurationStateProvider.notifier)
-                    .set(v.round()),
-              ),
+        if (ReaderSwitch.flashOnPageChange.isSupported)
+          ShioriSettingsGroup(
+            title: l10n.flash_on_page_change,
+            children: [
+              const ReaderSwitchRow(ReaderSwitch.flashOnPageChange),
+              if (flashOnPageChange) ...[
+                ShioriValueRow<int>(
+                  title: l10n.flash_color,
+                  value: flashColor,
+                  options: named([
+                    l10n.flash_color_black,
+                    l10n.flash_color_white,
+                    l10n.flash_color_white_black,
+                  ]),
+                  onChanged: (v) =>
+                      ref.read(flashColorStateProvider.notifier).set(v),
+                ),
+                ShioriSliderRow(
+                  title: l10n.flash_interval(flashInterval.toString()),
+                  value: flashInterval.toDouble(),
+                  min: 1,
+                  max: 10,
+                  divisions: 9,
+                  valueLabel: (_) => '',
+                  defaultValue: 1,
+                  onReset: () =>
+                      ref.read(flashIntervalStateProvider.notifier).set(1),
+                  resetTooltip: l10n.reset,
+                  onChanged: (v) => ref
+                      .read(flashIntervalStateProvider.notifier)
+                      .set(v.round()),
+                ),
+                ShioriSliderRow(
+                  title: l10n.flash_duration(flashDuration.toString()),
+                  value: flashDuration.toDouble(),
+                  min: 50,
+                  max: 500,
+                  divisions: 9,
+                  valueLabel: (_) => '',
+                  defaultValue: 100,
+                  onReset: () =>
+                      ref.read(flashDurationStateProvider.notifier).set(100),
+                  resetTooltip: l10n.reset,
+                  onChanged: (v) => ref
+                      .read(flashDurationStateProvider.notifier)
+                      .set(v.round()),
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
       ],
       ReaderSettingsSection.swipe: [
         ShioriSettingsGroup(
@@ -384,15 +368,20 @@ class ReaderScreen extends ConsumerWidget {
         padding: tvPageInsets,
         children: [
           for (final section in ReaderSettingsSection.values)
-            ShioriSettingRow(
-              autofocus: isTv && section == ReaderSettingsSection.values.first,
-              icon: section.icon,
-              title: section.title(context),
-              subtitle: section.summary(context),
-              trailing: const Icon(Symbols.chevron_forward_rounded),
-              onTap: () =>
-                  context.push('/readerSettingsSection', extra: section.index),
-            ),
+            if (section != ReaderSettingsSection.layout ||
+                readerPageLayoutSupported)
+              ShioriSettingRow(
+                autofocus:
+                    isTv && section == ReaderSettingsSection.values.first,
+                icon: section.icon,
+                title: section.title(context),
+                subtitle: section.summary(context),
+                trailing: const Icon(Symbols.chevron_forward_rounded),
+                onTap: () => context.push(
+                  '/readerSettingsSection',
+                  extra: section.index,
+                ),
+              ),
         ],
       ),
     );
@@ -400,32 +389,24 @@ class ReaderScreen extends ConsumerWidget {
 }
 
 String getReaderModeName(ReaderMode readerMode, BuildContext context) {
-  return switch (readerMode.normalized) {
-    ReaderMode.verticalPaged => context.l10n.reading_mode_vertical_paged,
-    ReaderMode.horizontalPaged => context.l10n.reading_mode_horizontal_paged,
+  return switch (readerMode) {
+    ReaderMode.vertical => context.l10n.reading_mode_vertical,
     ReaderMode.verticalContinuous =>
       context.l10n.reading_mode_vertical_continuous,
-    ReaderMode.horizontalContinuous =>
-      context.l10n.reading_mode_horizontal_continuous,
+    ReaderMode.ltr => context.l10n.reading_mode_left_to_right,
+    ReaderMode.rtl => context.l10n.reading_mode_right_to_left,
+    ReaderMode.horizontalContinuous => context.l10n.horizontal_continious,
+    ReaderMode.horizontalContinuousRTL =>
+      "${context.l10n.horizontal_continious} (RTL)",
     _ => context.l10n.reading_mode_webtoon,
-  };
-}
-
-String getReadingDirectionName(
-  ReadingDirection readingDirection,
-  BuildContext context,
-) {
-  return switch (readingDirection) {
-    ReadingDirection.leftToRight => context.l10n.reading_mode_left_to_right,
-    ReadingDirection.rightToLeft => context.l10n.reading_mode_right_to_left,
   };
 }
 
 String getPageModeName(PageMode pageMode, BuildContext context) {
   return switch (pageMode) {
     PageMode.onePage => context.l10n.page_mode_single,
-    PageMode.doublePage => context.l10n.page_mode_double,
-    PageMode.doublePageCover => context.l10n.page_mode_double_cover,
+    PageMode.doublePage ||
+    PageMode.legacyDoublePageCover => context.l10n.page_mode_double,
   };
 }
 

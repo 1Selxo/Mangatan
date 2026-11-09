@@ -1,49 +1,54 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mangayomi/modules/manga/reader/u_chap_data_preload.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/page_preview.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_bottom_bar.dart';
+import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:shiori/shiori.dart';
 
-/// Displays the thumbnail preview of the page under the reader bottom bar
-/// slider while it is being dragged.
-class ReaderSliderPreviewOverlay extends StatelessWidget {
+/// Displays the thumbnail preview of the page under the reader bottom bar slider
+/// while it is being dragged.
+class ReaderSliderPreviewOverlay extends ConsumerWidget {
   final ValueListenable<int?> sliderPreviewIndex;
   final bool isUiVisible;
+  final List<UChapDataPreload> pages;
   final int totalPages;
   final bool isReverseHorizontal;
-
-  /// The image of the chapter's page at a slider position, or null while
-  /// it is not known.
-  final ImageProvider? Function(int pageInChapter) imageForPage;
+  final int Function(int pageInChapter) actualIndexOfChapterPage;
   final String Function(int index) currentIndexLabel;
 
   const ReaderSliderPreviewOverlay({
     super.key,
     required this.sliderPreviewIndex,
     required this.isUiVisible,
+    required this.pages,
     required this.totalPages,
     required this.isReverseHorizontal,
-    required this.imageForPage,
+    required this.actualIndexOfChapterPage,
     required this.currentIndexLabel,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ValueListenableBuilder<int?>(
       valueListenable: sliderPreviewIndex,
       builder: (context, index, _) {
         if (index == null || !isUiVisible) {
           return const SizedBox.shrink();
         }
+        final actual = actualIndexOfChapterPage(index);
         ImageProvider? image;
-        try {
-          image = imageForPage(index);
-        } catch (_) {
-          image = null;
+        if (actual >= 0 && actual < pages.length) {
+          try {
+            image = pages[actual].getImageProvider(ref, false);
+          } catch (_) {
+            image = null;
+          }
         }
-        // Over the slider's thumb, as a video's frame follows the finger:
-        // the slider's share of the way, mirrored when reading right to
-        // left.
+        // Over the slider's thumb, as a video's frame follows
+        // the finger: the slider's share of the way, mirrored
+        // when reading right to left.
         var fraction = totalPages > 1 ? index / (totalPages - 1) : 0.5;
         if (isReverseHorizontal) fraction = 1 - fraction;
         return Positioned(
@@ -54,8 +59,8 @@ class ReaderSliderPreviewOverlay extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
               child: Padding(
-                // The track's ends: the panel's margin, a chapter button and
-                // a page figure each side.
+                // The track's ends: the panel's margin, a
+                // chapter button and a page figure each side.
                 padding: const EdgeInsets.symmetric(
                   horizontal: ShioriSpace.s8 + 48 + 44,
                 ),

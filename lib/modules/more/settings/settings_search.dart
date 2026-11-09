@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
+import 'package:mangayomi/modules/more/settings/mangatan_settings_index.dart';
 import 'package:mangayomi/modules/more/settings/settings_index.dart';
 import 'package:shiori/shiori.dart';
 
@@ -33,7 +34,7 @@ List<SettingsEntry> searchSettings(
   if (words.isEmpty) return const [];
   final titleHits = <SettingsEntry>[];
   final otherHits = <SettingsEntry>[];
-  for (final entry in index ?? settingsIndex) {
+  for (final entry in index ?? [...settingsIndex, ...mangatanSettingsIndex]) {
     final title = foldForSearch(entry.title(l10n));
     final haystack = [
       title,

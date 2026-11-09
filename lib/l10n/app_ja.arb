@@ -322,7 +322,6 @@
   "no_rotation": "回転なし",
   "rotate_left": "左回転",
   "rotate_right": "右回転",
-  "reading_direction": "読み方向",
   "show_page_number": "ページ番号を表示",
   "show_page_number_info": "リーダーでページ番号を表示",
   "auto_scroll": "自動スクロール",

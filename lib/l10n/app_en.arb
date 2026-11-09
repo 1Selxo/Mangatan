@@ -2069,14 +2069,9 @@
       }
     }
   },
-  "reading_direction": "Reading direction",
-  "reading_mode_horizontal_paged": "Horizontal paged",
-  "reading_mode_vertical_paged": "Vertical paged",
-  "reading_mode_horizontal_continuous": "Horizontal continuous",
   "default_page_mode": "Default page mode",
   "page_mode_single": "Single page",
   "page_mode_double": "Double page",
-  "page_mode_double_cover": "Double page with cover offset",
   "subtitle_position": "Subtitle position",
   "dictionary_lookup": "Dictionary",
   "dictionary_settings": "Dictionary settings",

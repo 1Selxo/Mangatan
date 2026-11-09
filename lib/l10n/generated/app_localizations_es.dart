@@ -4836,18 +4836,6 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get reading_direction => 'Reading direction';
-
-  @override
-  String get reading_mode_horizontal_paged => 'Horizontal paged';
-
-  @override
-  String get reading_mode_vertical_paged => 'Vertical paged';
-
-  @override
-  String get reading_mode_horizontal_continuous => 'Horizontal continuous';
-
-  @override
   String get default_page_mode => 'Default page mode';
 
   @override
@@ -4855,9 +4843,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get page_mode_double => 'Double page';
-
-  @override
-  String get page_mode_double_cover => 'Double page with cover offset';
 
   @override
   String get subtitle_position => 'Subtitle position';

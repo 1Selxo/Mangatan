@@ -8494,30 +8494,6 @@ abstract class AppLocalizations {
   /// **'{percentage}% duration'**
   String animation_duration_percentage(int percentage);
 
-  /// No description provided for @reading_direction.
-  ///
-  /// In en, this message translates to:
-  /// **'Reading direction'**
-  String get reading_direction;
-
-  /// No description provided for @reading_mode_horizontal_paged.
-  ///
-  /// In en, this message translates to:
-  /// **'Horizontal paged'**
-  String get reading_mode_horizontal_paged;
-
-  /// No description provided for @reading_mode_vertical_paged.
-  ///
-  /// In en, this message translates to:
-  /// **'Vertical paged'**
-  String get reading_mode_vertical_paged;
-
-  /// No description provided for @reading_mode_horizontal_continuous.
-  ///
-  /// In en, this message translates to:
-  /// **'Horizontal continuous'**
-  String get reading_mode_horizontal_continuous;
-
   /// No description provided for @default_page_mode.
   ///
   /// In en, this message translates to:
@@ -8535,12 +8511,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Double page'**
   String get page_mode_double;
-
-  /// No description provided for @page_mode_double_cover.
-  ///
-  /// In en, this message translates to:
-  /// **'Double page with cover offset'**
-  String get page_mode_double_cover;
 
   /// No description provided for @subtitle_position.
   ///

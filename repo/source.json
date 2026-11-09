@@ -14,15 +14,15 @@
       "bundleIdentifier": "com.selxo.mangatan",
       "developerName": "Mangatan contributors",
       "subtitle": "Read manga, novels, and watch anime",
-      "version": "1.2.24",
-      "versionDate": "2026-10-06T22:40:08Z",
-      "versionDescription": "Mangatan v1.2.24 (build 212) integrates Mangayomi v0.9.8 while preserving Mangatan's reader, player, OCR, subtitle mining, Anki, Chimahon sync, and lazy iOS Mihon runtime.\n\nChanges:\n\u2022 Fix local image\u2022folder manga opening with a null\u2022check error on Windows. Local pages retain their on\u2022disk paths and do not require remote source metadata.\n\u2022 Adopt disk\u2022backed chapter page caching and clear the cache on reader retry; reject stale Mihon proxy URLs.\n\u2022 Pin the complete Linux X11 EGL renderer fix: native display discovery, an isolated rendering context/thread, and deferred texture deletion. Keep the existing system libmpv integration.\n\u2022 Update compatible upstream dependencies, source handling, trackers, localizations, and shared helpers.\n\nValidation: static analysis reports zero errors. Bridge/local chapter, archive, download retry, Mihon compatibility, backup, queue, novel, and Chimahon regression checks passed after integration fixes. Physical X11 playback and iPhone startup remain unverified; ten LNReader tests require the native QuickJS DLL unavailable in the local test environment.\n\nGitHub Actions builds and attaches the Windows installer/ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA. Downloads appear as the build jobs complete.\n\nSource commit: 28e8cf77\r\n",
-      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.24/Mangatan-v1.2.24-build.212-28e8cf7-ios.ipa",
+      "version": "1.3.0",
+      "versionDate": "2026-11-09T10:14:21Z",
+      "versionDescription": "",
+      "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.3.0-beta.4/Mangatan-v1.3.0-beta.4-build.219-5977a6d-ios.ipa",
       "localizedDescription": "Mangatan is an open-source Flutter app for reading manga and novels, watching anime, and language learning.",
       "iconURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/icons/icon_default.webp",
       "tintColor": "EF4444",
       "category": "entertainment",
-      "size": 180110491,
+      "size": 181740084,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_0_default.webp",
         "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/screenshots/image_1_default.webp",
@@ -30,9 +30,30 @@
       ],
       "versions": [
         {
+          "version": "1.3.0",
+          "date": "2026-11-09T10:14:21Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.3.0-beta.4/Mangatan-v1.3.0-beta.4-build.219-5977a6d-ios.ipa",
+          "size": 181740084
+        },
+        {
+          "version": "1.2.26",
+          "date": "2026-10-18T22:02:42Z",
+          "localizedDescription": "Mangatan v1.2.26 (build 214)\n\nPerformance, reliability and sync\u2022safety release.\n\n\u2022 Measure common flows with a perf harness and speed them up without changing\n  behavior: library unread badges, global search, downloads queueing,\n  extension repository refresh, backup restore, startup settings reads and the\n  Chimahon pre\u2022upload safety audit.\n\u2022 Fix Chimahon sync false positives and anime duplicates, and add Chimahon 2.4\n  compatibility with safer sync and restore.\n\u2022 Anime: lay out seasons like Anikku and Animiru, fix YouTube timeouts and\n  player robustness, and keep Jellyfin entries working when a source is renamed.\n\u2022 Reader: sturdier local imports, downloads and page cropping; track the\n  pointer from Flutter for novel dictionary lookups.\n\u2022 Mining: dictionaries, OCR and card export now fail safely.\n\u2022 Statistics: never erase history after a failed storage open.\n\u2022 Categories: close the order gap when a category is deleted.\n\u2022 Extensions: harden extension settings, repositories and uninstall, and manage\n  the desktop extension server's lifetime.\n\u2022 iOS: keep the embedded Mihon bridge from crashing the app. Bump the build\n  number to 214.\n\nKnown issues\n\n\u2022 **Anime seasons are not fully restored by Chimahon or Anikku.** Their sync\n  restorer restores each season entry with base data only, so episodes, watch\n  progress, seen state, categories and tracking set on a season in Mangatan\n  reach the synced backup but do not appear in those apps. This is an upstream\n  bug; Chimahon\u2022side changes still sync to Mangatan, and standalone entries\n  sync both ways. Details: [Chimahon sync compatibility](https://github.com/1Selxo/Mangatan/blob/main/docs/chimahon_sync_compatibility.mdknown\u2022upstream\u2022issues).\n\u2022 **Tracking does not work on season entries yet.** Tracker linking and\n  progress updates do not currently apply to anime season entries in Mangatan.\n\nFull changelog: [v1.2.25...v1.2.26](https://github.com/1Selxo/Mangatan/compare/v1.2.25...v1.2.26).\n",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.26/Mangatan-v1.2.26-build.214-f32c5de-ios.ipa",
+          "size": 180264855
+        },
+        {
+          "version": "1.2.25",
+          "date": "2026-10-07T02:58:46Z",
+          "localizedDescription": "Mangatan v1.2.25 (build 213)\n\nFix an APKBridge compatibility regression introduced in v1.2.24. Opening Mihon\nsources could fail with HTTP 500 and \"Unrecognized field \"lang\"\".\n\n\u2022 Remove unsupported top\u2022level \"lang\" and \"sourceId\" fields from extension\n  requests. Preserve source selection through the supported bridge preferences\n  context, using the real JVM source ID rather than the local database ID.\n\u2022 Add manga and anime regression tests against the pinned server's strict\n  \"DataBody\" schema, covering catalogue, details, chapters, pages, videos, and\n  seasons.\n\u2022 Preserve existing release notes when the build workflow uploads packages.\n\u2022 Bump the iOS build number to 213.\n\nThis is an app\u2022side fix; the pinned embedded runtime and extension server are\nunchanged. Physical device verification remains necessary after installing the\nnew build.\n\nValidation: all 45 Mihon and embedded\u2022bridge tests passed, including strict\nrequest\u2022schema tests for both manga and anime. Static analysis of the changed\nservice and regression test reported zero errors; formatting and whitespace\nchecks passed.\n\nFull changelog: [v1.2.24...v1.2.25](https://github.com/1Selxo/Mangatan/compare/v1.2.24...v1.2.25).\n",
+          "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.25/Mangatan-v1.2.25-build.213-b399d66-ios.ipa",
+          "size": 180109929
+        },
+        {
           "version": "1.2.24",
           "date": "2026-10-06T22:40:08Z",
-          "localizedDescription": "Mangatan v1.2.24 (build 212) integrates Mangayomi v0.9.8 while preserving Mangatan's reader, player, OCR, subtitle mining, Anki, Chimahon sync, and lazy iOS Mihon runtime.\n\nChanges:\n\u2022 Fix local image\u2022folder manga opening with a null\u2022check error on Windows. Local pages retain their on\u2022disk paths and do not require remote source metadata.\n\u2022 Adopt disk\u2022backed chapter page caching and clear the cache on reader retry; reject stale Mihon proxy URLs.\n\u2022 Pin the complete Linux X11 EGL renderer fix: native display discovery, an isolated rendering context/thread, and deferred texture deletion. Keep the existing system libmpv integration.\n\u2022 Update compatible upstream dependencies, source handling, trackers, localizations, and shared helpers.\n\nValidation: static analysis reports zero errors. Bridge/local chapter, archive, download retry, Mihon compatibility, backup, queue, novel, and Chimahon regression checks passed after integration fixes. Physical X11 playback and iPhone startup remain unverified; ten LNReader tests require the native QuickJS DLL unavailable in the local test environment.\n\nGitHub Actions builds and attaches the Windows installer/ZIP, Linux archive, macOS DMG, and sideloadable iOS IPA. Downloads appear as the build jobs complete.\n\nSource commit: 28e8cf77\r\n",
+          "localizedDescription": "Mangatan v1.2.24 \u2014 build 212\n\nThis release integrates [Mangayomi v0.9.8](https://github.com/kodjodevf/mangayomi/releases/tag/v0.9.8) while preserving Mangatan's custom reader, player, OCR, dictionary lookup, subtitle mining, Anki export, EPUB support, Chimahon sync, and embedded iOS Mihon runtime.\n\nChangelog\n\nLocal manga and reading\n\u2022 Fix the Windows crash showing **\u201cNull check operator used on a null value\u201d** when opening local image\u2022folder manga. Folder pages now retain their file paths instead of requiring image bytes.\n\u2022 Allow local folders and archives to open without remote source/language metadata.\n\u2022 Resolve completed downloads from disk before contacting an extension, so downloaded chapters can open offline or with the extension unavailable.\n\u2022 Move chapter page URL caching to disk, clear the cache when retrying a chapter, and refresh expired Mihon proxy URLs.\n\u2022 Calculate reader progress from the loaded chapter's page count.\n\nLinux playback\n\u2022 Include and pin the complete renderer backport of [Predidit's X11 hardware\u2022rendering fix](https://github.com/Predidit/media\u2022kit/commit/df5a969e617a1ce038d5cca46bedcfa1970a7dc6).\n\u2022 Use native X11/Wayland EGL display discovery and a dedicated rendering thread with an isolated EGL context.\n\u2022 Defer texture deletion until it can run in the correct rendering context.\n\u2022 Retain Mangatan's system libmpv integration.\n\nDownloads and OCR\n\u2022 Preserve download progress, queue ordering, and preferred video streams.\n\u2022 Improve interrupted video retries, including range requests and servers that respond with a full file instead.\n\u2022 Improve video OCR text sizing and character hit testing while retaining the translucent overlay appearance.\n\nUpstream improvements\n\u2022 Add scheduled library refresh support and Linux window\u2022position/size persistence.\n\u2022 Improve AniList rate\u2022limit retries and Trakt tracking, including season mapping and watchlist sections; prioritize series in the Trakt library.\n\u2022 Merge compatible LNReader extension, HTTP, source\u2022handling, and shared utility improvements.\n\u2022 Update dependencies and translations, including Korean localization.\n\u2022 Adapt file selection to the updated file\u2022picker API and defer Windows WebView initialization until after the app window starts.\n\nMihon and iOS\n\u2022 Improve multi\u2022source extension request routing and Cloudflare proxy handling while retaining Mangatan's bridge retries and image/media proxy behavior.\n\u2022 Preserve lazy OpenJDK Zero startup, foreground listener suspension/restart, and explicit Android Proxy Server support.\n\u2022 Bump the iOS build number to **212**.\n\nDownloads and validation\n\nWindows installer and portable ZIP, Linux archive, macOS ARM64 DMG, and the sideloadable iOS IPA are attached below. Both release\u2022build workflows completed successfully. Windows/Linux Chimahon sync contract checks and CI analysis also passed; the separate debug\u2022build CI jobs failed.\n\nLocal static analysis reports zero errors, and the affected bridge, local chapter, archive, download, Mihon, backup, queue, novel, and Chimahon regression checks passed after fixes. Physical X11 playback and iPhone startup still need device validation. Ten LNReader tests remain unverified locally because the native QuickJS DLL was unavailable.\n\nSource commit: [\"28e8cf77\"](https://github.com/1Selxo/Mangatan/commit/28e8cf773461293a3920e940b1275c0ea369e77c).\n\n**Full changelog:** [v1.2.23\u2026v1.2.24](https://github.com/1Selxo/Mangatan/compare/v1.2.23...v1.2.24)\r\n",
           "downloadURL": "https://github.com/1Selxo/Mangatan/releases/download/v1.2.24/Mangatan-v1.2.24-build.212-28e8cf7-ios.ipa",
           "size": 180110491
         },
@@ -434,6 +455,17 @@
       "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
       "notify": true,
       "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.2.24"
+    },
+    {
+      "appID": "com.selxo.mangatan",
+      "title": "1.3.0-beta.4 - 09 Nov",
+      "identifier": "release-1.3.0-beta.4",
+      "caption": "Update for Mangatan now available!",
+      "date": "2026-11-09T10:14:21Z",
+      "tintColor": "EF4444",
+      "imageURL": "https://raw.githubusercontent.com/1Selxo/Mangatan/refs/heads/main/repo/images/news/update_default.webp",
+      "notify": true,
+      "url": "https://github.com/1Selxo/Mangatan/releases/tag/v1.3.0-beta.4"
     }
   ]
 }

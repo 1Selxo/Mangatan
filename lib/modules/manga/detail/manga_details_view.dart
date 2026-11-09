@@ -211,7 +211,6 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
     return Scaffold(
       floatingActionButton: Consumer(
         builder: (context, ref, child) {
-          if (ref.watch(isLongPressedStateProvider)) return Container();
           // Read this title's own episodes. A shared "current chapter list"
           // would be overwritten by any other detail page still open below
           // this one, such as the series page behind a season.
@@ -224,12 +223,17 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
             sourceChapters: rows,
           );
           final isExtended = ref.watch(isExtendedStateProvider);
-          if (!chaptersList.any((element) => element.isRead != true)) {
-            return Container();
-          }
+          final hidden =
+              ref.watch(isLongPressedStateProvider) ||
+              !chaptersList.any((element) => element.isRead != true);
+          // Listened to even while the button is hidden: the stream can
+          // only be listened to once, and listening again when the button
+          // came back (after selecting chapters, or marking one unread)
+          // failed, which drew a grey box over the whole screen.
           return StreamBuilder<List<History>>(
             stream: _history,
             builder: (context, snapshot) {
+              if (hidden) return Container();
               String buttonLabel = widget.manga.itemType != ItemType.anime
                   ? l10n.read
                   : l10n.watch;

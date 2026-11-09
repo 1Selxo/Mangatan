@@ -69,7 +69,9 @@ class ReaderOverlays extends ConsumerWidget {
           child: IgnorePointer(
             child: AnimatedOpacity(
               opacity: isFlashing ? 1.0 : 0.0,
-              duration: ShioriMotion.fast,
+              // On at once, as a flash is: fading in took longer than the
+              // white half of "white and black", which was never seen.
+              duration: isFlashing ? Duration.zero : ShioriMotion.fast,
               curve: Curves.easeInOut,
               child: Container(color: flashOverlayColor),
             ),

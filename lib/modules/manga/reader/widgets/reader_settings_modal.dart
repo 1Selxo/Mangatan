@@ -4,6 +4,7 @@ import 'package:mangayomi/modules/more/settings/reader/reader_switches.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/modules/reader_common/mixins/reader_gestures.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_mode_picker.dart';
+import 'package:mangayomi/modules/manga/reader/widgets/reader_ocr_settings_group.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/modules/reader_common/utils/reader_orientation.dart';
 import 'package:mangayomi/services/volume_keys.dart';
@@ -344,6 +345,7 @@ class _GeneralTab extends ConsumerWidget {
                 onChanged: (v) =>
                     ref.read(scaleTypeStateProvider.notifier).set(v),
               ),
+              const ReaderEInkSwitchRow(),
               if (!isMobile)
                 ShioriSwitchRow(
                   title: l10n.fullscreen,
@@ -356,6 +358,7 @@ class _GeneralTab extends ConsumerWidget {
               const ReaderSwitchRow(ReaderSwitch.animatePageTransitions),
             ],
           ),
+          const ReaderOcrSettingsGroup(),
           ShioriSettingsGroup(
             title: ReaderSettingsSection.navigation.title(context),
             children: [

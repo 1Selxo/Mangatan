@@ -63,6 +63,12 @@ jobs:
     name: iOS IPA
     needs: build-mihon
     runs-on: macos-26
+    env:
+      # Rust 1.100 makes Xcode 26.6's linker crash on the release build
+      # (Segmentation fault: 11); 1.99.1 links. Cargokit builds with this
+      # one too (as upstream's iOS release does). Move up once a newer Rust
+      # or Xcode links again.
+      CARGOKIT_TOOLCHAIN: "1.99.1"
     steps:
       - name: Check out source and submodules
         uses: actions/checkout@v4
@@ -72,7 +78,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.47.1"
+          flutter-version: "3.50.0"
           architecture: arm64
           cache: true
 
@@ -83,8 +89,9 @@ jobs:
           java-version: "21"
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.CARGOKIT_TOOLCHAIN }}
           targets: aarch64-apple-ios
 
       - name: Cache Rust build

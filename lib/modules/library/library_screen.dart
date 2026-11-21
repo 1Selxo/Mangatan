@@ -2,7 +2,7 @@
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/widgets/collapsing_header.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:mangayomi/modules/main_view/nav_groups.dart';
@@ -31,10 +31,13 @@ import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.
 import 'package:mangayomi/modules/widgets/bottom_select_bar.dart';
 import 'package:mangayomi/modules/library/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
+import 'package:mangayomi/modules/widgets/restore_bottom_padding.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/modules/library/widgets/active_filter_chips.dart';
 import 'package:mangayomi/modules/library/widgets/continue_shelf.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
+import 'package:mangayomi/modules/library/utils/last_category.dart';
+import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:shiori/shiori.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -48,12 +51,19 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 /// - [showDeleteMangaDialog] — bulk delete dialog
 /// - [showImportLocalDialog] — import local files dialog
 /// - [filteredLibraryMangaProvider] — cached filter+sort (S8)
+/// A search for the library's tab to open on.
+class LibrarySearch {
+  final String query;
+
+  const LibrarySearch(this.query);
+}
+
 class LibraryScreen extends ConsumerStatefulWidget {
   final ItemType itemType;
-  final String? presetInput;
+  final LibrarySearch? search;
   const LibraryScreen({
     required this.itemType,
-    required this.presetInput,
+    required this.search,
     super.key,
   });
 
@@ -67,20 +77,67 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   bool _ignoreFiltersOnSearch = false;
   final _textEditingController = TextEditingController();
   TabController? tabBarController;
-  String? _selectedTabKey;
+  int _tabIndex = 0;
   Timer? _searchDebounce;
+
+  /// The category of the selected tab (null for Default), which the tab is
+  /// found by when the tabs change. Starts as the one the library was last
+  /// left on, so it reopens there.
+  int? _selectedCategoryId;
+
+  /// The category each tab shows, in order (null for Default).
+  List<int?> _tabCategoryIds = const [];
+
+  /// Saves the selected category when the app is sent to the background,
+  /// the last moment it reliably runs before the system may close it.
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
     super.initState();
-    if (widget.presetInput != null) {
-      _isSearch = true;
-      _textEditingController.text = widget.presetInput!;
+    if (widget.search != null) _openSearch(widget.search!);
+    final settings = settingsRepository.currentOrNull;
+    _selectedCategoryId = settings == null
+        ? null
+        : lastLibraryCategoryId(settings, widget.itemType);
+    _lifecycleListener = AppLifecycleListener(onHide: _saveSelectedCategory);
+  }
+
+  void _openSearch(LibrarySearch search) {
+    _isSearch = true;
+    _textEditingController.text = search.query;
+  }
+
+  @override
+  void didUpdateWidget(LibraryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The tab stays mounted; each request is a new one, even for the same text.
+    final search = widget.search;
+    if (search != null && !identical(search, oldWidget.search)) {
+      _openSearch(search);
     }
+  }
+
+  /// Saved here rather than on every tab change: writing a setting rebuilds
+  /// the library, which would make each swipe between categories stutter.
+  void _saveSelectedCategory() {
+    final settings = settingsRepository.currentOrNull;
+    if (settings == null) return;
+    if (lastLibraryCategoryId(settings, widget.itemType) ==
+        _selectedCategoryId) {
+      return;
+    }
+    final itemType = widget.itemType;
+    final categoryId = _selectedCategoryId;
+    settingsRepository.updateLocalState(
+      (s) => setLastLibraryCategoryId(s, itemType, categoryId),
+    );
   }
 
   @override
   void dispose() {
+    _saveSelectedCategory();
+    _lifecycleListener.dispose();
     _textEditingController.dispose();
     tabBarController?.dispose();
     // Anything waiting for the end of a frame that will now never come.
@@ -215,19 +272,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     final searchQuery = _textEditingController.text;
 
-    return LibraryFileDropTarget(
-      itemType: widget.itemType,
-      onImport: (filePaths, importItemType) => ref.read(
-        importArchivesFromPathsProvider(
-          itemType: importItemType,
-          null,
-          filePaths: filePaths,
-          init: true,
-          splitChapters: false,
-        ).future,
-      ),
-      child: Scaffold(
-        body: mangaAll.when(
+    // The selection bar below always fills bottomNavigationBar, so this
+    // Scaffold takes the floating navigation bar's height out of its body's
+    // padding and the grid's last row ended up underneath the bar.
+    final navBarInset = MediaQuery.paddingOf(context).bottom;
+    final library = Scaffold(
+      body: RestoreBottomPadding(
+        bottom: navBarInset,
+        child: mangaAll.when(
           data: (man) {
             return categories.when(
               data: (data) {
@@ -325,6 +377,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                     showNumbersOfItems: showNumbersOfItems,
                     isNotFiltering: isNotFiltering,
                     numberOfItems: numberOfItemsList.length,
+                    visibleEntries: numberOfItemsList,
                     bodyForCategory: bodyForCategory,
                     badgeForCategory: badgeForCategory,
                     downloadFilterType: downloadFilterType,
@@ -338,7 +391,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                     isNotFiltering: isNotFiltering,
                     showNumbersOfItems: showNumbersOfItems,
                     numberOfItems: numberOfItemsList.length,
-                    entries: man,
+                    entries: numberOfItemsList,
+                    libraryEntries: man,
                     isCategory: false,
                     categoryId: null,
                     settings: settings,
@@ -371,8 +425,22 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           error: (error, _) => ErrorText(error),
           loading: _loadingLibrary,
         ),
-        bottomNavigationBar: _buildBottomBar(),
       ),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+    // Archives and folders dropped on the library are imported.
+    return LibraryFileDropTarget(
+      itemType: widget.itemType,
+      onImport: (filePaths, importItemType) => ref.read(
+        importArchivesFromPathsProvider(
+          itemType: importItemType,
+          null,
+          filePaths: filePaths,
+          init: true,
+          splitChapters: false,
+        ).future,
+      ),
+      child: library,
     );
   }
 
@@ -384,36 +452,37 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     required bool showNumbersOfItems,
     required bool isNotFiltering,
     required int numberOfItems,
+    required List<Manga> visibleEntries,
     required Widget Function({int? categoryId, bool withoutCategories})
     bodyForCategory,
     required Widget Function(int categoryId) badgeForCategory,
     required int downloadFilterType,
     required bool downloadedOnly,
   }) {
-    data.sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
-    final entr = data.where((e) => !(e.hide ?? false)).toList();
-    final tabKeys = <String>[
-      if (withoutCategory.isNotEmpty) 'default',
-      ...entr.map((entry) => 'category:${entry.id}'),
-    ];
-    if (_selectedTabKey == null || !tabKeys.contains(_selectedTabKey)) {
-      _selectedTabKey = tabKeys.isEmpty ? null : tabKeys.first;
-    }
-    var selectedIndex = _selectedTabKey == null
-        ? 0
-        : tabKeys.indexOf(_selectedTabKey!);
-    if (selectedIndex < 0) selectedIndex = 0;
-    final tabCount = tabKeys.length;
+    final sortedData = [...data]
+      ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
+    final entr = sortedData.where((e) => !(e.hide ?? false)).toList();
+    int tabCount = withoutCategory.isNotEmpty ? entr.length + 1 : entr.length;
 
     if (tabCount <= 0) {
       return bodyForCategory();
     }
 
+    _tabCategoryIds = [
+      if (withoutCategory.isNotEmpty) null,
+      for (final category in entr) category.id,
+    ];
+
     // Manage TabController
     if (tabCount > 0 &&
         (tabBarController == null || tabBarController!.length != tabCount)) {
-      int newTabIndex = selectedIndex;
-      if (newTabIndex >= tabCount) newTabIndex = tabCount - 1;
+      // Back on the selected category's tab, wherever it now sits: the first
+      // build may come before the series load and the Default tab appears.
+      final newTabIndex = libraryTabIndexFor(
+        _tabCategoryIds,
+        _selectedCategoryId,
+        fallback: _tabIndex,
+      );
       // Retire the old one after this frame rather than here. Disposing a
       // TabController sets its animation to null, and the TabBar built in the
       // previous frame is still holding this one: its _IndicatorPainter reads
@@ -426,42 +495,43 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         vsync: this,
         initialIndex: newTabIndex,
       );
+      _tabIndex = newTabIndex;
       tabBarController!.addListener(() {
-        if (tabBarController!.index < tabKeys.length) {
-          _selectedTabKey = tabKeys[tabBarController!.index];
+        final index = tabBarController!.index;
+        if (_tabIndex != index) {
+          setState(() {
+            _tabIndex = index;
+            if (index < _tabCategoryIds.length) {
+              _selectedCategoryId = _tabCategoryIds[index];
+            }
+          });
         }
-        setState(() {});
-      });
-    }
-    if (tabBarController != null &&
-        tabBarController!.length == tabCount &&
-        tabBarController!.index != selectedIndex) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted ||
-            tabBarController == null ||
-            tabBarController!.length != tabCount ||
-            tabBarController!.index == selectedIndex) {
-          return;
-        }
-        tabBarController!.animateTo(selectedIndex);
       });
     }
 
+    final currentCategoryId = withoutCategory.isNotEmpty && _tabIndex == 0
+        ? null
+        : entr[withoutCategory.isNotEmpty ? _tabIndex - 1 : _tabIndex].id!;
+
+    final tabEntries = visibleEntries.where((m) {
+      if (currentCategoryId == null) {
+        return m.categories == null || m.categories!.isEmpty;
+      }
+      return m.categories?.contains(currentCategoryId) ?? false;
+    }).toList();
+
     return DefaultTabController(
-      length: tabCount,
+      length: entr.length,
       child: Scaffold(
         appBar: LibraryAppBar(
           itemType: widget.itemType,
           isNotFiltering: isNotFiltering,
           showNumbersOfItems: showNumbersOfItems,
           numberOfItems: numberOfItems,
-          entries: man,
+          entries: tabEntries,
+          libraryEntries: man,
           isCategory: true,
-          categoryId: _selectedTabKey == 'default'
-              ? null
-              : (_selectedTabKey?.startsWith('category:') ?? false)
-              ? int.tryParse(_selectedTabKey!.substring(9))
-              : null,
+          categoryId: currentCategoryId,
           settings: settings,
           isSearch: _isSearch,
           ignoreFiltersOnSearch: _ignoreFiltersOnSearch,
@@ -498,7 +568,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                       withoutCategory: withoutCategory,
                       showNumbersOfItems: showNumbersOfItems,
                       badgeForCategory: badgeForCategory,
-                      tabKeys: tabKeys,
                     ),
                     Flexible(
                       child: TabBarView(
@@ -522,17 +591,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     required List<Manga> withoutCategory,
     required bool showNumbersOfItems,
     required Widget Function(int categoryId) badgeForCategory,
-    required List<String> tabKeys,
   }) {
     final l10n = l10nLocalizations(context)!;
     return TabBar(
       isScrollable: true,
       controller: tabBarController,
-      onTap: (index) {
-        if (index < tabKeys.length) {
-          setState(() => _selectedTabKey = tabKeys[index]);
-        }
-      },
       tabs: [
         if (withoutCategory.isNotEmpty)
           Row(

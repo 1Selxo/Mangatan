@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/widgets/in_library_badge.dart';
 import 'package:shiori/shiori.dart';
 import 'package:go_router/go_router.dart';
@@ -171,7 +171,7 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
   Widget _buildSequels() {
     if (sequels != null && sequels!.isNotEmpty) {
       return SuperListView.builder(
-        padding: tvPageInsets.add(pageBottomInsets(context)),
+        padding: pageInsets(context),
         extentPrecalculationPolicy: SuperPrecalculationPolicy(),
         itemCount: sequels!.length,
         itemBuilder: (context, index) {
@@ -367,7 +367,7 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820),
         child: SingleChildScrollView(
-          padding: tvPageInsets.add(pageBottomInsets(context)),
+          padding: pageInsets(context),
           child: Column(
             children: [
               for (var index = 0; index < items.length; index++)

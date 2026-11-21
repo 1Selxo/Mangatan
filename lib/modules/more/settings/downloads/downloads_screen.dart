@@ -1,6 +1,6 @@
 import 'package:mangayomi/services/local_folders.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
@@ -39,7 +39,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n!.downloads)),
       body: SingleChildScrollView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         child: Column(
           children: [
             SwitchListTile(

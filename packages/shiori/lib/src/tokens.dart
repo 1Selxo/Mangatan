@@ -6,7 +6,7 @@
 // contexts. Values that depend on the theme or the device (colour, type,
 // density) travel in [ShioriTokens], a ThemeExtension read with
 // `context.shiori`.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'alphas.dart';
 
@@ -346,8 +346,9 @@ class ShioriType {
     required this.overline,
   });
 
-  /// The scale at [ShioriDensity.typeScale].
-  factory ShioriType.scaled(double scale) {
+  /// The scale at [ShioriDensity.typeScale], set in [fontFamily] if provided,
+  /// otherwise [shioriFontFamily].
+  factory ShioriType.scaled(double scale, {String? fontFamily}) {
     TextStyle s(
       double size,
       FontWeight weight, {
@@ -355,7 +356,7 @@ class ShioriType {
       double? height,
       bool tabular = false,
     }) => TextStyle(
-      fontFamily: shioriFontFamily,
+      fontFamily: fontFamily ?? shioriFontFamily,
       fontSize: size * scale,
       fontWeight: weight,
       letterSpacing: tracking * size * scale,
@@ -473,11 +474,23 @@ abstract final class ShioriMotion {
   static const Curve enterCurve = Cubic(0.05, 0.7, 0.1, 1);
   static const Curve exitCurve = Cubic(0.3, 0, 0.8, 0.15);
 
-  /// [duration], or nothing when the platform asks for reduced motion.
+  /// Whether the platform asks for no animation at all (Android's "Remove
+  /// animations", an accessibility service, a test).
+  static bool stillOf(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  /// Whether the platform asks for less motion: iOS "Reduce Motion", or no
+  /// animation at all. Movement is then a fade instead, as the reader asked.
+  static bool reducedOf(BuildContext context) =>
+      stillOf(context) || (MediaQuery.maybeReduceMotionOf(context) ?? false);
+
+  /// [duration], or nothing when the platform asks for less motion.
+  ///
+  /// What this times is mostly movement, so it stops for "Reduce Motion" as
+  /// well; a transition that can fade instead checks [stillOf] and
+  /// [reducedOf] itself.
   static Duration of(BuildContext context, Duration duration) =>
-      MediaQuery.maybeDisableAnimationsOf(context) ?? false
-      ? Duration.zero
-      : duration;
+      reducedOf(context) ? Duration.zero : duration;
 }
 
 /// Fixed darkening for things drawn over a cover, a page or a video, whose
@@ -530,8 +543,8 @@ enum ShioriDensity {
 /// `context.shiori`.
 @immutable
 class ShioriTokens extends ThemeExtension<ShioriTokens> {
-  ShioriTokens({required this.color, required this.density})
-    : text = ShioriType.scaled(density.typeScale);
+  ShioriTokens({required this.color, required this.density, String? fontFamily})
+    : text = ShioriType.scaled(density.typeScale, fontFamily: fontFamily);
 
   const ShioriTokens._(this.color, this.text, this.density);
 
@@ -546,7 +559,12 @@ class ShioriTokens extends ThemeExtension<ShioriTokens> {
   ShioriTokens copyWith({ShioriColors? color, ShioriDensity? density}) =>
       ShioriTokens._(
         color ?? this.color,
-        density == null ? text : ShioriType.scaled(density.typeScale),
+        density == null
+            ? text
+            : ShioriType.scaled(
+                density.typeScale,
+                fontFamily: text.body.fontFamily,
+              ),
         density ?? this.density,
       );
 

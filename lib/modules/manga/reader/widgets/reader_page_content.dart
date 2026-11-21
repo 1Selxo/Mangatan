@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/chapter.dart';
@@ -208,15 +208,15 @@ class ReaderPageContent extends ConsumerWidget {
       },
       child: (pageMode == PageMode.doublePage && !isHorizontalContinuous)
           ? PageView.builder(
+              // Builds the spread on either side too, so it decodes while this
+              // one is read, as single pages do below.
+              allowImplicitScrolling: true,
               controller: extendedController,
               scrollDirection: scrollDirection,
               reverse: isReverseHorizontal,
               physics: isCurrentPageZoomed
                   ? const NeverScrollableScrollPhysics()
                   : const ClampingScrollPhysics(),
-              // The pages either side are built, and their images decoded,
-              // before they slide in.
-              allowImplicitScrolling: true,
               itemBuilder: (context, index) {
                 final singleFirst = ref.watch(
                   doublePageSingleFirstPageStateProvider,
@@ -273,15 +273,17 @@ class ReaderPageContent extends ConsumerWidget {
               onPageChanged: onPageChanged,
             )
           : PageView.builder(
+              // Builds the page on either side too. A page decodes once it is
+              // built, and the prefetch only brings its file to disk: built
+              // only as it slid into view, every page showed its loading
+              // ring, prefetched or not.
+              allowImplicitScrolling: true,
               controller: extendedController,
               scrollDirection: scrollDirection,
               reverse: isReverseHorizontal,
               physics: isCurrentPageZoomed
                   ? const NeverScrollableScrollPhysics()
                   : const ClampingScrollPhysics(),
-              // The pages either side are built, and their images decoded,
-              // before they slide in.
-              allowImplicitScrolling: true,
               itemBuilder: (BuildContext context, int index) {
                 final page = pages[index];
                 if (backgroundColor == BackgroundColor.automatic) {

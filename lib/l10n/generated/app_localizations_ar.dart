@@ -1741,6 +1741,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fullscreen => 'شاشة كاملة';
 
   @override
+  String get fullscreen_wayland_info =>
+      'في Wayland، لا يُطبَّق عند الفتح: قد يؤدي تبديل النافذة إلى ملء الشاشة إلى تجميد التطبيق (خلل في Flutter).';
+
+  @override
   String get update_library => 'تحديث المكتبة';
 
   @override
@@ -4856,4 +4860,209 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'مزامنة الإعدادات';
+
+  @override
+  String get move_to_top => 'نقل إلى الأعلى';
+
+  @override
+  String get move_series_to_top => 'نقل السلسلة إلى الأعلى';
+
+  @override
+  String get move_to_bottom => 'نقل إلى الأسفل';
+
+  @override
+  String get move_series_to_bottom => 'نقل السلسلة إلى الأسفل';
+
+  @override
+  String get show_active_filters => 'إظهار عوامل التصفية النشطة';
+
+  @override
+  String get device_sync => 'المزامنة بين أجهزتك';
+
+  @override
+  String get device_sync_summary =>
+      'لا حاجة إلى خادم: يستضيف أحد أجهزتك المزامنة، وتقترن الأجهزة الأخرى به';
+
+  @override
+  String get device_sync_host_section => 'هذا الجهاز كمضيف';
+
+  @override
+  String get device_sync_host => 'استضافة المزامنة على هذا الجهاز';
+
+  @override
+  String get device_sync_host_info =>
+      'تتزامن أجهزتك الأخرى مع هذا الجهاز عبر شبكتك المحلية أو Tailscale، بشكل مشفّر، وفقط بعد الاقتران. أبقِ التطبيق مفتوحًا على هذا الجهاز لتتمكن من المزامنة.';
+
+  @override
+  String device_sync_host_running(String port) {
+    return 'يستمع على المنفذ $port';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'تعذّر تشغيل المضيف: $error';
+  }
+
+  @override
+  String get device_sync_add_device => 'إضافة جهاز';
+
+  @override
+  String get device_sync_paired_devices => 'الأجهزة المقترنة';
+
+  @override
+  String get device_sync_no_paired => 'لا يوجد جهاز مقترن بعد';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return 'اقترن في $date';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return 'إزالة $name؟';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'يتوقف هذا الجهاز عن قبوله فورًا. يمكنه الاقتران مجددًا لاحقًا برمز QR جديد.';
+
+  @override
+  String get device_sync_join_section => 'الانضمام إلى مضيف';
+
+  @override
+  String get device_sync_join_info =>
+      'اقترن بالجهاز الذي يستضيف المزامنة. رمز QR الخاص به موجود في «إضافة جهاز» على ذلك الجهاز.';
+
+  @override
+  String get device_sync_scan => 'مسح رمز QR الخاص بالمضيف';
+
+  @override
+  String get device_sync_paste => 'لصق رابط اقتران';
+
+  @override
+  String get device_sync_link => 'رابط الاقتران';
+
+  @override
+  String get device_sync_link_invalid => 'هذا ليس رابط اقتران';
+
+  @override
+  String get device_sync_pair => 'اقتران';
+
+  @override
+  String get device_sync_pairing => 'جارٍ الاقتران… اقبل هذا الجهاز على المضيف';
+
+  @override
+  String get device_sync_paired => 'تم الاقتران بالمضيف';
+
+  @override
+  String get device_sync_wrong_code =>
+      'رمز خاطئ. اعرض رمز QR جديدًا على المضيف وحاول مرة أخرى.';
+
+  @override
+  String get device_sync_refused =>
+      'رفض المضيف هذا الجهاز، أو انتهت صلاحية الرمز.';
+
+  @override
+  String get device_sync_unreachable =>
+      'تعذّر الوصول إلى المضيف. يجب أن يكون الجهازان على الشبكة نفسها.';
+
+  @override
+  String get device_sync_invite_info =>
+      'على الجهاز الآخر، افتح الإعدادات ← المزامنة ← المزامنة بين أجهزتك وامسح هذا الرمز، أو الصق الرابط. يعمل مرة واحدة، لمدة 5 دقائق.';
+
+  @override
+  String get device_sync_copy_link => 'نسخ الرابط';
+
+  @override
+  String get device_sync_link_copied => 'تم نسخ الرابط';
+
+  @override
+  String get device_sync_no_network =>
+      'هذا الجهاز ليس على شبكة محلية، لذا لا يمكن لأي جهاز آخر الوصول إليه.';
+
+  @override
+  String get device_sync_allow_title => 'السماح لهذا الجهاز؟';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return 'يريد «$name» المزامنة مع هذا الجهاز. اسمح له فقط إن كان جهازك.';
+  }
+
+  @override
+  String get device_sync_allow => 'سماح';
+
+  @override
+  String get device_sync_deny => 'رفض';
+
+  @override
+  String get device_sync_switch_title => 'تغيير ما يتزامن معه هذا الجهاز؟';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'يتوقف هذا الجهاز عن المزامنة مع $server. لا يُحذف شيء، لا هنا ولا هناك.';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return 'متزامن مع المضيف على $server';
+  }
+
+  @override
+  String get device_sync_with_this_device => 'متزامن مع مضيف هذا الجهاز';
+
+  @override
+  String get device_sync_leave => 'إيقاف المزامنة مع المضيف';
+
+  @override
+  String get device_sync_stop_host_title => 'إيقاف الاستضافة؟';
+
+  @override
+  String get device_sync_stop_host_message =>
+      'لن تتمكن أجهزتك الأخرى من المزامنة حتى يعود للعمل. ما خزّنه المضيف يبقى على هذا الجهاز.';
+
+  @override
+  String get device_sync_scan_hint => 'وجّه الكاميرا نحو رمز QR على المضيف';
+
+  @override
+  String sync_refused(String what) {
+    return 'رُفضت المزامنة بسبب $what. حدّث Mangayomi وخادم المزامنة، ثم حاول مرة أخرى.';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return 'هذه العناصر أطول من أن تُزامَن وقد استُبعدت: $items';
+  }
+
+  @override
+  String get missing_chapters_title => 'الفصول المفقودة';
+
+  @override
+  String get missing_episodes_title => 'الحلقات المفقودة';
+
+  @override
+  String get missing_chapters_info =>
+      'لا يحمل أي فصل من هذه السلسلة هذه الأرقام. قد لا يتوفر في المصدر، أو قد يكون مرقّمًا بشكل مختلف.';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'الفصول $numbers مفقودة',
+      one: 'الفصل $numbers مفقود',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return 'الفصل التالي هو $chapter.';
+  }
+
+  @override
+  String get warn_missing_chapters => 'التحذير من الفصول المفقودة';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      'قبل الانتقال إلى الفصل التالي، اذكر أرقام الفصول التي سيتم تخطيها.';
 }

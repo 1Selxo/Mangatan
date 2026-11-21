@@ -1730,6 +1730,10 @@ class AppLocalizationsId extends AppLocalizations {
   String get fullscreen => 'Layar Penuh';
 
   @override
+  String get fullscreen_wayland_info =>
+      'Di Wayland, tidak diterapkan saat dibuka: mengubah jendela ke layar penuh dapat membuat aplikasi membeku (bug Flutter).';
+
+  @override
   String get update_library => 'Perbarui perpustakaan';
 
   @override
@@ -4875,4 +4879,210 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'Sinkronkan pengaturan';
+
+  @override
+  String get move_to_top => 'Pindahkan ke atas';
+
+  @override
+  String get move_series_to_top => 'Pindahkan seri ke atas';
+
+  @override
+  String get move_to_bottom => 'Pindahkan ke bawah';
+
+  @override
+  String get move_series_to_bottom => 'Pindahkan seri ke bawah';
+
+  @override
+  String get show_active_filters => 'Tampilkan filter aktif';
+
+  @override
+  String get device_sync => 'Sinkronisasi antar perangkat Anda';
+
+  @override
+  String get device_sync_summary =>
+      'Tanpa server: salah satu perangkat Anda menjadi host, yang lain dipasangkan dengannya';
+
+  @override
+  String get device_sync_host_section => 'Perangkat ini sebagai host';
+
+  @override
+  String get device_sync_host => 'Jadikan perangkat ini host sinkronisasi';
+
+  @override
+  String get device_sync_host_info =>
+      'Perangkat Anda yang lain disinkronkan dengan perangkat ini melalui jaringan lokal atau Tailscale, terenkripsi, dan hanya setelah dipasangkan. Biarkan aplikasi tetap terbuka di perangkat ini agar mereka dapat disinkronkan.';
+
+  @override
+  String device_sync_host_running(String port) {
+    return 'Mendengarkan di port $port';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'Tidak dapat memulai host: $error';
+  }
+
+  @override
+  String get device_sync_add_device => 'Tambahkan perangkat';
+
+  @override
+  String get device_sync_paired_devices => 'Perangkat yang dipasangkan';
+
+  @override
+  String get device_sync_no_paired => 'Belum ada perangkat yang dipasangkan';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return 'Dipasangkan pada $date';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return 'Hapus $name?';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'Perangkat ini langsung berhenti menerimanya. Perangkat itu dapat dipasangkan lagi nanti dengan kode QR baru.';
+
+  @override
+  String get device_sync_join_section => 'Bergabung ke host';
+
+  @override
+  String get device_sync_join_info =>
+      'Pasangkan dengan perangkat yang menjadi host sinkronisasi. Kode QR-nya ada di Tambahkan perangkat pada perangkat tersebut.';
+
+  @override
+  String get device_sync_scan => 'Pindai kode QR host';
+
+  @override
+  String get device_sync_paste => 'Tempel tautan pemasangan';
+
+  @override
+  String get device_sync_link => 'Tautan pemasangan';
+
+  @override
+  String get device_sync_link_invalid => 'Ini bukan tautan pemasangan';
+
+  @override
+  String get device_sync_pair => 'Pasangkan';
+
+  @override
+  String get device_sync_pairing => 'Memasangkan… terima perangkat ini di host';
+
+  @override
+  String get device_sync_paired => 'Terpasang dengan host';
+
+  @override
+  String get device_sync_wrong_code =>
+      'Kode salah. Tampilkan kode QR baru di host lalu coba lagi.';
+
+  @override
+  String get device_sync_refused =>
+      'Host menolak perangkat ini, atau kodenya kedaluwarsa.';
+
+  @override
+  String get device_sync_unreachable =>
+      'Tidak dapat menjangkau host. Kedua perangkat harus berada di jaringan yang sama.';
+
+  @override
+  String get device_sync_invite_info =>
+      'Di perangkat lain, buka Pengaturan → Sinkronisasi → Sinkronisasi antar perangkat Anda lalu pindai kode ini, atau tempel tautannya. Ini berlaku sekali, selama 5 menit.';
+
+  @override
+  String get device_sync_copy_link => 'Salin tautan';
+
+  @override
+  String get device_sync_link_copied => 'Tautan disalin';
+
+  @override
+  String get device_sync_no_network =>
+      'Perangkat ini tidak berada di jaringan lokal, jadi tidak ada perangkat lain yang dapat menjangkaunya.';
+
+  @override
+  String get device_sync_allow_title => 'Izinkan perangkat ini?';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '\"$name\" ingin disinkronkan dengan perangkat ini. Izinkan hanya jika itu milik Anda.';
+  }
+
+  @override
+  String get device_sync_allow => 'Izinkan';
+
+  @override
+  String get device_sync_deny => 'Tolak';
+
+  @override
+  String get device_sync_switch_title =>
+      'Ubah tujuan sinkronisasi perangkat ini?';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'Perangkat ini berhenti disinkronkan dengan $server. Tidak ada yang dihapus, baik di sini maupun di sana.';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return 'Disinkronkan dengan host di $server';
+  }
+
+  @override
+  String get device_sync_with_this_device =>
+      'Disinkronkan dengan host perangkat ini';
+
+  @override
+  String get device_sync_leave => 'Berhenti sinkronisasi dengan host';
+
+  @override
+  String get device_sync_stop_host_title => 'Berhenti menjadi host?';
+
+  @override
+  String get device_sync_stop_host_message =>
+      'Perangkat Anda yang lain tidak dapat disinkronkan sampai host aktif kembali. Data yang disimpan host tetap ada di perangkat ini.';
+
+  @override
+  String get device_sync_scan_hint => 'Arahkan kamera ke kode QR di host';
+
+  @override
+  String sync_refused(String what) {
+    return 'Sinkronisasi ditolak karena $what. Perbarui Mangayomi dan server sinkronisasi, lalu coba lagi.';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return 'Item ini terlalu panjang untuk disinkronkan dan dilewati: $items';
+  }
+
+  @override
+  String get missing_chapters_title => 'Bab yang hilang';
+
+  @override
+  String get missing_episodes_title => 'Episode yang hilang';
+
+  @override
+  String get missing_chapters_info =>
+      'Tidak ada bab dari seri ini yang memiliki nomor tersebut. Sumbernya mungkin tidak memilikinya, atau memberi nomor yang berbeda.';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Bab $numbers hilang',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return 'Bab berikutnya adalah $chapter.';
+  }
+
+  @override
+  String get warn_missing_chapters => 'Peringatkan tentang bab yang hilang';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      'Sebelum pindah ke bab berikutnya, beri tahu nomor bab mana yang dilewati.';
 }

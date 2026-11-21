@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/modules/widgets/tracker_logo.dart';
@@ -34,7 +34,7 @@ class ManageTrackersScreen extends StatelessWidget {
             );
           }
           return ListView(
-            padding: tvPageInsets,
+            padding: pageInsets(context),
             children: [
               for (final pref in trackers)
                 ShioriListRow(

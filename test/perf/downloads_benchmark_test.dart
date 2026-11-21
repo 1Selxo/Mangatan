@@ -474,7 +474,7 @@ void main() {
     final mangaDir = Directory(p.join(root.path, 'pages'));
     writePages('Chapter 1');
     await _bench('downloaded_chapter_lookup_60', () async {
-      final found = findDownloadedChapterIn(
+      final found = await findDownloadedChapterIn(
         [mangaDir],
         chapterName: 'Chapter 1',
         chapterDirectoryName: 'Chapter 1',

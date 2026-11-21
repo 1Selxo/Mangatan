@@ -16,6 +16,7 @@ import 'api/rar.dart';
 import 'api/rhttp/client.dart';
 import 'api/rhttp/error.dart';
 import 'api/rhttp/http.dart';
+import 'api/sync_host.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -52,6 +53,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_RequestClientPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_SyncHostPtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_SyncPeerClientPtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient;
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw);
@@ -93,6 +102,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SyncHost
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    dynamic raw,
+  );
+
+  @protected
+  SyncPeerClient
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    dynamic raw,
+  );
+
+  @protected
   AidokuSource
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAidokuSource(
     dynamic raw,
@@ -113,6 +134,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   RequestClient
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
+    dynamic raw,
+  );
+
+  @protected
+  SyncHost
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    dynamic raw,
+  );
+
+  @protected
+  SyncPeerClient
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
     dynamic raw,
   );
 
@@ -197,7 +230,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SyncHost
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    dynamic raw,
+  );
+
+  @protected
+  SyncPeerClient
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    dynamic raw,
+  );
+
+  @protected
   RustStreamSink<Uint8List> dco_decode_StreamSink_list_prim_u_8_strict_Sse(
+    dynamic raw,
+  );
+
+  @protected
+  RustStreamSink<SyncHostRequest> dco_decode_StreamSink_sync_host_request_Sse(
     dynamic raw,
   );
 
@@ -305,6 +355,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StaticDnsSettings dco_decode_box_autoadd_static_dns_settings(dynamic raw);
+
+  @protected
+  SyncHostConfig dco_decode_box_autoadd_sync_host_config(dynamic raw);
+
+  @protected
+  SyncHostResponse dco_decode_box_autoadd_sync_host_response(dynamic raw);
+
+  @protected
+  SyncIdentity dco_decode_box_autoadd_sync_identity(dynamic raw);
 
   @protected
   TimeoutSettings dco_decode_box_autoadd_timeout_settings(dynamic raw);
@@ -565,6 +624,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StaticDnsSettings dco_decode_static_dns_settings(dynamic raw);
 
   @protected
+  SyncHostConfig dco_decode_sync_host_config(dynamic raw);
+
+  @protected
+  SyncHostRequest dco_decode_sync_host_request(dynamic raw);
+
+  @protected
+  SyncHostRequestKind dco_decode_sync_host_request_kind(dynamic raw);
+
+  @protected
+  SyncHostResponse dco_decode_sync_host_response(dynamic raw);
+
+  @protected
+  SyncIdentity dco_decode_sync_identity(dynamic raw);
+
+  @protected
+  SyncPeerResponse dco_decode_sync_peer_response(dynamic raw);
+
+  @protected
   TimeoutSettings dco_decode_timeout_settings(dynamic raw);
 
   @protected
@@ -631,6 +708,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SyncHost
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncPeerClient
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   AidokuSource
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAidokuSource(
     SseDeserializer deserializer,
@@ -651,6 +740,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   RequestClient
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncHost
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncPeerClient
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
     SseDeserializer deserializer,
   );
 
@@ -701,7 +802,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SyncHost
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncPeerClient
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RustStreamSink<Uint8List> sse_decode_StreamSink_list_prim_u_8_strict_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<SyncHostRequest> sse_decode_StreamSink_sync_host_request_Sse(
     SseDeserializer deserializer,
   );
 
@@ -832,6 +950,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StaticDnsSettings sse_decode_box_autoadd_static_dns_settings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncHostConfig sse_decode_box_autoadd_sync_host_config(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncHostResponse sse_decode_box_autoadd_sync_host_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncIdentity sse_decode_box_autoadd_sync_identity(
     SseDeserializer deserializer,
   );
 
@@ -1168,6 +1301,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SyncHostConfig sse_decode_sync_host_config(SseDeserializer deserializer);
+
+  @protected
+  SyncHostRequest sse_decode_sync_host_request(SseDeserializer deserializer);
+
+  @protected
+  SyncHostRequestKind sse_decode_sync_host_request_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SyncHostResponse sse_decode_sync_host_response(SseDeserializer deserializer);
+
+  @protected
+  SyncIdentity sse_decode_sync_identity(SseDeserializer deserializer);
+
+  @protected
+  SyncPeerResponse sse_decode_sync_peer_response(SseDeserializer deserializer);
+
+  @protected
   TimeoutSettings sse_decode_timeout_settings(SseDeserializer deserializer);
 
   @protected
@@ -1244,6 +1397,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    SyncHost self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    SyncPeerClient self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAidokuSource(
     AidokuSource self,
     SseSerializer serializer,
@@ -1267,6 +1434,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
     RequestClient self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    SyncHost self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    SyncPeerClient self,
     SseSerializer serializer,
   );
 
@@ -1369,8 +1550,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    SyncHost self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    SyncPeerClient self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_StreamSink_list_prim_u_8_strict_Sse(
     RustStreamSink<Uint8List> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_sync_host_request_Sse(
+    RustStreamSink<SyncHostRequest> self,
     SseSerializer serializer,
   );
 
@@ -1546,6 +1747,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_static_dns_settings(
     StaticDnsSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_sync_host_config(
+    SyncHostConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_sync_host_response(
+    SyncHostResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_sync_identity(
+    SyncIdentity self,
     SseSerializer serializer,
   );
 
@@ -1978,6 +2197,39 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_sync_host_config(
+    SyncHostConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_host_request(
+    SyncHostRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_host_request_kind(
+    SyncHostRequestKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_host_response(
+    SyncHostResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_identity(SyncIdentity self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_peer_response(
+    SyncPeerResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_timeout_settings(
     TimeoutSettings self,
     SseSerializer serializer,
@@ -2092,6 +2344,38 @@ class RustLibWire implements BaseWire {
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
         ptr,
       );
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+        ptr,
+      );
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+        ptr,
+      );
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+        ptr,
+      );
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+        ptr,
+      );
 }
 
 @JS('wasm_bindgen')
@@ -2147,6 +2431,26 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
 
   external void
   rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRequestClient(
+    int ptr,
+  );
+
+  external void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    int ptr,
+  );
+
+  external void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncHost(
+    int ptr,
+  );
+
+  external void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
+    int ptr,
+  );
+
+  external void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSyncPeerClient(
     int ptr,
   );
 }

@@ -1733,6 +1733,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get fullscreen => 'Tam ekran';
 
   @override
+  String get fullscreen_wayland_info =>
+      'Wayland altında açılışta uygulanmaz: pencereyi tam ekrana almak uygulamayı dondurabilir (bir Flutter hatası).';
+
+  @override
   String get update_library => 'Kütüphaneyi güncelle';
 
   @override
@@ -4876,4 +4880,213 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'Ayarları senkronize et';
+
+  @override
+  String get move_to_top => 'En Üste Taşı';
+
+  @override
+  String get move_series_to_top => 'Seriyi En Üste Taşı';
+
+  @override
+  String get move_to_bottom => 'En Alta Taşı';
+
+  @override
+  String get move_series_to_bottom => 'Seriyi En Alta Taşı';
+
+  @override
+  String get show_active_filters => 'Etkin filtreleri göster';
+
+  @override
+  String get device_sync => 'Cihazlarınız arasında senkronizasyon';
+
+  @override
+  String get device_sync_summary =>
+      'Sunucu gerekmez: cihazlarınızdan biri ana cihaz olur, diğerleri onunla eşleşir';
+
+  @override
+  String get device_sync_host_section => 'Ana cihaz olarak bu cihaz';
+
+  @override
+  String get device_sync_host => 'Senkronizasyonu bu cihazda barındır';
+
+  @override
+  String get device_sync_host_info =>
+      'Diğer cihazlarınız yerel ağınız veya Tailscale üzerinden, şifreli olarak ve yalnızca eşleştikten sonra bu cihazla senkronize olur. Senkronize olabilmeleri için uygulamayı bu cihazda açık tutun.';
+
+  @override
+  String device_sync_host_running(String port) {
+    return '$port numaralı bağlantı noktası dinleniyor';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'Ana cihaz başlatılamadı: $error';
+  }
+
+  @override
+  String get device_sync_add_device => 'Cihaz ekle';
+
+  @override
+  String get device_sync_paired_devices => 'Eşleşmiş cihazlar';
+
+  @override
+  String get device_sync_no_paired => 'Henüz eşleşmiş cihaz yok';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return '$date tarihinde eşleşti';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return '$name kaldırılsın mı?';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'Bu cihaz onu hemen kabul etmeyi bırakır. Daha sonra yeni bir QR koduyla tekrar eşleşebilir.';
+
+  @override
+  String get device_sync_join_section => 'Bir ana cihaza katıl';
+
+  @override
+  String get device_sync_join_info =>
+      'Senkronizasyonu barındıran cihazla eşleşin. QR kodu o cihazda Cihaz ekle bölümündedir.';
+
+  @override
+  String get device_sync_scan => 'Ana cihazın QR kodunu tara';
+
+  @override
+  String get device_sync_paste => 'Eşleştirme bağlantısı yapıştır';
+
+  @override
+  String get device_sync_link => 'Eşleştirme bağlantısı';
+
+  @override
+  String get device_sync_link_invalid => 'Bu bir eşleştirme bağlantısı değil';
+
+  @override
+  String get device_sync_pair => 'Eşleştir';
+
+  @override
+  String get device_sync_pairing =>
+      'Eşleştiriliyor… bu cihazı ana cihazda onaylayın';
+
+  @override
+  String get device_sync_paired => 'Ana cihazla eşleşti';
+
+  @override
+  String get device_sync_wrong_code =>
+      'Yanlış kod. Ana cihazda yeni bir QR kodu gösterin ve tekrar deneyin.';
+
+  @override
+  String get device_sync_refused =>
+      'Ana cihaz bu cihazı reddetti veya kodun süresi doldu.';
+
+  @override
+  String get device_sync_unreachable =>
+      'Ana cihaza ulaşılamadı. İki cihazın da aynı ağda olması gerekir.';
+
+  @override
+  String get device_sync_invite_info =>
+      'Diğer cihazda Ayarlar → Senkronizasyon → Cihazlarınız arasında senkronizasyon bölümünü açın ve bu kodu tarayın ya da bağlantıyı yapıştırın. Bir kez, 5 dakika boyunca çalışır.';
+
+  @override
+  String get device_sync_copy_link => 'Bağlantıyı kopyala';
+
+  @override
+  String get device_sync_link_copied => 'Bağlantı kopyalandı';
+
+  @override
+  String get device_sync_no_network =>
+      'Bu cihaz yerel bir ağda değil, bu yüzden başka hiçbir cihaz ona ulaşamaz.';
+
+  @override
+  String get device_sync_allow_title => 'Bu cihaza izin verilsin mi?';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '\"$name\" bu cihazla senkronize olmak istiyor. Yalnızca sizinse izin verin.';
+  }
+
+  @override
+  String get device_sync_allow => 'İzin ver';
+
+  @override
+  String get device_sync_deny => 'Reddet';
+
+  @override
+  String get device_sync_switch_title =>
+      'Bu cihazın neyle senkronize olacağı değiştirilsin mi?';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'Bu cihaz $server ile senkronize olmayı bırakır. Ne burada ne orada hiçbir şey silinmez.';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return '$server adresindeki ana cihazla senkronize';
+  }
+
+  @override
+  String get device_sync_with_this_device =>
+      'Bu cihazın ana cihazıyla senkronize';
+
+  @override
+  String get device_sync_leave => 'Ana cihazla senkronizasyonu durdur';
+
+  @override
+  String get device_sync_stop_host_title => 'Barındırma durdurulsun mu?';
+
+  @override
+  String get device_sync_stop_host_message =>
+      'Diğer cihazlarınız, tekrar açılana kadar senkronize olamaz. Ana cihazın sakladıkları bu cihazda kalır.';
+
+  @override
+  String get device_sync_scan_hint =>
+      'Kamerayı ana cihazdaki QR koduna doğrultun';
+
+  @override
+  String sync_refused(String what) {
+    return 'Senkronizasyon $what nedeniyle reddedildi. Mangayomi\'yi ve senkronizasyon sunucusunu güncelleyip tekrar deneyin.';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return 'Bu öğeler senkronize edilemeyecek kadar uzun ve dışarıda bırakıldı: $items';
+  }
+
+  @override
+  String get missing_chapters_title => 'Eksik bölümler';
+
+  @override
+  String get missing_episodes_title => 'Eksik bölümler';
+
+  @override
+  String get missing_chapters_info =>
+      'Bu serinin hiçbir bölümü bu numaraları taşımıyor. Kaynakta olmayabilirler ya da farklı numaralandırılmış olabilirler.';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Bölümler $numbers eksik',
+      one: 'Bölüm $numbers eksik',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return 'Sonraki bölüm: $chapter.';
+  }
+
+  @override
+  String get warn_missing_chapters => 'Eksik bölümler için uyar';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      'Sonraki bölüme geçmeden önce hangi bölüm numaralarının atlandığını söyle.';
 }

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:mangayomi/modules/library/widgets/active_filter_chips.dart';
 import 'package:mangayomi/modules/library/widgets/continue_shelf.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +14,9 @@ import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
-/// Shows the library filter/sort/display settings sheet.
+/// Shows the library filter/sort/display settings sheet. [entries] is the
+/// whole library of [itemType], before any filter: its extensions are the
+/// ones offered, and its filters are the ones the library screen applies.
 void showLibrarySettingsSheet({
   required BuildContext context,
   required TickerProvider vsync,
@@ -196,7 +199,9 @@ class _FilterTab extends ConsumerWidget {
                 .update();
           },
         ),
-        if (sources.$1.length > 1)
+        // Also with a single extension left while one is picked: the
+        // filter must stay there to be lifted.
+        if (sources.$1.length > 1 || sources.$2.isNotEmpty)
           ShioriSettingRow(
             icon: Symbols.filter_list_rounded,
             title: sourceFilterTitle,
@@ -486,6 +491,18 @@ class _DisplayTab extends ConsumerWidget {
                       onTap: () => ref
                           .read(continueShelfProvider.notifier)
                           .set(!showShelf),
+                    );
+                  },
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final showChips = ref.watch(activeFilterChipsProvider);
+                    return ListTileChapterFilter(
+                      label: l10n.show_active_filters,
+                      type: showChips ? 1 : 0,
+                      onTap: () => ref
+                          .read(activeFilterChipsProvider.notifier)
+                          .set(!showChips),
                     );
                   },
                 ),

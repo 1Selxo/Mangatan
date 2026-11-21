@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:flutter/services.dart';
@@ -29,7 +29,7 @@ class TrackScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.tracking)),
       body: SingleChildScrollView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         child: StreamBuilder(
           stream: trackRepository.watchAllWithSyncId(),
           builder: (context, snapshot) {

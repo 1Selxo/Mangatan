@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:shiori/shiori.dart';
 import 'package:mangayomi/utils/constant.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -202,7 +203,7 @@ class _OnboardingScreenState extends ConsumerState<_OnboardingBody>
   /// been asked to keep still.
   /// A single frame rather than [Duration.zero], because the implicit
   /// animations assert on a zero-length controller.
-  Duration get _motion => MediaQuery.disableAnimationsOf(context)
+  Duration get _motion => ShioriMotion.reducedOf(context)
       ? const Duration(milliseconds: 1)
       : const Duration(milliseconds: 260);
 

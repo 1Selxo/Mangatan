@@ -315,6 +315,71 @@ class Synching extends _$Synching {
   Future<void> setServer(String? server) =>
       _updateCurrentPreference((current) => current.server = server);
 
+  // Device sync (upstream's sync host). Not reachable from the fork's sync
+  // screen yet; kept so upstream's device sync screens build.
+
+  /// Syncs from now on with the host at [server], whose certificate has
+  /// [fingerprint], from the start: it has nothing this device sent yet.
+  /// [addresses] are the others it may be reached at.
+  Future<void> useHost(
+    String server,
+    String fingerprint, {
+    List<String> addresses = const [],
+  }) async {
+    await _updateCurrentPreference(
+      (current) => _startOver(current)
+        ..server = server
+        ..hostFingerprint = fingerprint
+        ..hostAddresses = addresses.isEmpty ? null : addresses
+        ..authToken = null
+        ..email = null,
+    );
+    ref.invalidateSelf();
+  }
+
+  /// Syncs from now on with the host this device runs, from the start.
+  Future<void> useThisDeviceAsHost() async {
+    await _updateCurrentPreference(
+      (current) => _startOver(current)
+        ..server = SyncPreference.thisDeviceHost
+        ..hostFingerprint = null
+        ..hostAddresses = null
+        ..authToken = null
+        ..email = null,
+    );
+    ref.invalidateSelf();
+  }
+
+  Future<void> setHostEnabled(bool value) async {
+    await _updateCurrentPreference((current) => current.hostEnabled = value);
+    ref.invalidateSelf();
+  }
+
+  /// Stops syncing with a host, this device's or another's.
+  Future<void> leaveHost() async {
+    await _updateCurrentPreference(
+      (current) => current
+        ..server = null
+        ..hostFingerprint = null
+        ..hostAddresses = null,
+    );
+    ref.invalidateSelf();
+  }
+
+  /// The host answered at [address], one of its others: tried first from
+  /// now on. Nothing else changes, it is the same host.
+  Future<void> rememberHostAddress(String address) async {
+    if (state.server == address || state.hostFingerprint == null) return;
+    await _updateCurrentPreference((current) => current.server = address);
+    ref.invalidateSelf();
+  }
+
+  /// The next sync sends everything and takes everything.
+  static SyncPreference _startOver(SyncPreference preference) => preference
+    ..since = 0
+    ..sessionToken = null
+    ..lastSync = null;
+
   Future<void> setSyncOn(bool value) async {
     await _updateCurrentPreference((current) => current.syncOn = value);
     // MainScreen listens to this provider to cancel or resume its timer.

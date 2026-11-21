@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/anime/utils/player_shortcuts.dart';
@@ -141,7 +141,8 @@ class _KeyboardShortcutsScreenState
             // Side by side where there is room, stacked on narrow windows so
             // the keys never run into the labels.
             return SingleChildScrollView(
-              padding: tvPageInsets.add(const EdgeInsets.all(ShioriSpace.s12)),
+              padding: pageInsets(context)
+                  .add(const EdgeInsets.all(ShioriSpace.s12)),
               child: constraints.maxWidth >= 900
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

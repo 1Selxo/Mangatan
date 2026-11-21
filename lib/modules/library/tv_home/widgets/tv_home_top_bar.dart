@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +20,8 @@ class TvHomeTopBar extends StatelessWidget {
   });
   final TextEditingController controller;
   final Settings settings;
+
+  /// The whole library, before any filter: see [showLibrarySettingsSheet].
   final List<Manga> entries;
   final ValueChanged<String> onChanged;
 

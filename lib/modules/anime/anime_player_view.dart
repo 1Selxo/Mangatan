@@ -8,7 +8,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:ffi/ffi.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/services/player_output_preferences.dart';
@@ -1818,7 +1818,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     } catch (_) {}
     if (isDesktop) {
       if (_firstTime) {
-        final globalFullscreen = ref.read(fullScreenPlayerStateProvider);
+        final globalFullscreen =
+            ref.read(fullScreenPlayerStateProvider) &&
+            mayEnterFullScreenOnItsOwn;
         // Delay fullscreen until after the first frame so the window is ready.
         // On Windows, calling setFullScreen before the widget tree is built
         // can silently fail, leaving the title bar visible.

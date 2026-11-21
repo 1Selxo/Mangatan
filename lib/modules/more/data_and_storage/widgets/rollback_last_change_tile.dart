@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
@@ -66,9 +66,7 @@ Future<void> offerLibraryRollback(
 
   bool? syncAfterRestore;
   final syncPreference = ref.read(synchingProvider(syncId: 1));
-  final hasServer =
-      (syncPreference.authToken?.isNotEmpty ?? false) &&
-      (syncPreference.server?.isNotEmpty ?? false);
+  final hasServer = syncPreference.isConnected;
   if (hasServer) {
     syncAfterRestore = await confirmSyncAfterRestore(
       context,

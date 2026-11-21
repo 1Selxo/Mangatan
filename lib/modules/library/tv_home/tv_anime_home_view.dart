@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -518,7 +518,9 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   child: TvHomeTopBar(
                     controller: _searchController,
                     settings: settings,
-                    entries: entries,
+                    // The whole library, as the filters below are keyed
+                    // to: not what they leave of it.
+                    entries: visible,
                     onChanged: (v) => setState(() => _query = v),
                   ),
                 ),

@@ -33,6 +33,9 @@ parking_lot = "0.12.5"
 regex = "1.13.1"
 url = "2.5.8"
 anyhow = "1.0.104"
+# The sync host: device identities, a mutual-TLS server and a pinned client,
+# shared with the sync server.
+mangayomi_sync_host = { path = "sync_host" }
 
 [dev-dependencies]
 base64 = "0.22.1"
@@ -40,6 +43,9 @@ base64 = "0.22.1"
 [build-dependencies]
 cc = "1.2.58"
 cmake = "0.1.54"
+
+[workspace]
+members = [".", "sync_host"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

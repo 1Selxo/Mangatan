@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:mangayomi/modules/reader_common/missing_chapters_warning.dart';
 import 'package:mangayomi/modules/reader_common/key_bindings.dart';
+import 'package:mangayomi/services/download_manager/delete_after_reading.dart';
 import 'package:mangayomi/modules/manga/reader/utils/download_ahead.dart';
 import 'package:mangayomi/modules/widgets/error_state.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -13,7 +15,7 @@ import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart'
 import 'package:mangayomi/modules/reader_common/utils/reader_orientation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/reader_common/reader_chapter_navigation.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/modules/reader_common/providers/chapter_display.dart';
@@ -260,6 +262,24 @@ class _MangaChapterPageGalleryState
   int pageViewToActualIndexSyncForPrefetch(int pageViewIndex) =>
       pageViewToActualIndexSync(pageViewIndex);
 
+  /// The paged view stays where it was, now on the page before the one read:
+  /// it is moved on once it has the pages put in.
+  @override
+  void onPagesInsertedBeforeCurrent(int count) {
+    if (_cachedReaderMode.isContinuous || isDoublePageActive) return;
+    final index = _currentIndex;
+    if (index == null) return;
+    final target = index + count;
+    _currentIndex = target;
+    _currentPageViewIndex.value = target;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _currentIndex != target) return;
+      if (_extendedController.hasClients) {
+        _extendedController.jumpToPage(target);
+      }
+    });
+  }
+
   @override
   int? get currentZoomPageViewIndex => _currentIndex;
   @override
@@ -328,6 +348,8 @@ class _MangaChapterPageGalleryState
       unawaited(discordRpc?.endReaderSession(discordReaderSession));
     }
     _saveCurrentPage(pageViewToActualIndexSync(_currentIndex ?? 0));
+    // After the save above, which may be what marks this chapter read.
+    unawaited(PendingDownloadDeletions.flush());
     // Releases this reader's own decoded pages. The budget itself is shared
     // with the reader replacing this one on a chapter switch, so clearing it
     // here would throw away images the new reader just decoded.
@@ -560,17 +582,24 @@ class _MangaChapterPageGalleryState
   ///
   /// If the reader is already at the first or last chapter (depending on
   /// the direction), the method returns without navigating.
-  void _goToChapter(bool next) {
+  Future<void> _goToChapter(bool next) async {
     if (next && !_readerController.hasNextChapter) return;
     if (!next && !_readerController.hasPreviousChapter) return;
+    final chapter = next
+        ? _readerController.getNextChapter()
+        : _readerController.getPrevChapter();
+    if (next &&
+        !await confirmSkippingMissingChapters(
+          context,
+          _readerController,
+          chapter,
+        )) {
+      return;
+    }
+    if (!mounted) return;
     ReaderChapterNavigation.markNavigatingToChapter();
     try {
-      pushReplacementMangaReaderView(
-        context: context,
-        chapter: next
-            ? _readerController.getNextChapter()
-            : _readerController.getPrevChapter(),
-      );
+      pushReplacementMangaReaderView(context: context, chapter: chapter);
     } catch (_) {
       // If the replacement fails, dispose() never runs to reset this flag, so reset it here instead.
       ReaderChapterNavigation.reset();
@@ -1174,7 +1203,7 @@ class _MangaChapterPageGalleryState
     final fullScreenReader = ref.read(fullScreenReaderStateProvider);
     if (fullScreenReader) {
       if (isDesktop) {
-        setFullScreen(value: true);
+        if (mayEnterFullScreenOnItsOwn) setFullScreen(value: true);
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
       }

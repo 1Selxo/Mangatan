@@ -1,5 +1,5 @@
 import 'package:flex_color_scheme/flex_color_scheme.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/detail_header_action.dart';
 import 'package:mangayomi/modules/widgets/cover_hero.dart';
@@ -61,6 +61,25 @@ void main() {
     );
     await tester.tap(find.text('Add to library'));
     expect(taps, 1);
+  });
+
+  testWidgets('a long press runs its own action, not the tap', (tester) async {
+    var taps = 0, longPresses = 0;
+    await tester.pumpWidget(
+      _host(
+        DetailHeaderAction(
+          icon: Symbols.favorite_rounded,
+          label: 'In library',
+          active: true,
+          onPressed: () => taps++,
+          onLongPress: () => longPresses++,
+        ),
+      ),
+    );
+    await tester.longPress(find.text('In library'));
+    expect((taps, longPresses), (0, 1));
+    await tester.tap(find.text('In library'));
+    expect((taps, longPresses), (1, 1));
   });
 
   test('both ends of the cover flight agree on the tag', () {

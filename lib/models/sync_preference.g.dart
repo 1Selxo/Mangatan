@@ -79,28 +79,43 @@ const SyncPreferenceSchema = CollectionSchema(
       name: r'googleDriveConnected',
       type: IsarType.bool,
     ),
-    r'lastSync': PropertySchema(id: 13, name: r'lastSync', type: IsarType.long),
-    r'server': PropertySchema(id: 14, name: r'server', type: IsarType.string),
-    r'sessionToken': PropertySchema(
+    r'hostAddresses': PropertySchema(
+      id: 13,
+      name: r'hostAddresses',
+      type: IsarType.stringList,
+    ),
+    r'hostEnabled': PropertySchema(
+      id: 14,
+      name: r'hostEnabled',
+      type: IsarType.bool,
+    ),
+    r'hostFingerprint': PropertySchema(
       id: 15,
+      name: r'hostFingerprint',
+      type: IsarType.string,
+    ),
+    r'lastSync': PropertySchema(id: 16, name: r'lastSync', type: IsarType.long),
+    r'server': PropertySchema(id: 17, name: r'server', type: IsarType.string),
+    r'sessionToken': PropertySchema(
+      id: 18,
       name: r'sessionToken',
       type: IsarType.string,
     ),
-    r'since': PropertySchema(id: 16, name: r'since', type: IsarType.long),
+    r'since': PropertySchema(id: 19, name: r'since', type: IsarType.long),
     r'syncMode': PropertySchema(
-      id: 17,
+      id: 20,
       name: r'syncMode',
       type: IsarType.byte,
       enumMap: _SyncPreferencesyncModeEnumValueMap,
     ),
-    r'syncOn': PropertySchema(id: 18, name: r'syncOn', type: IsarType.bool),
+    r'syncOn': PropertySchema(id: 21, name: r'syncOn', type: IsarType.bool),
     r'syncYomiApiToken': PropertySchema(
-      id: 19,
+      id: 22,
       name: r'syncYomiApiToken',
       type: IsarType.string,
     ),
     r'syncYomiServer': PropertySchema(
-      id: 20,
+      id: 23,
       name: r'syncYomiServer',
       type: IsarType.string,
     ),
@@ -152,6 +167,24 @@ int _syncPreferenceEstimateSize(
     }
   }
   {
+    final list = object.hostAddresses;
+    if (list != null) {
+      bytesCount += 3 + list.length * 3;
+      {
+        for (var i = 0; i < list.length; i++) {
+          final value = list[i];
+          bytesCount += value.length * 3;
+        }
+      }
+    }
+  }
+  {
+    final value = object.hostFingerprint;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.server;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -197,14 +230,17 @@ void _syncPreferenceSerialize(
   writer.writeByte(offsets[10], object.chimahonSyncProvider.index);
   writer.writeString(offsets[11], object.email);
   writer.writeBool(offsets[12], object.googleDriveConnected);
-  writer.writeLong(offsets[13], object.lastSync);
-  writer.writeString(offsets[14], object.server);
-  writer.writeString(offsets[15], object.sessionToken);
-  writer.writeLong(offsets[16], object.since);
-  writer.writeByte(offsets[17], object.syncMode.index);
-  writer.writeBool(offsets[18], object.syncOn);
-  writer.writeString(offsets[19], object.syncYomiApiToken);
-  writer.writeString(offsets[20], object.syncYomiServer);
+  writer.writeStringList(offsets[13], object.hostAddresses);
+  writer.writeBool(offsets[14], object.hostEnabled);
+  writer.writeString(offsets[15], object.hostFingerprint);
+  writer.writeLong(offsets[16], object.lastSync);
+  writer.writeString(offsets[17], object.server);
+  writer.writeString(offsets[18], object.sessionToken);
+  writer.writeLong(offsets[19], object.since);
+  writer.writeByte(offsets[20], object.syncMode.index);
+  writer.writeBool(offsets[21], object.syncOn);
+  writer.writeString(offsets[22], object.syncYomiApiToken);
+  writer.writeString(offsets[23], object.syncYomiServer);
 }
 
 SyncPreference _syncPreferenceDeserialize(
@@ -233,19 +269,22 @@ SyncPreference _syncPreferenceDeserialize(
         ChimahonSyncProvider.syncYomi,
     email: reader.readStringOrNull(offsets[11]),
     googleDriveConnected: reader.readBoolOrNull(offsets[12]) ?? false,
-    lastSync: reader.readLongOrNull(offsets[13]),
-    server: reader.readStringOrNull(offsets[14]),
-    sessionToken: reader.readStringOrNull(offsets[15]),
-    since: reader.readLongOrNull(offsets[16]),
+    hostAddresses: reader.readStringList(offsets[13]),
+    hostEnabled: reader.readBoolOrNull(offsets[14]) ?? false,
+    hostFingerprint: reader.readStringOrNull(offsets[15]),
+    lastSync: reader.readLongOrNull(offsets[16]),
+    server: reader.readStringOrNull(offsets[17]),
+    sessionToken: reader.readStringOrNull(offsets[18]),
+    since: reader.readLongOrNull(offsets[19]),
     syncId: id,
     syncMode:
         _SyncPreferencesyncModeValueEnumMap[reader.readByteOrNull(
-          offsets[17],
+          offsets[20],
         )] ??
         SyncMode.native,
-    syncOn: reader.readBoolOrNull(offsets[18]) ?? false,
-    syncYomiApiToken: reader.readStringOrNull(offsets[19]),
-    syncYomiServer: reader.readStringOrNull(offsets[20]),
+    syncOn: reader.readBoolOrNull(offsets[21]) ?? false,
+    syncYomiApiToken: reader.readStringOrNull(offsets[22]),
+    syncYomiServer: reader.readStringOrNull(offsets[23]),
   );
   return object;
 }
@@ -287,24 +326,30 @@ P _syncPreferenceDeserializeProp<P>(
     case 12:
       return (reader.readBoolOrNull(offset) ?? false) as P;
     case 13:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringList(offset)) as P;
     case 14:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBoolOrNull(offset) ?? false) as P;
     case 15:
       return (reader.readStringOrNull(offset)) as P;
     case 16:
       return (reader.readLongOrNull(offset)) as P;
     case 17:
+      return (reader.readStringOrNull(offset)) as P;
+    case 18:
+      return (reader.readStringOrNull(offset)) as P;
+    case 19:
+      return (reader.readLongOrNull(offset)) as P;
+    case 20:
       return (_SyncPreferencesyncModeValueEnumMap[reader.readByteOrNull(
                 offset,
               )] ??
               SyncMode.native)
           as P;
-    case 18:
+    case 21:
       return (reader.readBoolOrNull(offset) ?? false) as P;
-    case 19:
+    case 22:
       return (reader.readStringOrNull(offset)) as P;
-    case 20:
+    case 23:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1326,6 +1371,386 @@ extension SyncPreferenceQueryFilter
           property: r'googleDriveConnected',
           value: value,
         ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'hostAddresses'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'hostAddresses'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'hostAddresses',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'hostAddresses',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'hostAddresses',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'hostAddresses',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'hostAddresses',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'hostAddresses',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'hostAddresses',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'hostAddresses',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'hostAddresses', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'hostAddresses', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'hostAddresses', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'hostAddresses', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'hostAddresses', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'hostAddresses', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'hostAddresses', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostAddressesLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'hostAddresses',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostEnabledEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'hostEnabled', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'hostFingerprint'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'hostFingerprint'),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'hostFingerprint',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'hostFingerprint',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'hostFingerprint',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'hostFingerprint',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'hostFingerprint',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'hostFingerprint',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'hostFingerprint',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'hostFingerprint',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'hostFingerprint', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterFilterCondition>
+  hostFingerprintIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'hostFingerprint', value: ''),
       );
     });
   }
@@ -2437,6 +2862,34 @@ extension SyncPreferenceQuerySortBy
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByHostEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostEnabled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByHostEnabledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostEnabled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByHostFingerprint() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostFingerprint', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  sortByHostFingerprintDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostFingerprint', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> sortByLastSync() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSync', Sort.asc);
@@ -2725,6 +3178,34 @@ extension SyncPreferenceQuerySortThenBy
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByHostEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostEnabled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByHostEnabledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostEnabled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByHostFingerprint() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostFingerprint', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy>
+  thenByHostFingerprintDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hostFingerprint', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QAfterSortBy> thenByLastSync() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastSync', Sort.asc);
@@ -2946,6 +3427,30 @@ extension SyncPreferenceQueryWhereDistinct
     });
   }
 
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByHostAddresses() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'hostAddresses');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByHostEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'hostEnabled');
+    });
+  }
+
+  QueryBuilder<SyncPreference, SyncPreference, QDistinct>
+  distinctByHostFingerprint({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'hostFingerprint',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
   QueryBuilder<SyncPreference, SyncPreference, QDistinct> distinctByLastSync() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastSync');
@@ -3100,6 +3605,26 @@ extension SyncPreferenceQueryProperty
   googleDriveConnectedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'googleDriveConnected');
+    });
+  }
+
+  QueryBuilder<SyncPreference, List<String>?, QQueryOperations>
+  hostAddressesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'hostAddresses');
+    });
+  }
+
+  QueryBuilder<SyncPreference, bool, QQueryOperations> hostEnabledProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'hostEnabled');
+    });
+  }
+
+  QueryBuilder<SyncPreference, String?, QQueryOperations>
+  hostFingerprintProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'hostFingerprint');
     });
   }
 

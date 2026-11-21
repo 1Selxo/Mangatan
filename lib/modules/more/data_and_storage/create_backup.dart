@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -54,7 +54,7 @@ class _CreateBackupState extends ConsumerState<CreateBackup> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.create_backup)),
       body: ListView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         children: [
           group(l10n.library, _libraryList),
           group(l10n.settings, _settingsList),

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:shiori/shiori.dart';
@@ -54,7 +54,7 @@ class LicensesScreen extends StatelessWidget {
             );
           }
           return ListView(
-            padding: tvPageInsets,
+            padding: pageInsets(context),
             children: [
               ShioriSettingsGroup(
                 footer: l10n.open_source_licenses_subtitle,
@@ -88,7 +88,8 @@ class _LicenseTextScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(package.name)),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(ShioriSpace.s16),
+        padding: const EdgeInsets.all(ShioriSpace.s16)
+            .add(pageBottomInsets(context)),
         child: SelectableText(
           package.texts.join('\n\n${'-' * 40}\n\n'),
           style: context.shiori.text.meta.copyWith(

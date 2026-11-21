@@ -150,21 +150,27 @@ Future<GetChapterPagesModel> getChapterPages(
         }
       } else {
         // With no urls from the cache and none from the source, the folder on
-        // disk is the only thing that knows how many pages there are.
+        // disk is the only thing that knows how many pages there are. Each
+        // page on disk carries its file, found here once, so that nothing
+        // looks it up again while the reader builds the page.
+        final pageFiles = downloaded?.pageFiles ?? const <File>[];
         final pageCount = pageUrls.isNotEmpty
             ? pageUrls.length
-            : downloaded!.pageCount;
-        final onDisk = pageCount == 0
-            ? const <File?>[]
-            : await _findDownloadedPages(path!, pageCount);
+            : pageFiles.length;
+        // Pages past the listed ones (urls from the cache, a gap on disk) are
+        // looked up together rather than one file system call at a time.
+        final onDisk = pageCount > pageFiles.length && path != null
+            ? await _findDownloadedPages(path, pageCount)
+            : const <File?>[];
         for (var i = 0; i < pageCount; i++) {
           archiveImages.add(null);
-          chapterModel.localImagePaths.add(null);
-          if (onDisk[i] != null) {
-            isLocaleList.add(true);
-          } else {
-            isLocaleList.add(false);
-          }
+          final file = i < pageFiles.length
+              ? pageFiles[i]
+              : i < onDisk.length
+              ? onDisk[i]
+              : null;
+          chapterModel.localImagePaths.add(file?.path);
+          isLocaleList.add(file != null);
         }
       }
       // The reader indexes pageUrls, isLocaleList and archiveImages together,

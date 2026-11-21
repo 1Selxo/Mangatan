@@ -1,6 +1,6 @@
 # Upstream divergence
 
-Mangatan is rebased on Mangayomi v0.9.95. Most of upstream is adopted as is.
+Mangatan is rebased on Mangayomi v0.9.97. Most of upstream is adopted as is.
 A few subsystems stay fork-owned because the fork's language-learning
 features (OCR, dictionary lookup, mining, Anki, Jimaku subtitles, the EPUB
 reader, Chimahon sync) are built into them. This file records what was left
@@ -15,15 +15,14 @@ out, so it can be adopted later on purpose rather than by accident.
 | Manga detail | `manga_detail_view.dart`, `manga_details_view.dart` | Quick filters, filter sheet | Medium |
 | Local folders and onboarding | Plain folder paths (`Settings.localFolders`) | Named folders with virtual paths | Low-medium, pending a product decision |
 | Extension server screen | Fork screen with iOS embedded runtime controls | Grouped settings screen | Medium |
-| Sync screen | Fork screen with Chimahon modes | Upstream layout | Medium; Chimahon UI must stay |
+| Sync screen | Fork screen with Chimahon modes | Upstream layout, device sync | Medium; Chimahon UI must stay |
 | Mihon/Tachiyomi restore | `restore.dart` Mihon path | `TachiyomiRestoreService` | Low; the fork already covers upstream's history and anime fixes |
 | Downloads, manga home | Fork versions | Upstream changes | Low-medium |
 
 ## Upstream files not present
 
-These upstream v0.9.95 files were removed because nothing in the fork uses
-them. Restore any of them with
-`git checkout <v0.9.95 commit> -- <path>`.
+These upstream files were removed because nothing in the fork uses them.
+Restore any of them with `git checkout v0.9.97 -- <path>`.
 
 - Anime player: `anime/mixins/anime_{mpv_bridge,player_controls,player_settings,track_selection}_mixin.dart`,
   `anime/utils/always_on_top.dart`, `anime/widgets/{anime_screenshot_sheet,desktop_fullscreen_button,desktop_position_indicator,desktop_volume_button,mobile_primary_button_bar,player_settings_sections,player_shortcut_pills,seek_indicator_text}.dart`
@@ -70,6 +69,28 @@ parts sit beside upstream's files, each with a hook in them:
   when splitting or the direction changes; `reader_wheel_interceptor.dart`
   takes the mouse wheel for paged reading and zoom.
 
+## Device sync: present, not wired up
+
+v0.9.96 adds sync between devices without a server (a host on one device,
+pairing by invite link or QR code over mutual TLS), a standalone sync server
+under `server/`, and the `rust/sync_host` crate. The code is merged and builds,
+but the fork's sync screen, `Synching` provider and `SyncServer` stay in
+charge, so it cannot be reached from the app yet:
+
+- `SyncPreference` carries upstream's host fields (`hostFingerprint`,
+  `hostAddresses`, `hostEnabled`) and getters next to the Chimahon ones.
+- `Synching` has upstream's host methods (`useHost`, `useThisDeviceAsHost`,
+  `setHostEnabled`, `leaveHost`, `rememberHostAddress`), written through the
+  fork's transactional `_updateCurrentPreference`, so upstream's
+  `device_sync` screens build.
+- `SyncServer` keeps the fork's HTTP sync; upstream's `SyncTransport`
+  split (local host, peer, HTTP) is not used.
+- The main screen does not start the host at launch.
+
+To adopt it: add a device sync mode beside Chimahon, SyncYomi, Google Drive
+and WebDAV in the sync screen, route `SyncServer` through upstream's
+transports for that mode, and start the host from the lifecycle mixin.
+
 ## Shared code adapted to the fork
 
 - `services/local_folders.dart` keeps upstream's location but the fork's
@@ -88,6 +109,29 @@ parts sit beside upstream's files, each with a hook in them:
   the download, and localized error toasts.
 - The fork's downloads screen hosts upstream's `AutoDownloadGroup`, the
   delete-after-reading slot options, and the reader's download-ahead.
+- The fork's download queue screen (with its Downloaded tab) takes v0.9.96's
+  pause/resume toggle, the move to top/bottom actions and the reorder fix,
+  with the fork's widgets.
+- The continue-reading button hides when nothing is left to read, using the
+  fork's `unreadChaptersCount` getter, which looks up hidden scanlators
+  itself.
+- The app font picked in Appearance (v0.9.96) also feeds the fork's CJK
+  fallback (`applyAppFontFallback`) and is the novel reader's "Default" font.
+- v0.9.97's "missing chapters" label (tap for the list of gaps) replaces the
+  plain count in the fork's detail header, and the novel reader asks before
+  moving on past a gap, as upstream's readers do. EPUB navigation is
+  unaffected.
+- `AppLayers` holds the lock screen, the memory overlay and the secure
+  screen cover over the app, so open pages are kept when the lock screen
+  comes and goes. The fork's "disable animations" wrapper sits around it.
+- Downloaded page folders are listed asynchronously (v0.9.97), and the
+  fork's gap check still sends a folder with a missing page to the source.
+- The bottom inset (`pageInsets`/`pageBottomInsets`, v0.9.97) is applied to
+  the fork's downloads, novel reader settings, extension server and sync
+  screens.
+- Flutter 3.50: every import uses `material_ui`/`cupertino_ui`
+  (`dart fix --code=migrate_design_widgets`). Run it again on fork files
+  merged later.
 - Extension updates follow upstream: repositories are read first, then
   `applyExtensionUpdates` sets the newest version and auto-updates a source
   only from its own repository.
@@ -98,6 +142,19 @@ parts sit beside upstream's files, each with a hook in them:
 
 These upstream fixes target the reader and player files the fork keeps. They
 are worth porting by hand, or come for free with the redesign.
+
+- `425a19d9` a swiped chapter dims at once (needs upstream's `ChapterSwipe`
+  row; the fork keeps its own chapter tile)
+- `427c3218` one awaited write for `since` and `lastSync`: the fork's sync
+  setters already read and write the current row in one transaction
+- `b30a2f2d` one row over a sync limit no longer stops every sync: it lives
+  in upstream's sync engine (`SyncTransport`, `ChangedRows.unsent`), which
+  the fork's `SyncServer` does not use
+- `24f10b6f` (part) the archive reader's async folder scan: the fork keeps
+  its scan in a background isolate with its own RAR handling
+- `.github/workflows/release.yml`: upstream's Android, TV and iOS release jobs;
+  the fork packages its own releases. Its iOS Rust pin (1.99.1, `89f78193`)
+  is applied to the fork's `ios-sideload.yml`.
 
 - `305c4e47` press and hover overlays bounded to their decoration
 - `a4db8257` memory work in the restore service (the reader's came with it)

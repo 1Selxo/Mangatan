@@ -1,5 +1,5 @@
 import 'package:mangayomi/utils/platform_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/more/settings/reader/reader_switches.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/reader_mode_glyph.dart';
 import 'package:shiori/shiori.dart';
@@ -132,6 +132,7 @@ class ReaderScreen extends ConsumerWidget {
             if (!isMobile)
               ShioriSwitchRow(
                 title: l10n.fullscreen,
+                subtitle: isLinuxWayland ? l10n.fullscreen_wayland_info : null,
                 value: fullScreenReader,
                 onChanged: (v) =>
                     ref.read(fullScreenReaderStateProvider.notifier).set(v),
@@ -177,6 +178,7 @@ class ReaderScreen extends ConsumerWidget {
             const ReaderSwitchRow(ReaderSwitch.skipReadChapters),
             const ReaderSwitchRow(ReaderSwitch.skipFilteredChapters),
             const ReaderSwitchRow(ReaderSwitch.skipDuplicateChapters),
+            const ReaderSwitchRow(ReaderSwitch.warnMissingChapters),
           ],
         ),
         ShioriSettingsGroup(
@@ -354,7 +356,10 @@ class ReaderScreen extends ConsumerWidget {
     if (section == null) return _hub(context);
     return Scaffold(
       appBar: AppBar(title: Text(section.title(context))),
-      body: ListView(padding: tvPageInsets, children: sections[section]!),
+      body: ListView(
+        padding: pageInsets(context),
+        children: sections[section]!,
+      ),
     );
   }
 
@@ -364,7 +369,7 @@ class ReaderScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.reader)),
       body: ListView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         children: [
           for (final section in ReaderSettingsSection.values)
             ShioriSettingRow(

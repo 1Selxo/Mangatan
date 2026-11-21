@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/source.dart';
@@ -34,7 +34,7 @@ class MassMigrationDestinationScreen extends ConsumerWidget {
               compact: true,
             )
           : ListView.separated(
-              padding: tvPageInsets,
+              padding: pageInsets(context),
               itemCount: sources.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {

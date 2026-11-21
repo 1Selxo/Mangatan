@@ -40,7 +40,7 @@ final class AniSkipProvider extends $NotifierProvider<AniSkip, void> {
   }
 }
 
-String _$aniSkipHash() => r'cc2a5785c07a18fb8f9126fcb7664d9f743f726e';
+String _$aniSkipHash() => r'f93a29991dcc80e743189079874071aba473e1d5';
 
 abstract class _$AniSkip extends $Notifier<void> {
   void build();

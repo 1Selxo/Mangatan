@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/services/discord_rpc.dart';
@@ -83,7 +83,7 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.general)),
       body: ListView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         children: [
           ShioriSettingsGroup(
             title: l10n.library,

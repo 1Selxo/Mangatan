@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/mass_migration/mass_migration_preview_screen.dart';
@@ -46,7 +46,7 @@ class MassMigrationSourceSelectionScreen extends StatelessWidget {
               compact: true,
             )
           : ListView.separated(
-              padding: tvPageInsets,
+              padding: pageInsets(context),
               itemCount: sourceGroups.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {

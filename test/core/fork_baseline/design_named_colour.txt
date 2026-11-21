@@ -1,7 +1,7 @@
 1 lib/modules/anime/widgets/chimahon_primary_controls.dart
 12 lib/modules/anime/widgets/subtitle_cue_list.dart
 7 lib/modules/anime/widgets/video_ocr_overlay.dart
-6 lib/modules/manga/detail/manga_detail_view.dart
+5 lib/modules/manga/detail/manga_detail_view.dart
 1 lib/modules/manga/detail/manga_details_view.dart
 3 lib/modules/manga/detail/widgets/chapter_list_tile_widget.dart
 1 lib/modules/mining/widgets/dictionary_lookup_popup.dart

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:mangayomi/utils/platform_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -42,7 +42,7 @@ class BrowseSScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.browse)),
       body: ListView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         children: [
           // The master "anime only" TV switch: turning it off removes all the
           // TV-only gates (shows manga & novel again across the app).

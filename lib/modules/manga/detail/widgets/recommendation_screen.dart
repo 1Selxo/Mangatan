@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/modules/widgets/entry_badge_chip.dart';
 import 'package:go_router/go_router.dart';
@@ -104,7 +104,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                     ? 2
                     : 1;
                 return GridView.builder(
-                  padding: tvPageInsets,
+                  padding: pageInsets(context),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
                     mainAxisExtent: _cardExtent,

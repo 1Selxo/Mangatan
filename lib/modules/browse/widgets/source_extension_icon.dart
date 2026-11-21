@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/services/extension_icon_resolver.dart';
 import 'package:mangayomi/utils/cached_network.dart';

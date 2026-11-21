@@ -1739,6 +1739,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fullscreen => 'تمام‌صفحه';
 
   @override
+  String get fullscreen_wayland_info =>
+      'در Wayland هنگام باز شدن اعمال نمی‌شود: تمام‌صفحه کردن پنجره ممکن است برنامه را از کار بیندازد (یک باگ Flutter).';
+
+  @override
   String get update_library => 'به‌روزرسانی کتابخانه';
 
   @override
@@ -4890,4 +4894,212 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'Sync settings';
+
+  @override
+  String get move_to_top => 'انتقال به بالا';
+
+  @override
+  String get move_series_to_top => 'انتقال مجموعه به بالا';
+
+  @override
+  String get move_to_bottom => 'انتقال به پایین';
+
+  @override
+  String get move_series_to_bottom => 'انتقال مجموعه به پایین';
+
+  @override
+  String get show_active_filters => 'نمایش فیلترهای فعال';
+
+  @override
+  String get device_sync => 'همگام‌سازی بین دستگاه‌های شما';
+
+  @override
+  String get device_sync_summary =>
+      'بدون نیاز به سرور: یکی از دستگاه‌هایتان میزبان می‌شود و بقیه با آن جفت می‌شوند';
+
+  @override
+  String get device_sync_host_section => 'این دستگاه به‌عنوان میزبان';
+
+  @override
+  String get device_sync_host => 'میزبانی همگام‌سازی روی این دستگاه';
+
+  @override
+  String get device_sync_host_info =>
+      'دستگاه‌های دیگرتان از طریق شبکه محلی یا Tailscale، به‌صورت رمزگذاری‌شده و فقط پس از جفت شدن، با این دستگاه همگام می‌شوند. برنامه را روی این دستگاه باز نگه دارید تا بتوانند همگام شوند.';
+
+  @override
+  String device_sync_host_running(String port) {
+    return 'در حال گوش دادن روی درگاه $port';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'راه‌اندازی میزبان ممکن نشد: $error';
+  }
+
+  @override
+  String get device_sync_add_device => 'افزودن دستگاه';
+
+  @override
+  String get device_sync_paired_devices => 'دستگاه‌های جفت‌شده';
+
+  @override
+  String get device_sync_no_paired => 'هنوز هیچ دستگاهی جفت نشده است';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return 'جفت‌شده در $date';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return '$name حذف شود؟';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'این دستگاه بلافاصله پذیرفتن آن را متوقف می‌کند. بعداً می‌تواند با یک کد QR جدید دوباره جفت شود.';
+
+  @override
+  String get device_sync_join_section => 'پیوستن به میزبان';
+
+  @override
+  String get device_sync_join_info =>
+      'با دستگاهی که میزبان همگام‌سازی است جفت شوید. کد QR آن در بخش «افزودن دستگاه» روی همان دستگاه است.';
+
+  @override
+  String get device_sync_scan => 'اسکن کد QR میزبان';
+
+  @override
+  String get device_sync_paste => 'چسباندن پیوند جفت‌سازی';
+
+  @override
+  String get device_sync_link => 'پیوند جفت‌سازی';
+
+  @override
+  String get device_sync_link_invalid => 'این پیوند جفت‌سازی نیست';
+
+  @override
+  String get device_sync_pair => 'جفت کردن';
+
+  @override
+  String get device_sync_pairing =>
+      'در حال جفت‌سازی… این دستگاه را روی میزبان بپذیرید';
+
+  @override
+  String get device_sync_paired => 'با میزبان جفت شد';
+
+  @override
+  String get device_sync_wrong_code =>
+      'کد اشتباه است. یک کد QR جدید روی میزبان نمایش دهید و دوباره تلاش کنید.';
+
+  @override
+  String get device_sync_refused =>
+      'میزبان این دستگاه را رد کرد، یا کد منقضی شده است.';
+
+  @override
+  String get device_sync_unreachable =>
+      'دسترسی به میزبان ممکن نشد. هر دو دستگاه باید در یک شبکه باشند.';
+
+  @override
+  String get device_sync_invite_info =>
+      'روی دستگاه دیگر، تنظیمات ← همگام‌سازی ← همگام‌سازی بین دستگاه‌های شما را باز کنید و این کد را اسکن کنید، یا پیوند را بچسبانید. فقط یک بار و به مدت 5 دقیقه کار می‌کند.';
+
+  @override
+  String get device_sync_copy_link => 'کپی پیوند';
+
+  @override
+  String get device_sync_link_copied => 'پیوند کپی شد';
+
+  @override
+  String get device_sync_no_network =>
+      'این دستگاه به شبکه محلی وصل نیست، بنابراین هیچ دستگاه دیگری نمی‌تواند به آن دسترسی پیدا کند.';
+
+  @override
+  String get device_sync_allow_title => 'به این دستگاه اجازه داده شود؟';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '«$name» می‌خواهد با این دستگاه همگام شود. فقط اگر مال شماست اجازه دهید.';
+  }
+
+  @override
+  String get device_sync_allow => 'اجازه دادن';
+
+  @override
+  String get device_sync_deny => 'رد کردن';
+
+  @override
+  String get device_sync_switch_title =>
+      'مقصد همگام‌سازی این دستگاه تغییر کند؟';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'این دستگاه دیگر با $server همگام نمی‌شود. هیچ چیزی حذف نمی‌شود، نه اینجا و نه آنجا.';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return 'همگام با میزبان در $server';
+  }
+
+  @override
+  String get device_sync_with_this_device => 'همگام با میزبان این دستگاه';
+
+  @override
+  String get device_sync_leave => 'توقف همگام‌سازی با میزبان';
+
+  @override
+  String get device_sync_stop_host_title => 'میزبانی متوقف شود؟';
+
+  @override
+  String get device_sync_stop_host_message =>
+      'دستگاه‌های دیگرتان تا زمانی که دوباره روشن شود نمی‌توانند همگام شوند. آنچه میزبان ذخیره کرده روی این دستگاه می‌ماند.';
+
+  @override
+  String get device_sync_scan_hint =>
+      'دوربین را به سمت کد QR روی میزبان بگیرید';
+
+  @override
+  String sync_refused(String what) {
+    return 'همگام‌سازی به دلیل $what رد شد. Mangayomi و سرور همگام‌سازی را به‌روزرسانی کنید و دوباره تلاش کنید.';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return 'این موارد برای همگام‌سازی بیش از حد طولانی هستند و کنار گذاشته شدند: $items';
+  }
+
+  @override
+  String get missing_chapters_title => 'فصل‌های ناموجود';
+
+  @override
+  String get missing_episodes_title => 'قسمت‌های ناموجود';
+
+  @override
+  String get missing_chapters_info =>
+      'هیچ فصلی از این مجموعه این شماره‌ها را ندارد. ممکن است منبع آن‌ها را نداشته باشد، یا شماره‌گذاری متفاوتی داشته باشد.';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'فصل‌های $numbers ناموجودند',
+      one: 'فصل $numbers ناموجود است',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return 'فصل بعدی $chapter است.';
+  }
+
+  @override
+  String get warn_missing_chapters => 'هشدار درباره فصل‌های ناموجود';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      'پیش از رفتن به فصل بعدی، بگوید کدام شماره‌های فصل رد می‌شوند.';
 }

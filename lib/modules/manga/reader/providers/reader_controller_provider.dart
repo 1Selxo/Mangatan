@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
@@ -229,14 +229,17 @@ class ReaderController extends _$ReaderController
         if (isRead) {
           chapter.updateTrackChapterRead(ref);
           if (ref.read(deleteDownloadAfterReadingStateProvider)) {
-            chapterToDeleteAfterReading(
+            // Not now: the reader still shows this chapter, and may still
+            // show the earlier ones it keeps loaded.
+            final target = chapterToDeleteAfterReading(
               getManga().getChapterListForReading(),
               chapter,
               slot: ref.read(deleteAfterReadingSlotStateProvider),
               deleteBookmarked: ref.read(
                 deleteBookmarkedAfterReadingStateProvider,
               ),
-            )?.deleteDownloadedFiles();
+            );
+            if (target != null) PendingDownloadDeletions.add(target);
           }
         }
       }

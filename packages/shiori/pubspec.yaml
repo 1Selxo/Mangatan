@@ -4,14 +4,18 @@ publish_to: "none"
 version: 0.1.0
 
 environment:
-  sdk: ^3.13.1
+  sdk: ^3.13.5
+  # MediaQuery.maybeReduceMotionOf.
+  flutter: ">=3.50.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  flex_color_scheme: ^8.3.1
+  flex_color_scheme: ^9.0.0
+  material_ui: ^1.11.0
   material_symbols_icons: ^4.2960.0
 
+  cupertino_ui: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

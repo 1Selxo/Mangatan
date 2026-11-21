@@ -3183,6 +3183,12 @@ abstract class AppLocalizations {
   /// **'Fullscreen'**
   String get fullscreen;
 
+  /// No description provided for @fullscreen_wayland_info.
+  ///
+  /// In en, this message translates to:
+  /// **'Under Wayland, not applied on opening: switching the window to fullscreen can freeze the app (a Flutter bug).'**
+  String get fullscreen_wayland_info;
+
   /// No description provided for @update_library.
   ///
   /// In en, this message translates to:
@@ -7068,7 +7074,7 @@ abstract class AppLocalizations {
   /// No description provided for @show_continue_shelf.
   ///
   /// In en, this message translates to:
-  /// **'Show what you are reading'**
+  /// **'Show the Continue row'**
   String get show_continue_shelf;
 
   /// No description provided for @show_continue_shelf_subtitle.
@@ -8661,6 +8667,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sync settings'**
   String get sync_enable_settings;
+
+  /// No description provided for @move_to_top.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to top'**
+  String get move_to_top;
+
+  /// No description provided for @move_series_to_top.
+  ///
+  /// In en, this message translates to:
+  /// **'Move series to top'**
+  String get move_series_to_top;
+
+  /// No description provided for @move_to_bottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to bottom'**
+  String get move_to_bottom;
+
+  /// No description provided for @move_series_to_bottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Move series to bottom'**
+  String get move_series_to_bottom;
+
+  /// No description provided for @show_active_filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Show active filters'**
+  String get show_active_filters;
+
+  /// No description provided for @device_sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync between your devices'**
+  String get device_sync;
+
+  /// No description provided for @device_sync_summary.
+  ///
+  /// In en, this message translates to:
+  /// **'No server needed: one of your devices hosts, the others pair with it'**
+  String get device_sync_summary;
+
+  /// No description provided for @device_sync_host_section.
+  ///
+  /// In en, this message translates to:
+  /// **'This device as host'**
+  String get device_sync_host_section;
+
+  /// No description provided for @device_sync_host.
+  ///
+  /// In en, this message translates to:
+  /// **'Host sync on this device'**
+  String get device_sync_host;
+
+  /// No description provided for @device_sync_host_info.
+  ///
+  /// In en, this message translates to:
+  /// **'Your other devices sync with this one over your local network or Tailscale, encrypted, and only once paired. Keep the app open on this device so they can sync.'**
+  String get device_sync_host_info;
+
+  /// No description provided for @device_sync_host_running.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening on port {port}'**
+  String device_sync_host_running(String port);
+
+  /// No description provided for @device_sync_host_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t start the host: {error}'**
+  String device_sync_host_failed(String error);
+
+  /// No description provided for @device_sync_add_device.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a device'**
+  String get device_sync_add_device;
+
+  /// No description provided for @device_sync_paired_devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Paired devices'**
+  String get device_sync_paired_devices;
+
+  /// No description provided for @device_sync_no_paired.
+  ///
+  /// In en, this message translates to:
+  /// **'No device paired yet'**
+  String get device_sync_no_paired;
+
+  /// No description provided for @device_sync_paired_on.
+  ///
+  /// In en, this message translates to:
+  /// **'Paired on {date}'**
+  String device_sync_paired_on(String date);
+
+  /// No description provided for @device_sync_forget_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String device_sync_forget_title(String name);
+
+  /// No description provided for @device_sync_forget_message.
+  ///
+  /// In en, this message translates to:
+  /// **'This device stops accepting it at once. It can pair again later with a new QR code.'**
+  String get device_sync_forget_message;
+
+  /// No description provided for @device_sync_join_section.
+  ///
+  /// In en, this message translates to:
+  /// **'Join a host'**
+  String get device_sync_join_section;
+
+  /// No description provided for @device_sync_join_info.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair with the device that hosts sync. Its QR code is under Add a device on that device.'**
+  String get device_sync_join_info;
+
+  /// No description provided for @device_sync_scan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the host\'s QR code'**
+  String get device_sync_scan;
+
+  /// No description provided for @device_sync_paste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a pairing link'**
+  String get device_sync_paste;
+
+  /// No description provided for @device_sync_link.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing link'**
+  String get device_sync_link;
+
+  /// No description provided for @device_sync_link_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This isn\'t a pairing link'**
+  String get device_sync_link_invalid;
+
+  /// No description provided for @device_sync_pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair'**
+  String get device_sync_pair;
+
+  /// No description provided for @device_sync_pairing.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing… accept this device on the host'**
+  String get device_sync_pairing;
+
+  /// No description provided for @device_sync_paired.
+  ///
+  /// In en, this message translates to:
+  /// **'Paired with the host'**
+  String get device_sync_paired;
+
+  /// No description provided for @device_sync_wrong_code.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong code. Show a new QR code on the host and try again.'**
+  String get device_sync_wrong_code;
+
+  /// No description provided for @device_sync_refused.
+  ///
+  /// In en, this message translates to:
+  /// **'The host turned this device down, or the code expired.'**
+  String get device_sync_refused;
+
+  /// No description provided for @device_sync_unreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach the host. Both devices need to be on the same network.'**
+  String get device_sync_unreachable;
+
+  /// No description provided for @device_sync_invite_info.
+  ///
+  /// In en, this message translates to:
+  /// **'On the other device, open Settings → Sync → Sync between your devices and scan this code, or paste the link. It works once, for 5 minutes.'**
+  String get device_sync_invite_info;
+
+  /// No description provided for @device_sync_copy_link.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get device_sync_copy_link;
+
+  /// No description provided for @device_sync_link_copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get device_sync_link_copied;
+
+  /// No description provided for @device_sync_no_network.
+  ///
+  /// In en, this message translates to:
+  /// **'This device isn\'t on a local network, so no other device can reach it.'**
+  String get device_sync_no_network;
+
+  /// No description provided for @device_sync_allow_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this device?'**
+  String get device_sync_allow_title;
+
+  /// No description provided for @device_sync_allow_message.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" wants to sync with this device. Allow it only if it\'s yours.'**
+  String device_sync_allow_message(String name);
+
+  /// No description provided for @device_sync_allow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get device_sync_allow;
+
+  /// No description provided for @device_sync_deny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get device_sync_deny;
+
+  /// No description provided for @device_sync_switch_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Change what this device syncs with?'**
+  String get device_sync_switch_title;
+
+  /// No description provided for @device_sync_switch_message.
+  ///
+  /// In en, this message translates to:
+  /// **'This device stops syncing with {server}. Nothing is deleted, here or there.'**
+  String device_sync_switch_message(String server);
+
+  /// No description provided for @device_sync_with_host.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced with the host at {server}'**
+  String device_sync_with_host(String server);
+
+  /// No description provided for @device_sync_with_this_device.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced with this device\'s host'**
+  String get device_sync_with_this_device;
+
+  /// No description provided for @device_sync_leave.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop syncing with the host'**
+  String get device_sync_leave;
+
+  /// No description provided for @device_sync_stop_host_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop hosting?'**
+  String get device_sync_stop_host_title;
+
+  /// No description provided for @device_sync_stop_host_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Your other devices can\'t sync until it\'s back on. What the host stored stays on this device.'**
+  String get device_sync_stop_host_message;
+
+  /// No description provided for @device_sync_scan_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at the QR code on the host'**
+  String get device_sync_scan_hint;
+
+  /// No description provided for @sync_refused.
+  ///
+  /// In en, this message translates to:
+  /// **'The sync was refused because of {what}. Update Mangayomi and the sync server, then try again.'**
+  String sync_refused(String what);
+
+  /// No description provided for @sync_rows_not_sent.
+  ///
+  /// In en, this message translates to:
+  /// **'These items are too long to sync and were left out: {items}'**
+  String sync_rows_not_sent(String items);
+
+  /// No description provided for @missing_chapters_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing chapters'**
+  String get missing_chapters_title;
+
+  /// No description provided for @missing_episodes_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing episodes'**
+  String get missing_episodes_title;
+
+  /// No description provided for @missing_chapters_info.
+  ///
+  /// In en, this message translates to:
+  /// **'No chapter of this series carries these numbers. The source may not have them, or may have numbered them differently.'**
+  String get missing_chapters_info;
+
+  /// No description provided for @missing_chapters_skipped.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Chapter {numbers} is missing} other{Chapters {numbers} are missing}}'**
+  String missing_chapters_skipped(int count, String numbers);
+
+  /// No description provided for @missing_chapters_skipped_message.
+  ///
+  /// In en, this message translates to:
+  /// **'The next chapter is {chapter}.'**
+  String missing_chapters_skipped_message(String chapter);
+
+  /// No description provided for @warn_missing_chapters.
+  ///
+  /// In en, this message translates to:
+  /// **'Warn about missing chapters'**
+  String get warn_missing_chapters;
+
+  /// No description provided for @warn_missing_chapters_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Before going to the next chapter, say which chapter numbers it skips.'**
+  String get warn_missing_chapters_subtitle;
 }
 
 class _AppLocalizationsDelegate

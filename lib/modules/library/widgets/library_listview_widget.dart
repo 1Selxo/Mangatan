@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/widgets/continue_reader_button.dart';
@@ -103,7 +103,8 @@ class LibraryListViewWidget extends StatelessWidget {
                         EntryBadgeChip(label: entry.lang!.toUpperCase()),
                     ],
                   ),
-                  if (continueReaderBtn) ContinueReaderButton(entry: entry),
+                  if (continueReaderBtn)
+                    ContinueReaderButton(entry: entry),
                 ],
               ),
             );

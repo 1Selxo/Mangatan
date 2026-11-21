@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:shiori/shiori.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
@@ -9,6 +9,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
+import 'package:mangayomi/services/extension_update.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
@@ -227,13 +228,17 @@ class _SourceRepositoriesState extends ConsumerState<SourceRepositories> {
   /// #774: when a repo is removed, drop its *not-installed* sources so they
   /// don't linger as placeholders with a dead install button. Installed
   /// sources (non-empty [Source.sourceCode]) are kept so users don't lose them.
+  ///
+  /// The address is compared as [isSameRepo] does: a trailing slash or a
+  /// capital letter left the listings behind.
   Future<void> _removeOrphanSources(Repo removedRepo) async {
-    final repoUrl = removedRepo.jsonUrl;
-    if (repoUrl == null) return;
+    if (removedRepo.jsonUrl == null) return;
     final orphanIds = sourceRepository
         .getByItemType(widget.itemType)
         .where(
-          (s) => s.repo?.jsonUrl == repoUrl && (s.sourceCode?.isEmpty ?? true),
+          (s) =>
+              isSameRepo(s.repo, removedRepo) &&
+              (s.sourceCode?.isEmpty ?? true),
         )
         .map((s) => s.id!)
         .toList();

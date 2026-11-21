@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/more/statistics/widgets/immersion_stats_format.dart';
 import 'package:mangayomi/modules/more/statistics/widgets/stats_sheet_layout.dart';
 import 'package:mangayomi/services/statistics/manga_statistics_tracker.dart';

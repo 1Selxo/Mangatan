@@ -258,6 +258,8 @@ class Settings {
   @enumerated
   late DisplayType mangaHomeDisplayType;
 
+  String? appFontFamily;
+
   int? mangaGridSize;
 
   int? animeGridSize;
@@ -367,6 +369,14 @@ class Settings {
   /// preference: kept on this device and out of sync.
   int? updatesLastSeenAt;
 
+  /// The category tab each library was last left on, by category id, so the
+  /// library reopens there. Null is the first tab (Default when there is
+  /// one). App state rather than a preference: kept on this device and out
+  /// of sync.
+  int? libraryLastCategoryIdMangas;
+  int? libraryLastCategoryIdAnime;
+  int? libraryLastCategoryIdNovel;
+
   /// Lets the chosen palette colour the surfaces (backgrounds, cards, bars)
   /// as well as the accent, the way the app looked before Shiori.
   ///
@@ -383,6 +393,10 @@ class Settings {
   /// Whether a library opens on a row of the series in progress. Null, for a
   /// library saved before the option existed, means on.
   bool? showContinueShelf;
+
+  /// Whether a library lists the filters that are on as chips above its
+  /// grid. Null, for a library saved before the option existed, means on.
+  bool? showActiveFilterChips;
 
   /// Whether the video player's gesture guide has been shown once already.
   bool? playerGestureHintSeen;
@@ -547,6 +561,10 @@ class Settings {
 
   bool? skipDuplicateChapters;
 
+  /// Whether going to the next chapter first says which chapter numbers it
+  /// skips.
+  bool? warnMissingChapters;
+
   int? deleteAfterReadingSlot;
 
   bool? deleteBookmarkedAfterReading;
@@ -674,6 +692,7 @@ class Settings {
     this.colorFilterBlendMode = ColorFilterBlendMode.none,
     this.playerSubtitleSettings,
     this.mangaHomeDisplayType = DisplayType.comfortableGrid,
+    this.appFontFamily,
     this.mangaGridSize,
     this.animeGridSize,
     this.disableSectionType = SectionType.all,
@@ -722,9 +741,13 @@ class Settings {
     this.useFloatingNavigationBar = false,
     this.showUpdatesBadge = true,
     this.updatesLastSeenAt,
+    this.libraryLastCategoryIdMangas,
+    this.libraryLastCategoryIdAnime,
+    this.libraryLastCategoryIdNovel,
     this.tintSurfacesWithPalette = false,
     this.groupNavDestinations = true,
     this.showContinueShelf = true,
+    this.showActiveFilterChips = true,
     this.playerGestureHintSeen = false,
     this.chapterNumberDisplayMangaIds = const [],
     this.volumeKeysPaging = false,
@@ -811,6 +834,7 @@ class Settings {
     this.skipReadChapters = false,
     this.skipFilteredChapters = true,
     this.skipDuplicateChapters = true,
+    this.warnMissingChapters = true,
     this.deleteAfterReadingSlot = 0,
     this.deleteBookmarkedAfterReading = false,
     this.downloadAheadWhileReading = 0,
@@ -1019,6 +1043,7 @@ class Settings {
     mangaHomeDisplayType =
         DisplayType.values[json['mangaHomeDisplayType'] ??
             DisplayType.comfortableGrid.index];
+    appFontFamily = json['appFontFamily'];
     mangaGridSize = json['mangaGridSize'];
     animeGridSize = json['animeGridSize'];
     disableSectionType =
@@ -1112,9 +1137,13 @@ class Settings {
     useFloatingNavigationBar = json['useFloatingNavigationBar'] ?? false;
     showUpdatesBadge = json['showUpdatesBadge'] ?? true;
     updatesLastSeenAt = json['updatesLastSeenAt'];
+    libraryLastCategoryIdMangas = json['libraryLastCategoryIdMangas'];
+    libraryLastCategoryIdAnime = json['libraryLastCategoryIdAnime'];
+    libraryLastCategoryIdNovel = json['libraryLastCategoryIdNovel'];
     tintSurfacesWithPalette = json['tintSurfacesWithPalette'] ?? false;
     groupNavDestinations = json['groupNavDestinations'] ?? true;
     showContinueShelf = json['showContinueShelf'] ?? true;
+    showActiveFilterChips = json['showActiveFilterChips'] ?? true;
     playerGestureHintSeen = json['playerGestureHintSeen'] ?? false;
     chapterNumberDisplayMangaIds =
         (json['chapterNumberDisplayMangaIds'] as List?)?.cast<int>() ?? [];
@@ -1206,6 +1235,7 @@ class Settings {
     skipReadChapters = json['skipReadChapters'];
     skipFilteredChapters = json['skipFilteredChapters'];
     skipDuplicateChapters = json['skipDuplicateChapters'];
+    warnMissingChapters = json['warnMissingChapters'];
     deleteAfterReadingSlot = json['deleteAfterReadingSlot'];
     deleteBookmarkedAfterReading = json['deleteBookmarkedAfterReading'];
     downloadAheadWhileReading = json['downloadAheadWhileReading'];
@@ -1348,6 +1378,7 @@ class Settings {
     if (playerSubtitleSettings != null)
       'playerSubtitleSettings': playerSubtitleSettings!.toJson(),
     'mangaHomeDisplayType': mangaHomeDisplayType.index,
+    'appFontFamily': appFontFamily,
     'mangaGridSize': mangaGridSize,
     'animeGridSize': animeGridSize,
     'disableSectionType': disableSectionType.index,
@@ -1398,9 +1429,13 @@ class Settings {
     'useFloatingNavigationBar': useFloatingNavigationBar,
     'showUpdatesBadge': showUpdatesBadge,
     'updatesLastSeenAt': updatesLastSeenAt,
+    'libraryLastCategoryIdMangas': libraryLastCategoryIdMangas,
+    'libraryLastCategoryIdAnime': libraryLastCategoryIdAnime,
+    'libraryLastCategoryIdNovel': libraryLastCategoryIdNovel,
     'tintSurfacesWithPalette': tintSurfacesWithPalette,
     'groupNavDestinations': groupNavDestinations,
     'showContinueShelf': showContinueShelf,
+    'showActiveFilterChips': showActiveFilterChips,
     'playerGestureHintSeen': playerGestureHintSeen,
     'chapterNumberDisplayMangaIds': chapterNumberDisplayMangaIds,
     'volumeKeysPaging': volumeKeysPaging,
@@ -1488,6 +1523,7 @@ class Settings {
     'skipReadChapters': skipReadChapters,
     'skipFilteredChapters': skipFilteredChapters,
     'skipDuplicateChapters': skipDuplicateChapters,
+    'warnMissingChapters': warnMissingChapters,
     'deleteAfterReadingSlot': deleteAfterReadingSlot,
     'deleteBookmarkedAfterReading': deleteBookmarkedAfterReading,
     'downloadAheadWhileReading': downloadAheadWhileReading,

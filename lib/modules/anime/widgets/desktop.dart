@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:mangayomi/utils/system_ui.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/anime/widgets/player_overlay_surface.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter/services.dart';

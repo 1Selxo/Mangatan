@@ -1726,6 +1726,10 @@ class AppLocalizationsTh extends AppLocalizations {
   String get fullscreen => 'เต็มจอ';
 
   @override
+  String get fullscreen_wayland_info =>
+      'บน Wayland จะไม่ใช้ตอนเปิดแอป: การสลับหน้าต่างเป็นเต็มจออาจทำให้แอปค้าง (บั๊กของ Flutter)';
+
+  @override
   String get update_library => 'อัพเดทชั้นหนังสือ';
 
   @override
@@ -4841,4 +4845,208 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'ซิงค์การตั้งค่า';
+
+  @override
+  String get move_to_top => 'ย้ายไปบนสุด';
+
+  @override
+  String get move_series_to_top => 'ย้ายซีรีส์ไปบนสุด';
+
+  @override
+  String get move_to_bottom => 'ย้ายไปล่างสุด';
+
+  @override
+  String get move_series_to_bottom => 'ย้ายซีรีส์ไปล่างสุด';
+
+  @override
+  String get show_active_filters => 'แสดงตัวกรองที่ใช้อยู่';
+
+  @override
+  String get device_sync => 'ซิงค์ระหว่างอุปกรณ์ของคุณ';
+
+  @override
+  String get device_sync_summary =>
+      'ไม่ต้องใช้เซิร์ฟเวอร์: อุปกรณ์หนึ่งเป็นโฮสต์ อุปกรณ์อื่นจับคู่กับเครื่องนั้น';
+
+  @override
+  String get device_sync_host_section => 'ใช้อุปกรณ์นี้เป็นโฮสต์';
+
+  @override
+  String get device_sync_host => 'โฮสต์การซิงค์บนอุปกรณ์นี้';
+
+  @override
+  String get device_sync_host_info =>
+      'อุปกรณ์อื่นของคุณจะซิงค์กับอุปกรณ์นี้ผ่านเครือข่ายภายในหรือ Tailscale แบบเข้ารหัส และเฉพาะหลังจากจับคู่แล้วเท่านั้น เปิดแอปไว้บนอุปกรณ์นี้เพื่อให้อุปกรณ์อื่นซิงค์ได้';
+
+  @override
+  String device_sync_host_running(String port) {
+    return 'กำลังรอการเชื่อมต่อที่พอร์ต $port';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'ไม่สามารถเริ่มโฮสต์: $error';
+  }
+
+  @override
+  String get device_sync_add_device => 'เพิ่มอุปกรณ์';
+
+  @override
+  String get device_sync_paired_devices => 'อุปกรณ์ที่จับคู่แล้ว';
+
+  @override
+  String get device_sync_no_paired => 'ยังไม่มีอุปกรณ์ที่จับคู่';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return 'จับคู่เมื่อ $date';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return 'ลบ $name ใช่ไหม?';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'อุปกรณ์นี้จะหยุดยอมรับอุปกรณ์นั้นทันที สามารถจับคู่ใหม่ภายหลังด้วยคิวอาร์โค้ดใหม่';
+
+  @override
+  String get device_sync_join_section => 'เข้าร่วมโฮสต์';
+
+  @override
+  String get device_sync_join_info =>
+      'จับคู่กับอุปกรณ์ที่โฮสต์การซิงค์ คิวอาร์โค้ดของเครื่องนั้นอยู่ใน เพิ่มอุปกรณ์ บนเครื่องนั้น';
+
+  @override
+  String get device_sync_scan => 'สแกนคิวอาร์โค้ดของโฮสต์';
+
+  @override
+  String get device_sync_paste => 'วางลิงก์จับคู่';
+
+  @override
+  String get device_sync_link => 'ลิงก์จับคู่';
+
+  @override
+  String get device_sync_link_invalid => 'นี่ไม่ใช่ลิงก์จับคู่';
+
+  @override
+  String get device_sync_pair => 'จับคู่';
+
+  @override
+  String get device_sync_pairing => 'กำลังจับคู่… ยอมรับอุปกรณ์นี้บนโฮสต์';
+
+  @override
+  String get device_sync_paired => 'จับคู่กับโฮสต์แล้ว';
+
+  @override
+  String get device_sync_wrong_code =>
+      'รหัสไม่ถูกต้อง แสดงคิวอาร์โค้ดใหม่บนโฮสต์แล้วลองอีกครั้ง';
+
+  @override
+  String get device_sync_refused => 'โฮสต์ปฏิเสธอุปกรณ์นี้ หรือรหัสหมดอายุแล้ว';
+
+  @override
+  String get device_sync_unreachable =>
+      'ไม่สามารถเชื่อมต่อโฮสต์ได้ อุปกรณ์ทั้งสองต้องอยู่ในเครือข่ายเดียวกัน';
+
+  @override
+  String get device_sync_invite_info =>
+      'บนอุปกรณ์อีกเครื่อง เปิด การตั้งค่า → การซิงค์ → ซิงค์ระหว่างอุปกรณ์ของคุณ แล้วสแกนโค้ดนี้ หรือวางลิงก์ ใช้ได้ครั้งเดียว ภายใน 5 นาที';
+
+  @override
+  String get device_sync_copy_link => 'คัดลอกลิงก์';
+
+  @override
+  String get device_sync_link_copied => 'คัดลอกลิงก์แล้ว';
+
+  @override
+  String get device_sync_no_network =>
+      'อุปกรณ์นี้ไม่ได้อยู่ในเครือข่ายภายใน จึงไม่มีอุปกรณ์อื่นเชื่อมต่อได้';
+
+  @override
+  String get device_sync_allow_title => 'อนุญาตอุปกรณ์นี้ไหม?';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '\"$name\" ต้องการซิงค์กับอุปกรณ์นี้ อนุญาตเฉพาะเมื่อเป็นอุปกรณ์ของคุณ';
+  }
+
+  @override
+  String get device_sync_allow => 'อนุญาต';
+
+  @override
+  String get device_sync_deny => 'ปฏิเสธ';
+
+  @override
+  String get device_sync_switch_title =>
+      'เปลี่ยนสิ่งที่อุปกรณ์นี้ซิงค์ด้วยไหม?';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'อุปกรณ์นี้จะหยุดซิงค์กับ $server ไม่มีอะไรถูกลบ ทั้งที่นี่และที่นั่น';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return 'ซิงค์กับโฮสต์ที่ $server';
+  }
+
+  @override
+  String get device_sync_with_this_device => 'ซิงค์กับโฮสต์ของอุปกรณ์นี้';
+
+  @override
+  String get device_sync_leave => 'หยุดซิงค์กับโฮสต์';
+
+  @override
+  String get device_sync_stop_host_title => 'หยุดโฮสต์ไหม?';
+
+  @override
+  String get device_sync_stop_host_message =>
+      'อุปกรณ์อื่นของคุณจะซิงค์ไม่ได้จนกว่าจะเปิดอีกครั้ง ข้อมูลที่โฮสต์เก็บไว้ยังคงอยู่บนอุปกรณ์นี้';
+
+  @override
+  String get device_sync_scan_hint => 'เล็งกล้องไปที่คิวอาร์โค้ดบนโฮสต์';
+
+  @override
+  String sync_refused(String what) {
+    return 'การซิงค์ถูกปฏิเสธเนื่องจาก $what อัปเดต Mangayomi และเซิร์ฟเวอร์ซิงค์ แล้วลองอีกครั้ง';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return 'รายการเหล่านี้ยาวเกินกว่าจะซิงค์และถูกข้ามไป: $items';
+  }
+
+  @override
+  String get missing_chapters_title => 'ตอนที่ขาดหายไป';
+
+  @override
+  String get missing_episodes_title => 'ตอนที่ขาดหายไป';
+
+  @override
+  String get missing_chapters_info =>
+      'ไม่มีตอนใดในซีรีส์นี้ที่มีหมายเลขเหล่านี้ แหล่งที่มาอาจไม่มี หรืออาจใช้หมายเลขต่างออกไป';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ตอนที่ $numbers ขาดหายไป',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return 'ตอนถัดไปคือ $chapter';
+  }
+
+  @override
+  String get warn_missing_chapters => 'เตือนเมื่อมีตอนที่ขาดหายไป';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      'ก่อนไปตอนถัดไป ให้แจ้งว่าจะข้ามตอนหมายเลขใดบ้าง';
 }

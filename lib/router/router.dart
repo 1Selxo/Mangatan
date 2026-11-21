@@ -2,7 +2,7 @@ import 'package:mangayomi/modules/more/settings/keyboard_shortcuts/keyboard_shor
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -42,6 +42,7 @@ import 'package:mangayomi/modules/updates/updates_screen.dart';
 import 'package:mangayomi/modules/more/categories/categories_screen.dart';
 import 'package:mangayomi/modules/more/settings/downloads/downloads_screen.dart';
 import 'package:mangayomi/modules/more/settings/player/player_screen.dart';
+import 'package:mangayomi/modules/more/settings/sync/device_sync/device_sync_screen.dart';
 import 'package:mangayomi/modules/more/settings/sync/sync.dart';
 import 'package:mangayomi/modules/more/settings/track/track.dart';
 import 'package:mangayomi/modules/more/settings/track/manage_trackers/manage_trackers.dart';
@@ -209,24 +210,24 @@ class RouterNotifier extends ChangeNotifier {
       },
       branches: [
         _branch(
-          _genericRoute<String?>(
+          _genericRoute<LibrarySearch?>(
             name: "MangaLibrary",
-            builder: (id) =>
-                LibraryScreen(itemType: ItemType.manga, presetInput: id),
+            builder: (search) =>
+                LibraryScreen(itemType: ItemType.manga, search: search),
           ),
         ),
         _branch(
-          _genericRoute<String?>(
+          _genericRoute<LibrarySearch?>(
             name: "AnimeLibrary",
-            builder: (id) =>
-                LibraryScreen(itemType: ItemType.anime, presetInput: id),
+            builder: (search) =>
+                LibraryScreen(itemType: ItemType.anime, search: search),
           ),
         ),
         _branch(
-          _genericRoute<String?>(
+          _genericRoute<LibrarySearch?>(
             name: "NovelLibrary",
-            builder: (id) =>
-                LibraryScreen(itemType: ItemType.novel, presetInput: id),
+            builder: (search) =>
+                LibraryScreen(itemType: ItemType.novel, search: search),
           ),
         ),
         _branch(
@@ -250,6 +251,10 @@ class RouterNotifier extends ChangeNotifier {
     _genericRoute<(Source?, bool)>(
       name: "mangaHome",
       builder: (id) => MangaHomeScreen(source: id.$1!, isLatest: id.$2),
+    ),
+    _genericRoute<(Source?, String)>(
+      name: "mangaHomeGenre",
+      builder: (id) => MangaHomeScreen(source: id.$1!, genre: id.$2),
     ),
     _genericRoute<int>(
       path: "/manga-reader/detail",
@@ -303,6 +308,7 @@ class RouterNotifier extends ChangeNotifier {
     _genericRoute(name: "openSourceLicenses", child: const LicensesScreen()),
     _genericRoute(name: "track", child: const TrackScreen()),
     _genericRoute(name: "sync", child: const SyncScreen()),
+    _genericRoute(name: "deviceSync", child: const DeviceSyncScreen()),
     _genericRoute<ItemType>(
       name: "sourceFilter",
       builder: (itemType) => SourcesFilterScreen(itemType: itemType),

@@ -2,13 +2,14 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:mangayomi/modules/reader_common/missing_chapters_warning.dart';
 import 'package:mangayomi/services/external_browser.dart';
 import 'package:mangayomi/modules/reader_common/key_bindings.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/quickjs/ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
@@ -35,6 +36,7 @@ import 'package:mangayomi/modules/novel/widgets/novel_reader_settings_sheet.dart
 import 'package:mangayomi/modules/novel/widgets/novel_dictionary_selection.dart';
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
 import 'package:mangayomi/modules/novel/utils/novel_custom_fonts.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/app_font_family.dart';
 import 'package:mangayomi/modules/novel/utils/novel_reader_fonts.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
 import 'package:mangayomi/modules/widgets/desktop_back_navigation_handler.dart';
@@ -736,7 +738,7 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   ///
   /// If the reader is already at the first or last chapter (depending on
   /// the direction), the method returns without navigating.
-  void _goToChapter(bool next) {
+  Future<void> _goToChapter(bool next) async {
     if (_chapterTransitionInProgress || !mounted) return;
     if (epubBook != null) {
       unawaited(_epubReaderController.jumpToAdjacentChapter(next ? 1 : -1));
@@ -744,13 +746,22 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     }
     if (next && !_readerController.hasNextChapter) return;
     if (!next && !_readerController.hasPreviousChapter) return;
+    final chapter = next
+        ? _readerController.getNextChapter()
+        : _readerController.getPrevChapter();
+    // Moving on past a gap in the numbering asks first.
     _chapterTransitionInProgress = true;
-    pushReplacementMangaReaderView(
-      context: context,
-      chapter: next
-          ? _readerController.getNextChapter()
-          : _readerController.getPrevChapter(),
-    );
+    if (next &&
+        !await confirmSkippingMissingChapters(
+          context,
+          _readerController,
+          chapter,
+        )) {
+      _chapterTransitionInProgress = false;
+      return;
+    }
+    if (!mounted) return;
+    pushReplacementMangaReaderView(context: context, chapter: chapter);
   }
 
   void _goToEpubChapter(String chapterId) {
@@ -1114,9 +1125,14 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
                                   final fontKey = ref.watch(
                                     novelFontFamilyStateProvider,
                                   );
-                                  final fontFamily = resolveNovelFontFamily(
-                                    fontKey,
-                                  );
+                                  // "Default" is the font picked in Appearance.
+                                  final fontFamily =
+                                      resolveNovelFontFamily(fontKey) ??
+                                      ref.watch(
+                                        appFontFamilyProvider.select(
+                                          (t) => t.$2,
+                                        ),
+                                      );
                                   unawaited(
                                     ensureNovelCustomFontLoaded(fontKey),
                                   );

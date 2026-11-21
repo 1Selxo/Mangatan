@@ -11,7 +11,7 @@ import 'package:archive/archive.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -44,6 +44,8 @@ import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/animation_duration_scale_provider.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
+import 'package:mangayomi/l10n/l10n_delegates.dart';
+import 'package:mangayomi/utils/legacy_material.dart';
 import 'package:mangayomi/services/library_updater.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/sync/chimahon_restore_sync_coordinator.dart';
@@ -86,6 +88,9 @@ import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart' show rootBundle, LogicalKeyboardKey;
 import 'package:mangayomi/utils/window_geometry.dart';
 import 'package:mangayomi/modules/manga/reader/subsampling_scale_image_view/subsampling_scale_image_view.dart';
+import 'package:mangayomi/modules/more/settings/general/providers/memory_probe_provider.dart';
+import 'package:mangayomi/modules/widgets/memory_overlay.dart';
+import 'package:mangayomi/core/app_layers.dart';
 import 'package:mangayomi/modules/widgets/app_ui_scale.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
 import 'package:mangayomi/utils/error_toast.dart';
@@ -171,7 +176,7 @@ void main(List<String> args) async {
     await initIsTv();
     if (!isMobile) {
       await windowManager.ensureInitialized();
-      await WindowGeometry.restore();
+      await WindowGeometryStore.restore();
     }
     StartupTrace.mark('window');
     if (Platform.isWindows || Platform.isLinux) {
@@ -592,7 +597,7 @@ class _MyAppState extends ConsumerState<MyApp>
       themeMode: themeMode,
       debugShowCheckedModeBanner: false,
       locale: locale,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) {
         Widget content = child ?? const SizedBox.shrink();
@@ -644,7 +649,11 @@ class _MyAppState extends ConsumerState<MyApp>
           scale: ref.watch(appUiScaleStateProvider),
           child: content,
         );
-        final base = BotToastInit()(context, scaledChild);
+        // bot_toast draws its toasts on the old built-in Material library,
+        // as do a few other packages under it.
+        final base = LegacyMaterialBridge(
+          child: BotToastInit()(context, scaledChild),
+        );
         content = !isMobile
             ? DesktopBackNavigationHandler(
                 canGoBack: router.canPop,
@@ -654,26 +663,31 @@ class _MyAppState extends ConsumerState<MyApp>
               )
             : base;
 
-        if (_obscured && ref.watch(secureScreenOnProvider)) {
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              content,
-              ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
-            ],
-          );
-        }
-
-        if (!Platform.isLinux) {
-          final isUnlocked = ref.watch(appUnlockedStateProvider);
-          final lockEnabled = ref.watch(appLockEnabledStateProvider);
-          if (lockEnabled && !isUnlocked) {
-            content = Stack(
-              fit: StackFit.expand,
-              children: [content, const AppLockScreen()],
-            );
-          }
-        }
+        final locked =
+            !Platform.isLinux &&
+            ref.watch(appLockEnabledStateProvider) &&
+            !ref.watch(appUnlockedStateProvider);
+        content = AppLayers(
+          app: content,
+          covers: [
+            if (locked) const AppLockScreen(key: ValueKey(AppLockScreen)),
+            // Above the lock screen, because a measurement is not worth
+            // taking if navigating away ends it.
+            if (ref.watch(memoryOverlayVisibleProvider))
+              MemoryOverlay(
+                key: const ValueKey(MemoryOverlay),
+                probe: ref.read(memoryProbeProvider),
+                onClose: () =>
+                    ref.read(memoryOverlayVisibleProvider.notifier).set(false),
+              ),
+            // Over everything, so the app switcher shows none of it.
+            if (_obscured && ref.watch(secureScreenOnProvider))
+              ColoredBox(
+                key: const ValueKey('secure screen cover'),
+                color: Theme.of(context).scaffoldBackgroundColor,
+              ),
+          ],
+        );
 
         if (!isMobile &&
             animationDurationScale == minimumAnimationDurationScale) {
@@ -724,7 +738,7 @@ class _MyAppState extends ConsumerState<MyApp>
     WidgetsBinding.instance.removeObserver(this);
     if (!isMobile) {
       windowManager.removeListener(this);
-      WindowGeometry.save();
+      unawaited(WindowGeometryStore.save());
     }
     unawaited(_mExtensionServer.stopServer());
     _linkSubscription?.cancel();
@@ -736,24 +750,25 @@ class _MyAppState extends ConsumerState<MyApp>
     super.dispose();
   }
 
-  // Linux emits `resize`/`move` while the window is being resized or moved;
-  // Windows and macOS emit `resized`/`moved` once it settles. Handle both, or
-  // the geometry is never saved on Linux and the window size is not remembered.
+  // Linux emits `resize`/`move` at each step of a resize or move; Windows and
+  // macOS emit `resized`/`moved` once it settles. Handle both, or the geometry
+  // is never saved on Linux and the window size is not remembered.
   @override
-  void onWindowResize() => WindowGeometry.save();
+  void onWindowResize() => WindowGeometryStore.scheduleSave();
 
   @override
-  void onWindowResized() => WindowGeometry.save();
+  void onWindowResized() => WindowGeometryStore.scheduleSave();
 
   @override
-  void onWindowMove() => WindowGeometry.save();
+  void onWindowMove() => WindowGeometryStore.scheduleSave();
 
   @override
-  void onWindowMoved() => WindowGeometry.save();
+  void onWindowMoved() => WindowGeometryStore.scheduleSave();
 
   @override
-  void onWindowClose() {
-    WindowGeometry.save();
+  Future<void> onWindowClose() async {
+    // Awaited: on Linux the exit below would otherwise come first.
+    await WindowGeometryStore.save();
     // Workaround for libepoxy error when closing app; caused by media-kit
     if (Platform.isLinux) {
       unawaited(_stopExtensionServerForExit().whenComplete(() => exit(0)));

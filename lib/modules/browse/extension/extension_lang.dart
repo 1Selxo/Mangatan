@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -69,7 +69,7 @@ class ExtensionsLang extends ConsumerWidget {
 
           languages.sort((a, b) => a.compareTo(b));
           return SuperListView.builder(
-            padding: tvPageInsets,
+            padding: pageInsets(context),
             itemCount: languages.length,
             itemBuilder: (context, index) {
               final lang = languages[index];

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/widgets/error_state.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:shiori/shiori.dart';
@@ -35,7 +35,7 @@ class AboutScreen extends ConsumerWidget {
           .watch(getPackageInfoProvider)
           .when(
             data: (data) => ListView(
-              padding: tvPageInsets,
+              padding: pageInsets(context),
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(

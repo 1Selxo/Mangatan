@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -19,9 +19,7 @@ import 'package:shiori/shiori.dart';
 /// whether sync is currently on or off) and, if so, whether it's on.
 (bool hasServer, bool syncOn) _syncState(WidgetRef ref) {
   final syncPreference = ref.read(synchingProvider(syncId: 1));
-  final hasServer =
-      (syncPreference.authToken?.isNotEmpty ?? false) &&
-      (syncPreference.server?.isNotEmpty ?? false);
+  final hasServer = syncPreference.isConnected;
   return (hasServer, syncPreference.syncOn);
 }
 

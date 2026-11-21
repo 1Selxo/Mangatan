@@ -1691,6 +1691,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fullscreen => 'フルスクリーン';
 
   @override
+  String get fullscreen_wayland_info =>
+      'Waylandでは起動時に適用されません：ウィンドウを全画面にするとアプリがフリーズすることがあります（Flutterの不具合）。';
+
+  @override
   String get update_library => 'ライブラリを更新';
 
   @override
@@ -4742,4 +4746,206 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get sync_enable_settings => '設定を同期';
+
+  @override
+  String get move_to_top => '一番上へ移動';
+
+  @override
+  String get move_series_to_top => 'シリーズを一番上へ移動';
+
+  @override
+  String get move_to_bottom => '一番下へ移動';
+
+  @override
+  String get move_series_to_bottom => 'シリーズを一番下へ移動';
+
+  @override
+  String get show_active_filters => '有効なフィルターを表示';
+
+  @override
+  String get device_sync => 'デバイス間で同期';
+
+  @override
+  String get device_sync_summary => 'サーバー不要：デバイスの1台がホストになり、他のデバイスがペアリングします';
+
+  @override
+  String get device_sync_host_section => 'このデバイスをホストにする';
+
+  @override
+  String get device_sync_host => 'このデバイスで同期をホスト';
+
+  @override
+  String get device_sync_host_info =>
+      '他のデバイスは、ローカルネットワークまたはTailscale経由で、暗号化され、ペアリング後にのみこのデバイスと同期します。同期できるよう、このデバイスでアプリを開いたままにしてください。';
+
+  @override
+  String device_sync_host_running(String port) {
+    return 'ポート$portで待機中';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'ホストを開始できませんでした：$error';
+  }
+
+  @override
+  String get device_sync_add_device => 'デバイスを追加';
+
+  @override
+  String get device_sync_paired_devices => 'ペアリング済みのデバイス';
+
+  @override
+  String get device_sync_no_paired => 'ペアリングされたデバイスはまだありません';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return '$dateにペアリング';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return '$nameを削除しますか？';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'このデバイスはただちに受け付けを停止します。後で新しいQRコードで再度ペアリングできます。';
+
+  @override
+  String get device_sync_join_section => 'ホストに参加';
+
+  @override
+  String get device_sync_join_info =>
+      '同期をホストしているデバイスとペアリングします。QRコードはそのデバイスの「デバイスを追加」にあります。';
+
+  @override
+  String get device_sync_scan => 'ホストのQRコードをスキャン';
+
+  @override
+  String get device_sync_paste => 'ペアリングリンクを貼り付け';
+
+  @override
+  String get device_sync_link => 'ペアリングリンク';
+
+  @override
+  String get device_sync_link_invalid => 'これはペアリングリンクではありません';
+
+  @override
+  String get device_sync_pair => 'ペアリング';
+
+  @override
+  String get device_sync_pairing => 'ペアリング中… ホストでこのデバイスを承認してください';
+
+  @override
+  String get device_sync_paired => 'ホストとペアリングしました';
+
+  @override
+  String get device_sync_wrong_code =>
+      'コードが正しくありません。ホストで新しいQRコードを表示して、もう一度お試しください。';
+
+  @override
+  String get device_sync_refused => 'ホストがこのデバイスを拒否したか、コードの有効期限が切れました。';
+
+  @override
+  String get device_sync_unreachable =>
+      'ホストに接続できませんでした。両方のデバイスが同じネットワーク上にある必要があります。';
+
+  @override
+  String get device_sync_invite_info =>
+      'もう一方のデバイスで、設定 → 同期 → デバイス間で同期 を開いてこのコードをスキャンするか、リンクを貼り付けてください。1回限り、5分間有効です。';
+
+  @override
+  String get device_sync_copy_link => 'リンクをコピー';
+
+  @override
+  String get device_sync_link_copied => 'リンクをコピーしました';
+
+  @override
+  String get device_sync_no_network =>
+      'このデバイスはローカルネットワークに接続されていないため、他のデバイスから接続できません。';
+
+  @override
+  String get device_sync_allow_title => 'このデバイスを許可しますか？';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '「$name」がこのデバイスとの同期を求めています。自分のデバイスである場合のみ許可してください。';
+  }
+
+  @override
+  String get device_sync_allow => '許可';
+
+  @override
+  String get device_sync_deny => '拒否';
+
+  @override
+  String get device_sync_switch_title => 'このデバイスの同期先を変更しますか？';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'このデバイスは$serverとの同期を停止します。こちらでもあちらでも、何も削除されません。';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return '$serverのホストと同期中';
+  }
+
+  @override
+  String get device_sync_with_this_device => 'このデバイスのホストと同期中';
+
+  @override
+  String get device_sync_leave => 'ホストとの同期を停止';
+
+  @override
+  String get device_sync_stop_host_title => 'ホストを停止しますか？';
+
+  @override
+  String get device_sync_stop_host_message =>
+      '再開するまで、他のデバイスは同期できません。ホストが保存したデータはこのデバイスに残ります。';
+
+  @override
+  String get device_sync_scan_hint => 'ホストのQRコードにカメラを向けてください';
+
+  @override
+  String sync_refused(String what) {
+    return '$whatのため同期が拒否されました。Mangayomiと同期サーバーを更新してから、もう一度お試しください。';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return '次の項目は長すぎるため同期されませんでした：$items';
+  }
+
+  @override
+  String get missing_chapters_title => '不足しているチャプター';
+
+  @override
+  String get missing_episodes_title => '不足しているエピソード';
+
+  @override
+  String get missing_chapters_info =>
+      'このシリーズにはこれらの番号のチャプターがありません。ソースに存在しないか、別の番号が付けられている可能性があります。';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'チャプター$numbersがありません',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return '次のチャプターは$chapterです。';
+  }
+
+  @override
+  String get warn_missing_chapters => '不足しているチャプターを警告';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      '次のチャプターに進む前に、飛ばされるチャプター番号を表示します。';
 }

@@ -9,5 +9,6 @@ pub mod hoshidicts;
 pub mod image;
 pub mod rar;
 pub mod rhttp;
+pub mod sync_host;
 
 pub use epub::{EpubChapter, EpubNovel, EpubResource};

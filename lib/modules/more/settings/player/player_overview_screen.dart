@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,7 +16,7 @@ class PlayerOverviewScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n!.player)),
       body: SingleChildScrollView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         child: Column(
           children: [
             // On TV, choose between the dedicated TV player and the original

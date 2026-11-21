@@ -11,8 +11,10 @@ import 'package:mangayomi/modules/manga/detail/widgets/anime_season_list.dart';
 import 'package:mangayomi/services/download_manager/next_downloads.dart';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
+import 'package:mangayomi/modules/manga/detail/widgets/missing_chapters_label.dart';
+import 'package:mangayomi/modules/manga/detail/widgets/chapter_selection_reset_scope.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
@@ -408,13 +410,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
     final chapters = ref.watch(
       getChaptersStreamProvider(mangaId: widget.manga!.id!),
     );
-    return PopScope(
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) return;
-        // Reset chapter selection so the top/bottom bars don't bleed into the library screen
-        ref.read(isLongPressedStateProvider.notifier).update(false);
-        ref.read(chaptersListStateProvider.notifier).clear();
-      },
+    return ChapterSelectionResetScope(
       child: NotificationListener<UserScrollNotification>(
         onNotification: (notification) {
           if (notification.direction == ScrollDirection.forward) {
@@ -979,33 +975,8 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                                                           .bold,
                                                                 ),
                                                               ),
-                                                              Builder(
-                                                                builder: (context) {
-                                                                  final missing =
-                                                                      widget
-                                                                          .manga!
-                                                                          .missingChapterCount();
-                                                                  if (missing <=
-                                                                      0) {
-                                                                    return const SizedBox.shrink();
-                                                                  }
-                                                                  return Text(
-                                                                    widget.manga!.itemType !=
-                                                                            ItemType.anime
-                                                                        ? l10n.missing_chapters(
-                                                                            missing,
-                                                                          )
-                                                                        : l10n.missing_episodes(
-                                                                            missing,
-                                                                          ),
-                                                                    style: TextStyle(
-                                                                      fontSize:
-                                                                          12,
-                                                                      color: Colors
-                                                                          .red[400],
-                                                                    ),
-                                                                  );
-                                                                },
+                                                              MissingChaptersLabel(
+                                                                manga: widget.manga!,
                                                               ),
                                                             ],
                                                           ),
@@ -1984,25 +1955,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    Builder(
-                                      builder: (context) {
-                                        final missing = widget.manga!
-                                            .missingChapterCount();
-                                        if (missing <= 0) {
-                                          return const SizedBox.shrink();
-                                        }
-                                        return Text(
-                                          widget.manga!.itemType !=
-                                                  ItemType.anime
-                                              ? l10n.missing_chapters(missing)
-                                              : l10n.missing_episodes(missing),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.red[400],
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    MissingChaptersLabel(manga: widget.manga!),
                                   ],
                                 ),
                               ),

@@ -112,7 +112,7 @@ jobs:
       - name: setup flutter
         uses: subosito/flutter-action@v2.23.0
         with:
-          flutter-version: "3.47.1"
+          flutter-version: "3.50.0"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -155,7 +155,7 @@ jobs:
       - name: setup flutter
         uses: subosito/flutter-action@v2.23.0
         with:
-          flutter-version: "3.47.1"
+          flutter-version: "3.50.0"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -282,7 +282,7 @@ jobs:
       - name: setup flutter
         uses: subosito/flutter-action@v2.23.0
         with:
-          flutter-version: "3.47.1"
+          flutter-version: "3.50.0"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master

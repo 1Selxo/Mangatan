@@ -1,6 +1,6 @@
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/modules/widgets/collapsing_header.dart';
 import 'package:mangayomi/modules/main_view/nav_groups.dart';
 import 'package:mangayomi/modules/main_view/widgets/nav_group_switcher.dart';
@@ -34,6 +34,10 @@ class LibraryAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final bool showNumbersOfItems;
   final int numberOfItems;
   final List<Manga> entries;
+
+  /// Every entry of this library, before any filter or tab: what the
+  /// filter sheet offers to filter by, and what its filters apply to.
+  final List<Manga> libraryEntries;
   final bool isCategory;
   final int? categoryId;
   final Settings settings;
@@ -56,6 +60,7 @@ class LibraryAppBar extends ConsumerWidget implements PreferredSizeWidget {
     required this.showNumbersOfItems,
     required this.numberOfItems,
     required this.entries,
+    required this.libraryEntries,
     required this.isCategory,
     required this.categoryId,
     required this.settings,
@@ -150,6 +155,8 @@ class LibraryAppBar extends ConsumerWidget implements PreferredSizeWidget {
     return AppBar(
       elevation: 0,
       backgroundColor: Colors.transparent,
+      // The search field has its own back button.
+      automaticallyImplyLeading: !isSearch,
       title: isSearch
           ? null
           : Row(
@@ -187,7 +194,10 @@ class LibraryAppBar extends ConsumerWidget implements PreferredSizeWidget {
         isSearch
             ? SeachFormTextField(
                 onChanged: (_) => onSearchClear(),
-                onPressed: onSearchToggle,
+                onPressed: () {
+                  textEditingController.clear();
+                  onSearchToggle();
+                },
                 controller: textEditingController,
                 onSuffixPressed: () {
                   textEditingController.clear();
@@ -230,7 +240,7 @@ class LibraryAppBar extends ConsumerWidget implements PreferredSizeWidget {
               vsync: vsync,
               settings: settings,
               itemType: itemType,
-              entries: entries,
+              entries: libraryEntries,
             );
           },
           tooltip: l10n.filter,

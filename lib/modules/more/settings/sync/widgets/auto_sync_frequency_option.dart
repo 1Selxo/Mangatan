@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Radio-group deselection means the already-selected Off row was tapped.
 int autoSyncFrequencyFromRadioValue(int? value) => value ?? 0;

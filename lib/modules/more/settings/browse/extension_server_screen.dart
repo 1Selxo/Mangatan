@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:mangayomi/services/external_browser.dart';
@@ -98,7 +98,8 @@ class _ExtensionServerScreenState extends ConsumerState<ExtensionServerScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        // Clear of the system's navigation bar below the last row.
+        padding: const EdgeInsets.all(16).add(pageBottomInsets(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

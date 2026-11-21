@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 
 /// One label/value pair in a statistics sheet.

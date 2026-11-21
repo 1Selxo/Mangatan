@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/more/settings/player/providers/player_state_provider.dart';
@@ -40,7 +40,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.internal_player)),
       body: ListView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         children: [
           ShioriSettingsGroup(
             title: l10n.group_playback,
@@ -160,7 +160,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             children: [
               ShioriSwitchRow(
                 title: l10n.full_screen_player,
-                subtitle: l10n.full_screen_player_info,
+                subtitle: isLinuxWayland
+                    ? l10n.fullscreen_wayland_info
+                    : l10n.full_screen_player_info,
                 value: fullScreenPlayer,
                 onChanged: (v) =>
                     ref.read(fullScreenPlayerStateProvider.notifier).set(v),

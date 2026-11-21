@@ -1726,6 +1726,10 @@ class AppLocalizationsAs extends AppLocalizations {
   String get fullscreen => 'সম্পূৰ্ণ স্ক্ৰীন';
 
   @override
+  String get fullscreen_wayland_info =>
+      'Wayland-ত খোলোঁতে প্ৰয়োগ কৰা নহয়: ৱিণ্ড\'টো সম্পূৰ্ণ স্ক্ৰীনলৈ সলনি কৰিলে এপটো ৰৈ যাব পাৰে (Flutter-ৰ এটা বাগ)।';
+
+  @override
   String get update_library => 'পুথিভঁৰাল আপডেট কৰক';
 
   @override
@@ -4862,4 +4866,214 @@ class AppLocalizationsAs extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'ছেটিংছ সিংক কৰক';
+
+  @override
+  String get move_to_top => 'ওপৰলৈ নিয়ক';
+
+  @override
+  String get move_series_to_top => 'শৃংখলাটো ওপৰলৈ নিয়ক';
+
+  @override
+  String get move_to_bottom => 'তললৈ নিয়ক';
+
+  @override
+  String get move_series_to_bottom => 'শৃংখলাটো তললৈ নিয়ক';
+
+  @override
+  String get show_active_filters => 'সক্ৰিয় ফিল্টাৰ দেখুৱাওক';
+
+  @override
+  String get device_sync => 'আপোনাৰ ডিভাইচসমূহৰ মাজত সিংক';
+
+  @override
+  String get device_sync_summary =>
+      'কোনো চাৰ্ভাৰৰ প্ৰয়োজন নাই: আপোনাৰ এটা ডিভাইচ হ\'ষ্ট হয়, বাকীবোৰ তাৰ সৈতে পেয়াৰ হয়';
+
+  @override
+  String get device_sync_host_section => 'এই ডিভাইচটো হ\'ষ্ট হিচাপে';
+
+  @override
+  String get device_sync_host => 'এই ডিভাইচত সিংক হ\'ষ্ট কৰক';
+
+  @override
+  String get device_sync_host_info =>
+      'আপোনাৰ আন ডিভাইচবোৰ আপোনাৰ স্থানীয় নেটৱৰ্ক বা Tailscale-ৰ জৰিয়তে, এনক্ৰিপ্ট কৰি আৰু কেৱল পেয়াৰ হোৱাৰ পিছতহে, এই ডিভাইচৰ সৈতে সিংক হয়। সেইবোৰে সিংক কৰিব পৰাকৈ এই ডিভাইচত এপটো খুলি ৰাখক।';
+
+  @override
+  String device_sync_host_running(String port) {
+    return 'প\'ৰ্ট $portত শুনি আছে';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'হ\'ষ্ট আৰম্ভ কৰিব পৰা নগ\'ল: $error';
+  }
+
+  @override
+  String get device_sync_add_device => 'এটা ডিভাইচ যোগ কৰক';
+
+  @override
+  String get device_sync_paired_devices => 'পেয়াৰ কৰা ডিভাইচসমূহ';
+
+  @override
+  String get device_sync_no_paired =>
+      'এতিয়ালৈকে কোনো ডিভাইচ পেয়াৰ কৰা হোৱা নাই';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return '$dateত পেয়াৰ কৰা হৈছিল';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return '$name আঁতৰাব নেকি?';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'এই ডিভাইচটোৱে তাক তৎক্ষণাত গ্ৰহণ কৰা বন্ধ কৰে। পিছত নতুন QR ক\'ডেৰে পুনৰ পেয়াৰ কৰিব পাৰি।';
+
+  @override
+  String get device_sync_join_section => 'এটা হ\'ষ্টত যোগদান কৰক';
+
+  @override
+  String get device_sync_join_info =>
+      'সিংক হ\'ষ্ট কৰা ডিভাইচটোৰ সৈতে পেয়াৰ কৰক। ইয়াৰ QR ক\'ড সেই ডিভাইচৰ \"এটা ডিভাইচ যোগ কৰক\"-ত আছে।';
+
+  @override
+  String get device_sync_scan => 'হ\'ষ্টৰ QR ক\'ড স্কেন কৰক';
+
+  @override
+  String get device_sync_paste => 'এটা পেয়াৰিং লিংক পেষ্ট কৰক';
+
+  @override
+  String get device_sync_link => 'পেয়াৰিং লিংক';
+
+  @override
+  String get device_sync_link_invalid => 'এইটো পেয়াৰিং লিংক নহয়';
+
+  @override
+  String get device_sync_pair => 'পেয়াৰ কৰক';
+
+  @override
+  String get device_sync_pairing =>
+      'পেয়াৰ কৰি আছে… হ\'ষ্টত এই ডিভাইচটো গ্ৰহণ কৰক';
+
+  @override
+  String get device_sync_paired => 'হ\'ষ্টৰ সৈতে পেয়াৰ হ\'ল';
+
+  @override
+  String get device_sync_wrong_code =>
+      'ভুল ক\'ড। হ\'ষ্টত নতুন QR ক\'ড দেখুৱাই পুনৰ চেষ্টা কৰক।';
+
+  @override
+  String get device_sync_refused =>
+      'হ\'ষ্টে এই ডিভাইচটো নাকচ কৰিলে, বা ক\'ডটোৰ ম্যাদ উকলিল।';
+
+  @override
+  String get device_sync_unreachable =>
+      'হ\'ষ্টলৈ উপনীত হ\'ব পৰা নগ\'ল। দুয়োটা ডিভাইচ একেটা নেটৱৰ্কত থাকিব লাগিব।';
+
+  @override
+  String get device_sync_invite_info =>
+      'আনটো ডিভাইচত, ছেটিং → সিংক → আপোনাৰ ডিভাইচসমূহৰ মাজত সিংক খুলক আৰু এই ক\'ডটো স্কেন কৰক, বা লিংকটো পেষ্ট কৰক। ই এবাৰ, 5 মিনিটৰ বাবে কাম কৰে।';
+
+  @override
+  String get device_sync_copy_link => 'লিংক কপি কৰক';
+
+  @override
+  String get device_sync_link_copied => 'লিংক কপি কৰা হ\'ল';
+
+  @override
+  String get device_sync_no_network =>
+      'এই ডিভাইচটো কোনো স্থানীয় নেটৱৰ্কত নাই, গতিকে আন কোনো ডিভাইচে ইয়াক পাব নোৱাৰে।';
+
+  @override
+  String get device_sync_allow_title => 'এই ডিভাইচটোক অনুমতি দিব নেকি?';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '\"$name\"-এ এই ডিভাইচৰ সৈতে সিংক কৰিব বিচাৰে। ই আপোনাৰ হ\'লেহে অনুমতি দিয়ক।';
+  }
+
+  @override
+  String get device_sync_allow => 'অনুমতি দিয়ক';
+
+  @override
+  String get device_sync_deny => 'নাকচ কৰক';
+
+  @override
+  String get device_sync_switch_title =>
+      'এই ডিভাইচে কিহৰ সৈতে সিংক কৰে সলনি কৰিব নেকি?';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'এই ডিভাইচে $serverৰ সৈতে সিংক কৰা বন্ধ কৰে। ইয়াত বা তাত একো মচা নহয়।';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return '$serverত থকা হ\'ষ্টৰ সৈতে সিংক কৰা হৈছে';
+  }
+
+  @override
+  String get device_sync_with_this_device =>
+      'এই ডিভাইচৰ হ\'ষ্টৰ সৈতে সিংক কৰা হৈছে';
+
+  @override
+  String get device_sync_leave => 'হ\'ষ্টৰ সৈতে সিংক বন্ধ কৰক';
+
+  @override
+  String get device_sync_stop_host_title => 'হ\'ষ্টিং বন্ধ কৰিব নেকি?';
+
+  @override
+  String get device_sync_stop_host_message =>
+      'ই পুনৰ অন নোহোৱালৈকে আপোনাৰ আন ডিভাইচবোৰে সিংক কৰিব নোৱাৰে। হ\'ষ্টে সংৰক্ষণ কৰা বস্তুবোৰ এই ডিভাইচতে থাকে।';
+
+  @override
+  String get device_sync_scan_hint =>
+      'কেমেৰাটো হ\'ষ্টৰ QR ক\'ডৰ ফালে লক্ষ্য কৰক';
+
+  @override
+  String sync_refused(String what) {
+    return '$whatৰ বাবে সিংক নাকচ কৰা হ\'ল। Mangayomi আৰু সিংক চাৰ্ভাৰ আপডেট কৰক, তাৰ পিছত পুনৰ চেষ্টা কৰক।';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return 'এই বস্তুবোৰ সিংক কৰিবলৈ অতি দীঘল আৰু বাদ দিয়া হ\'ল: $items';
+  }
+
+  @override
+  String get missing_chapters_title => 'বাদ পৰা অধ্যায়সমূহ';
+
+  @override
+  String get missing_episodes_title => 'বাদ পৰা খণ্ডসমূহ';
+
+  @override
+  String get missing_chapters_info =>
+      'এই ছিৰিজৰ কোনো অধ্যায়তে এই নম্বৰবোৰ নাই। উৎসত হয়তো এইবোৰ নাই, বা বেলেগ ধৰণে নম্বৰ দিয়া হৈছে।';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'অধ্যায় $numbers বাদ পৰিছে',
+      one: 'অধ্যায় $numbers বাদ পৰিছে',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return 'পৰৱৰ্তী অধ্যায় $chapter।';
+  }
+
+  @override
+  String get warn_missing_chapters => 'বাদ পৰা অধ্যায়ৰ বিষয়ে সতৰ্ক কৰক';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      'পৰৱৰ্তী অধ্যায়লৈ যোৱাৰ আগতে, ই কোনবোৰ অধ্যায় নম্বৰ এৰি যায় কওক।';
 }

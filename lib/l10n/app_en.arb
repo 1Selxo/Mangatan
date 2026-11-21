@@ -690,6 +690,7 @@
   "skip_opening": "Skip opening",
   "skip_ending": "Skip ending",
   "fullscreen": "Fullscreen",
+  "fullscreen_wayland_info": "Under Wayland, not applied on opening: switching the window to fullscreen can freeze the app (a Flutter bug).",
   "update_library": "Update library",
   "updating_library": "Updating library ({cur} / {max}) - Failed: {failed}",
   "next_chapter": "Next chapter",
@@ -1615,7 +1616,7 @@
   "group_nav_destinations_subtitle": "One Library tab with a switcher for manga, anime and novels, and one Activity tab for updates and history",
   "search_all_sources": "Search every source",
   "continue_reading": "Continue",
-  "show_continue_shelf": "Show what you are reading",
+  "show_continue_shelf": "Show the Continue row",
   "show_continue_shelf_subtitle": "A row of the series in progress at the top of the library",
   "excluded": "Excluded",
   "remove_filter": "Remove filter",
@@ -2110,5 +2111,113 @@
   "sync_section_data_types": "What to sync",
   "sync_enable_histories": "Sync history data",
   "sync_enable_updates": "Sync update data",
-  "sync_enable_settings": "Sync settings"
+  "sync_enable_settings": "Sync settings",
+  "move_to_top": "Move to top",
+  "move_series_to_top": "Move series to top",
+  "move_to_bottom": "Move to bottom",
+  "move_series_to_bottom": "Move series to bottom",
+  "show_active_filters": "Show active filters",
+  "device_sync": "Sync between your devices",
+  "device_sync_summary": "No server needed: one of your devices hosts, the others pair with it",
+  "device_sync_host_section": "This device as host",
+  "device_sync_host": "Host sync on this device",
+  "device_sync_host_info": "Your other devices sync with this one over your local network or Tailscale, encrypted, and only once paired. Keep the app open on this device so they can sync.",
+  "device_sync_host_running": "Listening on port {port}",
+  "@device_sync_host_running": {
+    "placeholders": {
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "device_sync_host_failed": "Couldn't start the host: {error}",
+  "@device_sync_host_failed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "device_sync_add_device": "Add a device",
+  "device_sync_paired_devices": "Paired devices",
+  "device_sync_no_paired": "No device paired yet",
+  "device_sync_paired_on": "Paired on {date}",
+  "@device_sync_paired_on": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "device_sync_forget_title": "Remove {name}?",
+  "@device_sync_forget_title": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "device_sync_forget_message": "This device stops accepting it at once. It can pair again later with a new QR code.",
+  "device_sync_join_section": "Join a host",
+  "device_sync_join_info": "Pair with the device that hosts sync. Its QR code is under Add a device on that device.",
+  "device_sync_scan": "Scan the host's QR code",
+  "device_sync_paste": "Paste a pairing link",
+  "device_sync_link": "Pairing link",
+  "device_sync_link_invalid": "This isn't a pairing link",
+  "device_sync_pair": "Pair",
+  "device_sync_pairing": "Pairing… accept this device on the host",
+  "device_sync_paired": "Paired with the host",
+  "device_sync_wrong_code": "Wrong code. Show a new QR code on the host and try again.",
+  "device_sync_refused": "The host turned this device down, or the code expired.",
+  "device_sync_unreachable": "Couldn't reach the host. Both devices need to be on the same network.",
+  "device_sync_invite_info": "On the other device, open Settings → Sync → Sync between your devices and scan this code, or paste the link. It works once, for 5 minutes.",
+  "device_sync_copy_link": "Copy link",
+  "device_sync_link_copied": "Link copied",
+  "device_sync_no_network": "This device isn't on a local network, so no other device can reach it.",
+  "device_sync_allow_title": "Allow this device?",
+  "device_sync_allow_message": "\"{name}\" wants to sync with this device. Allow it only if it's yours.",
+  "@device_sync_allow_message": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "device_sync_allow": "Allow",
+  "device_sync_deny": "Deny",
+  "device_sync_switch_title": "Change what this device syncs with?",
+  "device_sync_switch_message": "This device stops syncing with {server}. Nothing is deleted, here or there.",
+  "@device_sync_switch_message": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "device_sync_with_host": "Synced with the host at {server}",
+  "@device_sync_with_host": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "device_sync_with_this_device": "Synced with this device's host",
+  "device_sync_leave": "Stop syncing with the host",
+  "device_sync_stop_host_title": "Stop hosting?",
+  "device_sync_stop_host_message": "Your other devices can't sync until it's back on. What the host stored stays on this device.",
+  "device_sync_scan_hint": "Point the camera at the QR code on the host",
+  "sync_refused": "The sync was refused because of {what}. Update Mangayomi and the sync server, then try again.",
+  "@sync_refused": {"placeholders": {"what": {"type": "String"}}},
+  "sync_rows_not_sent": "These items are too long to sync and were left out: {items}",
+  "@sync_rows_not_sent": {"placeholders": {"items": {"type": "String"}}},
+  "missing_chapters_title": "Missing chapters",
+  "missing_episodes_title": "Missing episodes",
+  "missing_chapters_info": "No chapter of this series carries these numbers. The source may not have them, or may have numbered them differently.",
+  "missing_chapters_skipped": "{count, plural, =1{Chapter {numbers} is missing} other{Chapters {numbers} are missing}}",
+  "@missing_chapters_skipped": {"placeholders": {"count": {"type": "int"}, "numbers": {"type": "String"}}},
+  "missing_chapters_skipped_message": "The next chapter is {chapter}.",
+  "@missing_chapters_skipped_message": {"placeholders": {"chapter": {"type": "String"}}},
+  "warn_missing_chapters": "Warn about missing chapters",
+  "warn_missing_chapters_subtitle": "Before going to the next chapter, say which chapter numbers it skips."
 }

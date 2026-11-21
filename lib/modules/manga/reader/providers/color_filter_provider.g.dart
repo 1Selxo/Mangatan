@@ -42,7 +42,7 @@ final class CustomColorFilterStateProvider
 }
 
 String _$customColorFilterStateHash() =>
-    r'd8bf74d22aff1a57ec8091cb38d73191b73bf547';
+    r'a34dc2b62247cd524df9669c5bed81114461dbd7';
 
 abstract class _$CustomColorFilterState extends $Notifier<CustomColorFilter?> {
   CustomColorFilter? build();

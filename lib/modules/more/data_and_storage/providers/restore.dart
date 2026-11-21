@@ -22,7 +22,7 @@ import 'package:mangayomi/router/router.dart';
 
 import 'package:mangayomi/services/sync/chimahon_anime_seasons.dart';
 import 'package:archive/archive_io.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/services/background_work/background_work.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
@@ -215,9 +215,7 @@ Future<void> _uploadToSyncServerIfConnected(
 ) async {
   try {
     final syncPreference = ref.read(synchingProvider(syncId: 1));
-    final connected =
-        (syncPreference.authToken?.isNotEmpty ?? false) &&
-        (syncPreference.server?.isNotEmpty ?? false);
+    final connected = syncPreference.isConnected;
     if (!connected) return;
     botToast(l10n.restore_sync_uploading);
     // silent: true suppresses startSync's own generic "Starting/Finished"

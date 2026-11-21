@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
@@ -288,7 +288,8 @@ class MangaFilterSourceState extends _$MangaFilterSourceState {
         names.add(m.source!);
       }
     }
-    return names.toList();
+    return names.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
 
   List<String> _getFilterSources() {

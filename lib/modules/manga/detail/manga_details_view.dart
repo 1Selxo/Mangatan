@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/eval/model/m_manga.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/custom_floating_action_btn.dart';
@@ -311,6 +311,14 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                     model.dateAdded = 0;
                     await mangaRepository.put(model);
                   },
+                  // As in Mihon: a tap takes it out, a long press keeps it and
+                  // changes its categories.
+                  onLongPress: () => showCategorySelectionDialog(
+                    context: context,
+                    ref: ref,
+                    itemType: widget.manga.itemType,
+                    singleManga: widget.manga,
+                  ),
                   child: Column(
                     children: [
                       const Icon(Icons.favorite, size: 20),

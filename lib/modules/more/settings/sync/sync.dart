@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/services/external_browser.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
@@ -75,6 +75,8 @@ class SyncScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10nLocalizations(context)!.syncing)),
       body: SingleChildScrollView(
+        // Clear of the system's navigation bar below the last row.
+        padding: pageBottomInsets(context),
         child: StreamBuilder(
           stream: syncPreferenceRepository.watchAllWithSyncId(),
           builder: (context, snapshot) {

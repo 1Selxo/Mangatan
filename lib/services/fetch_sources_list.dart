@@ -323,6 +323,34 @@ Future<void> installMissingMihonSiblings(
   }
 }
 
+/// Removes the extensions offered by repositories no longer in [repos] and
+/// never installed: a download button for an extension nothing offers any
+/// more.
+///
+/// Removing a repository from its screen drops its listings, but a
+/// repository removed otherwise (a restored backup, a sync, a version
+/// before that) or whose address was written slightly differently left
+/// them in the extensions list for good, and refreshing never took them
+/// out. [offeredIds] are the extensions the repositories just read list: a
+/// listing one of them still offers is kept, whatever repository it was
+/// first recorded with. Installed extensions are always kept.
+Future<void> removeListingsOfRemovedRepos({
+  required List<Repo> repos,
+  required Set<int> offeredIds,
+  required ItemType itemType,
+}) async {
+  final orphans = (await sourceRepository.getNonLocalByItemType(itemType))
+      .where(
+        (s) =>
+            !(s.isAdded ?? false) &&
+            !offeredIds.contains(s.id) &&
+            !repos.any((r) => isSameRepo(r, s.repo)),
+      )
+      .map((s) => s.id!)
+      .toList();
+  if (orphans.isNotEmpty) await sourceRepository.deleteAll(orphans);
+}
+
 /// Points extensions installed from an address [repos] no longer has at the
 /// repository it moved to. Only the old address itself is believed: it names
 /// its replacement ([resolveIndexUrl], by default following its index's
@@ -914,7 +942,12 @@ Future<Map<String, String>> fetchHeadersDalvik(
     }
     return headers;
   } catch (error, stackTrace) {
-    recordError(error, stack: stackTrace, source: 'fetch_sources_list');
+    recordError(
+      error,
+      stack: stackTrace,
+      source: 'fetch_sources_list',
+      detail: _describeSource(source),
+    );
     return {};
   }
 }
@@ -938,7 +971,12 @@ Future<bool> fetchSupportLatestDalvik(
     );
     return res.body.trim() == "true";
   } catch (error, stackTrace) {
-    recordError(error, stack: stackTrace, source: 'fetch_sources_list');
+    recordError(
+      error,
+      stack: stackTrace,
+      source: 'fetch_sources_list',
+      detail: _describeSource(source),
+    );
     return false;
   }
 }
@@ -965,9 +1003,23 @@ Future<FilterList?> fetchFilterListDalvik(
 
     return FilterList(filtersFromJson(data));
   } catch (error, stackTrace) {
-    recordError(error, stack: stackTrace, source: 'fetch_sources_list');
+    recordError(
+      error,
+      stack: stackTrace,
+      source: 'fetch_sources_list',
+      detail: _describeSource(source),
+    );
     return null;
   }
+}
+
+String _describeSource(Source source) =>
+    'Source: ${source.name} (${source.lang}, ${source.sourceCodeLanguage.name})';
+
+SelectFilterOption? _selectOption(dynamic e) {
+  final value = e is Map ? e['value'] : e;
+  if (value == null) return null;
+  return SelectFilterOption('$value', '$value', null);
 }
 
 List<dynamic> filtersFromJson(List<dynamic> json) {
@@ -979,9 +1031,14 @@ List<dynamic> filtersFromJson(List<dynamic> json) {
       yield SortFilter(
         "${e['name']}Filter",
         e['name'],
-        SortState(e['state']['index'], e['state']['ascending'], null),
+        SortState(
+          e['state']['index'] is int ? e['state']['index'] : 0,
+          e['state']['ascending'] == true,
+          null,
+        ),
         (e['values'] as List)
-            .map((e) => SelectFilterOption(e, e, null))
+            .map(_selectOption)
+            .whereType<SelectFilterOption>()
             .toList(),
         null,
       );
@@ -994,15 +1051,21 @@ List<dynamic> filtersFromJson(List<dynamic> json) {
         e['state'],
         e['vals'] is List
             ? (e['vals'] as List)
-                  .map((e) => SelectFilterOption(e['first'], e['second'], null))
+                  .map(
+                    (e) => e is Map && e['first'] != null
+                        ? SelectFilterOption(
+                            '${e['first']}',
+                            '${e['second'] ?? e['first']}',
+                            null,
+                          )
+                        : null,
+                  )
+                  .whereType<SelectFilterOption>()
                   .toList()
             : e['values'] is List
             ? (e['values'] as List)
-                  .map(
-                    (e) => (e is Map)
-                        ? SelectFilterOption(e['value'], e['value'], null)
-                        : SelectFilterOption(e, e, null),
-                  )
+                  .map(_selectOption)
+                  .whereType<SelectFilterOption>()
                   .toList()
             : [],
         "SelectFilter",
@@ -1015,7 +1078,8 @@ List<dynamic> filtersFromJson(List<dynamic> json) {
         null,
         state: e['state'],
       );
-    } else if (e['included'] is bool &&
+    } else if (e['name'] is String &&
+        e['included'] is bool &&
         e['ignored'] is bool &&
         e['excluded'] is bool) {
       yield TriStateFilter(
@@ -1023,7 +1087,7 @@ List<dynamic> filtersFromJson(List<dynamic> json) {
         e['name'],
         e['id'] ?? e['name'],
         null,
-        state: e['state'],
+        state: e['state'] is int ? e['state'] : 0,
       );
     } else if (e['name'] is String && e['state'] is List) {
       yield GroupFilter(
@@ -1083,7 +1147,12 @@ Future<List<SourcePreference>?> fetchPreferencesDalvik(
         )
         .toList();
   } catch (error, stackTrace) {
-    recordError(error, stack: stackTrace, source: 'fetch_sources_list');
+    recordError(
+      error,
+      stack: stackTrace,
+      source: 'fetch_sources_list',
+      detail: _describeSource(source),
+    );
     return null;
   }
 }

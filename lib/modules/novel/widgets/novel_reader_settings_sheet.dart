@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
 import 'package:mangayomi/modules/novel/novel_reader_controller_provider.dart';
+import 'package:mangayomi/modules/more/settings/appearance/providers/app_font_family.dart';
 import 'package:mangayomi/modules/novel/utils/novel_custom_fonts.dart';
 import 'package:mangayomi/modules/novel/utils/novel_reader_fonts.dart';
 import 'package:mangayomi/modules/novel/widgets/ttsu_epub_reader.dart';
@@ -640,7 +641,13 @@ class _NovelFontPickerState extends ConsumerState<_NovelFontPicker> {
           children: [
             for (final option in novelReaderFontOptions)
               ChoiceChip(
-                label: Text(option.label),
+                // "Default" follows the font picked in Appearance.
+                label: Text(
+                  option.key == null
+                      ? ref.watch(appFontFamilyProvider.select((t) => t.$1)) ??
+                            option.label
+                      : option.label,
+                ),
                 selected: selectedKey == option.key,
                 onSelected: (_) => _select(option.key),
               ),

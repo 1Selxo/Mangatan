@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shiori/shiori.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
@@ -28,7 +28,7 @@ class _PlayerAudioScreenState extends ConsumerState<PlayerAudioScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.video_audio)),
       body: ListView(
-        padding: tvPageInsets,
+        padding: pageInsets(context),
         children: [
           ShioriSettingsGroup(
             children: [

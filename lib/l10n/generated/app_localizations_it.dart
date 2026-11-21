@@ -1747,6 +1747,10 @@ class AppLocalizationsIt extends AppLocalizations {
   String get fullscreen => 'Schermo intero';
 
   @override
+  String get fullscreen_wayland_info =>
+      'Su Wayland, non applicato all\'apertura: passare la finestra a schermo intero può bloccare l\'app (un bug di Flutter).';
+
+  @override
   String get update_library => 'Aggiorna libreria';
 
   @override
@@ -4916,4 +4920,214 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'Sincronizza impostazioni';
+
+  @override
+  String get move_to_top => 'Sposta in cima';
+
+  @override
+  String get move_series_to_top => 'Sposta la serie in cima';
+
+  @override
+  String get move_to_bottom => 'Sposta in fondo';
+
+  @override
+  String get move_series_to_bottom => 'Sposta la serie in fondo';
+
+  @override
+  String get show_active_filters => 'Mostra filtri attivi';
+
+  @override
+  String get device_sync => 'Sincronizza tra i tuoi dispositivi';
+
+  @override
+  String get device_sync_summary =>
+      'Nessun server necessario: uno dei tuoi dispositivi fa da host, gli altri si associano a esso';
+
+  @override
+  String get device_sync_host_section => 'Questo dispositivo come host';
+
+  @override
+  String get device_sync_host =>
+      'Ospita la sincronizzazione su questo dispositivo';
+
+  @override
+  String get device_sync_host_info =>
+      'Gli altri tuoi dispositivi si sincronizzano con questo tramite la rete locale o Tailscale, in modo cifrato e solo dopo l\'associazione. Tieni l\'app aperta su questo dispositivo perché possano sincronizzarsi.';
+
+  @override
+  String device_sync_host_running(String port) {
+    return 'In ascolto sulla porta $port';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return 'Impossibile avviare l\'host: $error';
+  }
+
+  @override
+  String get device_sync_add_device => 'Aggiungi un dispositivo';
+
+  @override
+  String get device_sync_paired_devices => 'Dispositivi associati';
+
+  @override
+  String get device_sync_no_paired => 'Nessun dispositivo ancora associato';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return 'Associato il $date';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return 'Rimuovere $name?';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      'Questo dispositivo smette subito di accettarlo. Potrà associarsi di nuovo in seguito con un nuovo codice QR.';
+
+  @override
+  String get device_sync_join_section => 'Unisciti a un host';
+
+  @override
+  String get device_sync_join_info =>
+      'Associati al dispositivo che ospita la sincronizzazione. Il suo codice QR si trova in Aggiungi un dispositivo, su quel dispositivo.';
+
+  @override
+  String get device_sync_scan => 'Scansiona il codice QR dell\'host';
+
+  @override
+  String get device_sync_paste => 'Incolla un link di associazione';
+
+  @override
+  String get device_sync_link => 'Link di associazione';
+
+  @override
+  String get device_sync_link_invalid => 'Questo non è un link di associazione';
+
+  @override
+  String get device_sync_pair => 'Associa';
+
+  @override
+  String get device_sync_pairing =>
+      'Associazione in corso… accetta questo dispositivo sull\'host';
+
+  @override
+  String get device_sync_paired => 'Associato all\'host';
+
+  @override
+  String get device_sync_wrong_code =>
+      'Codice errato. Mostra un nuovo codice QR sull\'host e riprova.';
+
+  @override
+  String get device_sync_refused =>
+      'L\'host ha rifiutato questo dispositivo, oppure il codice è scaduto.';
+
+  @override
+  String get device_sync_unreachable =>
+      'Impossibile raggiungere l\'host. Entrambi i dispositivi devono essere sulla stessa rete.';
+
+  @override
+  String get device_sync_invite_info =>
+      'Sull\'altro dispositivo, apri Impostazioni → Sincronizzazione → Sincronizza tra i tuoi dispositivi e scansiona questo codice, oppure incolla il link. Funziona una volta, per 5 minuti.';
+
+  @override
+  String get device_sync_copy_link => 'Copia link';
+
+  @override
+  String get device_sync_link_copied => 'Link copiato';
+
+  @override
+  String get device_sync_no_network =>
+      'Questo dispositivo non è su una rete locale, quindi nessun altro dispositivo può raggiungerlo.';
+
+  @override
+  String get device_sync_allow_title => 'Consentire questo dispositivo?';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '«$name» vuole sincronizzarsi con questo dispositivo. Consentilo solo se è tuo.';
+  }
+
+  @override
+  String get device_sync_allow => 'Consenti';
+
+  @override
+  String get device_sync_deny => 'Rifiuta';
+
+  @override
+  String get device_sync_switch_title =>
+      'Cambiare con cosa si sincronizza questo dispositivo?';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return 'Questo dispositivo smette di sincronizzarsi con $server. Non viene eliminato nulla, né qui né lì.';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return 'Sincronizzato con l\'host su $server';
+  }
+
+  @override
+  String get device_sync_with_this_device =>
+      'Sincronizzato con l\'host di questo dispositivo';
+
+  @override
+  String get device_sync_leave => 'Interrompi la sincronizzazione con l\'host';
+
+  @override
+  String get device_sync_stop_host_title => 'Smettere di ospitare?';
+
+  @override
+  String get device_sync_stop_host_message =>
+      'Gli altri tuoi dispositivi non potranno sincronizzarsi finché non sarà riattivato. Ciò che l\'host ha memorizzato resta su questo dispositivo.';
+
+  @override
+  String get device_sync_scan_hint =>
+      'Inquadra il codice QR sull\'host con la fotocamera';
+
+  @override
+  String sync_refused(String what) {
+    return 'La sincronizzazione è stata rifiutata a causa di $what. Aggiorna Mangayomi e il server di sincronizzazione, poi riprova.';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return 'Questi elementi sono troppo lunghi da sincronizzare e sono stati esclusi: $items';
+  }
+
+  @override
+  String get missing_chapters_title => 'Capitoli mancanti';
+
+  @override
+  String get missing_episodes_title => 'Episodi mancanti';
+
+  @override
+  String get missing_chapters_info =>
+      'Nessun capitolo di questa serie porta questi numeri. La fonte potrebbe non averli, o averli numerati diversamente.';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mancano i capitoli $numbers',
+      one: 'Manca il capitolo $numbers',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return 'Il capitolo successivo è $chapter.';
+  }
+
+  @override
+  String get warn_missing_chapters => 'Avvisa dei capitoli mancanti';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      'Prima di passare al capitolo successivo, indica quali numeri di capitolo salta.';
 }

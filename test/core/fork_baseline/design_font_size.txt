@@ -7,7 +7,7 @@
 1 lib/modules/anime/widgets/subtitle_view.dart
 8 lib/modules/browse/extension/extension_detail.dart
 7 lib/modules/browse/extension/widgets/source_preference_widget.dart
-9 lib/modules/manga/detail/manga_detail_view.dart
+8 lib/modules/manga/detail/manga_detail_view.dart
 2 lib/modules/manga/detail/manga_details_view.dart
 1 lib/modules/manga/detail/widgets/anime_season_list.dart
 11 lib/modules/manga/detail/widgets/chapter_list_tile_widget.dart

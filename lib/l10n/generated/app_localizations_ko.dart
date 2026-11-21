@@ -1693,6 +1693,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get fullscreen => '전체 화면';
 
   @override
+  String get fullscreen_wayland_info =>
+      'Wayland에서는 열 때 적용되지 않습니다: 창을 전체 화면으로 전환하면 앱이 멈출 수 있습니다(Flutter 버그).';
+
+  @override
   String get update_library => '보관함 업데이트';
 
   @override
@@ -4770,4 +4774,206 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get sync_enable_settings => 'Sync settings';
+
+  @override
+  String get move_to_top => '맨 위로 이동';
+
+  @override
+  String get move_series_to_top => '시리즈를 맨 위로 이동';
+
+  @override
+  String get move_to_bottom => '맨 아래로 이동';
+
+  @override
+  String get move_series_to_bottom => '시리즈를 맨 아래로 이동';
+
+  @override
+  String get show_active_filters => '활성 필터 표시';
+
+  @override
+  String get device_sync => '내 기기 간 동기화';
+
+  @override
+  String get device_sync_summary => '서버 불필요: 기기 하나가 호스트가 되고 나머지 기기가 페어링합니다';
+
+  @override
+  String get device_sync_host_section => '이 기기를 호스트로';
+
+  @override
+  String get device_sync_host => '이 기기에서 동기화 호스팅';
+
+  @override
+  String get device_sync_host_info =>
+      '다른 기기는 로컬 네트워크 또는 Tailscale을 통해 암호화된 상태로, 페어링된 후에만 이 기기와 동기화합니다. 동기화할 수 있도록 이 기기에서 앱을 열어 두세요.';
+
+  @override
+  String device_sync_host_running(String port) {
+    return '포트 $port에서 대기 중';
+  }
+
+  @override
+  String device_sync_host_failed(String error) {
+    return '호스트를 시작할 수 없습니다: $error';
+  }
+
+  @override
+  String get device_sync_add_device => '기기 추가';
+
+  @override
+  String get device_sync_paired_devices => '페어링된 기기';
+
+  @override
+  String get device_sync_no_paired => '아직 페어링된 기기가 없습니다';
+
+  @override
+  String device_sync_paired_on(String date) {
+    return '$date에 페어링됨';
+  }
+
+  @override
+  String device_sync_forget_title(String name) {
+    return '$name을(를) 제거할까요?';
+  }
+
+  @override
+  String get device_sync_forget_message =>
+      '이 기기는 즉시 해당 기기를 더 이상 받아들이지 않습니다. 나중에 새 QR 코드로 다시 페어링할 수 있습니다.';
+
+  @override
+  String get device_sync_join_section => '호스트에 참여';
+
+  @override
+  String get device_sync_join_info =>
+      '동기화를 호스팅하는 기기와 페어링하세요. QR 코드는 해당 기기의 기기 추가에 있습니다.';
+
+  @override
+  String get device_sync_scan => '호스트의 QR 코드 스캔';
+
+  @override
+  String get device_sync_paste => '페어링 링크 붙여넣기';
+
+  @override
+  String get device_sync_link => '페어링 링크';
+
+  @override
+  String get device_sync_link_invalid => '페어링 링크가 아닙니다';
+
+  @override
+  String get device_sync_pair => '페어링';
+
+  @override
+  String get device_sync_pairing => '페어링 중… 호스트에서 이 기기를 수락하세요';
+
+  @override
+  String get device_sync_paired => '호스트와 페어링됨';
+
+  @override
+  String get device_sync_wrong_code =>
+      '코드가 잘못되었습니다. 호스트에서 새 QR 코드를 표시하고 다시 시도하세요.';
+
+  @override
+  String get device_sync_refused => '호스트가 이 기기를 거부했거나 코드가 만료되었습니다.';
+
+  @override
+  String get device_sync_unreachable =>
+      '호스트에 연결할 수 없습니다. 두 기기가 같은 네트워크에 있어야 합니다.';
+
+  @override
+  String get device_sync_invite_info =>
+      '다른 기기에서 설정 → 동기화 → 내 기기 간 동기화를 열고 이 코드를 스캔하거나 링크를 붙여넣으세요. 한 번, 5분 동안 사용할 수 있습니다.';
+
+  @override
+  String get device_sync_copy_link => '링크 복사';
+
+  @override
+  String get device_sync_link_copied => '링크가 복사되었습니다';
+
+  @override
+  String get device_sync_no_network =>
+      '이 기기는 로컬 네트워크에 연결되어 있지 않아 다른 기기가 연결할 수 없습니다.';
+
+  @override
+  String get device_sync_allow_title => '이 기기를 허용할까요?';
+
+  @override
+  String device_sync_allow_message(String name) {
+    return '\"$name\"이(가) 이 기기와 동기화하려고 합니다. 본인 기기인 경우에만 허용하세요.';
+  }
+
+  @override
+  String get device_sync_allow => '허용';
+
+  @override
+  String get device_sync_deny => '거부';
+
+  @override
+  String get device_sync_switch_title => '이 기기의 동기화 대상을 변경할까요?';
+
+  @override
+  String device_sync_switch_message(String server) {
+    return '이 기기는 $server와(과)의 동기화를 중지합니다. 이곳이나 그곳에서 아무것도 삭제되지 않습니다.';
+  }
+
+  @override
+  String device_sync_with_host(String server) {
+    return '$server의 호스트와 동기화됨';
+  }
+
+  @override
+  String get device_sync_with_this_device => '이 기기의 호스트와 동기화됨';
+
+  @override
+  String get device_sync_leave => '호스트와의 동기화 중지';
+
+  @override
+  String get device_sync_stop_host_title => '호스팅을 중지할까요?';
+
+  @override
+  String get device_sync_stop_host_message =>
+      '다시 켤 때까지 다른 기기는 동기화할 수 없습니다. 호스트가 저장한 내용은 이 기기에 남아 있습니다.';
+
+  @override
+  String get device_sync_scan_hint => '호스트의 QR 코드에 카메라를 맞추세요';
+
+  @override
+  String sync_refused(String what) {
+    return '$what 때문에 동기화가 거부되었습니다. Mangayomi와 동기화 서버를 업데이트한 후 다시 시도하세요.';
+  }
+
+  @override
+  String sync_rows_not_sent(String items) {
+    return '다음 항목은 너무 길어 동기화에서 제외되었습니다: $items';
+  }
+
+  @override
+  String get missing_chapters_title => '누락된 화';
+
+  @override
+  String get missing_episodes_title => '누락된 에피소드';
+
+  @override
+  String get missing_chapters_info =>
+      '이 시리즈에는 이 번호를 가진 화가 없습니다. 소스에 없거나 다르게 번호가 매겨졌을 수 있습니다.';
+
+  @override
+  String missing_chapters_skipped(int count, String numbers) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$numbers화가 누락되었습니다',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missing_chapters_skipped_message(String chapter) {
+    return '다음 화는 $chapter입니다.';
+  }
+
+  @override
+  String get warn_missing_chapters => '누락된 화 경고';
+
+  @override
+  String get warn_missing_chapters_subtitle =>
+      '다음 화로 넘어가기 전에 건너뛰는 화 번호를 알려줍니다.';
 }

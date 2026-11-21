@@ -102,7 +102,10 @@ class ChimahonManualRestoreAdapter {
     dateUpload: '$dateUpload',
     isBookmarked: remote.bookmark,
     isRead: remote.read,
-    lastPageRead: remote.lastPageRead == 0 ? '1' : '${remote.lastPageRead}',
+    // Chimahon counts pages from 0, Mangatan from 1 ("1": not started).
+    lastPageRead: remote.lastPageRead <= 0
+        ? '1'
+        : '${remote.lastPageRead.toInt() + 1}',
     scanlator: remote.hasScanlator() ? remote.scanlator : '',
     url: remote.url,
     chapterNumber: remote.chapterNumber,

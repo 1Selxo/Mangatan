@@ -362,7 +362,7 @@ class MihonBackupExporter {
       scanlator: chapter.scanlator,
       read: chapter.isRead ?? false,
       bookmark: chapter.isBookmarked ?? false,
-      lastPageRead: Int64(_wireProgress(chapter.lastPageRead)),
+      lastPageRead: Int64(_wirePageIndex(chapter.lastPageRead)),
       dateFetch: Int64(0),
       dateUpload: Int64(int.tryParse(chapter.dateUpload ?? '') ?? 0),
       chapterNumber: chimahonCanonicalChildNumber(
@@ -505,6 +505,13 @@ class MihonBackupExporter {
   /// Mangatan stores `1` as its no-resume sentinel. Mihon and Chimahon use
   /// zero, so sending the local sentinel verbatim would mark every untouched
   /// chapter or episode as partially consumed.
+  /// Chimahon's `last_page_read` for a Mangatan chapter page: Chimahon counts
+  /// pages from 0, Mangatan from 1, where "1" also means not started.
+  int _wirePageIndex(String? page) {
+    final parsed = int.tryParse(page ?? '');
+    return parsed != null && parsed > 1 ? parsed - 1 : 0;
+  }
+
   int _wireProgress(String? progress) {
     final parsed = int.tryParse(progress ?? '');
     return parsed != null && parsed > 1 ? parsed : 0;

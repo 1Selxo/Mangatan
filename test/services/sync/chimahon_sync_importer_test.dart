@@ -657,7 +657,7 @@ void main() {
       );
       expect(restoredSyncedChapter?.name, 'Remote chapter name');
       expect(restoredSyncedChapter?.isRead, isTrue);
-      expect(restoredSyncedChapter?.lastPageRead, '7');
+      expect(restoredSyncedChapter?.lastPageRead, '8');
       expect(restoredSyncedChapter?.archivePath, '/downloads/chapter-1.cbz');
       final restoredHistory = database.historys
           .filter()
@@ -2155,7 +2155,7 @@ void main() {
     expect(chapters, hasLength(1));
     expect(chapters.single.id, survivor.id);
     expect(chapters.single.chapterNumber, 54);
-    expect(chapters.single.lastPageRead, '5');
+    expect(chapters.single.lastPageRead, '6');
     expect(chapters.single.isBookmarked, isTrue);
     expect(database.chapters.getSync(duplicate.id!), isNull);
 

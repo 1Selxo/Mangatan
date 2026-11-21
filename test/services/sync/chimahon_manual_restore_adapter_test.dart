@@ -342,7 +342,8 @@ void main() {
     );
     expect(chapter.mangaId, 40);
     expect(chapter.chapterNumber, 12.5);
-    expect(chapter.lastPageRead, '7');
+    // Chimahon's page index 7 is Mangatan's page 8.
+    expect(chapter.lastPageRead, '8');
     expect(chapter.updatedAt, 1700000001000);
 
     final episode = adapter.animeEpisodeRow(

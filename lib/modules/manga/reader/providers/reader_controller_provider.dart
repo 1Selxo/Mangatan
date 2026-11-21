@@ -132,16 +132,17 @@ class ReaderController extends _$ReaderController
   }
 
   int getPageIndex() {
-    if (incognitoMode) return 0;
+    if (incognitoMode || chapter.isRead!) return 0;
+    // The chapter's own page is the one sync brings in from other devices
+    // (Chimahon); the reader keeps it in step with its saved index below, so
+    // where the two differ the chapter's page is the newer one.
+    final page = int.tryParse(chapter.lastPageRead ?? '');
+    if (page != null) return page > 1 ? page - 1 : 0;
     final chapterPageIndexList = getIsarSetting().chapterPageIndexList ?? [];
     final index = chapterPageIndexList.where(
       (element) => element.chapterId == chapter.id,
     );
-    return chapter.isRead!
-        ? 0
-        : index.isNotEmpty
-        ? index.first.index!
-        : 0;
+    return index.isNotEmpty ? index.first.index! : 0;
   }
 
   int getPageLength(List pages) {
@@ -165,6 +166,14 @@ class ReaderController extends _$ReaderController
     if (isRead || save) {
       void executeSave() {
         if (chapter.isRead! || incognitoMode) return;
+        // Leaving on the page the chapter already records is not new
+        // progress. Saving it would stamp the chapter as just changed, and
+        // that stale page would then win over newer progress from another
+        // device on the next sync.
+        final storedPage = int.tryParse(chapter.lastPageRead ?? '') ?? 1;
+        if (!isRead && newIndex + 1 == (storedPage < 1 ? 1 : storedPage)) {
+          return;
+        }
         List<ChapterPageIndex>? chapterPageIndexs = [];
         for (var chapterPageIndex
             in getIsarSetting().chapterPageIndexList ?? []) {

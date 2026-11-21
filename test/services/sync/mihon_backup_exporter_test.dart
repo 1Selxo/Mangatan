@@ -170,7 +170,8 @@ void main() {
     expect(backup.backupManga.single.title, 'Source Manga');
     expect(backup.backupManga.single.customTitle, 'Custom Manga');
     expect(backup.backupManga.single.categories, [Int64(3)]);
-    expect(backup.backupManga.single.chapters.single.lastPageRead, Int64(8));
+    // Mangatan's page 8 is Chimahon's page index 7.
+    expect(backup.backupManga.single.chapters.single.lastPageRead, Int64(7));
     expect(backup.backupManga.single.chapters.single.url, '/chapter');
     expect(backup.backupManga.single.chapters, hasLength(1));
     expect(backup.backupManga.single.chapters.single.chapterNumber, 4.5);
@@ -377,7 +378,7 @@ void main() {
       for (final episode in backup.backupAnime.single.episodes)
         episode.url: episode.lastSecondSeen.toInt(),
     };
-    expect(chapters, {'/new': 0, '/started': 9});
+    expect(chapters, {'/new': 0, '/started': 8});
     expect(
       backup.backupManga.single.chapters
           .singleWhere((chapter) => chapter.url == '/started')
@@ -746,7 +747,7 @@ void main() {
 
     final chapter = backup.backupManga.single.chapters.single;
     expect(chapter.chapterNumber, 54);
-    expect(chapter.lastPageRead, Int64(5));
+    expect(chapter.lastPageRead, Int64(4));
     expect(chapter.bookmark, isTrue);
   });
 

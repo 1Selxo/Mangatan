@@ -1340,7 +1340,7 @@ class ChimahonSyncImporter {
           chapterNumber: remote.chapterNumber,
           isBookmarked: remote.bookmark,
           isRead: remote.read,
-          lastPageRead: _progressString(remote.lastPageRead.toInt()),
+          lastPageRead: _chapterPage(remote.lastPageRead.toInt()),
           updatedAt: normalizeMihonTimestamp(remote.lastModifiedAt.toInt()),
         )..manga.value = manga;
         database.chapters.putSync(local);
@@ -1361,7 +1361,7 @@ class ChimahonSyncImporter {
           ..chapterNumber = remote.chapterNumber
           ..isBookmarked = remote.bookmark
           ..isRead = remote.read
-          ..lastPageRead = _progressString(remote.lastPageRead.toInt())
+          ..lastPageRead = _chapterPage(remote.lastPageRead.toInt())
           ..updatedAt = normalizeMihonTimestamp(remote.lastModifiedAt.toInt());
         database.chapters.putSync(local);
         updated++;
@@ -1779,6 +1779,12 @@ class ChimahonSyncImporter {
       chimahonEpisodeIdentity(episode);
 
   String _progressString(int value) => value == 0 ? '1' : '$value';
+
+  /// Mangatan's page for a Chimahon chapter's `last_page_read`. Chimahon
+  /// counts pages from 0 and Mangatan from 1, where "1" also means not
+  /// started.
+  String _chapterPage(int pageIndex) =>
+      pageIndex <= 0 ? '1' : '${pageIndex + 1}';
 
   Status _status(int value) => switch (value) {
     1 => Status.ongoing,

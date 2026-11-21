@@ -483,6 +483,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
   void dispose() {
     _isDisposed = true;
     HardwareKeyboard.instance.removeHandler(_handleHiddenEpubEscape);
+    _epubReaderController.pageHasKeyboardFocus.removeListener(
+      _onEpubLayoutChanged,
+    );
     DictionaryLookupPopup.dismissActive();
     _readingStopwatch.stop();
     WidgetsBinding.instance.removeObserver(this);
@@ -578,6 +581,9 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
     HardwareKeyboard.instance.addHandler(_handleHiddenEpubEscape);
     unawaited(ReaderLookupTriggerState.initialize());
     _epubLayout.addListener(_onEpubLayoutChanged);
+    _epubReaderController.pageHasKeyboardFocus.addListener(
+      _onEpubLayoutChanged,
+    );
     WidgetsBinding.instance.addObserver(this);
     _savedEpubPositionExists = widget.initialEpubHasSavedPosition;
     _savedEpubChapterIndex = widget.initialEpubChapterIndex ?? 0;
@@ -994,8 +1000,12 @@ class _NovelWebViewState extends ConsumerState<NovelWebView>
         unawaited(_continueReadingAtPreviewPosition());
       }
     });
+    // The page turns its own pages for the horizontal keys, but only while it
+    // has the keyboard: before it is clicked into, they reach the app.
     final delegateHorizontalPageKeysToChild =
-        widget.result.asData?.value.$2 != null && !Platform.isLinux;
+        widget.result.asData?.value.$2 != null &&
+        !Platform.isLinux &&
+        _epubReaderController.pageHasKeyboardFocus.value;
     return ReaderKeyboardHandler(
       onBack: () => _goBack(context),
       onFullScreen: () => _setFullScreen(),

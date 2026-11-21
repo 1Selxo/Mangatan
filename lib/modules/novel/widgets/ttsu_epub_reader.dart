@@ -87,10 +87,18 @@ enum EpubReadingLayout {
 class TtsuEpubReaderController {
   InAppWebViewController? _webView;
 
+  /// Whether the page has the keyboard. Keys then reach the page directly
+  /// and it turns its own pages; until it is clicked into, they reach the
+  /// app instead, which has to turn them for it.
+  final pageHasKeyboardFocus = ValueNotifier<bool>(false);
+
   void attach(InAppWebViewController controller) => _webView = controller;
 
   void detach(InAppWebViewController controller) {
-    if (identical(_webView, controller)) _webView = null;
+    if (identical(_webView, controller)) {
+      _webView = null;
+      pageHasKeyboardFocus.value = false;
+    }
   }
 
   Future<bool?> scrollBy(double logicalPixels) async {
@@ -663,6 +671,13 @@ class _TtsuEpubReaderState extends State<TtsuEpubReader> {
     controller.addJavaScriptHandler(
       handlerName: 'readerHoverMiss',
       callback: (_) => _scheduleHoverDismiss(),
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'readerKeyboardFocus',
+      callback: (arguments) {
+        widget.controller.pageHasKeyboardFocus.value =
+            arguments.firstOrNull == true;
+      },
     );
     controller.addJavaScriptHandler(
       handlerName: 'readerHoverHit',
@@ -2731,6 +2746,13 @@ String buildTtsuEpubDocument({
         middleLookupActive = false;
         lastHeldLookupKey = null;
       });
+      // The app turns pages for the arrow keys only while the page does not
+      // have the keyboard, so tell it whenever that changes.
+      const reportKeyboardFocus = () =>
+        call('readerKeyboardFocus', document.hasFocus());
+      window.addEventListener('focus', reportKeyboardFocus);
+      window.addEventListener('blur', reportKeyboardFocus);
+      reportKeyboardFocus();
 
       // Hoshi normalizes ruby base text before retaining DOM ranges. This
       // keeps lookup ranges stable while excluding furigana from scans.

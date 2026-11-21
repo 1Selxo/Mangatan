@@ -79,6 +79,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   TabController? tabBarController;
   int _tabIndex = 0;
   Timer? _searchDebounce;
+  Timer? _categorySaveDebounce;
 
   /// The category of the selected tab (null for Default), which the tab is
   /// found by when the tabs change. Starts as the one the library was last
@@ -118,9 +119,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
   }
 
-  /// Saved here rather than on every tab change: writing a setting rebuilds
-  /// the library, which would make each swipe between categories stutter.
+  /// Saved once the tab has settled rather than on every tab change: writing
+  /// a setting rebuilds the library, which would make each swipe between
+  /// categories stutter. Waiting for dispose or the app being hidden is not
+  /// enough on desktop, where closing the window ends the process first.
+  void _scheduleSelectedCategorySave() {
+    _categorySaveDebounce?.cancel();
+    _categorySaveDebounce = Timer(
+      const Duration(milliseconds: 1500),
+      _saveSelectedCategory,
+    );
+  }
+
   void _saveSelectedCategory() {
+    _categorySaveDebounce?.cancel();
     final settings = settingsRepository.currentOrNull;
     if (settings == null) return;
     if (lastLibraryCategoryId(settings, widget.itemType) ==
@@ -505,6 +517,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               _selectedCategoryId = _tabCategoryIds[index];
             }
           });
+          _scheduleSelectedCategorySave();
         }
       });
     }

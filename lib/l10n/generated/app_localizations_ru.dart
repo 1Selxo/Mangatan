@@ -1153,6 +1153,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sync_starting => 'Начало синхронизации...';
 
   @override
+  String get sync_preparing => 'Подготовка к синхронизации…';
+
+  @override
   String get sync_finished => 'Синхронизация завершена';
 
   @override

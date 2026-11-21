@@ -387,6 +387,7 @@
   "sync_server": "সিংক চাৰ্ভাৰ ঠিকনা",
   "sync_login_invalid_creds": "অবৈধ ইমেইল বা পাছৱৰ্ড",
   "sync_starting": "সিংক আৰম্ভ হৈছে...",
+  "sync_preparing": "সিংকৰ প্ৰস্তুতি চলি আছে…",
   "sync_finished": "সিংক সম্পূৰ্ণ",
   "sync_failed": "সিংক বিফল",
   "sync_button_sync": "প্ৰগতি সিংক কৰক",

@@ -246,6 +246,14 @@ class SyncServer extends _$SyncServer {
         return true;
       }
       if (syncPreference.syncMode == SyncMode.chimahon) {
+        if (!silent && l10n != null) {
+          // A Chimahon sync can wait for other sync work and then keep the
+          // app busy before it reports starting; show at once that the tap
+          // was taken. One frame's pause lets the toast be drawn first.
+          botToast(l10n.sync_preparing, second: 500);
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          if (!ref.mounted) return false;
+        }
         final ran = await _startChimahonSync(
           silent: silent,
           scheduled: scheduled,

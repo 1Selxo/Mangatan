@@ -498,6 +498,7 @@
   "sync_login_browser": "Log in with browser",
   "sync_server": "Sync server address",
   "sync_starting": "Starting sync...",
+  "sync_preparing": "Preparing sync…",
   "sync_finished": "Sync finished",
   "sync_failed": "Sync failed",
   "sync_restore_in_progress": "Sync skipped — restore in progress",

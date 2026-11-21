@@ -440,6 +440,7 @@
   "sync_server": "同步服务器地址",
   "sync_login_invalid_creds": "无效的电子邮件或密码",
   "sync_starting": "开始同步…",
+  "sync_preparing": "正在准备同步…",
   "sync_finished": "同步完成",
   "sync_failed": "同步失败",
   "sync_button_sync": "同步进度",

@@ -435,6 +435,7 @@
   "sync_server": "Indirizzo del server di sincronizzazione",
   "sync_login_invalid_creds": "Email o password non validi",
   "sync_starting": "Avvio della sincronizzazione...",
+  "sync_preparing": "Preparazione della sincronizzazione…",
   "sync_finished": "Sincronizzazione terminata",
   "sync_failed": "Sincronizzazione fallita",
   "sync_button_sync": "Sincronizza la progressione",

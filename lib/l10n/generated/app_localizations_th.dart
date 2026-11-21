@@ -1135,6 +1135,9 @@ class AppLocalizationsTh extends AppLocalizations {
   String get sync_starting => 'กำลังเริ่มการซิงค์...';
 
   @override
+  String get sync_preparing => 'กำลังเตรียมการซิงค์…';
+
+  @override
   String get sync_finished => 'การซิงค์เสร็จสิ้น';
 
   @override

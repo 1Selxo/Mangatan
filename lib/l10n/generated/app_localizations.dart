@@ -2103,6 +2103,12 @@ abstract class AppLocalizations {
   /// **'Starting sync...'**
   String get sync_starting;
 
+  /// No description provided for @sync_preparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing sync…'**
+  String get sync_preparing;
+
   /// No description provided for @sync_finished.
   ///
   /// In en, this message translates to:

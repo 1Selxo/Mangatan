@@ -522,6 +522,7 @@
   "sync_login_browser": "브라우저로 로그인",
   "sync_server": "동기화 서버 주소",
   "sync_starting": "동기화 시작 중...",
+  "sync_preparing": "동기화 준비 중…",
   "sync_finished": "동기화 완료",
   "sync_failed": "동기화 실패",
   "sync_restore_in_progress": "동기화 건너뜀 — 복원 진행 중",

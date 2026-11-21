@@ -1137,6 +1137,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sync_starting => 'Starting sync...';
 
   @override
+  String get sync_preparing => 'Preparing sync…';
+
+  @override
   String get sync_finished => 'Sync finished';
 
   @override

@@ -1135,6 +1135,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get sync_starting => 'شروع همگام‌سازی…';
 
   @override
+  String get sync_preparing => 'در حال آماده‌سازی همگام‌سازی…';
+
+  @override
   String get sync_finished => 'همگام‌سازی پایان یافت';
 
   @override

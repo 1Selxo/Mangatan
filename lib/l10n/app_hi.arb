@@ -387,6 +387,7 @@
   "sync_server": "सिंक सर्वर का पता",
   "sync_login_invalid_creds": "अमान्य ईमेल या पासवर्ड",
   "sync_starting": "सिंक शुरू हो रहा है...",
+  "sync_preparing": "सिंक की तैयारी हो रही है…",
   "sync_finished": "सिंक पूर्ण",
   "sync_failed": "सिंक विफल",
   "sync_button_sync": "प्रगति सिंक करें",

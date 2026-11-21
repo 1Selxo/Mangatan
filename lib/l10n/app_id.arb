@@ -435,6 +435,7 @@
   "sync_server": "Alamat server sinkronisasi",
   "sync_login_invalid_creds": "Email atau kata sandi tidak valid",
   "sync_starting": "Memulai sinkronisasi...",
+  "sync_preparing": "Menyiapkan sinkronisasi…",
   "sync_finished": "Sinkronisasi selesai",
   "sync_failed": "Sinkronisasi gagal",
   "sync_button_sync": "Sinkronkan progres",

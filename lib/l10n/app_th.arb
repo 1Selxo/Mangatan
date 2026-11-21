@@ -439,6 +439,7 @@
   "sync_server": "ที่อยู่เซิร์ฟเวอร์ซิงค์",
   "sync_login_invalid_creds": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
   "sync_starting": "กำลังเริ่มการซิงค์...",
+  "sync_preparing": "กำลังเตรียมการซิงค์…",
   "sync_finished": "การซิงค์เสร็จสิ้น",
   "sync_failed": "การซิงค์ล้มเหลว",
   "sync_button_sync": "ซิงค์ความคืบหน้า",

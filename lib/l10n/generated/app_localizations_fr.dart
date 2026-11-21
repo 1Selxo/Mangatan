@@ -1147,6 +1147,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get sync_starting => 'Démarrage de la synchronisation...';
 
   @override
+  String get sync_preparing => 'Préparation de la synchronisation…';
+
+  @override
   String get sync_finished => 'Synchronisation terminée';
 
   @override

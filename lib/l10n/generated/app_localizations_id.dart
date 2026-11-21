@@ -1138,6 +1138,9 @@ class AppLocalizationsId extends AppLocalizations {
   String get sync_starting => 'Memulai sinkronisasi...';
 
   @override
+  String get sync_preparing => 'Menyiapkan sinkronisasi…';
+
+  @override
   String get sync_finished => 'Sinkronisasi selesai';
 
   @override

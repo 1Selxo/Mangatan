@@ -435,6 +435,7 @@
   "sync_server": "Senkronizasyon Sunucu Adresi",
   "sync_login_invalid_creds": "Geçersiz e-posta veya şifre",
   "sync_starting": "Senkronizasyonu başlatıyorum.",
+  "sync_preparing": "Senkronizasyon hazırlanıyor…",
   "sync_finished": "Senkronizasyon tamamlandı",
   "sync_failed": "Senkronizasyon başarısız",
   "sync_button_sync": "İlerlemeyi senkronize et",

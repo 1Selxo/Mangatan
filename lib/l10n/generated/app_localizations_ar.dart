@@ -1147,6 +1147,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sync_starting => 'بدء المزامنة...';
 
   @override
+  String get sync_preparing => 'جارٍ التحضير للمزامنة…';
+
+  @override
   String get sync_finished => 'تم الانتهاء من المزامنة';
 
   @override

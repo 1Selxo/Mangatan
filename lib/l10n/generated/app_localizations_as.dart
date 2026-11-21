@@ -1137,6 +1137,9 @@ class AppLocalizationsAs extends AppLocalizations {
   String get sync_starting => 'সিংক আৰম্ভ হৈছে...';
 
   @override
+  String get sync_preparing => 'সিংকৰ প্ৰস্তুতি চলি আছে…';
+
+  @override
   String get sync_finished => 'সিংক সম্পূৰ্ণ';
 
   @override

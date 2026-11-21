@@ -1118,6 +1118,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sync_starting => '동기화 시작 중...';
 
   @override
+  String get sync_preparing => '동기화 준비 중…';
+
+  @override
   String get sync_finished => '동기화 완료';
 
   @override

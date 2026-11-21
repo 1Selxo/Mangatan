@@ -1111,6 +1111,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sync_starting => '开始同步…';
 
   @override
+  String get sync_preparing => '正在准备同步…';
+
+  @override
   String get sync_finished => '同步完成';
 
   @override

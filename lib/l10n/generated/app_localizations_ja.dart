@@ -1117,6 +1117,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sync_starting => '同期を開始しています...';
 
   @override
+  String get sync_preparing => '同期を準備しています…';
+
+  @override
   String get sync_finished => '同期完了';
 
   @override

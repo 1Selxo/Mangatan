@@ -1141,6 +1141,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sync_starting => 'Iniciar a sincronização...';
 
   @override
+  String get sync_preparing => 'A preparar a sincronização…';
+
+  @override
   String get sync_finished => 'Sincronização concluída';
 
   @override
@@ -6259,6 +6262,9 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get sync_starting => 'Iniciando a sincronização...';
+
+  @override
+  String get sync_preparing => 'Preparando a sincronização…';
 
   @override
   String get sync_finished => 'Sincronização concluída';

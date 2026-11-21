@@ -512,6 +512,7 @@
   "sync_server": "IP-Adresse/Domain des Sync-Servers",
   "sync_login_invalid_creds": "Ungültige E-Mail-Adresse oder ungültiges Passwort",
   "sync_starting": "Sync gestartet...",
+  "sync_preparing": "Sync wird vorbereitet…",
   "sync_finished": "Sync erfolgreich abgeschlossen!",
   "sync_failed": "Sync fehlgeschlagen!",
   "sync_button_sync": "Jetzt synchronisieren",

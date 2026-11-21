@@ -1140,6 +1140,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sync_starting => 'Sync gestartet...';
 
   @override
+  String get sync_preparing => 'Sync wird vorbereitet…';
+
+  @override
   String get sync_finished => 'Sync erfolgreich abgeschlossen!';
 
   @override

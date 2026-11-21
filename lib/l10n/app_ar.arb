@@ -435,6 +435,7 @@
   "sync_server": "عنوان خادم المزامنة",
   "sync_login_invalid_creds": "بريد إلكتروني أو كلمة مرور غير صحيحة",
   "sync_starting": "بدء المزامنة...",
+  "sync_preparing": "جارٍ التحضير للمزامنة…",
   "sync_finished": "تم الانتهاء من المزامنة",
   "sync_failed": "فشلت المزامنة",
   "sync_button_sync": "مزامنة التقدم",

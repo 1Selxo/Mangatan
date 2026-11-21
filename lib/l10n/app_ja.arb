@@ -359,6 +359,7 @@
   "sync_server": "同期サーバーアドレス",
   "sync_login_invalid_creds": "無効なメールアドレスまたはパスワード",
   "sync_starting": "同期を開始しています...",
+  "sync_preparing": "同期を準備しています…",
   "sync_finished": "同期完了",
   "sync_failed": "同期失敗",
   "sync_button_sync": "進行状況を同期",

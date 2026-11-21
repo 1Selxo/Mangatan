@@ -511,7 +511,7 @@
   "last_sync_update": "Updates zuletzt synchronisiert:",
   "sync_server": "IP-Adresse/Domain des Sync-Servers",
   "sync_login_invalid_creds": "Ungültige E-Mail-Adresse oder ungültiges Passwort",
-  "sync_starting": "Sync gestartet...",
+  "sync_starting": "Sync läuft…",
   "sync_preparing": "Sync wird vorbereitet…",
   "sync_finished": "Sync erfolgreich abgeschlossen!",
   "sync_failed": "Sync fehlgeschlagen!",

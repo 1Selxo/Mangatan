@@ -434,7 +434,7 @@
   "last_sync_update": "Última sincronização das atualizações:",
   "sync_server": "Endereço do servidor de sincronização",
   "sync_login_invalid_creds": "E-mail ou palavra-passe inválidos",
-  "sync_starting": "Iniciar a sincronização...",
+  "sync_starting": "A sincronizar…",
   "sync_preparing": "A preparar a sincronização…",
   "sync_finished": "Sincronização concluída",
   "sync_failed": "A sincronização falhou",

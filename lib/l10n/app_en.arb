@@ -497,7 +497,7 @@
   "last_sync": "Last sync at: ",
   "sync_login_browser": "Log in with browser",
   "sync_server": "Sync server address",
-  "sync_starting": "Starting sync...",
+  "sync_starting": "Syncing…",
   "sync_preparing": "Preparing sync…",
   "sync_finished": "Sync finished",
   "sync_failed": "Sync failed",

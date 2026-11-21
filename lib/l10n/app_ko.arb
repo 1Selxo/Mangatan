@@ -521,7 +521,7 @@
   "last_sync": "마지막 동기화: ",
   "sync_login_browser": "브라우저로 로그인",
   "sync_server": "동기화 서버 주소",
-  "sync_starting": "동기화 시작 중...",
+  "sync_starting": "동기화 중…",
   "sync_preparing": "동기화 준비 중…",
   "sync_finished": "동기화 완료",
   "sync_failed": "동기화 실패",

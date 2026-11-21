@@ -1143,7 +1143,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get sync_server => 'Indirizzo del server di sincronizzazione';
 
   @override
-  String get sync_starting => 'Avvio della sincronizzazione...';
+  String get sync_starting => 'Sincronizzazione in corso…';
 
   @override
   String get sync_preparing => 'Preparazione della sincronizzazione…';

@@ -1137,7 +1137,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sync_server => 'IP-Adresse/Domain des Sync-Servers';
 
   @override
-  String get sync_starting => 'Sync gestartet...';
+  String get sync_starting => 'Sync läuft…';
 
   @override
   String get sync_preparing => 'Sync wird vorbereitet…';

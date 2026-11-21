@@ -434,7 +434,7 @@
   "last_sync_update": "آخر مزامنة للتحديثات:",
   "sync_server": "عنوان خادم المزامنة",
   "sync_login_invalid_creds": "بريد إلكتروني أو كلمة مرور غير صحيحة",
-  "sync_starting": "بدء المزامنة...",
+  "sync_starting": "جارٍ المزامنة…",
   "sync_preparing": "جارٍ التحضير للمزامنة…",
   "sync_finished": "تم الانتهاء من المزامنة",
   "sync_failed": "فشلت المزامنة",

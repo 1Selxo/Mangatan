@@ -1138,7 +1138,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sync_server => 'Endereço do servidor de sincronização';
 
   @override
-  String get sync_starting => 'Iniciar a sincronização...';
+  String get sync_starting => 'A sincronizar…';
 
   @override
   String get sync_preparing => 'A preparar a sincronização…';
@@ -6261,7 +6261,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get sync_server => 'Endereço do servidor de sincronização';
 
   @override
-  String get sync_starting => 'Iniciando a sincronização...';
+  String get sync_starting => 'Sincronizando…';
 
   @override
   String get sync_preparing => 'Preparando a sincronização…';

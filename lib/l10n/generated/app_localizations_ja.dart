@@ -1114,7 +1114,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sync_server => '同期サーバーアドレス';
 
   @override
-  String get sync_starting => '同期を開始しています...';
+  String get sync_starting => '同期しています…';
 
   @override
   String get sync_preparing => '同期を準備しています…';

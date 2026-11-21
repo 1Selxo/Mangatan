@@ -2100,7 +2100,7 @@ abstract class AppLocalizations {
   /// No description provided for @sync_starting.
   ///
   /// In en, this message translates to:
-  /// **'Starting sync...'**
+  /// **'Syncing…'**
   String get sync_starting;
 
   /// No description provided for @sync_preparing.

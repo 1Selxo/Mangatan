@@ -1132,7 +1132,7 @@ class AppLocalizationsTh extends AppLocalizations {
   String get sync_server => 'ที่อยู่เซิร์ฟเวอร์ซิงค์';
 
   @override
-  String get sync_starting => 'กำลังเริ่มการซิงค์...';
+  String get sync_starting => 'กำลังซิงค์…';
 
   @override
   String get sync_preparing => 'กำลังเตรียมการซิงค์…';

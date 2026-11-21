@@ -1130,7 +1130,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get sync_server => 'Senkronizasyon Sunucu Adresi';
 
   @override
-  String get sync_starting => 'Senkronizasyonu başlatıyorum.';
+  String get sync_starting => 'Senkronize ediliyor…';
 
   @override
   String get sync_preparing => 'Senkronizasyon hazırlanıyor…';

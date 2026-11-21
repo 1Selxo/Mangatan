@@ -380,7 +380,7 @@
   "last_sync_update": "Dernière synchronisation des mises à jour :",
   "sync_server": "Adresse du serveur de synchronisation",
   "sync_login_invalid_creds": "E-mail ou mot de passe invalide",
-  "sync_starting": "Démarrage de la synchronisation...",
+  "sync_starting": "Synchronisation en cours…",
   "sync_preparing": "Préparation de la synchronisation…",
   "sync_finished": "Synchronisation terminée",
   "sync_failed": "Échec de la synchronisation",

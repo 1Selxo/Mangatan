@@ -1144,7 +1144,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sync_server => 'عنوان خادم المزامنة';
 
   @override
-  String get sync_starting => 'بدء المزامنة...';
+  String get sync_starting => 'جارٍ المزامنة…';
 
   @override
   String get sync_preparing => 'جارٍ التحضير للمزامنة…';

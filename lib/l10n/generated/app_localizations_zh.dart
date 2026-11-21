@@ -1108,7 +1108,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sync_server => '同步服务器地址';
 
   @override
-  String get sync_starting => '开始同步…';
+  String get sync_starting => '正在同步…';
 
   @override
   String get sync_preparing => '正在准备同步…';

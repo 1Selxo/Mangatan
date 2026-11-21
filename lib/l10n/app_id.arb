@@ -434,7 +434,7 @@
   "last_sync_update": "Sinkronisasi pembaruan terakhir:",
   "sync_server": "Alamat server sinkronisasi",
   "sync_login_invalid_creds": "Email atau kata sandi tidak valid",
-  "sync_starting": "Memulai sinkronisasi...",
+  "sync_starting": "Menyinkronkan…",
   "sync_preparing": "Menyiapkan sinkronisasi…",
   "sync_finished": "Sinkronisasi selesai",
   "sync_failed": "Sinkronisasi gagal",

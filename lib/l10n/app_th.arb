@@ -438,7 +438,7 @@
   "last_sync_update": "อัปเดตข้อมูลล่าสุดเมื่อ:",
   "sync_server": "ที่อยู่เซิร์ฟเวอร์ซิงค์",
   "sync_login_invalid_creds": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
-  "sync_starting": "กำลังเริ่มการซิงค์...",
+  "sync_starting": "กำลังซิงค์…",
   "sync_preparing": "กำลังเตรียมการซิงค์…",
   "sync_finished": "การซิงค์เสร็จสิ้น",
   "sync_failed": "การซิงค์ล้มเหลว",

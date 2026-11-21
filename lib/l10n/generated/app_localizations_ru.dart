@@ -1150,7 +1150,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sync_server => 'Адрес сервера синхронизации';
 
   @override
-  String get sync_starting => 'Начало синхронизации...';
+  String get sync_starting => 'Синхронизация…';
 
   @override
   String get sync_preparing => 'Подготовка к синхронизации…';

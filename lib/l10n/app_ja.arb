@@ -358,7 +358,7 @@
   "last_sync_update": "最終更新同期: ",
   "sync_server": "同期サーバーアドレス",
   "sync_login_invalid_creds": "無効なメールアドレスまたはパスワード",
-  "sync_starting": "同期を開始しています...",
+  "sync_starting": "同期しています…",
   "sync_preparing": "同期を準備しています…",
   "sync_finished": "同期完了",
   "sync_failed": "同期失敗",

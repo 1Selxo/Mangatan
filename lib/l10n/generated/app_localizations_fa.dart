@@ -1132,7 +1132,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get sync_server => 'آدرس سرور همگام‌سازی';
 
   @override
-  String get sync_starting => 'شروع همگام‌سازی…';
+  String get sync_starting => 'در حال همگام‌سازی…';
 
   @override
   String get sync_preparing => 'در حال آماده‌سازی همگام‌سازی…';

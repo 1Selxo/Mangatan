@@ -1134,7 +1134,7 @@ class AppLocalizationsHi extends AppLocalizations {
   String get sync_server => 'सिंक सर्वर का पता';
 
   @override
-  String get sync_starting => 'सिंक शुरू हो रहा है...';
+  String get sync_starting => 'सिंक हो रहा है…';
 
   @override
   String get sync_preparing => 'सिंक की तैयारी हो रही है…';

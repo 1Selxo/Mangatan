@@ -723,7 +723,7 @@
   "last_sync_update": "Última sincronización de actualizaciones:",
   "sync_server": "Dirección del servidor de sincronización",
   "sync_login_invalid_creds": "Correo electrónico o contraseña no válidos",
-  "sync_starting": "Empezando la sincronización...",
+  "sync_starting": "Sincronizando…",
   "sync_preparing": "Preparando la sincronización…",
   "sync_finished": "Sincronización finalizada",
   "sync_failed": "Error de sincronización",

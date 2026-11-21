@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import 'package:mangayomi/services/fetch_sources_list.dart'
+    show filtersFromJson;
 import 'package:mangayomi/eval/http_response_extensions.dart';
 import 'package:mangayomi/eval/model/filter.dart';
 import 'package:mangayomi/eval/model/m_chapter.dart';
@@ -525,6 +527,24 @@ class MihonExtensionService implements ExtensionService {
   @override
   FilterList getFilterList() {
     return source.getFilterList() ?? FilterList([]);
+  }
+
+  /// The filters as the extension gives them now, rather than as stored when
+  /// it was installed. Some extensions load part of their filters from the
+  /// site in the background after the first request (Keiyoushi's "Tap
+  /// 'Reset' to load filters"); Mihon's Reset asks again, and so does this.
+  Future<FilterList?> fetchFilterList() async {
+    final name = source.itemType == ItemType.anime ? "Anime" : "Manga";
+    final res = await _postDalvik(
+      body: {
+        "method": "filters$name",
+        "data": source.sourceCode,
+        "preferences": mihonPreferencePayload(source, getSourcePreferences()),
+      },
+    );
+    final data = _checkedJson(res);
+    if (data is! List) return null;
+    return FilterList(filtersFromJson(data));
   }
 
   @override

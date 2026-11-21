@@ -18,6 +18,7 @@ import 'package:mangayomi/modules/widgets/listview_widget.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/get_filter_list.dart';
+import 'package:mangayomi/services/mihon_filter_list.dart';
 import 'package:mangayomi/services/get_latest_updates.dart';
 import 'package:mangayomi/services/get_popular.dart';
 import 'package:mangayomi/services/get_source_baseurl.dart';
@@ -194,6 +195,7 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
     super.initState();
     _openOnGenre();
     _pagination = _createPagination();
+    unawaited(_refreshFiltersOnOpen());
     _scrollController.addListener(_onScroll);
     _mangaStreamSub = mangaRepository
         .watchBySourceAndLang(source.name, source.lang)
@@ -335,6 +337,61 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
       _isSearch = true;
       _query = genre;
       _textEditingController.text = genre;
+    }
+  }
+
+  bool get _isMihon =>
+      !isLocal && source.sourceCodeLanguage == SourceCodeLanguage.mihon;
+
+  /// The filters the extension gives now, asked of the bridge again as
+  /// Mihon's Reset does; null when that is not possible.
+  Future<List<dynamic>?> _fetchFreshFilters() async {
+    if (!_isMihon) return null;
+    try {
+      return await ref.refresh(mihonFilterListProvider(source).future);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// A Mihon source's stored filters are the ones it gave when installed.
+  /// Asking again on open picks up filters it has loaded from the site since,
+  /// and starts that loading for extensions that only begin it on request.
+  Future<void> _refreshFiltersOnOpen() async {
+    if (!_isMihon) return;
+    final genre = widget.genre;
+    if (genre != null && !_isFiltering) {
+      await _resolveGenreFilter(genre);
+      return;
+    }
+    final fresh = await _fetchFreshFilters();
+    // A filter the user is already using is left alone.
+    if (fresh == null || !mounted || _isFiltering) return;
+    setState(() => filters = fresh);
+  }
+
+  /// The genre was not among the stored filters, so it is searched as text.
+  /// An extension that loads its genre list from the site in the background
+  /// after the first filter request may have it a moment later: ask a few
+  /// times, then browse the genre as a filter instead.
+  Future<void> _resolveGenreFilter(String genre) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await Future.delayed(const Duration(seconds: 2));
+      final fresh = await _fetchFreshFilters();
+      if (fresh == null || !mounted) return;
+      // The user has moved on from the genre search.
+      if (_query != genre || _selectedIndex != 2) return;
+      if (selectGenreFilter(fresh, genre)) {
+        setState(() {
+          filters = fresh;
+          _isFiltering = true;
+          _isSearch = false;
+          _query = '';
+          _textEditingController.clear();
+          _resetPagination();
+        });
+        return;
+      }
     }
   }
 
@@ -696,12 +753,21 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                                       child: Row(
                                         children: [
                                           TextButton(
-                                            onPressed: () {
+                                            onPressed: () async {
                                               setState(() {
                                                 filters = getFilterList(
                                                   source: source,
                                                 );
                                               });
+                                              // As in Mihon, Reset also asks
+                                              // the extension again, for
+                                              // filters it loads from the site.
+                                              final fresh =
+                                                  await _fetchFreshFilters();
+                                              if (fresh != null &&
+                                                  context.mounted) {
+                                                setState(() => filters = fresh);
+                                              }
                                             },
                                             child: Text(l10n.reset),
                                           ),

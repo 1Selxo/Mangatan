@@ -81,3 +81,7 @@ AGENTS.override.md
 
 # Crash reports written by debug runs; they contain local library paths
 crash_reports.json
+
+# Written by the desktop app, whose data folder is Documents/Mangatan:
+# the repository root when the repo is cloned there.
+/logs.txt

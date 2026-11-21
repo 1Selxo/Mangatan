@@ -543,7 +543,7 @@ void main() {
           case 'findNotes':
             expect(
               (body['params'] as Map<String, dynamic>)['query'],
-              '"deck:Japanese" "expression:事件"',
+              '"deck:Japanese" "note:Mining" "expression:事件"',
             );
             return http.Response('{"result": [41, 42], "error": null}', 200);
         }
@@ -574,7 +574,7 @@ void main() {
           expect(
             (body['params'] as Map<String, dynamic>)['query'],
             '("deck:Japanese::Mining" or "deck:Japanese::Archive") '
-            '"expression:事件"',
+            '"note:Mining" "expression:事件"',
           );
           return http.Response('{"result": [51], "error": null}', 200);
       }
@@ -591,6 +591,38 @@ void main() {
 
     expect(ids, [51]);
   });
+
+  test(
+    'looks for existing notes of every note type when the profile asks',
+    () async {
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        switch (body['action']) {
+          case 'modelFieldNames':
+            return http.Response(
+              '{"result": ["Expression", "Meaning"], "error": null}',
+              200,
+            );
+          case 'findNotes':
+            expect(
+              (body['params'] as Map<String, dynamic>)['query'],
+              '"deck:Japanese::Mining" "expression:事件"',
+            );
+            return http.Response('{"result": [61], "error": null}', 200);
+        }
+        fail('Unexpected action: ${body['action']}');
+      });
+
+      final ids = await AnkiConnectService(client: client).findDuplicateNoteIds(
+        deckName: 'Japanese::Mining',
+        modelName: 'Mining',
+        expression: '事件',
+        checkAllModels: true,
+      );
+
+      expect(ids, [61]);
+    },
+  );
 
   test('opens matching notes in the Anki card browser', () async {
     final client = MockClient((request) async {

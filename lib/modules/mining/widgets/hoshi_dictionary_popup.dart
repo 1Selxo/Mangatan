@@ -451,6 +451,7 @@ class _HoshiDictionaryPopupState extends State<HoshiDictionaryPopup> {
         expression: expression,
         duplicateScope: profile.duplicateScope,
         duplicateDeckNames: profile.duplicateDeckNames,
+        checkAllModels: profile.checkAllModels,
       );
     } catch (_) {
       return const [];

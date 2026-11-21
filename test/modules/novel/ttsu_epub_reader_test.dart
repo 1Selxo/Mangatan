@@ -647,6 +647,44 @@ void main() {
     expect(candidates, isNot(contains('second')));
   });
 
+  test('promotes nested and display-utility picture wrappers', () {
+    final document = buildTtsuEpubDocument(
+      html: '''
+        <section data-mangatan-spine-index="0">
+          <div id="nested"><div><span><img src="data:image/png;base64,AA=="></span></div></div>
+          <div id="kobo" class="display-inline-block"><img src="data:image/png;base64,AA=="></div>
+          <div id="inline-img" class="inline-img"><img src="data:image/png;base64,AA=="></div>
+          <div id="pair"><div><img id="left" src="data:image/png;base64,AA=="></div><div><img id="right" src="data:image/png;base64,AA=="></div></div>
+        </section>
+      ''',
+      book: book,
+      title: 'fixture',
+      backgroundColor: '#101010',
+      textColor: '#f0f0f0',
+      fontSize: 18,
+      lineHeight: 1.8,
+      padding: 24,
+      textAlign: 'left',
+      initialProgress: 0,
+      tapToScroll: true,
+      layout: EpubReadingLayout.horizontalPaged,
+    );
+
+    final candidates = html_parser
+        .parse(document)
+        .querySelector('#reader-content')!
+        .querySelectorAll('[data-mangatan-full-page-candidate]')
+        .map((element) => element.id)
+        .toSet();
+    // A picture several levels down is still the wrapper's only picture.
+    expect(candidates, contains('nested'));
+    // "display-inline-block" is CSS layout, not an inline image.
+    expect(candidates, contains('kobo'));
+    expect(candidates, isNot(contains('inline-img')));
+    // Two pictures side by side stay in the flow.
+    expect(candidates, isNot(contains('pair')));
+  });
+
   test(
     'supports continuous vertical writing on the horizontal scroll axis',
     () {

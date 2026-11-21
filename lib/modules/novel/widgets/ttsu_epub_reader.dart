@@ -2897,7 +2897,10 @@ bool _isHeading(dom.Element element) =>
     const {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}.contains(element.localName);
 
 bool _hasInlineMediaSignal(dom.Element element) {
-  final classNames = element.classes.join(' ').toLowerCase();
+  final classNames = element.classes
+      .map((name) => name.toLowerCase())
+      .where((name) => !_cssDisplayUtilityClass.hasMatch(name))
+      .join(' ');
   if (RegExp(
     r'(^|[\s_-])(gaiji(?:-line)?|inline(?:-img|-image)?|emoji|illus(?:tration)?|float[-_]?img|decorat(?:ive|ion)?)([\s_-]|$)',
   ).hasMatch(classNames)) {
@@ -2909,6 +2912,13 @@ bool _hasInlineMediaSignal(dom.Element element) {
         attribute.value.toLowerCase().contains('illustration');
   });
 }
+
+/// Class names that only say how the element is displayed, such as the
+/// `display-inline-block` that EBPAJ and Kobo books put around full-page
+/// artwork. Their "inline" is CSS layout, not a sign of an inline image.
+final _cssDisplayUtilityClass = RegExp(
+  r'^(?:display[-_])?inline[-_](?:block|flex|grid|table)$|^display[-_]inline$',
+);
 
 bool _hasSmallAuthoredDimension(dom.Element element) =>
     const ['width', 'height'].any((name) {
@@ -2929,7 +2939,7 @@ bool _containsOnlyMediaBranch(dom.Element container, dom.Element branch) {
         .where((element) => element.querySelector('image') != null),
   ];
   return otherMedia.every(
-    (element) => identical(element, branch) || branch.contains(element),
+    (element) => identical(element, branch) || _isInside(element, branch),
   );
 }
 
@@ -2941,8 +2951,18 @@ bool _hasOtherMediaOutside(dom.Element container, dom.Element branch) {
         .where((element) => element.querySelector('image') != null),
   ];
   return media.any(
-    (element) => !identical(element, branch) && !branch.contains(element),
+    (element) => !identical(element, branch) && !_isInside(element, branch),
   );
+}
+
+/// Whether [node] sits anywhere under [ancestor]. The html package's
+/// `contains` only looks at direct children, so a picture nested a level
+/// deeper read as other media beside its own branch.
+bool _isInside(dom.Node node, dom.Node ancestor) {
+  for (var parent = node.parent; parent != null; parent = parent.parent) {
+    if (identical(parent, ancestor)) return true;
+  }
+  return false;
 }
 
 const _inlineMediaContextElements = {

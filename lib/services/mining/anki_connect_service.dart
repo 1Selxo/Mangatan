@@ -138,6 +138,7 @@ class AnkiConnectService {
     required String expression,
     String duplicateScope = 'deck',
     List<String> duplicateDeckNames = const [],
+    bool checkAllModels = false,
   }) async {
     final fields = await modelFieldNames(modelName);
     if (fields.isEmpty || expression.trim().isEmpty) return const [];
@@ -155,8 +156,14 @@ class AnkiConnectService {
         '(${selectedDecks.map((deck) => '"deck:${_escapeSearch(deck)}"').join(' or ')}) ',
       _ => '"deck:$escapedDeck" ',
     };
+    // Anki counts a note as a duplicate only within its own note type unless
+    // the profile checks all of them, so the notes shown as already mined
+    // must agree with what adding the card would report.
+    final noteType = checkAllModels
+        ? ''
+        : '"note:${_escapeSearch(modelName)}" ';
     return findNotes(
-      '$scope"${fields.first.toLowerCase()}:$escapedExpression"',
+      '$scope$noteType"${fields.first.toLowerCase()}:$escapedExpression"',
     );
   }
 

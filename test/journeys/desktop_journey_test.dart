@@ -3,6 +3,7 @@
 // mode is switched mid-chapter from the bottom bar. The library category bug
 // (fixed 2026-11-21) was exactly "saved on dispose, lost on window close".
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'harness/journey.dart';
@@ -21,9 +22,10 @@ void main() {
   group('closing the window', () {
     for (final mode in [ReaderMode.ltr, ReaderMode.webtoon]) {
       testWidgets(
-        'S4 ${mode.name}: closing the window mid-chapter keeps the '
+        '${mode.name}: closing the window mid-chapter keeps the '
         'page for next time',
-        skip: true, // Suspected bug S4: the page is saved only on dispose.
+        // Was S4: the page was saved only on dispose, which closing a
+        // desktop window never runs.
         (tester) async {
           late int id;
           final j = await Journey.start(
@@ -49,7 +51,14 @@ void main() {
             isNot(anyOf('', '1')),
             reason: 'left on $leftOn',
           );
-          await j.tapText('Kuso Onna');
+          // From the library grid: the Continue shelf above it opens the
+          // chapter straight in the reader.
+          await j.tap(
+            find.descendant(
+              of: find.byType(CoverViewWidget),
+              matching: find.text('Kuso Onna'),
+            ),
+          );
           await j.openChapter('Chapter 1');
           expect(j.pageIndicator, leftOn);
         },

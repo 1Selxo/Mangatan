@@ -347,6 +347,7 @@ class _MangaChapterPageGalleryState
     if (discordReaderSession != null) {
       unawaited(discordRpc?.endReaderSession(discordReaderSession));
     }
+    _pageSaveTimer?.cancel();
     _saveCurrentPage(pageViewToActualIndexSync(_currentIndex ?? 0));
     // After the save above, which may be what marks this chapter read.
     unawaited(PendingDownloadDeletions.flush());
@@ -1294,9 +1295,27 @@ class _MangaChapterPageGalleryState
       _currentPageDisplayIndex.value = idx;
       _updateHasCurrentError();
       _readerController.setPageIndex(idx, false, _chapterUrlModel.pageUrls);
+      _schedulePageSave(idx);
       ref.read(currentIndexProvider(chapter).notifier).setCurrentIndex(idx);
       onLearningPageShown(actualIndex);
     }
+  }
+
+  Timer? _pageSaveTimer;
+
+  /// Saves page [idx] as the reading position once the reader rests on it.
+  /// Saving only on dispose loses the page whenever the reader is never
+  /// disposed: a desktop window closed with its X, a crash, the system
+  /// ending the app. The short delay keeps fast page flipping from writing
+  /// every page it passes.
+  void _schedulePageSave(int idx) {
+    _pageSaveTimer?.cancel();
+    final controller = _readerController;
+    final pageUrls = _chapterUrlModel.pageUrls;
+    _pageSaveTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      controller.setPageIndex(idx, true, pageUrls);
+    });
   }
 
   late final _pageOffset = ValueNotifier(

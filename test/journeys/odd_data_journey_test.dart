@@ -95,9 +95,8 @@ void main() {
   testWidgets(
     'a corrupt page shows as failed and the rest of the chapter '
     'still reads',
-    // Suspected bug S11: OCR's precacheImage reports the failed page as an
-    // uncaught error (an "error report" in the app).
-    skip: true,
+    // Was S11: OCR's precacheImage reported the failed page as an uncaught
+    // error (an "error report" in the app).
     (tester) async {
       final j = await Journey.start(
         tester,

@@ -97,7 +97,13 @@ mixin ReaderLearningMixin<T extends ConsumerStatefulWidget>
         startIndex: startIndex,
         preparePage: (page) async {
           if (!mounted) return;
-          await precacheImage(page.getImageProvider(ref, true), context);
+          // A page that cannot be decoded shows as failed in the reader;
+          // reading ahead for OCR must not report it as an app error (S11).
+          await precacheImage(
+            page.getImageProvider(ref, true),
+            context,
+            onError: (_, _) {},
+          );
         },
       ),
     );

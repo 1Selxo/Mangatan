@@ -73,6 +73,9 @@ class MangaInfoHeader extends ConsumerStatefulWidget {
 class _MangaInfoHeaderState extends ConsumerState<MangaInfoHeader> {
   bool _expanded = false;
 
+  /// Null for a series whose source gives no genres (see MangaDetailView).
+  List<String> get _genres => widget.manga.genre ?? const [];
+
   @override
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
@@ -147,16 +150,12 @@ class _MangaInfoHeaderState extends ConsumerState<MangaInfoHeader> {
                     padding: const EdgeInsets.symmetric(
                       horizontal: ShioriSpace.s12,
                     ),
-                    child: widget.manga.genre!.isEmpty
+                    child: _genres.isEmpty
                         ? const SizedBox(height: ShioriSpace.s32)
                         : _expanded || context.isTablet
                         ? Wrap(
                             children: [
-                              for (
-                                var i = 0;
-                                i < widget.manga.genre!.length;
-                                i++
-                              )
+                              for (var i = 0; i < _genres.length; i++)
                                 _genreChip(i, l10n),
                             ],
                           )
@@ -165,11 +164,7 @@ class _MangaInfoHeaderState extends ConsumerState<MangaInfoHeader> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.start,
                               children: [
-                                for (
-                                  var i = 0;
-                                  i < widget.manga.genre!.length;
-                                  i++
-                                )
+                                for (var i = 0; i < _genres.length; i++)
                                   _genreChip(i, l10n),
                               ],
                             ),
@@ -275,7 +270,7 @@ class _MangaInfoHeaderState extends ConsumerState<MangaInfoHeader> {
 
   Widget _genreChip(int index, AppLocalizations l10n) {
     return DetailGenreChip(
-      label: widget.manga.genre![index],
+      label: _genres[index],
       libraryLabel: l10n.genre_search_library,
       sourceLabel: l10n.genre_search_source,
       onSelected: (value) => _selectGenre(index, value, l10n),
@@ -283,7 +278,7 @@ class _MangaInfoHeaderState extends ConsumerState<MangaInfoHeader> {
   }
 
   void _selectGenre(int index, int value, AppLocalizations l10n) {
-    final genre = widget.manga.genre![index];
+    final genre = _genres[index];
     if (value == 0) {
       context.go(
         libraryRouteFor(widget.manga.itemType),

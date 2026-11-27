@@ -167,10 +167,8 @@ void main() {
       expect(novel?.itemType, ItemType.novel);
     });
 
-    testWidgets('a series without genres from the sync opens', skip: true, (
-      tester,
-    ) async {
-      // Suspected bug S9, reached through sync.
+    testWidgets('a series without genres from the sync opens', (tester) async {
+      // Was S9, reached through sync.
       await tester.runAsync(() async => server = await FakeSyncYomi.start());
       final j = await connectedTo(tester, server);
       await j.sync(download: true);

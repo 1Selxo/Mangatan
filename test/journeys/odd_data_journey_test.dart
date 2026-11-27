@@ -288,12 +288,10 @@ void main() {
     expect(find.text('Chapter 1'), findsWidgets);
   });
 
-  testWidgets('S9: a series without genres opens its manga page', skip: true, (
-    tester,
-  ) async {
-    // Suspected bug S9: manga_detail_view.dart reads
-    // `manga.genre!`, null for local series whose details.json has no genre,
-    // LNReader novels without genres and Aidoku entries without tags.
+  testWidgets('a series without genres opens its manga page', (tester) async {
+    // Was S9: manga_detail_view.dart read `manga.genre!`, null for local
+    // series whose details.json has no genre, LNReader novels without genres
+    // and Aidoku entries without tags.
     final j = await Journey.start(
       tester,
       arrange: (seed) async {

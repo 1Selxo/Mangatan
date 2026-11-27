@@ -251,6 +251,10 @@ class _DetailActions extends ConsumerWidget {
 
 class _MangaDetailViewState extends ConsumerState<MangaDetailView>
     with TickerProviderStateMixin {
+  /// A series may have no genre list at all: a local folder whose
+  /// details.json has none, an LNReader novel or an Aidoku entry without tags.
+  List<String> get _genres => widget.manga?.genre ?? const [];
+
   List<EpubBookProgress> _localNovelProgresses() {
     final mangaId = widget.manga?.id;
     if (mangaId == null || !isLocalArchive) return const [];
@@ -1770,16 +1774,12 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                     ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: widget.manga!.genre!.isEmpty
+                    child: _genres.isEmpty
                         ? const SizedBox(height: 30)
                         : _expanded || context.isTablet
                         ? Wrap(
                             children: [
-                              for (
-                                var i = 0;
-                                i < widget.manga!.genre!.length;
-                                i++
-                              )
+                              for (var i = 0; i < _genres.length; i++)
                                 Padding(
                                   padding: const EdgeInsets.only(
                                     left: 2,
@@ -1824,7 +1824,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                           return;
                                         }
                                         if (value == 0) {
-                                          final genre = widget.manga!.genre![i];
+                                          final genre = _genres[i];
                                           switch (widget.manga!.itemType) {
                                             case ItemType.manga:
                                               context.pushReplacement(
@@ -1865,7 +1865,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                         ),
                                         onPressed: null,
                                         child: Text(
-                                          widget.manga!.genre![i],
+                                          _genres[i],
                                           style: TextStyle(
                                             // 11 is the chip step. 11.5 is not
                                             // on the scale and renders
@@ -1888,11 +1888,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.start,
                               children: [
-                                for (
-                                  var i = 0;
-                                  i < widget.manga!.genre!.length;
-                                  i++
-                                )
+                                for (var i = 0; i < _genres.length; i++)
                                   Padding(
                                     padding: const EdgeInsets.only(
                                       left: 2,
@@ -1914,7 +1910,7 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                         ),
                                         onPressed: () {},
                                         child: Text(
-                                          widget.manga!.genre![i],
+                                          _genres[i],
                                           style: TextStyle(
                                             // 11 is the chip step. 11.5 is not
                                             // on the scale and renders

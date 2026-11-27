@@ -360,8 +360,10 @@ Future<void> followMovedRepos({
   required Map<int, List<ExtensionOffer>> offers,
   required ItemType itemType,
   Future<String?> Function(String url)? resolveIndexUrl,
+  List<Source>? installedSources,
 }) async {
-  final installed = sourceRepository.getAddedByItemType(itemType);
+  final installed =
+      installedSources ?? sourceRepository.getAddedByItemType(itemType);
   final resolve = resolveIndexUrl ?? _resolveIndexUrl;
   for (final url in movedOriginCandidates(installed, repos, offers)) {
     final resolved = await resolve(url);
@@ -396,10 +398,12 @@ Future<void> applyExtensionUpdates({
   required bool autoUpdate,
   required String androidProxyServer,
   required ItemType itemType,
+  List<Source>? installedSources,
 }) async {
   // A Mihon APK's sources are installed together: once per APK.
   final installedMihonGroups = <String>{};
-  for (final installed in sourceRepository.getAddedByItemType(itemType)) {
+  for (final installed
+      in installedSources ?? sourceRepository.getAddedByItemType(itemType)) {
     if (installed.isLocal ?? false) continue;
     final offer = chooseUpdate(installed, offers[installed.id] ?? const []);
     if (offer == null) {

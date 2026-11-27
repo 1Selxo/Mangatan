@@ -90,7 +90,18 @@ Future<void> fetchItemSourcesList(
       );
     }
   }
-  await followMovedRepos(repos: repos, offers: offers, itemType: itemType);
+  // Read once for both steps: every installed source carries its whole APK.
+  // followMovedRepos saves what it changes through these same objects.
+  final installed = await isar.sources
+      .where()
+      .itemTypeIsAddedEqualTo(itemType, true)
+      .findAll();
+  await followMovedRepos(
+    repos: repos,
+    offers: offers,
+    itemType: itemType,
+    installedSources: installed,
+  );
   await removeListingsOfRemovedRepos(
     repos: repos,
     offeredIds: offers.keys.toSet(),
@@ -102,6 +113,7 @@ Future<void> fetchItemSourcesList(
     autoUpdate: ref.watch(autoUpdateExtensionsStateProvider),
     androidProxyServer: androidProxyServer,
     itemType: itemType,
+    installedSources: installed,
   );
   for (final (repo, listed) in listings) {
     try {

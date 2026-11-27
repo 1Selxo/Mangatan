@@ -27,14 +27,15 @@ Future<void> fetchItemSourcesList(
 
   // Mihon extensions are read through the bridge, which may still have to
   // start (the embedded iOS runtime starts on first use).
+  // One row: every installed source carries its whole APK, so reading all
+  // of them to take the first stalled launch.
   final mihonSource = id != null
       ? isar.sources.getSync(id)
-      : (await isar.sources
-                .filter()
-                .sourceCodeLanguageEqualTo(SourceCodeLanguage.mihon)
-                .isAddedEqualTo(true)
-                .findAll())
-            .firstOrNull;
+      : await isar.sources
+            .filter()
+            .sourceCodeLanguageEqualTo(SourceCodeLanguage.mihon)
+            .isAddedEqualTo(true)
+            .findFirst();
   if (mihonSource != null &&
       mihonSource.sourceCodeLanguage == SourceCodeLanguage.mihon) {
     await prepareMihonBridge(ref, mihonSource);

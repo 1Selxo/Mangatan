@@ -111,9 +111,9 @@ void main() {
       ReaderMode.horizontalContinuous,
     ]) {
       testWidgets(
-        '${to.isContinuous && to != ReaderMode.webtoon ? 'S6 ' : ''}left to right → ${to.name} stays on the same page',
-        // Suspected bug S6: vertical and horizontal continuous land a page early.
-        skip: to.isContinuous && to != ReaderMode.webtoon,
+        // Was S6 for vertical and horizontal continuous: they landed a page
+        // early.
+        'left to right → ${to.name} stays on the same page',
         (tester) async {
           final j = await Journey.start(
             tester,

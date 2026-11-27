@@ -1404,15 +1404,49 @@ class _MangaChapterPageGalleryState
     } else {
       if (_listController.isAttached &&
           _continuousScrollController.hasClients) {
-        _listController.jumpToItem(
-          index: targetIndex,
-          scrollController: _continuousScrollController,
-          alignment: 0.0,
-        );
+        _jumpToContinuousPage(targetIndex);
+        // The strip estimates the extents of pages it has not laid out yet;
+        // as their images load the estimate changes and a single jump ended
+        // on the page before (S6). Aim again while they settle, unless the
+        // reader has moved on.
+        for (final wait in const [100, 300, 700]) {
+          await Future<void>.delayed(Duration(milliseconds: wait));
+          if (!mounted ||
+              isUserDragging ||
+              // This reader's own ref: [ref] here may be the mode sheet's,
+              // gone once the sheet closes.
+              this.ref.read(_currentReaderMode) != value ||
+              !_listController.isAttached ||
+              !_continuousScrollController.hasClients) {
+            break;
+          }
+          final shown = _listController.visibleRange?.$1;
+          if (shown == targetIndex) continue;
+          if (shown != null && (shown - targetIndex).abs() > 1) break;
+          _jumpToContinuousPage(targetIndex);
+        }
       }
     }
     // Split halves are in the order of the direction read.
     if (directionChanged) rejoinSplitPages();
+  }
+
+  /// Puts page [index] at the start of the continuous strip. Half a pixel
+  /// past its edge: aligned exactly, rounding leaves a sliver of the page
+  /// before it in view, and the page counter, which follows the first page
+  /// in view, then names that one (S6).
+  void _jumpToContinuousPage(int index) {
+    _listController.jumpToItem(
+      index: index,
+      scrollController: _continuousScrollController,
+      alignment: 0.0,
+    );
+    final position = _continuousScrollController.position;
+    final nudged = (position.pixels + 0.5).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    _continuousScrollController.jumpTo(nudged);
   }
 
   void _goBack(BuildContext context) {

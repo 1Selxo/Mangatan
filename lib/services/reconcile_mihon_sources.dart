@@ -78,7 +78,9 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
 }) async {
   final totalWatch = Stopwatch()..start();
   final candidates = isar.sources
-      .where()
+      .filter()
+      .isAddedEqualTo(true)
+      .sourceCodeLanguageEqualTo(SourceCodeLanguage.mihon)
       .findAllSync()
       .where(
         (source) =>
@@ -156,15 +158,19 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
       bridgeMicroseconds += bridgeWatch.elapsedMicroseconds;
       for (var pass = 0; pass < 3; pass++) {
         passes++;
-        final currentGroup =
-            (await isar.sources
-                    .filter()
-                    .sourceCodeUrlEqualTo(template.sourceCodeUrl)
-                    .findAll())
-                .where(
-                  (source) => belongsToSameMihonExtension(template, source),
-                )
-                .toList();
+        // The first pass works on the rows just read; a later one re-reads
+        // the group, which the pass before may have grown. Each row carries
+        // its whole APK, so reading them again is not free.
+        final currentGroup = pass == 0
+            ? sources
+            : (await isar.sources
+                      .filter()
+                      .sourceCodeUrlEqualTo(template.sourceCodeUrl)
+                      .findAll())
+                  .where(
+                    (source) => belongsToSameMihonExtension(template, source),
+                  )
+                  .toList();
         if (currentGroup.isEmpty) break;
         template = currentGroup.firstWhere(
           (source) => source.id == template.id,

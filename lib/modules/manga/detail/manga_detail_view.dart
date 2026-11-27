@@ -937,48 +937,56 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                                         : MainAxisAlignment
                                                               .start,
                                                     children: [
-                                                      Container(
-                                                        height: chapters.isEmpty
-                                                            ? context.height(1)
-                                                            : null,
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).scaffoldBackgroundColor,
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                              ),
-                                                          child: Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              Text(
-                                                                widget.manga!.itemType !=
-                                                                        ItemType
-                                                                            .anime
-                                                                    ? l10n.n_chapters(
-                                                                        chapters
-                                                                            .length,
-                                                                      )
-                                                                    : l10n.n_episodes(
-                                                                        chapters
-                                                                            .length,
-                                                                      ),
-                                                                style: const TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
+                                                      // Shrinks and wraps beside the button: the chapter
+                                                      // pane of the split layout is narrow in small windows.
+                                                      Flexible(
+                                                        child: Container(
+                                                          height:
+                                                              chapters.isEmpty
+                                                              ? context.height(
+                                                                  1,
+                                                                )
+                                                              : null,
+                                                          color: Theme.of(
+                                                            context,
+                                                          ).scaffoldBackgroundColor,
+                                                          child: Padding(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal: 8,
                                                                 ),
-                                                              ),
-                                                              MissingChaptersLabel(
-                                                                manga: widget.manga!,
-                                                              ),
-                                                            ],
+                                                            child: Column(
+                                                              crossAxisAlignment:
+                                                                  CrossAxisAlignment
+                                                                      .start,
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                Text(
+                                                                  widget.manga!.itemType !=
+                                                                          ItemType
+                                                                              .anime
+                                                                      ? l10n.n_chapters(
+                                                                          chapters
+                                                                              .length,
+                                                                        )
+                                                                      : l10n.n_episodes(
+                                                                          chapters
+                                                                              .length,
+                                                                        ),
+                                                                  style: const TextStyle(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                                ),
+                                                                MissingChaptersLabel(
+                                                                  manga: widget
+                                                                      .manga!,
+                                                                ),
+                                                              ],
+                                                            ),
                                                           ),
                                                         ),
                                                       ),

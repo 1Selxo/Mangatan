@@ -17,6 +17,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:bot_toast/bot_toast.dart';
+import 'package:mangayomi/modules/widgets/end_selection.dart';
 import 'package:mangayomi/core/app_layers.dart';
 import 'package:mangayomi/modules/mining/widgets/dictionary_lookup_popup.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/app_ui_scale_state_provider.dart';
@@ -570,7 +571,8 @@ class _App extends ConsumerWidget {
         content = DesktopBackNavigationHandler(
           canGoBack: router.canPop,
           onBack: router.pop,
-          dismissTransientUi: DictionaryLookupPopup.dismissActive,
+          dismissTransientUi: () =>
+              DictionaryLookupPopup.dismissActive() || endSelection(ref),
           child: LegacyMaterialBridge(child: BotToastInit()(context, content)),
         );
         final locked =

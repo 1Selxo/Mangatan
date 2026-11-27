@@ -5,6 +5,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'package:app_links/app_links.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:mangayomi/modules/widgets/end_selection.dart';
 import 'package:mangayomi/services/crash_native.dart';
 import 'package:mangayomi/services/sync_server.dart';
 import 'package:archive/archive.dart';
@@ -658,7 +659,8 @@ class _MyAppState extends ConsumerState<MyApp>
             ? DesktopBackNavigationHandler(
                 canGoBack: router.canPop,
                 onBack: router.pop,
-                dismissTransientUi: DictionaryLookupPopup.dismissActive,
+                dismissTransientUi: () =>
+                    DictionaryLookupPopup.dismissActive() || endSelection(ref),
                 child: base,
               )
             : base;

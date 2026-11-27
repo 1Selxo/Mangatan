@@ -159,8 +159,8 @@ void main() {
     });
 
     testWidgets(
-      'S12: Escape ends a library selection on desktop',
-      skip: true, // Suspected bug S12: only the close button ends it.
+      // Was S12: only the close button ended it.
+      'Escape ends a library selection on desktop',
       (tester) async {
         final (j, _) = await library(tester);
         await j.longPress(find.text('Alpha'));

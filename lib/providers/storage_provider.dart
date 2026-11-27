@@ -35,6 +35,29 @@ String? linuxDocumentsFallbackPath(Map<String, String> environment) {
   return home == null || home.isEmpty ? null : home;
 }
 
+/// Every collection of the app database, in the order it is opened with.
+/// Tests open the same list so they never drift from the real layout.
+const appIsarSchemas = <CollectionSchema<dynamic>>[
+  MangaSchema,
+  ChangedPartSchema,
+  ChapterSchema,
+  CategorySchema,
+  CustomButtonSchema,
+  UpdateSchema,
+  HistorySchema,
+  DownloadSchema,
+  EpubBookProgressSchema,
+  SourceSchema,
+  SettingsSchema,
+  TrackPreferenceSchema,
+  TrackSchema,
+  SyncPreferenceSchema,
+  SourcePreferenceSchema,
+  SourcePreferenceStringValueSchema,
+  BackupPasswordFallbackSchema,
+  TrackerLibraryCacheSchema,
+];
+
 class StorageProvider {
   static const _defaultDirectoryName = 'Mangatan';
   static const _legacyDirectoryName = 'Mangayomi';
@@ -370,26 +393,7 @@ class StorageProvider {
     }
 
     final isar = await Isar.open(
-      [
-        MangaSchema,
-        ChangedPartSchema,
-        ChapterSchema,
-        CategorySchema,
-        CustomButtonSchema,
-        UpdateSchema,
-        HistorySchema,
-        DownloadSchema,
-        EpubBookProgressSchema,
-        SourceSchema,
-        SettingsSchema,
-        TrackPreferenceSchema,
-        TrackSchema,
-        SyncPreferenceSchema,
-        SourcePreferenceSchema,
-        SourcePreferenceStringValueSchema,
-        BackupPasswordFallbackSchema,
-        TrackerLibraryCacheSchema,
-      ],
+      appIsarSchemas,
       directory: dir!.path,
       name: "mangayomiDb",
       inspector: inspector,

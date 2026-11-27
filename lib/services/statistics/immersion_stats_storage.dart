@@ -30,6 +30,11 @@ class ImmersionStatsStorage {
 
   static Future<void> _lock = Future<void>.value();
 
+  /// Starts with nothing queued, for tests that run several app launches in
+  /// one process (see ChimahonRestoreSyncCoordinator.resetForTest).
+  @visibleForTesting
+  static void resetLockForTest() => _lock = Future<void>.value();
+
   /// Serializes [action] against every other mutation.
   static Future<T> _synchronized<T>(Future<T> Function() action) {
     final completer = Completer<T>();

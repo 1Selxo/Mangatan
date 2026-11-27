@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:crypto/crypto.dart';
 import 'package:mangayomi/services/external_browser.dart';
@@ -110,6 +111,11 @@ String _syncMilliseconds(Duration duration) =>
 @riverpod
 class SyncServer extends _$SyncServer {
   static final Set<int> _syncsInProgress = <int>{};
+
+  /// Forgets syncs a previous app launch in the same test process left
+  /// unfinished (see ChimahonRestoreSyncCoordinator.resetForTest).
+  @visibleForTesting
+  static void resetForTest() => _syncsInProgress.clear();
 
   final http = MClient.init(reqcopyWith: {'useDartHttpClient': true});
   final _entityApplier = const SyncEntityApplier();

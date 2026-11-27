@@ -118,6 +118,31 @@ class SourceRepository {
       .optional(hideNovel, (q) => q.not().itemTypeEqualTo(ItemType.novel))
       .watch(fireImmediately: true);
 
+  /// The installed version and the newest known version of every installed,
+  /// enabled, current extension of [itemTypes], each time the sources change.
+  ///
+  /// Only those two fields are read: the update badges used to watch whole
+  /// sources, and each one carries its whole APK, so every change to the
+  /// table decoded all of them again for every badge on screen.
+  Stream<List<(String?, String?)>> watchInstalledVersions(
+    Set<ItemType> itemTypes,
+  ) => isar.sources.watchLazy(fireImmediately: true).asyncMap((_) async {
+    if (itemTypes.isEmpty) return const <(String?, String?)>[];
+    final query = isar.sources
+        .where()
+        .isActiveEqualTo(true)
+        .filter()
+        .isAddedEqualTo(true)
+        .anyOf(itemTypes, (q, ItemType type) => q.itemTypeEqualTo(type))
+        .group((q) => q.isObsoleteIsNull().or().isObsoleteEqualTo(false));
+    final installed = await query.versionProperty().findAll();
+    final newest = await query.versionLastProperty().findAll();
+    return [
+      for (var i = 0; i < installed.length && i < newest.length; i++)
+        (installed[i], newest[i]),
+    ];
+  });
+
   List<Source> getPinnedByItemType(ItemType itemType) => isar.sources
       .filter()
       .isPinnedEqualTo(true)

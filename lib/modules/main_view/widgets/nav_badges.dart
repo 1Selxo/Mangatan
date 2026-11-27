@@ -2,10 +2,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/modules/updates/providers/updates_last_seen_provider.dart';
 import 'package:mangayomi/providers/show_updates_badge_state_provider.dart';
-import 'package:mangayomi/repositories/source_repository.dart';
+import 'package:mangayomi/modules/browse/browse_screen.dart'
+    show navExtensionUpdateCountProvider;
 import 'package:mangayomi/repositories/update_repository.dart';
 import 'package:mangayomi/providers/reader_state_provider.dart';
-import 'package:mangayomi/services/fetch_sources_list.dart';
 
 class ExtensionBadgeWidget extends ConsumerWidget {
   const ExtensionBadgeWidget({
@@ -19,39 +19,9 @@ class ExtensionBadgeWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hideItems = ref.watch(hideItemsStateProvider);
-
-    return StreamBuilder(
-      stream: sourceRepository.watchActiveExcludingHiddenItemTypes(
-        hideManga: hideItems.contains("/MangaLibrary"),
-        hideAnime: hideItems.contains("/AnimeLibrary"),
-        hideNovel: hideItems.contains("/NovelLibrary"),
-      ),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return icon;
-        }
-
-        final entries = snapshot.data!
-            .where(
-              (element) =>
-                  (element.isAdded ?? false) &&
-                  !(element.isObsolete ?? false) &&
-                  compareVersions(
-                        element.version ?? '',
-                        element.versionLast ?? '',
-                      ) <
-                      0,
-            )
-            .toList();
-
-        if (entries.isEmpty) {
-          return icon;
-        }
-
-        return Badge(label: Text("${entries.length}"), child: icon);
-      },
-    );
+    final count = ref.watch(navExtensionUpdateCountProvider).value ?? 0;
+    if (count == 0) return icon;
+    return Badge(label: Text("$count"), child: icon);
   }
 }
 

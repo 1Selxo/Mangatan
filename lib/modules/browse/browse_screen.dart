@@ -682,26 +682,30 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   }
 }
 
-final extensionUpdateCountProvider = StreamProvider.family<int, ItemType>((
-  ref,
-  itemType,
-) {
-  return sourceRepository
-      .watchActiveByItemType(itemType)
-      .map(
-        (list) => list
-            .where(
-              (element) =>
-                  (element.isAdded ?? false) &&
-                  !(element.isObsolete ?? false) &&
-                  compareVersions(
-                        element.version ?? '',
-                        element.versionLast ?? '',
-                      ) <
-                      0,
-            )
-            .length,
-      );
+final extensionUpdateCountProvider = StreamProvider.family<int, ItemType>(
+  (ref, itemType) => watchExtensionUpdateCount({itemType}),
+);
+
+/// How many installed extensions of [itemTypes] have an update waiting.
+Stream<int> watchExtensionUpdateCount(Set<ItemType> itemTypes) =>
+    sourceRepository
+        .watchInstalledVersions(itemTypes)
+        .map(
+          (versions) => versions
+              .where((v) => compareVersions(v.$1 ?? '', v.$2 ?? '') < 0)
+              .length,
+        )
+        .distinct();
+
+/// The same for the Browse destination: every item type the navigation
+/// shows.
+final navExtensionUpdateCountProvider = StreamProvider<int>((ref) {
+  final hidden = ref.watch(hideItemsStateProvider);
+  return watchExtensionUpdateCount({
+    if (!hidden.contains('/MangaLibrary')) ItemType.manga,
+    if (!hidden.contains('/AnimeLibrary')) ItemType.anime,
+    if (!hidden.contains('/NovelLibrary')) ItemType.novel,
+  });
 });
 
 class ExtensionUpdateNumbersBadge extends ConsumerWidget {

@@ -35,17 +35,20 @@ String dateFormat(
   stringDate = null;
   final date = DateTime(dateTime.year, dateTime.month, dateTime.day);
   if (stringDate == null) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final twoDaysAgo = DateTime(now.year, now.month, now.day - 2);
-    final threeDaysAgo = DateTime(now.year, now.month, now.day - 3);
-    final fourDaysAgo = DateTime(now.year, now.month, now.day - 4);
-    final fiveDaysAgo = DateTime(now.year, now.month, now.day - 5);
-    final sixDaysAgo = DateTime(now.year, now.month, now.day - 6);
-    final aWeekAgo = DateTime(now.year, now.month, now.day - 7);
+    // Only made when a relative date can be shown. Each local DateTime asks
+    // the OS for the time zone (on Windows a system call), and the history
+    // list calls this once per entry to group them, thousands of times.
+    late final now = DateTime.now();
+    late final today = DateTime(now.year, now.month, now.day);
+    late final yesterday = DateTime(now.year, now.month, now.day - 1);
+    late final twoDaysAgo = DateTime(now.year, now.month, now.day - 2);
+    late final threeDaysAgo = DateTime(now.year, now.month, now.day - 3);
+    late final fourDaysAgo = DateTime(now.year, now.month, now.day - 4);
+    late final fiveDaysAgo = DateTime(now.year, now.month, now.day - 5);
+    late final sixDaysAgo = DateTime(now.year, now.month, now.day - 6);
+    late final aWeekAgo = DateTime(now.year, now.month, now.day - 7);
 
-    if (date == today && useRelativeTimesTamps && relativeTimestamps != 0) {
+    if (useRelativeTimesTamps && relativeTimestamps != 0 && date == today) {
       if (showHOURorMINUTE) {
         final difference = now.difference(dateTime);
         if (difference.inMinutes < 60) {
@@ -63,9 +66,9 @@ String dateFormat(
       }
 
       return l10n.today;
-    } else if (date == yesterday &&
-        useRelativeTimesTamps &&
-        relativeTimestamps != 0) {
+    } else if (useRelativeTimesTamps &&
+        relativeTimestamps != 0 &&
+        date == yesterday) {
       return l10n.yesterday;
     } else if (useRelativeTimesTamps && relativeTimestamps == 2) {
       if (date.isAfter(twoDaysAgo) ||
@@ -90,7 +93,7 @@ String dateFormat(
       }
     }
     return forHistoryValue
-        ? DateTime(dateTime.year, dateTime.month, dateTime.day).toString()
+        ? date.toString()
         : _cachedFormatter(
             dateFormat.isEmpty ? dateFrmt : dateFormat,
             locale.toLanguageTag(),

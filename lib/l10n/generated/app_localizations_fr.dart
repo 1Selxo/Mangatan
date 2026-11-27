@@ -3657,6 +3657,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Épinglez-en une, ou désactivez « Inclure uniquement les sources épinglées » dans les paramètres d\'exploration.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'Toutes les sources dont vous disposez pour ceci sont marquées NSFW et sont masquées.';
 

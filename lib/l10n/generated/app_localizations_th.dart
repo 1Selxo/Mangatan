@@ -3584,6 +3584,14 @@ class AppLocalizationsTh extends AppLocalizations {
       'ปักหมุดแหล่งที่มา หรือปิด \"รวมเฉพาะแหล่งที่มาที่ปักหมุดไว้\" ในการตั้งค่าการเรียกดู';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'แหล่งที่มาทั้งหมดที่คุณมีสำหรับสิ่งนี้ถูกทำเครื่องหมายเป็น NSFW และถูกซ่อนไว้';
 

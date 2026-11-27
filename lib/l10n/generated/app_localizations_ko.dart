@@ -3530,6 +3530,14 @@ class AppLocalizationsKo extends AppLocalizations {
       '하나를 고정하거나, 탐색 설정에서 \"고정된 소스만 포함\"을 끄세요.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       '이 유형에 대한 모든 소스가 NSFW로 표시되어 있으며 숨겨져 있습니다.';
 

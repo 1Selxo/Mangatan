@@ -32,7 +32,7 @@ import 'package:mangayomi/modules/widgets/memory_overlay.dart';
 import 'package:mangayomi/providers/security_state_provider.dart';
 import 'package:mangayomi/utils/legacy_material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
+import 'package:flutter_riverpod/misc.dart' show Override, ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
@@ -112,6 +112,7 @@ class Journey {
   final Locale locale;
   ProviderContainer? _container;
   var _launches = 0;
+  var _overrides = const <Override>[];
 
   /// The database the running app uses.
   Isar get db => app.isar;
@@ -125,6 +126,7 @@ class Journey {
     bool dark = false,
     bool pureBlack = false,
     Locale locale = const Locale('en'),
+    List<Override> overrides = const [],
   }) async {
     late Journey journey;
     stubPlatformPlugins();
@@ -151,6 +153,7 @@ class Journey {
       journey = Journey._(tester, directory, seed, locale);
       if (arrange != null) await arrange(seed);
     });
+    journey._overrides = overrides;
     await journey.resize(window);
     addTearDown(journey._dispose);
     await journey._boot();
@@ -165,7 +168,10 @@ class Journey {
 
   Future<void> _boot() async {
     resetAppGlobals();
-    _container = ProviderContainer(retry: (_, _) => null);
+    _container = ProviderContainer(
+      overrides: _overrides,
+      retry: (_, _) => null,
+    );
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: _container!,

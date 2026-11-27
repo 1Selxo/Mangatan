@@ -56,13 +56,23 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
   late final List<Source> _installedSources = sourceRepository
       .getAddedByItemType(widget.itemType);
 
-  late final List<Source> sourceList = () {
-    final sources = ref.read(onlyIncludePinnedSourceStateProvider)
-        ? sourceRepository.getPinnedByItemType(widget.itemType)
-        : sourceRepository.getAddedByItemType(widget.itemType);
-    if (_showNSFW) return sources;
-    return sources.where((e) => !(e.isNsfw ?? false)).toList();
-  }();
+  /// The installed sources the pinned setting leaves, before the Browse
+  /// visibility and NSFW filters.
+  late final List<Source> _candidates =
+      ref.read(onlyIncludePinnedSourceStateProvider)
+      ? _installedSources.where((e) => e.isPinned ?? false).toList()
+      : _installedSources;
+
+  /// Those enabled in Browse. A source hidden there (its language turned off,
+  /// or the source itself) is not searched, as in Mihon: searching them made
+  /// a search of 73 visible sources query 247.
+  late final List<Source> _enabled = _candidates
+      .where((e) => e.isActive ?? false)
+      .toList();
+
+  late final List<Source> sourceList = _showNSFW
+      ? _enabled
+      : _enabled.where((e) => !(e.isNsfw ?? false)).toList();
 
   /// Sources that finished with nothing to show, id to the reason.
   ///
@@ -183,6 +193,8 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
     final (String message, String hint) = switch (noSourcesReason(
       installed: _installedSources.length,
       pinnedOnly: pinnedOnly,
+      candidates: _candidates.length,
+      enabled: _enabled.length,
     )) {
       NoSourcesReason.noneInstalled => (
         l10n.global_search_no_sources(widget.itemType.localized(l10n)),
@@ -191,6 +203,10 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
       NoSourcesReason.nonePinned => (
         l10n.global_search_only_pinned(_installedSources.length),
         l10n.global_search_only_pinned_hint,
+      ),
+      NoSourcesReason.noneEnabled => (
+        l10n.global_search_none_enabled,
+        l10n.global_search_none_enabled_hint,
       ),
       NoSourcesReason.allNsfw => (
         l10n.global_search_all_nsfw,
@@ -302,6 +318,10 @@ class _SourceSearchScreenState extends ConsumerState<SourceSearchScreen> {
 
   String _errorMessage = "";
   bool _isLoading = true;
+
+  /// Whether this row's request is running, rather than queued behind the
+  /// fetch gate.
+  bool _fetching = false;
   MPages? pages;
   Future<void> _init() async {
     // Throttled: with many sources installed, letting every row fire its
@@ -313,6 +333,7 @@ class _SourceSearchScreenState extends ConsumerState<SourceSearchScreen> {
       widget.fetchGate.release();
       return;
     }
+    setState(() => _fetching = true);
     try {
       _errorMessage = "";
       // No query: same "Popular" request the source's own tab makes, so an
@@ -411,33 +432,39 @@ class _SourceSearchScreenState extends ConsumerState<SourceSearchScreen> {
             // a transient blip, and the header still opens the source.
             Flexible(
               child: _isLoading
-                  // The shape of what is coming: a row of covers.
-                  ? ListView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: ShioriSpace.s8,
-                      ),
-                      children: [
-                        for (var i = 0; i < 6; i++)
-                          const Padding(
-                            padding: EdgeInsets.all(ShioriSpace.s4),
-                            child: SizedBox(
-                              width: _cardWidth - ShioriSpace.s8,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                spacing: ShioriSpace.s8,
-                                children: [
-                                  ShioriSkeleton.box(
-                                    height: _cardHeight - ShioriSpace.s16,
-                                    radius: ShioriShape.cover,
-                                  ),
-                                  ShioriSkeleton.line(),
-                                ],
+                  // The shape of what is coming: a row of covers. Only rows
+                  // whose request is running pulse; with hundreds of rows
+                  // queued behind the fetch gate, every one of them animating
+                  // made each frame rebuild and repaint thousands of boxes.
+                  ? TickerMode(
+                      enabled: _fetching,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: ShioriSpace.s8,
+                        ),
+                        children: [
+                          for (var i = 0; i < 6; i++)
+                            const Padding(
+                              padding: EdgeInsets.all(ShioriSpace.s4),
+                              child: SizedBox(
+                                width: _cardWidth - ShioriSpace.s8,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  spacing: ShioriSpace.s8,
+                                  children: [
+                                    ShioriSkeleton.box(
+                                      height: _cardHeight - ShioriSpace.s16,
+                                      radius: ShioriShape.cover,
+                                    ),
+                                    ShioriSkeleton.line(),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     )
                   : SuperListView.builder(
                       extentPrecalculationPolicy: SuperPrecalculationPolicy(),
@@ -708,6 +735,10 @@ enum NoSourcesReason {
   /// are pinned.
   nonePinned,
 
+  /// Every remaining source is hidden in Browse (its language or the source
+  /// itself turned off), and hidden sources are not searched.
+  noneEnabled,
+
   /// Sources exist and are not excluded by the pinned setting, so the NSFW
   /// filter is what removed them.
   allNsfw,
@@ -720,8 +751,11 @@ enum NoSourcesReason {
 NoSourcesReason noSourcesReason({
   required int installed,
   required bool pinnedOnly,
+  int candidates = 0,
+  int? enabled,
 }) {
   if (installed == 0) return NoSourcesReason.noneInstalled;
-  if (pinnedOnly) return NoSourcesReason.nonePinned;
+  if (pinnedOnly && candidates == 0) return NoSourcesReason.nonePinned;
+  if (enabled == 0) return NoSourcesReason.noneEnabled;
   return NoSourcesReason.allNsfw;
 }

@@ -3461,6 +3461,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get global_search_only_pinned_hint => '请固定某个来源，或在浏览设置中关闭“仅包含固定的来源”。';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw => '该分类下的所有来源均被标记为 NSFW 并已被隐藏。';
 
   @override

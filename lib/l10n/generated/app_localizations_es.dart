@@ -3650,6 +3650,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Fije una fuente o desactive \"Solo incluir fuentes fijadas\" en los ajustes de Explorar.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'Todas sus fuentes para esto están marcadas como NSFW y están ocultas.';
 

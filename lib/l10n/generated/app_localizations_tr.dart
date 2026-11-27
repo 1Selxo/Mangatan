@@ -3612,6 +3612,14 @@ class AppLocalizationsTr extends AppLocalizations {
       'Birini sabitleyin veya Gözat ayarlarından \"Yalnızca sabitlenmiş kaynakları dahil et\" seçeneğini kapatın.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'Bunun için sahip olduğunuz tüm kaynaklar NSFW olarak işaretlenmiş ve gizlenmiştir.';
 

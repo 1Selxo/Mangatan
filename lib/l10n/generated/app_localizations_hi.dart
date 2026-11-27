@@ -3605,6 +3605,14 @@ class AppLocalizationsHi extends AppLocalizations {
       'किसी एक को पिन करें, या ब्राउज़ सेटिंग्स में \"केवल पिन किए गए स्रोतों को शामिल करें\" बंद करें।';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'इसके लिए आपके सभी स्रोत NSFW चिह्नित हैं और छिपे हुए हैं।';
 

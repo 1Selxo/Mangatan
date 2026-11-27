@@ -3601,6 +3601,14 @@ class AppLocalizationsAr extends AppLocalizations {
       'قم بتثبيت أحدها، أو أوقف تشغيل \"تضمين المصادر المثبتة فقط\" في إعدادات التصفح.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'جميع مصادرك لهذا مصنفة كـ NSFW وهي مخفية.';
 

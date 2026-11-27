@@ -42,10 +42,18 @@ void main() {
     },
   );
 
+  test('sources exist but every one is hidden in Browse', () {
+    expect(
+      noSourcesReason(installed: 4, pinnedOnly: false, enabled: 0),
+      NoSourcesReason.noneEnabled,
+    );
+  });
+
   test('every reason is reachable, so none of the messages is dead', () {
     final reached = {
       noSourcesReason(installed: 0, pinnedOnly: false),
       noSourcesReason(installed: 1, pinnedOnly: true),
+      noSourcesReason(installed: 1, pinnedOnly: false, enabled: 0),
       noSourcesReason(installed: 1, pinnedOnly: false),
     };
     expect(reached, NoSourcesReason.values.toSet());

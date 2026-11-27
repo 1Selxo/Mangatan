@@ -6429,6 +6429,18 @@ abstract class AppLocalizations {
   /// **'Pin one, or turn off \"Only include pinned sources\" in Browse settings.'**
   String get global_search_only_pinned_hint;
 
+  /// No description provided for @global_search_none_enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Every source you have for this is hidden in Browse, and hidden sources are not searched.'**
+  String get global_search_none_enabled;
+
+  /// No description provided for @global_search_none_enabled_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn its language or the source back on in the Browse sources filter.'**
+  String get global_search_none_enabled_hint;
+
   /// No description provided for @global_search_all_nsfw.
   ///
   /// In en, this message translates to:

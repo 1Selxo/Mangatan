@@ -3635,6 +3635,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Pinnen Sie eine Quelle an oder deaktivieren Sie \"Nur angepinnte Quellen einbeziehen\" in den Durchsuchen-Einstellungen.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'Alle Ihre Quellen hierfür sind als NSFW markiert und ausgeblendet.';
 

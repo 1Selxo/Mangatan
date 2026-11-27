@@ -3610,6 +3610,14 @@ class AppLocalizationsId extends AppLocalizations {
       'Sematkan salah satu, atau matikan \"Hanya sertakan sumber yang disematkan\" di pengaturan Jelajahi.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'Semua sumber yang Anda miliki untuk ini ditandai NSFW dan disembunyikan.';
 

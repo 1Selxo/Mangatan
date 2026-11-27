@@ -3642,6 +3642,14 @@ class AppLocalizationsIt extends AppLocalizations {
       'Fissa una fonte o disattiva \"Includi solo fonti fissate\" nelle impostazioni di Sfoglia.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'Tutte le fonti disponibili per questo sono contrassegnate come NSFW e sono nascoste.';
 

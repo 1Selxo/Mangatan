@@ -3620,6 +3620,14 @@ class AppLocalizationsFa extends AppLocalizations {
       'یکی را سنجاق کنید، یا «فقط منابع سنجاق‌شده گنجانده شوند» را در تنظیمات مرور خاموش کنید.';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'تمام منابعی که برای این مورد دارید با برچسب NSFW مشخص شده‌اند و پنهان هستند.';
 

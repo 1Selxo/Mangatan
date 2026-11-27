@@ -3601,6 +3601,14 @@ class AppLocalizationsAs extends AppLocalizations {
       'এটা পিন কৰক, বা ব্ৰাউজ ছেটিংছত \"কেৱল পিন কৰা উৎসসমূহ অন্তৰ্ভুক্ত কৰক\" বন্ধ কৰক।';
 
   @override
+  String get global_search_none_enabled =>
+      'Every source you have for this is hidden in Browse, and hidden sources are not searched.';
+
+  @override
+  String get global_search_none_enabled_hint =>
+      'Turn its language or the source back on in the Browse sources filter.';
+
+  @override
   String get global_search_all_nsfw =>
       'ইয়াৰ বাবে আপোনাৰ সকলো উৎস NSFW হিচাপে চিহ্নিত আৰু লুকুওৱা হৈছে।';
 

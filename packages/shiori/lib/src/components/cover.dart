@@ -228,12 +228,10 @@ class ShioriCoverTile extends StatelessWidget {
       context,
       tokens.text.meta.copyWith(color: tokens.color.fgMuted),
     );
-    return Column(
+    final caption = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        cover,
-        const SizedBox(height: ShioriSpace.s4),
         ExcludeSemantics(
           child: Text(
             cover.title,
@@ -253,6 +251,32 @@ class ShioriCoverTile extends StatelessWidget {
               strutStyle: _strut(subtitleStyle),
             ),
           ),
+      ],
+    );
+    final tappable =
+        cover.onTap != null ||
+        cover.onLongPress != null ||
+        cover.onSecondaryTap != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        cover,
+        const SizedBox(height: ShioriSpace.s4),
+        // The caption is part of the tile: clicking the title does what
+        // clicking the cover does. The cover keeps the focus and semantics.
+        if (tappable)
+          InkWell(
+            onTap: cover.onTap,
+            onLongPress: cover.onLongPress,
+            onSecondaryTap: cover.onSecondaryTap,
+            canRequestFocus: false,
+            excludeFromSemantics: true,
+            borderRadius: BorderRadius.circular(ShioriShape.cover),
+            child: caption,
+          )
+        else
+          caption,
       ],
     );
   }

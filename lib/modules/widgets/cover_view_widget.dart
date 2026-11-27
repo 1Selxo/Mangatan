@@ -207,7 +207,17 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
           // A small gap so the focused card's 3px ring (and its slight scale)
           // clears the title below instead of bleeding onto it.
           if (showBottomText) const SizedBox(height: ShioriSpace.s4),
-          if (showBottomText) widget.bottomTextWidget!,
+          // The title under the cover is part of the card: it opens the
+          // series too, as in the compact grid and the list (S3).
+          if (showBottomText)
+            InkWell(
+              onTap: widget.onTap,
+              onLongPress: widget.onLongPress,
+              onSecondaryTap: widget.onSecondaryTap,
+              borderRadius: BorderRadius.circular(ShioriShape.cover),
+              canRequestFocus: false,
+              child: widget.bottomTextWidget!,
+            ),
         ],
       ),
     );

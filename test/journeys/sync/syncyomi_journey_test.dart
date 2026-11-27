@@ -144,7 +144,7 @@ void main() {
       await j.go('/MangaLibrary');
       await j.waitFor(find.text(Fixture.categoryA));
       await j.tapText(Fixture.categoryA);
-      // The grid's tile: the Continue shelf's caption does not open it (S3).
+      // The grid's tile: the Continue shelf above it opens the chapter.
       await j.tap(
         find.descendant(
           of: find.byType(CoverViewWidget),

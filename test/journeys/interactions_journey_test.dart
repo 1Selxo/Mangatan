@@ -208,7 +208,8 @@ void main() {
   });
 
   testWidgets(
-    'S3: in the Comfortable grid, the title under a cover opens the series',
+    // Was S3: only the cover opened it.
+    'in the Comfortable grid, the title under a cover opens the series',
     (tester) async {
       final j = await Journey.start(
         tester,
@@ -222,7 +223,6 @@ void main() {
       await j.tapText('Half way');
       await j.waitFor(chapterCount);
     },
-    skip: true, // Suspected bug S3: only the cover opens it.
   );
 
   group('reader controls', () {

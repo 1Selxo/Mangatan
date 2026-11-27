@@ -132,7 +132,7 @@ Future<void> visit(Journey j, List<String> routes) async {
 /// Opens the first series of the library and one of its chapters.
 Future<void> openSeriesAndReader(Journey j) async {
   await j.go('/MangaLibrary');
-  // The grid's tile; the Continue shelf only opens from its cover (S3).
+  // The grid's tile: the Continue shelf above it opens the chapter.
   await j.tap(
     find.descendant(
       of: find.byType(CoverViewWidget),

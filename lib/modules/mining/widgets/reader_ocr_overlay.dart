@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mangayomi/main.dart';
@@ -694,8 +695,8 @@ class ReaderOcrState {
   }
 
   static void cancelScan({bool clearLast = true}) {
-    _scanGeneration++;
-    progress.value = null;
+    final generation = ++_scanGeneration;
+    _clearProgress(generation);
     _activeScan = null;
     _activeScanKey = null;
     if (clearLast) {
@@ -703,6 +704,23 @@ class ReaderOcrState {
       _lastPreparePage = null;
       _completedScanKey = null;
     }
+  }
+
+  /// Hides the progress note of the scan cancelled as [generation].
+  ///
+  /// A reader that closes cancels its scan while the widget tree is being
+  /// torn down, and the note listening to [progress] cannot rebuild then.
+  /// The note is cleared once the frame ends instead, unless a new scan (the
+  /// next chapter's reader) has started meanwhile.
+  static void _clearProgress(int generation) {
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase != SchedulerPhase.persistentCallbacks) {
+      progress.value = null;
+      return;
+    }
+    scheduler.addPostFrameCallback((_) {
+      if (_scanGeneration == generation) progress.value = null;
+    });
   }
 
   static ReaderOcrProgress _scanProgress({

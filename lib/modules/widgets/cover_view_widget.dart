@@ -182,6 +182,10 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
                         : Ink.image(
                             fit: BoxFit.cover,
                             image: widget.image!,
+                            // A cover that fails to load (dead link, source
+                            // down, offline) leaves the plain tile; reported,
+                            // it was recorded as an app error (S16).
+                            onImageError: (_, _) {},
                             child: Stack(
                               children: [
                                 ?selection,

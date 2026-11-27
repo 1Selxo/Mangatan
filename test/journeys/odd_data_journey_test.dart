@@ -335,8 +335,8 @@ void main() {
   });
 
   testWidgets(
-    'S16: a cover that cannot be loaded is not reported as an app error',
-    skip: true, // Suspected bug S16: Ink.image in CoverViewWidget has no onImageError.
+    // Was S16: Ink.image in CoverViewWidget had no onImageError.
+    'a cover that cannot be loaded is not reported as an app error',
     (tester) async {
       final j = await Journey.start(
         tester,

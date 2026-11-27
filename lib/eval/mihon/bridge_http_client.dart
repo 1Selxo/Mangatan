@@ -113,7 +113,13 @@ final _responseBodies = Expando<String>('mihonResponseBody');
 String mihonResponseBody(http.Response response) =>
     _responseBodies[response] ??= response.body;
 
-const _extensionIdHeader = 'x-mangatan-extension-id';
+/// The server's handle for an extension it has loaded, under either name:
+/// servers since an upstream merge send Mangayomi's. Without it every request
+/// uploads the whole APK again.
+const _extensionIdHeaders = [
+  'x-mangatan-extension-id',
+  'x-mangayomi-extension-id',
+];
 const _extensionToastsHeader = 'x-mangatan-toasts';
 final _extensionToasts = StreamController<String>.broadcast();
 
@@ -195,7 +201,9 @@ class _PreparedBridgeBody {
 
   void rememberExtensionId(http.Response response) {
     final key = cacheKey;
-    final extensionId = response.headers[_extensionIdHeader]?.trim();
+    final extensionId = _extensionIdHeaders
+        .map((name) => response.headers[name]?.trim())
+        .firstWhere((id) => id != null && id.isNotEmpty, orElse: () => null);
     if (key == null ||
         extensionId == null ||
         !RegExp(r'^[0-9a-f]{64}$').hasMatch(extensionId)) {

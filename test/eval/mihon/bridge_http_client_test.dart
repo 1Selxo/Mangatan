@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:http/testing.dart';
 import 'package:mangayomi/eval/mihon/bridge_http_client.dart';
 
@@ -257,6 +259,40 @@ void main() {
 
         expect(payloads.first['data'], 'base64-apk-data');
         expect(payloads.first, isNot(contains('extensionId')));
+        expect(payloads.last, isNot(contains('data')));
+        expect(payloads.last['extensionId'], extensionId);
+      },
+    );
+
+    test(
+      'reuses the handle a released server sends under the Mangayomi name',
+      () async {
+        // MExtensionServer v1.1 sends X-Mangayomi-Extension-Id. Reading only
+        // the Mangatan name made every request upload the whole APK again.
+        const extensionId =
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final payloads = <Map<String, dynamic>>[];
+        server.listen((request) async {
+          payloads.add(
+            jsonDecode(await utf8.decodeStream(request))
+                as Map<String, dynamic>,
+          );
+          request.response.headers.set('X-Mangayomi-Extension-Id', extensionId);
+          request.response.headers.contentType = ContentType.json;
+          request.response.write('{}');
+          await request.response.close();
+        });
+        addTearDown(() => server.close(force: true));
+        final client = IOClient();
+        addTearDown(client.close);
+        final uri = Uri.parse('http://127.0.0.1:${server.port}/dalvik');
+        final body = {'method': 'getPopularManga', 'data': 'base64-apk-data'};
+
+        await postMihonBridge(client, uri, body: body);
+        await postMihonBridge(client, uri, body: body);
+
+        expect(payloads.first['data'], 'base64-apk-data');
         expect(payloads.last, isNot(contains('data')));
         expect(payloads.last['extensionId'], extensionId);
       },

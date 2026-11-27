@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -154,6 +155,10 @@ class ExternalBrowser {
   /// The in-flight OAuth loopback server and its timeout. A login that never
   /// completes keeps its port; close it before the next attempt binds.
   static HttpServer? _oauthServer;
+
+  /// Stands in for the browser in tests of the loopback login.
+  @visibleForTesting
+  static Future<bool> Function(String url)? openForTest;
   static Timer? _oauthTimer;
 
   /// Runs an OAuth login and returns the callback URI (the code is in its
@@ -163,20 +168,22 @@ class ExternalBrowser {
     required int port,
     required String callbackUrlScheme,
   }) {
-    if (Platform.isLinux) return _openOAuthLinux(authUrl, port: port);
-    // TODO(platforms): implement the macOS and Windows chosen-browser login.
-    if (Platform.isMacOS) {
-      return _openOAuthDefault(authUrl, callbackUrlScheme: callbackUrlScheme);
+    // Windows too: flutter_web_auth_2's WebView window there finishes only
+    // when the redirect's scheme equals [callbackUrlScheme], and the trackers
+    // pass "http://localhost:43824", never equal to a scheme ("http"). The
+    // window then loaded localhost, where nothing listened, and no login on
+    // Windows could finish.
+    if (Platform.isLinux || Platform.isWindows) {
+      return _openOAuthLoopback(authUrl, port: port);
     }
-    if (Platform.isWindows) {
-      return _openOAuthDefault(authUrl, callbackUrlScheme: callbackUrlScheme);
-    }
+    // TODO(platforms): implement the macOS chosen-browser login.
     return _openOAuthDefault(authUrl, callbackUrlScheme: callbackUrlScheme);
   }
 
-  /// Linux: open the authorize page in the chosen browser and catch the
-  /// redirect on a local loopback server bound to [port].
-  static Future<Uri?> _openOAuthLinux(
+  /// Linux and Windows: open the authorize page in the chosen (or default)
+  /// browser and catch the redirect on a local loopback server bound to
+  /// [port].
+  static Future<Uri?> _openOAuthLoopback(
     String authUrl, {
     required int port,
   }) async {
@@ -198,9 +205,17 @@ class ExternalBrowser {
     });
     _oauthTimer = timer;
     try {
-      final opened = await open(authUrl);
+      final opened = await (openForTest ?? open)(authUrl);
       if (!opened) return null;
       await server.listen((request) async {
+        // A browser may also ask for /favicon.ico; only the redirect, which
+        // carries the code (or the error), ends the login.
+        final query = request.uri.queryParameters;
+        if (!query.containsKey('code') && !query.containsKey('error')) {
+          request.response.statusCode = HttpStatus.notFound;
+          await request.response.close();
+          return;
+        }
         request.response.headers.add('Content-Type', 'text/html');
         request.response.write(
           '<html><body>You can close this window and return to the app.</body></html>',
@@ -220,7 +235,7 @@ class ExternalBrowser {
     }
   }
 
-  /// The original `flutter_web_auth_2` flow (mobile, and macOS/Windows until
+  /// The original `flutter_web_auth_2` flow (mobile, and macOS until
   /// implemented).
   static Future<Uri?> _openOAuthDefault(
     String authUrl, {

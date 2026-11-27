@@ -187,9 +187,13 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
           );
           if (fresh == null) continue;
           final merged = mergeMihonPreferenceValues(fresh, persisted);
-          source.preferenceList = jsonEncode(
+          final encoded = jsonEncode(
             merged.map((preference) => preference.toJson()).toList(),
           );
+          // Unchanged on almost every launch; a write would store the APK
+          // again for nothing.
+          if (encoded == source.preferenceList) continue;
+          source.preferenceList = encoded;
           await dbWriteQueue.run(
             () => isar.writeTxn(() => isar.sources.put(source)),
           );
@@ -351,6 +355,18 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
   final descriptorIds = descriptors.map((descriptor) => descriptor.id).toSet();
   final now = DateTime.now().millisecondsSinceEpoch;
   final updates = <Source>[];
+  // Only sources that changed are written. Each write stores the whole APK
+  // again and wakes every screen watching the sources table, and this runs
+  // for every installed extension on every launch.
+  final writes = <Source>[];
+  String fingerprint(Source source) => [
+    source.name,
+    source.lang,
+    source.baseUrl,
+    source.isActive,
+    source.additionalParams,
+    source.isObsolete,
+  ].join(' ');
   var created = 0;
   var updated = 0;
   var unavailable = 0;
@@ -359,6 +375,7 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
     final existing = byNativeId[descriptor.id];
     if (existing != null) {
       final metadata = mihonSourceMetadata(existing);
+      final before = fingerprint(existing);
       existing
         ..name = descriptor.name
         ..lang = descriptor.lang
@@ -372,54 +389,56 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
           extensionName: extensionName,
           packageLang: packageLang,
         )
-        ..isObsolete = false
-        ..updatedAt = now;
+        ..isObsolete = false;
       updates.add(existing);
-      updated++;
+      if (fingerprint(existing) != before) {
+        writes.add(existing..updatedAt = now);
+        updated++;
+      }
       continue;
     }
 
-    updates.add(
-      Source()
-        ..id = mihonLocalSourceId(descriptor.id)
-        ..name = descriptor.name
-        ..baseUrl = descriptor.baseUrl
-        ..lang = descriptor.lang
-        ..isActive = true
-        ..isAdded = true
-        ..isPinned = false
-        ..isNsfw = template.isNsfw
-        ..sourceCode = template.sourceCode
-        ..sourceCodeUrl = template.sourceCodeUrl
-        ..typeSource = template.typeSource
-        ..iconUrl = template.iconUrl
-        ..isFullData = template.isFullData
-        ..hasCloudflare = template.hasCloudflare
-        ..lastUsed = false
-        ..dateFormat = template.dateFormat
-        ..dateFormatLocale = template.dateFormatLocale
-        ..apiUrl = template.apiUrl
-        ..version = template.version
-        ..versionLast = template.versionLast
-        ..headers = template.headers
-        ..supportLatest = template.supportLatest
-        ..filterList = template.filterList
-        ..preferenceList = null
-        ..itemType = template.itemType
-        ..appMinVerReq = template.appMinVerReq
-        ..additionalParams = encodeMihonSourceMetadata(
-          sourceId: descriptor.id,
-          packageName: packageName,
-          extensionName: extensionName,
-          packageLang: packageLang,
-        )
-        ..isLocal = false
-        ..isObsolete = false
-        ..sourceCodeLanguage = SourceCodeLanguage.mihon
-        ..notes = template.notes
-        ..repo = template.repo
-        ..updatedAt = now,
-    );
+    final child = Source()
+      ..id = mihonLocalSourceId(descriptor.id)
+      ..name = descriptor.name
+      ..baseUrl = descriptor.baseUrl
+      ..lang = descriptor.lang
+      ..isActive = true
+      ..isAdded = true
+      ..isPinned = false
+      ..isNsfw = template.isNsfw
+      ..sourceCode = template.sourceCode
+      ..sourceCodeUrl = template.sourceCodeUrl
+      ..typeSource = template.typeSource
+      ..iconUrl = template.iconUrl
+      ..isFullData = template.isFullData
+      ..hasCloudflare = template.hasCloudflare
+      ..lastUsed = false
+      ..dateFormat = template.dateFormat
+      ..dateFormatLocale = template.dateFormatLocale
+      ..apiUrl = template.apiUrl
+      ..version = template.version
+      ..versionLast = template.versionLast
+      ..headers = template.headers
+      ..supportLatest = template.supportLatest
+      ..filterList = template.filterList
+      ..preferenceList = null
+      ..itemType = template.itemType
+      ..appMinVerReq = template.appMinVerReq
+      ..additionalParams = encodeMihonSourceMetadata(
+        sourceId: descriptor.id,
+        packageName: packageName,
+        extensionName: extensionName,
+        packageLang: packageLang,
+      )
+      ..isLocal = false
+      ..isObsolete = false
+      ..sourceCodeLanguage = SourceCodeLanguage.mihon
+      ..notes = template.notes
+      ..repo = template.repo
+      ..updatedAt = now;
+    updates.add(child);
+    writes.add(child);
     created++;
   }
 
@@ -427,18 +446,18 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
     final nativeId = mihonSourceMetadata(source)?.sourceId;
     if (nativeId != null && !descriptorIds.contains(nativeId)) {
       final metadata = mihonSourceMetadata(source);
-      updates.add(
-        source
-          ..isActive = false
-          ..additionalParams = encodeMihonSourceMetadata(
-            sourceId: nativeId,
-            packageName: metadata?.packageName ?? packageName,
-            factoryAvailable: false,
-            extensionName: metadata?.extensionName ?? extensionName,
-            packageLang: metadata?.packageLang ?? packageLang,
-          )
-          ..updatedAt = now,
-      );
+      final before = fingerprint(source);
+      source
+        ..isActive = false
+        ..additionalParams = encodeMihonSourceMetadata(
+          sourceId: nativeId,
+          packageName: metadata?.packageName ?? packageName,
+          factoryAvailable: false,
+          extensionName: metadata?.extensionName ?? extensionName,
+          packageLang: metadata?.packageLang ?? packageLang,
+        );
+      updates.add(source);
+      if (fingerprint(source) != before) writes.add(source..updatedAt = now);
       unavailable++;
     }
   }
@@ -545,28 +564,30 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
   }
 
   await beforeReconciliationWrite?.call();
-  await dbWriteQueue.run(
-    () => isar.writeTxn(() async {
-      await isar.sources.putAll(updates);
-      if (mangaUpdates.isEmpty) return;
-      final currentMangas = await isar.mangas.getAll(
-        mangaUpdates.map((update) => update.id).toList(growable: false),
-      );
-      final rebinding = <Manga>[];
-      for (var index = 0; index < mangaUpdates.length; index++) {
-        final manga = currentMangas[index];
-        if (manga == null) continue;
-        final update = mangaUpdates[index];
-        manga
-          ..sourceId = update.sourceId
-          ..source = update.source
-          ..lang = update.lang
-          ..mihonSourceId = update.mihonSourceId;
-        rebinding.add(manga);
-      }
-      if (rebinding.isNotEmpty) await isar.mangas.putAll(rebinding);
-    }),
-  );
+  if (writes.isNotEmpty || mangaUpdates.isNotEmpty) {
+    await dbWriteQueue.run(
+      () => isar.writeTxn(() async {
+        if (writes.isNotEmpty) await isar.sources.putAll(writes);
+        if (mangaUpdates.isEmpty) return;
+        final currentMangas = await isar.mangas.getAll(
+          mangaUpdates.map((update) => update.id).toList(growable: false),
+        );
+        final rebinding = <Manga>[];
+        for (var index = 0; index < mangaUpdates.length; index++) {
+          final manga = currentMangas[index];
+          if (manga == null) continue;
+          final update = mangaUpdates[index];
+          manga
+            ..sourceId = update.sourceId
+            ..source = update.source
+            ..lang = update.lang
+            ..mihonSourceId = update.mihonSourceId;
+          rebinding.add(manga);
+        }
+        if (rebinding.isNotEmpty) await isar.mangas.putAll(rebinding);
+      }),
+    );
+  }
   final detached = mangaUpdates
       .where(
         (update) => update.sourceId == null && update.mihonSourceId != null,

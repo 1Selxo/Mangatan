@@ -236,6 +236,49 @@ void main() {
     },
   );
 
+  test(
+    'reconciling a factory whose sources did not change writes nothing',
+    () async {
+      // Every launch reconciles every installed extension. Rewriting each
+      // unchanged source stored its whole APK again and woke every screen
+      // watching the sources table.
+      final template = Source(
+        id: 201,
+        name: 'Site',
+        lang: 'en',
+        baseUrl: 'https://site.example',
+        sourceCodeUrl: 'https://extensions.example/site.apk',
+        sourceCode: 'apk-bytes',
+        isActive: true,
+        itemType: ItemType.manga,
+      )..sourceCodeLanguage = SourceCodeLanguage.mihon;
+      const descriptors = [
+        MihonSourceDescriptor(
+          id: '2001',
+          name: 'Site',
+          lang: 'en',
+          baseUrl: 'https://site.example',
+        ),
+      ];
+      template.additionalParams = encodeMihonSourceMetadata(
+        sourceId: '2001',
+        packageName: 'eu.kanade.tachiyomi.extension.en.site',
+      );
+      await database.writeTxn(() => database.sources.put(template));
+      await reconcileMihonFactorySources(template, descriptors);
+      final stored = database.sources.getSync(201)!;
+
+      var writes = 0;
+      final watch = database.sources.watchLazy().listen((_) => writes++);
+      await reconcileMihonFactorySources(stored, descriptors);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await watch.cancel();
+
+      expect(writes, 0);
+      expect(database.sources.getSync(201)!.updatedAt, stored.updatedAt);
+    },
+  );
+
   group('title restored before its extension was installed', () {
     Source template() => Source(
       id: 201,

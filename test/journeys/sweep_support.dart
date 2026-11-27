@@ -104,12 +104,7 @@ const keyRoutes = [
 
 /// Screens with a suspected bug, by window, skipped here (each has its own
 /// journey) so the sweep stays green for everything else. Remove an entry once its bug is fixed.
-const knownIssues = {
-  ('desktop', '/calendarScreen'): 'S2: calendar buttons need a Material',
-  ('desktop dark', '/calendarScreen'): 'S2: calendar buttons need a Material',
-  ('phone', '/calendarScreen'): 'S2: calendar buttons need a Material',
-  ('small window', '/calendarScreen'): 'S2: calendar buttons need a Material',
-};
+const knownIssues = <(String, String), String>{};
 
 /// Same, for the translation sweep: (language, window, test).
 // Empty since the sweep measures text in the app's own font (S14, S17 and

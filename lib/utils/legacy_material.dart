@@ -1,6 +1,8 @@
 // The point of this file: the bridge and the old library it serves.
 // ignore_for_file: deprecated_member_use
-import 'package:material_ui/material_ui.dart' as legacy;
+// Flutter's own Material library, on purpose: the packages below still use
+// it (dart fix --code=migrate_design_widgets must not rewrite this line).
+import 'package:flutter/material.dart' as legacy;
 import 'package:material_ui/material_ui.dart';
 
 /// Lets the packages still built on Flutter's old built-in Material library

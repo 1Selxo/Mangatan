@@ -446,6 +446,7 @@ class _MangaChapterPageGalleryState
   late ReaderMode _cachedReaderMode = _readerController.getReaderMode();
   late PageMode _pageMode = _readerController.getPageMode();
   Orientation? _lastOrientation;
+  Size? _lastViewSize;
   PageMode? _lastEffectivePageMode;
   late final _currentReaderMode = StateProvider<ReaderMode?>(
     () => _cachedReaderMode,
@@ -664,6 +665,7 @@ class _MangaChapterPageGalleryState
       });
     }
     _lastOrientation = orientation;
+    _keepPageAcrossResize(MediaQuery.sizeOf(context), readerMode);
     _lastEffectivePageMode = currentEffectivePageMode;
 
     ref.listen<bool>(doublePageSingleFirstPageStateProvider, (previous, next) {
@@ -1429,6 +1431,29 @@ class _MangaChapterPageGalleryState
     }
     // Split halves are in the order of the direction read.
     if (directionChanged) rejoinSplitPages();
+  }
+
+  /// Keeps the page in view when the window changes size. The continuous
+  /// strip keeps its scroll offset in pixels while every page's height
+  /// follows the new width, so maximizing a webtoon chapter at page 5 showed
+  /// page 1 to 3 (S5). Built before the strip lays out at the new size, so
+  /// [_currentIndex] is still the page that was in view.
+  void _keepPageAcrossResize(Size size, ReaderMode readerMode) {
+    final previous = _lastViewSize;
+    _lastViewSize = size;
+    if (previous == null || previous == size || !readerMode.isContinuous) {
+      return;
+    }
+    final keep = _currentIndex;
+    if (keep == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_listController.isAttached ||
+          !_continuousScrollController.hasClients) {
+        return;
+      }
+      _jumpToContinuousPage(keep);
+    });
   }
 
   /// Puts page [index] at the start of the continuous strip. Half a pixel

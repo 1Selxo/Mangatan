@@ -162,9 +162,8 @@ void main() {
       ReaderMode.rtl,
     ]) {
       testWidgets(
-        '${mode == ReaderMode.webtoon ? 'S5 ' : ''}${mode.name}: maximizing mid-chapter keeps the page',
-        // Suspected bug S5: webtoon keeps the pixel offset, not the page.
-        skip: mode == ReaderMode.webtoon,
+        // Was S5 for webtoon: it kept the pixel offset, not the page.
+        '${mode.name}: maximizing mid-chapter keeps the page',
         (tester) async {
           final j = await Journey.start(
             tester,

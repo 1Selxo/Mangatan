@@ -2514,6 +2514,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String local_metadata_invalid(Object file, Object series, Object reason) {
+    return 'Couldn\'t read $file of \"$series\": $reason. Fix the file and rescan the local folder.';
+  }
+
+  @override
   String get export_metadata => 'تصدير البيانات الوصفية';
 
   @override

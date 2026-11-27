@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io'; // For I/O-operations
 import 'dart:typed_data';
 
@@ -21,7 +20,11 @@ import 'package:mangayomi/repositories/manga_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/eval/model/m_bridge.dart' show botToast;
+import 'package:mangayomi/modules/library/providers/local_details.dart';
 import 'package:mangayomi/services/local_folders.dart';
+import 'package:mangayomi/utils/localized_message.dart';
+import 'package:shiori/shiori.dart' show ShioriToastTone;
 import 'package:riverpod_annotation/riverpod_annotation.dart'; // Annotations for code generation
 part 'file_scanner.g.dart';
 
@@ -182,7 +185,11 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
 
     // List all folders and files inside a Manga/Anime title
     final children = await folder.list().toList();
-    final subDirs = children.whereType<Directory>().toList();
+    // An empty folder is not a chapter (a stray "New folder", say).
+    final subDirs = [
+      for (final d in children.whereType<Directory>())
+        if (await d.list().any((e) => e is File)) d,
+    ];
     final files = children.whereType<File>().toList();
 
     // Determine itemtype
@@ -260,6 +267,13 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       }
     }
 
+    // Older scans blanked the name of a series whose metadata file had no
+    // "name"; a nameless series is hidden from Browse → Local.
+    if ((manga.name ?? '').trim().isEmpty) {
+      manga.updateSourceTitle(title);
+      manga.lastUpdate = dateNow;
+    }
+
     // Detect a single image in item's root and use it as custom cover
     final imageFiles = files.where((f) => _isImage(f.path)).toList();
     if (imageFiles.length == 1) {
@@ -277,22 +291,45 @@ Future<void> _scanDirectory(Ref ref, Directory? dir) async {
       manga.customCoverImage = null;
     }
 
-    final jsonFiles = files.where((f) => _isJson(f.path)).toList();
+    final jsonFiles = files.where((f) => _isJson(f.path)).toList()
+      // Mihon's details.json first, when a folder has several.
+      ..sort(
+        (a, b) => (p.basename(b.path).toLowerCase() == 'details.json' ? 1 : 0)
+            .compareTo(
+              p.basename(a.path).toLowerCase() == 'details.json' ? 1 : 0,
+            ),
+      );
     if (jsonFiles.isNotEmpty) {
+      final file = jsonFiles.first;
       try {
-        final str = await File(jsonFiles.first.path).readAsString();
-        final data = jsonDecode(str) as Map<String, dynamic>?;
-        manga.updateSourceTitle(data?["name"]);
-        manga.description = data?["description"];
-        manga.artist = data?["artist"];
-        manga.author = data?["author"];
-        manga.genre = data?["genre"]?.cast<String>();
-        manga.status = data?["status"] != null
-            ? Status.values[data!["status"]]
-            : Status.unknown;
+        final details = LocalDetails.parse(
+          await File(file.path).readAsString(),
+          fileName: p.basename(file.path),
+        );
+        // Only what the file says: a missing title keeps the folder name
+        // (a series without a name is hidden from Browse → Local).
+        if (details.title != null) manga.updateSourceTitle(details.title);
+        if (details.description != null) {
+          manga.description = details.description;
+        }
+        if (details.artist != null) manga.artist = details.artist;
+        if (details.author != null) manga.author = details.author;
+        manga.genre = details.genres ?? manga.genre ?? [];
+        if (details.status != null) manga.status = details.status!;
         manga.lastUpdate = dateNow;
       } catch (e) {
-        BotToast.showText(text: "Error reading metadata: $e");
+        final reason = e is FormatException ? e.message : '$e';
+        botToast(
+          localizedMessage(
+            (l10n) => l10n.local_metadata_invalid(
+              p.basename(file.path),
+              title,
+              reason,
+            ),
+          ),
+          tone: ShioriToastTone.error,
+          second: 6,
+        );
       }
     }
 

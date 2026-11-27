@@ -1029,6 +1029,14 @@
       "error": {}
     }
   },
+  "local_metadata_invalid": "Couldn't read {file} of \"{series}\": {reason}. Fix the file and rescan the local folder.",
+  "@local_metadata_invalid": {
+    "placeholders": {
+      "file": {},
+      "series": {},
+      "reason": {}
+    }
+  },
   "export_metadata": "Export metadata",
   "exported": "Exported",
   "failed_to_export_metadata": "Failed to export metadata: {error}",

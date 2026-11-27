@@ -4563,6 +4563,12 @@ abstract class AppLocalizations {
   /// **'Error getting local library: {error}'**
   String error_getting_local_library(Object error);
 
+  /// No description provided for @local_metadata_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read {file} of \"{series}\": {reason}. Fix the file and rescan the local folder.'**
+  String local_metadata_invalid(Object file, Object series, Object reason);
+
   /// No description provided for @export_metadata.
   ///
   /// In en, this message translates to:

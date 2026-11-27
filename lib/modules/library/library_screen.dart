@@ -608,6 +608,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final l10n = l10nLocalizations(context)!;
     return TabBar(
       isScrollable: true,
+      // Material 3 starts a scrollable tab bar 52 px in (startOffset), which
+      // left a gap before the first category for no reason.
+      tabAlignment: TabAlignment.start,
       controller: tabBarController,
       tabs: [
         if (withoutCategory.isNotEmpty)

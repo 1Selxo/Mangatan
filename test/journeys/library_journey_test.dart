@@ -23,6 +23,21 @@ void main() {
       },
     );
 
+    testWidgets('the first category tab starts at the left edge', (
+      tester,
+    ) async {
+      // Material 3's startOffset put 52 px of nothing before it; seen by hand
+      // on Windows at phone width and at 640×480.
+      final j = await withCategories(tester);
+      final tab = find.text('Romance').hitTestable().first;
+      final bar = find.ancestor(of: tab, matching: find.byType(TabBar));
+      expect(
+        tester.getTopLeft(tab).dx - tester.getTopLeft(bar.first).dx,
+        lessThan(40),
+      );
+      await j.settle();
+    });
+
     testWidgets('each category tab shows only its own series', (tester) async {
       final j = await withCategories(tester);
       expect(find.text('Love Story'), findsWidgets);

@@ -7,6 +7,7 @@ import 'package:mangayomi/repositories/db.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
 import 'package:mangayomi/utils/error_toast.dart';
+import 'package:mangayomi/utils/ascii_json.dart';
 
 class SourcePreferenceRepository {
   SourcePreference? findByKey(int? sourceId, String? key) {
@@ -94,8 +95,8 @@ class SourcePreferenceRepository {
           prefs[idx] = sourcePreference..id = null;
           await isar.sources.put(
             source
-              ..preferenceList = jsonEncode(
-                prefs.map((e) => e.toJson()).toList(),
+              ..preferenceList = asciiJson(
+                jsonEncode(prefs.map((e) => e.toJson()).toList()),
               ),
           );
         }

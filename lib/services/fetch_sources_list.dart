@@ -27,6 +27,7 @@ import 'package:mangayomi/utils/extension_language_defaults.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:isar_community/isar.dart';
+import 'package:mangayomi/utils/ascii_json.dart';
 
 /// The extensions [repo] lists for [itemType] that this version of the app
 /// can run. A Mihon APK becomes one row per source it holds, all sharing the
@@ -654,10 +655,12 @@ Future<void> _updateSources(
         ..headers = jsonEncode(headers)
         ..supportLatest = supportLatest
         ..filterList = filterList != null
-            ? jsonEncode(filterList.toJson())
+            ? asciiJson(jsonEncode(filterList.toJson()))
             : null
         ..preferenceList = preferenceList != null
-            ? jsonEncode(preferenceList.map((e) => e.toJson()).toList())
+            ? asciiJson(
+                jsonEncode(preferenceList.map((e) => e.toJson()).toList()),
+              )
             : null
         ..isAdded = true
         ..isActive =

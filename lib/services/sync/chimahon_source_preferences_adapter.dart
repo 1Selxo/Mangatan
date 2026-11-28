@@ -8,6 +8,7 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPr
 import 'package:mangayomi/services/mihon_source_preferences.dart';
 import 'package:mangayomi/services/sync/chimahon_preferences.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/utils/ascii_json.dart';
 
 /// Lossless bridge for preferences owned by installed Mihon source factories.
 ///
@@ -210,8 +211,10 @@ class ChimahonSourcePreferencesAdapter {
         storedByKey[encoded.key] = persisted;
       }
       if (!sourceChanged) continue;
-      source.preferenceList = jsonEncode(
-        definitions.map((preference) => preference.toJson()).toList(),
+      source.preferenceList = asciiJson(
+        jsonEncode(
+          definitions.map((preference) => preference.toJson()).toList(),
+        ),
       );
       changedSources.add(source);
     }

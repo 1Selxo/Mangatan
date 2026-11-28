@@ -56,6 +56,7 @@ import 'package:mangayomi/services/sync/google_drive_platform_support.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
 import 'package:mangayomi/services/reconcile_mihon_sources.dart';
+import 'package:mangayomi/services/source_json_migration.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/services/mining/mining_preferences.dart';
 import 'package:mangayomi/services/mining/dictionary_update_service.dart';
@@ -396,6 +397,15 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
     }
   }
   StartupTrace.mark('post_launch_done');
+  // Once per database, away from the launch: it reads every source.
+  unawaited(
+    Future<void>.delayed(const Duration(seconds: 15), () async {
+      final directory = await storage.getDatabaseDirectory();
+      if (directory != null) await migrateSourceJsonToAscii(isar, directory);
+    }).catchError((Object error, StackTrace stack) {
+      recordError(error, stack: stack, source: 'source_json_migration');
+    }),
+  );
 }
 
 class MyApp extends ConsumerStatefulWidget {

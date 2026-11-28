@@ -14,6 +14,7 @@ import 'package:mangayomi/services/mihon_source_preferences.dart';
 import 'package:mangayomi/services/sync/chimahon_source_preferences_adapter.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/utils/ascii_json.dart';
 
 final refreshInstalledMihonFactorySourcesProvider =
     FutureProvider<MihonFactoryRefreshResult>(
@@ -193,8 +194,10 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
           );
           if (fresh == null) continue;
           final merged = mergeMihonPreferenceValues(fresh, persisted);
-          final encoded = jsonEncode(
-            merged.map((preference) => preference.toJson()).toList(),
+          final encoded = asciiJson(
+            jsonEncode(
+              merged.map((preference) => preference.toJson()).toList(),
+            ),
           );
           // Unchanged on almost every launch; a write would store the APK
           // again for nothing.

@@ -5,6 +5,7 @@ import 'package:mangayomi/eval/mihon/service.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/repositories/source_repository.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
+import 'package:mangayomi/utils/ascii_json.dart';
 
 /// The filters a Mihon source gives now, asked of the bridge again.
 ///
@@ -22,7 +23,7 @@ final mihonFilterListProvider = FutureProvider.family<List<dynamic>?, Source>((
   try {
     final fresh = await service.fetchFilterList();
     if (fresh == null) return null;
-    final encoded = jsonEncode(fresh.toJson());
+    final encoded = asciiJson(jsonEncode(fresh.toJson()));
     if (encoded != source.filterList) {
       source.filterList = encoded;
       await sourceRepository.save(source);

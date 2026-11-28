@@ -35,6 +35,7 @@ import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
+import 'package:mangayomi/utils/ascii_json.dart';
 
 class ExtensionDetail extends ConsumerStatefulWidget {
   final Source source;
@@ -205,8 +206,8 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
 
       if (fresh == null) return;
       var merged = mergeMihonPreferenceValues(fresh, appliedPreferences);
-      source.preferenceList = jsonEncode(
-        merged.map((preference) => preference.toJson()).toList(),
+      source.preferenceList = asciiJson(
+        jsonEncode(merged.map((preference) => preference.toJson()).toList()),
       );
       if (changedKey != null) {
         final acceptedPreference = merged
@@ -275,9 +276,13 @@ class _ExtensionDetailState extends ConsumerState<ExtensionDetail> {
         preferences: merged,
       );
       if (refreshed == null || !current()) continue;
-      final previousJson = jsonEncode(merged.map((p) => p.toJson()).toList());
+      final previousJson = asciiJson(
+        jsonEncode(merged.map((p) => p.toJson()).toList()),
+      );
       merged = mergeMihonPreferenceValues(refreshed, merged);
-      final mergedJson = jsonEncode(merged.map((p) => p.toJson()).toList());
+      final mergedJson = asciiJson(
+        jsonEncode(merged.map((p) => p.toJson()).toList()),
+      );
       if (mergedJson == previousJson) continue;
       source.preferenceList = mergedJson;
       await dbWriteQueue.run(

@@ -11,6 +11,7 @@ import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 
 import 'package:mangayomi/eval/aidoku/aidoku_ext_dart.dart' as aidoku;
+import 'package:mangayomi/utils/ascii_json.dart';
 
 // Written synchronously: extensions read a value back through the database
 // right after setting it, and a queued write would return the stale value.
@@ -33,8 +34,8 @@ void setPreferenceSetting(SourcePreference sourcePreference, Source source) {
           ..id = null;
         isar.sources.putSync(
           source
-            ..preferenceList = jsonEncode(
-              prefs.map((e) => e.toJson()).toList(),
+            ..preferenceList = asciiJson(
+              jsonEncode(prefs.map((e) => e.toJson()).toList()),
             ),
         );
       }

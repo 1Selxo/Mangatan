@@ -5,6 +5,8 @@ import 'package:mangayomi/eval/model/filter.dart';
 import 'package:mangayomi/eval/model/m_source.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/utils/ascii_json.dart';
+
 part 'source.g.dart';
 
 @collection
@@ -140,8 +142,8 @@ class Source {
     hasCloudflare = json['hasCloudflare'];
     headers = json['headers'];
     supportLatest = json['supportLatest'];
-    filterList = json['filterList'];
-    preferenceList = json['preferenceList'];
+    filterList = asciiJsonOrNull(json['filterList'] as String?);
+    preferenceList = asciiJsonOrNull(json['preferenceList'] as String?);
     iconUrl = json['iconUrl'];
     id = json['id'] is int ? json['id'] : null;
     isActive = json['isActive'];

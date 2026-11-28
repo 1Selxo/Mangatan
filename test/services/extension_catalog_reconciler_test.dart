@@ -57,6 +57,26 @@ void main() {
     expect(existing.versionLast, '1.4.1');
     expect(mihonSourceMetadata(existing)?.factoryAvailable, isFalse);
   });
+
+  test('an installed source keeps the address of the APK it holds', () {
+    // The repository moved MangaDex to a new release URL without a version
+    // bump. Taking that address into the installed rows made the launch
+    // refresh, which finds an extension's rows by address, recreate 62 of
+    // them on every launch, clearing their preferences.
+    const moved = 'https://repo.test/b4f9106/tachiyomi-all.twicomi-v1.4.1.apk';
+    final installed = _twicomi()..isAdded = true;
+    final listing = _twicomi()..isAdded = false;
+    final catalog = _twicomi()..sourceCodeUrl = moved;
+
+    applyExtensionCatalogMetadata(installed, catalog, repo: catalog.repo);
+    applyExtensionCatalogMetadata(listing, catalog, repo: catalog.repo);
+
+    expect(
+      installed.sourceCodeUrl,
+      'https://repo.test/tachiyomi-all.twicomi-v1.4.1.apk',
+    );
+    expect(listing.sourceCodeUrl, moved);
+  });
 }
 
 const _sourceId = '4589056979500242728';

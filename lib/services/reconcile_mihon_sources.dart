@@ -358,6 +358,27 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
     final metadata = mihonSourceMetadata(source);
     if (metadata != null) byNativeId[metadata.sourceId] = source;
   }
+  // A child stored under another address than the template (an older
+  // catalog write moved it) is still this extension's: update it rather
+  // than replace it with a new row of the same id, which lost its
+  // preferences and pinned state.
+  final strayIds = [
+    for (final descriptor in descriptors)
+      if (!byNativeId.containsKey(descriptor.id))
+        mihonLocalSourceId(descriptor.id),
+  ];
+  if (strayIds.isNotEmpty) {
+    final strays = await isar.sources.getAll(strayIds);
+    for (final stray in strays) {
+      final metadata = stray == null ? null : mihonSourceMetadata(stray);
+      if (stray == null ||
+          metadata == null ||
+          metadata.packageName != packageName) {
+        continue;
+      }
+      byNativeId[metadata.sourceId] = stray;
+    }
+  }
   final descriptorIds = descriptors.map((descriptor) => descriptor.id).toSet();
   final now = DateTime.now().millisecondsSinceEpoch;
   final updates = <Source>[];
@@ -372,7 +393,8 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
     source.isActive,
     source.additionalParams,
     source.isObsolete,
-  ].join(' ');
+    source.sourceCodeUrl,
+  ].join('\u0000');
   var created = 0;
   var updated = 0;
   var unavailable = 0;
@@ -396,6 +418,11 @@ Future<MihonFactoryReconcileResult> reconcileMihonFactorySources(
           packageLang: packageLang,
         )
         ..isObsolete = false;
+      // A row moved to another address by an older catalog write, still
+      // holding this APK, takes the extension's address back.
+      if (existing.sourceCode == template.sourceCode) {
+        existing.sourceCodeUrl = template.sourceCodeUrl;
+      }
       updates.add(existing);
       if (fingerprint(existing) != before) {
         writes.add(existing..updatedAt = now);

@@ -41,11 +41,6 @@ bool applyExtensionCatalogMetadata(
   update(existing.lang, catalog.lang, (value) => existing.lang = value);
   update(existing.isNsfw, catalog.isNsfw, (value) => existing.isNsfw = value);
   update(
-    existing.sourceCodeUrl,
-    catalog.sourceCodeUrl,
-    (value) => existing.sourceCodeUrl = value,
-  );
-  update(
     existing.typeSource,
     catalog.typeSource,
     (value) => existing.typeSource = value,
@@ -105,10 +100,19 @@ bool applyExtensionCatalogMetadata(
     changed = true;
   }
 
-  // For entries that have not been installed yet, both versions describe the
-  // catalog artifact. Installed entries keep their installed version so the
-  // existing update detection can compare it with the latest catalog version.
+  // For entries that have not been installed yet, both versions and the
+  // address describe the catalog artifact. Installed entries keep their
+  // installed version, so update detection can compare it with the latest
+  // catalog version, and the address of the APK they hold: the launch refresh
+  // finds an extension's rows by it, and an update installs from the offer's
+  // own address. A repository republishing at a new address made it recreate
+  // those rows on every launch.
   if (!(existing.isAdded ?? false)) {
+    update(
+      existing.sourceCodeUrl,
+      catalog.sourceCodeUrl,
+      (value) => existing.sourceCodeUrl = value,
+    );
     update(
       existing.version,
       catalog.version,

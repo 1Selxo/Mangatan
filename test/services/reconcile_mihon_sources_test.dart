@@ -279,6 +279,71 @@ void main() {
     },
   );
 
+  test(
+    'a stored source found under another APK address is updated, not replaced',
+    () async {
+      // Was: a factory child stored under a different address than the
+      // extension's template was taken for a new one and overwritten,
+      // losing its preferences and pinned state.
+      final template = Source(
+        id: 301,
+        name: 'Site (en)',
+        lang: 'en',
+        sourceCodeUrl: 'https://repo.example/old/site.apk',
+        sourceCode: 'apk-bytes',
+        isAdded: true,
+        isActive: true,
+        itemType: ItemType.manga,
+        additionalParams: encodeMihonSourceMetadata(
+          sourceId: '3001',
+          packageName: 'eu.kanade.tachiyomi.extension.all.site',
+        ),
+      )..sourceCodeLanguage = SourceCodeLanguage.mihon;
+      final sibling = Source(
+        id: mihonLocalSourceId('3002'),
+        name: 'Site (fr)',
+        lang: 'fr',
+        sourceCodeUrl: 'https://repo.example/new/site.apk',
+        sourceCode: 'apk-bytes',
+        isAdded: true,
+        isActive: true,
+        isPinned: true,
+        preferenceList: '[{"key":"quality"}]',
+        itemType: ItemType.manga,
+        additionalParams: encodeMihonSourceMetadata(
+          sourceId: '3002',
+          packageName: 'eu.kanade.tachiyomi.extension.all.site',
+        ),
+      )..sourceCodeLanguage = SourceCodeLanguage.mihon;
+      await database.writeTxn(
+        () => database.sources.putAll([template, sibling]),
+      );
+
+      final result = await reconcileMihonFactorySources(template, const [
+        MihonSourceDescriptor(
+          id: '3001',
+          name: 'Site (en)',
+          lang: 'en',
+          baseUrl: 'https://site.example',
+        ),
+        MihonSourceDescriptor(
+          id: '3002',
+          name: 'Site (fr)',
+          lang: 'fr',
+          baseUrl: 'https://site.example/fr',
+        ),
+      ]);
+
+      final stored = database.sources.getSync(mihonLocalSourceId('3002'))!;
+      expect(result.created, 0);
+      expect(stored.preferenceList, '[{"key":"quality"}]');
+      expect(stored.isPinned, isTrue);
+      expect(stored.baseUrl, 'https://site.example/fr');
+      // Holding the same APK, it takes the extension's address back.
+      expect(stored.sourceCodeUrl, 'https://repo.example/old/site.apk');
+    },
+  );
+
   group('title restored before its extension was installed', () {
     Source template() => Source(
       id: 201,

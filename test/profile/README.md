@@ -42,6 +42,9 @@ dart run tool/perf/real_app_driver.dart --exe <absolute path to mangayomi.exe> \
   --seconds 60 [--search love --search-after 40]
 ```
 
+`python tool/perf/window_top.py <out> <run> <from ms> <to ms>` lists the top
+functions of one stretch of a run (times as in `<run>.json`).
+
 The driver records every frame's build and raster time, the main isolate's
 CPU samples, the startup phase marks and the Mihon refresh timing the app
 logs. The harness build keeps all data in the folder, and the bridge's own

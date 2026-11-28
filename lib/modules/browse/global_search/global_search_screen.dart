@@ -146,17 +146,24 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
               padding: pageBottomInsets(context),
               child: Column(
                 children: [
-                  for (final source in sourceList)
-                    SourceSearchScreen(
-                      // Keyed per source as well as per query. They previously
-                      // all shared one key, which is not a valid sibling key.
-                      key: ValueKey('$query#${source.id}'),
-                      query: query,
-                      source: source,
-                      fetchGate: _fetchGate,
-                      onNothingToShow: (reason) =>
-                          _reportNothingToShow(source, reason),
-                    ),
+                  _ProgressiveRows(
+                    key: ValueKey(query),
+                    count: sourceList.length,
+                    row: (index) {
+                      final source = sourceList[index];
+                      return SourceSearchScreen(
+                        // Keyed per source as well as per query. They
+                        // previously all shared one key, which is not a valid
+                        // sibling key.
+                        key: ValueKey('$query#${source.id}'),
+                        query: query,
+                        source: source,
+                        fetchGate: _fetchGate,
+                        onNothingToShow: (reason) =>
+                            _reportNothingToShow(source, reason),
+                      );
+                    },
+                  ),
                   ValueListenableBuilder<int>(
                     valueListenable: _nothingToShowRevision,
                     builder: (context, _, _) => _nothingToShowGroup(context),
@@ -280,6 +287,52 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
     _nothingToShowRevision.dispose();
     super.dispose();
   }
+}
+
+/// The source rows of a search, a few more each frame.
+///
+/// Every row is built rather than lazily (see the screen's build), and
+/// building all of them in the frame that opens the screen made that frame
+/// take a third of a second on a library with dozens of sources, though
+/// only the first few rows are on screen. Each batch is built once and kept,
+/// so adding the next does not rebuild the earlier ones. Rows further down
+/// would wait behind the fetch gate anyway.
+class _ProgressiveRows extends StatefulWidget {
+  const _ProgressiveRows({super.key, required this.count, required this.row});
+
+  final int count;
+  final Widget Function(int index) row;
+
+  @override
+  State<_ProgressiveRows> createState() => _ProgressiveRowsState();
+}
+
+class _ProgressiveRowsState extends State<_ProgressiveRows> {
+  static const _batch = 6;
+  final _batches = <Widget>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _addBatch();
+  }
+
+  void _addBatch() {
+    final start = _batches.length * _batch;
+    if (start >= widget.count) return;
+    final end = (start + _batch).clamp(0, widget.count);
+    _batches.add(
+      Column(children: [for (var i = start; i < end; i++) widget.row(i)]),
+    );
+    if (end < widget.count) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(_addBatch);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(children: [..._batches]);
 }
 
 class SourceSearchScreen extends ConsumerStatefulWidget {

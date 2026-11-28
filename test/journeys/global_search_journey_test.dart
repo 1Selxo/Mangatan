@@ -122,4 +122,28 @@ void main() {
 
     expect(asked, ['Pinned Source']);
   });
+
+  testWidgets('a search over many sources asks every one of them', (
+    tester,
+  ) async {
+    // The rows are built a few per frame, so the first frame does not build
+    // dozens of them; every source must still be searched in the end.
+    final (asked, overrides) = _recordingSources();
+    final j = await Journey.start(
+      tester,
+      overrides: overrides,
+      arrange: (seed) async {
+        for (var i = 1; i <= 20; i++) {
+          await _install(seed.db, 'Source $i', id: i);
+        }
+      },
+    );
+
+    await j.push('globalSearch', extra: ('love', ItemType.manga));
+    for (var i = 0; i < 40 && asked.length < 20; i++) {
+      await j.settle(rounds: 2);
+    }
+
+    expect(asked.toSet(), {for (var i = 1; i <= 20; i++) 'Source $i'});
+  });
 }

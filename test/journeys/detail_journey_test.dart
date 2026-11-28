@@ -2,6 +2,7 @@
 // unread, bookmarking, the library heart, and selection state that must not
 // leak elsewhere. From the 2026-11-09 and 2026-11-21 test rounds.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:marquee/marquee.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'harness/journey.dart';
@@ -154,5 +155,35 @@ void main() {
     // A tap afterwards still only removes; the picker does not stick around.
     await j.key(LogicalKeyboardKey.escape);
     expect(find.text('Kuso Onna'), findsWidgets);
+  });
+
+  testWidgets('long chapter titles stop scrolling while the list scrolls', (
+    tester,
+  ) async {
+    // Each overflowing title is a running marquee. Scrolling a long series
+    // started one for every row going by, which made the scroll stutter.
+    final title = 'A chapter title much too long to fit in one row ' * 3;
+    final j = await Journey.start(
+      tester,
+      arrange: (seed) async {
+        final manga = await seed.manga('Kuso Onna');
+        for (var i = 1; i <= 30; i++) {
+          await seed.chapter(manga, '$title$i', number: i.toDouble());
+        }
+      },
+    );
+    await j.tapText('Kuso Onna');
+    await j.waitFor(find.byType(Marquee));
+
+    final list = find.byType(Scrollable).last;
+    await tester.pump();
+    final gesture = await tester.startGesture(tester.getCenter(list));
+    await gesture.moveBy(const Offset(0, -200));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byType(Marquee), findsNothing);
+
+    await gesture.up();
+    await j.settle(rounds: 20);
+    expect(find.byType(Marquee), findsWidgets);
   });
 }

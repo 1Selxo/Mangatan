@@ -7,6 +7,8 @@ import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/modules/novel/novel_reader_progress.dart';
 import 'package:mangayomi/modules/novel/novel_reader_view.dart';
 import 'package:mangayomi/utils/constant.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:marquee/marquee.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/manga.dart';
@@ -321,7 +323,10 @@ class ChapterListTileWidget extends ConsumerWidget {
     }
   }
 
-  Widget _buildTitle(String text, BuildContext context) {
+  Widget _buildTitle(String text, BuildContext context) =>
+      _ScrollPausedTitle(text: text, title: _buildMeasuredTitle);
+
+  Widget _buildMeasuredTitle(String text, BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Make sure that (constraints.maxWidth - (35 + 5)) is strictly positive.
@@ -497,4 +502,72 @@ class ChapterListTileWidget extends ConsumerWidget {
       },
     );
   }
+}
+
+/// A chapter title that scrolls when it does not fit, except while the
+/// list is scrolling: then it is a plain title cut off with an ellipsis.
+///
+/// Each overflowing title is a running marquee with its own animation and
+/// pause timers, and the overflow is measured with a text layout of its
+/// own. Scrolling a long series' chapter list started both for every row
+/// going by, which made the scroll stutter. The titles on screen start
+/// scrolling again once the list stops.
+class _ScrollPausedTitle extends StatefulWidget {
+  const _ScrollPausedTitle({required this.text, required this.title});
+
+  final String text;
+  final Widget Function(String text, BuildContext context) title;
+
+  @override
+  State<_ScrollPausedTitle> createState() => _ScrollPausedTitleState();
+}
+
+class _ScrollPausedTitleState extends State<_ScrollPausedTitle> {
+  ValueListenable<bool>? _scrolling;
+  var _isScrolling = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final scrolling = Scrollable.maybeOf(context)?.position.isScrollingNotifier;
+    if (identical(scrolling, _scrolling)) return;
+    _scrolling?.removeListener(_onScrollingChanged);
+    _scrolling = scrolling?..addListener(_onScrollingChanged);
+    _isScrolling = scrolling?.value ?? false;
+  }
+
+  /// The flag can flip during layout (a list whose content changed settles
+  /// its position), when a rebuild cannot be asked for: then it is applied
+  /// right after the frame.
+  void _onScrollingChanged() {
+    void apply() {
+      final value = _scrolling?.value ?? false;
+      if (mounted && value != _isScrolling) {
+        setState(() => _isScrolling = value);
+      }
+    }
+
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) => apply());
+    } else {
+      apply();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrolling?.removeListener(_onScrollingChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _isScrolling
+      ? Text(
+          widget.text,
+          style: const TextStyle(fontSize: 13),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        )
+      : widget.title(widget.text, context);
 }

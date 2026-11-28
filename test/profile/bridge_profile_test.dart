@@ -158,10 +158,8 @@ void main() {
         ) async {
           await record(name);
           await profiler.start();
-          final drain = Timer.periodic(
-            const Duration(seconds: 2),
-            (_) => unawaited(profiler.drain().catchError((_) {})),
-          );
+          // Samples are taken once, after the phase: fetching them makes the
+          // VM build their JSON on this isolate, which would show as stalls.
           var writes = 0;
           final watch = db.sources.watchLazy().listen((_) => writes++);
           final stalls = _Stalls();
@@ -169,7 +167,6 @@ void main() {
           final facts = await action();
           wall.stop();
           final stalled = stalls.stop();
-          drain.cancel();
           await watch.cancel();
           await profiler.stop(name, {
             'wallMs': wall.elapsedMilliseconds,

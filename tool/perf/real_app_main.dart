@@ -20,26 +20,58 @@ import 'package:mangayomi/models/source.dart';
 void main(List<String> args) {
   app.main(args);
   _watch();
+  _visitRoutes();
   final query = Platform.environment['MANGATAN_PERF_SEARCH'];
   if (query == null) return;
   final after = int.tryParse(
     Platform.environment['MANGATAN_PERF_SEARCH_AFTER'] ?? '',
   );
   Timer(Duration(seconds: after ?? 40), () {
-    GoRouter? router;
-    void visit(Element element) {
-      if (router != null) return;
-      if (element.widget is Router) {
-        router = GoRouter.maybeOf(element);
-        if (router != null) return;
-      }
-      element.visitChildren(visit);
-    }
-
-    WidgetsBinding.instance.rootElement?.visitChildren(visit);
+    final router = _router();
     router?.pushNamed('globalSearch', extra: (query, ItemType.manga));
     debugPrint('PERF search opened: ${router != null}');
   });
+}
+
+GoRouter? _router() {
+  GoRouter? router;
+  void visit(Element element) {
+    if (router != null) return;
+    if (element.widget is Router) {
+      router = GoRouter.maybeOf(element);
+      if (router != null) return;
+    }
+    element.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement?.visitChildren(visit);
+  return router;
+}
+
+/// MANGATAN_PERF_ROUTES: locations to open one after another, each
+/// MANGATAN_PERF_ROUTE_EVERY seconds (default 6), starting
+/// MANGATAN_PERF_ROUTES_AFTER seconds after launch (default 20). An entry
+/// "push:<name>" pushes a named route instead; "pop" goes back.
+void _visitRoutes() {
+  final env = Platform.environment;
+  final routes = env['MANGATAN_PERF_ROUTES']?.split(',');
+  if (routes == null) return;
+  final every = int.tryParse(env['MANGATAN_PERF_ROUTE_EVERY'] ?? '') ?? 6;
+  final after = int.tryParse(env['MANGATAN_PERF_ROUTES_AFTER'] ?? '') ?? 20;
+  for (var i = 0; i < routes.length; i++) {
+    Timer(Duration(seconds: after + i * every), () {
+      final router = _router();
+      final route = routes[i];
+      if (route == 'pop') {
+        router?.pop();
+      } else if (route.startsWith('push:')) {
+        router?.pushNamed(route.substring(5));
+      } else {
+        router?.go(route);
+      }
+      debugPrint('PERF route $route');
+    });
+  }
 }
 
 /// Prints, against the launch clock, every change to the tables startup

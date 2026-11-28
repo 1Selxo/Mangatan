@@ -44,7 +44,11 @@ Future<void> main(List<String> args) async {
           '-Dsuwayomi.tachidesk.config.server.rootDir=$root/bridge '
           '-Djava.io.tmpdir=$root/bridge-tmp',
       if (o['search'] != null) 'MANGATAN_PERF_SEARCH': o['search']!,
-      if (o['skip'] != null) 'MANGATAN_PERF_SKIP': o['skip']!,
+      if (o['routes'] != null) 'MANGATAN_PERF_ROUTES': o['routes']!,
+      if (o['route-every'] != null)
+        'MANGATAN_PERF_ROUTE_EVERY': o['route-every']!,
+      if (o['routes-after'] != null)
+        'MANGATAN_PERF_ROUTES_AFTER': o['routes-after']!,
       if (o['search-after'] != null)
         'MANGATAN_PERF_SEARCH_AFTER': o['search-after']!,
     },
@@ -236,6 +240,8 @@ Map<String, Object?> _summarize(
     'windows': [
       window('to first frame', 0, firstFrame),
       window('first 15 s after first frame', firstFrame, firstFrame + 15000),
+      for (final (at, route, next) in _routeWindows(lines, last))
+        window('route $route', at, next),
       if (searchAt != null) ...[
         window('before search', firstFrame + 15000, searchAt),
         window('search, first 20 s', searchAt, searchAt + 20000),
@@ -243,6 +249,23 @@ Map<String, Object?> _summarize(
       ],
     ],
   };
+}
+
+/// Each visited route with when it was opened and when the next one was.
+List<(int, String, int)> _routeWindows(List<String> lines, int last) {
+  final opened = [
+    for (final l in lines)
+      if (l.contains('PERF route '))
+        (int.parse(l.split('	').first), l.split('PERF route ').last.trim()),
+  ];
+  return [
+    for (var i = 0; i < opened.length; i++)
+      (
+        opened[i].$1,
+        opened[i].$2,
+        i + 1 < opened.length ? opened[i + 1].$1 : last + 1,
+      ),
+  ];
 }
 
 String _name(ProfileFunction f) {

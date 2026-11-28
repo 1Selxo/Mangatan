@@ -429,39 +429,51 @@ class _SourceSearchScreenState extends ConsumerState<SourceSearchScreen> {
             Flexible(
               child: _isLoading
                   // The shape of what is coming: a row of covers. Only rows
-                  // whose request is running pulse; with hundreds of rows
-                  // queued behind the fetch gate, every one of them animating
-                  // made each frame rebuild and repaint thousands of boxes.
-                  ? TickerMode(
-                      enabled: _fetching,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: ShioriSpace.s8,
-                        ),
-                        children: [
-                          for (var i = 0; i < 6; i++)
-                            const Padding(
-                              padding: EdgeInsets.all(ShioriSpace.s4),
-                              child: SizedBox(
-                                width: _cardWidth - ShioriSpace.s8,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  spacing: ShioriSpace.s8,
-                                  children: [
-                                    ShioriSkeleton.box(
-                                      height: _cardHeight - ShioriSpace.s16,
-                                      radius: ShioriShape.cover,
+                  // whose request is running pulse. Rows still queued behind
+                  // the fetch gate, most of them with many sources, are one
+                  // painted placeholder each: a dozen animated skeletons per
+                  // row made opening the screen build and lay out thousands
+                  // of widgets, and every one of them animating made each
+                  // frame repaint them.
+                  ? _fetching
+                        ? ListView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: ShioriSpace.s8,
+                            ),
+                            children: [
+                              for (var i = 0; i < 6; i++)
+                                const Padding(
+                                  padding: EdgeInsets.all(ShioriSpace.s4),
+                                  child: SizedBox(
+                                    width: _cardWidth - ShioriSpace.s8,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      spacing: ShioriSpace.s8,
+                                      children: [
+                                        ShioriSkeleton.box(
+                                          height: _cardHeight - ShioriSpace.s16,
+                                          radius: ShioriShape.cover,
+                                        ),
+                                        ShioriSkeleton.line(),
+                                      ],
                                     ),
-                                    ShioriSkeleton.line(),
-                                  ],
+                                  ),
+                                ),
+                            ],
+                          )
+                        : ExcludeSemantics(
+                            child: CustomPaint(
+                              size: Size.infinite,
+                              painter: _QueuedRowPainter(
+                                context.shiori.color.fg.withValues(
+                                  alpha: Alphas.tint,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    )
+                          )
                   : SuperListView.builder(
                       extentPrecalculationPolicy: SuperPrecalculationPolicy(),
                       scrollDirection: Axis.horizontal,
@@ -754,4 +766,47 @@ NoSourcesReason noSourcesReason({
   if (pinnedOnly && candidates == 0) return NoSourcesReason.nonePinned;
   if (enabled == 0) return NoSourcesReason.noneEnabled;
   return NoSourcesReason.allNsfw;
+}
+
+/// The covers of a row still waiting for its request, painted as the
+/// skeleton row looks before its pulse starts.
+class _QueuedRowPainter extends CustomPainter {
+  const _QueuedRowPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    const cover = _cardHeight - ShioriSpace.s16;
+    const width = _cardWidth - ShioriSpace.s8;
+    var left = ShioriSpace.s8 + ShioriSpace.s4;
+    while (left < size.width) {
+      canvas
+        ..drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(left, ShioriSpace.s4, width, cover),
+            const Radius.circular(ShioriShape.cover),
+          ),
+          paint,
+        )
+        ..drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(
+              left,
+              ShioriSpace.s4 + cover + ShioriSpace.s8,
+              width,
+              12,
+            ),
+            const Radius.circular(ShioriShape.badge),
+          ),
+          paint,
+        );
+      left += _cardWidth;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_QueuedRowPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

@@ -25,9 +25,16 @@ String dateFormat(
   bool showHOURorMINUTE = false,
   bool showInDaysFuture = false,
 }) {
+  final relativeTimestamps = ref.read(relativeTimesTampsStateProvider);
+  // The grouping key of the history and updates lists, made for every entry.
+  if (forHistoryValue &&
+      stringDate == null &&
+      timestamp != null &&
+      (!useRelativeTimesTamps || relativeTimestamps == 0)) {
+    return localDayKey(int.parse(timestamp));
+  }
   final l10n = l10nLocalizations(context)!;
   final locale = currentLocale(context);
-  final relativeTimestamps = ref.read(relativeTimesTampsStateProvider);
   final dateFrmt = ref.read(dateFormatStateProvider);
   final dateTime = stringDate != null
       ? DateTime.parse(stringDate)
@@ -128,4 +135,30 @@ List<String> relativeTimestampsList(BuildContext context) {
     l10n.relative_timestamp_short,
     l10n.relative_timestamp_long,
   ];
+}
+
+final _zoneOffsets = <int, int>{};
+
+/// The local day of [millisecondsSinceEpoch], as
+/// `DateTime(year, month, day).toString()` gives it.
+///
+/// A local DateTime asks the OS for the time zone when it is made and again
+/// for each field read (a system call on Windows), and the history list
+/// grouped thousands of entries this way on every build. Every zone changes
+/// its offset on a quarter hour, so one lookup per quarter hour is exact.
+String localDayKey(int millisecondsSinceEpoch) {
+  const quarterHour = 15 * 60 * 1000;
+  final offset = _zoneOffsets.putIfAbsent(
+    millisecondsSinceEpoch ~/ quarterHour,
+    () =>
+        DateTime.fromMillisecondsSinceEpoch(millisecondsSinceEpoch)
+            .timeZoneOffset
+            .inMilliseconds,
+  );
+  final local = DateTime.fromMillisecondsSinceEpoch(
+    millisecondsSinceEpoch + offset,
+    isUtc: true,
+  );
+  final day = DateTime.utc(local.year, local.month, local.day).toString();
+  return day.substring(0, day.length - 1); // without the UTC "Z"
 }

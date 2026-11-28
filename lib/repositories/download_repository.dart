@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/repositories/db.dart';
@@ -25,15 +26,55 @@ class DownloadRepository {
 
   Download? getById(int id) => isar.downloads.getSync(id);
 
-  /// Watches the download whose id is [chapterId] through the primary key, so
-  /// each emission reads one row instead of scanning every download. A null
-  /// [chapterId] can match no stored row and keeps the filter query.
-  Stream<List<Download>> watchByChapterId(int? chapterId) => chapterId == null
-      ? isar.downloads.filter().idEqualTo(null).watch(fireImmediately: true)
-      : isar.downloads
-            .where()
-            .idEqualTo(chapterId)
-            .watch(fireImmediately: true);
+  /// Watches the download whose id is [chapterId]: its current state, then
+  /// again whenever a download changes. A null [chapterId] matches no row.
+  ///
+  /// Every chapter row of a series and of Updates watches its download. A
+  /// database watch each made scrolling a long chapter list register and
+  /// drop native watchers for every row going by; all rows now share one
+  /// watch of the downloads table and read their own row by primary key.
+  Stream<List<Download>> watchByChapterId(int? chapterId) {
+    List<Download> current() {
+      final download = getByChapterId(chapterId);
+      return download == null ? const [] : [download];
+    }
+
+    if (chapterId == null) return Stream.value(const []);
+    return Stream.multi((listener) {
+      var last = current();
+      listener.add(last);
+      final changes = _downloadChanges().listen((_) {
+        final now = current();
+        // Only this row's changes, not every other download's.
+        if (_sameState(now, last)) return;
+        last = now;
+        listener.add(now);
+      });
+      listener.onCancel = changes.cancel;
+    });
+  }
+
+  static bool _sameState(List<Download> a, List<Download> b) =>
+      a.length == b.length &&
+      (a.isEmpty ||
+          jsonEncode(a.first.toJson()) == jsonEncode(b.first.toJson()));
+
+  Stream<void>? _changes;
+  Isar? _changesDatabase;
+
+  /// One lazy watch of the downloads table for every listener, started by
+  /// the first and stopped after the last.
+  Stream<void> _downloadChanges() {
+    final changes = _changes;
+    if (changes != null && identical(_changesDatabase, isar)) return changes;
+    _changesDatabase = isar;
+    return _changes = isar.downloads.watchLazy().asBroadcastStream(
+      onCancel: (subscription) {
+        subscription.cancel();
+        _changes = null;
+      },
+    );
+  }
 
   List<int> getDownloadedIdsAmong(List<int> chapterIds) => isar.downloads
       .where()

@@ -172,7 +172,7 @@ are worth porting by hand, or come for free with the redesign.
 - The server fork (M-Extension-Server) now merges kodjodevf's upstream.
   The app sends the remote WebView port and token on every Mihon request,
   starting the WebView host first. `tool/prepare_embedded_mihon_ios.sh`
-  pins the merged server's runtime, ios-runtime-v17.
+  pins the merged server's runtime, ios-runtime-v18.
 - The server pins Suwayomi's `android-jar` stubs to a fixed commit, because
   Suwayomi republishes that version in place without classes the fork
   still needs.

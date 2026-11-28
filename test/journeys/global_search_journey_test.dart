@@ -34,6 +34,8 @@ Future<void> _install(
   String name, {
   required int id,
   bool enabled = true,
+  bool pinned = false,
+  bool nsfw = false,
 }) => db.writeTxn(
   () => db.sources.put(
     Source(
@@ -43,7 +45,8 @@ Future<void> _install(
       baseUrl: 'https://$id.example',
       isAdded: true,
       isActive: enabled,
-      isNsfw: false,
+      isPinned: pinned,
+      isNsfw: nsfw,
       itemType: ItemType.manga,
     ),
   ),
@@ -87,5 +90,36 @@ void main() {
 
     expect(find.textContaining('hidden in Browse'), findsOneWidget);
     expect(asked, isEmpty);
+  });
+
+  testWidgets('pinned-only and hidden NSFW narrow what is asked', (
+    tester,
+  ) async {
+    final (asked, overrides) = _recordingSources();
+    final j = await Journey.start(
+      tester,
+      overrides: overrides,
+      arrange: (seed) async {
+        await seed.settings(
+          (s) => s
+            ..onlyIncludePinnedSources = true
+            ..showNSFW = false,
+        );
+        await _install(seed.db, 'Pinned Source', id: 1, pinned: true);
+        await _install(seed.db, 'Unpinned Source', id: 2);
+        await _install(
+          seed.db,
+          'Pinned NSFW Source',
+          id: 3,
+          pinned: true,
+          nsfw: true,
+        );
+      },
+    );
+
+    await j.push('globalSearch', extra: ('love', ItemType.manga));
+    await j.waitFor(find.text('Found on Pinned Source'));
+
+    expect(asked, ['Pinned Source']);
   });
 }

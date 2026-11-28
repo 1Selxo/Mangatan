@@ -150,6 +150,43 @@ class SourceRepository {
       .itemTypeEqualTo(itemType)
       .findAllSync();
 
+  /// The installed sources of [itemType] a global search queries: enabled in
+  /// Browse, pinned when [pinnedOnly], and not marked NSFW unless
+  /// [includeNsfw]. Only those rows are read; each carries its whole APK.
+  List<Source> getSearchableByItemType(
+    ItemType itemType, {
+    required bool pinnedOnly,
+    required bool includeNsfw,
+  }) => _installed(
+    itemType,
+    pinnedOnly: pinnedOnly,
+    activeOnly: true,
+  ).optional(!includeNsfw, (q) => q.not().isNsfwEqualTo(true)).findAllSync();
+
+  /// How many installed sources of [itemType] there are, optionally only the
+  /// pinned and the enabled ones, without reading them.
+  int countAddedByItemType(
+    ItemType itemType, {
+    bool pinnedOnly = false,
+    bool activeOnly = false,
+  }) => _installed(
+    itemType,
+    pinnedOnly: pinnedOnly,
+    activeOnly: activeOnly,
+  ).countSync();
+
+  QueryBuilder<Source, Source, QAfterFilterCondition> _installed(
+    ItemType itemType, {
+    required bool pinnedOnly,
+    required bool activeOnly,
+  }) => isar.sources
+      .where()
+      .itemTypeIsAddedEqualTo(itemType, true)
+      .filter()
+      .idIsNotNull()
+      .optional(pinnedOnly, (q) => q.isPinnedEqualTo(true))
+      .optional(activeOnly, (q) => q.isActiveEqualTo(true));
+
   List<Source> getAddedByItemType(ItemType itemType) =>
       isar.sources.where().itemTypeIsAddedEqualTo(itemType, true).findAllSync();
 

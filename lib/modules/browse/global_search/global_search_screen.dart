@@ -47,32 +47,19 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
   late final bool _showNSFW = ref.read(showNSFWStateProvider);
   final _fetchGate = FetchGate(3);
 
-  /// Every installed source for this item type, before the pinned-only and
-  /// NSFW settings are applied.
-  ///
-  /// Kept so an empty result can say which of the three reasons it is: none
-  /// installed, none pinned, or all of them hidden as NSFW. They need
-  /// different things done about them.
-  late final List<Source> _installedSources = sourceRepository
-      .getAddedByItemType(widget.itemType);
+  late final bool _pinnedOnly = ref.read(onlyIncludePinnedSourceStateProvider);
 
-  /// The installed sources the pinned setting leaves, before the Browse
-  /// visibility and NSFW filters.
-  late final List<Source> _candidates =
-      ref.read(onlyIncludePinnedSourceStateProvider)
-      ? _installedSources.where((e) => e.isPinned ?? false).toList()
-      : _installedSources;
-
-  /// Those enabled in Browse. A source hidden there (its language turned off,
-  /// or the source itself) is not searched, as in Mihon: searching them made
-  /// a search of 73 visible sources query 247.
-  late final List<Source> _enabled = _candidates
-      .where((e) => e.isActive ?? false)
-      .toList();
-
-  late final List<Source> sourceList = _showNSFW
-      ? _enabled
-      : _enabled.where((e) => !(e.isNsfw ?? false)).toList();
+  /// The sources searched: installed, enabled in Browse (a source hidden
+  /// there, its language turned off or the source itself, is not searched,
+  /// as in Mihon), pinned under the pinned-only setting, and not NSFW unless
+  /// shown. Only these rows are read: every source carries its whole APK,
+  /// and reading all installed ones to filter them made opening the screen
+  /// take a third of a second.
+  late final List<Source> sourceList = sourceRepository.getSearchableByItemType(
+    widget.itemType,
+    pinnedOnly: _pinnedOnly,
+    includeNsfw: _showNSFW,
+  );
 
   /// Sources that finished with nothing to show, id to the reason.
   ///
@@ -190,18 +177,27 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
     final l10n = l10nLocalizations(context)!;
     final pinnedOnly = ref.read(onlyIncludePinnedSourceStateProvider);
 
+    // Counted, not read: only needed to say why nothing was searched.
+    final installed = sourceRepository.countAddedByItemType(widget.itemType);
     final (String message, String hint) = switch (noSourcesReason(
-      installed: _installedSources.length,
+      installed: installed,
       pinnedOnly: pinnedOnly,
-      candidates: _candidates.length,
-      enabled: _enabled.length,
+      candidates: sourceRepository.countAddedByItemType(
+        widget.itemType,
+        pinnedOnly: _pinnedOnly,
+      ),
+      enabled: sourceRepository.countAddedByItemType(
+        widget.itemType,
+        pinnedOnly: _pinnedOnly,
+        activeOnly: true,
+      ),
     )) {
       NoSourcesReason.noneInstalled => (
         l10n.global_search_no_sources(widget.itemType.localized(l10n)),
         l10n.global_search_no_sources_hint,
       ),
       NoSourcesReason.nonePinned => (
-        l10n.global_search_only_pinned(_installedSources.length),
+        l10n.global_search_only_pinned(installed),
         l10n.global_search_only_pinned_hint,
       ),
       NoSourcesReason.noneEnabled => (

@@ -253,15 +253,20 @@ class MCookieManager extends InterceptorContract {
 
   @override
   Future<BaseRequest> interceptRequest({required BaseRequest request}) async {
-    final settings = settingsRepository.currentOrNull;
+    // Two fields, not the whole settings row: it holds lists that grow with
+    // the library, and this runs for every request.
     final cookie = MClient.getCookiesPref(
       request.url.toString(),
-      cookiesList: settings?.cookiesList ?? const <MCookie>[],
+      cookiesList:
+          settingsRepository.fieldOrNull((s) => s.cookiesListProperty()) ??
+          const <MCookie>[],
     );
     applyStoredRequestHeaders(
       request,
       cookieHeaders: cookie,
-      userAgent: settings?.userAgent ?? defaultUserAgent,
+      userAgent:
+          settingsRepository.fieldOrNull((s) => s.userAgentProperty()) ??
+          defaultUserAgent,
       useDefaultUserAgent: useDefaultUserAgent,
     );
     try {

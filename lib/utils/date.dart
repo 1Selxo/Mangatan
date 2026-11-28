@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/providers/date_format_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 
@@ -26,38 +27,59 @@ String dateFormat(
   bool showInDaysFuture = false,
 }) {
   final relativeTimestamps = ref.read(relativeTimesTampsStateProvider);
+  final millisecondsSinceEpoch = stringDate != null
+      ? DateTime.parse(stringDate).millisecondsSinceEpoch
+      : int.parse(timestamp!);
   // The grouping key of the history and updates lists, made for every entry.
-  if (forHistoryValue &&
-      stringDate == null &&
-      timestamp != null &&
-      (!useRelativeTimesTamps || relativeTimestamps == 0)) {
-    return localDayKey(int.parse(timestamp));
+  if (forHistoryValue && (!useRelativeTimesTamps || relativeTimestamps == 0)) {
+    return localDayKey(millisecondsSinceEpoch);
   }
-  final l10n = l10nLocalizations(context)!;
-  final locale = currentLocale(context);
-  final dateFrmt = ref.read(dateFormatStateProvider);
-  final dateTime = stringDate != null
-      ? DateTime.parse(stringDate)
-      : DateTime.fromMillisecondsSinceEpoch(int.parse(timestamp!));
-  stringDate = null;
-  final date = DateTime(dateTime.year, dateTime.month, dateTime.day);
-  if (stringDate == null) {
-    // Only made when a relative date can be shown. Each local DateTime asks
-    // the OS for the time zone (on Windows a system call), and the history
-    // list calls this once per entry to group them, thousands of times.
-    late final now = DateTime.now();
-    late final today = DateTime(now.year, now.month, now.day);
-    late final yesterday = DateTime(now.year, now.month, now.day - 1);
-    late final twoDaysAgo = DateTime(now.year, now.month, now.day - 2);
-    late final threeDaysAgo = DateTime(now.year, now.month, now.day - 3);
-    late final fourDaysAgo = DateTime(now.year, now.month, now.day - 4);
-    late final fiveDaysAgo = DateTime(now.year, now.month, now.day - 5);
-    late final sixDaysAgo = DateTime(now.year, now.month, now.day - 6);
-    late final aWeekAgo = DateTime(now.year, now.month, now.day - 7);
+  return dateLabel(
+    millisecondsSinceEpoch,
+    nowMilliseconds: DateTime.now().millisecondsSinceEpoch,
+    l10n: l10nLocalizations(context)!,
+    pattern: dateFormat.isEmpty
+        ? ref.read(dateFormatStateProvider)
+        : dateFormat,
+    localeTag: currentLocale(context).toLanguageTag(),
+    relativeTimestamps: relativeTimestamps,
+    useRelativeTimestamps: useRelativeTimesTamps,
+    forHistoryValue: forHistoryValue,
+    showHourOrMinute: showHOURorMINUTE,
+    showInDaysFuture: showInDaysFuture,
+  );
+}
 
-    if (useRelativeTimesTamps && relativeTimestamps != 0 && date == today) {
-      if (showHOURorMINUTE) {
-        final difference = now.difference(dateTime);
+/// What [dateFormat] shows for [millisecondsSinceEpoch], [nowMilliseconds]
+/// being now.
+///
+/// Days are counted as local day numbers (see [localDayKey]) rather than
+/// with local DateTimes: each of those asks the OS for the time zone, a
+/// system call on Windows, and a chapter list called this for every row
+/// with nine of them each. Counting days also stays exact across a
+/// daylight-saving change, where a 23-hour day made "a week ago" read "6
+/// days ago".
+@visibleForTesting
+String dateLabel(
+  int millisecondsSinceEpoch, {
+  required int nowMilliseconds,
+  required AppLocalizations l10n,
+  required String pattern,
+  required String localeTag,
+  required int relativeTimestamps,
+  bool useRelativeTimestamps = true,
+  bool forHistoryValue = false,
+  bool showHourOrMinute = false,
+  bool showInDaysFuture = false,
+}) {
+  final day = _localDay(millisecondsSinceEpoch);
+  if (useRelativeTimestamps && relativeTimestamps != 0) {
+    final today = _localDay(nowMilliseconds);
+    if (day == today) {
+      if (showHourOrMinute) {
+        final difference = Duration(
+          milliseconds: nowMilliseconds - millisecondsSinceEpoch,
+        );
         if (difference.inMinutes < 60) {
           return switch (difference.inMinutes) {
             0 => l10n.now,
@@ -71,42 +93,32 @@ String dateFormat(
           };
         }
       }
-
       return l10n.today;
-    } else if (useRelativeTimesTamps &&
-        relativeTimestamps != 0 &&
-        date == yesterday) {
-      return l10n.yesterday;
-    } else if (useRelativeTimesTamps && relativeTimestamps == 2) {
-      if (date.isAfter(twoDaysAgo) ||
-          date.isAfter(twoDaysAgo) ||
-          date.isAfter(threeDaysAgo) ||
-          date.isAfter(fourDaysAgo) ||
-          date.isAfter(fiveDaysAgo) ||
-          date.isAfter(sixDaysAgo) ||
-          date.isAfter(aWeekAgo)) {
-        final difference = today.difference(date).inDays.abs();
-        return switch (difference) {
-          1 =>
-            showInDaysFuture
-                ? l10n.in_n_day(difference)
-                : l10n.n_day_ago(difference),
-          != 7 =>
-            showInDaysFuture
-                ? l10n.in_n_days(difference)
-                : l10n.n_days_ago(difference),
-          _ => showInDaysFuture ? l10n.next_week : l10n.a_week_ago,
-        };
-      }
     }
-    return forHistoryValue
-        ? date.toString()
-        : _cachedFormatter(
-            dateFormat.isEmpty ? dateFrmt : dateFormat,
-            locale.toLanguageTag(),
-          ).format(date);
+    if (day == today - 1) return l10n.yesterday;
+    // Within the last week, or any day ahead (the calendar's "in n days").
+    if (relativeTimestamps == 2 && day > today - 7) {
+      final difference = (today - day).abs();
+      return switch (difference) {
+        1 =>
+          showInDaysFuture
+              ? l10n.in_n_day(difference)
+              : l10n.n_day_ago(difference),
+        != 7 =>
+          showInDaysFuture
+              ? l10n.in_n_days(difference)
+              : l10n.n_days_ago(difference),
+        _ => showInDaysFuture ? l10n.next_week : l10n.a_week_ago,
+      };
+    }
   }
-  return date.toString();
+  if (forHistoryValue) return localDayKey(millisecondsSinceEpoch);
+  // The local calendar date, as UTC so formatting it asks no time zone; the
+  // patterns show dates only.
+  return _cachedFormatter(
+    pattern,
+    localeTag,
+  ).format(DateTime.fromMillisecondsSinceEpoch(day * _dayMs, isUtc: true));
 }
 
 String dateFormatHour(String timestamp, BuildContext context) {
@@ -138,27 +150,38 @@ List<String> relativeTimestampsList(BuildContext context) {
 }
 
 final _zoneOffsets = <int, int>{};
+const _dayMs = Duration.millisecondsPerDay;
+
+/// The local time zone's offset at [millisecondsSinceEpoch]. Every zone
+/// changes its offset on a quarter hour, so one lookup per quarter hour is
+/// exact.
+int _zoneOffset(int millisecondsSinceEpoch) {
+  const quarterHour = 15 * 60 * 1000;
+  return _zoneOffsets.putIfAbsent(
+    (millisecondsSinceEpoch / quarterHour).floor(),
+    () =>
+        DateTime.fromMillisecondsSinceEpoch(millisecondsSinceEpoch)
+            .timeZoneOffset
+            .inMilliseconds,
+  );
+}
+
+/// The local calendar day of [millisecondsSinceEpoch], counted from
+/// 1970-01-01.
+int _localDay(int millisecondsSinceEpoch) =>
+    ((millisecondsSinceEpoch + _zoneOffset(millisecondsSinceEpoch)) / _dayMs)
+        .floor();
 
 /// The local day of [millisecondsSinceEpoch], as
 /// `DateTime(year, month, day).toString()` gives it.
 ///
 /// A local DateTime asks the OS for the time zone when it is made and again
 /// for each field read (a system call on Windows), and the history list
-/// grouped thousands of entries this way on every build. Every zone changes
-/// its offset on a quarter hour, so one lookup per quarter hour is exact.
+/// grouped thousands of entries this way on every build.
 String localDayKey(int millisecondsSinceEpoch) {
-  const quarterHour = 15 * 60 * 1000;
-  final offset = _zoneOffsets.putIfAbsent(
-    millisecondsSinceEpoch ~/ quarterHour,
-    () =>
-        DateTime.fromMillisecondsSinceEpoch(millisecondsSinceEpoch)
-            .timeZoneOffset
-            .inMilliseconds,
-  );
-  final local = DateTime.fromMillisecondsSinceEpoch(
-    millisecondsSinceEpoch + offset,
+  final day = DateTime.fromMillisecondsSinceEpoch(
+    _localDay(millisecondsSinceEpoch) * _dayMs,
     isUtc: true,
-  );
-  final day = DateTime.utc(local.year, local.month, local.day).toString();
+  ).toString();
   return day.substring(0, day.length - 1); // without the UTC "Z"
 }

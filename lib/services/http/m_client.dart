@@ -34,13 +34,24 @@ String? customDns;
 class MClient {
   MClient();
   static final defaultClient = IOClient(HttpClient());
-  static final Map<rhttp.ClientSettings, Client> rhttpPool = {};
+
+  /// One native client per configuration, reused: each one keeps its own
+  /// connections. ClientSettings has no value equality, so it was keyed by
+  /// identity before and every call built a new native client that was never
+  /// released, and no request reused another's connection.
+  static final Map<Object, Client> rhttpPool = {};
   static Client httpClient({
     Map<String, dynamic>? reqcopyWith,
     rhttp.ClientSettings? settings,
+    Object? poolKey,
   }) {
     if (!(reqcopyWith?["useDartHttpClient"] ?? false)) {
       try {
+        final key = rhttpPoolKey(
+          reqcopyWith,
+          settings: settings,
+          poolKey: poolKey,
+        );
         settings ??= rhttp.ClientSettings(
           throwOnStatusCode: false,
           proxySettings: reqcopyWith?["noProxy"] ?? false
@@ -58,7 +69,7 @@ class MClient {
             verifyCertificates: reqcopyWith?["verifyCertificates"] ?? false,
           ),
         );
-        return rhttpPool.putIfAbsent(settings, () {
+        return rhttpPool.putIfAbsent(key, () {
           return rhttp.RhttpCompatibleClient.createSync(settings: settings);
         });
       } catch (_) {}
@@ -80,6 +91,7 @@ class MClient {
     );
 
     DnsSettings? dnsSettings;
+    Object? dnsKey;
 
     if (useDoH && doHProviderId != null) {
       // Use DoH resolver with the selected provider — either a preset or, when
@@ -90,12 +102,14 @@ class MClient {
                 : null)
           : DoHProviders.byId[doHProviderId];
       if (provider != null) {
+        dnsKey = ('doh', doHProviderId, DohCustomStore.url.trim());
         dnsSettings = DnsSettings.dynamic(
           resolver: (host) => DoHResolver.resolve(host, provider: provider),
         );
       }
     } else if (customDns != null && customDns!.trim().isNotEmpty) {
       // Fallback to custom static DNS
+      dnsKey = ('dns', customDns!.trim());
       dnsSettings = DnsSettings.dynamic(resolver: (host) async => [customDns!]);
     }
 
@@ -107,7 +121,15 @@ class MClient {
 
     return InterceptedClient.build(
       client: PerfHttpClient(
-        httpClient(settings: clientSettings, reqcopyWith: reqcopyWith),
+        httpClient(
+          settings: clientSettings,
+          reqcopyWith: reqcopyWith,
+          // The DNS settings are made anew on each call; what they resolve
+          // with is what tells two of them apart.
+          poolKey: dnsKey == null
+              ? null
+              : (dnsKey, settings == null ? null : identityHashCode(settings)),
+        ),
       ),
       retryPolicy: ResolveCloudFlareChallenge(showCloudFlareError),
       interceptors: [
@@ -797,3 +819,21 @@ Future<void> _evaluateJavascriptViaWebview(HttpRequest request) async {
       ..close();
   }
 }
+
+/// What tells two [MClient.httpClient] configurations apart. Explicit
+/// [settings] without a [poolKey] are told apart by identity: they are
+/// usually constants.
+@visibleForTesting
+Object rhttpPoolKey(
+  Map<String, dynamic>? reqcopyWith, {
+  Object? settings,
+  Object? poolKey,
+}) =>
+    poolKey ??
+    settings ??
+    (
+      reqcopyWith?["noProxy"] ?? false,
+      reqcopyWith?["timeout"],
+      reqcopyWith?["connectTimeout"],
+      reqcopyWith?["verifyCertificates"] ?? false,
+    );

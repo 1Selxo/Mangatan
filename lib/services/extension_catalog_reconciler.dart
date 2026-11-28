@@ -32,13 +32,22 @@ bool applyExtensionCatalogMetadata(
           packageLang: catalogMihonMetadata.packageLang,
         );
 
-  update(existing.name, catalog.name, (value) => existing.name = value);
-  update(
-    existing.baseUrl,
-    catalog.baseUrl,
-    (value) => existing.baseUrl = value,
-  );
-  update(existing.lang, catalog.lang, (value) => existing.lang = value);
+  // An installed Mihon source takes its name, address and language from the
+  // extension itself, which the launch refresh applies every time. Taking
+  // the listing's as well made the two write them back and forth on every
+  // launch where they differ (MangaBox's listing has another base URL).
+  final extensionOwned =
+      (existing.isAdded ?? false) &&
+      existing.sourceCodeLanguage == SourceCodeLanguage.mihon;
+  if (!extensionOwned) {
+    update(existing.name, catalog.name, (value) => existing.name = value);
+    update(
+      existing.baseUrl,
+      catalog.baseUrl,
+      (value) => existing.baseUrl = value,
+    );
+    update(existing.lang, catalog.lang, (value) => existing.lang = value);
+  }
   update(existing.isNsfw, catalog.isNsfw, (value) => existing.isNsfw = value);
   update(
     existing.typeSource,

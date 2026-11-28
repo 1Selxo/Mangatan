@@ -58,6 +58,31 @@ void main() {
     expect(mihonSourceMetadata(existing)?.factoryAvailable, isFalse);
   });
 
+  test(
+    'an installed Mihon source keeps the name and address its extension gives',
+    () {
+      // The launch refresh sets them from the extension itself. MangaBox's
+      // listing gives another base URL, so the two wrote it back and forth on
+      // every launch.
+      final installed = _twicomi()
+        ..isAdded = true
+        ..baseUrl = 'https://twicomi.com';
+      final catalog = _twicomi()
+        ..baseUrl = 'https://twicomi.com/reader/'
+        ..name = 'Twicomi (listing)';
+
+      final changed = applyExtensionCatalogMetadata(
+        installed,
+        catalog,
+        repo: catalog.repo,
+      );
+
+      expect(installed.baseUrl, 'https://twicomi.com');
+      expect(installed.name, 'Twicomi');
+      expect(changed, isFalse);
+    },
+  );
+
   test('an installed source keeps the address of the APK it holds', () {
     // The repository moved MangaDex to a new release URL without a version
     // bump. Taking that address into the installed rows made the launch

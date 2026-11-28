@@ -10,15 +10,21 @@ import 'package:mangayomi/modules/more/data_and_storage/providers/proto/BackupPr
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/http/m_client.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
+import 'package:mangayomi/services/mihon_launch_refresh_memory.dart';
 import 'package:mangayomi/services/mihon_source_preferences.dart';
+import 'package:mangayomi/providers/storage_provider.dart';
+import 'package:mangayomi/repositories/settings_repository.dart';
 import 'package:mangayomi/services/sync/chimahon_source_preferences_adapter.dart';
 import 'package:mangayomi/utils/log/logger.dart';
 import 'package:mangayomi/repositories/db_write_queue.dart';
 import 'package:mangayomi/utils/ascii_json.dart';
+import 'package:mangayomi/models/settings.dart';
 
+/// The launch refresh. It skips the extensions nothing has changed for
+/// since the last one (see [MihonLaunchRefreshMemory]).
 final refreshInstalledMihonFactorySourcesProvider =
     FutureProvider<MihonFactoryRefreshResult>(
-      refreshInstalledMihonFactorySources,
+      (ref) => refreshInstalledMihonFactorySources(ref, skipUnchanged: true),
     );
 
 final _successfullyRefreshedFactoryGroups = Expando<Set<String>>();
@@ -76,6 +82,7 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
   bool replacePresentPreferences = false,
   Set<String>? requiredNativeSourceIds,
   Set<int> changedPreferenceSourceIds = const {},
+  bool skipUnchanged = false,
 }) async {
   final totalWatch = Stopwatch()..start();
   final candidates = isar.sources
@@ -94,6 +101,27 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
   final groups = <String, List<Source>>{};
   for (final source in candidates) {
     groups.putIfAbsent(mihonExtensionGroupKey(source), () => []).add(source);
+  }
+  // At launch, only the extensions something changed for since the last
+  // refresh: asking every one again uploaded every APK and loaded every
+  // extension on the bridge for the same answers.
+  MihonLaunchRefreshMemory? memory;
+  var skipped = 0;
+  final bridge =
+      settingsRepository.fieldOrNull((s) => s.extensionServerPathProperty()) ??
+      '';
+  if (skipUnchanged &&
+      requiredNativeSourceIds == null &&
+      remoteSourcePreferences.isEmpty &&
+      !replacePresentPreferences) {
+    memory = await MihonLaunchRefreshMemory.load(
+      await StorageProvider().getDatabaseDirectory(),
+    );
+    groups.removeWhere((key, sources) {
+      final unchanged = memory!.isUnchanged(key, sources, bridge);
+      if (unchanged) skipped++;
+      return unchanged;
+    });
   }
   final refreshedGroups = _successfullyRefreshedFactoryGroups[isar] ??=
       <String>{};
@@ -269,6 +297,9 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
     if (groupFailed && groupReconciled) unresolvedGroups++;
     if (!groupFailed && groupReconciled) {
       refreshedGroups.add(_factoryRefreshFingerprint(sources));
+      memory?.remember(mihonExtensionGroupKey(template), sources, bridge);
+    } else {
+      memory?.forget(mihonExtensionGroupKey(template));
     }
   }
 
@@ -277,11 +308,13 @@ Future<MihonFactoryRefreshResult> refreshInstalledMihonFactorySources(
     concurrency: 8,
     action: refreshGroup,
   );
+  await memory?.save();
   totalWatch.stop();
   AppLogger.log(
     'Mihon factory refresh performance: '
     'total=${_milliseconds(totalWatch.elapsedMicroseconds)}ms '
-    'groups=${groups.length} passes=$passes concurrency=8 '
+    'groups=${groups.length} unchangedSkipped=$skipped '
+    'passes=$passes concurrency=8 '
     'requiredIds=${requiredIds.length} '
     'knownRequiredIds=${knownRequiredIds.length} '
     'changedPreferenceSources=${changedPreferenceSourceIds.length} '
